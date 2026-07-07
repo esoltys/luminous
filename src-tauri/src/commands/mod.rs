@@ -4,5 +4,6 @@ pub mod playlist;
 pub mod cover;
 pub mod visualizer;
 pub mod equalizer;
+pub mod lyrics;
 
 

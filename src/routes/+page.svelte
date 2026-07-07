@@ -5,8 +5,9 @@
   import PlaylistView from "../lib/components/PlaylistView.svelte";
   import FoldersView from "../lib/components/FoldersView.svelte";
   import Equalizer from "../lib/components/Equalizer.svelte";
+  import LyricsView from "../lib/components/LyricsView.svelte";
 
-  let activeTab = $state<"collection" | "playlists" | "settings" | "equalizer">("collection");
+  let activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
   let activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 </script>
 
@@ -25,6 +26,8 @@
         <FoldersView />
       {:else if activeTab === "equalizer"}
         <Equalizer />
+      {:else if activeTab === "lyrics"}
+        <LyricsView />
       {/if}
     </main>
   </div>

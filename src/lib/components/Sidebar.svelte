@@ -1,12 +1,12 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { Music, ListMusic, FolderHeart, RefreshCw, Plus, Trash2, SlidersHorizontal } from "lucide-svelte";
+  import { Music, ListMusic, FolderHeart, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   // Navigation tab state
   let { activeTab = $bindable("collection"), activeSubTab = $bindable("songs") } = $props<{
-    activeTab: "collection" | "playlists" | "settings" | "equalizer";
+    activeTab: "collection" | "playlists" | "settings" | "equalizer" | "lyrics";
     activeSubTab: "songs" | "albums" | "artists";
   }>();
 
@@ -96,6 +96,13 @@
       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'equalizer' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}"
     >
       <SlidersHorizontal class="w-4 h-4" /> Equalizer
+    </button>
+
+    <button
+      onclick={() => { activeTab = "lyrics"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'lyrics' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}"
+    >
+      <FileText class="w-4 h-4" /> Lyrics
     </button>
   </nav>
 

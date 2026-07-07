@@ -16,6 +16,7 @@ mod commands;
 mod covermanager;
 mod db;
 mod equalizer;
+mod lyrics;
 mod models;
 mod moodbar;
 mod player;
@@ -279,6 +280,9 @@ pub fn run() {
             commands::equalizer::set_equalizer_band,
             commands::equalizer::set_equalizer_preamp,
             commands::equalizer::load_equalizer_preset,
+            // Lyrics commands
+            commands::lyrics::get_lyrics,
+            commands::lyrics::save_lyrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");
