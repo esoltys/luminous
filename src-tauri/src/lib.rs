@@ -15,6 +15,7 @@ mod collection;
 mod commands;
 mod covermanager;
 mod db;
+mod equalizer;
 mod models;
 mod moodbar;
 mod player;
@@ -272,6 +273,12 @@ pub fn run() {
             commands::visualizer::get_waveform_data,
             commands::visualizer::get_moodbar_data,
             commands::visualizer::set_spectrum_enabled,
+            // Equalizer commands
+            commands::equalizer::get_equalizer_state,
+            commands::equalizer::set_equalizer_enabled,
+            commands::equalizer::set_equalizer_band,
+            commands::equalizer::set_equalizer_preamp,
+            commands::equalizer::load_equalizer_preset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

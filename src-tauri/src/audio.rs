@@ -55,6 +55,7 @@ pub struct AudioEngine {
     pub play_state: Arc<Mutex<PlayState>>,
     pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
+    pub equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
 }
 
 impl AudioEngine {
@@ -66,17 +67,19 @@ impl AudioEngine {
         let play_state = Arc::new(Mutex::new(PlayState::Stopped));
         let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
         let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let equalizer = Arc::new(Mutex::new(crate::equalizer::Equalizer::new()));
 
         let pos_clone = Arc::clone(&position);
         let vol_clone = Arc::clone(&volume);
         let state_clone = Arc::clone(&play_state);
         let vis_clone = Arc::clone(&visualizer_buf);
+        let eq_clone = Arc::clone(&equalizer);
 
         // Spawn a plain OS thread — no Send requirement on cpal::Stream
         std::thread::Builder::new()
             .name("luminous-audio".to_string())
             .spawn(move || {
-                decode_thread(cmd_rx, event_tx, pos_clone, vol_clone, state_clone, vis_clone);
+                decode_thread(cmd_rx, event_tx, pos_clone, vol_clone, state_clone, vis_clone, eq_clone);
             })
             .expect("failed to spawn audio thread");
 
@@ -88,6 +91,7 @@ impl AudioEngine {
             play_state,
             visualizer_buf,
             spectrum_enabled,
+            equalizer,
         }
     }
 
@@ -161,6 +165,7 @@ fn decode_thread(
     volume: Arc<Mutex<f32>>,
     play_state: Arc<Mutex<PlayState>>,
     visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
 ) {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use symphonia::core::{
@@ -305,6 +310,11 @@ fn decode_thread(
 
                 let vol_ref = Arc::clone(&volume);
 
+                // Update equalizer sample rate and channels format
+                if let Ok(mut eq) = equalizer.lock() {
+                    eq.update_format(sample_rate, channels as usize);
+                }
+
                 // Simpler approach: use a shared VecDeque protected by Mutex
                 let shared_buf: Arc<Mutex<std::collections::VecDeque<f32>>> =
                     Arc::new(Mutex::new(std::collections::VecDeque::with_capacity(
@@ -319,6 +329,7 @@ fn decode_thread(
                 let played_samples_cpal = Arc::clone(&played_samples);
                 let position_cpal = Arc::clone(&position);
                 let visualizer_buf_cpal = Arc::clone(&visualizer_buf);
+                let eq_cpal = Arc::clone(&equalizer);
 
                 let stream = match device.build_output_stream(
                     &config,
@@ -328,11 +339,21 @@ fn decode_thread(
                         let mut played = 0;
                         for sample in output.iter_mut() {
                             if let Some(s) = buf.pop_front() {
-                                *sample = s * vol;
+                                *sample = s;
                                 played += 1;
                             } else {
                                 *sample = 0.0;
                             }
+                        }
+
+                        // Apply equalizer DSP
+                        if let Ok(mut eq) = eq_cpal.try_lock() {
+                            eq.process_interleaved(&mut output[..played]);
+                        }
+
+                        // Apply volume gain
+                        for sample in output[..played].iter_mut() {
+                            *sample *= vol;
                         }
 
                         if played > 0 {

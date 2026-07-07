@@ -1,12 +1,12 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { Music, ListMusic, FolderHeart, RefreshCw, Plus, Trash2 } from "lucide-svelte";
+  import { Music, ListMusic, FolderHeart, RefreshCw, Plus, Trash2, SlidersHorizontal } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   // Navigation tab state
   let { activeTab = $bindable("collection"), activeSubTab = $bindable("songs") } = $props<{
-    activeTab: "collection" | "playlists" | "settings";
+    activeTab: "collection" | "playlists" | "settings" | "equalizer";
     activeSubTab: "songs" | "albums" | "artists";
   }>();
 
@@ -89,6 +89,13 @@
       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'settings' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}"
     >
       <FolderHeart class="w-4 h-4" /> Watched Folders
+    </button>
+
+    <button
+      onclick={() => { activeTab = "equalizer"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'equalizer' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}"
+    >
+      <SlidersHorizontal class="w-4 h-4" /> Equalizer
     </button>
   </nav>
 
