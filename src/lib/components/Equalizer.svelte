@@ -147,13 +147,14 @@
         <select
           bind:value={activePreset}
           onchange={() => selectPreset(activePreset)}
-          class="bg-gray-950 text-xs text-gray-200 border border-gray-800 rounded px-2 py-0.5 outline-none cursor-pointer focus:border-violet-500 font-medium"
+          class="bg-gray-950 text-xs text-gray-200 border border-gray-800 rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-violet-500 font-medium appearance-none -webkit-appearance-none"
+          style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
         >
           {#each presets as preset}
-            <option value={preset} class="bg-gray-900 text-gray-200">{preset}</option>
+            <option value={preset} class="bg-gray-950 text-gray-200">{preset}</option>
           {/each}
           {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-gray-900 text-gray-200" disabled>Custom</option>
+            <option value="Custom" class="bg-gray-950 text-gray-200" disabled>Custom</option>
           {/if}
         </select>
       </div>
