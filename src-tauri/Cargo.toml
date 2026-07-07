@@ -2,7 +2,7 @@
 name = "luminous"
 version = "0.1.0"
 description = "Luminous Music Player — A modern reimagining of Strawberry"
-authors = []
+authors = ["Eric James Soltys <ericjamessoltys@outlook.com>"]
 edition = "2021"
 
 [lib]
@@ -14,7 +14,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # --- Tauri ---
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
@@ -35,17 +35,9 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.25"
 
 # --- Audio decoding ---
-symphonia = { version = "0.5", features = [
-    "all",
-    "mp3",
-    "aac",
-    "flac",
-    "ogg",
-    "wav",
-    "aiff",
-    "vorbis",
-    "opus",
-] }
+# `all` enables every codec and format symphonia supports.
+# Note: AIFF is not yet a supported format in symphonia 0.5.x.
+symphonia = { version = "0.5", features = ["all"] }
 
 # --- Audio output ---
 cpal = "0.15"
@@ -63,7 +55,8 @@ rustfft = "6"
 notify = { version = "6", features = ["serde"] }
 
 # --- HTTP client ---
-reqwest = { version = "0.12", features = ["json", "stream"] }
+# Use rustls to avoid requiring libssl-dev system package
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 
 # --- UUID for playlist item identity ---
 uuid = { version = "1", features = ["v4"] }
@@ -79,6 +72,7 @@ log = "0.4"
 walkdir = "2"
 chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
+rand = "0.8"
 
 [profile.release]
 panic = "abort"

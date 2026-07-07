@@ -1,7 +1,9 @@
 {
   "name": "luminous",
   "version": "0.1.0",
-  "description": "",
+  "description": "Luminous Music Player — A modern reimagining of Strawberry",
+  "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
