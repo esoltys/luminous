@@ -68,7 +68,7 @@ pub fn run() {
             let app_handle_ticks = app.handle().clone();
             let audio_ticks = Arc::clone(&audio);
             let player_ticks = Arc::clone(&player);
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
                 loop {
                     interval.tick().await;
