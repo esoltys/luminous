@@ -13,6 +13,7 @@ class CollectionStore {
   });
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
+  excludedFormats = $state<string[]>([]);
 
   // Cached collections
   songs = $state<Song[]>([]);
@@ -30,6 +31,16 @@ class CollectionStore {
       await this.refreshDirectories();
       await this.refreshStats();
       await this.refreshLibrary();
+
+      // Load excluded formats from backend settings
+      const settings = await invoke<Record<string, string>>("get_all_app_settings");
+      if (settings && settings.excluded_formats) {
+        try {
+          this.excludedFormats = JSON.parse(settings.excluded_formats);
+        } catch (e) {
+          console.error("Failed to parse excluded_formats:", e);
+        }
+      }
 
       // Listen to library scan progress events
       await listen<ScanProgress>("scan-progress", (event) => {
@@ -84,6 +95,30 @@ class CollectionStore {
       return;
     }
     this.searchResults = await invoke("search_songs", { query, limit: 500 });
+  }
+
+  isFormatExcluded(filetype: string): boolean {
+    const ft = (filetype || "").toUpperCase();
+    for (const excluded of this.excludedFormats) {
+      if (excluded === "OGG" && ft.startsWith("OGG_")) {
+        return true;
+      }
+      if (ft === excluded) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async toggleFormat(format: string) {
+    if (this.excludedFormats.includes(format)) {
+      this.excludedFormats = this.excludedFormats.filter(f => f !== format);
+    } else {
+      this.excludedFormats.push(format);
+    }
+    await invoke("set_app_setting", { key: "excluded_formats", value: JSON.stringify(this.excludedFormats) }).catch(err => {
+      console.error("Failed to save excluded_formats:", err);
+    });
   }
 }
 

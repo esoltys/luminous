@@ -81,17 +81,20 @@ pub fn run() {
                     tauri::http::Response::builder()
                         .status(200)
                         .header("content-type", mime)
+                        .header("access-control-allow-origin", "*")
                         .body(data)
                         .unwrap()
                 } else {
                     tauri::http::Response::builder()
                         .status(500)
+                        .header("access-control-allow-origin", "*")
                         .body(Vec::new())
                         .unwrap()
                 }
             } else {
                 tauri::http::Response::builder()
                     .status(404)
+                    .header("access-control-allow-origin", "*")
                     .body(Vec::new())
                     .unwrap()
             }

@@ -44,9 +44,17 @@
   let sortField = $state<keyof Song>("title");
   let sortAsc = $state(true);
 
+  // Trigger search on collectionStore when query changes
+  $effect(() => {
+    collectionStore.search(searchQuery);
+  });
+
   // Computed songs list with filtering and sorting
   let filteredSongs = $derived.by(() => {
     let result = searchQuery.trim() === "" ? collectionStore.songs : collectionStore.searchResults;
+
+    // Filter by excluded formats
+    result = result.filter(song => !collectionStore.isFormatExcluded(song.filetype));
 
     // Apply sort
     return [...result].sort((a, b) => {
@@ -70,10 +78,24 @@
     });
   });
 
-  function handleSearch(e: Event) {
-    const query = (e.target as HTMLInputElement).value;
-    collectionStore.search(query);
-  }
+  // Computed albums list with search filtering
+  let filteredAlbums = $derived.by(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query === "") return collectionStore.albums;
+    return collectionStore.albums.filter(album => 
+      (album.album && album.album.toLowerCase().includes(query)) ||
+      (album.artist && album.artist.toLowerCase().includes(query))
+    );
+  });
+
+  // Computed artists list with search filtering
+  let filteredArtists = $derived.by(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query === "") return collectionStore.artists;
+    return collectionStore.artists.filter(artist => 
+      artist.name && artist.name.toLowerCase().includes(query)
+    );
+  });
 
   function toggleSort(field: keyof Song) {
     if (sortField === field) {
@@ -116,7 +138,6 @@
         type="text"
         placeholder="Search track, artist, album..."
         bind:value={searchQuery}
-        oninput={handleSearch}
         class="w-full bg-brand-sidebar border border-brand-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-brand-accent text-brand-text-primary"
       />
     </div>
@@ -219,7 +240,7 @@
     {:else if activeSubTab === "albums"}
       <!-- Albums Card Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-        {#each collectionStore.albums as album}
+        {#each filteredAlbums as album}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
@@ -235,10 +256,13 @@
                 await playlistsStore.createPlaylist(playlistName);
               }
 
-              const songs = await invoke<Song[]>("get_songs_by_album", {
+              let songs = await invoke<Song[]>("get_songs_by_album", {
                 albumArtist: album.artist || "",
                 album: album.album || "",
               });
+
+              // Filter out excluded formats
+              songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
 
               if (songs.length > 0) {
                 const songIds = songs.map((s) => s.id);
@@ -264,10 +288,12 @@
               <button
                 onclick={async (e) => {
                   e.stopPropagation();
-                  const songs = await invoke<Song[]>("get_songs_by_album", {
+                  let songs = await invoke<Song[]>("get_songs_by_album", {
                     albumArtist: album.artist || "",
                     album: album.album || "",
                   });
+                  // Filter out excluded formats
+                  songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
                   if (songs.length > 0) {
                     const songIds = songs.map((s) => s.id);
                     playerStore.playSongs(songIds, 0);
@@ -292,7 +318,7 @@
             </div>
           </div>
         {/each}
-        {#if collectionStore.albums.length === 0}
+        {#if filteredAlbums.length === 0}
           <div class="col-span-full py-12 text-center text-gray-500">
             <FolderClosed class="w-12 h-12 mx-auto mb-2 text-gray-600" />
             No albums found.
@@ -302,7 +328,7 @@
     {:else if activeSubTab === "artists"}
       <!-- Artists List Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-        {#each collectionStore.artists as artist}
+        {#each filteredArtists as artist}
           <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
             <div class="w-20 h-20 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
               {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
@@ -317,7 +343,7 @@
             </div>
           </div>
         {/each}
-        {#if collectionStore.artists.length === 0}
+        {#if filteredArtists.length === 0}
           <div class="col-span-full py-12 text-center text-gray-500">
             <Music class="w-12 h-12 mx-auto mb-2 text-gray-600" />
             No artists found.

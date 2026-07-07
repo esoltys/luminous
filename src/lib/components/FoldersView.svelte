@@ -4,7 +4,7 @@
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
-  let settingsTab = $state<"folders" | "themes">("folders");
+  let settingsTab = $state<"folders" | "themes" | "formats">("folders");
 
   // Folders operations
   async function handleAddDirectory() {
@@ -110,6 +110,12 @@
       >
         UI Themes
       </button>
+      <button
+        onclick={() => { settingsTab = "formats"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        File Formats
+      </button>
     </div>
   </div>
 
@@ -171,7 +177,7 @@
           </div>
         {/if}
       </div>
-    {:else}
+    {:else if settingsTab === "themes"}
       <!-- UI Themes Section -->
       <div class="space-y-6">
         <div>
@@ -330,6 +336,36 @@
               Save Custom Theme
             </button>
             <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
+          </div>
+        </div>
+      </div>
+    {:else if settingsTab === "formats"}
+      <!-- File Formats Filter Section -->
+      <div class="space-y-6">
+        <div>
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">Filter Library by File Format</h3>
+          <p class="text-xs text-brand-text-secondary/60 mb-4">Uncheck formats you want to exclude from your library and playlists.</p>
+          
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {#each ["MP3", "FLAC", "WAV", "AAC", "ALAC", "OGG", "AIFF", "APE"] as format}
+              {@const isChecked = !collectionStore.excludedFormats.includes(format)}
+              <button
+                onclick={() => collectionStore.toggleFormat(format)}
+                class="bg-brand-sidebar/40 border rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:border-brand-accent/40 cursor-pointer w-full text-left {isChecked ? 'border-brand-accent bg-brand-sidebar/60' : 'border-brand-border'}"
+              >
+                <div class="flex flex-col">
+                  <span class="font-semibold text-sm text-brand-text-primary">{format}</span>
+                  <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
+                    {isChecked ? 'Enabled' : 'Excluded'}
+                  </span>
+                </div>
+                <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors {isChecked ? 'bg-brand-accent border-brand-accent text-white' : 'border-brand-border bg-black/10'}">
+                  {#if isChecked}
+                    <Check class="w-3 h-3 stroke-[3]" />
+                  {/if}
+                </div>
+              </button>
+            {/each}
           </div>
         </div>
       </div>
