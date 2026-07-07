@@ -79,7 +79,6 @@
       artAutomatic={playerStore.currentSong?.art_automatic}
       artManual={playerStore.currentSong?.art_manual}
       sizeClass="w-12 h-12"
-      animateSpin={playerStore.state === 'playing'}
     />
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">

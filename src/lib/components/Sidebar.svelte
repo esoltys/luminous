@@ -41,7 +41,7 @@
   <!-- Brand / Title -->
   <div class="h-16 flex items-center px-6 border-b border-brand-border">
     <h1 class="text-xl font-bold tracking-wider text-brand-accent flex items-center gap-2">
-      <Music class="w-6 h-6" /> Luminous
+      <Music class="w-6 h-6" />
     </h1>
   </div>
 

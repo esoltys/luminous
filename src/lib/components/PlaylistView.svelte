@@ -56,12 +56,38 @@
     const s = sec % 60;
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
+
+  let currentCoverUrl = $derived.by(() => {
+    const song = playerStore.currentSong;
+    if (!song) return null;
+    if (song.art_manual) {
+      return `luminous-art://${song.art_manual}`;
+    }
+    if (song.art_automatic) {
+      if (song.art_automatic.startsWith("album-")) {
+        return `luminous-art://${song.art_automatic}`;
+      } else {
+        return `luminous-art://local/${song.art_automatic}`;
+      }
+    }
+    return null;
+  });
 </script>
 
-<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
+<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full relative">
+  {#if currentCoverUrl}
+    <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
+      <div 
+        class="absolute inset-0 bg-cover bg-center opacity-[0.12] scale-105 blur-[60px] saturate-[180%] transition-all duration-1000"
+        style="background-image: url('{currentCoverUrl}');"
+      ></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-transparent to-brand-main/20"></div>
+    </div>
+  {/if}
+
   {#if activePlaylist}
     <!-- Top Header bar -->
-    <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
+    <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between relative z-10 bg-brand-main/40 backdrop-blur-md">
       <div class="flex items-center gap-3">
         <ListMusic class="w-5 h-5 text-brand-accent" />
         <h2 class="text-base font-bold text-brand-text-primary">{activePlaylist.name}</h2>
@@ -94,8 +120,8 @@
     </div>
 
     <!-- Tracks List Scrollable Container -->
-    <div class="flex-1 overflow-y-auto p-6">
-      <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/40">
+    <div class="flex-1 overflow-y-auto p-6 relative z-10">
+      <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/30 backdrop-blur-md">
         <table class="w-full text-left text-sm border-collapse">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
