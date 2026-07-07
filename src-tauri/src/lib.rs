@@ -21,6 +21,7 @@ mod models;
 mod moodbar;
 mod player;
 mod playlist;
+mod tageditor;
 mod waveform;
 
 use std::sync::Arc;
@@ -283,6 +284,10 @@ pub fn run() {
             // Lyrics commands
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
+            // Tag Editor commands
+            commands::tageditor::get_song_details,
+            commands::tageditor::lookup_acoustid_tags,
+            commands::tageditor::save_song_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

@@ -4,10 +4,21 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import { Search, Play, Plus, Clock, FileText, Music, FolderClosed } from "lucide-svelte";
+  import TagEditor from "./TagEditor.svelte";
+  import { Search, Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
 
   let { activeSubTab = "songs" } = $props<{ activeSubTab: "songs" | "albums" | "artists" }>();
+
+  let editingSongId = $state<number | null>(null);
+
+  function openTagEditor(songId: number) {
+    editingSongId = songId;
+  }
+
+  function handleTagEditorSaved() {
+    collectionStore.refreshLibrary();
+  }
 
   let searchQuery = $state("");
   let sortField = $state<keyof Song>("title");
@@ -150,13 +161,22 @@
                 <td class="py-2.5 px-4 text-gray-400 truncate max-w-xs">{song.album || "Unknown Album"}</td>
                 <td class="py-2.5 px-4 text-center text-gray-400">{formatDuration(song.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
-                  <button
-                    onclick={() => handleAddSongToPlaylist(song.id)}
-                    class="text-gray-400 hover:text-violet-400 transition-colors"
-                    title="Add to active playlist"
-                  >
-                    <Plus class="w-4 h-4" />
-                  </button>
+                  <div class="flex items-center justify-center gap-2.5">
+                    <button
+                      onclick={() => handleAddSongToPlaylist(song.id)}
+                      class="text-gray-400 hover:text-violet-400 transition-colors"
+                      title="Add to active playlist"
+                    >
+                      <Plus class="w-4 h-4" />
+                    </button>
+                    <button
+                      onclick={() => openTagEditor(song.id)}
+                      class="text-gray-400 hover:text-violet-400 transition-colors"
+                      title="Edit tags"
+                    >
+                      <Edit3 class="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -249,3 +269,11 @@
     {/if}
   </div>
 </div>
+
+{#if editingSongId !== null}
+  <TagEditor
+    songId={editingSongId}
+    onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}

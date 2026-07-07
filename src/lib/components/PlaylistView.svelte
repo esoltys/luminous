@@ -1,8 +1,21 @@
 <script lang="ts">
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Play, Trash2, ArrowUp, ArrowDown, ListMusic, RotateCcw, RotateCw } from "lucide-svelte";
+  import { Play, Trash2, ArrowUp, ArrowDown, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
   import type { PlaylistItem } from "../types";
+  import TagEditor from "./TagEditor.svelte";
+
+  let editingSongId = $state<number | null>(null);
+
+  function openTagEditor(songId: number) {
+    editingSongId = songId;
+  }
+
+  function handleTagEditorSaved() {
+    if (playlistsStore.activePlaylistId !== null) {
+      playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+    }
+  }
 
   // Selected playlist from the store
   let activePlaylist = $derived(
@@ -146,13 +159,23 @@
                   </div>
                 </td>
                 <td class="py-2.5 px-4 text-center">
-                  <button
-                    onclick={() => handleRemoveItem(item.uuid)}
-                    class="text-gray-500 hover:text-red-400 transition-colors"
-                    title="Remove from playlist"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button>
+                  <div class="flex items-center justify-center gap-2.5">
+                    <button
+                      onclick={() => item.song?.id && openTagEditor(item.song.id)}
+                      class="text-gray-500 hover:text-violet-400 transition-colors disabled:opacity-30"
+                      title="Edit tags"
+                      disabled={!item.song}
+                    >
+                      <Edit3 class="w-4 h-4" />
+                    </button>
+                    <button
+                      onclick={() => handleRemoveItem(item.uuid)}
+                      class="text-gray-500 hover:text-red-400 transition-colors"
+                      title="Remove from playlist"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -177,3 +200,11 @@
     </div>
   {/if}
 </div>
+
+{#if editingSongId !== null}
+  <TagEditor
+    songId={editingSongId}
+    onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
