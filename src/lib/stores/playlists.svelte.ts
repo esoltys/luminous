@@ -13,6 +13,14 @@ class PlaylistsStore {
   private async init() {
     try {
       await this.refreshPlaylists();
+      const settings = await invoke<Record<string, string>>("get_all_app_settings");
+      if (settings && settings.active_playlist_id) {
+        const plId = parseInt(settings.active_playlist_id, 10);
+        if (!isNaN(plId) && this.playlists.some((p) => p.id === plId)) {
+          await this.selectPlaylist(plId);
+          return;
+        }
+      }
       if (this.playlists.length > 0) {
         await this.selectPlaylist(this.playlists[0].id);
       }
@@ -28,6 +36,11 @@ class PlaylistsStore {
   async selectPlaylist(id: number) {
     this.activePlaylistId = id;
     this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
+    try {
+      await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
+    } catch (err) {
+      console.error("Failed to save active playlist settings:", err);
+    }
   }
 
   async createPlaylist(name: string) {

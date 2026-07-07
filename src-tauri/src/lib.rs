@@ -313,6 +313,9 @@ pub fn run() {
             commands::tageditor::get_song_details,
             commands::tageditor::lookup_acoustid_tags,
             commands::tageditor::save_song_tags,
+            // Settings commands
+            commands::settings::set_app_setting,
+            commands::settings::get_all_app_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

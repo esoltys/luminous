@@ -265,6 +265,11 @@ CREATE TABLE IF NOT EXISTS equalizer_settings (
     gains TEXT NOT NULL DEFAULT '0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0'
 );
 INSERT OR IGNORE INTO equalizer_settings (id, enabled, preamp, gains) VALUES (1, 0, 0.0, '0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0');
+
+CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 ";
 
 #[cfg(test)]

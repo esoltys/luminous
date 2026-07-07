@@ -49,16 +49,64 @@ pub struct Player {
 
 impl Player {
     pub fn new(db: Arc<Database>, audio: Arc<Mutex<AudioEngine>>) -> Self {
+        let mut volume = 1.0f32;
+        let mut shuffle_mode = ShuffleMode::Off;
+        let mut repeat_mode = RepeatMode::Off;
+
+        // Query database settings on startup
+        if let Ok(conn) = db.pool.get() {
+            if let Ok(v_str) = conn.query_row(
+                "SELECT value FROM app_state WHERE key = 'volume'",
+                [],
+                |row| row.get::<_, String>(0),
+            ) {
+                if let Ok(v) = v_str.parse::<f32>() {
+                    volume = v.clamp(0.0, 1.0);
+                    // Apply to audio engine
+                    if let Ok(engine) = audio.try_lock() {
+                        let _ = engine.set_volume(volume);
+                    }
+                }
+            }
+            if let Ok(s_str) = conn.query_row(
+                "SELECT value FROM app_state WHERE key = 'shuffle_mode'",
+                [],
+                |row| row.get::<_, String>(0),
+            ) {
+                shuffle_mode = match s_str.as_str() {
+                    "all" => ShuffleMode::All,
+                    "inside_album" => ShuffleMode::InsideAlbum,
+                    "albums" => ShuffleMode::Albums,
+                    "artists" => ShuffleMode::Artists,
+                    _ => ShuffleMode::Off,
+                };
+            }
+            if let Ok(r_str) = conn.query_row(
+                "SELECT value FROM app_state WHERE key = 'repeat_mode'",
+                [],
+                |row| row.get::<_, String>(0),
+            ) {
+                repeat_mode = match r_str.as_str() {
+                    "track" => RepeatMode::Track,
+                    "album" => RepeatMode::Album,
+                    "playlist" => RepeatMode::Playlist,
+                    "one_by_one" => RepeatMode::OneByOne,
+                    "intro" => RepeatMode::Intro,
+                    _ => RepeatMode::Off,
+                };
+            }
+        }
+
         Self {
             _db: db,
             audio,
             current_song: None,
             current_playlist_id: None,
             current_item_uuid: None,
-            shuffle_mode: ShuffleMode::Off,
-            repeat_mode: RepeatMode::Off,
+            shuffle_mode,
+            repeat_mode,
             stop_after_current: false,
-            volume: 1.0,
+            volume,
             playlist_items: Vec::new(),
             shuffle_order: Vec::new(),
             current_index: None,
@@ -146,7 +194,15 @@ impl Player {
 
     pub async fn set_volume(&mut self, vol: f32) -> Result<()> {
         self.volume = vol.clamp(0.0, 1.0);
-        self.audio.lock().await.set_volume(self.volume)
+        let audio = self.audio.lock().await;
+        let _ = audio.set_volume(self.volume);
+        if let Ok(conn) = self._db.pool.get() {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('volume', ?1)",
+                rusqlite::params![self.volume.to_string()],
+            );
+        }
+        Ok(())
     }
 
     pub async fn next_track(&mut self) -> Result<()> {
@@ -265,10 +321,37 @@ impl Player {
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
         self.shuffle_mode = mode;
         self.rebuild_shuffle_order();
+        let mode_str = match mode {
+            ShuffleMode::Off => "off",
+            ShuffleMode::All => "all",
+            ShuffleMode::InsideAlbum => "inside_album",
+            ShuffleMode::Albums => "albums",
+            ShuffleMode::Artists => "artists",
+        };
+        if let Ok(conn) = self._db.pool.get() {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('shuffle_mode', ?1)",
+                rusqlite::params![mode_str],
+            );
+        }
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
+        let mode_str = match mode {
+            RepeatMode::Off => "off",
+            RepeatMode::Track => "track",
+            RepeatMode::Album => "album",
+            RepeatMode::Playlist => "playlist",
+            RepeatMode::OneByOne => "one_by_one",
+            RepeatMode::Intro => "intro",
+        };
+        if let Ok(conn) = self._db.pool.get() {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('repeat_mode', ?1)",
+                rusqlite::params![mode_str],
+            );
+        }
     }
 
     /// Get the current playback state snapshot for the frontend.

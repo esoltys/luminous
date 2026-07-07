@@ -6,5 +6,6 @@ pub mod visualizer;
 pub mod equalizer;
 pub mod lyrics;
 pub mod tageditor;
+pub mod settings;
 
 
