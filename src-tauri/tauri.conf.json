@@ -26,13 +26,6 @@
       "csp": null
     }
   },
-  "plugins": {
-    "fs": {
-      "all": true,
-      "scope": {
-        "allow": ["$AUDIO/**", "$MUSIC/**", "$HOME/**", "$DOCUMENT/**"]
-      }
-    }
   },
   "bundle": {
     "active": true,
