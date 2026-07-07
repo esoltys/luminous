@@ -44,9 +44,13 @@ Luminous is a modern, high-performance desktop music player built with **Tauri v
    - Calculate AcoustID audio fingerprints using `fpcalc` to query suggestions and autofill tags.
 10. **State Preservation (Core Design Principle)**:
     - Automatically persists and restores the user's active sidebar view, sub-tab selections, playlist selections, player volume levels, shuffle/repeat parameters, and equalizer configurations on startup.
-11. **Modern, Responsive UI**:
-    - Built on Svelte 5 runes and styled with Tailwind CSS v4.
-    - Custom dark mode theme, live search filters, sortable metadata tables, and active audio filetype format indicator pills (MP3, WAV, etc.).
+11. **Dynamic Theme Engine**:
+    - Switch between multiple predefined color themes (Luminous Violet, Strawberry Red, Nordic Blue, and Retro Amber).
+    - Custom Theme Builder with real-time, interactive color pickers that dynamically adjust layout variables (background, sidebar, player bar, borders, text, accents) with instant live previews.
+    - Theme selections and custom palettes are stored and restored directly from the SQLite database.
+12. **Sleek Table Pinned Headers & Album Playlist Creation**:
+    - Column titles for track listings in both the Library (Collection) and Playlist views are sticky and remain pinned to the top of viewports during scrolling.
+    - Double-clicking an album card generates or loads a playlist for that album (automatically ordered sequentially by disc and track number), switches active tab views to the Playlists view, and starts playback instantly.
 
 ---
 
@@ -65,7 +69,7 @@ luminous/
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
-│   │   ├── stores/           # Global stores (player, collection, playlists)
+│   │   ├── stores/           # Global stores (player, collection, playlists, theme)
 │   │   └── types/            # Frontend interfaces
 │   └── routes/               # Layouts and navigation views
 └── src-tauri/                # Tauri + Rust Backend Core
