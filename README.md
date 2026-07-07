@@ -84,6 +84,24 @@ Ensure ALSA and SSL development headers are installed:
 sudo apt install libasound2-dev libssl-dev pkg-config
 ```
 
+### AcoustID / Chromaprint Setup (Optional)
+To enable AcoustID audio fingerprinting and auto-tagging, you need the `fpcalc` utility:
+*   **Linux (Ubuntu/Debian)**:
+    ```bash
+    sudo apt install chromaprint-tools
+    ```
+*   **macOS (Homebrew)**:
+    ```bash
+    brew install chromaprint
+    ```
+*   **Windows**:
+    Download the binary from the [AcoustID Website](https://acoustid.org/chromaprint), extract it, and add the folder containing `fpcalc.exe` to your system `PATH`.
+
+If `fpcalc` is not in your system `PATH`, you can set the `FPCALC_PATH` environment variable to point directly to the binary:
+```bash
+export FPCALC_PATH="/path/to/fpcalc"
+```
+
 ### Dev Server
 To start the Svelte frontend dev server and compile the Tauri app:
 ```bash
