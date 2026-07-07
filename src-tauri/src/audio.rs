@@ -293,19 +293,34 @@ fn decode_thread(
                 // Simpler approach: use a shared VecDeque protected by Mutex
                 let shared_buf: Arc<Mutex<std::collections::VecDeque<f32>>> =
                     Arc::new(Mutex::new(std::collections::VecDeque::with_capacity(
-                        sample_rate as usize * channels as usize,
+                        sample_rate as usize * channels as usize * 2,
                     )));
                 let shared_buf_writer = Arc::clone(&shared_buf);
                 let shared_buf_reader = Arc::clone(&shared_buf);
+
+                let played_samples = Arc::new(AtomicU64::new(
+                    (req.start_nanosec as f64 * sample_rate as f64 * channels as f64 / 1_000_000_000.0) as u64
+                ));
+                let played_samples_cpal = Arc::clone(&played_samples);
+                let position_cpal = Arc::clone(&position);
 
                 let stream = match device.build_output_stream(
                     &config,
                     move |output: &mut [f32], _| {
                         let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
                         let mut buf = shared_buf_reader.lock().unwrap();
+                        let mut played = 0;
                         for sample in output.iter_mut() {
-                            *sample = buf.pop_front().unwrap_or(0.0) * vol;
+                            if let Some(s) = buf.pop_front() {
+                                *sample = s * vol;
+                                played += 1;
+                            } else {
+                                *sample = 0.0;
+                            }
                         }
+                        let total_played = played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
+                        let pos_ns = (total_played as f64 * 1_000_000_000.0 / (sample_rate as f64 * channels as f64)) as u64;
+                        position_cpal.store(pos_ns, Ordering::Relaxed);
                     },
                     |err| log::error!("CPAL stream error: {err}"),
                     None,
@@ -333,6 +348,8 @@ fn decode_thread(
                 }
                 position.store(req.start_nanosec, Ordering::Relaxed);
                 let _ = event_tx.send(AudioEvent::Playing { song_id });
+
+                let mut eof_reached = false;
 
                 // Decode loop
                 'decode: loop {
@@ -374,10 +391,6 @@ fn decode_thread(
                                     AudioCommand::Play(new_req) => {
                                         // New play while paused — restart outer loop
                                         _stream = None;
-                                        // Re-queue by breaking and letting the outer
-                                        // loop handle the next iteration.
-                                        // For simplicity we just stop here; a proper
-                                        // impl would handle this more elegantly.
                                         let _ = event_tx.send(AudioEvent::Stopped);
                                         break 'decode;
                                     }
@@ -415,7 +428,10 @@ fn decode_thread(
                             if let Ok(mut buf) = shared_buf_writer.lock() {
                                 buf.clear();
                             }
+                            let target_samples = (target_ns as f64 * sample_rate as f64 * channels as f64 / 1_000_000_000.0) as u64;
+                            played_samples.store(target_samples, Ordering::Relaxed);
                             position.store(target_ns, Ordering::Relaxed);
+                            eof_reached = false; // Reset EOF so we resume decoding
                         }
                         Ok(AudioCommand::SetVolume(v)) => {
                             if let Ok(mut vol) = volume.lock() {
@@ -425,6 +441,40 @@ fn decode_thread(
                         Err(mpsc::TryRecvError::Empty) => {} // no pending command
                         Err(mpsc::TryRecvError::Disconnected) => break 'decode,
                         Ok(AudioCommand::Resume) => {} // already playing
+                    }
+
+                    // If decoder has reached the end of the file, wait until output buffer drains completely
+                    if eof_reached {
+                        let is_empty = if let Ok(buf) = shared_buf_writer.lock() {
+                            buf.is_empty()
+                        } else {
+                            true
+                        };
+
+                        if is_empty {
+                            let _ = event_tx.send(AudioEvent::TrackFinished { song_id });
+                            _stream = None;
+                            if let Ok(mut s) = play_state.lock() {
+                                *s = PlayState::Stopped;
+                            }
+                            break 'decode;
+                        } else {
+                            // Buffer still has remaining audio, wait for it to be played
+                            std::thread::sleep(std::time::Duration::from_millis(20));
+                            continue 'decode;
+                        }
+                    }
+
+                    // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
+                    let is_full = if let Ok(buf) = shared_buf_writer.lock() {
+                        buf.len() > (sample_rate as usize * channels as usize * 3 / 2)
+                    } else {
+                        false
+                    };
+
+                    if is_full {
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        continue 'decode;
                     }
 
                     // Decode one packet
@@ -442,18 +492,6 @@ fn decode_thread(
                                     );
                                     sample_buf.copy_interleaved_ref(decoded);
 
-                                    // Update position from packet timestamp
-                                    if let Some(tb) = track.codec_params.time_base {
-                                        let ts = packet.ts();
-                                        let ns = (ts as f64 * tb.numer as f64
-                                            / tb.denom as f64
-                                            * 1_000_000_000.0) as u64;
-                                        position.store(
-                                            req.start_nanosec.saturating_add(ns),
-                                            Ordering::Relaxed,
-                                        );
-                                    }
-
                                     // Push samples into the shared playback buffer
                                     if let Ok(mut buf) = shared_buf_writer.lock() {
                                         for &s in sample_buf.samples() {
@@ -468,12 +506,8 @@ fn decode_thread(
                         Err(SymphoniaError::IoError(ref e))
                             if e.kind() == std::io::ErrorKind::UnexpectedEof =>
                         {
-                            let _ = event_tx.send(AudioEvent::TrackFinished { song_id });
-                            _stream = None;
-                            if let Ok(mut s) = play_state.lock() {
-                                *s = PlayState::Stopped;
-                            }
-                            break 'decode;
+                            eof_reached = true;
+                            continue 'decode;
                         }
                         Err(e) => {
                             let _ = event_tx.send(AudioEvent::Error {
