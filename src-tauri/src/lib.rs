@@ -12,6 +12,7 @@
 mod audio;
 mod collection;
 mod commands;
+mod covermanager;
 mod db;
 mod models;
 mod player;
@@ -22,6 +23,7 @@ use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
 pub use audio::AudioEngine;
+pub use covermanager::CoverManager;
 pub use db::Database;
 pub use player::Player;
 pub use playlist::PlaylistManager;
@@ -32,11 +34,52 @@ pub struct AppState {
     pub audio: Arc<Mutex<AudioEngine>>,
     pub player: Arc<Mutex<Player>>,
     pub playlists: Arc<Mutex<PlaylistManager>>,
+    pub cover_manager: Arc<CoverManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
+            let app_handle = ctx.app_handle();
+            let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
+            let path = request.uri().path();
+            let trimmed = path.trim_start_matches('/');
+
+            let file_path = if trimmed.starts_with("local/") {
+                let local_path = trimmed.trim_start_matches("local/");
+                let decoded = percent_encoding::percent_decode_str(local_path).decode_utf8_lossy().into_owned();
+                std::path::PathBuf::from(decoded)
+            } else {
+                let decoded = percent_encoding::percent_decode_str(trimmed).decode_utf8_lossy().into_owned();
+                covers_dir.join(decoded)
+            };
+
+            if file_path.exists() && file_path.is_file() {
+                if let Ok(data) = std::fs::read(&file_path) {
+                    let mime = if file_path.extension().map_or(false, |e| e == "png") {
+                        "image/png"
+                    } else {
+                        "image/jpeg"
+                    };
+                    tauri::http::Response::builder()
+                        .status(200)
+                        .header("content-type", mime)
+                        .body(data)
+                        .unwrap()
+                } else {
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .body(Vec::new())
+                        .unwrap()
+                }
+            } else {
+                tauri::http::Response::builder()
+                    .status(404)
+                    .body(Vec::new())
+                    .unwrap()
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -62,6 +105,12 @@ pub fn run() {
             // Initialize playlist manager
             let playlists = Arc::new(Mutex::new(
                 PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists"),
+            ));
+
+            // Initialize cover manager
+            let cover_manager = Arc::new(CoverManager::new(
+                Arc::clone(&db),
+                app.path().app_data_dir().expect("no app data dir"),
             ));
 
             // Spawn position tick loop (Tokio)
@@ -143,6 +192,7 @@ pub fn run() {
                 audio,
                 player,
                 playlists,
+                cover_manager,
             });
 
             Ok(())
@@ -185,6 +235,9 @@ pub fn run() {
             commands::playlist::clear_playlist,
             commands::playlist::undo_playlist,
             commands::playlist::redo_playlist,
+            // Cover Art commands
+            commands::cover::get_cover_art_uri,
+            commands::cover::fetch_remote_cover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

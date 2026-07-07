@@ -3,6 +3,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import CoverArt from "./CoverArt.svelte";
   import { Search, Play, Plus, Clock, FileText, Music, FolderClosed } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
 
@@ -176,7 +177,13 @@
         {#each collectionStore.albums as album}
           <div class="bg-gray-900 border border-gray-800/60 rounded-xl p-4 flex flex-col group hover:border-violet-500/40 transition-all duration-200">
             <div class="aspect-square bg-gray-950 rounded-lg mb-3 flex items-center justify-center text-violet-400 border border-gray-800 overflow-hidden relative">
-              <FolderClosed class="w-12 h-12" />
+              <CoverArt
+                songId={undefined}
+                artEmbedded={album.art_embedded}
+                artAutomatic={album.art_automatic}
+                artManual={album.art_manual}
+                sizeClass="w-full h-full"
+              />
               <button
                 onclick={async () => {
                   const songs = await invoke<Song[]>("get_songs_by_album", {

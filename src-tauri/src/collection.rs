@@ -3,6 +3,7 @@
 use crate::{
     db::Database,
     models::{FileType, LibraryStats, MusicDirectory, ScanPhase, ScanProgress, Song, SongSource},
+    covermanager::CoverManager,
 };
 use anyhow::{Context, Result};
 use lofty::{
@@ -17,7 +18,7 @@ use std::{
     sync::Arc,
     time::UNIX_EPOCH,
 };
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
 pub struct CollectionScanner {
@@ -114,6 +115,9 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let mut scanned = 0u64;
 
+        let app_data_dir = app.path().app_data_dir().expect("no app data dir");
+        let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
+
         for path in &all_paths {
             let path_str = path.to_string_lossy().to_string();
 
@@ -134,7 +138,18 @@ impl CollectionScanner {
 
             // Read tags
             match read_tags(path) {
-                Ok(song) => {
+                Ok(mut song) => {
+                    if song.art_embedded {
+                        let artist = song.album_artist.as_deref().unwrap_or(song.artist.as_deref().unwrap_or(""));
+                        let album = song.album.as_deref().unwrap_or("");
+                        if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album) {
+                            song.art_automatic = Some(cached_filename);
+                            song.art_unset = false;
+                        }
+                    } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+                        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+                        song.art_unset = false;
+                    }
                     upsert_song(&conn, &song)?;
                 }
                 Err(e) => {
@@ -482,6 +497,8 @@ fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
                     filesize=excluded.filesize, mtime=excluded.mtime,
                     art_embedded=excluded.art_embedded,
+                    art_automatic=excluded.art_automatic,
+                    art_unset=excluded.art_unset,
                     filetype=excluded.filetype, source=excluded.source",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS),
         params![
@@ -507,6 +524,8 @@ fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
             song.filesize,
             song.mtime,
             song.art_embedded,
+            song.art_automatic,
+            song.art_unset,
         ],
     )?;
     Ok(())
@@ -536,10 +555,10 @@ const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
     composer, lyrics, comment, track, disc, year, genre,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
-    filesize, mtime, art_embedded
+    filesize, mtime, art_embedded, art_automatic, art_unset
 ";
 
-const SONG_INSERT_PLACEHOLDERS: &str = "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22";
+const SONG_INSERT_PLACEHOLDERS: &str = "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24";
 
 fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {

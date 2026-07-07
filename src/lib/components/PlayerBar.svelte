@@ -1,6 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import CoverArt from "./CoverArt.svelte";
   import {
     Play,
     Pause,
@@ -69,14 +70,14 @@
 <footer class="h-20 bg-gray-950 border-t border-gray-800 flex items-center justify-between px-6 text-gray-200 select-none">
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
-    <div class="w-12 h-12 bg-gray-900 border border-gray-800 rounded flex items-center justify-center text-violet-400 overflow-hidden relative group">
-      {#if playerStore.currentSong?.art_embedded || playerStore.currentSong?.art_automatic || playerStore.currentSong?.art_manual}
-        <!-- In a full implementation, we would load the album art asset path via Tauri protocol -->
-        <Disc class="w-6 h-6 animate-spin" style="animation-duration: 4s;" />
-      {:else}
-        <Disc class="w-6 h-6" />
-      {/if}
-    </div>
+    <CoverArt
+      songId={playerStore.currentSong?.id}
+      artEmbedded={playerStore.currentSong?.art_embedded}
+      artAutomatic={playerStore.currentSong?.art_automatic}
+      artManual={playerStore.currentSong?.art_manual}
+      sizeClass="w-12 h-12"
+      animateSpin={playerStore.state === 'playing'}
+    />
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
         <span class="text-sm font-semibold text-gray-100 truncate">
