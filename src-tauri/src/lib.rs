@@ -161,6 +161,7 @@ pub fn run() {
             commands::collection::get_artists,
             // Playback commands
             commands::player::play_song,
+            commands::player::play_songs,
             commands::player::play_playlist_item,
             commands::player::pause,
             commands::player::resume,

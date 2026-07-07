@@ -53,7 +53,9 @@
   }
 
   function handlePlaySong(song: Song) {
-    playerStore.playSong(song.id);
+    const index = filteredSongs.findIndex((s) => s.id === song.id);
+    const songIds = filteredSongs.map((s) => s.id);
+    playerStore.playSongs(songIds, index >= 0 ? index : 0);
   }
 
   function formatDuration(ns: number | undefined): string {
@@ -170,13 +172,13 @@
               <FolderClosed class="w-12 h-12" />
               <button
                 onclick={async () => {
-                  // Find all songs in this album and play them
                   const songs = await invoke<Song[]>("get_songs_by_album", {
                     albumArtist: album.artist || "",
                     album: album.album || "",
                   });
                   if (songs.length > 0) {
-                    playerStore.playSong(songs[0].id);
+                    const songIds = songs.map((s) => s.id);
+                    playerStore.playSongs(songIds, 0);
                   }
                 }}
                 class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"

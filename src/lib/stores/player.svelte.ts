@@ -60,6 +60,10 @@ class PlayerStore {
     await invoke("play_song", { songId });
   }
 
+  async playSongs(songIds: number[], startIndex: number) {
+    await invoke("play_songs", { songIds, startIndex });
+  }
+
   async playPlaylistItem(playlistId: number, itemIndex: number) {
     await invoke("play_playlist_item", { playlistId, itemIndex });
   }
