@@ -70,7 +70,7 @@
   }
 </script>
 
-<footer class="h-20 bg-gray-950 border-t border-gray-800 flex items-center justify-between px-6 text-gray-200 select-none">
+<footer class="h-20 bg-brand-playerbar border-t border-brand-border flex items-center justify-between px-6 text-brand-text-secondary select-none">
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <CoverArt
@@ -83,16 +83,16 @@
     />
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold text-gray-100 truncate">
+        <span class="text-sm font-semibold text-brand-text-primary truncate">
           {playerStore.currentSong?.title || "Not Playing"}
         </span>
         {#if playerStore.currentSong}
-          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-sm shrink-0">
+          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
         {/if}
       </div>
-      <span class="text-xs text-gray-400 truncate">
+      <span class="text-xs text-brand-text-secondary/70 truncate">
         {playerStore.currentSong?.artist || "Unknown Artist"}
       </span>
     </div>
@@ -103,44 +103,44 @@
     <div class="flex items-center gap-5">
       <button
         onclick={cycleShuffle}
-        class="text-xs transition-colors hover:text-white relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-violet-400 font-bold' : 'text-gray-500'}"
+        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent font-bold' : 'text-brand-text-secondary/50'}"
         title="Shuffle Mode: {playerStore.shuffleMode}"
       >
         <Shuffle class="w-4 h-4" />
         {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-violet-600 text-white rounded-full px-0.5 scale-75">
+          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-text-primary rounded-full px-0.5 scale-75">
             {playerStore.shuffleMode === 'inside_album' ? 'IA' : playerStore.shuffleMode === 'albums' ? 'AL' : 'AR'}
           </span>
         {/if}
       </button>
 
-      <button onclick={() => playerStore.previous()} class="text-gray-400 hover:text-white transition-colors">
+      <button onclick={() => playerStore.previous()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
         <SkipBack class="w-5 h-5 fill-current" />
       </button>
 
       {#if playerStore.state === 'playing'}
         <button
           onclick={() => playerStore.pause()}
-          class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary flex items-center justify-center hover:scale-105 transition-all shadow-md"
         >
-          <Pause class="w-4 h-4 fill-current text-black" />
+          <Pause class="w-4 h-4 fill-current text-white" />
         </button>
       {:else}
         <button
           onclick={() => playerStore.resume()}
-          class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary flex items-center justify-center hover:scale-105 transition-all shadow-md"
         >
-          <Play class="w-4 h-4 fill-current text-black ml-0.5" />
+          <Play class="w-4 h-4 fill-current text-white ml-0.5" />
         </button>
       {/if}
 
-      <button onclick={() => playerStore.next()} class="text-gray-400 hover:text-white transition-colors">
+      <button onclick={() => playerStore.next()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
       <button
         onclick={cycleRepeat}
-        class="text-xs transition-colors hover:text-white relative p-1 {playerStore.repeatMode !== 'off' ? 'text-violet-400 font-bold' : 'text-gray-500'}"
+        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent font-bold' : 'text-brand-text-secondary/50'}"
         title="Repeat Mode: {playerStore.repeatMode}"
       >
         {#if playerStore.repeatMode === 'track'}
@@ -149,7 +149,7 @@
           <Repeat class="w-4 h-4" />
         {/if}
         {#if playerStore.repeatMode !== 'off' && playerStore.repeatMode !== 'track' && playerStore.repeatMode !== 'playlist'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-violet-600 text-white rounded-full px-0.5 scale-75">
+          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-text-primary rounded-full px-0.5 scale-75">
             {playerStore.repeatMode === 'album' ? 'AL' : '1x'}
           </span>
         {/if}
@@ -157,7 +157,7 @@
     </div>
 
     <!-- Scrubber -->
-    <div class="flex items-center gap-2.5 w-full text-[10px] text-gray-400">
+    <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
       <span>{formatTime(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
@@ -172,7 +172,7 @@
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>
-    <button onclick={toggleMute} class="text-gray-400 hover:text-white transition-colors">
+    <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
       {#if isMuted || playerStore.volume === 0}
         <VolumeX class="w-4 h-4" />
       {:else}
@@ -186,7 +186,7 @@
       step="0.01"
       value={playerStore.volume}
       oninput={handleVolumeChange}
-      class="w-24 accent-violet-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+      class="w-24 accent-brand-accent h-1 bg-brand-border rounded-lg appearance-none cursor-pointer"
     />
   </div>
 </footer>

@@ -1,19 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-main: var(--bg-main);
+  --color-brand-sidebar: var(--bg-sidebar);
+  --color-brand-playerbar: var(--bg-playerbar);
+  --color-brand-accent: var(--color-accent);
+  --color-brand-accent-hover: var(--color-accent-hover);
+  --color-brand-text-primary: var(--color-text-primary);
+  --color-brand-text-secondary: var(--color-text-secondary);
+  --color-brand-border: var(--color-border);
+}
+
 @layer base {
   :root {
-    --color-bg-primary: #0b0f19;
-    --color-bg-secondary: #111827;
-    --color-bg-tertiary: #1f2937;
+    /* Default Luminous Violet Theme Colors */
+    --bg-main: #0d0b18;
+    --bg-sidebar: #07050e;
+    --bg-playerbar: #0a0813;
     --color-accent: #8b5cf6;
     --color-accent-hover: #a78bfa;
     --color-text-primary: #f3f4f6;
     --color-text-secondary: #9ca3af;
-    --color-border: #374151;
+    --color-border: #1f1b2e;
   }
 
   body {
-    background-color: var(--color-bg-primary);
+    background-color: var(--bg-main);
     color: var(--color-text-primary);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
@@ -27,7 +39,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-bg-primary);
+    background: var(--bg-main);
   }
 
   ::-webkit-scrollbar-thumb {

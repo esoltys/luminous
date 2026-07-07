@@ -8,6 +8,7 @@
   import FoldersView from "../lib/components/FoldersView.svelte";
   import Equalizer from "../lib/components/Equalizer.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
+  import { themeStore } from "../lib/stores/theme.svelte";
 
   let activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
   let activeSubTab = $state<"songs" | "albums" | "artists">("songs");
@@ -15,6 +16,9 @@
   let isInitialized = $state(false);
 
   onMount(async () => {
+    // Initialize theme store first to prevent flash of default theme
+    await themeStore.init();
+
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings) {
@@ -49,7 +53,7 @@
   });
 </script>
 
-<div class="flex flex-col h-screen overflow-hidden bg-gray-950 font-sans">
+<div class="flex flex-col h-screen overflow-hidden bg-brand-main font-sans">
   <div class="flex flex-1 overflow-hidden">
     <!-- Sidebar navigation -->
     <Sidebar bind:activeTab bind:activeSubTab />
@@ -57,7 +61,7 @@
     <!-- Main View Content Area -->
     <main class="flex-1 flex flex-col min-w-0">
       {#if activeTab === "collection"}
-        <CollectionView {activeSubTab} />
+        <CollectionView {activeSubTab} bind:activeTab />
       {:else if activeTab === "playlists"}
         <PlaylistView />
       {:else if activeTab === "settings"}

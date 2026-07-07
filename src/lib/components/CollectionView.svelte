@@ -8,7 +8,10 @@
   import { Search, Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
 
-  let { activeSubTab = "songs" } = $props<{ activeSubTab: "songs" | "albums" | "artists" }>();
+  let { activeSubTab = "songs", activeTab = $bindable() } = $props<{
+    activeSubTab: "songs" | "albums" | "artists";
+    activeTab?: "collection" | "playlists" | "settings" | "equalizer" | "lyrics";
+  }>();
 
   let editingSongId = $state<number | null>(null);
 
@@ -87,20 +90,20 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col overflow-hidden bg-gray-950 text-gray-200 h-full">
+<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Top bar with Search & Filter -->
-  <div class="h-16 px-6 border-b border-gray-800 flex items-center justify-between">
+  <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
     <div class="relative w-80">
-      <Search class="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+      <Search class="absolute left-3 top-2.5 w-4 h-4 text-brand-text-secondary/50" />
       <input
         type="text"
         placeholder="Search track, artist, album..."
         bind:value={searchQuery}
         oninput={handleSearch}
-        class="w-full bg-gray-900 border border-gray-800 rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-violet-500 text-gray-200"
+        class="w-full bg-brand-sidebar border border-brand-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-brand-accent text-brand-text-primary"
       />
     </div>
-    <div class="text-xs text-gray-400">
+    <div class="text-xs text-brand-text-secondary">
       {#if activeSubTab === "songs"}
         Showing {filteredSongs.length} tracks
       {:else if activeSubTab === "albums"}
@@ -115,68 +118,68 @@
   <div class="flex-1 overflow-y-auto p-6">
     {#if activeSubTab === "songs"}
       <!-- Songs Table View -->
-      <div class="w-full border border-gray-800 rounded-lg overflow-hidden bg-gray-900/40">
+      <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/40">
         <table class="w-full text-left text-sm border-collapse">
           <thead>
-            <tr class="border-b border-gray-800 bg-gray-900 text-xs text-gray-400 uppercase tracking-wider font-semibold">
-              <th class="py-3 px-4 w-12 text-center"></th>
-              <th onclick={() => toggleSort("title")} class="py-3 px-4 cursor-pointer hover:text-white select-none">
+            <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10"></th>
+              <th onclick={() => toggleSort("title")} class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 cursor-pointer hover:text-brand-text-primary select-none z-10">
                 Title {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
               </th>
-              <th onclick={() => toggleSort("artist")} class="py-3 px-4 cursor-pointer hover:text-white select-none">
+              <th onclick={() => toggleSort("artist")} class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 cursor-pointer hover:text-brand-text-primary select-none z-10">
                 Artist {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
               </th>
-              <th onclick={() => toggleSort("album")} class="py-3 px-4 cursor-pointer hover:text-white select-none">
+              <th onclick={() => toggleSort("album")} class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 cursor-pointer hover:text-brand-text-primary select-none z-10">
                 Album {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
               </th>
-              <th onclick={() => toggleSort("length_nanosec")} class="py-3 px-4 cursor-pointer hover:text-white select-none w-24">
+              <th onclick={() => toggleSort("length_nanosec")} class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 cursor-pointer hover:text-brand-text-primary select-none w-24 z-10">
                 <Clock class="w-4 h-4 mx-auto" />
               </th>
-              <th class="py-3 px-4 w-16 text-center">Actions</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-16 text-center z-10">Actions</th>
             </tr>
           </thead>
           <tbody>
             {#each filteredSongs as song}
               <tr
                 ondblclick={() => handlePlaySong(song)}
-                class="border-b border-gray-800/40 hover:bg-gray-800/40 group transition-colors"
+                class="border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors"
               >
                 <td class="py-2.5 px-4 text-center">
                   <button
                     onclick={() => handlePlaySong(song)}
-                    class="opacity-0 group-hover:opacity-100 text-violet-400 hover:text-violet-300 transition-opacity"
+                    class="opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-opacity"
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>
                 </td>
-                <td class="py-2.5 px-4 font-medium text-white truncate max-w-xs">
+                <td class="py-2.5 px-4 font-medium text-brand-text-primary truncate max-w-xs">
                   <div class="flex items-center gap-2">
                     <span class="truncate">{song.title || "Unknown Title"}</span>
-                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-gray-800 text-gray-400 border border-gray-700/50 shrink-0">
+                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                       {song.filetype}
                     </span>
                     {#if song.lyrics && song.lyrics.trim() !== ""}
-                      <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-violet-950/40 text-violet-400 border border-violet-800/40 shrink-0" title="Lyrics available">
+                      <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shrink-0" title="Lyrics available">
                         LRC
                       </span>
                     {/if}
                   </div>
                 </td>
-                <td class="py-2.5 px-4 text-gray-300 truncate max-w-xs">{song.artist || "Unknown Artist"}</td>
-                <td class="py-2.5 px-4 text-gray-400 truncate max-w-xs">{song.album || "Unknown Album"}</td>
-                <td class="py-2.5 px-4 text-center text-gray-400">{formatDuration(song.length_nanosec)}</td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">{song.artist || "Unknown Artist"}</td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">{song.album || "Unknown Album"}</td>
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={() => handleAddSongToPlaylist(song.id)}
-                      class="text-gray-400 hover:text-violet-400 transition-colors"
+                      class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors"
                       title="Add to active playlist"
                     >
                       <Plus class="w-4 h-4" />
                     </button>
                     <button
                       onclick={() => openTagEditor(song.id)}
-                      class="text-gray-400 hover:text-violet-400 transition-colors"
+                      class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors"
                       title="Edit tags"
                     >
                       <Edit3 class="w-4 h-4" />
@@ -200,8 +203,40 @@
       <!-- Albums Card Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {#each collectionStore.albums as album}
-          <div class="bg-gray-900 border border-gray-800/60 rounded-xl p-4 flex flex-col group hover:border-violet-500/40 transition-all duration-200">
-            <div class="aspect-square bg-gray-950 rounded-lg mb-3 flex items-center justify-center text-violet-400 border border-gray-800 overflow-hidden relative">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div
+            ondblclick={async () => {
+              const albumName = album.album || "Unknown Album";
+              const playlistName = `Album: ${albumName}`;
+              let existingPlaylist = playlistsStore.playlists.find(p => p.name === playlistName);
+
+              if (existingPlaylist) {
+                await playlistsStore.selectPlaylist(existingPlaylist.id);
+                await playlistsStore.clearPlaylist(existingPlaylist.id);
+              } else {
+                await playlistsStore.createPlaylist(playlistName);
+              }
+
+              const songs = await invoke<Song[]>("get_songs_by_album", {
+                albumArtist: album.artist || "",
+                album: album.album || "",
+              });
+
+              if (songs.length > 0) {
+                const songIds = songs.map((s) => s.id);
+                if (playlistsStore.activePlaylistId !== null) {
+                  await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songIds);
+                  if (activeTab) {
+                    activeTab = "playlists";
+                  }
+                  await playerStore.playPlaylistItem(playlistsStore.activePlaylistId, 0);
+                }
+              }
+            }}
+            class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
+          >
+            <div class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent border border-brand-border overflow-hidden relative">
               <CoverArt
                 songId={undefined}
                 artEmbedded={album.art_embedded}
@@ -210,7 +245,8 @@
                 sizeClass="w-full h-full"
               />
               <button
-                onclick={async () => {
+                onclick={async (e) => {
+                  e.stopPropagation();
                   const songs = await invoke<Song[]>("get_songs_by_album", {
                     albumArtist: album.artist || "",
                     album: album.album || "",
@@ -222,18 +258,18 @@
                 }}
                 class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
               >
-                <div class="w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
-                  <Play class="w-5 h-5 fill-current ml-0.5" />
+                <div class="w-12 h-12 rounded-full bg-brand-accent text-brand-text-primary flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
+                  <Play class="w-5 h-5 fill-current ml-0.5 text-white" />
                 </div>
               </button>
             </div>
-            <h3 class="font-semibold text-sm text-gray-100 truncate w-full" title={album.album || "Unknown Album"}>
+            <h3 class="font-semibold text-sm text-brand-text-primary truncate w-full" title={album.album || "Unknown Album"}>
               {album.album || "Unknown Album"}
             </h3>
-            <p class="text-xs text-gray-400 truncate w-full" title={album.artist || "Unknown Artist"}>
+            <p class="text-xs text-brand-text-secondary truncate w-full" title={album.artist || "Unknown Artist"}>
               {album.artist || "Unknown Artist"}
             </p>
-            <div class="flex items-center justify-between mt-2 text-[10px] text-gray-500">
+            <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
               <span>{album.track_count} tracks</span>
             </div>
@@ -250,14 +286,14 @@
       <!-- Artists List Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {#each collectionStore.artists as artist}
-          <div class="bg-gray-900 border border-gray-800/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-violet-500/40 transition-all duration-200">
-            <div class="w-20 h-20 bg-gray-950 rounded-full mb-3 flex items-center justify-center text-violet-400 border border-gray-800">
+          <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
+            <div class="w-20 h-20 bg-brand-main rounded-full mb-3 flex items-center justify-center text-brand-accent border border-brand-border">
               <Music class="w-8 h-8" />
             </div>
-            <h3 class="font-semibold text-sm text-gray-100 truncate w-full" title={artist.name || "Unknown Artist"}>
+            <h3 class="font-semibold text-sm text-brand-text-primary truncate w-full" title={artist.name || "Unknown Artist"}>
               {artist.name || "Unknown Artist"}
             </h3>
-            <div class="flex gap-2 justify-center mt-2 text-[10px] text-gray-500">
+            <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{artist.album_count} albums</span>
               <span>•</span>
               <span>{artist.song_count} tracks</span>
