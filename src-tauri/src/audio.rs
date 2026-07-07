@@ -171,11 +171,37 @@ fn decode_thread(
     // Keep current CPAL stream alive. Dropping it stops playback.
     let mut _stream: Option<cpal::Stream> = None;
 
-    for cmd in &cmd_rx {
-        match cmd {
-            AudioCommand::Play(req) => {
-                // Drop any existing stream
-                _stream = None;
+    let mut current_req = None;
+
+    loop {
+        let req = match current_req.take() {
+            Some(r) => r,
+            None => {
+                match cmd_rx.recv() {
+                    Ok(AudioCommand::Play(r)) => r,
+                    Ok(AudioCommand::Stop) => {
+                        _stream = None;
+                        position.store(0, Ordering::Relaxed);
+                        if let Ok(mut s) = play_state.lock() {
+                            *s = PlayState::Stopped;
+                        }
+                        let _ = event_tx.send(AudioEvent::Stopped);
+                        continue;
+                    }
+                    Ok(AudioCommand::SetVolume(v)) => {
+                        if let Ok(mut vol) = volume.lock() {
+                            *vol = v.clamp(0.0, 1.0);
+                        }
+                        continue;
+                    }
+                    Ok(_) => continue, // Ignore other commands when stopped
+                    Err(_) => break, // Channel disconnected
+                }
+            }
+        };
+
+        // Drop any existing stream
+        _stream = None;
 
                 let path = match req.song.path.as_deref() {
                     Some(p) => p.to_owned(),
@@ -389,7 +415,7 @@ fn decode_thread(
                                         }
                                     }
                                     AudioCommand::Play(new_req) => {
-                                        // New play while paused — restart outer loop
+                                        current_req = Some(new_req);
                                         _stream = None;
                                         let _ = event_tx.send(AudioEvent::Stopped);
                                         break 'decode;
@@ -398,11 +424,17 @@ fn decode_thread(
                                 }
                             }
                         }
-                        Ok(AudioCommand::Stop) | Ok(AudioCommand::Play(_)) => {
+                        Ok(AudioCommand::Stop) => {
                             _stream = None;
                             if let Ok(mut s) = play_state.lock() {
                                 *s = PlayState::Stopped;
                             }
+                            let _ = event_tx.send(AudioEvent::Stopped);
+                            break 'decode;
+                        }
+                        Ok(AudioCommand::Play(new_req)) => {
+                            current_req = Some(new_req);
+                            _stream = None;
                             let _ = event_tx.send(AudioEvent::Stopped);
                             break 'decode;
                         }
@@ -518,29 +550,4 @@ fn decode_thread(
                     }
                 }
             }
-
-            AudioCommand::Pause => {
-                // No active stream — ignore
-            }
-            AudioCommand::Resume => {
-                // No active stream — ignore
-            }
-            AudioCommand::Stop => {
-                _stream = None;
-                position.store(0, Ordering::Relaxed);
-                if let Ok(mut s) = play_state.lock() {
-                    *s = PlayState::Stopped;
-                }
-                let _ = event_tx.send(AudioEvent::Stopped);
-            }
-            AudioCommand::SetVolume(v) => {
-                if let Ok(mut vol) = volume.lock() {
-                    *vol = v.clamp(0.0, 1.0);
-                }
-            }
-            AudioCommand::SeekTo(_) => {
-                // No active playback — ignore
-            }
         }
-    }
-}
