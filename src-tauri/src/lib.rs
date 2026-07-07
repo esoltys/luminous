@@ -49,11 +49,18 @@ pub fn run() {
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
             let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
-            let path = request.uri().path();
-            let trimmed = path.trim_start_matches('/');
+            
+            // Extract the resource path directly from the full URI string
+            let uri_str = request.uri().to_string();
+            let mut trimmed = uri_str.strip_prefix("luminous-art://").unwrap_or(&uri_str);
+            
+            // If the webview prepends localhost/ to the authority, strip it
+            if trimmed.starts_with("localhost/") {
+                trimmed = trimmed.strip_prefix("localhost/").unwrap_or(trimmed);
+            }
 
             let file_path = if trimmed.starts_with("local/") {
-                let local_path = trimmed.trim_start_matches("local/");
+                let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
                 let decoded = percent_encoding::percent_decode_str(local_path).decode_utf8_lossy().into_owned();
                 std::path::PathBuf::from(decoded)
             } else {
