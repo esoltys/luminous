@@ -132,6 +132,11 @@
                       <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-gray-800 text-gray-400 border border-gray-700/50 shrink-0">
                         {item.song.filetype}
                       </span>
+                      {#if item.song.lyrics && item.song.lyrics.trim() !== ""}
+                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-violet-950/40 text-violet-400 border border-violet-800/40 shrink-0" title="Lyrics available">
+                          LRC
+                        </span>
+                      {/if}
                     {/if}
                   </div>
                 </td>

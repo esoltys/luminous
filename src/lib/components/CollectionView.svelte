@@ -155,6 +155,11 @@
                     <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-gray-800 text-gray-400 border border-gray-700/50 shrink-0">
                       {song.filetype}
                     </span>
+                    {#if song.lyrics && song.lyrics.trim() !== ""}
+                      <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-violet-950/40 text-violet-400 border border-violet-800/40 shrink-0" title="Lyrics available">
+                        LRC
+                      </span>
+                    {/if}
                   </div>
                 </td>
                 <td class="py-2.5 px-4 text-gray-300 truncate max-w-xs">{song.artist || "Unknown Artist"}</td>
