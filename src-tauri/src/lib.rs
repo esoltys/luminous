@@ -18,7 +18,7 @@ mod player;
 mod playlist;
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 
 pub use audio::AudioEngine;
@@ -63,6 +63,80 @@ pub fn run() {
             let playlists = Arc::new(Mutex::new(
                 PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists"),
             ));
+
+            // Spawn position tick loop (Tokio)
+            let app_handle_ticks = app.handle().clone();
+            let audio_ticks = Arc::clone(&audio);
+            let player_ticks = Arc::clone(&player);
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+                loop {
+                    interval.tick().await;
+                    let (pos, state) = {
+                        let engine = audio_ticks.lock().await;
+                        (engine.current_position_nanosec(), engine.current_state())
+                    };
+                    if state == crate::models::PlayState::Playing {
+                        let mut p = player_ticks.lock().await;
+                        p.on_position_update(pos);
+                        let _ = app_handle_ticks.emit("playback-position", serde_json::json!({
+                            "position_nanosec": pos
+                        }));
+                    }
+                }
+            });
+
+            // Spawn event receiver loop (OS thread)
+            let app_handle_events = app.handle().clone();
+            let audio_events = Arc::clone(&audio);
+            let player_events = Arc::clone(&player);
+            std::thread::Builder::new()
+                .name("luminous-events".to_string())
+                .spawn(move || {
+                    let rx = {
+                        let engine = tauri::async_runtime::block_on(async {
+                            audio_events.lock().await
+                        });
+                        engine.event_rx.clone()
+                    };
+
+                    let rx = rx.lock().unwrap();
+                    for event in rx.iter() {
+                        eprintln!("[Luminous Backend] Received event: {:?}", event);
+                        let app = app_handle_events.clone();
+                        let player = player_events.clone();
+                        tauri::async_runtime::block_on(async move {
+                            let mut p = player.lock().await;
+                            match event {
+                                crate::audio::AudioEvent::Playing { .. } => {
+                                    let _ = app.emit("track-changed", serde_json::json!({
+                                        "song": p.current_song.clone()
+                                    }));
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
+                                }
+                                crate::audio::AudioEvent::Paused => {
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
+                                }
+                                crate::audio::AudioEvent::Stopped => {
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
+                                }
+                                crate::audio::AudioEvent::TrackFinished { .. } => {
+                                    let _ = p.on_track_finished().await;
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
+                                }
+                                crate::audio::AudioEvent::Error { message } => {
+                                    eprintln!("[Luminous Backend] ERROR from audio engine: {}", message);
+                                }
+                                _ => {}
+                            }
+                        });
+                    }
+                })
+                .expect("failed to spawn event thread");
 
             app.manage(AppState {
                 db,
