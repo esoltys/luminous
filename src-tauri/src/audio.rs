@@ -165,9 +165,6 @@ fn decode_thread(
         probe::Hint,
     };
 
-    // PCM sample queue shared between decode loop and CPAL callback
-    let (pcm_tx, pcm_rx) = mpsc::sync_channel::<Vec<f32>>(128);
-
     // Keep current CPAL stream alive. Dropping it stops playback.
     let mut _stream: Option<cpal::Stream> = None;
 
@@ -298,23 +295,7 @@ fn decode_thread(
                     buffer_size: cpal::BufferSize::Default,
                 };
 
-                // Drain the PCM queue before starting a new track
-                while pcm_rx.try_recv().is_ok() {}
-
                 let vol_ref = Arc::clone(&volume);
-
-                // Build CPAL output stream — pcm_rx is moved into the callback
-                // SAFETY: we drain pcm_rx above before each new Play command.
-                // The stream callback and decode loop share the queue.
-                let pcm_rx_arc = Arc::new(Mutex::new({
-                    // We can't move pcm_rx into both the callback and keep it
-                    // in this thread, so we use a new pair and bridge them.
-                    let (inner_tx, inner_rx) = mpsc::sync_channel::<Vec<f32>>(128);
-                    // We'll forward from pcm_tx → inner_rx via the decode loop below.
-                    // For simplicity: decode loop sends directly to pcm_tx,
-                    // and we clone pcm_tx for the inner callback.
-                    inner_rx
-                }));
 
                 // Simpler approach: use a shared VecDeque protected by Mutex
                 let shared_buf: Arc<Mutex<std::collections::VecDeque<f32>>> =

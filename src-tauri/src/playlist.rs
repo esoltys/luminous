@@ -13,6 +13,7 @@ use uuid::Uuid;
 // Undo/Redo stack operations
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 enum PlaylistOp {
     Insert {

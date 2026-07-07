@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct Player {
-    db: Arc<Database>,
+    _db: Arc<Database>,
     audio: Arc<Mutex<AudioEngine>>,
 
     // Current playback context
@@ -50,7 +50,7 @@ pub struct Player {
 impl Player {
     pub fn new(db: Arc<Database>, audio: Arc<Mutex<AudioEngine>>) -> Self {
         Self {
-            db,
+            _db: db,
             audio,
             current_song: None,
             current_playlist_id: None,
