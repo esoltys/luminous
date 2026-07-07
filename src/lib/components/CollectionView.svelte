@@ -23,6 +23,23 @@
     collectionStore.refreshLibrary();
   }
 
+  function getArtistGradient(name: string | null): string {
+    if (!name) return "from-purple-900 to-indigo-900";
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % 5;
+    const gradients = [
+      "from-indigo-600 to-purple-600",
+      "from-rose-600 to-orange-600",
+      "from-emerald-600 to-teal-600",
+      "from-cyan-600 to-blue-600",
+      "from-amber-600 to-red-600"
+    ];
+    return gradients[index];
+  }
+
   let searchQuery = $state("");
   let sortField = $state<keyof Song>("title");
   let sortAsc = $state(true);
@@ -287,8 +304,8 @@
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {#each collectionStore.artists as artist}
           <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
-            <div class="w-20 h-20 bg-brand-main rounded-full mb-3 flex items-center justify-center text-brand-accent border border-brand-border">
-              <Music class="w-8 h-8" />
+            <div class="w-20 h-20 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
+              {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
             </div>
             <h3 class="font-semibold text-sm text-brand-text-primary truncate w-full" title={artist.name || "Unknown Artist"}>
               {artist.name || "Unknown Artist"}

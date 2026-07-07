@@ -58,6 +58,9 @@ pub fn run() {
             if trimmed.starts_with("localhost/") {
                 trimmed = trimmed.strip_prefix("localhost/").unwrap_or(trimmed);
             }
+            
+            // Webviews normalize empty paths to trailing slashes (e.g. URI/ -> path/)
+            trimmed = trimmed.trim_end_matches('/');
 
             let file_path = if trimmed.starts_with("local/") {
                 let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
