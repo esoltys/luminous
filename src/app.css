@@ -22,6 +22,14 @@
     --color-text-primary: #f3f4f6;
     --color-text-secondary: #9ca3af;
     --color-border: #1f1b2e;
+
+    /* Artwork extracted colors defaults */
+    --color-artwork-primary: #0d0b18;
+    --color-artwork-sidebar: #07050e;
+    --color-artwork-playerbar: #0a0813;
+    --color-artwork-accent: #8b5cf6;
+    --color-artwork-accent-hover: #a78bfa;
+    --color-artwork-border: #1f1b2e;
   }
 
   body {

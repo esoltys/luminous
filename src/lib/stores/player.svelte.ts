@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState } from "../types";
+import { themeStore } from "./theme.svelte";
 
 class PlayerStore {
   // Reactive state using Svelte 5 Runes
@@ -23,6 +24,7 @@ class PlayerStore {
       // Get initial playback state from backend
       const initialState: PlaybackState = await invoke("get_playback_state");
       this.updateState(initialState);
+      themeStore.updateArtworkColors(this.currentSong);
 
       // Listen for position changes (emitted every ~250ms or on seek)
       await listen<{ position_nanosec: number }>("playback-position", (event) => {
@@ -31,12 +33,17 @@ class PlayerStore {
 
       // Listen for playback state changes
       await listen<PlaybackState>("playback-state", (event) => {
+        const oldSongId = this.currentSong?.id;
         this.updateState(event.payload);
+        if (this.currentSong?.id !== oldSongId) {
+          themeStore.updateArtworkColors(this.currentSong);
+        }
       });
 
       // Listen for track changes
       await listen<{ song: Song | null }>("track-changed", (event) => {
         this.currentSong = event.payload.song || undefined;
+        themeStore.updateArtworkColors(this.currentSong);
       });
     } catch (err) {
       console.error("Failed to initialize PlayerStore:", err);

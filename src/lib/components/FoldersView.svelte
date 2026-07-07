@@ -176,7 +176,7 @@
       <div class="space-y-6">
         <div>
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Predefined Themes</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {#each PREDEFINED_THEMES as theme}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
