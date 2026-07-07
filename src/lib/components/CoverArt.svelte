@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Music, Disc, Loader2 } from "lucide-svelte";
+  import { Music, Disc, LoaderCircle } from "lucide-svelte";
 
   interface Props {
     songId: number | undefined;
@@ -101,7 +101,7 @@
       }}
     />
   {:else if isLoading}
-    <Loader2 class="w-1/2 h-1/2 animate-spin text-violet-400" />
+    <LoaderCircle class="w-1/2 h-1/2 animate-spin text-violet-400" />
   {:else}
     <div class="flex items-center justify-center w-full h-full bg-linear-to-b from-gray-800 to-gray-950">
       {#if animateSpin}
