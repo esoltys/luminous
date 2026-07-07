@@ -359,3 +359,45 @@ impl PlaylistManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn setup_test_db() -> (Database, std::path::PathBuf) {
+        let temp_dir = std::env::temp_dir().join(format!("luminous_playlist_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        (db, temp_dir)
+    }
+
+    #[test]
+    fn test_playlist_crud() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        // Create playlist
+        let pl = manager.create_playlist("Chill Mix").unwrap();
+        let pl_id = pl.id;
+        assert!(pl_id > 0);
+
+        // Get playlists
+        let playlists = manager.get_playlists().unwrap();
+        assert_eq!(playlists.len(), 1);
+        assert_eq!(playlists[0].name, "Chill Mix");
+
+        // Rename playlist
+        manager.rename_playlist(pl_id, "Chill Beats").unwrap();
+        let playlists = manager.get_playlists().unwrap();
+        assert_eq!(playlists[0].name, "Chill Beats");
+
+        // Delete playlist
+        manager.delete_playlist(pl_id).unwrap();
+        let playlists = manager.get_playlists().unwrap();
+        assert_eq!(playlists.len(), 0);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+}

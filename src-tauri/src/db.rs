@@ -250,3 +250,26 @@ CREATE TABLE IF NOT EXISTS radio_channels (
     codec         TEXT
 );
 ";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_database_initialization() {
+        // Use a unique temp path for testing
+        let temp_dir = std::env::temp_dir().join(format!("luminous_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        
+        let conn = db.pool.get().unwrap();
+        let tables_count: i64 = conn.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('songs', 'directories', 'playlists')",
+            [],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(tables_count, 3);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+}
