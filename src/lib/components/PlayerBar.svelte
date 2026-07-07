@@ -78,9 +78,16 @@
       {/if}
     </div>
     <div class="flex flex-col truncate">
-      <span class="text-sm font-semibold text-gray-100 truncate">
-        {playerStore.currentSong?.title || "Not Playing"}
-      </span>
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-semibold text-gray-100 truncate">
+          {playerStore.currentSong?.title || "Not Playing"}
+        </span>
+        {#if playerStore.currentSong}
+          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-sm shrink-0">
+            {playerStore.currentSong.filetype}
+          </span>
+        {/if}
+      </div>
       <span class="text-xs text-gray-400 truncate">
         {playerStore.currentSong?.artist || "Unknown Artist"}
       </span>

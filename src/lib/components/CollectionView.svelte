@@ -137,7 +137,14 @@
                     <Play class="w-4 h-4 fill-current" />
                   </button>
                 </td>
-                <td class="py-2.5 px-4 font-medium text-white truncate max-w-xs">{song.title || "Unknown Title"}</td>
+                <td class="py-2.5 px-4 font-medium text-white truncate max-w-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="truncate">{song.title || "Unknown Title"}</span>
+                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-gray-800 text-gray-400 border border-gray-700/50 shrink-0">
+                      {song.filetype}
+                    </span>
+                  </div>
+                </td>
                 <td class="py-2.5 px-4 text-gray-300 truncate max-w-xs">{song.artist || "Unknown Artist"}</td>
                 <td class="py-2.5 px-4 text-gray-400 truncate max-w-xs">{song.album || "Unknown Album"}</td>
                 <td class="py-2.5 px-4 text-center text-gray-400">{formatDuration(song.length_nanosec)}</td>
