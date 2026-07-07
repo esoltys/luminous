@@ -88,7 +88,7 @@ sudo apt install libasound2-dev libssl-dev pkg-config
 To enable AcoustID audio fingerprinting and auto-tagging, you need the `fpcalc` utility:
 *   **Linux (Ubuntu/Debian)**:
     ```bash
-    sudo apt install chromaprint-tools
+    sudo apt install libchromaprint-tools
     ```
 *   **macOS (Homebrew)**:
     ```bash
