@@ -1,0 +1,90 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem } from "../types";
+
+class CollectionStore {
+  directories = $state<MusicDirectory[]>([]);
+  stats = $state<LibraryStats>({
+    total_songs: 0,
+    total_artists: 0,
+    total_albums: 0,
+    total_duration_nanosec: 0,
+    total_filesize_bytes: 0,
+  });
+  isScanning = $state<boolean>(false);
+  scanProgress = $state<ScanProgress | null>(null);
+
+  // Cached collections
+  songs = $state<Song[]>([]);
+  albums = $state<AlbumItem[]>([]);
+  artists = $state<ArtistItem[]>([]);
+  searchResults = $state<Song[]>([]);
+  searchQuery = $state<string>("");
+
+  constructor() {
+    this.init();
+  }
+
+  private async init() {
+    try {
+      await this.refreshDirectories();
+      await this.refreshStats();
+      await this.refreshLibrary();
+
+      // Listen to library scan progress events
+      await listen<ScanProgress>("scan-progress", (event) => {
+        this.scanProgress = event.payload;
+        this.isScanning = event.payload.phase !== "done";
+        if (event.payload.phase === "done") {
+          this.refreshStats();
+          this.refreshLibrary();
+        }
+      });
+    } catch (err) {
+      console.error("Failed to initialize CollectionStore:", err);
+    }
+  }
+
+  async refreshDirectories() {
+    this.directories = await invoke("get_directories");
+  }
+
+  async refreshStats() {
+    this.stats = await invoke("get_library_stats");
+  }
+
+  async refreshLibrary() {
+    this.songs = await invoke("get_songs", { limit: 1000, offset: 0 });
+    this.albums = await invoke("get_albums");
+    this.artists = await invoke("get_artists");
+  }
+
+  async addDirectory(path: string) {
+    await invoke("add_directory", { path });
+    await this.refreshDirectories();
+  }
+
+  async removeDirectory(path: string) {
+    await invoke("remove_directory", { path });
+    await this.refreshDirectories();
+  }
+
+  async startScan() {
+    this.isScanning = true;
+    invoke("scan_directories").catch((err) => {
+      console.error("Failed to scan directories:", err);
+      this.isScanning = false;
+    });
+  }
+
+  async search(query: string) {
+    this.searchQuery = query;
+    if (query.trim() === "") {
+      this.searchResults = [];
+      return;
+    }
+    this.searchResults = await invoke("search_songs", { query, limit: 500 });
+  }
+}
+
+export const collectionStore = new CollectionStore();

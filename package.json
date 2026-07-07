@@ -13,11 +13,11 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri"
   },
-  "license": "MIT",
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/svelte-table": "^8.21.3",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
     "lucide-svelte": "^1.0.1",
     "svelte-virtual-list-ts": "^0.0.3",
