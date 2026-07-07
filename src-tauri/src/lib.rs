@@ -9,14 +9,17 @@
 //   collection — Library scanner + file watcher
 //   playlist  — Playlist CRUD + undo/redo
 
+mod analyzer;
 mod audio;
 mod collection;
 mod commands;
 mod covermanager;
 mod db;
 mod models;
+mod moodbar;
 mod player;
 mod playlist;
+mod waveform;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -135,6 +138,33 @@ pub fn run() {
                 }
             });
 
+            // Spawn real-time visualizer spectrum emission loop (Tokio)
+            let app_handle_visualizer = app.handle().clone();
+            let audio_visualizer = Arc::clone(&audio);
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+                loop {
+                    interval.tick().await;
+                    let (enabled, spectrum) = {
+                        let engine = audio_visualizer.lock().await;
+                        let enabled = engine.spectrum_enabled.load(std::sync::atomic::Ordering::Relaxed);
+                        let state = engine.current_state();
+                        let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                            Some(crate::analyzer::calculate_spectrum(&engine.visualizer_buf, 1024))
+                        } else {
+                            None
+                        };
+                        (enabled, spectrum)
+                    };
+
+                    if enabled {
+                        if let Some(spec) = spectrum {
+                            let _ = app_handle_visualizer.emit("spectrum-data", spec);
+                        }
+                    }
+                }
+            });
+
             // Spawn event receiver loop (OS thread)
             let app_handle_events = app.handle().clone();
             let audio_events = Arc::clone(&audio);
@@ -238,6 +268,10 @@ pub fn run() {
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,
+            // Visualizer commands
+            commands::visualizer::get_waveform_data,
+            commands::visualizer::get_moodbar_data,
+            commands::visualizer::set_spectrum_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

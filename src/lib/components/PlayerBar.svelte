@@ -2,6 +2,9 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import WaveformSeekBar from "./WaveformSeekBar.svelte";
+  import MoodBar from "./MoodBar.svelte";
+  import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import {
     Play,
     Pause,
@@ -156,21 +159,19 @@
     <!-- Scrubber -->
     <div class="flex items-center gap-2.5 w-full text-[10px] text-gray-400">
       <span>{formatTime(playerStore.positionNanosec)}</span>
-      <input
-        type="range"
-        min="0"
-        max={playerStore.currentSong?.length_nanosec || 0}
-        value={playerStore.positionNanosec}
-        onchange={handleSeek}
-        class="flex-1 accent-violet-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer hover:h-1.5 transition-all"
-        disabled={!playerStore.currentSong}
-      />
+      <div class="flex-1 flex flex-col gap-1">
+        <WaveformSeekBar />
+        <MoodBar />
+      </div>
       <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
     </div>
   </div>
 
-  <!-- Auxiliary (Volume) -->
+  <!-- Auxiliary (Volume & Visualizers) -->
   <div class="flex items-center justify-end gap-3 w-1/3 min-w-[200px]">
+    <div class="w-24 h-7 mr-2 hidden md:block">
+      <SpectrumVisualizer />
+    </div>
     <button onclick={toggleMute} class="text-gray-400 hover:text-white transition-colors">
       {#if isMuted || playerStore.volume === 0}
         <VolumeX class="w-4 h-4" />

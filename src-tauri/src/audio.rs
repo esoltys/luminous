@@ -53,6 +53,8 @@ pub struct AudioEngine {
     pub position_nanosec: Arc<AtomicU64>,
     pub volume: Arc<Mutex<f32>>,
     pub play_state: Arc<Mutex<PlayState>>,
+    pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AudioEngine {
@@ -62,16 +64,19 @@ impl AudioEngine {
         let position = Arc::new(AtomicU64::new(0));
         let volume = Arc::new(Mutex::new(1.0f32));
         let play_state = Arc::new(Mutex::new(PlayState::Stopped));
+        let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
+        let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
         let pos_clone = Arc::clone(&position);
         let vol_clone = Arc::clone(&volume);
         let state_clone = Arc::clone(&play_state);
+        let vis_clone = Arc::clone(&visualizer_buf);
 
         // Spawn a plain OS thread — no Send requirement on cpal::Stream
         std::thread::Builder::new()
             .name("luminous-audio".to_string())
             .spawn(move || {
-                decode_thread(cmd_rx, event_tx, pos_clone, vol_clone, state_clone);
+                decode_thread(cmd_rx, event_tx, pos_clone, vol_clone, state_clone, vis_clone);
             })
             .expect("failed to spawn audio thread");
 
@@ -81,6 +86,8 @@ impl AudioEngine {
             position_nanosec: position,
             volume,
             play_state,
+            visualizer_buf,
+            spectrum_enabled,
         }
     }
 
@@ -153,6 +160,7 @@ fn decode_thread(
     position: Arc<AtomicU64>,
     volume: Arc<Mutex<f32>>,
     play_state: Arc<Mutex<PlayState>>,
+    visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
 ) {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use symphonia::core::{
@@ -310,6 +318,7 @@ fn decode_thread(
                 ));
                 let played_samples_cpal = Arc::clone(&played_samples);
                 let position_cpal = Arc::clone(&position);
+                let visualizer_buf_cpal = Arc::clone(&visualizer_buf);
 
                 let stream = match device.build_output_stream(
                     &config,
@@ -325,6 +334,17 @@ fn decode_thread(
                                 *sample = 0.0;
                             }
                         }
+
+                        if played > 0 {
+                            let channels_u = channels as usize;
+                            let mut mono_samples = Vec::with_capacity(played / channels_u);
+                            for chunk in output[..played].chunks(channels_u) {
+                                let sum: f32 = chunk.iter().sum();
+                                mono_samples.push(sum / channels as f32);
+                            }
+                            visualizer_buf_cpal.push(&mono_samples);
+                        }
+
                         let total_played = played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
                         let pos_ns = (total_played as f64 * 1_000_000_000.0 / (sample_rate as f64 * channels as f64)) as u64;
                         position_cpal.store(pos_ns, Ordering::Relaxed);
