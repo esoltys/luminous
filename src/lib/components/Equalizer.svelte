@@ -51,28 +51,70 @@
     else activePreset = "Custom";
   }
 
+  async function ensureEnabled() {
+    if (!enabled) {
+      enabled = true;
+      await invoke("set_equalizer_enabled", { enabled: true });
+    }
+  }
+
   async function handleToggle() {
     await invoke("set_equalizer_enabled", { enabled });
   }
 
   async function handlePreampChange() {
+    await ensureEnabled();
     await invoke("set_equalizer_preamp", { preampDb: preamp });
   }
 
   async function handleBandChange(index: number) {
     activePreset = "Custom";
+    await ensureEnabled();
     await invoke("set_equalizer_band", { bandIdx: index, gainDb: gains[index] });
   }
 
   async function selectPreset(preset: string) {
     if (preset === "Custom") return;
     try {
+      await ensureEnabled();
       const config = await invoke<{ enabled: boolean; preamp: number; gains: number[] }>("load_equalizer_preset", { presetName: preset });
       gains = config.gains;
       activePreset = preset;
     } catch (e) {
       console.error("Failed to load preset:", e);
     }
+  }
+
+  // Smooth Catmull-Rom spline path generator for the SVG EQ envelope graphic
+  let curvePath = $derived.by(() => {
+    if (gains.length === 0) return "";
+    const pts = gains.map((g, i) => ({
+      x: (i / 9) * 100,
+      y: 20 - (g / 12.0) * 17
+    }));
+
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = i > 0 ? pts[i - 1] : pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
+
+      // Calculate control points for smooth transition
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  });
+
+  function verticalOrient(node: HTMLInputElement) {
+    node.setAttribute("orient", "vertical");
   }
 
   onMount(loadConfig);
@@ -105,13 +147,13 @@
         <select
           bind:value={activePreset}
           onchange={() => selectPreset(activePreset)}
-          class="bg-transparent text-xs text-gray-200 border-none outline-none cursor-pointer focus:ring-0 font-medium"
+          class="bg-gray-950 text-xs text-gray-200 border border-gray-800 rounded px-2 py-0.5 outline-none cursor-pointer focus:border-violet-500 font-medium"
         >
           {#each presets as preset}
-            <option value={preset} class="bg-gray-900">{preset}</option>
+            <option value={preset} class="bg-gray-900 text-gray-200">{preset}</option>
           {/each}
           {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-gray-900" disabled>Custom</option>
+            <option value="Custom" class="bg-gray-900 text-gray-200" disabled>Custom</option>
           {/if}
         </select>
       </div>
@@ -147,9 +189,8 @@
         <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-gray-800 pointer-events-none"></div>
         <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
           {#if gains.length === 10}
-            {@const points = gains.map((g, i) => `${(i / 9) * 100},${20 - (g / 12.0) * 18}`)}
             <path
-              d="M {points.join(' L ')}"
+              d={curvePath}
               fill="none"
               stroke={enabled ? "url(#eqGrad)" : "#4b5563"}
               stroke-width="1.5"
@@ -187,10 +228,11 @@
               min="-12.0"
               max="12.0"
               step="0.5"
+              use:verticalOrient
               bind:value={gains[idx]}
               oninput={() => handleBandChange(idx)}
-              class="accent-violet-500"
-              style="writing-mode: vertical-lr; direction: rtl; width: 8px; height: 100%; cursor: ns-resize;"
+              class="accent-violet-500 cursor-ns-resize"
+              style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 12px; height: 100%;"
             />
           </div>
 
