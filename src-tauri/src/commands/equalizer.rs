@@ -8,6 +8,20 @@ pub struct EqualizerConfig {
     pub preamp: f32,
 }
 
+fn save_eq_settings(db: &crate::db::Database, enabled: bool, preamp: f32, gains: &[f32; 10]) {
+    if let Ok(conn) = db.pool.get() {
+        let gains_str = gains
+            .iter()
+            .map(|g| g.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+        let _ = conn.execute(
+            "UPDATE equalizer_settings SET enabled = ?1, preamp = ?2, gains = ?3 WHERE id = 1",
+            rusqlite::params![if enabled { 1 } else { 0 }, preamp as f64, gains_str],
+        );
+    }
+}
+
 #[tauri::command]
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
@@ -24,6 +38,7 @@ pub async fn set_equalizer_enabled(state: State<'_, AppState>, enabled: bool) ->
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.enabled = enabled;
+    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
     Ok(())
 }
 
@@ -32,6 +47,7 @@ pub async fn set_equalizer_band(state: State<'_, AppState>, band_idx: usize, gai
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_gain(band_idx, gain_db);
+    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
     Ok(())
 }
 
@@ -40,6 +56,7 @@ pub async fn set_equalizer_preamp(state: State<'_, AppState>, preamp_db: f32) ->
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_preamp(preamp_db);
+    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
     Ok(())
 }
 
@@ -59,6 +76,8 @@ pub async fn load_equalizer_preset(state: State<'_, AppState>, preset_name: Stri
     };
 
     eq.load_preset(gains);
+    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
+
     Ok(EqualizerConfig {
         enabled: eq.enabled,
         gains: eq.gains,

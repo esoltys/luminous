@@ -100,7 +100,32 @@ pub fn run() {
             );
 
             // Initialize audio engine
-            let audio = Arc::new(Mutex::new(AudioEngine::new()));
+            let audio_engine = AudioEngine::new();
+
+            // Load and restore equalizer settings on startup
+            if let Ok(conn) = db.pool.get() {
+                if let Ok((enabled, preamp, gains_str)) = conn.query_row(
+                    "SELECT enabled, preamp, gains FROM equalizer_settings WHERE id = 1",
+                    [],
+                    |row| Ok((row.get::<_, i32>(0)? != 0, row.get::<_, f64>(1)? as f32, row.get::<_, String>(2)?)),
+                ) {
+                    let mut gains = [0.0f32; 10];
+                    for (i, val) in gains_str.split(',').enumerate() {
+                        if i < 10 {
+                            if let Ok(gain) = val.parse::<f32>() {
+                                gains[i] = gain;
+                            }
+                        }
+                    }
+                    if let Ok(mut eq) = audio_engine.equalizer.lock() {
+                        eq.enabled = enabled;
+                        eq.preamp = preamp;
+                        eq.load_preset(gains);
+                    }
+                }
+            }
+
+            let audio = Arc::new(Mutex::new(audio_engine));
 
             // Initialize player (needs db + audio refs)
             let player = Arc::new(Mutex::new(Player::new(

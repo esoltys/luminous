@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 1;
+const CURRENT_SCHEMA_VERSION: i32 = 2;
 
 pub struct Database {
     pub pool: DbPool,
@@ -74,8 +74,14 @@ impl Database {
             )?;
         }
 
-        // Future migrations go here:
-        // if version < 2 { conn.execute_batch(MIGRATION_2)?; ... }
+        if version < 2 {
+            log::info!("Running migration 2: equalizer settings");
+            conn.execute_batch(MIGRATION_2)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![2],
+            )?;
+        }
 
         Ok(())
     }
@@ -249,6 +255,16 @@ CREATE TABLE IF NOT EXISTS radio_channels (
     tags          TEXT,
     codec         TEXT
 );
+";
+
+const MIGRATION_2: &str = "
+CREATE TABLE IF NOT EXISTS equalizer_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0,
+    preamp REAL NOT NULL DEFAULT 0.0,
+    gains TEXT NOT NULL DEFAULT '0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0'
+);
+INSERT OR IGNORE INTO equalizer_settings (id, enabled, preamp, gains) VALUES (1, 0, 0.0, '0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0');
 ";
 
 #[cfg(test)]
