@@ -224,6 +224,80 @@ impl CollectionScanner {
             log::error!("Failed to prune missing songs during scan: {e}");
         }
 
+        // Phase 3: Resolve missing album artwork (local & remote)
+        log::info!("Starting artwork resolution for missing albums...");
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT
+                id,
+                path,
+                COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
+                album,
+                art_embedded
+             FROM songs
+             WHERE source IN (1, 2)
+               AND album IS NOT NULL
+               AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
+             GROUP BY effective_artist, album"
+        ) {
+            let mut albums_to_resolve = Vec::new();
+            if let Ok(mut rows) = stmt.query([]) {
+                while let Ok(Some(row)) = rows.next() {
+                    if let (Ok(id), Ok(path_str), Ok(effective_artist), Ok(album), Ok(art_embedded)) = (
+                        row.get::<_, i64>(0),
+                        row.get::<_, String>(1),
+                        row.get::<_, String>(2),
+                        row.get::<_, String>(3),
+                        row.get::<_, bool>(4),
+                    ) {
+                        albums_to_resolve.push((id, path_str, effective_artist, album, art_embedded));
+                    }
+                }
+            }
+
+            let mut remote_fetch_count = 0;
+            for (song_id, path_str, effective_artist, album, art_embedded) in albums_to_resolve {
+                let path = Path::new(&path_str);
+                let mut resolved = false;
+
+                // 1. Try embedded art
+                if art_embedded {
+                    if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, &effective_artist, &album) {
+                        let _ = conn.execute(
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
+                            params![cached_filename, effective_artist, album],
+                        );
+                        resolved = true;
+                    }
+                }
+
+                // 2. Try folder art
+                if !resolved {
+                    if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+                        let folder_art_str = folder_art_path.to_string_lossy().to_string();
+                        let _ = conn.execute(
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
+                            params![folder_art_str, effective_artist, album],
+                        );
+                        resolved = true;
+                    }
+                }
+
+                // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
+                if !resolved && remote_fetch_count < 50 {
+                    remote_fetch_count += 1;
+                    // Add a small delay between requests
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    
+                    if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
+                        let _ = conn.execute(
+                            "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
+                            params![filename, effective_artist, album],
+                        );
+                    }
+                }
+            }
+        }
+
         // Done
         let _ = app.emit(
             "scan-progress",
