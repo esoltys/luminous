@@ -8,6 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function main() {
+  if (process.env.CI) {
+    console.log("[Screenshot Automation] Running in CI environment. Skipping screenshot generation.");
+    process.exit(0);
+  }
   console.log("[Screenshot Automation] Starting screenshot generation...");
   
   // 1. Try dynamically importing playwright
