@@ -59,15 +59,15 @@ describe("PlayerStore", () => {
   });
 
   it("should update shuffle mode locally and invoke set_shuffle_mode", async () => {
-    await store.setShuffleMode("on");
-    expect(store.shuffleMode).toBe("on");
-    expect(invoke).toHaveBeenCalledWith("set_shuffle_mode", { mode: "on" });
+    await store.setShuffleMode("all");
+    expect(store.shuffleMode).toBe("all");
+    expect(invoke).toHaveBeenCalledWith("set_shuffle_mode", { mode: "all" });
   });
 
   it("should update repeat mode locally and invoke set_repeat_mode", async () => {
-    await store.setRepeatMode("one");
-    expect(store.repeatMode).toBe("one");
-    expect(invoke).toHaveBeenCalledWith("set_repeat_mode", { mode: "one" });
+    await store.setRepeatMode("track");
+    expect(store.repeatMode).toBe("track");
+    expect(invoke).toHaveBeenCalledWith("set_repeat_mode", { mode: "track" });
   });
 
   it("should update position and invoke seek_to on seek", async () => {
