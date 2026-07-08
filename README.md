@@ -10,7 +10,7 @@ Luminous is a gorgeous, high-performance desktop music player designed for moder
 
 ---
 
-## 🚀 Product Highlights
+## Product Highlights
 
 *   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
 *   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
@@ -24,18 +24,11 @@ Luminous is a gorgeous, high-performance desktop music player designed for moder
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 luminous/
 ├── features/                 # BDD Gherkin Feature Specifications
-│   ├── cover_art.feature     # BDD Specs for cover art extraction
-│   ├── equalizer.feature     # BDD Specs for biquad equalizer
-│   ├── library_scan.feature  # BDD Specs for local collection scanner
-│   ├── lyrics.feature        # BDD Specs for synced lyrics caching
-│   ├── playback_controls.feature # BDD Specs for player audio engine
-│   ├── playlists.feature     # BDD Specs for playlist editor
-│   └── tag_editor.feature    # BDD Specs for lofty metadata writes & AcoustID
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
@@ -64,19 +57,7 @@ luminous/
 
 ---
 
-## 🔬 Testing and Specifications
-
-Luminous features are defined using BDD Gherkin files in the `features/` directory and backed by unit and integration tests.
-
-To run the test suite:
-```bash
-cd src-tauri
-cargo test
-```
-
----
-
-## 🛠️ Building Luminous
+## Building Luminous
 
 Luminous is a cross-platform application that can be built and run on both Linux and Windows.
 
@@ -152,3 +133,15 @@ To enable AcoustID audio fingerprinting and automatic metadata lookup, the `fpca
     # Windows PowerShell
     $env:FPCALC_PATH="C:\path\to\fpcalc.exe"
     ```
+
+---
+
+## Testing and Specifications
+
+Luminous features are defined using BDD Gherkin files in the `features/` directory and backed by unit and integration tests.
+
+To run the test suite:
+```bash
+cd src-tauri
+cargo test
+```
