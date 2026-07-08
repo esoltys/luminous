@@ -10,7 +10,7 @@ use lofty::{
     file::TaggedFileExt,
     prelude::*,
     probe::Probe,
-    tag::{Accessor, Tag},
+    tag::{Accessor, ItemKey, Tag},
 };
 use notify::Watcher;
 use rusqlite::params;
@@ -147,64 +147,65 @@ impl CollectionScanner {
             },
         );
 
-        let conn = self.db.pool.get()?;
         let mut scanned = 0u64;
-
         let app_data_dir = app.path().app_data_dir().expect("no app data dir");
         let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
 
-        for path in &all_paths {
-            let path_str = path.to_string_lossy().to_string();
+        {
+            let conn = self.db.pool.get()?;
+            for path in &all_paths {
+                let path_str = path.to_string_lossy().to_string();
 
-            // mtime-based incremental scan: skip if mtime unchanged
-            let mtime = get_mtime(path).unwrap_or(0);
-            let existing_mtime: Option<i64> = conn
-                .query_row(
-                    "SELECT mtime FROM songs WHERE path = ?1",
-                    params![path_str],
-                    |row| row.get(0),
-                )
-                .ok();
+                // mtime-based incremental scan: skip if mtime unchanged
+                let mtime = get_mtime(path).unwrap_or(0);
+                let existing_mtime: Option<i64> = conn
+                    .query_row(
+                        "SELECT mtime FROM songs WHERE path = ?1",
+                        params![path_str],
+                        |row| row.get(0),
+                    )
+                    .ok();
 
-            if existing_mtime == Some(mtime) {
-                scanned += 1;
-                continue; // No change — skip tag re-read
-            }
+                if existing_mtime == Some(mtime) {
+                    scanned += 1;
+                    continue; // No change — skip tag re-read
+                }
 
-            // Read tags
-            match read_tags(path) {
-                Ok(mut song) => {
-                    if song.art_embedded {
-                        let artist = song.album_artist.as_deref().unwrap_or(song.artist.as_deref().unwrap_or(""));
-                        let album = song.album.as_deref().unwrap_or("");
-                        if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album) {
-                            song.art_automatic = Some(cached_filename);
+                // Read tags
+                match read_tags(path) {
+                    Ok(mut song) => {
+                        if song.art_embedded {
+                            let artist = song.album_artist.as_deref().unwrap_or(song.artist.as_deref().unwrap_or(""));
+                            let album = song.album.as_deref().unwrap_or("");
+                            if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album) {
+                                song.art_automatic = Some(cached_filename);
+                                song.art_unset = false;
+                            }
+                        } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+                            song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
                             song.art_unset = false;
                         }
-                    } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-                        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
-                        song.art_unset = false;
+                        upsert_song(&conn, &song)?;
                     }
-                    upsert_song(&conn, &song)?;
+                    Err(e) => {
+                        log::warn!("Failed to read tags for {}: {e}", path.display());
+                    }
                 }
-                Err(e) => {
-                    log::warn!("Failed to read tags for {}: {e}", path.display());
+
+                scanned += 1;
+
+                // Emit progress every 50 files to avoid flooding
+                if scanned % 50 == 0 || scanned == total {
+                    let _ = app.emit(
+                        "scan-progress",
+                        ScanProgress {
+                            phase: ScanPhase::ReadingTags,
+                            scanned,
+                            total,
+                            current_path: Some(path_str),
+                        },
+                    );
                 }
-            }
-
-            scanned += 1;
-
-            // Emit progress every 50 files to avoid flooding
-            if scanned % 50 == 0 || scanned == total {
-                let _ = app.emit(
-                    "scan-progress",
-                    ScanProgress {
-                        phase: ScanPhase::ReadingTags,
-                        scanned,
-                        total,
-                        current_path: Some(path_str),
-                    },
-                );
             }
         }
 
@@ -226,69 +227,77 @@ impl CollectionScanner {
 
         // Phase 3: Resolve missing album artwork (local & remote)
         log::info!("Starting artwork resolution for missing albums...");
-        if let Ok(mut stmt) = conn.prepare(
-            "SELECT
-                id,
-                path,
-                COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
-                album,
-                art_embedded
-             FROM songs
-             WHERE source IN (1, 2)
-               AND album IS NOT NULL
-               AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
-             GROUP BY effective_artist, album"
-        ) {
-            let mut albums_to_resolve = Vec::new();
-            if let Ok(mut rows) = stmt.query([]) {
-                while let Ok(Some(row)) = rows.next() {
-                    if let (Ok(id), Ok(path_str), Ok(effective_artist), Ok(album), Ok(art_embedded)) = (
-                        row.get::<_, i64>(0),
-                        row.get::<_, String>(1),
-                        row.get::<_, String>(2),
-                        row.get::<_, String>(3),
-                        row.get::<_, bool>(4),
-                    ) {
-                        albums_to_resolve.push((id, path_str, effective_artist, album, art_embedded));
+        let mut albums_to_resolve = Vec::new();
+        if let Ok(conn) = self.db.pool.get() {
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT
+                    id,
+                    path,
+                    COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
+                    album,
+                    art_embedded
+                 FROM songs
+                 WHERE source IN (1, 2)
+                   AND album IS NOT NULL
+                   AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
+                 GROUP BY effective_artist, album"
+            ) {
+                if let Ok(mut rows) = stmt.query([]) {
+                    while let Ok(Some(row)) = rows.next() {
+                        if let (Ok(id), Ok(path_str), Ok(effective_artist), Ok(album), Ok(art_embedded)) = (
+                            row.get::<_, i64>(0),
+                            row.get::<_, String>(1),
+                            row.get::<_, String>(2),
+                            row.get::<_, String>(3),
+                            row.get::<_, bool>(4),
+                        ) {
+                            albums_to_resolve.push((id, path_str, effective_artist, album, art_embedded));
+                        }
                     }
                 }
             }
+        }
 
-            let mut remote_fetch_count = 0;
-            for (song_id, path_str, effective_artist, album, art_embedded) in albums_to_resolve {
-                let path = Path::new(&path_str);
-                let mut resolved = false;
+        let mut remote_fetch_count = 0;
+        for (song_id, path_str, effective_artist, album, art_embedded) in albums_to_resolve {
+            let path = Path::new(&path_str);
+            let mut resolved = false;
 
-                // 1. Try embedded art
-                if art_embedded {
-                    if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, &effective_artist, &album) {
+            // 1. Try embedded art
+            if art_embedded {
+                if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, &effective_artist, &album) {
+                    if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
                             "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
                             params![cached_filename, effective_artist, album],
                         );
-                        resolved = true;
                     }
+                    resolved = true;
                 }
+            }
 
-                // 2. Try folder art
-                if !resolved {
-                    if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-                        let folder_art_str = folder_art_path.to_string_lossy().to_string();
+            // 2. Try folder art
+            if !resolved {
+                if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+                    let folder_art_str = folder_art_path.to_string_lossy().to_string();
+                    if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
                             "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
                             params![folder_art_str, effective_artist, album],
                         );
-                        resolved = true;
                     }
+                    resolved = true;
                 }
+            }
 
-                // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
-                if !resolved && remote_fetch_count < 50 {
-                    remote_fetch_count += 1;
-                    // Add a small delay between requests
-                    std::thread::sleep(std::time::Duration::from_millis(150));
-                    
-                    if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
+            // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
+            if !resolved && remote_fetch_count < 50 {
+                remote_fetch_count += 1;
+                // Add a small delay between requests
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                
+                if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
+                    if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
                             "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
                             params![filename, effective_artist, album],
@@ -574,15 +583,15 @@ fn read_tags(path: &Path) -> Result<Song> {
 
         // Album artist (various tag formats store this differently)
         song.album_artist = tag
-            .get_string(&lofty::tag::ItemKey::AlbumArtist)
+            .get_string(&ItemKey::AlbumArtist)
             .map(|s| s.to_string());
 
         song.composer = tag
-            .get_string(&lofty::tag::ItemKey::Composer)
+            .get_string(&ItemKey::Composer)
             .map(|s| s.to_string());
 
         song.lyrics = tag
-            .get_string(&lofty::tag::ItemKey::Lyrics)
+            .get_string(&ItemKey::Lyrics)
             .map(|s| s.to_string());
 
         // Check for embedded art
@@ -803,8 +812,8 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         match delete_path_and_subpaths(&db_for_thread, &path_str) {
                             Ok(deleted) => {
                                 if deleted > 0 {
-                                    log::info!("Pruned {} deleted song(s) from db", deleted);
-                                    let _ = app_clone.emit("library-changed", ());
+                                     log::info!("Pruned {} deleted song(s) from db", deleted);
+                                     let _ = app_clone.emit("library-changed", ());
                                 }
                             }
                             Err(e) => {
