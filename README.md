@@ -137,10 +137,31 @@ To enable AcoustID audio fingerprinting and automatic metadata lookup, the `fpca
 
 ## Testing and Specifications
 
-Luminous features are defined using BDD Gherkin files in the `features/` directory and backed by unit and integration tests.
+Luminous uses automated tests at both the frontend (Svelte 5) and backend (Rust) layers.
 
-To run the test suite:
+### Frontend Unit & Integration Tests (Vitest)
+
+Frontend tests are written with Vitest and test component rendering, Svelte 5 stores, and state updates with mocked Tauri APIs.
+
+To run the frontend test suite:
+```bash
+bun run test:run
+```
+
+### Backend Unit & Integration Tests (Rust)
+
+To run the standard cargo unit test suite:
 ```bash
 cd src-tauri
 cargo test
+```
+
+### Backend BDD Features (Cucumber)
+
+Luminous features are defined using Cucumber Gherkin specifications in the `features/` directory and implemented as integration tests in Rust using the `cucumber` crate.
+
+To run the Cucumber BDD test suite:
+```bash
+cd src-tauri
+cargo test --test equalizer_bdd
 ```

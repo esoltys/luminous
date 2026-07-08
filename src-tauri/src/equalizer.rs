@@ -91,6 +91,7 @@ impl BiquadFilter {
 // Cascaded 10-Band Equalizer
 // ---------------------------------------------------------------------------
 
+#[derive(Debug)]
 pub struct Equalizer {
     pub enabled: bool,
     pub gains: [f32; 10], // dB gains per band (-12.0 to +12.0)

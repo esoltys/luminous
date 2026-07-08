@@ -15,7 +15,7 @@ mod collection;
 mod commands;
 mod covermanager;
 mod db;
-mod equalizer;
+pub mod equalizer;
 mod lyrics;
 mod models;
 mod moodbar;

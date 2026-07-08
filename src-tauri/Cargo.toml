@@ -75,6 +75,13 @@ parking_lot = "0.12"
 rand = "0.8"
 percent-encoding = "2"
 
+[dev-dependencies]
+cucumber = { version = "0.20", features = ["macros"] }
+
+[[test]]
+name = "equalizer_bdd"
+harness = false
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

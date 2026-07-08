@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState } from "../types";
 import { themeStore } from "./theme.svelte";
 
-class PlayerStore {
+export class PlayerStore {
   // Reactive state using Svelte 5 Runes
   state = $state<PlayState>("stopped");
   currentSong = $state<Song | undefined>(undefined);
