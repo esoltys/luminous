@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Master App Canvas Shape Definition -->
+    <clipPath id="squircle">
+      <rect x="32" y="32" width="448" height="448" rx="105" ry="105" />
+    </clipPath>
+    
+    <!-- Asymmetrical Sunrise Gradient: Deep Left Shadow to Right White-Heat -->
+    <linearGradient id="sunriseGradient" x1="0%" y1="20%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#3a0d00" />    <!-- Muted, deep shadow silhouette red -->
+      <stop offset="30%" stop-color="#c83200" />   <!-- Rich mid-glow orange-red -->
+      <stop offset="65%" stop-color="#ff7300" />   <!-- Vibrant Zest Orange core -->
+      <stop offset="88%" stop-color="#ffcc00" />   <!-- High-intensity golden horizon -->
+      <stop offset="100%" stop-color="#ffffff" />  <!-- Blazing white-hot sunrise peak -->
+    </linearGradient>
+
+    <!-- Heavy Coronal Diffusion Filters for Scaled Visibility -->
+    <filter id="heavyGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="28" result="blur1" />
+      <feGaussianBlur stdDeviation="10" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur1" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Base Dark App Bounding Box Container -->
+  <g clip-path="url(#squircle)">
+    <!-- Deep Space Obsidian Canvas Layer -->
+    <rect x="0" y="0" width="512" height="512" fill="#08080b" />
+    
+    <!-- Subtle technical layout grids to anchor the dark canvas -->
+    <circle cx="256" cy="256" r="215" stroke="#13131c" stroke-width="1.5" fill="none" />
+    <circle cx="256" cy="256" r="175" stroke="#13131c" stroke-width="1" fill="none" stroke-dasharray="4 6" />
+
+    <!-- Ambient Backplate Glow (Shifted Eastward to throw light behind the planet) -->
+    <circle cx="280" cy="256" r="115" fill="url(#sunriseGradient)" opacity="0.35" filter="url(#heavyGlow)" />
+
+    <!-- Beefed-up Eclipse Ring (Thickened from 8px to 26px for extreme small-scale parity) -->
+    <circle cx="256" cy="256" r="120" stroke="url(#sunriseGradient)" stroke-width="26" fill="none" filter="url(#heavyGlow)" />
+
+    <!-- The White-Hot Sunrise Burst (Placed right over the eastern ring centerline) -->
+    <circle cx="368" cy="256" r="32" fill="#ffffff" filter="url(#heavyGlow)" opacity="0.65" />
+
+    <!-- The "Planet" Disc (Shifted 4px Left to naturally thin the western rim and thicken the sunrise) -->
+    <circle cx="252" cy="256" r="107" fill="#101015" />
+    
+    <!-- Razor-thin obsidian inner border to cleanly separate the core disc from the corona -->
+    <circle cx="252" cy="256" r="107" stroke="#08080b" stroke-width="1.5" fill="none" />
+  </g>
+</svg>
