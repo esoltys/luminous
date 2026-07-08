@@ -118,11 +118,11 @@ bun run tauri build
 Download and install the [Visual Studio Installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/). Select the **Desktop development with C++** workload and ensure the MSVC C++ build tools are checked.
 
 #### 2. Install Bun & Rust
-*   **Bun**: Install Bun by running the following command in PowerShell:
-    ```powershell
-    powershell -c "irm bun.sh/install.ps1 | iex"
-    ```
-*   **Rust**: Download and run the `rustup-init.exe` installer from [rustup.rs](https://rustup.rs/).
+Install the JavaScript runtime, package manager, and Rust toolchain
+
+```powershell
+winget install Oven-sh.Bun Rustlang.Rustup
+```
 
 #### 3. Run Development Server
 Run the following commands in your terminal (e.g., PowerShell or Command Prompt):
