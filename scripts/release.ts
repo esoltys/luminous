@@ -164,7 +164,7 @@ async function main() {
     for (let i = 0; i < 10; i++) {
       await new Promise(r => setTimeout(r, 3000));
       try {
-        const runJson = execSync(`gh run list --tag ${tagName} --limit 1 --json databaseId,status,conclusion`, { encoding: "utf-8" });
+        const runJson = execSync(`gh run list --branch ${tagName} --limit 1 --json databaseId,status,conclusion`, { encoding: "utf-8" });
         const runs = JSON.parse(runJson);
         if (runs && runs.length > 0) {
           runId = runs[0].databaseId.toString();
