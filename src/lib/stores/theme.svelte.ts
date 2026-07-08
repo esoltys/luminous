@@ -44,8 +44,8 @@ export const PREDEFINED_THEMES: Theme[] = [
     }
   },
   {
-    id: "strawberry-red",
-    name: "Strawberry Red",
+    id: "ruby-red",
+    name: "Ruby Red",
     colors: {
       "bg-main": "#1a0f12",
       "bg-sidebar": "#10090a",

@@ -12,8 +12,8 @@ Luminous is a gorgeous, high-performance desktop music player designed for moder
 
 ## 🚀 Product Highlights
 
-*   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Strawberry Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
-*   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, Clementine/Strawberry-style colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
+*   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
+*   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
 *   **10-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and style-based presets.
 *   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched from LRCLIB and plain text from Lyrics.ovh, complete with local caching and visual lyrics indicators.
 *   **AcoustID Audio Fingerprinting & Tag Editor**: Automatically identify tracks and fix incorrect metadata using AcoustID acoustic fingerprinting (via `fpcalc`) and write edits directly back to your audio files.
