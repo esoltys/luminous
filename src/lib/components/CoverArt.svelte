@@ -28,12 +28,18 @@
   // Function to load the cover art URI
   async function loadCoverArt() {
     if (artManual) {
-      imgSrc = getCoverArtUrl(`luminous-art://${artManual}`);
+      if (artManual.startsWith("http://") || artManual.startsWith("https://") || artManual.startsWith("/")) {
+        imgSrc = artManual;
+      } else {
+        imgSrc = getCoverArtUrl(`luminous-art://${artManual}`);
+      }
       hasFailed = false;
       return;
     }
     if (artAutomatic) {
-      if (artAutomatic.startsWith("album-")) {
+      if (artAutomatic.startsWith("http://") || artAutomatic.startsWith("https://") || artAutomatic.startsWith("/")) {
+        imgSrc = artAutomatic;
+      } else if (artAutomatic.startsWith("album-")) {
         imgSrc = getCoverArtUrl(`luminous-art://${artAutomatic}`);
       } else {
         imgSrc = getCoverArtUrl(`luminous-art://local/${artAutomatic}`);

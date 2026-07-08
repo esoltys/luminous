@@ -78,7 +78,13 @@ async function main() {
 
   const mockCode = fs.readFileSync(path.join(__dirname, "tauri-ipc-mock.js"), "utf8");
 
-  async function capture(tab: string, subTab: string, theme: string, filename: string) {
+  async function capture(
+    tab: string,
+    subTab: string,
+    theme: string,
+    filename: string,
+    afterLoad?: (page: import("playwright").Page) => Promise<void>
+  ) {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme})...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -105,6 +111,12 @@ async function main() {
     // Wait for rendering & animations to settle (e.g. waveform seek bar, dynamic styles, visualizer FFT frames)
     await page.waitForTimeout(1500);
 
+    // Optional post-load interaction (e.g. clicking into a sub-tab)
+    if (afterLoad) {
+      await afterLoad(page);
+      await page.waitForTimeout(500);
+    }
+
     const dir = path.join(__dirname, "../docs/screenshots");
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -121,7 +133,14 @@ async function main() {
     await capture("collection", "songs", "luminous-violet", "home_violet.png");
     await capture("collection", "albums", "nordic-blue", "albums_blue.png");
     await capture("collection", "artists", "retro-amber", "artists_amber.png");
-    await capture("equalizer", "", "ruby-red", "equalizer_red.png");
+    await capture("settings", "", "retro-amber", "themes_amber.png", async (page) => {
+      // Click the "UI Themes" sub-tab inside the Settings view
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
+        if (t) (t as HTMLElement).click();
+      });
+    });
     await capture("lyrics", "", "luminous-violet", "lyrics_violet.png");
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
