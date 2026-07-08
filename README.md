@@ -7,7 +7,7 @@
 [![Release](https://img.shields.io/badge/Release-0.31.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases)
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-31%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 
-Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface.
+Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. You can download the compiled binaries for Windows and Linux from the [GitHub Releases](https://github.com/esoltys/luminous/releases) page.
 
 <p align="center">
   <img src="docs/screenshots/home_violet.png" width="100%" alt="Luminous Violet Home View" />

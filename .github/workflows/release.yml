@@ -39,7 +39,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Luminous v${{ github.ref_name }}'
-          releaseBody: 'Release of Luminous version ${{ github.ref_name }}.'
+          releaseName: 'Luminous ${{ github.ref_name }}'
+          releaseBody: 'Release of Luminous ${{ github.ref_name }}.'
           releaseDraft: true
           prerelease: false
