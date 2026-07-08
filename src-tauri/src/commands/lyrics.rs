@@ -22,6 +22,8 @@ fn is_synced_lrc(text: &str) -> bool {
 
 #[tauri::command]
 pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
+    eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}");
+    
     // 1. Check database cache
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let cached_lyrics: Option<String> = conn
@@ -34,10 +36,17 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
         .flatten();
 
     if let Some(ref lyrics) = cached_lyrics {
-        if !lyrics.trim().is_empty() && is_synced_lrc(lyrics) {
+        if !lyrics.trim().is_empty() {
+            let is_synced = is_synced_lrc(lyrics);
+            eprintln!(
+                "[Luminous Backend] Cache hit in SQLite. Returning cached lyrics (len: {}, synced: {is_synced})",
+                lyrics.len()
+            );
             return Ok(lyrics.clone());
         }
     }
+
+    eprintln!("[Luminous Backend] Cache miss. Fetching metadata to search online...");
 
     // 2. Fetch metadata from DB to search online
     let song_metadata = conn
@@ -55,24 +64,36 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
         .map_err(|e| e.to_string())?;
 
     let (artist, title, album, len_ns) = song_metadata;
+    eprintln!(
+        "[Luminous Backend] Metadata found: artist='{artist}', title='{title}', album='{album}', length={len_ns}ns"
+    );
+
     if artist.trim().is_empty() || title.trim().is_empty() {
         if let Some(lyrics) = cached_lyrics {
             if !lyrics.trim().is_empty() {
+                eprintln!("[Luminous Backend] Insufficient metadata for online fetch, falling back to cached lyrics");
                 return Ok(lyrics);
             }
         }
+        eprintln!("[Luminous Backend] Error: insufficient metadata (artist/title) to query lyrics online");
         return Err("insufficient song metadata (artist/title) to fetch online lyrics".to_string());
     }
 
     let duration_sec = (len_ns / 1_000_000_000) as u32;
 
     // 3. Query online APIs (LRCLIB -> Lyrics.ovh)
+    eprintln!("[Luminous Backend] Querying online lyrics providers for '{artist}' - '{title}' (duration: {duration_sec}s)...");
     let lyrics_manager = crate::lyrics::LyricsManager::new();
     match lyrics_manager
         .fetch_lyrics(&artist, &title, &album, duration_sec)
         .await
     {
         Ok(fetched) => {
+            let is_synced = is_synced_lrc(&fetched);
+            eprintln!(
+                "[Luminous Backend] Successfully fetched online lyrics (len: {}, synced: {is_synced}). Caching in SQLite...",
+                fetched.len()
+            );
             // Cache back in SQLite
             conn.execute(
                 "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
@@ -82,9 +103,11 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
             Ok(fetched)
         }
         Err(e) => {
+            eprintln!("[Luminous Backend] Online search failed: {e}");
             // Online search failed, fall back to cached plain text if available
             if let Some(lyrics) = cached_lyrics {
                 if !lyrics.trim().is_empty() {
+                    eprintln!("[Luminous Backend] Falling back to cached plain text lyrics");
                     return Ok(lyrics);
                 }
             }

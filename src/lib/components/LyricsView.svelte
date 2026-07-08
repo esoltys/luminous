@@ -17,7 +17,10 @@
 
   // Parse lyrics from LRC string supporting multiple timestamps per line
   let parsedLines = $derived.by<LyricLine[]>(() => {
-    if (!lyricsText) return [];
+    if (!lyricsText) {
+      console.log("[LyricsView] parsedLines: lyricsText is empty");
+      return [];
+    }
     const lines = lyricsText.split("\n");
     const parsed: LyricLine[] = [];
     const timeRegex = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g;
@@ -45,7 +48,9 @@
         }
       }
     }
-    return parsed.sort((a, b) => a.timeMs - b.timeMs);
+    const sorted = parsed.sort((a, b) => a.timeMs - b.timeMs);
+    console.log(`[LyricsView] parsedLines: parsed ${sorted.length} lines. isSynced: ${sorted.length > 0}`);
+    return sorted;
   });
 
   let isSynced = $derived(parsedLines.length > 0);
@@ -63,30 +68,38 @@
         break;
       }
     }
+    
+    // Log every 5 seconds or on line index changes to avoid console flooding
+    if (matchIdx !== -1 && (matchIdx % 5 === 0 || currentMs % 5000 < 250)) {
+      console.log(`[LyricsView] Position: ${Math.round(currentMs)}ms, Active index: ${matchIdx}, Text: "${parsedLines[matchIdx]?.text}"`);
+    }
     return matchIdx;
   });
 
   async function loadLyrics(songId: number | undefined, forceRefresh = false) {
     if (songId === undefined) {
+      console.log("[LyricsView] loadLyrics: no songId provided");
       lyricsText = "";
       errorMsg = "";
       return;
     }
 
+    console.log(`[LyricsView] loadLyrics: fetching lyrics for songId: ${songId}, forceRefresh: ${forceRefresh}`);
     isLoading = true;
     errorMsg = "";
     isEditing = false;
 
     try {
       if (forceRefresh) {
-        // Clear local cache first to force online refetch
+        console.log("[LyricsView] forceRefresh is true. Clearing DB cache...");
         await invoke("save_lyrics", { songId, lyrics: "" });
       }
       const lyrics = await invoke<string>("get_lyrics", { songId });
+      console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}`);
       lyricsText = lyrics;
       editText = lyrics;
     } catch (e: any) {
-      console.error("Failed to load lyrics:", e);
+      console.error("[LyricsView] Failed to load lyrics:", e);
       errorMsg = e.toString();
       lyricsText = "";
       editText = "";
@@ -98,11 +111,12 @@
   async function saveManualLyrics() {
     if (!playerStore.currentSong) return;
     try {
+      console.log(`[LyricsView] Manually saving lyrics for songId: ${playerStore.currentSong.id}`);
       await invoke("save_lyrics", { songId: playerStore.currentSong.id, lyrics: editText });
       lyricsText = editText;
       isEditing = false;
     } catch (e: any) {
-      console.error("Failed to save lyrics:", e);
+      console.error("[LyricsView] Failed to save lyrics manually:", e);
       alert("Failed to save lyrics: " + e.toString());
     }
   }
@@ -114,6 +128,7 @@
 
   // Load lyrics when song changes
   $effect(() => {
+    console.log("[LyricsView] Song changed. Reloading lyrics for song ID:", playerStore.currentSong?.id);
     loadLyrics(playerStore.currentSong?.id);
   });
 
@@ -122,6 +137,7 @@
     if (activeLineIndex !== -1 && containerEl && !isEditing) {
       const activeEl = containerEl.querySelector(`[data-index="${activeLineIndex}"]`);
       if (activeEl) {
+        console.log(`[LyricsView] Auto-scrolling to active index ${activeLineIndex}`);
         activeEl.scrollIntoView({
           behavior: "smooth",
           block: "center",

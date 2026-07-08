@@ -96,8 +96,10 @@ class PlayerStore {
   }
 
   async seek(positionNs: number) {
-    this.positionNanosec = positionNs;
-    await invoke("seek_to", { positionNanosec: positionNs });
+    const roundedNs = Math.round(positionNs);
+    this.positionNanosec = roundedNs;
+    console.log("[PlayerStore] Seeking to nanoseconds (rounded):", roundedNs, "original float:", positionNs);
+    await invoke("seek_to", { positionNanosec: roundedNs });
   }
 
   async setVolume(vol: number) {

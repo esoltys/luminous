@@ -446,6 +446,7 @@ fn decode_thread(
                             break 'decode;
                         }
                         Ok(AudioCommand::SeekTo(target_ns)) => {
+                            eprintln!("[Luminous Backend] SeekTo command received. target_ns: {target_ns}");
                             let target_time = symphonia::core::units::Time::from(
                                 std::time::Duration::from_nanos(target_ns),
                             );
@@ -462,9 +463,11 @@ fn decode_thread(
                             match seek_res {
                                 Ok(seeked_to) => {
                                     decoder.reset();
+                                    eprintln!("[Luminous Backend] Seek successful! seeked_to: {:?}", seeked_to);
                                     log::info!("Seek successful: {:?}", seeked_to);
                                 }
                                 Err(e) => {
+                                    eprintln!("[Luminous Backend] Seek failed error: {:?}", e);
                                     log::error!("Seek failed: {:?}", e);
                                 }
                             }
