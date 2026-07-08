@@ -1,14 +1,15 @@
 {
   "name": "luminous",
   "version": "0.1.0",
-  "description": "Luminous Music Player — A modern reimagining of Strawberry",
+  "description": "Luminous Music Player — A modern, elegant music player",
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
+    "dev": "svelte-kit sync && vite dev",
+    "build": "svelte-kit sync && vite build",
     "preview": "vite preview",
+    "prepare": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri"

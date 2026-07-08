@@ -207,3 +207,18 @@ export interface ArtistItem {
   album_count: number;
   song_count: number;
 }
+
+/**
+ * Converts a custom luminous-art protocol URI (e.g. luminous-art://...)
+ * to a platform-appropriate URL (e.g. http://luminous-art.localhost/ on Windows).
+ */
+export function getCoverArtUrl(uri: string | null | undefined): string | null {
+  if (!uri) return null;
+  if (uri.startsWith("luminous-art://")) {
+    const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
+    if (isWindows) {
+      return uri.replace("luminous-art://", "http://luminous-art.localhost/");
+    }
+  }
+  return uri;
+}

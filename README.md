@@ -12,8 +12,8 @@ Luminous is a gorgeous, high-performance desktop music player designed for moder
 
 ## 🚀 Product Highlights
 
-*   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Strawberry Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
-*   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, Clementine/Strawberry-style colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
+*   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
+*   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
 *   **10-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and style-based presets.
 *   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched from LRCLIB and plain text from Lyrics.ovh, complete with local caching and visual lyrics indicators.
 *   **AcoustID Audio Fingerprinting & Tag Editor**: Automatically identify tracks and fix incorrect metadata using AcoustID acoustic fingerprinting (via `fpcalc`) and write edits directly back to your audio files.
@@ -118,11 +118,11 @@ bun run tauri build
 Download and install the [Visual Studio Installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/). Select the **Desktop development with C++** workload and ensure the MSVC C++ build tools are checked.
 
 #### 2. Install Bun & Rust
-*   **Bun**: Install Bun by running the following command in PowerShell:
-    ```powershell
-    powershell -c "irm bun.sh/install.ps1 | iex"
-    ```
-*   **Rust**: Download and run the `rustup-init.exe` installer from [rustup.rs](https://rustup.rs/).
+Install the JavaScript runtime, package manager, and Rust toolchain
+
+```powershell
+winget install Oven-sh.Bun Rustlang.Rustup
+```
 
 #### 3. Run Development Server
 Run the following commands in your terminal (e.g., PowerShell or Command Prompt):

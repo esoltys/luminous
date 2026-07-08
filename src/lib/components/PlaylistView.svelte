@@ -3,6 +3,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
+  import { getCoverArtUrl } from "../types";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
 
@@ -95,13 +96,13 @@
     const song = playerStore.currentSong;
     if (!song) return null;
     if (song.art_manual) {
-      return `luminous-art://${song.art_manual}`;
+      return getCoverArtUrl(`luminous-art://${song.art_manual}`);
     }
     if (song.art_automatic) {
       if (song.art_automatic.startsWith("album-")) {
-        return `luminous-art://${song.art_automatic}`;
+        return getCoverArtUrl(`luminous-art://${song.art_automatic}`);
       } else {
-        return `luminous-art://local/${song.art_automatic}`;
+        return getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
       }
     }
     return null;

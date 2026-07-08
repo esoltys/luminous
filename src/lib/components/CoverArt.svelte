@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { Music, Disc, LoaderCircle } from "lucide-svelte";
+  import { getCoverArtUrl } from "../types";
 
   interface Props {
     songId: number | undefined;
@@ -27,15 +28,15 @@
   // Function to load the cover art URI
   async function loadCoverArt() {
     if (artManual) {
-      imgSrc = `luminous-art://${artManual}`;
+      imgSrc = getCoverArtUrl(`luminous-art://${artManual}`);
       hasFailed = false;
       return;
     }
     if (artAutomatic) {
       if (artAutomatic.startsWith("album-")) {
-        imgSrc = `luminous-art://${artAutomatic}`;
+        imgSrc = getCoverArtUrl(`luminous-art://${artAutomatic}`);
       } else {
-        imgSrc = `luminous-art://local/${artAutomatic}`;
+        imgSrc = getCoverArtUrl(`luminous-art://local/${artAutomatic}`);
       }
       hasFailed = false;
       return;
@@ -52,7 +53,7 @@
     try {
       const uri = await invoke<string | null>("get_cover_art_uri", { songId });
       if (uri) {
-        imgSrc = uri;
+        imgSrc = getCoverArtUrl(uri);
       } else {
         imgSrc = null;
         triggerRemoteFetch();
@@ -70,7 +71,7 @@
     try {
       const uri = await invoke<string | null>("fetch_remote_cover", { songId });
       if (uri) {
-        imgSrc = `luminous-art://${uri}`;
+        imgSrc = getCoverArtUrl(`luminous-art://${uri}`);
       }
     } catch (e) {
       console.error("Failed to fetch remote cover:", e);

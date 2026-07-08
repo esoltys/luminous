@@ -65,7 +65,7 @@
 
     for (let i = 0; i < numBars; i++) {
       const val = data[i] / 255.0;
-      // Center the bars vertically (Clementine/Strawberry style)
+      // Center the bars vertically
       const barHeight = Math.max(2, val * height * 0.85);
       const x = i * (barWidth + barGap);
       const y = (height - barHeight) / 2;

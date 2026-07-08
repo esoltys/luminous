@@ -19,8 +19,9 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
-- When working on a bug or feature, always work in a dedicated git worktree and clean up (remove) the worktree and delete the temporary branch after it has been successfully merged.
-- Always update/comment on and close the relevant GitHub issues using the `gh` CLI tool before completing the task. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
+- When working on a bug or feature, always work in a dedicated git worktree. Do not merge the temporary branch or delete the worktree until the user has approved the changes.
+- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before merging.
+- Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
 
 ## Package Manager
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).

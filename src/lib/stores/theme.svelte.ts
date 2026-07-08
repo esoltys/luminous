@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
 
 export interface ThemeColors {
@@ -44,8 +45,8 @@ export const PREDEFINED_THEMES: Theme[] = [
     }
   },
   {
-    id: "strawberry-red",
-    name: "Strawberry Red",
+    id: "ruby-red",
+    name: "Ruby Red",
     colors: {
       "bg-main": "#1a0f12",
       "bg-sidebar": "#10090a",
@@ -334,18 +335,18 @@ class ThemeStore {
 
     let url: string | null = null;
     if (song.art_manual) {
-      url = `luminous-art://${song.art_manual}`;
+      url = getCoverArtUrl(`luminous-art://${song.art_manual}`);
     } else if (song.art_automatic) {
       if (song.art_automatic.startsWith("album-")) {
-        url = `luminous-art://${song.art_automatic}`;
+        url = getCoverArtUrl(`luminous-art://${song.art_automatic}`);
       } else {
-        url = `luminous-art://local/${song.art_automatic}`;
+        url = getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
       }
     } else if (song.art_embedded) {
       try {
         const uri = await invoke<string | null>("get_cover_art_uri", { songId: song.id });
         if (uri) {
-          url = uri;
+          url = getCoverArtUrl(uri);
         }
       } catch (e) {
         console.error("Failed to query cover art URI in themeStore:", e);

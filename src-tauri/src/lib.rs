@@ -56,7 +56,12 @@ pub fn run() {
             
             // Extract the resource path directly from the full URI string
             let uri_str = request.uri().to_string();
-            let mut trimmed = uri_str.strip_prefix("luminous-art://").unwrap_or(&uri_str);
+            let mut trimmed = &uri_str[..];
+            if let Some(t) = uri_str.strip_prefix("http://luminous-art.localhost/") {
+                trimmed = t;
+            } else if let Some(t) = uri_str.strip_prefix("luminous-art://") {
+                trimmed = t;
+            }
             
             // If the webview prepends localhost/ to the authority, strip it
             if trimmed.starts_with("localhost/") {
@@ -74,6 +79,8 @@ pub fn run() {
                 let decoded = percent_encoding::percent_decode_str(trimmed).decode_utf8_lossy().into_owned();
                 covers_dir.join(decoded)
             };
+
+            eprintln!("[Luminous Backend] Custom protocol: URI = {}, Resolved path = {:?} (exists: {})", uri_str, file_path, file_path.exists());
 
             if file_path.exists() && file_path.is_file() {
                 if let Ok(data) = std::fs::read(&file_path) {

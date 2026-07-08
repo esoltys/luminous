@@ -319,7 +319,7 @@ pub struct Playlist {
 // Playback state models
 // ---------------------------------------------------------------------------
 
-/// Shuffle mode — mirrors Strawberry's ShuffleMode enum.
+/// Shuffle mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ShuffleMode {
@@ -331,7 +331,7 @@ pub enum ShuffleMode {
     Artists,
 }
 
-/// Repeat mode — mirrors Strawberry's RepeatMode enum.
+/// Repeat mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RepeatMode {

@@ -154,8 +154,9 @@ fn get_fpcalc_path() -> PathBuf {
 
 pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
     let fpcalc_bin = get_fpcalc_path();
+    eprintln!("[Luminous Backend] AcoustID: Running fpcalc binary '{:?}' on file '{:?}'", fpcalc_bin, path);
 
-    let output = Command::new(fpcalc_bin)
+    let output = Command::new(&fpcalc_bin)
         .arg("-json")
         .arg(path)
         .output()
@@ -163,11 +164,13 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("[Luminous Backend] AcoustID: fpcalc failed: {}", stderr);
         return Err(anyhow!("fpcalc failed: {}", stderr));
     }
 
     let res: FpCalcOutput = serde_json::from_slice(&output.stdout)
         .context("failed to parse fpcalc JSON output")?;
+    eprintln!("[Luminous Backend] AcoustID: fpcalc completed successfully. Duration: {}s", res.duration.round() as u32);
     Ok((res.fingerprint, res.duration.round() as u32))
 }
 
@@ -178,6 +181,8 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
         client_key, duration_sec, fingerprint
     );
 
+    eprintln!("[Luminous Backend] AcoustID: Querying API lookup service (duration: {}s)...", duration_sec);
+
     let client = Client::builder()
         .timeout(Duration::from_secs(8))
         .user_agent("LuminousMusicPlayer/0.1.0")
@@ -185,11 +190,13 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
 
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
+        eprintln!("[Luminous Backend] AcoustID: API request failed with status: {}", response.status());
         return Err(anyhow!("AcoustID API request failed: {}", response.status()));
     }
 
     let resp: AcoustIdResponse = response.json().await?;
     if resp.status != "ok" {
+        eprintln!("[Luminous Backend] AcoustID: Service returned non-ok status: {}", resp.status);
         return Err(anyhow!("AcoustID service status error"));
     }
 
@@ -218,10 +225,13 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
                     })
                 });
 
-                return Ok(SuggestedTags { title, artist, album, year });
+                let suggested = SuggestedTags { title, artist, album, year };
+                eprintln!("[Luminous Backend] AcoustID: Successfully matched track. Suggestions: {:?}", suggested);
+                return Ok(suggested);
             }
         }
     }
 
+    eprintln!("[Luminous Backend] AcoustID: No matching recording found in AcoustID database");
     Err(anyhow!("no matching audio recordings found on AcoustID"))
 }
