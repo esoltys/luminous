@@ -446,23 +446,29 @@ fn decode_thread(
                             break 'decode;
                         }
                         Ok(AudioCommand::SeekTo(target_ns)) => {
-                            let time_base = track.codec_params.time_base.unwrap_or(
-                                symphonia::core::units::TimeBase {
-                                    numer: 1,
-                                    denom: sample_rate,
-                                },
-                            );
                             let target_time = symphonia::core::units::Time::from(
                                 std::time::Duration::from_nanos(target_ns),
                             );
-                            let target_ts = time_base.calc_timestamp(target_time);
-                            let _ = format.seek(
+                            
+                            // Use SeekTo::Time instead of TimeStamp for robust format reader handling
+                            let seek_res = format.seek(
                                 symphonia::core::formats::SeekMode::Accurate,
-                                symphonia::core::formats::SeekTo::TimeStamp {
-                                    ts: target_ts,
-                                    track_id,
+                                symphonia::core::formats::SeekTo::Time {
+                                    time: target_time,
+                                    track_id: Some(track_id),
                                 },
                             );
+
+                            match seek_res {
+                                Ok(seeked_to) => {
+                                    decoder.reset();
+                                    log::info!("Seek successful: {:?}", seeked_to);
+                                }
+                                Err(e) => {
+                                    log::error!("Seek failed: {:?}", e);
+                                }
+                            }
+
                             // Clear the buffer after seek to avoid stale audio
                             if let Ok(mut buf) = shared_buf_writer.lock() {
                                 buf.clear();

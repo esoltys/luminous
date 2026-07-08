@@ -35,7 +35,14 @@ impl LyricsManager {
     /// Primary search chain: query LRCLIB (for synced/plain), fallback to Lyrics.ovh (for plain).
     pub async fn fetch_lyrics(&self, artist: &str, title: &str, album: &str, duration_sec: u32) -> Result<String> {
         // 1. Try LRCLIB primary (highly specific with track, album, and duration)
-        if let Ok(lyrics) = self.fetch_lrclib(artist, title, album, duration_sec).await {
+        if let Ok(lyrics) = self.fetch_lrclib(artist, title, Some(album), duration_sec).await {
+            if !lyrics.trim().is_empty() {
+                return Ok(lyrics);
+            }
+        }
+
+        // 1b. Try LRCLIB fallback (omitting the album, as album names can differ/remaster/etc.)
+        if let Ok(lyrics) = self.fetch_lrclib(artist, title, None, duration_sec).await {
             if !lyrics.trim().is_empty() {
                 return Ok(lyrics);
             }
@@ -51,14 +58,22 @@ impl LyricsManager {
         Err(anyhow!("no lyrics found on any online provider"))
     }
 
-    async fn fetch_lrclib(&self, artist: &str, title: &str, album: &str, duration_sec: u32) -> Result<String> {
-        let url = format!(
-            "https://lrclib.net/api/get?artist={}&track={}&album={}&duration={}",
+    async fn fetch_lrclib(&self, artist: &str, title: &str, album: Option<&str>, duration_sec: u32) -> Result<String> {
+        let mut url = format!(
+            "https://lrclib.net/api/get?artist={}&track={}&duration={}",
             percent_encoding::utf8_percent_encode(artist, percent_encoding::NON_ALPHANUMERIC),
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC),
-            percent_encoding::utf8_percent_encode(album, percent_encoding::NON_ALPHANUMERIC),
             duration_sec
         );
+
+        if let Some(alb) = album {
+            if !alb.trim().is_empty() {
+                url.push_str(&format!(
+                    "&album={}",
+                    percent_encoding::utf8_percent_encode(alb, percent_encoding::NON_ALPHANUMERIC)
+                ));
+            }
+        }
 
         let response = self.client.get(&url).send().await?;
         if response.status().is_success() {
