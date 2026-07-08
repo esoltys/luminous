@@ -21,7 +21,16 @@
       console.log("[LyricsView] parsedLines: lyricsText is empty");
       return [];
     }
-    const lines = lyricsText.split("\n");
+    
+    // Clean marker if present
+    let cleanText = lyricsText;
+    if (cleanText.startsWith("[synced:false]\n")) {
+      cleanText = cleanText.substring("[synced:false]\n".length);
+    } else if (cleanText.startsWith("[synced:false]")) {
+      cleanText = cleanText.substring("[synced:false]".length);
+    }
+
+    const lines = cleanText.split("\n");
     const parsed: LyricLine[] = [];
     const timeRegex = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g;
 
@@ -97,7 +106,14 @@
       const lyrics = await invoke<string>("get_lyrics", { songId });
       console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}`);
       lyricsText = lyrics;
-      editText = lyrics;
+      
+      let cleanEditText = lyrics;
+      if (cleanEditText.startsWith("[synced:false]\n")) {
+        cleanEditText = cleanEditText.substring("[synced:false]\n".length);
+      } else if (cleanEditText.startsWith("[synced:false]")) {
+        cleanEditText = cleanEditText.substring("[synced:false]".length);
+      }
+      editText = cleanEditText;
     } catch (e: any) {
       console.error("[LyricsView] Failed to load lyrics:", e);
       errorMsg = e.toString();
@@ -235,8 +251,14 @@
           </div>
         {:else}
           <!-- Plain Text View -->
+          <div class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            Synced lyrics not available. Showing plain text.
+          </div>
           <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans">
-            {lyricsText}
+            {lyricsText.startsWith("[synced:false]\n")
+              ? lyricsText.substring("[synced:false]\n".length)
+              : (lyricsText.startsWith("[synced:false]") ? lyricsText.substring("[synced:false]".length) : lyricsText)}
           </div>
         {/if}
       </div>

@@ -38,15 +38,22 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
     if let Some(ref lyrics) = cached_lyrics {
         if !lyrics.trim().is_empty() {
             let is_synced = is_synced_lrc(lyrics);
-            eprintln!(
-                "[Luminous Backend] Cache hit in SQLite. Returning cached lyrics (len: {}, synced: {is_synced})",
-                lyrics.len()
-            );
-            return Ok(lyrics.clone());
+            let has_plain_marker = lyrics.starts_with("[synced:false]");
+            
+            // If the cached lyrics are synced LRC, or if we have already checked online and marked it unsynced,
+            // return immediately without hitting the network!
+            if is_synced || has_plain_marker {
+                eprintln!(
+                    "[Luminous Backend] Cache hit in SQLite. Returning cached lyrics (len: {}, synced: {is_synced}, marked_unsynced: {has_plain_marker})",
+                    lyrics.len()
+                );
+                return Ok(lyrics.clone());
+            }
+            eprintln!("[Luminous Backend] Cache has plain lyrics from tags (not marked checked). Querying online for synced version...");
         }
+    } else {
+        eprintln!("[Luminous Backend] Cache miss. Querying online...");
     }
-
-    eprintln!("[Luminous Backend] Cache miss. Fetching metadata to search online...");
 
     // 2. Fetch metadata from DB to search online
     let song_metadata = conn
@@ -71,7 +78,7 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
     if artist.trim().is_empty() || title.trim().is_empty() {
         if let Some(lyrics) = cached_lyrics {
             if !lyrics.trim().is_empty() {
-                eprintln!("[Luminous Backend] Insufficient metadata for online fetch, falling back to cached lyrics");
+                eprintln!("[Luminous Backend] Insufficient metadata for online fetch, returning cached local lyrics");
                 return Ok(lyrics);
             }
         }
@@ -90,25 +97,40 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
     {
         Ok(fetched) => {
             let is_synced = is_synced_lrc(&fetched);
+            let final_lyrics = if is_synced {
+                fetched
+            } else {
+                format!("[synced:false]\n{fetched}")
+            };
             eprintln!(
                 "[Luminous Backend] Successfully fetched online lyrics (len: {}, synced: {is_synced}). Caching in SQLite...",
-                fetched.len()
+                final_lyrics.len()
             );
             // Cache back in SQLite
             conn.execute(
                 "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
-                rusqlite::params![fetched, song_id],
+                rusqlite::params![final_lyrics, song_id],
             )
             .map_err(|e| e.to_string())?;
-            Ok(fetched)
+            Ok(final_lyrics)
         }
         Err(e) => {
             eprintln!("[Luminous Backend] Online search failed: {e}");
-            // Online search failed, fall back to cached plain text if available
+            // Online search failed, fall back to cached local lyrics if available
             if let Some(lyrics) = cached_lyrics {
                 if !lyrics.trim().is_empty() {
-                    eprintln!("[Luminous Backend] Falling back to cached plain text lyrics");
-                    return Ok(lyrics);
+                    // Mark as checked to prevent future online lookup spamming
+                    let marked_lyrics = if lyrics.starts_with("[synced:false]") {
+                        lyrics.clone()
+                    } else {
+                        format!("[synced:false]\n{lyrics}")
+                    };
+                    let _ = conn.execute(
+                        "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                        rusqlite::params![marked_lyrics, song_id],
+                    );
+                    eprintln!("[Luminous Backend] Falling back to cached local lyrics (marked unsynced in SQLite)");
+                    return Ok(marked_lyrics);
                 }
             }
             Err(e.to_string())
