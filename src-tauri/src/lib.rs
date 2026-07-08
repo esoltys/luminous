@@ -45,6 +45,9 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+
     tauri::Builder::default()
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
