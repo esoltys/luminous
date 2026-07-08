@@ -51,6 +51,12 @@ class CollectionStore {
           this.refreshLibrary();
         }
       });
+
+      // Listen to library changed events (e.g. from background directory watcher)
+      await listen("library-changed", () => {
+        this.refreshStats();
+        this.refreshLibrary();
+      });
     } catch (err) {
       console.error("Failed to initialize CollectionStore:", err);
     }

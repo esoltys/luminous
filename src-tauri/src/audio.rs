@@ -182,15 +182,31 @@ fn decode_thread(
     let mut _stream: Option<cpal::Stream> = None;
 
     let mut current_req = None;
+    let mut paused_req: Option<PlayRequest> = None;
 
     loop {
         let req = match current_req.take() {
             Some(r) => r,
             None => {
                 match cmd_rx.recv() {
-                    Ok(AudioCommand::Play(r)) => r,
+                    Ok(AudioCommand::Play(r)) => {
+                        paused_req = None;
+                        r
+                    }
+                    Ok(AudioCommand::Resume) => {
+                        if let Some(r) = paused_req.take() {
+                            let cur_pos = position.load(Ordering::Relaxed);
+                            PlayRequest {
+                                song: r.song,
+                                start_nanosec: cur_pos,
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
                     Ok(AudioCommand::Stop) => {
                         _stream = None;
+                        paused_req = None;
                         position.store(0, Ordering::Relaxed);
                         if let Ok(mut s) = play_state.lock() {
                             *s = PlayState::Stopped;
@@ -404,47 +420,16 @@ fn decode_thread(
                     // Non-blocking command check
                     match cmd_rx.try_recv() {
                         Ok(AudioCommand::Pause) => {
-                            if let Some(ref s) = _stream {
-                                let _ = s.pause();
-                            }
+                            _stream = None;
                             if let Ok(mut s) = play_state.lock() {
                                 *s = PlayState::Paused;
                             }
                             let _ = event_tx.send(AudioEvent::Paused);
-                            // Block waiting for Resume or Stop
-                            for cmd in &cmd_rx {
-                                match cmd {
-                                    AudioCommand::Resume => {
-                                        if let Some(ref s) = _stream {
-                                            let _ = s.play();
-                                        }
-                                        if let Ok(mut s) = play_state.lock() {
-                                            *s = PlayState::Playing;
-                                        }
-                                        break;
-                                    }
-                                    AudioCommand::Stop => {
-                                        _stream = None;
-                                        if let Ok(mut s) = play_state.lock() {
-                                            *s = PlayState::Stopped;
-                                        }
-                                        let _ = event_tx.send(AudioEvent::Stopped);
-                                        break 'decode;
-                                    }
-                                    AudioCommand::SetVolume(v) => {
-                                        if let Ok(mut vol) = volume.lock() {
-                                            *vol = v.clamp(0.0, 1.0);
-                                        }
-                                    }
-                                    AudioCommand::Play(new_req) => {
-                                        current_req = Some(new_req);
-                                        _stream = None;
-                                        let _ = event_tx.send(AudioEvent::Stopped);
-                                        break 'decode;
-                                    }
-                                    _ => {}
-                                }
-                            }
+                            paused_req = Some(PlayRequest {
+                                song: req.song,
+                                start_nanosec: position.load(Ordering::Relaxed),
+                            });
+                            break 'decode;
                         }
                         Ok(AudioCommand::Stop) => {
                             _stream = None;

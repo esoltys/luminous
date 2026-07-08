@@ -134,7 +134,7 @@
         <Sliders class="w-4 h-4 text-violet-400" />
         <h3 class="text-sm font-bold">Edit Track Metadata</h3>
       </div>
-      <button onclick={onClose} class="text-gray-400 hover:text-white transition-colors">
+      <button onclick={onClose} disabled={isSaving} class="text-gray-400 hover:text-white transition-colors disabled:opacity-50">
         <X class="w-4 h-4" />
       </button>
     </div>
@@ -176,7 +176,8 @@
               <input
                 id="tag-title"
                 bind:value={title}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -186,7 +187,8 @@
               <input
                 id="tag-artist"
                 bind:value={artist}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -196,7 +198,8 @@
               <input
                 id="tag-album"
                 bind:value={album}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -206,7 +209,8 @@
               <input
                 id="tag-albumartist"
                 bind:value={albumArtist}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -216,7 +220,8 @@
               <input
                 id="tag-composer"
                 bind:value={composer}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -226,7 +231,8 @@
               <input
                 id="tag-genre"
                 bind:value={genre}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                disabled={isSaving}
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -237,11 +243,12 @@
                 id="tag-year"
                 type="number"
                 value={year ?? ""}
+                disabled={isSaving}
                 oninput={(e) => {
                   const val = parseInt((e.target as HTMLInputElement).value, 10);
                   year = isNaN(val) ? null : val;
                 }}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -252,11 +259,12 @@
                 id="tag-track"
                 type="number"
                 value={track ?? ""}
+                disabled={isSaving}
                 oninput={(e) => {
                   const val = parseInt((e.target as HTMLInputElement).value, 10);
                   track = isNaN(val) ? null : val;
                 }}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
 
@@ -267,11 +275,12 @@
                 id="tag-disc"
                 type="number"
                 value={disc ?? ""}
+                disabled={isSaving}
                 oninput={(e) => {
                   const val = parseInt((e.target as HTMLInputElement).value, 10);
                   disc = isNaN(val) ? null : val;
                 }}
-                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
               />
             </div>
           </div>

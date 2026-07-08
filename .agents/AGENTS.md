@@ -18,6 +18,8 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Make atomic git commits at logical points (e.g., after completing each task phase, after scaffolding, after adding a major feature).
 - Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
+- Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
+- Always update/comment on and close the relevant GitHub issues using the `gh` CLI tool before completing the task.
 
 ## Package Manager
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).

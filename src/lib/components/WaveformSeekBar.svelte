@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
+  import { themeStore } from "../stores/theme.svelte";
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
@@ -52,10 +53,15 @@
     const songLength = playerStore.currentSong?.length_nanosec || 1;
     const progressPct = playerStore.positionNanosec / songLength;
 
+    // Dynamically read active theme colors from document styles
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#8b5cf6';
+    const hoverColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-hover').trim() || '#a78bfa';
+    const borderCol = getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim() || '#374151';
+
     // Premium gradients for played part
     const gradPlayed = ctx.createLinearGradient(0, height, 0, 0);
-    gradPlayed.addColorStop(0, "#7c3aed"); // violet-600
-    gradPlayed.addColorStop(1, "#d946ef"); // fuchsia-500
+    gradPlayed.addColorStop(0, accentColor);
+    gradPlayed.addColorStop(1, hoverColor);
 
     for (let i = 0; i < numBars; i++) {
       const val = data[i] / 255.0;
@@ -68,7 +74,7 @@
       if (barPct <= progressPct) {
         ctx.fillStyle = gradPlayed;
       } else {
-        ctx.fillStyle = "#374151"; // gray-700
+        ctx.fillStyle = borderCol;
       }
 
       ctx.beginPath();
@@ -83,9 +89,10 @@
   });
 
   $effect(() => {
-    // Redraw whenever position, length, or data updates
+    // Redraw whenever position, length, theme, or data updates
     const _pos = playerStore.positionNanosec;
     const _len = playerStore.currentSong?.length_nanosec;
+    const _theme = themeStore.activeThemeId;
     const _data = waveformData;
     draw();
   });

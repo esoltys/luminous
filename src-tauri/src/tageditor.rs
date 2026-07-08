@@ -123,7 +123,19 @@ pub fn write_tags(
         tag.remove_key(&lofty::tag::ItemKey::Year);
     }
 
-    tagged_file.save_to_path(path, WriteOptions::default()).context("failed to write tags back to file")?;
+    let mut attempts = 0;
+    loop {
+        match tagged_file.save_to_path(path, WriteOptions::default()) {
+            Ok(_) => break,
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e).context("failed to write tags back to file after multiple attempts");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
     Ok(())
 }
 

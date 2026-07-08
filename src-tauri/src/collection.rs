@@ -12,6 +12,7 @@ use lofty::{
     probe::Probe,
     tag::{Accessor, Tag},
 };
+use notify::Watcher;
 use rusqlite::params;
 use std::{
     path::{Path, PathBuf},
@@ -67,6 +68,40 @@ impl CollectionScanner {
             .filter_map(|r| r.ok())
             .collect();
         Ok(dirs)
+    }
+
+    /// Prunes database records pointing to paths that no longer exist on disk.
+    pub fn prune_missing_songs(&self) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
+        let rows = stmt.query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let path: String = row.get(1)?;
+            Ok((id, path))
+        })?;
+
+        let mut to_delete = Vec::new();
+        for row in rows {
+            if let Ok((id, path)) = row {
+                let p = Path::new(&path);
+                if !p.exists() {
+                    to_delete.push(id);
+                }
+            }
+        }
+
+        let deleted_count = to_delete.len();
+        if !to_delete.is_empty() {
+            let tx = conn.unchecked_transaction()?;
+            {
+                let mut del_stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
+                for id in to_delete {
+                    del_stmt.execute(params![id])?;
+                }
+            }
+            tx.commit()?;
+        }
+        Ok(deleted_count)
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.
@@ -184,6 +219,10 @@ impl CollectionScanner {
                 current_path: None,
             },
         );
+
+        if let Err(e) = self.prune_missing_songs() {
+            log::error!("Failed to prune missing songs during scan: {e}");
+        }
 
         // Done
         let _ = app.emit(
@@ -615,4 +654,92 @@ fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         ebur128_loudness_range_lu: row.get(50)?,
         ..Default::default()
     })
+}
+
+// ---------------------------------------------------------------------------
+// File Watcher & Deletion Sync
+// ---------------------------------------------------------------------------
+
+/// Helper to delete a path and its subpaths from the SQLite database.
+pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
+    let conn = db.pool.get()?;
+    let deleted = conn.execute(
+        "DELETE FROM songs WHERE path = ?1 OR path LIKE ?1 || '/%'",
+        params![path_str],
+    )?;
+    Ok(deleted)
+}
+
+/// Start background directory watching using notify.
+pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
+    let db = Arc::clone(&state.db);
+    let app_clone = app.clone();
+
+    // Create a channel to receive events
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    // Create recommended watcher
+    let watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+        if let Ok(event) = res {
+            let _ = tx.send(event);
+        }
+    });
+
+    let mut watcher = match watcher {
+        Ok(w) => w,
+        Err(e) => {
+            log::error!("Failed to create file watcher: {e}");
+            return;
+        }
+    };
+
+    // Watch all monitored directories
+    if let Ok(conn) = db.pool.get() {
+        let mut stmt = match conn.prepare("SELECT path FROM directories") {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let dirs = stmt.query_map([], |row| row.get::<_, String>(0));
+        if let Ok(dirs) = dirs {
+            for dir_path in dirs.flatten() {
+                let p = PathBuf::from(dir_path);
+                if p.exists() {
+                    let _ = watcher.watch(&p, notify::RecursiveMode::Recursive);
+                }
+            }
+        }
+    }
+
+    // Save the watcher inside AppState to keep it alive
+    {
+        let mut w_guard = state.watcher.lock();
+        *w_guard = Some(watcher);
+    }
+
+    // Spawn the background thread to handle watcher events
+    let db_for_thread = Arc::clone(&db);
+    std::thread::Builder::new()
+        .name("luminous-watcher".to_string())
+        .spawn(move || {
+            for event in rx {
+                for path in event.paths {
+                    let path_str = path.to_string_lossy().to_string();
+                    if !path.exists() {
+                        log::info!("Watcher detected deletion: {}", path_str);
+                        match delete_path_and_subpaths(&db_for_thread, &path_str) {
+                            Ok(deleted) => {
+                                if deleted > 0 {
+                                    log::info!("Pruned {} deleted song(s) from db", deleted);
+                                    let _ = app_clone.emit("library-changed", ());
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to delete path from db: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .expect("failed to spawn watcher thread");
 }

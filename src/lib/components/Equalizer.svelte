@@ -120,41 +120,41 @@
   onMount(loadConfig);
 </script>
 
-<div class="flex-1 flex flex-col p-8 overflow-y-auto bg-gray-950 text-gray-200">
-  <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-800">
+<div class="flex-1 flex flex-col p-8 overflow-y-auto bg-brand-main text-brand-text-primary">
+  <div class="flex items-center justify-between mb-8 pb-4 border-b border-brand-border">
     <div>
-      <h2 class="text-2xl font-bold flex items-center gap-2.5 text-violet-400">
+      <h2 class="text-2xl font-bold flex items-center gap-2.5 text-brand-accent">
         <SlidersHorizontal class="w-6 h-6" /> Graphic Equalizer
       </h2>
-      <p class="text-xs text-gray-400 mt-1">Shape your frequency response with a 10-band cascaded peaking filter</p>
+      <p class="text-xs text-brand-text-secondary mt-1">Shape your frequency response with a 10-band cascaded peaking filter</p>
     </div>
 
     <!-- Toggle & Presets controls -->
     <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
-        <label for="eq-toggle" class="text-xs font-semibold text-gray-300">Enable EQ</label>
+      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+        <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">Enable EQ</label>
         <input
           id="eq-toggle"
           type="checkbox"
           bind:checked={enabled}
           onchange={handleToggle}
-          class="w-4 h-4 text-violet-600 bg-gray-950 border-gray-800 rounded focus:ring-violet-500 accent-violet-500 cursor-pointer"
+          class="w-4 h-4 text-brand-accent bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
         />
       </div>
 
-      <div class="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
-        <span class="text-xs font-semibold text-gray-300">Preset:</span>
+      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+        <span class="text-xs font-semibold text-brand-text-secondary">Preset:</span>
         <select
           bind:value={activePreset}
           onchange={() => selectPreset(activePreset)}
-          class="bg-gray-950 text-xs text-gray-200 border border-gray-800 rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-violet-500 font-medium appearance-none -webkit-appearance-none"
+          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
           style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
         >
           {#each presets as preset}
-            <option value={preset} class="bg-gray-950 text-gray-200">{preset}</option>
+            <option value={preset} class="bg-brand-main text-brand-text-primary">{preset}</option>
           {/each}
           {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-gray-950 text-gray-200" disabled>Custom</option>
+            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>Custom</option>
           {/if}
         </select>
       </div>
@@ -162,14 +162,14 @@
   </div>
 
   <!-- Rack Container -->
-  <div class="bg-gray-900/50 border border-gray-800/80 rounded-2xl p-6 md:p-8 flex flex-col gap-8 shadow-xl shadow-black/30">
+  <div class="bg-brand-sidebar/20 border border-brand-border rounded-2xl p-6 md:p-8 flex flex-col gap-8 shadow-xl shadow-black/30">
     <!-- Preamp and Spline Preview -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
       <!-- Preamp Slider -->
-      <div class="flex flex-col gap-2 bg-gray-900 border border-gray-800 rounded-xl p-4 lg:col-span-1">
-        <div class="flex justify-between items-center text-xs font-bold text-gray-400">
+      <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 lg:col-span-1">
+        <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
           <span>PRE-AMP</span>
-          <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-gray-500"}>
+          <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary/50"}>
             {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
           </span>
         </div>
@@ -180,32 +180,32 @@
           step="0.5"
           bind:value={preamp}
           oninput={handlePreampChange}
-          class="w-full accent-violet-500 bg-gray-950 h-1.5 rounded-lg appearance-none cursor-pointer"
+          class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       <!-- EQ Curve Preview -->
-      <div class="lg:col-span-3 h-20 bg-gray-950 border border-gray-800/80 rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
+      <div class="lg:col-span-3 h-20 bg-brand-main border border-brand-border rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
         <!-- Center line -->
-        <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-gray-800 pointer-events-none"></div>
+        <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-brand-border pointer-events-none"></div>
         <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
           {#if gains.length === 10}
             <path
               d={curvePath}
               fill="none"
-              stroke={enabled ? "url(#eqGrad)" : "#4b5563"}
+              stroke={enabled ? "url(#eqGrad)" : "var(--color-border)"}
               stroke-width="1.5"
               class="transition-all duration-200"
             />
           {/if}
           <defs>
             <linearGradient id="eqGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#8b5cf6" />
-              <stop offset="100%" stop-color="#ec4899" />
+              <stop offset="0%" stop-color="var(--color-accent)" />
+              <stop offset="100%" stop-color="var(--color-accent-hover)" />
             </linearGradient>
           </defs>
         </svg>
-        <div class="flex justify-between text-[8px] text-gray-600 px-1 font-mono uppercase">
+        <div class="flex justify-between text-[8px] text-brand-text-secondary/40 px-1 font-mono uppercase">
           <span>Bass</span>
           <span>Mid</span>
           <span>Treble</span>
@@ -214,11 +214,11 @@
     </div>
 
     <!-- Sliders Rack -->
-    <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-gray-950/40 border border-gray-800/60 rounded-xl p-4 md:p-6">
+    <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-4 md:p-6">
       {#each gains as gain, idx}
         <div class="flex flex-col items-center justify-between h-full group">
           <!-- Gain display -->
-          <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-violet-400 {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-gray-500'}">
+          <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
             {gain > 0 ? "+" : ""}{gain.toFixed(1)}
           </span>
 
@@ -232,13 +232,13 @@
               use:verticalOrient
               bind:value={gains[idx]}
               oninput={() => handleBandChange(idx)}
-              class="accent-violet-500 cursor-ns-resize"
+              class="accent-brand-accent cursor-ns-resize"
               style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 12px; height: 100%;"
             />
           </div>
 
           <!-- Label -->
-          <span class="text-[9px] md:text-[10px] font-medium text-gray-400 font-mono text-center tracking-tighter truncate w-full">
+          <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary/70 font-mono text-center tracking-tighter truncate w-full">
             {bandLabels[idx]}
           </span>
         </div>

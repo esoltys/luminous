@@ -41,6 +41,7 @@ pub struct AppState {
     pub player: Arc<Mutex<Player>>,
     pub playlists: Arc<Mutex<PlaylistManager>>,
     pub cover_manager: Arc<CoverManager>,
+    pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -261,13 +262,20 @@ pub fn run() {
                 })
                 .expect("failed to spawn event thread");
 
-            app.manage(AppState {
+            let watcher = Arc::new(parking_lot::Mutex::new(None));
+            let state = AppState {
                 db,
                 audio,
                 player,
                 playlists,
                 cover_manager,
-            });
+                watcher,
+            };
+
+            // Start background directory watcher
+            crate::collection::start_watcher(app.handle().clone(), &state);
+
+            app.manage(state);
 
             Ok(())
         })

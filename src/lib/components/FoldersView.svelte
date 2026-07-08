@@ -250,9 +250,16 @@
             <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Custom Themes</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               {#each themeStore.customThemes as theme}
-                <div class="flex items-center justify-between bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 hover:border-brand-border/80 transition-colors">
+                <div class="flex items-center justify-between bg-brand-sidebar/40 border rounded-xl p-4 transition-colors {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border hover:border-brand-border/80'}">
                   <button onclick={() => themeStore.setTheme(theme.id)} class="flex-1 flex items-center justify-between text-left cursor-pointer mr-3">
-                    <span class="font-medium text-sm text-brand-text-primary">{theme.name}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium text-sm text-brand-text-primary">{theme.name}</span>
+                      {#if themeStore.activeThemeId === theme.id}
+                        <div class="w-4 h-4 rounded-full bg-brand-accent text-white flex items-center justify-center scale-90 shadow">
+                          <Check class="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      {/if}
+                    </div>
                     <div class="flex gap-1 h-6 w-24 rounded overflow-hidden border border-brand-border/30 bg-black/10">
                       <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}"></div>
                       <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}"></div>

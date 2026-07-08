@@ -7,17 +7,26 @@ use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub async fn add_directory(
+    app: AppHandle,
     path: String,
     state: State<'_, AppState>,
 ) -> Result<MusicDirectory, String> {
     let scanner = CollectionScanner::new(state.db.clone());
-    scanner.add_directory(&path).map_err(|e| e.to_string())
+    let res = scanner.add_directory(&path).map_err(|e| e.to_string())?;
+    crate::collection::start_watcher(app, &state);
+    Ok(res)
 }
 
 #[tauri::command]
-pub async fn remove_directory(path: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn remove_directory(
+    app: AppHandle,
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let scanner = CollectionScanner::new(state.db.clone());
-    scanner.remove_directory(&path).map_err(|e| e.to_string())
+    scanner.remove_directory(&path).map_err(|e| e.to_string())?;
+    crate::collection::start_watcher(app, &state);
+    Ok(())
 }
 
 #[tauri::command]
