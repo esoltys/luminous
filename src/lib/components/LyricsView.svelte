@@ -15,23 +15,34 @@
   let editText = $state("");
   let containerEl = $state<HTMLDivElement | null>(null);
 
-  // Parse lyrics from LRC string
+  // Parse lyrics from LRC string supporting multiple timestamps per line
   let parsedLines = $derived.by<LyricLine[]>(() => {
     if (!lyricsText) return [];
     const lines = lyricsText.split("\n");
     const parsed: LyricLine[] = [];
-    const timeRegex = /\[(\d+):(\d+)(?:[.:](\d+))?\]/;
+    const timeRegex = /\[(\d+):(\d+)(?:[.:](\d+))?\]/g;
 
     for (const line of lines) {
-      const match = timeRegex.exec(line);
-      if (match) {
+      const matches: { timeMs: number }[] = [];
+      let match;
+      
+      // Reset the regex state before scanning
+      timeRegex.lastIndex = 0;
+      
+      while ((match = timeRegex.exec(line)) !== null) {
         const minutes = parseInt(match[1], 10);
         const seconds = parseInt(match[2], 10);
         const hundredths = match[3] ? parseInt(match[3], 10) : 0;
 
         const timeMs = minutes * 60 * 1000 + seconds * 1000 + (match[3] && match[3].length === 2 ? hundredths * 10 : hundredths);
+        matches.push({ timeMs });
+      }
+
+      if (matches.length > 0) {
         const text = line.replace(timeRegex, "").trim();
-        parsed.push({ timeMs, text });
+        for (const m of matches) {
+          parsed.push({ timeMs: m.timeMs, text });
+        }
       }
     }
     return parsed.sort((a, b) => a.timeMs - b.timeMs);
@@ -120,16 +131,16 @@
   });
 </script>
 
-<div class="flex-1 flex flex-col h-full bg-gray-950 text-gray-200 select-none overflow-hidden relative">
+<div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <!-- Top Panel Toolbar -->
-  <div class="h-16 flex items-center justify-between px-8 border-b border-gray-800 shrink-0">
+  <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
     <div class="flex items-center gap-3">
-      <FileText class="w-6 h-6 text-violet-400" />
+      <FileText class="w-6 h-6 text-brand-accent" />
       <div>
-        <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md">
+        <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary">
           {playerStore.currentSong ? playerStore.currentSong.title : "No song playing"}
         </h2>
-        <p class="text-[10px] text-gray-400 truncate max-w-xs md:max-w-md">
+        <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
           {playerStore.currentSong ? `${playerStore.currentSong.artist || "Unknown Artist"} — ${playerStore.currentSong.album || "Unknown Album"}` : "Select a track to view lyrics"}
         </p>
       </div>
@@ -141,27 +152,27 @@
         {#if !isEditing}
           <button
             onclick={() => loadLyrics(playerStore.currentSong?.id, true)}
-            class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
             title="Refetch lyrics online"
           >
             <RefreshCw class="w-3.5 h-3.5" /> Refetch
           </button>
           <button
             onclick={startEditing}
-            class="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-violet-900/30"
+            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
           >
             <Edit3 class="w-3.5 h-3.5" /> Edit
           </button>
         {:else}
           <button
             onclick={() => { isEditing = false; }}
-            class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
           >
             <X class="w-3.5 h-3.5" /> Cancel
           </button>
           <button
             onclick={saveManualLyrics}
-            class="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-green-900/30"
+            class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-emerald-950/30 cursor-pointer"
           >
             <Save class="w-3.5 h-3.5" /> Save
           </button>
@@ -174,17 +185,17 @@
   <div class="flex-1 overflow-y-auto px-6 py-12" bind:this={containerEl}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
-        <LoaderCircle class="w-8 h-8 animate-spin text-violet-400" />
-        <span class="text-xs text-gray-500 font-medium">Fetching lyrics...</span>
+        <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent" />
+        <span class="text-xs text-brand-text-secondary/60 font-medium">Fetching lyrics...</span>
       </div>
     {:else if isEditing}
       <!-- Editor Mode -->
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label for="lyrics-editor" class="text-xs font-bold text-gray-400 uppercase tracking-wider">Lyrics Text (plain or LRC synced format)</label>
+        <label for="lyrics-editor" class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider">Lyrics Text (plain or LRC synced format)</label>
         <textarea
           id="lyrics-editor"
           bind:value={editText}
-          class="flex-1 bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm font-mono text-gray-200 outline-none focus:border-violet-500 resize-none h-[calc(100vh-280px)] focus:ring-1 focus:ring-violet-500"
+          class="flex-1 bg-brand-sidebar border border-brand-border rounded-xl p-4 text-sm font-mono text-brand-text-primary outline-none focus:border-brand-accent resize-none h-[calc(100vh-280px)] focus:ring-1 focus:ring-brand-accent"
           placeholder="Paste synced LRC or plain text lyrics here..."
         ></textarea>
       </div>
@@ -200,7 +211,7 @@
               <p
                 data-index={idx}
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                class="text-xl md:text-2xl font-bold cursor-pointer transition-all duration-300 transform {isActive ? 'text-white scale-105 filter drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]' : 'text-gray-600 hover:text-gray-400'}"
+                class="text-xl md:text-2xl font-bold cursor-pointer transition-all duration-300 transform {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
                 {line.text || "•••"}
               </p>
@@ -208,31 +219,31 @@
           </div>
         {:else}
           <!-- Plain Text View -->
-          <div class="whitespace-pre-line text-lg leading-relaxed text-gray-300 select-text pb-20 font-medium">
+          <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans">
             {lyricsText}
           </div>
         {/if}
       </div>
     {:else if errorMsg}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <p class="text-sm font-semibold text-red-400">Unable to load lyrics</p>
-        <p class="text-xs text-gray-500 max-w-sm">{errorMsg}</p>
+        <p class="text-sm font-semibold text-rose-400">Unable to load lyrics</p>
+        <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <button
           onclick={() => loadLyrics(playerStore.currentSong?.id)}
-          class="mt-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 px-4 py-2 rounded-lg text-xs font-semibold transition-all"
+          class="mt-2 bg-brand-main/50 hover:bg-brand-main/80 border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
         >
           Retry Search
         </button>
       </div>
     {:else}
-      <div class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-gray-500">
-        <FileText class="w-12 h-12 stroke-[1] text-gray-700 mb-2" />
+      <div class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50">
+        <FileText class="w-12 h-12 stroke-[1] text-brand-text-secondary/30 mb-2" />
         {#if playerStore.currentSong}
-          <p class="text-sm font-semibold text-gray-400">No lyrics found for this song</p>
-          <p class="text-xs text-gray-600 max-w-xs mt-1">Try clicking 'Edit' above to manually paste the lyrics.</p>
+          <p class="text-sm font-semibold text-brand-text-secondary/80">No lyrics found for this song</p>
+          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">Try clicking 'Edit' above to manually paste the lyrics.</p>
         {:else}
-          <p class="text-sm font-semibold text-gray-400">No song selected</p>
-          <p class="text-xs text-gray-600 mt-1">Start playback to fetch lyrics.</p>
+          <p class="text-sm font-semibold text-brand-text-secondary/80">No song selected</p>
+          <p class="text-xs text-brand-text-secondary/50 mt-1">Start playback to fetch lyrics.</p>
         {/if}
       </div>
     {/if}

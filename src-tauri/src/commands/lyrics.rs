@@ -1,6 +1,25 @@
 use crate::AppState;
 use tauri::State;
 
+fn is_synced_lrc(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 6 {
+        return false;
+    }
+    for i in 0..(bytes.len() - 5) {
+        if bytes[i] == b'['
+            && bytes[i + 1].is_ascii_digit()
+            && bytes[i + 2].is_ascii_digit()
+            && bytes[i + 3] == b':'
+            && bytes[i + 4].is_ascii_digit()
+            && bytes[i + 5].is_ascii_digit()
+        {
+            return true;
+        }
+    }
+    false
+}
+
 #[tauri::command]
 pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
     // 1. Check database cache
@@ -11,11 +30,12 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
             rusqlite::params![song_id],
             |row| row.get(0),
         )
-        .ok();
+        .ok()
+        .flatten();
 
-    if let Some(lyrics) = cached_lyrics {
-        if !lyrics.trim().is_empty() {
-            return Ok(lyrics);
+    if let Some(ref lyrics) = cached_lyrics {
+        if !lyrics.trim().is_empty() && is_synced_lrc(lyrics) {
+            return Ok(lyrics.clone());
         }
     }
 
@@ -36,6 +56,11 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
 
     let (artist, title, album, len_ns) = song_metadata;
     if artist.trim().is_empty() || title.trim().is_empty() {
+        if let Some(lyrics) = cached_lyrics {
+            if !lyrics.trim().is_empty() {
+                return Ok(lyrics);
+            }
+        }
         return Err("insufficient song metadata (artist/title) to fetch online lyrics".to_string());
     }
 
@@ -43,19 +68,29 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
 
     // 3. Query online APIs (LRCLIB -> Lyrics.ovh)
     let lyrics_manager = crate::lyrics::LyricsManager::new();
-    let fetched = lyrics_manager
+    match lyrics_manager
         .fetch_lyrics(&artist, &title, &album, duration_sec)
         .await
-        .map_err(|e| e.to_string())?;
-
-    // 4. Cache back in SQLite
-    conn.execute(
-        "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
-        rusqlite::params![fetched, song_id],
-    )
-    .map_err(|e| e.to_string())?;
-
-    Ok(fetched)
+    {
+        Ok(fetched) => {
+            // Cache back in SQLite
+            conn.execute(
+                "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                rusqlite::params![fetched, song_id],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(fetched)
+        }
+        Err(e) => {
+            // Online search failed, fall back to cached plain text if available
+            if let Some(lyrics) = cached_lyrics {
+                if !lyrics.trim().is_empty() {
+                    return Ok(lyrics);
+                }
+            }
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]
