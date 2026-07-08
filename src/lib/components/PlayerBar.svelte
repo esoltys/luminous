@@ -1,6 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import MoodBar from "./MoodBar.svelte";
@@ -82,18 +83,38 @@
     />
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold text-brand-text-primary truncate">
-          {playerStore.currentSong?.title || "Not Playing"}
-        </span>
+        {#if playerStore.currentSong?.title}
+          <button
+            onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.title || ""); }}
+            class="text-sm font-semibold text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate cursor-pointer"
+            title="Filter by title: {playerStore.currentSong.title}"
+          >
+            {playerStore.currentSong.title}
+          </button>
+        {:else}
+          <span class="text-sm font-semibold text-brand-text-primary truncate">
+            Not Playing
+          </span>
+        {/if}
         {#if playerStore.currentSong}
           <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
         {/if}
       </div>
-      <span class="text-xs text-brand-text-secondary/70 truncate">
-        {playerStore.currentSong?.artist || "Unknown Artist"}
-      </span>
+      {#if playerStore.currentSong?.artist}
+        <button
+          onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", playerStore.currentSong?.artist || ""); }}
+          class="text-xs text-brand-text-secondary/70 hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate cursor-pointer"
+          title="Filter by artist: {playerStore.currentSong.artist}"
+        >
+          {playerStore.currentSong.artist}
+        </button>
+      {:else}
+        <span class="text-xs text-brand-text-secondary/70 truncate">
+          {playerStore.currentSong ? "Unknown Artist" : ""}
+        </span>
+      {/if}
     </div>
   </div>
 

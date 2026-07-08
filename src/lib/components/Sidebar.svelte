@@ -4,12 +4,6 @@
   import { Music, ListMusic, Settings, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
-  // Navigation tab state
-  let { activeTab = $bindable("collection"), activeSubTab = $bindable("songs") } = $props<{
-    activeTab: "collection" | "playlists" | "settings" | "equalizer" | "lyrics";
-    activeSubTab: "songs" | "albums" | "artists";
-  }>();
-
   let showAddDirModal = $state(false);
   let newPlaylistName = $state("");
 
@@ -48,29 +42,29 @@
   <!-- Navigation -->
   <nav class="p-4 space-y-1">
     <button
-      onclick={() => { activeTab = "collection"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+      onclick={() => { collectionStore.activeTab = "collection"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <Music class="w-4 h-4" /> Collection
     </button>
 
-    {#if activeTab === 'collection'}
+    {#if collectionStore.activeTab === 'collection'}
       <div class="pl-8 pr-2 py-1 space-y-1 text-xs">
         <button
-          onclick={() => { activeSubTab = "songs"; }}
-          class="w-full text-left py-1.5 px-2 rounded {activeSubTab === 'songs' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
+          onclick={() => { collectionStore.activeSubTab = "songs"; }}
+          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'songs' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
           Tracks ({collectionStore.stats.total_songs})
         </button>
         <button
-          onclick={() => { activeSubTab = "albums"; }}
-          class="w-full text-left py-1.5 px-2 rounded {activeSubTab === 'albums' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
+          onclick={() => { collectionStore.activeSubTab = "albums"; }}
+          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'albums' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
           Albums ({collectionStore.stats.total_albums})
         </button>
         <button
-          onclick={() => { activeSubTab = "artists"; }}
-          class="w-full text-left py-1.5 px-2 rounded {activeSubTab === 'artists' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
+          onclick={() => { collectionStore.activeSubTab = "artists"; }}
+          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'artists' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
           Artists ({collectionStore.stats.total_artists})
         </button>
@@ -78,36 +72,36 @@
     {/if}
 
     <button
-      onclick={() => { activeTab = "playlists"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'playlists' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+      onclick={() => { collectionStore.activeTab = "playlists"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'playlists' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <ListMusic class="w-4 h-4" /> Playlists
     </button>
 
     <button
-      onclick={() => { activeTab = "settings"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+      onclick={() => { collectionStore.activeTab = "settings"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <Settings class="w-4 h-4" /> Settings
     </button>
 
     <button
-      onclick={() => { activeTab = "equalizer"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'equalizer' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+      onclick={() => { collectionStore.activeTab = "equalizer"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'equalizer' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <SlidersHorizontal class="w-4 h-4" /> Equalizer
     </button>
 
     <button
-      onclick={() => { activeTab = "lyrics"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {activeTab === 'lyrics' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+      onclick={() => { collectionStore.activeTab = "lyrics"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <FileText class="w-4 h-4" /> Lyrics
     </button>
   </nav>
 
   <!-- Playlist quick access (if tab is playlists) -->
-  {#if activeTab === 'playlists'}
+  {#if collectionStore.activeTab === 'playlists'}
     <div class="flex-1 overflow-y-auto px-4 py-2 border-t border-brand-border">
       <div class="flex items-center justify-between text-xs text-brand-text-secondary font-semibold mb-2">
         <span>PLAYLISTS</span>

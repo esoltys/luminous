@@ -8,10 +8,7 @@
   import { Search, Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
 
-  let { activeSubTab = "songs", activeTab = $bindable() } = $props<{
-    activeSubTab: "songs" | "albums" | "artists";
-    activeTab?: "collection" | "playlists" | "settings" | "equalizer" | "lyrics";
-  }>();
+  // activeSubTab and activeTab are managed globally via collectionStore
 
   let editingSongId = $state<number | null>(null);
 
@@ -40,18 +37,17 @@
     return gradients[index];
   }
 
-  let searchQuery = $state("");
   let sortField = $state<keyof Song>("title");
   let sortAsc = $state(true);
 
   // Trigger search on collectionStore when query changes
   $effect(() => {
-    collectionStore.search(searchQuery);
+    collectionStore.search(collectionStore.searchQuery);
   });
 
   // Computed songs list with filtering and sorting
   let filteredSongs = $derived.by(() => {
-    let result = searchQuery.trim() === "" ? collectionStore.songs : collectionStore.searchResults;
+    let result = collectionStore.searchQuery.trim() === "" ? collectionStore.songs : collectionStore.searchResults;
 
     // Filter by excluded formats
     result = result.filter(song => !collectionStore.isFormatExcluded(song.filetype));
@@ -80,7 +76,7 @@
 
   // Computed albums list with search filtering
   let filteredAlbums = $derived.by(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = collectionStore.searchQuery.trim().toLowerCase();
     if (query === "") return collectionStore.albums;
     return collectionStore.albums.filter(album => 
       (album.album && album.album.toLowerCase().includes(query)) ||
@@ -90,7 +86,7 @@
 
   // Computed artists list with search filtering
   let filteredArtists = $derived.by(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = collectionStore.searchQuery.trim().toLowerCase();
     if (query === "") return collectionStore.artists;
     return collectionStore.artists.filter(artist => 
       artist.name && artist.name.toLowerCase().includes(query)
@@ -137,14 +133,14 @@
       <input
         type="text"
         placeholder="Search track, artist, album..."
-        bind:value={searchQuery}
+        bind:value={collectionStore.searchQuery}
         class="w-full bg-brand-sidebar border border-brand-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-brand-accent text-brand-text-primary"
       />
     </div>
     <div class="text-xs text-brand-text-secondary">
-      {#if activeSubTab === "songs"}
+      {#if collectionStore.activeSubTab === "songs"}
         Showing {filteredSongs.length} tracks
-      {:else if activeSubTab === "albums"}
+      {:else if collectionStore.activeSubTab === "albums"}
         Showing {collectionStore.albums.length} albums
       {:else}
         Showing {collectionStore.artists.length} artists
@@ -154,7 +150,7 @@
 
   <!-- Main View Scrollable Container -->
   <div class="flex-1 overflow-y-auto p-6">
-    {#if activeSubTab === "songs"}
+    {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
       <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/40">
         <table class="w-full text-left text-sm border-collapse">
@@ -191,8 +187,14 @@
                   </button>
                 </td>
                 <td class="py-2.5 px-4 font-medium text-brand-text-primary truncate max-w-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="truncate">{song.title || "Unknown Title"}</span>
+                  <div class="flex items-center gap-2 max-w-full">
+                    <button
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
+                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium text-brand-text-primary"
+                      title="Filter by title: {song.title || 'Unknown Title'}"
+                    >
+                      {song.title || "Unknown Title"}
+                    </button>
                     <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                       {song.filetype}
                     </span>
@@ -203,8 +205,32 @@
                     {/if}
                   </div>
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">{song.artist || "Unknown Artist"}</td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">{song.album || "Unknown Album"}</td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
+                  {#if song.artist}
+                    <button
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", song.artist || ""); }}
+                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      title="Filter by artist: {song.artist}"
+                    >
+                      {song.artist}
+                    </button>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">Unknown Artist</span>
+                  {/if}
+                </td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
+                  {#if song.album}
+                    <button
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "albums", song.album || ""); }}
+                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      title="Filter by album: {song.album}"
+                    >
+                      {song.album}
+                    </button>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">Unknown Album</span>
+                  {/if}
+                </td>
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
@@ -237,7 +263,7 @@
           </tbody>
         </table>
       </div>
-    {:else if activeSubTab === "albums"}
+    {:else if collectionStore.activeSubTab === "albums"}
       <!-- Albums Card Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {#each filteredAlbums as album}
@@ -268,9 +294,7 @@
                 const songIds = songs.map((s) => s.id);
                 if (playlistsStore.activePlaylistId !== null) {
                   await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songIds);
-                  if (activeTab) {
-                    activeTab = "playlists";
-                  }
+                  collectionStore.activeTab = "playlists";
                   await playerStore.playPlaylistItem(playlistsStore.activePlaylistId, 0);
                 }
               }
@@ -306,12 +330,20 @@
                 </div>
               </button>
             </div>
-            <h3 class="font-semibold text-sm text-brand-text-primary truncate w-full" title={album.album || "Unknown Album"}>
+            <button
+              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "albums", album.album || ""); }}
+              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+              title="Filter by album: {album.album || 'Unknown Album'}"
+            >
               {album.album || "Unknown Album"}
-            </h3>
-            <p class="text-xs text-brand-text-secondary truncate w-full" title={album.artist || "Unknown Artist"}>
+            </button>
+            <button
+              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", album.artist || ""); }}
+              class="text-xs text-brand-text-secondary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
+              title="Filter by artist: {album.artist || 'Unknown Artist'}"
+            >
               {album.artist || "Unknown Artist"}
-            </p>
+            </button>
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
               <span>{album.track_count} tracks</span>
@@ -325,7 +357,7 @@
           </div>
         {/if}
       </div>
-    {:else if activeSubTab === "artists"}
+    {:else if collectionStore.activeSubTab === "artists"}
       <!-- Artists List Grid View -->
       <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {#each filteredArtists as artist}
@@ -333,9 +365,13 @@
             <div class="w-20 h-20 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
               {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
             </div>
-            <h3 class="font-semibold text-sm text-brand-text-primary truncate w-full" title={artist.name || "Unknown Artist"}>
+            <button
+              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", artist.name || ""); }}
+              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-center truncate w-full cursor-pointer"
+              title="Filter by artist: {artist.name || 'Unknown Artist'}"
+            >
               {artist.name || "Unknown Artist"}
-            </h3>
+            </button>
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{artist.album_count} albums</span>
               <span>•</span>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
@@ -197,8 +198,18 @@
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 font-medium truncate max-w-xs {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : 'text-brand-text-primary'}">
-                  <div class="flex items-center gap-2">
-                    <span class="truncate">{item.song?.title || "Unknown Title"}</span>
+                  <div class="flex items-center gap-2 max-w-full">
+                    {#if item.song?.title}
+                      <button
+                        onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
+                        class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : 'text-brand-text-primary'}"
+                        title="Filter by title: {item.song.title}"
+                      >
+                        {item.song.title}
+                      </button>
+                    {:else}
+                      <span class="truncate">Unknown Title</span>
+                    {/if}
                     {#if item.song}
                       <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                         {item.song.filetype}
@@ -211,8 +222,32 @@
                     {/if}
                   </div>
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">{item.song?.artist || "Unknown Artist"}</td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">{item.song?.album || "Unknown Album"}</td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
+                  {#if item.song?.artist}
+                    <button
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", item.song?.artist || ""); }}
+                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      title="Filter by artist: {item.song.artist}"
+                    >
+                      {item.song.artist}
+                    </button>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">Unknown Artist</span>
+                  {/if}
+                </td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
+                  {#if item.song?.album}
+                    <button
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "albums", item.song?.album || ""); }}
+                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      title="Filter by album: {item.song.album}"
+                    >
+                      {item.song.album}
+                    </button>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">Unknown Album</span>
+                  {/if}
+                </td>
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">

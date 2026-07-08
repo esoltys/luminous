@@ -9,9 +9,7 @@
   import Equalizer from "../lib/components/Equalizer.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
-
-  let activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
-  let activeSubTab = $state<"songs" | "albums" | "artists">("songs");
+  import { collectionStore } from "../lib/stores/collection.svelte";
 
   let isInitialized = $state(false);
 
@@ -23,10 +21,10 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings) {
         if (settings.active_tab) {
-          activeTab = settings.active_tab as any;
+          collectionStore.activeTab = settings.active_tab as any;
         }
         if (settings.active_sub_tab) {
-          activeSubTab = settings.active_sub_tab as any;
+          collectionStore.activeSubTab = settings.active_sub_tab as any;
         }
       }
     } catch (e) {
@@ -38,7 +36,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_tab", value: activeTab }).catch((err) => {
+      invoke("set_app_setting", { key: "active_tab", value: collectionStore.activeTab }).catch((err) => {
         console.error("Failed to save active_tab:", err);
       });
     }
@@ -46,7 +44,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_sub_tab", value: activeSubTab }).catch((err) => {
+      invoke("set_app_setting", { key: "active_sub_tab", value: collectionStore.activeSubTab }).catch((err) => {
         console.error("Failed to save active_sub_tab:", err);
       });
     }
@@ -56,19 +54,19 @@
 <div class="flex flex-col h-screen overflow-hidden bg-brand-main font-sans">
   <div class="flex flex-1 overflow-hidden">
     <!-- Sidebar navigation -->
-    <Sidebar bind:activeTab bind:activeSubTab />
+    <Sidebar />
 
     <!-- Main View Content Area -->
     <main class="flex-1 flex flex-col min-w-0">
-      {#if activeTab === "collection"}
-        <CollectionView {activeSubTab} bind:activeTab />
-      {:else if activeTab === "playlists"}
+      {#if collectionStore.activeTab === "collection"}
+        <CollectionView />
+      {:else if collectionStore.activeTab === "playlists"}
         <PlaylistView />
-      {:else if activeTab === "settings"}
+      {:else if collectionStore.activeTab === "settings"}
         <FoldersView />
-      {:else if activeTab === "equalizer"}
+      {:else if collectionStore.activeTab === "equalizer"}
         <Equalizer />
-      {:else if activeTab === "lyrics"}
+      {:else if collectionStore.activeTab === "lyrics"}
         <LyricsView />
       {/if}
     </main>

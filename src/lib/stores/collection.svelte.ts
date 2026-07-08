@@ -21,6 +21,8 @@ class CollectionStore {
   artists = $state<ArtistItem[]>([]);
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
+  activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
+  activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 
   constructor() {
     this.init();
@@ -101,6 +103,16 @@ class CollectionStore {
       return;
     }
     this.searchResults = await invoke("search_songs", { query, limit: 500 });
+  }
+
+  navigateTo(tab: "collection" | "playlists" | "settings" | "equalizer" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
+    this.activeTab = tab;
+    if (subTab) {
+      this.activeSubTab = subTab;
+    }
+    if (query !== undefined) {
+      this.searchQuery = query;
+    }
   }
 
   isFormatExcluded(filetype: string): boolean {
