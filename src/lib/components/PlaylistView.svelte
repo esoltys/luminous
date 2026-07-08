@@ -1,7 +1,7 @@
 <script lang="ts">
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Play, Trash2, ArrowUp, ArrowDown, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
+  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
 
@@ -34,19 +34,52 @@
     }
   }
 
-  function handleMoveUp(index: number) {
-    if (playlistsStore.activePlaylistId !== null && index > 0) {
-      playlistsStore.reorderItem(playlistsStore.activePlaylistId, index, index - 1);
+  // Drag and drop state and handlers
+  let draggedIndex = $state<number | null>(null);
+  let dragOverIndex = $state<number | null>(null);
+
+  function handleDragStart(event: DragEvent, index: number) {
+    draggedIndex = index;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", index.toString());
     }
   }
 
-  function handleMoveDown(index: number) {
-    if (
-      playlistsStore.activePlaylistId !== null &&
-      index < playlistsStore.activePlaylistTracks.length - 1
-    ) {
-      playlistsStore.reorderItem(playlistsStore.activePlaylistId, index, index + 1);
+  function handleDragOver(event: DragEvent, index: number) {
+    if (draggedIndex === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
     }
+  }
+
+  function handleDragEnter(event: DragEvent, index: number) {
+    if (draggedIndex === null) return;
+    event.preventDefault();
+    dragOverIndex = index;
+  }
+
+  function handleDragLeave(index: number) {
+    if (dragOverIndex === index) {
+      dragOverIndex = null;
+    }
+  }
+
+  function handleDragEnd() {
+    draggedIndex = null;
+    dragOverIndex = null;
+  }
+
+  function handleDrop(event: DragEvent, index: number) {
+    event.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      if (playlistsStore.activePlaylistId !== null) {
+        playlistsStore.reorderItem(playlistsStore.activePlaylistId, draggedIndex, index);
+      }
+    }
+    draggedIndex = null;
+    dragOverIndex = null;
   }
 
   function formatDuration(ns: number | undefined): string {
@@ -112,7 +145,7 @@
         </button>
         <button
           onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
-          class="bg-red-950/40 hover:bg-red-900/40 text-red-400 hover:text-red-300 border border-red-900/50 px-3 py-1 text-xs font-semibold rounded transition-colors"
+          class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-primary px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
         >
           Clear Playlist
         </button>
@@ -130,15 +163,27 @@
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">Artist</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">Album</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">Duration</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">Reorder</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-16 text-center z-10">Remove</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">Actions</th>
             </tr>
           </thead>
           <tbody>
             {#each playlistsStore.activePlaylistTracks as item, index}
               <tr
+                draggable="true"
+                ondragstart={(e) => handleDragStart(e, index)}
+                ondragover={(e) => handleDragOver(e, index)}
+                ondragenter={(e) => handleDragEnter(e, index)}
+                ondragleave={() => handleDragLeave(index)}
+                ondragend={handleDragEnd}
+                ondrop={(e) => handleDrop(e, index)}
                 ondblclick={() => handlePlayPlaylistItem(index)}
-                class="border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors {playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}"
+                class="border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-all duration-150 select-none cursor-grab active:cursor-grabbing
+                  {playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}
+                  {draggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
+                  {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index
+                    ? (index < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
+                    : ''
+                  }"
               >
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium">
                   {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === 'playing'}
@@ -170,26 +215,6 @@
                 <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">{item.song?.album || "Unknown Album"}</td>
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
-                  <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onclick={() => handleMoveUp(index)}
-                      disabled={index === 0}
-                      class="p-1 hover:text-brand-text-primary disabled:opacity-30 disabled:hover:text-brand-text-secondary transition-colors"
-                      title="Move track up"
-                    >
-                      <ArrowUp class="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onclick={() => handleMoveDown(index)}
-                      disabled={index === playlistsStore.activePlaylistTracks.length - 1}
-                      class="p-1 hover:text-brand-text-primary disabled:opacity-30 disabled:hover:text-brand-text-secondary transition-colors"
-                      title="Move track down"
-                    >
-                      <ArrowDown class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
-                <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={() => item.song?.id && openTagEditor(item.song.id)}
@@ -212,7 +237,7 @@
             {/each}
             {#if playlistsStore.activePlaylistTracks.length === 0}
               <tr>
-                <td colspan="7" class="py-12 text-center text-brand-text-secondary/45">
+                <td colspan="6" class="py-12 text-center text-brand-text-secondary/45">
                   <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
                   Playlist is empty. Add songs from the Collection tab.
                 </td>
