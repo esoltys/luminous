@@ -26,7 +26,7 @@ impl LyricsManager {
         Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(6))
-                .user_agent("LuminousMusicPlayer/0.1.0")
+                .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .unwrap_or_default(),
         }

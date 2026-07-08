@@ -185,7 +185,7 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
 
     let client = Client::builder()
         .timeout(Duration::from_secs(8))
-        .user_agent("LuminousMusicPlayer/0.1.0")
+        .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
         .build()?;
 
     let response = client.get(&url).send().await?;

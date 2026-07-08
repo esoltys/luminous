@@ -17,7 +17,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "take-screenshots": "bun run scripts/take-screenshots.ts",
-    "postbuild": "bun run scripts/take-screenshots.ts"
+    "postbuild": "bun run scripts/take-screenshots.ts",
+    "release": "bun run scripts/release.ts",
+    "bump-version": "bun run scripts/bump-version.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
