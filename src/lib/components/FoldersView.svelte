@@ -1,6 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, type ThemeColors } from "../stores/theme.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
@@ -41,10 +42,46 @@
     "color-border": "#1f1b2e"
   });
 
-  // When a theme is selected, synchronize the creator state to make a good starting point
+  function loadActiveThemeColors() {
+    if (typeof document === "undefined") return;
+    const rootStyle = getComputedStyle(document.documentElement);
+    
+    const getHexColor = (prop: string, fallback: string): string => {
+      const val = rootStyle.getPropertyValue(prop).trim();
+      if (!val) return fallback;
+      if (val.startsWith("rgb")) {
+        const match = val.match(/\d+/g);
+        if (match && match.length >= 3) {
+          const r = parseInt(match[0]);
+          const g = parseInt(match[1]);
+          const b = parseInt(match[2]);
+          const toHex = (c: number) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+          };
+          return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+      }
+      return val.startsWith("#") ? val : fallback;
+    };
+
+    customColors = {
+      "bg-main": getHexColor("--bg-main", "#0d0b18"),
+      "bg-sidebar": getHexColor("--bg-sidebar", "#07050e"),
+      "bg-playerbar": getHexColor("--bg-playerbar", "#0a0813"),
+      "color-accent": getHexColor("--color-accent", "#8b5cf6"),
+      "color-accent-hover": getHexColor("--color-accent-hover", "#a78bfa"),
+      "color-text-primary": getHexColor("--color-text-primary", "#f3f4f6"),
+      "color-text-secondary": getHexColor("--color-text-secondary", "#9ca3af"),
+      "color-border": getHexColor("--color-border", "#1f1b2e"),
+    };
+  }
+
+  // Pre-fill theme builder with current active theme colors on mount and updates
   $effect(() => {
-    const active = themeStore.currentTheme;
-    customColors = { ...active.colors };
+    const _themeId = themeStore.activeThemeId;
+    const _songId = playerStore.currentSong?.id;
+    loadActiveThemeColors();
   });
 
   function handleLivePreview() {
@@ -243,15 +280,23 @@
             <h4 class="font-bold text-sm text-brand-text-primary">Custom Theme Builder</h4>
           </div>
 
-          <div class="flex flex-col gap-1.5 max-w-sm">
-            <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
-            <input
-              id="theme-name-input"
-              type="text"
-              bind:value={newThemeName}
-              placeholder="e.g. Emerald Coast, Cyberpunk..."
-              class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
-            />
+          <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+            <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
+              <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
+              <input
+                id="theme-name-input"
+                type="text"
+                bind:value={newThemeName}
+                placeholder="e.g. Emerald Coast, Cyberpunk..."
+                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
+              />
+            </div>
+            <button
+              onclick={loadActiveThemeColors}
+              class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
+            >
+              <Palette class="w-4 h-4 text-brand-accent" /> Import Active Colors
+            </button>
           </div>
 
           <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-2">
