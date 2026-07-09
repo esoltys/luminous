@@ -379,18 +379,18 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    pub fn get_songs_by_album(&self, album_artist: &str, album: &str) -> Result<Vec<Song>> {
+    pub fn get_songs_by_album(&self, album: &str) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE (album_artist = ?1 OR (album_artist IS NULL AND artist = ?1))
-               AND album = ?2
+             WHERE album = ?1
+               AND source IN (1, 2)
              ORDER BY disc, track",
             SONG_SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(params![album_artist, album], row_to_song)?
+            .query_map(params![album], row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -398,19 +398,23 @@ impl CollectionScanner {
 
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
+        // Group only by album name so that tracks with different per-track artists
+        // but the same album title are consolidated into a single entry.
+        // album_artist is taken as the shared value when all tracks agree on it;
+        // if they differ (true various-artist albums), it comes back as NULL.
         let mut stmt = conn.prepare(
             "SELECT
-                COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
+                NULLIF(MAX(NULLIF(album_artist, '')), '') AS album_artist,
                 album,
                 MIN(year) AS year,
                 COUNT(*) AS track_count,
-                art_embedded,
-                art_automatic,
-                art_manual
+                MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
+                MAX(art_automatic) AS art_automatic,
+                MAX(art_manual) AS art_manual
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL
-             GROUP BY effective_artist, album
-             ORDER BY effective_artist, album",
+             GROUP BY album
+             ORDER BY album_artist, album",
         )?;
         let albums: Vec<serde_json::Value> = stmt
             .query_map([], |row| {

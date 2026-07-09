@@ -76,13 +76,12 @@ pub async fn get_songs(
 
 #[tauri::command]
 pub async fn get_songs_by_album(
-    album_artist: String,
     album: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
-        .get_songs_by_album(&album_artist, &album)
+        .get_songs_by_album(&album)
         .map_err(|e| e.to_string())
 }
 

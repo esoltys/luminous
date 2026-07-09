@@ -283,7 +283,6 @@
               }
 
               let songs = await invoke<Song[]>("get_songs_by_album", {
-                albumArtist: album.artist || "",
                 album: album.album || "",
               });
 
@@ -313,7 +312,6 @@
                 onclick={async (e) => {
                   e.stopPropagation();
                   let songs = await invoke<Song[]>("get_songs_by_album", {
-                    albumArtist: album.artist || "",
                     album: album.album || "",
                   });
                   // Filter out excluded formats
@@ -340,9 +338,9 @@
             <button
               onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", album.artist || ""); }}
               class="text-xs text-brand-text-secondary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-              title="Filter by artist: {album.artist || 'Unknown Artist'}"
+              title="Filter by artist: {album.artist || 'Various Artists'}"
             >
-              {album.artist || "Unknown Artist"}
+              {album.artist || "Various Artists"}
             </button>
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
