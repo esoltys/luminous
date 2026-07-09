@@ -240,7 +240,9 @@
                   <div class="flex items-center gap-2 max-w-full">
                     {#if unavailable}
                       <!-- Unavailable track: show warning icon + last known title -->
-                      <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" title="File not found on disk" />
+                      <span title="File not found on disk">
+                        <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
+                      </span>
                       <span class="truncate line-through decoration-brand-text-secondary/40">
                         {item.song?.title ?? "Unknown Title"}
                       </span>

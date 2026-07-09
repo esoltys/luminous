@@ -10,28 +10,82 @@
   import LyricsView from "../lib/components/LyricsView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { collectionStore } from "../lib/stores/collection.svelte";
+  import { playerStore } from "../lib/stores/player.svelte";
 
   let isInitialized = $state(false);
 
-  onMount(async () => {
-    // Initialize theme store first to prevent flash of default theme
-    await themeStore.init();
+  const SEEK_STEP_NS = 10_000_000_000;
+  const VOLUME_STEP = 0.05;
 
-    try {
-      const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      if (settings) {
-        if (settings.active_tab) {
-          collectionStore.activeTab = settings.active_tab as any;
-        }
-        if (settings.active_sub_tab) {
-          collectionStore.activeSubTab = settings.active_sub_tab as any;
-        }
-      }
-    } catch (e) {
-      console.error("Failed to restore app settings:", e);
-    } finally {
-      isInitialized = true;
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+
+    const editable = target.closest("input, textarea, select, [contenteditable]");
+    return editable !== null;
+  }
+
+  function handleKeyboardShortcut(event: KeyboardEvent) {
+    if (event.repeat || isEditableTarget(event.target)) return;
+
+    switch (event.code) {
+      case "Space":
+        event.preventDefault();
+        playerStore.togglePlayPause().catch((err) => console.error("Failed to toggle playback:", err));
+        break;
+      case "ArrowLeft":
+        event.preventDefault();
+        playerStore.seekRelative(-SEEK_STEP_NS).catch((err) => console.error("Failed to seek backward:", err));
+        break;
+      case "ArrowRight":
+        event.preventDefault();
+        playerStore.seekRelative(SEEK_STEP_NS).catch((err) => console.error("Failed to seek forward:", err));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        playerStore.adjustVolume(VOLUME_STEP).catch((err) => console.error("Failed to increase volume:", err));
+        break;
+      case "ArrowDown":
+        event.preventDefault();
+        playerStore.adjustVolume(-VOLUME_STEP).catch((err) => console.error("Failed to decrease volume:", err));
+        break;
+      case "PageUp":
+        event.preventDefault();
+        playerStore.previous().catch((err) => console.error("Failed to play previous track:", err));
+        break;
+      case "PageDown":
+        event.preventDefault();
+        playerStore.next().catch((err) => console.error("Failed to play next track:", err));
+        break;
     }
+  }
+
+  onMount(() => {
+    window.addEventListener("keydown", handleKeyboardShortcut);
+
+    (async () => {
+      // Initialize theme store first to prevent flash of default theme
+      await themeStore.init();
+
+      try {
+        const settings = await invoke<Record<string, string>>("get_all_app_settings");
+        if (settings) {
+          if (settings.active_tab) {
+            collectionStore.activeTab = settings.active_tab as any;
+          }
+          if (settings.active_sub_tab) {
+            collectionStore.activeSubTab = settings.active_sub_tab as any;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore app settings:", e);
+      } finally {
+        isInitialized = true;
+      }
+    })();
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyboardShortcut);
+    };
   });
 
   $effect(() => {

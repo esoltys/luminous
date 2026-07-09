@@ -26,6 +26,7 @@ mod waveform;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, ShortcutState};
 use tokio::sync::Mutex;
 
 pub use audio::AudioEngine;
@@ -39,6 +40,7 @@ pub struct AppState {
     pub db: Arc<Database>,
     pub audio: Arc<Mutex<AudioEngine>>,
     pub player: Arc<Mutex<Player>>,
+    pub volume_before_mute: Arc<Mutex<f32>>,
     pub playlists: Arc<Mutex<PlaylistManager>>,
     pub cover_manager: Arc<CoverManager>,
     pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
@@ -156,6 +158,7 @@ pub fn run() {
                 Arc::clone(&db),
                 Arc::clone(&audio),
             )));
+            let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             // Initialize playlist manager
             let playlists = Arc::new(Mutex::new(
@@ -274,6 +277,7 @@ pub fn run() {
                 db,
                 audio,
                 player,
+                volume_before_mute,
                 playlists,
                 cover_manager,
                 watcher,
@@ -283,6 +287,79 @@ pub fn run() {
             crate::collection::start_watcher(app.handle().clone(), &state);
 
             app.manage(state);
+
+            let media_shortcuts = [
+                "MediaPlayPause",
+                "MediaTrackNext",
+                "MediaTrackPrevious",
+                "AudioVolumeUp",
+                "AudioVolumeDown",
+                "AudioVolumeMute",
+            ];
+            if let Err(err) =
+                app.global_shortcut()
+                    .on_shortcuts(media_shortcuts, |app, shortcut, event| {
+                        if event.state != ShortcutState::Pressed {
+                            return;
+                        }
+
+                        let key = shortcut.key;
+                        let app_handle = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state = app_handle.state::<AppState>();
+                            let mut player = state.player.lock().await;
+                            let result = match key {
+                                Code::MediaPlayPause => {
+                                    let playback_state = player.get_state().await.state;
+                                    if playback_state == crate::models::PlayState::Playing {
+                                        player.pause().await
+                                    } else {
+                                        player.resume().await
+                                    }
+                                }
+                                Code::MediaTrackNext => player.next_track().await,
+                                Code::MediaTrackPrevious => player.previous_track().await,
+                                Code::AudioVolumeUp => {
+                                    let volume = player.get_state().await.volume;
+                                    player.set_volume((volume + 0.05).min(1.0)).await
+                                }
+                                Code::AudioVolumeDown => {
+                                    let volume = player.get_state().await.volume;
+                                    player.set_volume((volume - 0.05).max(0.0)).await
+                                }
+                                Code::AudioVolumeMute => {
+                                    let volume = player.get_state().await.volume;
+                                    if volume > 0.0 {
+                                        let mut volume_before_mute =
+                                            state.volume_before_mute.lock().await;
+                                        *volume_before_mute = volume;
+                                        player.set_volume(0.0).await
+                                    } else {
+                                        let volume_before_mute =
+                                            *state.volume_before_mute.lock().await;
+                                        player.set_volume(volume_before_mute.max(0.05)).await
+                                    }
+                                }
+                                _ => Ok(()),
+                            };
+
+                            if let Err(err) = result {
+                                eprintln!(
+                                    "[Luminous Backend] Failed to handle media key {:?}: {}",
+                                    key, err
+                                );
+                            } else {
+                                let playback_state = player.get_state().await;
+                                let _ = app_handle.emit("playback-state", playback_state);
+                            }
+                        });
+                    })
+            {
+                eprintln!(
+                    "[Luminous Backend] Failed to register media key shortcuts: {}",
+                    err
+                );
+            }
 
             Ok(())
         })

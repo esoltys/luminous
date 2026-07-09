@@ -42,6 +42,10 @@
     playerStore.setVolume(vol);
   }
 
+  function releaseVolumeFocus(e: Event) {
+    (e.currentTarget as HTMLInputElement).blur();
+  }
+
   let isMuted = $state(false);
   let previousVolume = $state(1.0);
 
@@ -206,6 +210,9 @@
       step="0.01"
       value={playerStore.volume}
       oninput={handleVolumeChange}
+      onchange={releaseVolumeFocus}
+      onpointerup={releaseVolumeFocus}
+      onkeyup={releaseVolumeFocus}
       class="w-24 accent-brand-accent h-1 bg-brand-border rounded-lg appearance-none cursor-pointer"
     />
   </div>

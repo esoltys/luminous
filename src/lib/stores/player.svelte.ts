@@ -83,6 +83,14 @@ export class PlayerStore {
     await invoke("resume");
   }
 
+  async togglePlayPause() {
+    if (this.state === "playing") {
+      await this.pause();
+    } else {
+      await this.resume();
+    }
+  }
+
   async stop() {
     await invoke("stop");
   }
@@ -102,9 +110,21 @@ export class PlayerStore {
     await invoke("seek_to", { positionNanosec: roundedNs });
   }
 
+  async seekRelative(deltaNs: number) {
+    const durationNs = this.currentSong?.length_nanosec;
+    const maxPositionNs = typeof durationNs === "number" ? durationNs : Number.POSITIVE_INFINITY;
+    const nextPositionNs = Math.min(Math.max(this.positionNanosec + deltaNs, 0), maxPositionNs);
+    await this.seek(nextPositionNs);
+  }
+
   async setVolume(vol: number) {
     this.volume = vol;
     await invoke("set_volume", { volume: vol });
+  }
+
+  async adjustVolume(delta: number) {
+    const nextVolume = Math.round(Math.min(Math.max(this.volume + delta, 0), 1) * 100) / 100;
+    await this.setVolume(nextVolume);
   }
 
   async setShuffleMode(mode: ShuffleMode) {

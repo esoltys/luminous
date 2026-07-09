@@ -303,6 +303,22 @@ fn decode_thread(
             }
         };
 
+        if req.start_nanosec > 0 {
+            let target_time = symphonia::core::units::Time::from(
+                std::time::Duration::from_nanos(req.start_nanosec),
+            );
+            match format.seek(
+                symphonia::core::formats::SeekMode::Accurate,
+                symphonia::core::formats::SeekTo::Time {
+                    time: target_time,
+                    track_id: Some(track_id),
+                },
+            ) {
+                Ok(_) => decoder.reset(),
+                Err(e) => log::warn!("Initial seek to {}ns failed: {:?}", req.start_nanosec, e),
+            }
+        }
+
         let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
         let channels = track
             .codec_params

@@ -37,6 +37,22 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("resume");
   });
 
+  it("should pause when togglePlayPause is called while playing", async () => {
+    store.state = "playing";
+
+    await store.togglePlayPause();
+
+    expect(invoke).toHaveBeenCalledWith("pause");
+  });
+
+  it("should resume when togglePlayPause is called while paused or stopped", async () => {
+    store.state = "paused";
+
+    await store.togglePlayPause();
+
+    expect(invoke).toHaveBeenCalledWith("resume");
+  });
+
   it("should trigger stop invoke on stop", async () => {
     await store.stop();
     expect(invoke).toHaveBeenCalledWith("stop");
@@ -74,5 +90,28 @@ describe("PlayerStore", () => {
     await store.seek(1500.5);
     expect(store.positionNanosec).toBe(1501); // rounded
     expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 1501 });
+  });
+
+  it("should clamp relative seeking to the start and current song duration", async () => {
+    store.currentSong = { length_nanosec: 30_000_000_000 } as any;
+    store.positionNanosec = 25_000_000_000;
+
+    await store.seekRelative(10_000_000_000);
+    expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 30_000_000_000 });
+
+    await store.seekRelative(-40_000_000_000);
+    expect(invoke).toHaveBeenCalledWith("seek_to", { positionNanosec: 0 });
+  });
+
+  it("should clamp adjusted volume between muted and full volume", async () => {
+    store.volume = 0.98;
+
+    await store.adjustVolume(0.05);
+    expect(store.volume).toBe(1);
+    expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 1 });
+
+    await store.adjustVolume(-1.5);
+    expect(store.volume).toBe(0);
+    expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 0 });
   });
 });
