@@ -10,6 +10,10 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     mpsc, Arc, Mutex,
 };
+use ringbuf::{
+    traits::{Consumer, Observer, Producer, Split},
+    HeapRb,
+};
 
 // ---------------------------------------------------------------------------
 // Control messages sent to the decode thread
@@ -327,7 +331,16 @@ fn decode_thread(
                 continue;
             }
         };
-        let config = default_config.config();
+        let mut config = default_config.config();
+        
+        // Request a buffer size clamped to the device's supported range to prevent underruns
+        config.buffer_size = match default_config.buffer_size() {
+            cpal::SupportedBufferSize::Range { min, max } => {
+                cpal::BufferSize::Fixed(4096.clamp(*min, *max))
+            }
+            cpal::SupportedBufferSize::Unknown => cpal::BufferSize::Default,
+        };
+
         let target_sample_rate = config.sample_rate.0;
         let target_channels = config.channels;
 
@@ -338,13 +351,15 @@ fn decode_thread(
             eq.update_format(target_sample_rate, target_channels as usize);
         }
 
-        // Buffer capacity based on target device format
-        let shared_buf: Arc<Mutex<std::collections::VecDeque<f32>>> =
-            Arc::new(Mutex::new(std::collections::VecDeque::with_capacity(
-                target_sample_rate as usize * target_channels as usize * 2,
-            )));
-        let shared_buf_writer = Arc::clone(&shared_buf);
-        let shared_buf_reader = Arc::clone(&shared_buf);
+        // Buffer capacity based on target device format (approx. 2 seconds of audio)
+        let buffer_capacity = target_sample_rate as usize * target_channels as usize * 2;
+        let rb = HeapRb::<f32>::new(buffer_capacity);
+        let (mut prod, cons) = rb.split();
+
+        // Wrap consumer in a Mutex so that the decode thread can clear it upon Seek/Stop,
+        // while the audio callback can perform a non-blocking `try_lock()` on it.
+        let shared_consumer = Arc::new(Mutex::new(cons));
+        let shared_consumer_reader = Arc::clone(&shared_consumer);
 
         let played_samples = Arc::new(AtomicU64::new(
             (req.start_nanosec as f64 * target_sample_rate as f64 * target_channels as f64 / 1_000_000_000.0) as u64
@@ -358,13 +373,20 @@ fn decode_thread(
             &config,
             move |output: &mut [f32], _| {
                 let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
-                let mut buf = shared_buf_reader.lock().unwrap();
                 let mut played = 0;
-                for sample in output.iter_mut() {
-                    if let Some(s) = buf.pop_front() {
-                        *sample = s;
-                        played += 1;
-                    } else {
+                
+                // Non-blocking try_lock ensures CPAL callback never stalls
+                if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
+                    for sample in output.iter_mut() {
+                        if let Some(s) = consumer.try_pop() {
+                            *sample = s;
+                            played += 1;
+                        } else {
+                            *sample = 0.0;
+                        }
+                    }
+                } else {
+                    for sample in output.iter_mut() {
                         *sample = 0.0;
                     }
                 }
@@ -481,8 +503,8 @@ fn decode_thread(
                     }
 
                     // Clear the buffer after seek to avoid stale audio
-                    if let Ok(mut buf) = shared_buf_writer.lock() {
-                        buf.clear();
+                    if let Ok(mut consumer) = shared_consumer.lock() {
+                        while consumer.try_pop().is_some() {}
                     }
                     let target_samples = (target_ns as f64 * target_sample_rate as f64 * target_channels as f64 / 1_000_000_000.0) as u64;
                     played_samples.store(target_samples, Ordering::Relaxed);
@@ -502,11 +524,7 @@ fn decode_thread(
 
             // If decoder has reached the end of the file, wait until output buffer drains completely
             if eof_reached {
-                let is_empty = if let Ok(buf) = shared_buf_writer.lock() {
-                    buf.is_empty()
-                } else {
-                    true
-                };
+                let is_empty = prod.occupied_len() == 0;
 
                 if is_empty {
                     let _ = event_tx.send(AudioEvent::TrackFinished { song_id });
@@ -523,11 +541,7 @@ fn decode_thread(
             }
 
             // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
-            let is_full = if let Ok(buf) = shared_buf_writer.lock() {
-                buf.len() > (target_sample_rate as usize * target_channels as usize * 3 / 2)
-            } else {
-                false
-            };
+            let is_full = prod.occupied_len() > (target_sample_rate as usize * target_channels as usize * 3 / 2);
 
             if is_full {
                 std::thread::sleep(std::time::Duration::from_millis(20));
@@ -557,9 +571,14 @@ fn decode_thread(
                             let resampled = resampler.resample(&channel_converted);
 
                             // Push samples into the shared playback buffer
-                            if let Ok(mut buf) = shared_buf_writer.lock() {
-                                for s in resampled {
-                                    buf.push_back(s);
+                            let mut pushed = 0;
+                            while pushed < resampled.len() {
+                                let written = prod.push_slice(&resampled[pushed..]);
+                                if written == 0 {
+                                    // Ring buffer is full, sleep a bit and try again
+                                    std::thread::sleep(std::time::Duration::from_millis(5));
+                                } else {
+                                    pushed += written;
                                 }
                             }
                         }
@@ -583,6 +602,7 @@ fn decode_thread(
         }
     }
 }
+
 
 // ---------------------------------------------------------------------------
 // Resampling & Channel Conversion Helpers
