@@ -52,10 +52,7 @@ impl PlaylistManager {
 
     pub fn create_playlist(&self, name: &str) -> Result<Playlist> {
         let conn = self.db.pool.get()?;
-        conn.execute(
-            "INSERT INTO playlists (name) VALUES (?1)",
-            params![name],
-        )?;
+        conn.execute("INSERT INTO playlists (name) VALUES (?1)", params![name])?;
         let id = conn.last_insert_rowid();
         Ok(Playlist {
             id,
@@ -118,8 +115,8 @@ impl PlaylistManager {
 
     pub fn get_playlist_tracks(&self, playlist_id: i64) -> Result<Vec<PlaylistItem>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            &format!("SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
+        let mut stmt = conn.prepare(&format!(
+            "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
                              pi.uuid, pi.type, pi.url, pi.stream_url,
                              -- song fields
                              s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
@@ -138,8 +135,8 @@ impl PlaylistManager {
                       FROM playlist_items pi
                       LEFT JOIN songs s ON s.id = pi.song_id
                       WHERE pi.playlist_id = ?1
-                      ORDER BY pi.position"),
-        )?;
+                      ORDER BY pi.position"
+        ))?;
 
         let items = stmt
             .query_map(params![playlist_id], |row| {
@@ -262,10 +259,7 @@ impl PlaylistManager {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             );
             if let Ok((pos, song_id)) = result {
-                conn.execute(
-                    "DELETE FROM playlist_items WHERE uuid = ?1",
-                    params![uuid],
-                )?;
+                conn.execute("DELETE FROM playlist_items WHERE uuid = ?1", params![uuid])?;
                 if let Some(sid) = song_id {
                     removed.push((uuid.clone(), pos, sid));
                 }
@@ -369,7 +363,13 @@ mod tests {
     use crate::db::Database;
 
     fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!("luminous_playlist_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_playlist_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
     }

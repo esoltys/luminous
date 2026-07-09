@@ -3,7 +3,10 @@ use std::sync::Arc;
 use tauri::State;
 
 #[tauri::command]
-pub async fn get_waveform_data(state: State<'_, AppState>, song_id: i64) -> Result<Option<Vec<u8>>, String> {
+pub async fn get_waveform_data(
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<Option<Vec<u8>>, String> {
     // 1. Check cache in SQLite
     if let Ok(Some(cached)) = crate::waveform::get_cached_waveform(&state.db, song_id) {
         return Ok(Some(cached));
@@ -12,7 +15,11 @@ pub async fn get_waveform_data(state: State<'_, AppState>, song_id: i64) -> Resu
     // 2. Fetch song path from SQLite
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: Option<String> = conn
-        .query_row("SELECT path FROM songs WHERE id = ?1", rusqlite::params![song_id], |row| row.get(0))
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get(0),
+        )
         .ok();
 
     let path = match path_str {
@@ -33,7 +40,10 @@ pub async fn get_waveform_data(state: State<'_, AppState>, song_id: i64) -> Resu
 }
 
 #[tauri::command]
-pub async fn get_moodbar_data(state: State<'_, AppState>, song_id: i64) -> Result<Option<Vec<u8>>, String> {
+pub async fn get_moodbar_data(
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<Option<Vec<u8>>, String> {
     // 1. Check cache in SQLite
     if let Ok(Some(cached)) = crate::moodbar::get_cached_moodbar(&state.db, song_id) {
         return Ok(Some(cached));
@@ -42,7 +52,11 @@ pub async fn get_moodbar_data(state: State<'_, AppState>, song_id: i64) -> Resul
     // 2. Fetch song path from SQLite
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: Option<String> = conn
-        .query_row("SELECT path FROM songs WHERE id = ?1", rusqlite::params![song_id], |row| row.get(0))
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get(0),
+        )
         .ok();
 
     let path = match path_str {
@@ -65,6 +79,8 @@ pub async fn get_moodbar_data(state: State<'_, AppState>, song_id: i64) -> Resul
 #[tauri::command]
 pub async fn set_spectrum_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
     let engine = state.audio.lock().await;
-    engine.spectrum_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    engine
+        .spectrum_enabled
+        .store(enabled, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }

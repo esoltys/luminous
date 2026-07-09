@@ -123,7 +123,7 @@ pub struct Song {
 
     // Paths & URLs
     pub path: Option<String>,
-    pub url: Option<String>,       // for streams
+    pub url: Option<String>,        // for streams
     pub stream_url: Option<String>, // resolved at playback time
 
     // Core metadata
@@ -168,7 +168,7 @@ pub struct Song {
     pub mtime: Option<i64>,
 
     // Play statistics
-    pub rating: f32,       // 0.0–1.0, -1.0 = unset
+    pub rating: f32, // 0.0–1.0, -1.0 = unset
     pub playcount: i32,
     pub skipcount: i32,
     pub lastplayed: Option<i64>,
@@ -220,11 +220,10 @@ impl Song {
     pub fn display_title(&self) -> &str {
         self.title
             .as_deref()
-            .or(self.path.as_deref().and_then(|p| {
-                std::path::Path::new(p)
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-            }))
+            .or(self
+                .path
+                .as_deref()
+                .and_then(|p| std::path::Path::new(p).file_stem().and_then(|s| s.to_str())))
             .unwrap_or("Unknown Title")
     }
 

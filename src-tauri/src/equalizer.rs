@@ -76,7 +76,9 @@ impl BiquadFilter {
 
     #[inline(always)]
     pub fn process(&mut self, x: f32) -> f32 {
-        let y = self.b0 * x + self.b1 * self.x1 + self.b2 * self.x2 - self.a1 * self.y1 - self.a2 * self.y2;
+        let y = self.b0 * x + self.b1 * self.x1 + self.b2 * self.x2
+            - self.a1 * self.y1
+            - self.a2 * self.y2;
 
         self.x2 = self.x1;
         self.x1 = x;

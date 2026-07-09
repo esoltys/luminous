@@ -34,7 +34,10 @@ pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<Equalizer
 }
 
 #[tauri::command]
-pub async fn set_equalizer_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+pub async fn set_equalizer_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.enabled = enabled;
@@ -43,7 +46,11 @@ pub async fn set_equalizer_enabled(state: State<'_, AppState>, enabled: bool) ->
 }
 
 #[tauri::command]
-pub async fn set_equalizer_band(state: State<'_, AppState>, band_idx: usize, gain_db: f32) -> Result<(), String> {
+pub async fn set_equalizer_band(
+    state: State<'_, AppState>,
+    band_idx: usize,
+    gain_db: f32,
+) -> Result<(), String> {
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_gain(band_idx, gain_db);
@@ -52,7 +59,10 @@ pub async fn set_equalizer_band(state: State<'_, AppState>, band_idx: usize, gai
 }
 
 #[tauri::command]
-pub async fn set_equalizer_preamp(state: State<'_, AppState>, preamp_db: f32) -> Result<(), String> {
+pub async fn set_equalizer_preamp(
+    state: State<'_, AppState>,
+    preamp_db: f32,
+) -> Result<(), String> {
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_preamp(preamp_db);
@@ -61,7 +71,10 @@ pub async fn set_equalizer_preamp(state: State<'_, AppState>, preamp_db: f32) ->
 }
 
 #[tauri::command]
-pub async fn load_equalizer_preset(state: State<'_, AppState>, preset_name: String) -> Result<EqualizerConfig, String> {
+pub async fn load_equalizer_preset(
+    state: State<'_, AppState>,
+    preset_name: String,
+) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
 

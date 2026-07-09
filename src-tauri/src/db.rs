@@ -18,23 +18,21 @@ pub struct Database {
 impl Database {
     /// Create (or open) the Luminous database in `app_data_dir/luminous.db`.
     pub fn new(app_data_dir: PathBuf) -> Result<Self> {
-        std::fs::create_dir_all(&app_data_dir)
-            .context("failed to create app data directory")?;
+        std::fs::create_dir_all(&app_data_dir).context("failed to create app data directory")?;
 
         let db_path = app_data_dir.join("luminous.db");
         log::info!("Opening database: {}", db_path.display());
 
-        let manager = SqliteConnectionManager::file(&db_path)
-            .with_init(|conn| {
-                // Performance pragmas applied to every new connection
-                conn.execute_batch(
-                    "PRAGMA journal_mode=WAL;
+        let manager = SqliteConnectionManager::file(&db_path).with_init(|conn| {
+            // Performance pragmas applied to every new connection
+            conn.execute_batch(
+                "PRAGMA journal_mode=WAL;
                      PRAGMA synchronous=NORMAL;
                      PRAGMA foreign_keys=ON;
                      PRAGMA cache_size=-32000;  -- 32 MB page cache
                      PRAGMA temp_store=MEMORY;",
-                )
-            });
+            )
+        });
 
         let pool = r2d2::Pool::builder()
             .max_size(8)
@@ -296,9 +294,15 @@ mod tests {
     #[test]
     fn test_database_initialization() {
         // Use a unique temp path for testing
-        let temp_dir = std::env::temp_dir().join(format!("luminous_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let db = Database::new(temp_dir.clone()).unwrap();
-        
+
         let conn = db.pool.get().unwrap();
         let tables_count: i64 = conn.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('songs', 'directories', 'playlists')",

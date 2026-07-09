@@ -6,13 +6,13 @@
 
 use crate::models::{PlayState, Song};
 use anyhow::{anyhow, Result};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    mpsc, Arc, Mutex,
-};
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
+};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    mpsc, Arc, Mutex,
 };
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,15 @@ impl AudioEngine {
         std::thread::Builder::new()
             .name("luminous-audio".to_string())
             .spawn(move || {
-                decode_thread(cmd_rx, event_tx, pos_clone, vol_clone, state_clone, vis_clone, eq_clone);
+                decode_thread(
+                    cmd_rx,
+                    event_tx,
+                    pos_clone,
+                    vol_clone,
+                    state_clone,
+                    vis_clone,
+                    eq_clone,
+                );
             })
             .expect("failed to spawn audio thread");
 
@@ -101,7 +109,10 @@ impl AudioEngine {
 
     pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
         self.cmd_tx
-            .send(AudioCommand::Play(PlayRequest { song, start_nanosec }))
+            .send(AudioCommand::Play(PlayRequest {
+                song,
+                start_nanosec,
+            }))
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
@@ -148,7 +159,10 @@ impl AudioEngine {
     }
 
     pub fn current_state(&self) -> PlayState {
-        self.play_state.lock().map(|s| *s).unwrap_or(PlayState::Stopped)
+        self.play_state
+            .lock()
+            .map(|s| *s)
+            .unwrap_or(PlayState::Stopped)
     }
 }
 
@@ -173,13 +187,8 @@ fn decode_thread(
 ) {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use symphonia::core::{
-        audio::SampleBuffer,
-        codecs::DecoderOptions,
-        errors::Error as SymphoniaError,
-        formats::FormatOptions,
-        io::MediaSourceStream,
-        meta::MetadataOptions,
-        probe::Hint,
+        audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
+        formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
     };
 
     // Keep current CPAL stream alive. Dropping it stops playback.
@@ -225,7 +234,7 @@ fn decode_thread(
                         continue;
                     }
                     Ok(_) => continue, // Ignore other commands when stopped
-                    Err(_) => break, // Channel disconnected
+                    Err(_) => break,   // Channel disconnected
                 }
             }
         };
@@ -276,9 +285,7 @@ fn decode_thread(
         let track = match format
             .tracks()
             .iter()
-            .find(|t| {
-                t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL
-            })
+            .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
             .cloned()
         {
             Some(t) => t,
@@ -304,9 +311,9 @@ fn decode_thread(
         };
 
         if req.start_nanosec > 0 {
-            let target_time = symphonia::core::units::Time::from(
-                std::time::Duration::from_nanos(req.start_nanosec),
-            );
+            let target_time = symphonia::core::units::Time::from(std::time::Duration::from_nanos(
+                req.start_nanosec,
+            ));
             match format.seek(
                 symphonia::core::formats::SeekMode::Accurate,
                 symphonia::core::formats::SeekTo::Time {
@@ -348,7 +355,7 @@ fn decode_thread(
             }
         };
         let mut config = default_config.config();
-        
+
         // Request a buffer size clamped to the device's supported range to prevent underruns
         config.buffer_size = match default_config.buffer_size() {
             cpal::SupportedBufferSize::Range { min, max } => {
@@ -378,7 +385,8 @@ fn decode_thread(
         let shared_consumer_reader = Arc::clone(&shared_consumer);
 
         let played_samples = Arc::new(AtomicU64::new(
-            (req.start_nanosec as f64 * target_sample_rate as f64 * target_channels as f64 / 1_000_000_000.0) as u64
+            (req.start_nanosec as f64 * target_sample_rate as f64 * target_channels as f64
+                / 1_000_000_000.0) as u64,
         ));
         let played_samples_cpal = Arc::clone(&played_samples);
         let position_cpal = Arc::clone(&position);
@@ -390,7 +398,7 @@ fn decode_thread(
             move |output: &mut [f32], _| {
                 let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
                 let mut played = 0;
-                
+
                 // Non-blocking try_lock ensures CPAL callback never stalls
                 if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
                     for sample in output.iter_mut() {
@@ -427,8 +435,11 @@ fn decode_thread(
                     visualizer_buf_cpal.push(&mono_samples);
                 }
 
-                let total_played = played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
-                let pos_ns = (total_played as f64 * 1_000_000_000.0 / (target_sample_rate as f64 * target_channels as f64)) as u64;
+                let total_played =
+                    played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
+                let pos_ns = (total_played as f64 * 1_000_000_000.0
+                    / (target_sample_rate as f64 * target_channels as f64))
+                    as u64;
                 position_cpal.store(pos_ns, Ordering::Relaxed);
             },
             |err| log::error!("CPAL stream error: {err}"),
@@ -459,7 +470,8 @@ fn decode_thread(
         let _ = event_tx.send(AudioEvent::Playing { song_id });
 
         let mut eof_reached = false;
-        let mut resampler = Resampler::new(sample_rate, target_sample_rate, target_channels as usize);
+        let mut resampler =
+            Resampler::new(sample_rate, target_sample_rate, target_channels as usize);
 
         // Decode loop
         'decode: loop {
@@ -496,7 +508,7 @@ fn decode_thread(
                     let target_time = symphonia::core::units::Time::from(
                         std::time::Duration::from_nanos(target_ns),
                     );
-                    
+
                     // Use SeekTo::Time instead of TimeStamp for robust format reader handling
                     let seek_res = format.seek(
                         symphonia::core::formats::SeekMode::Accurate,
@@ -509,7 +521,10 @@ fn decode_thread(
                     match seek_res {
                         Ok(seeked_to) => {
                             decoder.reset();
-                            eprintln!("[Luminous Backend] Seek successful! seeked_to: {:?}", seeked_to);
+                            eprintln!(
+                                "[Luminous Backend] Seek successful! seeked_to: {:?}",
+                                seeked_to
+                            );
                             log::info!("Seek successful: {:?}", seeked_to);
                         }
                         Err(e) => {
@@ -522,10 +537,13 @@ fn decode_thread(
                     if let Ok(mut consumer) = shared_consumer.lock() {
                         while consumer.try_pop().is_some() {}
                     }
-                    let target_samples = (target_ns as f64 * target_sample_rate as f64 * target_channels as f64 / 1_000_000_000.0) as u64;
+                    let target_samples =
+                        (target_ns as f64 * target_sample_rate as f64 * target_channels as f64
+                            / 1_000_000_000.0) as u64;
                     played_samples.store(target_samples, Ordering::Relaxed);
                     position.store(target_ns, Ordering::Relaxed);
-                    resampler = Resampler::new(sample_rate, target_sample_rate, target_channels as usize);
+                    resampler =
+                        Resampler::new(sample_rate, target_sample_rate, target_channels as usize);
                     eof_reached = false; // Reset EOF so we resume decoding
                 }
                 Ok(AudioCommand::SetVolume(v)) => {
@@ -557,7 +575,8 @@ fn decode_thread(
             }
 
             // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
-            let is_full = prod.occupied_len() > (target_sample_rate as usize * target_channels as usize * 3 / 2);
+            let is_full = prod.occupied_len()
+                > (target_sample_rate as usize * target_channels as usize * 3 / 2);
 
             if is_full {
                 std::thread::sleep(std::time::Duration::from_millis(20));
@@ -573,10 +592,8 @@ fn decode_thread(
                     match decoder.decode(&packet) {
                         Ok(decoded) => {
                             let spec = *decoded.spec();
-                            let mut sample_buf = SampleBuffer::<f32>::new(
-                                decoded.capacity() as u64,
-                                spec,
-                            );
+                            let mut sample_buf =
+                                SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
                             sample_buf.copy_interleaved_ref(decoded);
 
                             let channel_converted = convert_channels(
@@ -618,7 +635,6 @@ fn decode_thread(
         }
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // Resampling & Channel Conversion Helpers
@@ -688,7 +704,7 @@ impl Resampler {
         let ratio = self.from_rate as f64 / self.to_rate as f64;
         let num_input_frames = input.len() / self.channels;
         let mut output = Vec::new();
-        
+
         let get_frame = |idx: usize| -> &[f32] {
             if idx == 0 {
                 &self.last_frame
@@ -708,21 +724,22 @@ impl Resampler {
             }
             let frac = current_phase - idx as f64;
             let next_idx = idx + 1;
-            
+
             let frame_now = get_frame(idx);
             let frame_next = get_frame(next_idx);
-            
+
             for c in 0..self.channels {
                 let val = frame_now[c] + frac as f32 * (frame_next[c] - frame_now[c]);
                 output.push(val);
             }
-            
+
             current_phase += ratio;
         }
 
         if num_input_frames > 0 {
             let last_start = (num_input_frames - 1) * self.channels;
-            self.last_frame.copy_from_slice(&input[last_start..last_start + self.channels]);
+            self.last_frame
+                .copy_from_slice(&input[last_start..last_start + self.channels]);
             self.phase = current_phase - num_input_frames as f64;
         } else {
             self.phase = current_phase;

@@ -23,7 +23,7 @@ fn is_synced_lrc(text: &str) -> bool {
 #[tauri::command]
 pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
     eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}");
-    
+
     // 1. Check database cache
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let cached_lyrics: Option<String> = conn
@@ -39,7 +39,7 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
         if !lyrics.trim().is_empty() {
             let is_synced = is_synced_lrc(lyrics);
             let has_plain_marker = lyrics.starts_with("[synced:false]");
-            
+
             // If the cached lyrics are synced LRC, or if we have already checked online and marked it unsynced,
             // return immediately without hitting the network!
             if is_synced || has_plain_marker {
@@ -82,7 +82,9 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
                 return Ok(lyrics);
             }
         }
-        eprintln!("[Luminous Backend] Error: insufficient metadata (artist/title) to query lyrics online");
+        eprintln!(
+            "[Luminous Backend] Error: insufficient metadata (artist/title) to query lyrics online"
+        );
         return Err("insufficient song metadata (artist/title) to fetch online lyrics".to_string());
     }
 
@@ -139,7 +141,11 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
 }
 
 #[tauri::command]
-pub async fn save_lyrics(state: State<'_, AppState>, song_id: i64, lyrics: String) -> Result<(), String> {
+pub async fn save_lyrics(
+    state: State<'_, AppState>,
+    song_id: i64,
+    lyrics: String,
+) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.execute(
         "UPDATE songs SET lyrics = ?1 WHERE id = ?2",

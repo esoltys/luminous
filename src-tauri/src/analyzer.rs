@@ -64,7 +64,8 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
         .iter()
         .enumerate()
         .map(|(i, &s)| {
-            let window = 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (fft_size - 1) as f32).cos());
+            let window =
+                0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (fft_size - 1) as f32).cos());
             Complex {
                 re: s * window,
                 im: 0.0,
@@ -94,7 +95,8 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
 
         // Logarithmic scaling maps index bounds to better match human hearing spacing
         let start_idx = (start_pct.powi(2) * half_size as f32) as usize;
-        let end_idx = ((end_pct.powi(2) * half_size as f32) as usize).clamp(start_idx + 1, half_size);
+        let end_idx =
+            ((end_pct.powi(2) * half_size as f32) as usize).clamp(start_idx + 1, half_size);
 
         let mut sum = 0.0;
         let mut count = 0;
@@ -120,8 +122,7 @@ pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
         formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
     };
 
-    let file = std::fs::File::open(path)
-        .context("failed to open audio file for offline decode")?;
+    let file = std::fs::File::open(path).context("failed to open audio file for offline decode")?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let probed = symphonia::default::get_probe()
@@ -159,7 +160,8 @@ pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
                 match decoder.decode(&packet) {
                     Ok(decoded) => {
                         let spec = *decoded.spec();
-                        let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                        let mut sample_buf =
+                            SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
                         sample_buf.copy_interleaved_ref(decoded);
 
                         let channels = spec.channels.count();

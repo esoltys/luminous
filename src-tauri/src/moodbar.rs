@@ -31,10 +31,8 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
                 }
 
                 let chunk = &samples[start..end];
-                let mut buffer: Vec<Complex<f32>> = chunk
-                    .iter()
-                    .map(|&s| Complex { re: s, im: 0.0 })
-                    .collect();
+                let mut buffer: Vec<Complex<f32>> =
+                    chunk.iter().map(|&s| Complex { re: s, im: 0.0 }).collect();
 
                 while buffer.len() < fft_size {
                     buffer.push(Complex { re: 0.0, im: 0.0 });
@@ -52,7 +50,8 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
 
                 for k in 1..(fft_size / 2) {
                     let freq = (k as f32 * sample_rate as f32) / fft_size as f32;
-                    let magnitude = (buffer[k].re * buffer[k].re + buffer[k].im * buffer[k].im).sqrt();
+                    let magnitude =
+                        (buffer[k].re * buffer[k].re + buffer[k].im * buffer[k].im).sqrt();
 
                     if freq < 250.0 {
                         bass_sum += magnitude;
@@ -66,9 +65,21 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
                     }
                 }
 
-                let r = if bass_count > 0 { bass_sum / bass_count as f32 } else { 0.0 };
-                let g = if mid_count > 0 { mid_sum / mid_count as f32 } else { 0.0 };
-                let b = if treble_count > 0 { treble_sum / treble_count as f32 } else { 0.0 };
+                let r = if bass_count > 0 {
+                    bass_sum / bass_count as f32
+                } else {
+                    0.0
+                };
+                let g = if mid_count > 0 {
+                    mid_sum / mid_count as f32
+                } else {
+                    0.0
+                };
+                let b = if treble_count > 0 {
+                    treble_sum / treble_count as f32
+                } else {
+                    0.0
+                };
 
                 // Scale spectral energy to RGB values with log offset boosting
                 let r_u8 = ((r * 150.0).clamp(0.0, 255.0)) as u8;

@@ -31,7 +31,12 @@ impl CoverManager {
     }
 
     /// Extract embedded picture from audio file tags and save it to the covers cache directory
-    pub fn extract_embedded_art(&self, audio_path: &Path, album_artist: &str, album: &str) -> Result<Option<String>> {
+    pub fn extract_embedded_art(
+        &self,
+        audio_path: &Path,
+        album_artist: &str,
+        album: &str,
+    ) -> Result<Option<String>> {
         let tagged_file = Probe::open(audio_path)
             .context("failed to open audio file for cover extraction")?
             .read()
@@ -69,8 +74,14 @@ impl CoverManager {
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
         let parent_dir = audio_path.parent()?;
         let common_names = [
-            "cover", "folder", "album", "front", "artwork",
-            "cover-art", "album-art", "folder-art"
+            "cover",
+            "folder",
+            "album",
+            "front",
+            "artwork",
+            "cover-art",
+            "album-art",
+            "folder-art",
         ];
         let common_extensions = ["jpg", "jpeg", "png"];
 
@@ -115,7 +126,11 @@ impl CoverManager {
             _ => return Ok(None),
         };
 
-        log::info!("Fetching remote cover art for: {} - {}", query_artist, query_album);
+        log::info!(
+            "Fetching remote cover art for: {} - {}",
+            query_artist,
+            query_album
+        );
         let client = reqwest::Client::new();
         let search_url = format!(
             "https://itunes.apple.com/search?term={}&entity=album&limit=1",
@@ -125,7 +140,12 @@ impl CoverManager {
             )
         );
 
-        let response = client.get(&search_url).send().await?.json::<serde_json::Value>().await?;
+        let response = client
+            .get(&search_url)
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
         let results = response.get("results").and_then(|r| r.as_array());
 
         if let Some(results) = results {
@@ -136,7 +156,11 @@ impl CoverManager {
                     log::info!("Downloading remote cover art from: {}", url_600);
 
                     let img_bytes = client.get(&url_600).send().await?.bytes().await?;
-                    let ext = if url_600.contains(".png") { "png" } else { "jpg" };
+                    let ext = if url_600.contains(".png") {
+                        "png"
+                    } else {
+                        "jpg"
+                    };
                     let hash_name = self.get_album_hash(query_artist, query_album);
                     let filename = format!("{}.{}", hash_name, ext);
                     let dest_path = self.covers_dir.join(&filename);

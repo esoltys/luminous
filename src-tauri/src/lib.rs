@@ -55,7 +55,7 @@ pub fn run() {
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
             let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
-            
+
             // Extract the resource path directly from the full URI string
             let uri_str = request.uri().to_string();
             let mut trimmed = &uri_str[..];
@@ -64,25 +64,34 @@ pub fn run() {
             } else if let Some(t) = uri_str.strip_prefix("luminous-art://") {
                 trimmed = t;
             }
-            
+
             // If the webview prepends localhost/ to the authority, strip it
             if trimmed.starts_with("localhost/") {
                 trimmed = trimmed.strip_prefix("localhost/").unwrap_or(trimmed);
             }
-            
+
             // Webviews normalize empty paths to trailing slashes (e.g. URI/ -> path/)
             trimmed = trimmed.trim_end_matches('/');
 
             let file_path = if trimmed.starts_with("local/") {
                 let local_path = trimmed.strip_prefix("local/").unwrap_or(trimmed);
-                let decoded = percent_encoding::percent_decode_str(local_path).decode_utf8_lossy().into_owned();
+                let decoded = percent_encoding::percent_decode_str(local_path)
+                    .decode_utf8_lossy()
+                    .into_owned();
                 std::path::PathBuf::from(decoded)
             } else {
-                let decoded = percent_encoding::percent_decode_str(trimmed).decode_utf8_lossy().into_owned();
+                let decoded = percent_encoding::percent_decode_str(trimmed)
+                    .decode_utf8_lossy()
+                    .into_owned();
                 covers_dir.join(decoded)
             };
 
-            eprintln!("[Luminous Backend] Custom protocol: URI = {}, Resolved path = {:?} (exists: {})", uri_str, file_path, file_path.exists());
+            eprintln!(
+                "[Luminous Backend] Custom protocol: URI = {}, Resolved path = {:?} (exists: {})",
+                uri_str,
+                file_path,
+                file_path.exists()
+            );
 
             if file_path.exists() && file_path.is_file() {
                 if let Ok(data) = std::fs::read(&file_path) {
@@ -133,7 +142,13 @@ pub fn run() {
                 if let Ok((enabled, preamp, gains_str)) = conn.query_row(
                     "SELECT enabled, preamp, gains FROM equalizer_settings WHERE id = 1",
                     [],
-                    |row| Ok((row.get::<_, i32>(0)? != 0, row.get::<_, f64>(1)? as f32, row.get::<_, String>(2)?)),
+                    |row| {
+                        Ok((
+                            row.get::<_, i32>(0)? != 0,
+                            row.get::<_, f64>(1)? as f32,
+                            row.get::<_, String>(2)?,
+                        ))
+                    },
                 ) {
                     let mut gains = [0.0f32; 10];
                     for (i, val) in gains_str.split(',').enumerate() {
@@ -154,10 +169,7 @@ pub fn run() {
             let audio = Arc::new(Mutex::new(audio_engine));
 
             // Initialize player (needs db + audio refs)
-            let player = Arc::new(Mutex::new(Player::new(
-                Arc::clone(&db),
-                Arc::clone(&audio),
-            )));
+            let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             // Initialize playlist manager
@@ -186,9 +198,12 @@ pub fn run() {
                     if state == crate::models::PlayState::Playing {
                         let mut p = player_ticks.lock().await;
                         p.on_position_update(pos);
-                        let _ = app_handle_ticks.emit("playback-position", serde_json::json!({
-                            "position_nanosec": pos
-                        }));
+                        let _ = app_handle_ticks.emit(
+                            "playback-position",
+                            serde_json::json!({
+                                "position_nanosec": pos
+                            }),
+                        );
                     }
                 }
             });
@@ -202,10 +217,15 @@ pub fn run() {
                     interval.tick().await;
                     let (enabled, spectrum) = {
                         let engine = audio_visualizer.lock().await;
-                        let enabled = engine.spectrum_enabled.load(std::sync::atomic::Ordering::Relaxed);
+                        let enabled = engine
+                            .spectrum_enabled
+                            .load(std::sync::atomic::Ordering::Relaxed);
                         let state = engine.current_state();
                         let spectrum = if enabled && state == crate::models::PlayState::Playing {
-                            Some(crate::analyzer::calculate_spectrum(&engine.visualizer_buf, 1024))
+                            Some(crate::analyzer::calculate_spectrum(
+                                &engine.visualizer_buf,
+                                1024,
+                            ))
                         } else {
                             None
                         };
@@ -228,9 +248,8 @@ pub fn run() {
                 .name("luminous-events".to_string())
                 .spawn(move || {
                     let rx = {
-                        let engine = tauri::async_runtime::block_on(async {
-                            audio_events.lock().await
-                        });
+                        let engine =
+                            tauri::async_runtime::block_on(async { audio_events.lock().await });
                         engine.event_rx.clone()
                     };
 
@@ -243,9 +262,12 @@ pub fn run() {
                             let mut p = player.lock().await;
                             match event {
                                 crate::audio::AudioEvent::Playing { .. } => {
-                                    let _ = app.emit("track-changed", serde_json::json!({
-                                        "song": p.current_song.clone()
-                                    }));
+                                    let _ = app.emit(
+                                        "track-changed",
+                                        serde_json::json!({
+                                            "song": p.current_song.clone()
+                                        }),
+                                    );
                                     let state = p.get_state().await;
                                     let _ = app.emit("playback-state", state);
                                 }
@@ -263,7 +285,10 @@ pub fn run() {
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::Error { message } => {
-                                    eprintln!("[Luminous Backend] ERROR from audio engine: {}", message);
+                                    eprintln!(
+                                        "[Luminous Backend] ERROR from audio engine: {}",
+                                        message
+                                    );
                                 }
                                 _ => {}
                             }

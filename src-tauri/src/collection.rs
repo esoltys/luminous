@@ -1,9 +1,9 @@
 //! Collection module — library scanner, file watcher, and DB integration.
 
 use crate::{
+    covermanager::CoverManager,
     db::Database,
     models::{FileType, LibraryStats, MusicDirectory, ScanPhase, ScanProgress, Song, SongSource},
-    covermanager::CoverManager,
 };
 use anyhow::{Context, Result};
 use lofty::{
@@ -72,7 +72,8 @@ impl CollectionScanner {
     /// Marks songs as unavailable (soft-delete) when their file no longer exists on disk.
     pub fn prune_missing_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0")?;
+        let mut stmt =
+            conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0")?;
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
@@ -99,11 +100,13 @@ impl CollectionScanner {
                 }
             }
             tx.commit()?;
-            log::info!("Marked {} song(s) as unavailable (file missing)", unavailable_count);
+            log::info!(
+                "Marked {} song(s) as unavailable (file missing)",
+                unavailable_count
+            );
         }
         Ok(unavailable_count)
     }
-
 
     /// Scan all watched directories, emitting progress events to the frontend.
     pub async fn scan_all(&self, app: AppHandle) -> Result<()> {
@@ -176,14 +179,20 @@ impl CollectionScanner {
                 match read_tags(path) {
                     Ok(mut song) => {
                         if song.art_embedded {
-                            let artist = song.album_artist.as_deref().unwrap_or(song.artist.as_deref().unwrap_or(""));
+                            let artist = song
+                                .album_artist
+                                .as_deref()
+                                .unwrap_or(song.artist.as_deref().unwrap_or(""));
                             let album = song.album.as_deref().unwrap_or("");
-                            if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album) {
+                            if let Ok(Some(cached_filename)) =
+                                cover_manager.extract_embedded_art(path, artist, album)
+                            {
                                 song.art_automatic = Some(cached_filename);
                                 song.art_unset = false;
                             }
                         } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-                            song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+                            song.art_automatic =
+                                Some(folder_art_path.to_string_lossy().to_string());
                             song.art_unset = false;
                         }
                         upsert_song(&conn, &song)?;
@@ -241,18 +250,30 @@ impl CollectionScanner {
                  WHERE source IN (1, 2)
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
-                 GROUP BY effective_artist, album"
+                 GROUP BY effective_artist, album",
             ) {
                 if let Ok(mut rows) = stmt.query([]) {
                     while let Ok(Some(row)) = rows.next() {
-                        if let (Ok(id), Ok(path_str), Ok(effective_artist), Ok(album), Ok(art_embedded)) = (
+                        if let (
+                            Ok(id),
+                            Ok(path_str),
+                            Ok(effective_artist),
+                            Ok(album),
+                            Ok(art_embedded),
+                        ) = (
                             row.get::<_, i64>(0),
                             row.get::<_, String>(1),
                             row.get::<_, String>(2),
                             row.get::<_, String>(3),
                             row.get::<_, bool>(4),
                         ) {
-                            albums_to_resolve.push((id, path_str, effective_artist, album, art_embedded));
+                            albums_to_resolve.push((
+                                id,
+                                path_str,
+                                effective_artist,
+                                album,
+                                art_embedded,
+                            ));
                         }
                     }
                 }
@@ -266,7 +287,9 @@ impl CollectionScanner {
 
             // 1. Try embedded art
             if art_embedded {
-                if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, &effective_artist, &album) {
+                if let Ok(Some(cached_filename)) =
+                    cover_manager.extract_embedded_art(path, &effective_artist, &album)
+                {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
                             "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?2 AND album = ?3",
@@ -296,7 +319,7 @@ impl CollectionScanner {
                 remote_fetch_count += 1;
                 // Add a small delay between requests
                 std::thread::sleep(std::time::Duration::from_millis(150));
-                
+
                 if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
                     if let Ok(conn) = self.db.pool.get() {
                         let _ = conn.execute(
@@ -491,8 +514,8 @@ impl CollectionScanner {
 // ---------------------------------------------------------------------------
 
 const AUDIO_EXTENSIONS: &[&str] = &[
-    "mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif",
-    "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b",
+    "mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape",
+    "tta", "dsf", "dff", "asf", "wma", "m4b",
 ];
 
 fn is_audio_file(path: &Path) -> bool {
@@ -589,17 +612,11 @@ fn read_tags(path: &Path) -> Result<Song> {
         song.disc = tag.disk().map(|d| d as i32);
 
         // Album artist (various tag formats store this differently)
-        song.album_artist = tag
-            .get_string(&ItemKey::AlbumArtist)
-            .map(|s| s.to_string());
+        song.album_artist = tag.get_string(&ItemKey::AlbumArtist).map(|s| s.to_string());
 
-        song.composer = tag
-            .get_string(&ItemKey::Composer)
-            .map(|s| s.to_string());
+        song.composer = tag.get_string(&ItemKey::Composer).map(|s| s.to_string());
 
-        song.lyrics = tag
-            .get_string(&ItemKey::Lyrics)
-            .map(|s| s.to_string());
+        song.lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
 
         // Check for embedded art
         song.art_embedded = !tag.pictures().is_empty();
@@ -614,7 +631,8 @@ fn read_tags(path: &Path) -> Result<Song> {
 
 fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
     conn.execute(
-        &format!("INSERT INTO songs ({}) VALUES ({})
+        &format!(
+            "INSERT INTO songs ({}) VALUES ({})
                   ON CONFLICT(path) DO UPDATE SET
                     title=excluded.title, artist=excluded.artist,
                     album=excluded.album, album_artist=excluded.album_artist,
@@ -630,7 +648,8 @@ fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
                     art_unset=excluded.art_unset,
                     filetype=excluded.filetype, source=excluded.source,
                     unavailable=0",
-            SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS),
+            SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
+        ),
         params![
             song.source as i32,
             song.filetype as i32,
@@ -689,7 +708,8 @@ const SONG_INSERT_COLS: &str = "
     filesize, mtime, art_embedded, art_automatic, art_unset
 ";
 
-const SONG_INSERT_PLACEHOLDERS: &str = "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24";
+const SONG_INSERT_PLACEHOLDERS: &str =
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24";
 
 fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -823,8 +843,8 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         match delete_path_and_subpaths(&db_for_thread, &path_str) {
                             Ok(deleted) => {
                                 if deleted > 0 {
-                                     log::info!("Pruned {} deleted song(s) from db", deleted);
-                                     let _ = app_clone.emit("library-changed", ());
+                                    log::info!("Pruned {} deleted song(s) from db", deleted);
+                                    let _ = app_clone.emit("library-changed", ());
                                 }
                             }
                             Err(e) => {

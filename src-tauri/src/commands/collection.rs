@@ -36,10 +36,7 @@ pub async fn get_directories(state: State<'_, AppState>) -> Result<Vec<MusicDire
 }
 
 #[tauri::command]
-pub async fn scan_directories(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn scan_directories(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.scan_all(app).await.map_err(|e| e.to_string())
 }

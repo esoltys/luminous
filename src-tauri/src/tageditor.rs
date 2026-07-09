@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
+use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, Tag};
-use lofty::config::WriteOptions;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -93,7 +93,9 @@ pub fn write_tags(
         None => {
             let tag_type = tagged_file.primary_tag_type();
             tagged_file.insert_tag(Tag::new(tag_type));
-            tagged_file.primary_tag_mut().ok_or_else(|| anyhow!("could not create a tag frame"))?
+            tagged_file
+                .primary_tag_mut()
+                .ok_or_else(|| anyhow!("could not create a tag frame"))?
         }
     };
 
@@ -130,7 +132,8 @@ pub fn write_tags(
             Err(e) => {
                 attempts += 1;
                 if attempts >= 5 {
-                    return Err(e).context("failed to write tags back to file after multiple attempts");
+                    return Err(e)
+                        .context("failed to write tags back to file after multiple attempts");
                 }
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
@@ -154,7 +157,10 @@ fn get_fpcalc_path() -> PathBuf {
 
 pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
     let fpcalc_bin = get_fpcalc_path();
-    eprintln!("[Luminous Backend] AcoustID: Running fpcalc binary '{:?}' on file '{:?}'", fpcalc_bin, path);
+    eprintln!(
+        "[Luminous Backend] AcoustID: Running fpcalc binary '{:?}' on file '{:?}'",
+        fpcalc_bin, path
+    );
 
     let output = Command::new(&fpcalc_bin)
         .arg("-json")
@@ -168,9 +174,12 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
         return Err(anyhow!("fpcalc failed: {}", stderr));
     }
 
-    let res: FpCalcOutput = serde_json::from_slice(&output.stdout)
-        .context("failed to parse fpcalc JSON output")?;
-    eprintln!("[Luminous Backend] AcoustID: fpcalc completed successfully. Duration: {}s", res.duration.round() as u32);
+    let res: FpCalcOutput =
+        serde_json::from_slice(&output.stdout).context("failed to parse fpcalc JSON output")?;
+    eprintln!(
+        "[Luminous Backend] AcoustID: fpcalc completed successfully. Duration: {}s",
+        res.duration.round() as u32
+    );
     Ok((res.fingerprint, res.duration.round() as u32))
 }
 
@@ -181,7 +190,10 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
         client_key, duration_sec, fingerprint
     );
 
-    eprintln!("[Luminous Backend] AcoustID: Querying API lookup service (duration: {}s)...", duration_sec);
+    eprintln!(
+        "[Luminous Backend] AcoustID: Querying API lookup service (duration: {}s)...",
+        duration_sec
+    );
 
     let client = Client::builder()
         .timeout(Duration::from_secs(8))
@@ -190,13 +202,22 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
 
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
-        eprintln!("[Luminous Backend] AcoustID: API request failed with status: {}", response.status());
-        return Err(anyhow!("AcoustID API request failed: {}", response.status()));
+        eprintln!(
+            "[Luminous Backend] AcoustID: API request failed with status: {}",
+            response.status()
+        );
+        return Err(anyhow!(
+            "AcoustID API request failed: {}",
+            response.status()
+        ));
     }
 
     let resp: AcoustIdResponse = response.json().await?;
     if resp.status != "ok" {
-        eprintln!("[Luminous Backend] AcoustID: Service returned non-ok status: {}", resp.status);
+        eprintln!(
+            "[Luminous Backend] AcoustID: Service returned non-ok status: {}",
+            resp.status
+        );
         return Err(anyhow!("AcoustID service status error"));
     }
 
@@ -204,29 +225,52 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
     let best_result = results
         .iter()
         .filter(|r| r.recordings.is_some() && !r.recordings.as_ref().unwrap().is_empty())
-        .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal));
+        .max_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
     if let Some(r) = best_result {
         if let Some(recordings) = &r.recordings {
             if let Some(rec) = recordings.first() {
                 let title = rec.title.clone();
-                let artist = rec.artists.as_ref()
+                let artist = rec
+                    .artists
+                    .as_ref()
                     .and_then(|artists| artists.first().map(|a| a.name.clone()));
-                let album = rec.release_groups.as_ref()
+                let album = rec
+                    .release_groups
+                    .as_ref()
                     .and_then(|rgs| rgs.first().and_then(|rg| rg.title.clone()))
-                    .or_else(|| rec.releases.as_ref().and_then(|rels| rels.first().and_then(|rel| rel.title.clone())));
+                    .or_else(|| {
+                        rec.releases
+                            .as_ref()
+                            .and_then(|rels| rels.first().and_then(|rel| rel.title.clone()))
+                    });
 
                 let year = rec.releases.as_ref().and_then(|rels| {
                     rels.iter().find_map(|rel| {
                         rel.date.as_ref().and_then(|d| match d {
                             AcoustIdDate::Year(y) => Some(*y),
-                            AcoustIdDate::Full(s) => s.split('-').next().and_then(|part| part.parse::<u32>().ok()),
+                            AcoustIdDate::Full(s) => s
+                                .split('-')
+                                .next()
+                                .and_then(|part| part.parse::<u32>().ok()),
                         })
                     })
                 });
 
-                let suggested = SuggestedTags { title, artist, album, year };
-                eprintln!("[Luminous Backend] AcoustID: Successfully matched track. Suggestions: {:?}", suggested);
+                let suggested = SuggestedTags {
+                    title,
+                    artist,
+                    album,
+                    year,
+                };
+                eprintln!(
+                    "[Luminous Backend] AcoustID: Successfully matched track. Suggestions: {:?}",
+                    suggested
+                );
                 return Ok(suggested);
             }
         }

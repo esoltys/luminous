@@ -1,5 +1,5 @@
-use crate::AppState;
 use crate::tageditor::SuggestedTags;
+use crate::AppState;
 use tauri::State;
 
 #[derive(serde::Serialize)]
@@ -18,7 +18,10 @@ pub struct SongDetails {
 }
 
 #[tauri::command]
-pub async fn get_song_details(state: State<'_, AppState>, song_id: i64) -> Result<SongDetails, String> {
+pub async fn get_song_details(
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<SongDetails, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year 
@@ -44,22 +47,28 @@ pub async fn get_song_details(state: State<'_, AppState>, song_id: i64) -> Resul
 }
 
 #[tauri::command]
-pub async fn lookup_acoustid_tags(state: State<'_, AppState>, song_id: i64) -> Result<SuggestedTags, String> {
+pub async fn lookup_acoustid_tags(
+    state: State<'_, AppState>,
+    song_id: i64,
+) -> Result<SuggestedTags, String> {
     // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: String = conn
-        .query_row("SELECT path FROM songs WHERE id = ?1", rusqlite::params![song_id], |row| row.get(0))
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get(0),
+        )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
 
     // 2. Generate fingerprint (blocking subprocess invocation)
-    let (fingerprint, duration_sec) = tauri::async_runtime::spawn_blocking(move || {
-        crate::tageditor::generate_fingerprint(&path)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| e.to_string())?;
+    let (fingerprint, duration_sec) =
+        tauri::async_runtime::spawn_blocking(move || crate::tageditor::generate_fingerprint(&path))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
 
     // 3. Query AcoustID web service lookup
     let suggestions = crate::tageditor::lookup_acoustid(&fingerprint, duration_sec)
@@ -86,7 +95,11 @@ pub async fn save_song_tags(
     // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: String = conn
-        .query_row("SELECT path FROM songs WHERE id = ?1", rusqlite::params![song_id], |row| row.get(0))
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get(0),
+        )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);

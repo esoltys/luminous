@@ -135,7 +135,9 @@ impl Player {
 
         let play_index = if self.shuffle_mode != ShuffleMode::Off {
             // Find the position of start_index in the shuffle order
-            self.shuffle_order.iter().position(|&i| i == start_index)
+            self.shuffle_order
+                .iter()
+                .position(|&i| i == start_index)
                 .unwrap_or(0)
         } else {
             start_index
@@ -196,15 +198,23 @@ impl Player {
         }
 
         let item_index = if self.shuffle_mode != ShuffleMode::Off {
-            *self.shuffle_order.get(candidate).ok_or(anyhow!("index out of bounds"))?
+            *self
+                .shuffle_order
+                .get(candidate)
+                .ok_or(anyhow!("index out of bounds"))?
         } else {
             candidate
         };
 
-        let item = self.playlist_items.get(item_index)
+        let item = self
+            .playlist_items
+            .get(item_index)
             .ok_or(anyhow!("playlist item not found"))?;
 
-        let song = item.song.clone().ok_or(anyhow!("playlist item has no song"))?;
+        let song = item
+            .song
+            .clone()
+            .ok_or(anyhow!("playlist item has no song"))?;
         let start_ns = song.beginning_nanosec.max(0) as u64;
 
         // Set scrobble point at 50% of track length
@@ -266,7 +276,10 @@ impl Player {
 
         // Check queue first
         if let Some(queued) = self.queue.pop_front() {
-            let song = queued.song.clone().ok_or(anyhow!("queued item has no song"))?;
+            let song = queued
+                .song
+                .clone()
+                .ok_or(anyhow!("queued item has no song"))?;
             let start_ns = song.beginning_nanosec.max(0) as u64;
             self.current_song = Some(song.clone());
             self.current_item_uuid = Some(queued.uuid.clone());
@@ -290,8 +303,17 @@ impl Player {
         // In shuffle mode, walk back through history (skip unavailable)
         if self.shuffle_mode != ShuffleMode::Off {
             while let Some(prev_index) = self.played_indices.pop() {
-                let item_index = self.shuffle_order.get(prev_index).copied().unwrap_or(prev_index);
-                if self.playlist_items.get(item_index).map(Self::is_item_playable).unwrap_or(false) {
+                let item_index = self
+                    .shuffle_order
+                    .get(prev_index)
+                    .copied()
+                    .unwrap_or(prev_index);
+                if self
+                    .playlist_items
+                    .get(item_index)
+                    .map(Self::is_item_playable)
+                    .unwrap_or(false)
+                {
                     return self.play_at_index(prev_index).await;
                 }
             }
@@ -303,14 +325,26 @@ impl Player {
             if len == 0 {
                 return Ok(());
             }
-            let mut candidate = if current > 0 { current - 1 } else { len.saturating_sub(1) };
+            let mut candidate = if current > 0 {
+                current - 1
+            } else {
+                len.saturating_sub(1)
+            };
             for _ in 0..len {
                 let item_index = if self.shuffle_mode != ShuffleMode::Off {
-                    self.shuffle_order.get(candidate).copied().unwrap_or(candidate)
+                    self.shuffle_order
+                        .get(candidate)
+                        .copied()
+                        .unwrap_or(candidate)
                 } else {
                     candidate
                 };
-                if self.playlist_items.get(item_index).map(Self::is_item_playable).unwrap_or(false) {
+                if self
+                    .playlist_items
+                    .get(item_index)
+                    .map(Self::is_item_playable)
+                    .unwrap_or(false)
+                {
                     return self.play_at_index(candidate).await;
                 }
                 if candidate == 0 {
