@@ -209,6 +209,10 @@ pub struct Song {
     pub artist_id: Option<String>,
     pub album_id: Option<String>,
     pub song_id: Option<String>,
+
+    /// Set to `true` when the file is missing from disk (soft-delete).
+    /// Song metadata is retained so playlists can display last-known info.
+    pub unavailable: bool,
 }
 
 impl Song {

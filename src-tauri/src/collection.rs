@@ -69,40 +69,41 @@ impl CollectionScanner {
             .collect();
         Ok(dirs)
     }
-
-    /// Prunes database records pointing to paths that no longer exist on disk.
+    /// Marks songs as unavailable (soft-delete) when their file no longer exists on disk.
     pub fn prune_missing_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
+        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0")?;
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
             Ok((id, path))
         })?;
 
-        let mut to_delete = Vec::new();
+        let mut to_mark_unavailable = Vec::new();
         for row in rows {
             if let Ok((id, path)) = row {
                 let p = Path::new(&path);
                 if !p.exists() {
-                    to_delete.push(id);
+                    to_mark_unavailable.push(id);
                 }
             }
         }
 
-        let deleted_count = to_delete.len();
-        if !to_delete.is_empty() {
+        let unavailable_count = to_mark_unavailable.len();
+        if !to_mark_unavailable.is_empty() {
             let tx = conn.unchecked_transaction()?;
             {
-                let mut del_stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
-                for id in to_delete {
-                    del_stmt.execute(params![id])?;
+                let mut upd_stmt = tx.prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")?;
+                for id in &to_mark_unavailable {
+                    upd_stmt.execute(params![id])?;
                 }
             }
             tx.commit()?;
+            log::info!("Marked {} song(s) as unavailable (file missing)", unavailable_count);
         }
-        Ok(deleted_count)
+        Ok(unavailable_count)
     }
+
 
     /// Scan all watched directories, emitting progress events to the frontend.
     pub async fn scan_all(&self, app: AppHandle) -> Result<()> {
@@ -327,17 +328,18 @@ impl CollectionScanner {
         // Use FTS5 for queries with non-trivial content
         let sql = if query.trim().is_empty() {
             format!(
-                "SELECT {} FROM songs ORDER BY album_artist, album, disc, track LIMIT ?2",
+                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY album_artist, album, disc, track LIMIT ?2",
                 SONG_SELECT_COLS
             )
         } else {
             format!(
-                "SELECT {} FROM songs WHERE id IN (
+                "SELECT {} FROM songs WHERE unavailable = 0 AND id IN (
                     SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?1
                  )
                  UNION
-                 SELECT {} FROM songs WHERE
+                 SELECT {} FROM songs WHERE unavailable = 0 AND (
                     title LIKE ?3 OR artist LIKE ?3 OR album LIKE ?3
+                 )
                  ORDER BY album_artist, album, disc, track
                  LIMIT ?2",
                 SONG_SELECT_COLS, SONG_SELECT_COLS
@@ -366,7 +368,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN (1, 2) AND unavailable = 0
              ORDER BY album_artist, album, disc, track
              LIMIT ?1 OFFSET ?2",
             SONG_SELECT_COLS
@@ -385,6 +387,7 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE album = ?1
                AND source IN (1, 2)
+               AND unavailable = 0
              ORDER BY disc, track",
             SONG_SELECT_COLS
         );
@@ -412,7 +415,7 @@ impl CollectionScanner {
                 MAX(art_automatic) AS art_automatic,
                 MAX(art_manual) AS art_manual
              FROM songs
-             WHERE source IN (1, 2) AND album IS NOT NULL
+             WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
              ORDER BY album_artist, album",
         )?;
@@ -441,7 +444,7 @@ impl CollectionScanner {
                 COUNT(DISTINCT album) AS album_count,
                 COUNT(*) AS song_count
              FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN (1, 2) AND unavailable = 0
              GROUP BY effective_artist
              ORDER BY effective_artist",
         )?;
@@ -467,7 +470,7 @@ impl CollectionScanner {
                 COUNT(DISTINCT album) as total_albums,
                 COALESCE(SUM(length_nanosec), 0) as total_duration,
                 COALESCE(SUM(filesize), 0) as total_filesize
-             FROM songs WHERE source IN (1, 2)",
+             FROM songs WHERE source IN (1, 2) AND unavailable = 0",
             [],
             |row| {
                 Ok(LibraryStats {
@@ -625,7 +628,8 @@ fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
                     art_embedded=excluded.art_embedded,
                     art_automatic=excluded.art_automatic,
                     art_unset=excluded.art_unset,
-                    filetype=excluded.filetype, source=excluded.source",
+                    filetype=excluded.filetype, source=excluded.source,
+                    unavailable=0",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS),
         params![
             song.source as i32,
@@ -674,7 +678,8 @@ const SONG_SELECT_COLS: &str = "
     rating, playcount, skipcount, lastplayed, lastseen,
     art_embedded, art_automatic, art_manual, art_unset,
     cue_path,
-    ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu
+    ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
+    unavailable
 ";
 
 const SONG_INSERT_COLS: &str = "
@@ -739,6 +744,7 @@ fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         cue_path: row.get(48)?,
         ebur128_integrated_loudness_lufs: row.get(49)?,
         ebur128_loudness_range_lu: row.get(50)?,
+        unavailable: row.get::<_, Option<bool>>(51)?.unwrap_or(false),
         ..Default::default()
     })
 }
@@ -747,14 +753,15 @@ fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 // File Watcher & Deletion Sync
 // ---------------------------------------------------------------------------
 
-/// Helper to delete a path and its subpaths from the SQLite database.
+/// Helper to soft-delete a path and its subpaths from the SQLite database.
+/// Sets unavailable = 1 instead of hard-deleting, so playlist items retain metadata.
 pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
     let conn = db.pool.get()?;
-    let deleted = conn.execute(
-        "DELETE FROM songs WHERE path = ?1 OR path LIKE ?1 || '/%'",
+    let updated = conn.execute(
+        "UPDATE songs SET unavailable = 1 WHERE (path = ?1 OR path LIKE ?1 || '/%') AND unavailable = 0",
         params![path_str],
     )?;
-    Ok(deleted)
+    Ok(updated)
 }
 
 /// Start background directory watching using notify.

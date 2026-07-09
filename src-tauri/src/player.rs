@@ -144,12 +144,61 @@ impl Player {
         self.play_at_index(play_index).await
     }
 
+    /// Returns true if the playlist item has a playable (present + available) song.
+    fn is_item_playable(item: &PlaylistItem) -> bool {
+        match &item.song {
+            Some(song) => !song.unavailable,
+            None => false, // legacy ghost row (song_id = NULL)
+        }
+    }
+
     /// Play the item at the given index (in virtual/shuffle order).
+    /// If the item is unavailable, auto-advances to the next playable track.
     async fn play_at_index(&mut self, index: usize) -> Result<()> {
-        let item_index = if self.shuffle_mode != ShuffleMode::Off {
-            *self.shuffle_order.get(index).ok_or(anyhow!("index out of bounds"))?
+        let total = if self.shuffle_mode != ShuffleMode::Off {
+            self.shuffle_order.len()
         } else {
-            index
+            self.playlist_items.len()
+        };
+
+        // Walk forward from `index` to find a playable item, guarding against
+        // an all-unavailable playlist (cycle limit = total items).
+        let mut candidate = index;
+        let mut attempts = 0;
+        loop {
+            if attempts >= total {
+                // Every item in the playlist is unavailable — stop.
+                log::warn!("Entire playlist contains only unavailable tracks — stopping.");
+                return self.stop().await;
+            }
+
+            let item_index = if self.shuffle_mode != ShuffleMode::Off {
+                match self.shuffle_order.get(candidate) {
+                    Some(&i) => i,
+                    None => return self.stop().await,
+                }
+            } else {
+                candidate
+            };
+
+            let item = match self.playlist_items.get(item_index) {
+                Some(i) => i,
+                None => return self.stop().await,
+            };
+
+            if Self::is_item_playable(item) {
+                break;
+            }
+
+            log::debug!("Skipping unavailable playlist item at index {candidate}");
+            candidate = (candidate + 1) % total;
+            attempts += 1;
+        }
+
+        let item_index = if self.shuffle_mode != ShuffleMode::Off {
+            *self.shuffle_order.get(candidate).ok_or(anyhow!("index out of bounds"))?
+        } else {
+            candidate
         };
 
         let item = self.playlist_items.get(item_index)
@@ -164,10 +213,10 @@ impl Player {
 
         self.current_song = Some(song.clone());
         self.current_item_uuid = Some(item.uuid.clone());
-        self.current_index = Some(index);
+        self.current_index = Some(candidate);
 
-        if index > 0 && !self.played_indices.contains(&index) {
-            self.played_indices.push(index);
+        if candidate > 0 && !self.played_indices.contains(&candidate) {
+            self.played_indices.push(candidate);
         }
 
         let audio = self.audio.lock().await;
@@ -206,6 +255,15 @@ impl Player {
     }
 
     pub async fn next_track(&mut self) -> Result<()> {
+        // Drain unavailable items from the front of the queue before playing
+        while let Some(front) = self.queue.front() {
+            if Self::is_item_playable(front) {
+                break;
+            }
+            log::debug!("Skipping unavailable queued item");
+            self.queue.pop_front();
+        }
+
         // Check queue first
         if let Some(queued) = self.queue.pop_front() {
             let song = queued.song.clone().ok_or(anyhow!("queued item has no song"))?;
@@ -229,22 +287,39 @@ impl Player {
     }
 
     pub async fn previous_track(&mut self) -> Result<()> {
-        // In shuffle mode, walk back through history
+        // In shuffle mode, walk back through history (skip unavailable)
         if self.shuffle_mode != ShuffleMode::Off {
-            if let Some(prev_index) = self.played_indices.pop() {
-                return self.play_at_index(prev_index).await;
+            while let Some(prev_index) = self.played_indices.pop() {
+                let item_index = self.shuffle_order.get(prev_index).copied().unwrap_or(prev_index);
+                if self.playlist_items.get(item_index).map(Self::is_item_playable).unwrap_or(false) {
+                    return self.play_at_index(prev_index).await;
+                }
             }
         }
 
-        let prev_index = self.current_index.map(|i| {
-            if i > 0 { i - 1 } else { self.playlist_items.len().saturating_sub(1) }
-        });
-
-        if let Some(idx) = prev_index {
-            self.play_at_index(idx).await
-        } else {
-            Ok(())
+        // Walk backwards from current, skipping unavailable items
+        if let Some(current) = self.current_index {
+            let len = self.playlist_items.len();
+            if len == 0 {
+                return Ok(());
+            }
+            let mut candidate = if current > 0 { current - 1 } else { len.saturating_sub(1) };
+            for _ in 0..len {
+                let item_index = if self.shuffle_mode != ShuffleMode::Off {
+                    self.shuffle_order.get(candidate).copied().unwrap_or(candidate)
+                } else {
+                    candidate
+                };
+                if self.playlist_items.get(item_index).map(Self::is_item_playable).unwrap_or(false) {
+                    return self.play_at_index(candidate).await;
+                }
+                if candidate == 0 {
+                    break;
+                }
+                candidate -= 1;
+            }
         }
+        Ok(())
     }
 
     /// Called when the audio engine reports a track has finished.

@@ -127,6 +127,9 @@ export interface Song {
   artist_id?: string;
   album_id?: string;
   song_id?: string;
+
+  /** True when the file is missing from disk (soft-deleted). Playlist items retain metadata. */
+  unavailable: boolean;
 }
 
 export type PlaylistItemType = "song" | "stream" | "streaming_service";

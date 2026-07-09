@@ -133,7 +133,8 @@ impl PlaylistManager {
                              s.bitrate, s.samplerate, s.bitdepth, s.channels,
                              s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
                              s.lastplayed, s.lastseen, s.art_embedded,
-                             s.art_automatic, s.art_manual, s.art_unset
+                             s.art_automatic, s.art_manual, s.art_unset,
+                             s.unavailable
                       FROM playlist_items pi
                       LEFT JOIN songs s ON s.id = pi.song_id
                       WHERE pi.playlist_id = ?1
@@ -192,6 +193,7 @@ impl PlaylistManager {
                         art_automatic: row.get(53)?,
                         art_manual: row.get(54)?,
                         art_unset: row.get(55)?,
+                        unavailable: row.get::<_, Option<bool>>(56)?.unwrap_or(false),
                         ..Default::default()
                     })
                 } else {

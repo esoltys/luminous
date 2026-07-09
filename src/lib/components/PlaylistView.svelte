@@ -2,7 +2,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3 } from "lucide-svelte";
+  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
@@ -25,10 +25,34 @@
   );
 
   function handlePlayPlaylistItem(index: number) {
+    // Don't attempt to play unavailable tracks
+    const item = playlistsStore.activePlaylistTracks[index];
+    if (!item || isItemUnavailable(item)) return;
     if (playlistsStore.activePlaylistId !== null) {
       playerStore.playPlaylistItem(playlistsStore.activePlaylistId, index);
     }
   }
+
+  /** Returns true if the item's song is missing from disk or has no song data. */
+  function isItemUnavailable(item: PlaylistItem): boolean {
+    return !item.song || item.song.unavailable === true;
+  }
+
+  /** Remove all playlist items whose song is unavailable. */
+  function removeUnavailableTracks() {
+    if (playlistsStore.activePlaylistId === null) return;
+    const uuids = playlistsStore.activePlaylistTracks
+      .filter((item) => isItemUnavailable(item))
+      .map((item) => item.uuid);
+    if (uuids.length > 0) {
+      playlistsStore.removeItemsFromPlaylist(playlistsStore.activePlaylistId, uuids);
+    }
+  }
+
+  /** Count of unavailable tracks in the active playlist. */
+  let unavailableCount = $derived(
+    playlistsStore.activePlaylistTracks.filter((item) => isItemUnavailable(item)).length
+  );
 
   function handleRemoveItem(uuid: string) {
     if (playlistsStore.activePlaylistId !== null) {
@@ -145,6 +169,16 @@
         >
           <RotateCw class="w-4 h-4" />
         </button>
+        {#if unavailableCount > 0}
+          <button
+            onclick={removeUnavailableTracks}
+            class="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
+            title="Remove all {unavailableCount} unavailable track{unavailableCount === 1 ? '' : 's'} from playlist"
+          >
+            <AlertTriangle class="w-3.5 h-3.5" />
+            Remove {unavailableCount} unavailable
+          </button>
+        {/if}
         <button
           onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
           class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-primary px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
@@ -170,17 +204,21 @@
           </thead>
           <tbody>
             {#each playlistsStore.activePlaylistTracks as item, index}
+              {@const unavailable = isItemUnavailable(item)}
               <tr
-                draggable="true"
-                ondragstart={(e) => handleDragStart(e, index)}
+                draggable={!unavailable}
+                ondragstart={(e) => !unavailable && handleDragStart(e, index)}
                 ondragover={(e) => handleDragOver(e, index)}
                 ondragenter={(e) => handleDragEnter(e, index)}
                 ondragleave={() => handleDragLeave(index)}
                 ondragend={handleDragEnd}
                 ondrop={(e) => handleDrop(e, index)}
-                ondblclick={() => handlePlayPlaylistItem(index)}
-                class="border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-all duration-150 select-none cursor-grab active:cursor-grabbing
-                  {playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}
+                ondblclick={() => !unavailable && handlePlayPlaylistItem(index)}
+                class="border-b border-brand-border/40 group transition-all duration-150 select-none
+                  {unavailable
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-brand-sidebar/40 cursor-grab active:cursor-grabbing'}
+                  {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}
                   {draggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
                   {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index
                     ? (index < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
@@ -198,9 +236,15 @@
                     {index + 1}
                   {/if}
                 </td>
-                <td class="py-2.5 px-4 font-medium truncate max-w-xs {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : 'text-brand-text-primary'}">
+                <td class="py-2.5 px-4 font-medium truncate max-w-xs {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : unavailable ? 'text-brand-text-secondary/50' : 'text-brand-text-primary'}">
                   <div class="flex items-center gap-2 max-w-full">
-                    {#if item.song?.title}
+                    {#if unavailable}
+                      <!-- Unavailable track: show warning icon + last known title -->
+                      <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" title="File not found on disk" />
+                      <span class="truncate line-through decoration-brand-text-secondary/40">
+                        {item.song?.title ?? "Unknown Title"}
+                      </span>
+                    {:else if item.song?.title}
                       <button
                         onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
                         class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : 'text-brand-text-primary'}"
@@ -211,7 +255,7 @@
                     {:else}
                       <span class="truncate">Unknown Title</span>
                     {/if}
-                    {#if item.song}
+                    {#if item.song && !unavailable}
                       <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                         {item.song.filetype}
                       </span>
@@ -224,7 +268,9 @@
                   </div>
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
-                  {#if item.song?.artist}
+                  {#if unavailable}
+                    <span class="text-brand-text-secondary/40 italic text-xs">File not found</span>
+                  {:else if item.song?.artist}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", item.song?.artist || ""); }}
                       class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
@@ -237,7 +283,9 @@
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
-                  {#if item.song?.album}
+                  {#if unavailable}
+                    <span class="text-brand-text-secondary/40 italic text-xs">{item.song?.album ?? ""}</span>
+                  {:else if item.song?.album}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "albums", item.song?.album || ""); }}
                       class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
@@ -253,10 +301,10 @@
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
                     <button
-                      onclick={() => item.song?.id && openTagEditor(item.song.id)}
+                      onclick={() => item.song?.id && !unavailable && openTagEditor(item.song.id)}
                       class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors disabled:opacity-30"
                       title="Edit tags"
-                      disabled={!item.song}
+                      disabled={!item.song || unavailable}
                     >
                       <Edit3 class="w-4 h-4" />
                     </button>

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 2;
+const CURRENT_SCHEMA_VERSION: i32 = 3;
 
 pub struct Database {
     pub pool: DbPool,
@@ -80,6 +80,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![2],
+            )?;
+        }
+
+        if version < 3 {
+            log::info!("Running migration 3: unavailable flag for soft-deleted songs");
+            conn.execute_batch(MIGRATION_3)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![3],
             )?;
         }
 
@@ -270,6 +279,14 @@ CREATE TABLE IF NOT EXISTS app_state (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+";
+
+// ---------------------------------------------------------------------------
+// Migration 3: soft-delete support for missing songs
+// ---------------------------------------------------------------------------
+
+const MIGRATION_3: &str = "
+ALTER TABLE songs ADD COLUMN unavailable BOOLEAN NOT NULL DEFAULT 0;
 ";
 
 #[cfg(test)]
