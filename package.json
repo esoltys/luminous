@@ -10,6 +10,7 @@
     "build": "svelte-kit sync && vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
+    "install:git-hooks": "git config core.hooksPath .githooks",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",

@@ -111,11 +111,12 @@ sudo apt install -y build-essential curl wget file libssl-dev libgtk-3-dev libwe
     ```
 
 #### 3. Run Development Server
+
 ```bash
 bun install
+bun run install:git-hooks # sets core.hooksPath to use the repository's tracked .githooks/pre-commit hook
 bun run tauri dev
 ```
-
 #### 4. Build Production Bundle
 ```bash
 bun run tauri build
