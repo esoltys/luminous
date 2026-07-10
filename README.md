@@ -10,29 +10,29 @@
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. You can download the compiled binaries for Windows and Linux from the [GitHub Releases](https://github.com/esoltys/luminous/releases) page.
 
 <p align="center">
-  <img src="docs/screenshots/home_violet.png" width="100%" alt="Luminous Violet Home View" />
+  <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
 </p>
 
 <div align="center">
   <table>
     <tr>
       <td width="50%">
-        <h4 align="center">Albums Grid (Nordic Blue)</h4>
-        <img src="docs/screenshots/albums_blue.png" alt="Albums Grid" />
+        <h4 align="center">Albums Grid</h4>
+        <img src="docs/screenshots/albums.png" alt="Albums Grid" />
       </td>
       <td width="50%">
-        <h4 align="center">Artists Grid (Retro Amber)</h4>
-        <img src="docs/screenshots/artists_amber.png" alt="Artists Grid" />
+        <h4 align="center">Artists Grid</h4>
+        <img src="docs/screenshots/artists.png" alt="Artists Grid" />
       </td>
     </tr>
     <tr>
       <td width="50%">
-        <h4 align="center">Synced Lyrics (Luminous Violet)</h4>
-        <img src="docs/screenshots/lyrics_violet.png" alt="Synced Lyrics" />
+        <h4 align="center">Synced Lyrics</h4>
+        <img src="docs/screenshots/lyrics.png" alt="Synced Lyrics" />
       </td>
       <td width="50%">
-        <h4 align="center">Custom Theme Builder (Retro Amber)</h4>
-        <img src="docs/screenshots/themes_amber.png" alt="Custom Theme Builder" />
+        <h4 align="center">Custom Theme Builder</h4>
+        <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
       </td>
     </tr>
   </table>
