@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import Sidebar from "../lib/components/Sidebar.svelte";
   import PlayerBar from "../lib/components/PlayerBar.svelte";
   import CollectionView from "../lib/components/CollectionView.svelte";
   import PlaylistView from "../lib/components/PlaylistView.svelte";
@@ -105,25 +104,20 @@
   });
 </script>
 
-<div class="flex flex-col h-screen overflow-hidden bg-brand-main font-sans">
-  <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar navigation -->
-    <Sidebar />
-
-    <!-- Main View Content Area -->
-    <main class="flex-1 flex flex-col min-w-0">
-      {#if collectionStore.activeTab === "collection"}
-        <CollectionView />
-      {:else if collectionStore.activeTab === "playlists"}
-        <PlaylistView />
-      {:else if collectionStore.activeTab === "settings"}
-        <FoldersView />
-      {:else if collectionStore.activeTab === "equalizer"}
-        <Equalizer />
-      {:else if collectionStore.activeTab === "lyrics"}
-        <LyricsView />
-      {/if}
-    </main>
+<div class="flex flex-col h-full overflow-hidden bg-brand-main font-sans">
+  <!-- Main View Content Area -->
+  <div class="flex-1 min-w-0 overflow-y-auto">
+    {#if collectionStore.activeTab === "collection"}
+      <CollectionView />
+    {:else if collectionStore.activeTab === "playlists"}
+      <PlaylistView />
+    {:else if collectionStore.activeTab === "settings"}
+      <FoldersView />
+    {:else if collectionStore.activeTab === "equalizer"}
+      <Equalizer />
+    {:else if collectionStore.activeTab === "lyrics"}
+      <LyricsView />
+    {/if}
   </div>
 
   <!-- Player controls panel -->
