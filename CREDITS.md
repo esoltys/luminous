@@ -11,16 +11,13 @@ Created by [Eric James Soltys](https://esoltys.github.io/)
 - https://github.com/HEnquist/rubato for audio resampling
 - https://github.com/RustAudio/cpal for audio output
 
-## Influences
+## Influences and Recommendations
 
-### Open Source
+### ❤️ Open Source
 
 - [Audacious Media Player](https://audacious-media-player.org/)
 - [Strawberry Music Player](https://www.strawberrymusicplayer.org/)
 
-### Corporate
+### Indie
 
-- [Apple Music](https://music.apple.com/ca/new)
-- [Spotify](https://open.spotify.com/)
-- [Windows Media Player](https://apps.microsoft.com/detail/9wzdncrfj3pt?hl=en-US&gl=CA)
-
+- [MusicBee Music Manager and Player](https://www.getmusicbee.com/)
