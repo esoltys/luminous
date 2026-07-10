@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import PlayerBar from "../lib/components/PlayerBar.svelte";
   import CollectionView from "../lib/components/CollectionView.svelte";
   import PlaylistView from "../lib/components/PlaylistView.svelte";
   import FoldersView from "../lib/components/FoldersView.svelte";
@@ -119,7 +118,4 @@
       <LyricsView />
     {/if}
   </div>
-
-  <!-- Player controls panel -->
-  <PlayerBar />
 </div>

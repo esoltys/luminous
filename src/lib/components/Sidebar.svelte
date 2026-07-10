@@ -1,7 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { Music, ListMusic, Settings, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
+  import { ListMusic, Settings, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   let showAddDirModal = $state(false);
@@ -35,7 +35,7 @@
   <!-- Brand / Title -->
   <div class="h-16 flex items-center px-6 border-b border-brand-border">
     <h1 class="text-xl font-bold tracking-wider text-brand-accent flex items-center gap-2">
-      <Music class="w-6 h-6" />
+      Collections
     </h1>
   </div>
 
@@ -45,7 +45,7 @@
       onclick={() => { collectionStore.activeTab = "collection"; }}
       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
-      <Music class="w-4 h-4" /> Collection
+      <ListMusic class="w-4 h-4" /> Collection
     </button>
 
     {#if collectionStore.activeTab === 'collection'}
