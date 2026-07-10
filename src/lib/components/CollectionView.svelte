@@ -5,7 +5,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Search, Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
+  import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
 
   // activeSubTab and activeTab are managed globally via collectionStore
@@ -126,17 +126,8 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <!-- Top bar with Search & Filter -->
-  <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
-    <div class="relative w-80">
-      <Search class="absolute left-3 top-2.5 w-4 h-4 text-brand-text-secondary/50" />
-      <input
-        type="text"
-        placeholder="Search track, artist, album..."
-        bind:value={collectionStore.searchQuery}
-        class="w-full bg-brand-sidebar border border-brand-border rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-brand-accent text-brand-text-primary"
-      />
-    </div>
+  <!-- Top bar with Filter Info -->
+  <div class="h-12 px-6 border-b border-brand-border flex items-center justify-end">
     <div class="text-xs text-brand-text-secondary">
       {#if collectionStore.activeSubTab === "songs"}
         Showing {filteredSongs.length} tracks
