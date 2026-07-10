@@ -21,9 +21,7 @@
   // Search handler
   async function handleSearch(e: Event) {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      await collectionStore.search(searchQuery);
-    }
+    await collectionStore.search(searchQuery);
   }
 
   // Folder ingestion trigger
