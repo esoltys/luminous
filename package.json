@@ -17,8 +17,8 @@
     "icon": "tauri icon app-icon.svg",
     "test": "vitest",
     "test:run": "vitest run",
-    "take-screenshots": "bun run scripts/take-screenshots.ts",
-    "postbuild": "bun run scripts/take-screenshots.ts",
+    "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
+    "postbuild": "bunx tsx scripts/take-screenshots.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts"
   },

@@ -13,7 +13,7 @@ async function main() {
     process.exit(0);
   }
   console.log("[Screenshot Automation] Starting screenshot generation...");
-  
+
   // 1. Try dynamically importing playwright
   let playwright;
   try {
@@ -45,7 +45,7 @@ async function main() {
     console.log("[Screenshot Automation] Cleaning up Vite server process...");
     devServer.kill("SIGTERM");
   };
-  
+
   process.on("exit", cleanup);
   process.on("SIGINT", () => { process.exit(0); });
   process.on("SIGTERM", () => { process.exit(0); });
@@ -88,10 +88,10 @@ async function main() {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme})...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
-    
+
     // Inject the mock Tauri IPC bridge
     await page.addInitScript(mockCode);
-    
+
     // Pre-configure the mock settings on mount
     await page.addInitScript(`
       window.mockSettings = {
@@ -104,10 +104,10 @@ async function main() {
     `);
 
     await page.goto("http://localhost:1420");
-    
+
     // Wait for Svelte app container to mount
     await page.waitForSelector(".flex-1");
-    
+
     // Wait for rendering & animations to settle (e.g. waveform seek bar, dynamic styles, visualizer FFT frames)
     await page.waitForTimeout(1500);
 
@@ -121,7 +121,7 @@ async function main() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    
+
     const screenshotPath = path.join(dir, filename);
     await page.screenshot({ path: screenshotPath });
     console.log(`[Screenshot Automation] Saved screenshot to ${screenshotPath}`);
@@ -130,10 +130,10 @@ async function main() {
 
   try {
     // Take screenshots of key views in their chosen themes
-    await capture("collection", "songs", "luminous-violet", "home_violet.png");
-    await capture("collection", "albums", "nordic-blue", "albums_blue.png");
-    await capture("collection", "artists", "retro-amber", "artists_amber.png");
-    await capture("settings", "", "retro-amber", "themes_amber.png", async (page) => {
+    await capture("collection", "songs", "nordic-blue", "home.png");
+    await capture("collection", "albums", "nordic-blue", "albums.png");
+    await capture("collection", "artists", "nordic-blue", "artists.png");
+    await capture("settings", "", "nordic-blue", "themes.png", async (page) => {
       // Click the "UI Themes" sub-tab inside the Settings view
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button"));
@@ -141,7 +141,7 @@ async function main() {
         if (t) (t as HTMLElement).click();
       });
     });
-    await capture("lyrics", "", "luminous-violet", "lyrics_violet.png");
+    await capture("lyrics", "", "nordic-blue", "lyrics.png");
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
   } finally {
