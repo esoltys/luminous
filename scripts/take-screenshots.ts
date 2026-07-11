@@ -83,9 +83,10 @@ async function main() {
     subTab: string,
     theme: string,
     filename: string,
-    afterLoad?: (page: import("playwright").Page) => Promise<void>
+    afterLoad?: (page: import("playwright").Page) => Promise<void>,
+    isImmersive = false
   ) {
-    console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme})...`);
+    console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
 
@@ -101,6 +102,7 @@ async function main() {
         active_sub_tab: "${subTab}",
         excluded_formats: "[]"
       };
+      window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
     `);
 
     await page.goto("http://localhost:1420");
@@ -141,7 +143,7 @@ async function main() {
         if (t) (t as HTMLElement).click();
       });
     });
-    await capture("lyrics", "", "nordic-blue", "lyrics.png");
+    await capture("collection", "songs", "nordic-blue", "now-playing.png", undefined, true);
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
   } finally {

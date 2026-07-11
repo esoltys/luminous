@@ -27,8 +27,8 @@ Luminous is a high-performance desktop music player designed for modern local au
     </tr>
     <tr>
       <td width="50%">
-        <h4 align="center">Synced Lyrics</h4>
-        <img src="docs/screenshots/lyrics.png" alt="Synced Lyrics" />
+        <h4 align="center">Immersive Now Playing</h4>
+        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
       </td>
       <td width="50%">
         <h4 align="center">Custom Theme Builder</h4>
