@@ -62,6 +62,22 @@ class CollectionStore {
 
         const savedFullHeight = localStorage.getItem("layout_storedFullHeight");
         if (savedFullHeight) this.storedFullHeight = parseFloat(savedFullHeight);
+
+        // If starting in mini-player mode, apply constraints and size on startup
+        if (!this.playerBarOpen) {
+          import("@tauri-apps/api/window").then(async ({ getCurrentWindow, LogicalSize }) => {
+            try {
+              const appWindow = getCurrentWindow();
+              await appWindow.setMinSize(new LogicalSize(180, 80));
+              const size = await appWindow.innerSize();
+              const factor = await appWindow.scaleFactor();
+              const width = size.width / factor;
+              await appWindow.setSize(new LogicalSize(width, 80));
+            } catch (e) {
+              console.error("Failed to initialize mini-player window constraints:", e);
+            }
+          });
+        }
       }
 
       await this.refreshDirectories();
@@ -208,6 +224,9 @@ class CollectionStore {
           localStorage.setItem("layout_storedFullWidth", logicalWidth.toString());
           localStorage.setItem("layout_storedFullHeight", logicalHeight.toString());
 
+          // Temporarily clear minSize constraints so it can shrink to mini player bar
+          await appWindow.setMinSize(new LogicalSize(180, 80));
+
           // Resize window to focus only on the player bar (80px height)
           await appWindow.setSize(new LogicalSize(logicalWidth, 80));
         } else {
@@ -215,6 +234,9 @@ class CollectionStore {
           const targetWidth = this.storedFullWidth || 1024;
           const targetHeight = this.storedFullHeight || 768;
           await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+
+          // Re-apply original minSize constraints from config
+          await appWindow.setMinSize(new LogicalSize(900, 600));
         }
       } catch (err) {
         console.error("Failed to adjust Tauri window size:", err);
