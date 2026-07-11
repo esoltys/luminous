@@ -75,17 +75,17 @@
     </button>
 
     <button
-      onclick={() => { collectionStore.activeTab = "settings"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
-    >
-      <Settings class="w-4 h-4" /> Settings
-    </button>
-
-    <button
       onclick={() => { collectionStore.activeTab = "lyrics"; }}
       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <FileText class="w-4 h-4" /> Lyrics
+    </button>
+
+    <button
+      onclick={() => { collectionStore.activeTab = "settings"; }}
+      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
+    >
+      <Settings class="w-4 h-4" /> Settings
     </button>
   </nav>
 

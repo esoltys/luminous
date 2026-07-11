@@ -98,7 +98,7 @@
         {#if currentSong.bitrate}
           <div class="flex items-center justify-between text-xs">
             <span class="text-brand-text-secondary/60">Bitrate</span>
-            <span class="text-brand-text-primary">{(currentSong.bitrate / 1000).toFixed(0)} kbps</span>
+            <span class="text-brand-text-primary">{currentSong.bitrate} kbps</span>
           </div>
         {/if}
         {#if currentSong.samplerate}
@@ -138,10 +138,7 @@
     {/if}
   </div>
 
-  <!-- Footer -->
-  <div class="p-4 border-t border-brand-border text-xs text-brand-text-secondary/60">
-    <p>🎵 Contextual Information Hub</p>
-  </div>
+
 </aside>
 
 <style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, Search, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
@@ -29,22 +29,7 @@
     collectionStore.search("");
   }
 
-  // Folder ingestion trigger
-  async function handleFolderIngest() {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Select Music Directory to Index"
-      });
-      if (selected && typeof selected === "string") {
-        await collectionStore.addDirectory(selected);
-      }
-    } catch (err) {
-      console.error("Failed to open folder dialog:", err);
-    }
-  }
+
 
   // Navigation history handlers
   function goBack() {
@@ -104,7 +89,7 @@
       <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title="Searching..."></div>
     {:else if collectionStore.searchQuery}
       <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
-        {collectionStore.searchResults.length} results
+        {collectionStore.searchResults.length} tracks
       </span>
       <button
         type="button"
@@ -115,15 +100,6 @@
         ✕
       </button>
     {/if}
-
-    <button
-      type="button"
-      onclick={handleFolderIngest}
-      class="p-1 text-brand-text-secondary hover:text-brand-accent hover:bg-brand-sidebar rounded transition-colors flex-shrink-0"
-      title="Add folder to index"
-    >
-      <FolderOpen class="w-4 h-4" />
-    </button>
   </form>
 
   <!-- Layout Panel Toggles Group -->

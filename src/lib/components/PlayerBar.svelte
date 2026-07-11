@@ -189,7 +189,7 @@
       <span>{formatTime(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
-        <MoodBar />
+        <!-- <MoodBar /> -->
       </div>
       <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
     </div>
