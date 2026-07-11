@@ -1,7 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle } from "lucide-svelte";
+  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check } from "lucide-svelte";
+  import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
 
   interface Props {
@@ -26,6 +27,7 @@
   let isLoading = $state(false);
   let isSaving = $state(false);
   let isLookingUp = $state(false);
+  let lookupSucceeded = $state(false);
   let errorMsg = $state("");
   let lookupErrorMsg = $state("");
 
@@ -68,6 +70,7 @@
   async function handleLookup() {
     isLookingUp = true;
     lookupErrorMsg = "";
+    lookupSucceeded = false;
     try {
       const suggestions = await invoke<{
         title: string | null;
@@ -80,6 +83,7 @@
       if (suggestions.artist) artist = suggestions.artist;
       if (suggestions.album) album = suggestions.album;
       if (suggestions.year) year = suggestions.year;
+      lookupSucceeded = true;
     } catch (e: any) {
       console.error("AcoustID lookup failed:", e);
       const str = e.toString();
@@ -293,19 +297,27 @@
     <!-- Footer -->
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border shrink-0 bg-brand-main">
       {#if !isLoading && !errorMsg}
-        <button
-          onclick={handleLookup}
-          disabled={isLookingUp || isSaving}
-          class="flex items-center gap-1.5 bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-        >
-          {#if isLookingUp}
-            <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent" />
-            Looking up...
-          {:else}
-            <Sparkles class="w-3.5 h-3.5 text-brand-accent" />
-            Lookup AcoustID
+        <div class="flex items-center gap-3">
+          <button
+            onclick={handleLookup}
+            disabled={isLookingUp || isSaving}
+            class="flex items-center gap-1.5 bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+          >
+            {#if isLookingUp}
+              <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent" />
+              Looking up...
+            {:else}
+              <Sparkles class="w-3.5 h-3.5 text-brand-accent" />
+              Lookup AcoustID
+            {/if}
+          </button>
+          {#if lookupSucceeded}
+            <div in:fade class="flex items-center gap-1.5 text-emerald-500 text-xs font-semibold">
+              <Check class="w-3.5 h-3.5 font-bold animate-bounce" />
+              <span>Matched!</span>
+            </div>
           {/if}
-        </button>
+        </div>
       {:else}
         <div></div>
       {/if}
