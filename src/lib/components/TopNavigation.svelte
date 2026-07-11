@@ -136,9 +136,9 @@
       <PanelLeft class="w-4 h-4" />
     </button>
     <button
-      onclick={() => collectionStore.togglePlayerBar()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.playerBarOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
-      title="Toggle Bottom Player Bar"
+      onclick={() => collectionStore.toggleImmersiveMode()}
+      class="p-1.5 rounded-md transition-all cursor-pointer {!collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      title="Toggle Immersive Album Art Screen"
     >
       <PanelBottom class="w-4 h-4" />
     </button>

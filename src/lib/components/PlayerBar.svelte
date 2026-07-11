@@ -218,9 +218,9 @@
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
       />
-    {#if !collectionStore.playerBarOpen}
+    {#if collectionStore.immersiveMode}
       <button 
-        onclick={() => collectionStore.togglePlayerBar()}
+        onclick={() => collectionStore.toggleImmersiveMode()}
         class="text-brand-text-secondary hover:text-brand-accent transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
         title="Restore Full Interface"
       >

@@ -4,8 +4,11 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide } from 'svelte/transition';
+  import { slide, fade } from 'svelte/transition';
   import { collectionStore } from '../lib/stores/collection.svelte';
+  import { playerStore } from '../lib/stores/player.svelte';
+  import CoverArt from '../lib/components/CoverArt.svelte';
+  import { Music } from 'lucide-svelte';
   
   let { children } = $props();
 
@@ -77,7 +80,63 @@
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden">
-  {#if collectionStore.playerBarOpen}
+  {#if collectionStore.immersiveMode}
+    <!-- Dedicated Immersive Album Artwork Screen -->
+    <div transition:fade={{ duration: 400 }} class="flex-1 relative overflow-hidden bg-brand-main flex flex-col items-center justify-center p-8 select-none">
+      <!-- Immersive Ambient Blurred Background -->
+      {#if playerStore.currentSong}
+        <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
+          <CoverArt
+            songId={playerStore.currentSong?.id}
+            artEmbedded={playerStore.currentSong?.art_embedded}
+            artAutomatic={playerStore.currentSong?.art_automatic}
+            artManual={playerStore.currentSong?.art_manual}
+            sizeClass="w-full h-full object-cover"
+          />
+        </div>
+      {/if}
+
+      <!-- Center Container: Card and Details -->
+      <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
+        <!-- Floating Cover Art Frame -->
+        <div class="w-72 h-72 md:w-[380px] md:h-[380px] rounded-2xl overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+          <CoverArt
+            songId={playerStore.currentSong?.id}
+            artEmbedded={playerStore.currentSong?.art_embedded}
+            artAutomatic={playerStore.currentSong?.art_automatic}
+            artManual={playerStore.currentSong?.art_manual}
+            sizeClass="w-full h-full object-cover"
+          />
+        </div>
+
+        <!-- Song Details Info -->
+        <div class="flex flex-col text-center md:text-left space-y-4 max-w-md">
+          {#if playerStore.currentSong}
+            <div>
+              <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent border border-brand-accent/25 rounded-full select-none">
+                Now Playing
+              </span>
+            </div>
+            <h1 class="text-3xl md:text-5xl font-black text-brand-text-primary leading-tight tracking-tight select-text">
+              {playerStore.currentSong.title || "Unknown Title"}
+            </h1>
+            <p class="text-lg md:text-xl text-brand-text-secondary select-text font-medium">
+              {playerStore.currentSong.artist || "Unknown Artist"}
+            </p>
+            <p class="text-sm text-brand-text-secondary/60 italic truncate select-text">
+              {playerStore.currentSong.album || "Unknown Album"}
+            </p>
+          {:else}
+            <div class="flex flex-col items-center justify-center text-center">
+              <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
+              <h2 class="text-2xl font-bold text-brand-text-primary">No track playing</h2>
+              <p class="text-sm text-brand-text-secondary/60 mt-1">Select a song from your collection to start playing.</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {:else}
     <!-- Top Navigation Ribbon -->
     <div transition:slide={{ axis: 'y', duration: 250 }} class="flex-shrink-0 z-40 overflow-hidden">
       <TopNavigation />

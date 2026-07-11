@@ -27,12 +27,10 @@ class CollectionStore {
 
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
-  playerBarOpen = $state<boolean>(true);
   rightPanelOpen = $state<boolean>(true);
   sidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
-  storedFullWidth = $state<number>(1024);
-  storedFullHeight = $state<number>(768);
+  immersiveMode = $state<boolean>(false);
 
   constructor() {
     this.init();
@@ -45,9 +43,6 @@ class CollectionStore {
         const savedSidebar = localStorage.getItem("layout_sidebarOpen");
         if (savedSidebar !== null) this.sidebarOpen = savedSidebar === "true";
 
-        const savedPlayer = localStorage.getItem("layout_playerBarOpen");
-        if (savedPlayer !== null) this.playerBarOpen = savedPlayer === "true";
-
         const savedRight = localStorage.getItem("layout_rightPanelOpen");
         if (savedRight !== null) this.rightPanelOpen = savedRight === "true";
 
@@ -57,27 +52,8 @@ class CollectionStore {
         const savedRightWidth = localStorage.getItem("layout_rightPanelWidth");
         if (savedRightWidth) this.rightPanelWidth = parseInt(savedRightWidth, 10);
 
-        const savedFullWidth = localStorage.getItem("layout_storedFullWidth");
-        if (savedFullWidth) this.storedFullWidth = parseFloat(savedFullWidth);
-
-        const savedFullHeight = localStorage.getItem("layout_storedFullHeight");
-        if (savedFullHeight) this.storedFullHeight = parseFloat(savedFullHeight);
-
-        // If starting in mini-player mode, apply constraints and size on startup
-        if (!this.playerBarOpen) {
-          import("@tauri-apps/api/window").then(async ({ getCurrentWindow, LogicalSize }) => {
-            try {
-              const appWindow = getCurrentWindow();
-              await appWindow.setMinSize(new LogicalSize(180, 80));
-              const size = await appWindow.innerSize();
-              const factor = await appWindow.scaleFactor();
-              const width = size.width / factor;
-              await appWindow.setSize(new LogicalSize(width, 80));
-            } catch (e) {
-              console.error("Failed to initialize mini-player window constraints:", e);
-            }
-          });
-        }
+        const savedImmersive = localStorage.getItem("layout_immersiveMode");
+        if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
       }
 
       await this.refreshDirectories();
@@ -203,44 +179,10 @@ class CollectionStore {
     }
   }
 
-  async togglePlayerBar() {
-    this.playerBarOpen = !this.playerBarOpen;
+  toggleImmersiveMode() {
+    this.immersiveMode = !this.immersiveMode;
     if (typeof window !== "undefined") {
-      localStorage.setItem("layout_playerBarOpen", this.playerBarOpen.toString());
-
-      try {
-        const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
-        const appWindow = getCurrentWindow();
-
-        if (!this.playerBarOpen) {
-          // Save the current window size before shrinking
-          const physicalSize = await appWindow.innerSize();
-          const scaleFactor = await appWindow.scaleFactor();
-          const logicalWidth = physicalSize.width / scaleFactor;
-          const logicalHeight = physicalSize.height / scaleFactor;
-
-          this.storedFullWidth = logicalWidth;
-          this.storedFullHeight = logicalHeight;
-          localStorage.setItem("layout_storedFullWidth", logicalWidth.toString());
-          localStorage.setItem("layout_storedFullHeight", logicalHeight.toString());
-
-          // Temporarily clear minSize constraints so it can shrink to mini player bar
-          await appWindow.setMinSize(new LogicalSize(180, 80));
-
-          // Resize window to focus only on the player bar (80px height)
-          await appWindow.setSize(new LogicalSize(logicalWidth, 80));
-        } else {
-          // Restore to saved size
-          const targetWidth = this.storedFullWidth || 1024;
-          const targetHeight = this.storedFullHeight || 768;
-          await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
-
-          // Re-apply original minSize constraints from config
-          await appWindow.setMinSize(new LogicalSize(900, 600));
-        }
-      } catch (err) {
-        console.error("Failed to adjust Tauri window size:", err);
-      }
+      localStorage.setItem("layout_immersiveMode", this.immersiveMode.toString());
     }
   }
 
