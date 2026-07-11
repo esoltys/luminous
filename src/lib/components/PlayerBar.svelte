@@ -217,7 +217,10 @@
       onchange={releaseVolumeFocus}
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
-      />
+      class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
+      style="background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) {playerStore.volume * 100}%, var(--color-border) {playerStore.volume * 100}%, var(--color-border) 100%)"
+      aria-label="Volume Slider"
+    />
     {#if collectionStore.immersiveMode}
       <button 
         onclick={() => collectionStore.toggleImmersiveMode()}
@@ -229,3 +232,47 @@
     {/if}
   </div>
 </footer>
+
+<style>
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    transition: background 0.15s ease;
+  }
+
+  /* Webkit thumb (Chrome, Safari, Edge, Opera) */
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid var(--color-accent);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+
+  .volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+    border-color: var(--color-accent-hover);
+  }
+
+  /* Firefox thumb */
+  .volume-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-accent);
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+
+  .volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.25);
+    border-color: var(--color-accent-hover);
+  }
+</style>
