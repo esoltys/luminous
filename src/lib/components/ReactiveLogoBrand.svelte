@@ -56,10 +56,9 @@
             weightedSum += data[i] * weight;
             weightTotal += weight;
           }
-          const avg = weightedSum / data.length;
-          // Scale it so that middle frequencies correspond to normal brightness (~0.5)
-          // and pinned/high-frequency peaks reach maximum brightness (~1.0).
-          pulseIntensity = Math.min(1.0, avg * 25);
+          const avg = weightedSum / weightTotal; // True weighted average
+          // Scale so that an average of ~0.034 gives ~75% pulse intensity
+          pulseIntensity = Math.min(1.0, avg * 22);
         } else {
           pulseIntensity = 0;
         }
