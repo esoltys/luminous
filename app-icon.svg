@@ -26,15 +26,8 @@
     </filter>
   </defs>
 
-  <!-- Base Dark App Bounding Box Container -->
-  <g clip-path="url(#squircle)">
-    <!-- Deep Space Obsidian Canvas Layer -->
-    <rect x="0" y="0" width="512" height="512" fill="#08080b" />
-    
-    <!-- Subtle technical layout grids to anchor the dark canvas -->
-    <circle cx="256" cy="256" r="215" stroke="#13131c" stroke-width="1.5" fill="none" />
-    <circle cx="256" cy="256" r="175" stroke="#13131c" stroke-width="1" fill="none" stroke-dasharray="4 6" />
-
+  <!-- Base Container without Squircle Background -->
+  <g>
     <!-- Ambient Backplate Glow (Shifted Eastward to throw light behind the planet) -->
     <circle cx="280" cy="256" r="115" fill="url(#sunriseGradient)" opacity="0.35" filter="url(#heavyGlow)" />
 
@@ -47,7 +40,7 @@
     <!-- The "Planet" Disc (Shifted 4px Left to naturally thin the western rim and thicken the sunrise) -->
     <circle cx="252" cy="256" r="107" fill="#101015" />
     
-    <!-- Razor-thin obsidian inner border to cleanly separate the core disc from the corona -->
-    <circle cx="252" cy="256" r="107" stroke="#08080b" stroke-width="1.5" fill="none" />
+    <!-- Razor-thin inner border to cleanly separate the core disc from the corona -->
+    <circle cx="252" cy="256" r="107" stroke="#101015" stroke-width="1.5" fill="none" />
   </g>
 </svg>
