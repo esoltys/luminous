@@ -85,6 +85,8 @@
       const str = e.toString();
       if (str.includes("fpcalc") || str.includes("chromaprint")) {
         lookupErrorMsg = "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.";
+      } else if (str.includes("invalid API key") || str.includes("API key")) {
+        lookupErrorMsg = "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.";
       } else {
         lookupErrorMsg = str;
       }
