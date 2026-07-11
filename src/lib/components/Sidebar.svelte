@@ -3,6 +3,9 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { ListMusic, Settings, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { slide } from "svelte/transition";
+
+  let { width = 256 }: { width?: number } = $props();
 
   let showAddDirModal = $state(false);
   let newPlaylistName = $state("");
@@ -31,7 +34,7 @@
   }
 </script>
 
-<aside class="w-64 bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none">
+<aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0">
   <!-- Brand / Title -->
   <div class="h-16 flex items-center px-6 border-b border-brand-border">
     <h1 class="text-xl font-bold tracking-wider text-brand-accent flex items-center gap-2">
@@ -49,7 +52,7 @@
     </button>
 
     {#if collectionStore.activeTab === 'collection'}
-      <div class="pl-8 pr-2 py-1 space-y-1 text-xs">
+      <div transition:slide={{ duration: 250 }} class="pl-8 pr-2 py-1 space-y-1 text-xs overflow-hidden">
         <button
           onclick={() => { collectionStore.activeSubTab = "songs"; }}
           class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'songs' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"

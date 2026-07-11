@@ -1,12 +1,15 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { ChevronRight, Music, Clock, Volume2 } from "lucide-svelte";
+  import { slide } from "svelte/transition";
 
   interface Props {
     isOpen?: boolean;
+    width?: number;
+    onClose?: () => void;
   }
 
-  let { isOpen = true }: Props = $props();
+  let { isOpen = true, width = 288, onClose }: Props = $props();
 
   function formatDuration(nanosec: number): string {
     if (!nanosec) return "0:00";
@@ -27,14 +30,23 @@
 </script>
 
 <aside
-  class="relative w-72 bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none transition-all duration-200 {isOpen ? 'translate-x-0' : 'translate-x-full'}"
+  transition:slide={{ axis: "x", duration: 350 }}
+  style="width: {width}px;"
+  class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
 >
   <!-- Header -->
-  <div class="h-20 flex items-center px-6 border-b border-brand-border">
+  <div class="h-20 flex items-center justify-between px-6 border-b border-brand-border">
     <h2 class="text-lg font-bold text-brand-text-primary flex items-center gap-2">
       <Music class="w-5 h-5" />
       Now Playing
     </h2>
+    <button
+      onclick={onClose}
+      class="p-1 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors focus:outline-none"
+      title="Close Panel"
+    >
+      <ChevronRight class="w-5 h-5" />
+    </button>
   </div>
 
   <!-- Content -->

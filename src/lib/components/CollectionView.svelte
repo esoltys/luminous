@@ -132,9 +132,9 @@
       {#if collectionStore.activeSubTab === "songs"}
         Showing {filteredSongs.length} tracks
       {:else if collectionStore.activeSubTab === "albums"}
-        Showing {collectionStore.albums.length} albums
+        Showing {filteredAlbums.length} albums
       {:else}
-        Showing {collectionStore.artists.length} artists
+        Showing {filteredArtists.length} artists
       {/if}
     </div>
   </div>
@@ -245,9 +245,26 @@
             {/each}
             {#if filteredSongs.length === 0}
               <tr>
-                <td colspan="6" class="py-12 text-center text-gray-500">
-                  <Music class="w-12 h-12 mx-auto mb-2 text-gray-600" />
-                  No songs in library or matching search.
+                <td colspan="6" class="py-16 text-center">
+                  <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
+                    <Music class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+                    <h3 class="text-base font-semibold text-brand-text-primary mb-1">No tracks found</h3>
+                    <p class="text-xs text-brand-text-secondary/60">
+                      {#if collectionStore.searchQuery}
+                        We couldn't find any songs matching "{collectionStore.searchQuery}". Try adjusting your keywords.
+                      {:else}
+                        Your music library is currently empty. Click "Rescan Library" or add a folder to get started.
+                      {/if}
+                    </p>
+                    {#if collectionStore.searchQuery}
+                      <button
+                        onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+                        class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded-lg transition-colors font-medium cursor-pointer"
+                      >
+                        Clear Search Filter
+                      </button>
+                    {/if}
+                  </div>
                 </td>
               </tr>
             {/if}
@@ -340,9 +357,26 @@
           </div>
         {/each}
         {#if filteredAlbums.length === 0}
-          <div class="col-span-full py-12 text-center text-gray-500">
-            <FolderClosed class="w-12 h-12 mx-auto mb-2 text-gray-600" />
-            No albums found.
+          <div class="col-span-full py-16 text-center">
+            <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
+              <FolderClosed class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+              <h3 class="text-base font-semibold text-brand-text-primary mb-1">No albums found</h3>
+              <p class="text-xs text-brand-text-secondary/60">
+                {#if collectionStore.searchQuery}
+                  No albums match your search query "{collectionStore.searchQuery}".
+                {:else}
+                  No albums found in your library.
+                {/if}
+              </p>
+              {#if collectionStore.searchQuery}
+                <button
+                  onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+                  class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded-lg transition-colors font-medium cursor-pointer"
+                >
+                  Clear Search Filter
+                </button>
+              {/if}
+            </div>
           </div>
         {/if}
       </div>
@@ -369,9 +403,26 @@
           </div>
         {/each}
         {#if filteredArtists.length === 0}
-          <div class="col-span-full py-12 text-center text-gray-500">
-            <Music class="w-12 h-12 mx-auto mb-2 text-gray-600" />
-            No artists found.
+          <div class="col-span-full py-16 text-center">
+            <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
+              <Music class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+              <h3 class="text-base font-semibold text-brand-text-primary mb-1">No artists found</h3>
+              <p class="text-xs text-brand-text-secondary/60">
+                {#if collectionStore.searchQuery}
+                  No artists match your search query "{collectionStore.searchQuery}".
+                {:else}
+                  No artists found in your library.
+                {/if}
+              </p>
+              {#if collectionStore.searchQuery}
+                <button
+                  onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+                  class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded-lg transition-colors font-medium cursor-pointer"
+                >
+                  Clear Search Filter
+                </button>
+              {/if}
+            </div>
           </div>
         {/if}
       </div>

@@ -2,8 +2,8 @@
   import { ChevronLeft, ChevronRight, Search, FolderOpen } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
+  import { fade } from "svelte/transition";
 
-  let searchQuery = $state("");
   let searchInput: HTMLInputElement | undefined;
 
   // Navigation history stack
@@ -18,10 +18,15 @@
     }
   }
 
-  // Search handler
-  async function handleSearch(e: Event) {
+  // Search handler (prevent reload)
+  function handleSearch(e: Event) {
     e.preventDefault();
-    await collectionStore.search(searchQuery);
+  }
+
+  // Clear search query
+  function clearSearch() {
+    collectionStore.searchQuery = "";
+    collectionStore.search("");
   }
 
   // Folder ingestion trigger
@@ -59,7 +64,7 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<header class="fixed top-0 left-0 w-full h-20 bg-brand-secondary border-b border-brand-border flex items-center px-6 gap-6 z-40">
+<header in:fade={{ duration: 600 }} class="fixed top-0 left-0 w-full h-20 bg-brand-secondary border-b border-brand-border flex items-center px-6 gap-6 z-40">
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
@@ -88,15 +93,33 @@
     <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
     <input
       bind:this={searchInput}
-      bind:value={searchQuery}
+      bind:value={collectionStore.searchQuery}
       type="text"
       placeholder="Search tracks, albums, artists... (Ctrl+L)"
       class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
     />
+
+    <!-- Search feedback / progress -->
+    {#if collectionStore.searchLoading}
+      <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title="Searching..."></div>
+    {:else if collectionStore.searchQuery}
+      <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
+        {collectionStore.searchResults.length} results
+      </span>
+      <button
+        type="button"
+        onclick={clearSearch}
+        class="p-1 text-brand-text-secondary hover:text-brand-accent transition-colors flex-shrink-0 font-bold leading-none text-sm"
+        title="Clear Search"
+      >
+        ✕
+      </button>
+    {/if}
+
     <button
       type="button"
       onclick={handleFolderIngest}
-      class="p-1 text-brand-text-secondary hover:text-brand-accent hover:bg-brand-sidebar rounded transition-colors"
+      class="p-1 text-brand-text-secondary hover:text-brand-accent hover:bg-brand-sidebar rounded transition-colors flex-shrink-0"
       title="Add folder to index"
     >
       <FolderOpen class="w-4 h-4" />

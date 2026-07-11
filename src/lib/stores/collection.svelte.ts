@@ -21,6 +21,7 @@ class CollectionStore {
   artists = $state<ArtistItem[]>([]);
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
+  searchLoading = $state<boolean>(false);
   activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
   activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 
@@ -102,7 +103,14 @@ class CollectionStore {
       this.searchResults = [];
       return;
     }
-    this.searchResults = await invoke("search_songs", { query, limit: 500 });
+    this.searchLoading = true;
+    try {
+      this.searchResults = await invoke("search_songs", { query, limit: 500 });
+    } catch (err) {
+      console.error("Failed to execute search:", err);
+    } finally {
+      this.searchLoading = false;
+    }
   }
 
   navigateTo(tab: "collection" | "playlists" | "settings" | "equalizer" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
