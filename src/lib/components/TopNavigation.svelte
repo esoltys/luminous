@@ -128,8 +128,8 @@
   </div>
 
   <!-- Reactive Logo Brand -->
-  <div class="flex-shrink-0">
-    <ReactiveLogoBrand size="xl" />
+  <div class="flex items-center justify-center flex-shrink-0">
+    <ReactiveLogoBrand size="lg" />
   </div>
 </header>
 
