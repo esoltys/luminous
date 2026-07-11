@@ -25,12 +25,37 @@ class CollectionStore {
   activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
   activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 
+  // Layout panel states
+  sidebarOpen = $state<boolean>(true);
+  playerBarOpen = $state<boolean>(true);
+  rightPanelOpen = $state<boolean>(true);
+  sidebarWidth = $state<number>(256);
+  rightPanelWidth = $state<number>(288);
+
   constructor() {
     this.init();
   }
 
   private async init() {
     try {
+      // Restore layout states from localStorage
+      if (typeof window !== "undefined") {
+        const savedSidebar = localStorage.getItem("layout_sidebarOpen");
+        if (savedSidebar !== null) this.sidebarOpen = savedSidebar === "true";
+
+        const savedPlayer = localStorage.getItem("layout_playerBarOpen");
+        if (savedPlayer !== null) this.playerBarOpen = savedPlayer === "true";
+
+        const savedRight = localStorage.getItem("layout_rightPanelOpen");
+        if (savedRight !== null) this.rightPanelOpen = savedRight === "true";
+
+        const savedSidebarWidth = localStorage.getItem("layout_sidebarWidth");
+        if (savedSidebarWidth) this.sidebarWidth = parseInt(savedSidebarWidth, 10);
+
+        const savedRightWidth = localStorage.getItem("layout_rightPanelWidth");
+        if (savedRightWidth) this.rightPanelWidth = parseInt(savedRightWidth, 10);
+      }
+
       await this.refreshDirectories();
       await this.refreshStats();
       await this.refreshLibrary();
@@ -145,6 +170,41 @@ class CollectionStore {
     await invoke("set_app_setting", { key: "excluded_formats", value: JSON.stringify(this.excludedFormats) }).catch(err => {
       console.error("Failed to save excluded_formats:", err);
     });
+  }
+
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_sidebarOpen", this.sidebarOpen.toString());
+    }
+  }
+
+  togglePlayerBar() {
+    this.playerBarOpen = !this.playerBarOpen;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_playerBarOpen", this.playerBarOpen.toString());
+    }
+  }
+
+  toggleRightPanel() {
+    this.rightPanelOpen = !this.rightPanelOpen;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_rightPanelOpen", this.rightPanelOpen.toString());
+    }
+  }
+
+  setSidebarWidth(width: number) {
+    this.sidebarWidth = width;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_sidebarWidth", width.toString());
+    }
+  }
+
+  setRightPanelWidth(width: number) {
+    this.rightPanelWidth = width;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_rightPanelWidth", width.toString());
+    }
   }
 }
 

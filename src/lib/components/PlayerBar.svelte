@@ -8,12 +8,7 @@
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import { fade } from "svelte/transition";
 
-  interface Props {
-    rightPanelOpen?: boolean;
-    onToggleRightPanel?: () => void;
-  }
 
-  let { rightPanelOpen = true, onToggleRightPanel }: Props = $props();
   import {
     Play,
     Pause,
@@ -223,12 +218,6 @@
       onkeyup={releaseVolumeFocus}
       class="w-24 accent-brand-accent h-1 bg-brand-border rounded-lg appearance-none cursor-pointer"
     />
-    <button 
-      onclick={onToggleRightPanel}
-      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors ml-1 p-1 rounded hover:bg-brand-main {rightPanelOpen ? 'text-brand-accent' : ''}"
-      title={rightPanelOpen ? "Hide Now Playing" : "Show Now Playing"}
-    >
-      <Disc class="w-4.5 h-4.5 {playerStore.state === 'playing' ? 'animate-spin-slow' : ''}" />
-    </button>
+
   </div>
 </footer>

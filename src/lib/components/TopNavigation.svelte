@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, FolderOpen } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
@@ -126,8 +126,33 @@
     </button>
   </form>
 
+  <!-- Layout Panel Toggles Group -->
+  <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
+    <button
+      onclick={() => collectionStore.toggleSidebar()}
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      title="Toggle Left Sidebar"
+    >
+      <PanelLeft class="w-4 h-4" />
+    </button>
+    <button
+      onclick={() => collectionStore.togglePlayerBar()}
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.playerBarOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      title="Toggle Bottom Player Bar"
+    >
+      <PanelBottom class="w-4 h-4" />
+    </button>
+    <button
+      onclick={() => collectionStore.toggleRightPanel()}
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      title="Toggle Right Panel"
+    >
+      <PanelRight class="w-4 h-4" />
+    </button>
+  </div>
+
   <!-- Reactive Logo Brand -->
-  <div class="ml-auto">
+  <div class="flex-shrink-0">
     <ReactiveLogoBrand size="md" />
   </div>
 </header>

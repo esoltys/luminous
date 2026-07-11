@@ -4,48 +4,20 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
+  import { slide } from 'svelte/transition';
+  import { collectionStore } from '../lib/stores/collection.svelte';
   
   let { children } = $props();
-
-  // Dynamic layout states
-  let sidebarWidth = $state(256);
-  let rightPanelWidth = $state(288);
-  let rightPanelOpen = $state(true);
-
-  // Restore states from localStorage on mount
-  $effect(() => {
-    const savedSidebar = localStorage.getItem("sidebarWidth");
-    if (savedSidebar) sidebarWidth = parseInt(savedSidebar, 10);
-
-    const savedRight = localStorage.getItem("rightPanelWidth");
-    if (savedRight) rightPanelWidth = parseInt(savedRight, 10);
-
-    const savedOpen = localStorage.getItem("rightPanelOpen");
-    if (savedOpen !== null) rightPanelOpen = savedOpen === "true";
-  });
-
-  // Save states to localStorage when changed
-  $effect(() => {
-    localStorage.setItem("sidebarWidth", sidebarWidth.toString());
-  });
-
-  $effect(() => {
-    localStorage.setItem("rightPanelWidth", rightPanelWidth.toString());
-  });
-
-  $effect(() => {
-    localStorage.setItem("rightPanelOpen", rightPanelOpen.toString());
-  });
 
   // Pointer drag resizing for Sidebar (left-to-right increase)
   function startResizeSidebar(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = sidebarWidth;
+    const startWidth = collectionStore.sidebarWidth;
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      sidebarWidth = Math.max(180, Math.min(400, startWidth + deltaX));
+      collectionStore.setSidebarWidth(Math.max(180, Math.min(400, startWidth + deltaX)));
     }
 
     function onPointerUp() {
@@ -61,11 +33,11 @@
   function startResizeRightPanel(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = rightPanelWidth;
+    const startWidth = collectionStore.rightPanelWidth;
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      rightPanelWidth = Math.max(220, Math.min(480, startWidth - deltaX));
+      collectionStore.setRightPanelWidth(Math.max(220, Math.min(480, startWidth - deltaX)));
     }
 
     function onPointerUp() {
@@ -82,11 +54,11 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      sidebarWidth = Math.max(180, sidebarWidth - 10);
+      collectionStore.setSidebarWidth(Math.max(180, collectionStore.sidebarWidth - 10));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      sidebarWidth = Math.min(400, sidebarWidth + 10);
+      collectionStore.setSidebarWidth(Math.min(400, collectionStore.sidebarWidth + 10));
     }
   }
 
@@ -95,11 +67,11 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      rightPanelWidth = Math.min(480, rightPanelWidth + 10);
+      collectionStore.setRightPanelWidth(Math.min(480, collectionStore.rightPanelWidth + 10));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      rightPanelWidth = Math.max(220, rightPanelWidth - 10);
+      collectionStore.setRightPanelWidth(Math.max(220, collectionStore.rightPanelWidth - 10));
     }
   }
 </script>
@@ -111,25 +83,29 @@
   <!-- Main Grid Layout (fills space between top nav and player bar) -->
   <div class="flex flex-1 overflow-hidden mt-20">
     <!-- Left Sidebar -->
-    <Sidebar width={sidebarWidth} />
+    {#if collectionStore.sidebarOpen}
+      <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
+        <Sidebar width={collectionStore.sidebarWidth} />
 
-    <!-- Left Resize Handle -->
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div 
-      role="separator"
-      aria-valuenow={sidebarWidth}
-      aria-valuemin={180}
-      aria-valuemax={400}
-      aria-label="Resize Left Sidebar"
-      tabindex="0"
-      class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
-      onpointerdown={startResizeSidebar}
-      onkeydown={handleSidebarKeyDown}
-    >
-      <!-- Expanded hover/touch area wrapper -->
-      <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
-    </div>
+        <!-- Left Resize Handle -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div 
+          role="separator"
+          aria-valuenow={collectionStore.sidebarWidth}
+          aria-valuemin={180}
+          aria-valuemax={400}
+          aria-label="Resize Left Sidebar"
+          tabindex="0"
+          class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
+          onpointerdown={startResizeSidebar}
+          onkeydown={handleSidebarKeyDown}
+        >
+          <!-- Expanded hover/touch area wrapper -->
+          <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+        </div>
+      </div>
+    {/if}
 
     <!-- Central Content Area -->
     <main class="flex-1 bg-brand-main overflow-y-auto">
@@ -137,31 +113,37 @@
     </main>
 
     <!-- Right Contextual Panel -->
-    {#if rightPanelOpen}
-      <!-- Right Resize Handle -->
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div 
-        role="separator"
-        aria-valuenow={rightPanelWidth}
-        aria-valuemin={220}
-        aria-valuemax={480}
-        aria-label="Resize Right Panel"
-        tabindex="0"
-        class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
-        onpointerdown={startResizeRightPanel}
-        onkeydown={handleRightPanelKeyDown}
-      >
-        <!-- Expanded hover/touch area wrapper -->
-        <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
-      </div>
+    {#if collectionStore.rightPanelOpen}
+      <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
+        <!-- Right Resize Handle -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div 
+          role="separator"
+          aria-valuenow={collectionStore.rightPanelWidth}
+          aria-valuemin={220}
+          aria-valuemax={480}
+          aria-label="Resize Right Panel"
+          tabindex="0"
+          class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
+          onpointerdown={startResizeRightPanel}
+          onkeydown={handleRightPanelKeyDown}
+        >
+          <!-- Expanded hover/touch area wrapper -->
+          <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+        </div>
 
-      <RightPanel isOpen={rightPanelOpen} width={rightPanelWidth} onClose={() => rightPanelOpen = false} />
+        <RightPanel isOpen={collectionStore.rightPanelOpen} width={collectionStore.rightPanelWidth} onClose={() => collectionStore.toggleRightPanel()} />
+      </div>
     {/if}
   </div>
 
   <!-- Full-Width Player Bar at Bottom -->
-  <PlayerBar rightPanelOpen={rightPanelOpen} onToggleRightPanel={() => rightPanelOpen = !rightPanelOpen} />
+  {#if collectionStore.playerBarOpen}
+    <div transition:slide={{ axis: 'y', duration: 300 }} class="flex-shrink-0 z-40 overflow-hidden">
+      <PlayerBar />
+    </div>
+  {/if}
 </div>
 
 <style>
