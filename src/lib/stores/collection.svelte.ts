@@ -206,6 +206,28 @@ class CollectionStore {
       localStorage.setItem("layout_rightPanelWidth", width.toString());
     }
   }
+
+  get filteredSongs(): Song[] {
+    let result = this.searchQuery.trim() === "" ? this.songs : this.searchResults;
+    return result.filter(song => !this.isFormatExcluded(song.filetype));
+  }
+
+  get filteredAlbums(): AlbumItem[] {
+    const query = this.searchQuery.trim().toLowerCase();
+    if (query === "") return this.albums;
+    return this.albums.filter(album => 
+      (album.album && album.album.toLowerCase().includes(query)) ||
+      (album.artist && album.artist.toLowerCase().includes(query))
+    );
+  }
+
+  get filteredArtists(): ArtistItem[] {
+    const query = this.searchQuery.trim().toLowerCase();
+    if (query === "") return this.artists;
+    return this.artists.filter(artist => 
+      artist.name && artist.name.toLowerCase().includes(query)
+    );
+  }
 }
 
 export const collectionStore = new CollectionStore();

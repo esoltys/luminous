@@ -47,10 +47,7 @@
 
   // Computed songs list with filtering and sorting
   let filteredSongs = $derived.by(() => {
-    let result = collectionStore.searchQuery.trim() === "" ? collectionStore.songs : collectionStore.searchResults;
-
-    // Filter by excluded formats
-    result = result.filter(song => !collectionStore.isFormatExcluded(song.filetype));
+    let result = collectionStore.filteredSongs;
 
     // Apply sort
     return [...result].sort((a, b) => {
@@ -75,23 +72,10 @@
   });
 
   // Computed albums list with search filtering
-  let filteredAlbums = $derived.by(() => {
-    const query = collectionStore.searchQuery.trim().toLowerCase();
-    if (query === "") return collectionStore.albums;
-    return collectionStore.albums.filter(album => 
-      (album.album && album.album.toLowerCase().includes(query)) ||
-      (album.artist && album.artist.toLowerCase().includes(query))
-    );
-  });
+  let filteredAlbums = $derived(collectionStore.filteredAlbums);
 
   // Computed artists list with search filtering
-  let filteredArtists = $derived.by(() => {
-    const query = collectionStore.searchQuery.trim().toLowerCase();
-    if (query === "") return collectionStore.artists;
-    return collectionStore.artists.filter(artist => 
-      artist.name && artist.name.toLowerCase().includes(query)
-    );
-  });
+  let filteredArtists = $derived(collectionStore.filteredArtists);
 
   function toggleSort(field: keyof Song) {
     if (sortField === field) {

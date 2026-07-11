@@ -50,19 +50,19 @@
           onclick={() => { collectionStore.activeSubTab = "songs"; }}
           class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'songs' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
-          Tracks ({collectionStore.stats.total_songs})
+          Tracks ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
         </button>
         <button
           onclick={() => { collectionStore.activeSubTab = "albums"; }}
           class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'albums' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
-          Albums ({collectionStore.stats.total_albums})
+          Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
         </button>
         <button
           onclick={() => { collectionStore.activeSubTab = "artists"; }}
           class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'artists' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
         >
-          Artists ({collectionStore.stats.total_artists})
+          Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
         </button>
       </div>
     {/if}
