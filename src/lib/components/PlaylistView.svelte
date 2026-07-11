@@ -2,7 +2,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle } from "lucide-svelte";
+  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
@@ -65,7 +65,10 @@
   let dragOverIndex = $state<number | null>(null);
 
   function handleDragStart(event: DragEvent, index: number) {
-    draggedIndex = index;
+    // Defer setting draggedIndex to prevent Chrome/Webkit from immediately canceling the drag due to synchronous DOM updates
+    setTimeout(() => {
+      draggedIndex = index;
+    }, 0);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", index.toString());
@@ -225,16 +228,28 @@
                     : ''
                   }"
               >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium">
-                  {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === 'playing'}
-                    <div class="flex items-center justify-center gap-0.5 h-4 w-4 mx-auto">
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
-                    </div>
-                  {:else}
-                    {index + 1}
-                  {/if}
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative">
+                  <div class="relative w-4 h-4 mx-auto flex items-center justify-center">
+                    {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === 'playing'}
+                      <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                      </div>
+                    {:else}
+                      <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
+                        {index + 1}
+                      </span>
+                    {/if}
+                    <button
+                      onclick={() => !unavailable && handlePlayPlaylistItem(index)}
+                      class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                      disabled={unavailable}
+                      title="Play track"
+                    >
+                      <Play class="w-4 h-4 fill-current" />
+                    </button>
+                  </div>
                 </td>
                 <td class="py-2.5 px-4 font-medium truncate max-w-xs {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : unavailable ? 'text-brand-text-secondary/50' : 'text-brand-text-primary'}">
                   <div class="flex items-center gap-2 max-w-full">

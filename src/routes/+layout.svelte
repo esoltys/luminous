@@ -86,7 +86,7 @@
     <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
       
       <!-- FRONT FACE: Normal App Layout -->
-      <div class="flip-face flex flex-col">
+      <div class="flip-face flex flex-col h-full">
         <!-- Top Navigation Ribbon -->
         <div class="flex-shrink-0 z-40 overflow-hidden">
           <TopNavigation />
