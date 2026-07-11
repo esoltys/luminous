@@ -140,10 +140,10 @@
   </div>
 
   <!-- Main View Scrollable Container -->
-  <div class="flex-1 overflow-y-auto p-6">
+  <div class="flex-1 p-6 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}">
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
-      <div class="w-full border border-brand-border rounded-lg overflow-x-auto bg-brand-sidebar/40">
+      <div class="flex-1 overflow-auto border border-brand-border rounded-lg bg-brand-sidebar/40">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
