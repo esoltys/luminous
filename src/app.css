@@ -13,23 +13,23 @@
 
 @layer base {
   :root {
-    /* Default Luminous Violet Theme Colors */
-    --bg-main: #0d0b18;
-    --bg-sidebar: #07050e;
-    --bg-playerbar: #0a0813;
-    --color-accent: #8b5cf6;
-    --color-accent-hover: #a78bfa;
-    --color-text-primary: #f3f4f6;
-    --color-text-secondary: #9ca3af;
-    --color-border: #1f1b2e;
+    /* Default Nordic Blue Theme Colors */
+    --bg-main: #2e3440;
+    --bg-sidebar: #242933;
+    --bg-playerbar: #2b303c;
+    --color-accent: #88c0d0;
+    --color-accent-hover: #8fbcbb;
+    --color-text-primary: #eceff4;
+    --color-text-secondary: #d8dee9;
+    --color-border: #3b4252;
 
     /* Artwork extracted colors defaults */
-    --color-artwork-primary: #0d0b18;
-    --color-artwork-sidebar: #07050e;
-    --color-artwork-playerbar: #0a0813;
-    --color-artwork-accent: #8b5cf6;
-    --color-artwork-accent-hover: #a78bfa;
-    --color-artwork-border: #1f1b2e;
+    --color-artwork-primary: #2e3440;
+    --color-artwork-sidebar: #242933;
+    --color-artwork-playerbar: #2b303c;
+    --color-artwork-accent: #88c0d0;
+    --color-artwork-accent-hover: #8fbcbb;
+    --color-artwork-border: #3b4252;
   }
 
   body {

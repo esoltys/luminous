@@ -241,12 +241,12 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
 
 function getFallbackColors(): ExtractedColors {
   return {
-    primary: "#0d0b18",
-    sidebar: "#07050e",
-    playerbar: "#0a0813",
-    accent: "#8b5cf6",
-    accentHover: "#a78bfa",
-    border: "#1f1b2e"
+    primary: "#2e3440",
+    sidebar: "#242933",
+    playerbar: "#2b303c",
+    accent: "#88c0d0",
+    accentHover: "#8fbcbb",
+    border: "#3b4252"
   };
 }
 
@@ -271,7 +271,7 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
 }
 
 class ThemeStore {
-  activeThemeId = $state<string>("luminous-violet");
+  activeThemeId = $state<string>("nordic-blue");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
 
@@ -306,7 +306,7 @@ class ThemeStore {
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
-    return custom || PREDEFINED_THEMES[0];
+    return custom || PREDEFINED_THEMES.find(t => t.id === "nordic-blue") || PREDEFINED_THEMES[0];
   }
 
   async setTheme(themeId: string) {
@@ -344,7 +344,7 @@ class ThemeStore {
     });
 
     if (this.activeThemeId === themeId) {
-      await this.setTheme("luminous-violet");
+      await this.setTheme("nordic-blue");
     }
   }
 
@@ -417,15 +417,15 @@ class ThemeStore {
     this.artworkColors = null;
     if (typeof document === "undefined") return;
     const root = document.documentElement;
-    root.style.setProperty("--color-artwork-primary", "#0d0b18");
-    root.style.setProperty("--color-artwork-sidebar", "#07050e");
-    root.style.setProperty("--color-artwork-playerbar", "#0a0813");
-    root.style.setProperty("--color-artwork-accent", "#8b5cf6");
-    root.style.setProperty("--color-artwork-accent-hover", "#a78bfa");
-    root.style.setProperty("--color-artwork-border", "#1f1b2e");
+    root.style.setProperty("--color-artwork-primary", "#2e3440");
+    root.style.setProperty("--color-artwork-sidebar", "#242933");
+    root.style.setProperty("--color-artwork-playerbar", "#2b303c");
+    root.style.setProperty("--color-artwork-accent", "#88c0d0");
+    root.style.setProperty("--color-artwork-accent-hover", "#8fbcbb");
+    root.style.setProperty("--color-artwork-border", "#3b4252");
 
     // Apply logo stop variables
-    const stops = calculateLogoStops("#8b5cf6", "#a78bfa");
+    const stops = calculateLogoStops("#88c0d0", "#8fbcbb");
     root.style.setProperty("--logo-stop-1", stops.stop1);
     root.style.setProperty("--logo-stop-2", stops.stop2);
     root.style.setProperty("--logo-stop-3", stops.stop3);

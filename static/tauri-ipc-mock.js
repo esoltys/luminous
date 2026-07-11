@@ -4,7 +4,7 @@
 
   // Default Mock Settings
   window.mockSettings = window.mockSettings || {
-    active_theme_id: "luminous-violet",
+    active_theme_id: "nordic-blue",
     custom_themes: "[]",
     active_tab: "collection",
     active_sub_tab: "songs",
