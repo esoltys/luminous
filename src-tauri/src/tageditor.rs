@@ -185,9 +185,12 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
 
 pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<SuggestedTags> {
     let client_key = std::env::var("ACOUSTID_API_KEY").unwrap_or_else(|_| "8Xt5vjYtOS".to_string());
+    let encoded_fingerprint =
+        percent_encoding::utf8_percent_encode(fingerprint, percent_encoding::NON_ALPHANUMERIC)
+            .to_string();
     let url = format!(
         "https://api.acoustid.org/v2/lookup?client={}&meta=recordings+releasegroups+releases&duration={}&fingerprint={}",
-        client_key, duration_sec, fingerprint
+        client_key, duration_sec, encoded_fingerprint
     );
 
     eprintln!(
