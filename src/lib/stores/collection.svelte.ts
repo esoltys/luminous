@@ -31,6 +31,8 @@ class CollectionStore {
   rightPanelOpen = $state<boolean>(true);
   sidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
+  storedFullWidth = $state<number>(1024);
+  storedFullHeight = $state<number>(768);
 
   constructor() {
     this.init();
@@ -54,6 +56,12 @@ class CollectionStore {
 
         const savedRightWidth = localStorage.getItem("layout_rightPanelWidth");
         if (savedRightWidth) this.rightPanelWidth = parseInt(savedRightWidth, 10);
+
+        const savedFullWidth = localStorage.getItem("layout_storedFullWidth");
+        if (savedFullWidth) this.storedFullWidth = parseFloat(savedFullWidth);
+
+        const savedFullHeight = localStorage.getItem("layout_storedFullHeight");
+        if (savedFullHeight) this.storedFullHeight = parseFloat(savedFullHeight);
       }
 
       await this.refreshDirectories();
@@ -179,10 +187,38 @@ class CollectionStore {
     }
   }
 
-  togglePlayerBar() {
+  async togglePlayerBar() {
     this.playerBarOpen = !this.playerBarOpen;
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_playerBarOpen", this.playerBarOpen.toString());
+
+      try {
+        const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
+        const appWindow = getCurrentWindow();
+
+        if (!this.playerBarOpen) {
+          // Save the current window size before shrinking
+          const physicalSize = await appWindow.innerSize();
+          const scaleFactor = await appWindow.scaleFactor();
+          const logicalWidth = physicalSize.width / scaleFactor;
+          const logicalHeight = physicalSize.height / scaleFactor;
+
+          this.storedFullWidth = logicalWidth;
+          this.storedFullHeight = logicalHeight;
+          localStorage.setItem("layout_storedFullWidth", logicalWidth.toString());
+          localStorage.setItem("layout_storedFullHeight", logicalHeight.toString());
+
+          // Resize window to focus only on the player bar (80px height)
+          await appWindow.setSize(new LogicalSize(logicalWidth, 80));
+        } else {
+          // Restore to saved size
+          const targetWidth = this.storedFullWidth || 1024;
+          const targetHeight = this.storedFullHeight || 768;
+          await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+        }
+      } catch (err) {
+        console.error("Failed to adjust Tauri window size:", err);
+      }
     }
   }
 
