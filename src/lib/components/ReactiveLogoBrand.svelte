@@ -22,7 +22,9 @@
 
   // State variables for pulsing
   let isPulsingEnabled = $state(true);
-  let pulseIntensity = $state(0);
+  let bassIntensity = $state(0);
+  let midIntensity = $state(0);
+  let coronalIntensity = $state(0);
   let unlisten: (() => void) | null = null;
 
   onMount(async () => {
@@ -41,22 +43,26 @@
     try {
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         if (!isPulsingEnabled) {
-          pulseIntensity = 0;
+          bassIntensity = 0;
+          midIntensity = 0;
+          coronalIntensity = 0;
           return;
         }
         const data = event.payload;
         if (data && data.length > 0) {
-          // Weight the bins so that higher frequencies (right-side of visualizer)
-          // have a much stronger influence on the logo brightness/luminance.
-          // The visualizer height is scaled by val * 14.0.
-          // Therefore, the maximum height of a bar is reached when val = 1.0 / 14.0 ≈ 0.0714.
-          // We look at the highest bar (the top edge of the active spectrum) to define the pulsing.
-          const maxVal = Math.max(...data);
-          
-          // Map maxVal to pulseIntensity: a top edge at 80% height (val ≈ 0.057) gives ~75% intensity.
-          pulseIntensity = Math.min(1.0, maxVal * 13.0);
+          // Segment the 32 spectrum bins into Bass (left), Mids (middle), and Coronal/Treble (right)
+          const bassPeak = Math.max(...data.slice(0, 10), 0);
+          const midPeak = Math.max(...data.slice(10, 22), 0);
+          const coronalPeak = Math.max(...data.slice(22, 32), 0);
+
+          // Calibrate each band's multiplier (higher gain for coronal treble due to lower natural energy)
+          bassIntensity = Math.min(1.0, bassPeak * 14.0);
+          midIntensity = Math.min(1.0, midPeak * 14.0);
+          coronalIntensity = Math.min(1.0, coronalPeak * 22.0);
         } else {
-          pulseIntensity = 0;
+          bassIntensity = 0;
+          midIntensity = 0;
+          coronalIntensity = 0;
         }
       });
     } catch (e) {
@@ -72,7 +78,9 @@
     isPulsingEnabled = !isPulsingEnabled;
     localStorage.setItem("logo_pulsing", String(isPulsingEnabled));
     if (!isPulsingEnabled) {
-      pulseIntensity = 0;
+      bassIntensity = 0;
+      midIntensity = 0;
+      coronalIntensity = 0;
     } else {
       await invoke("set_spectrum_enabled", { enabled: true }).catch((err) =>
         console.error("Failed to enable spectrum on toggle:", err)
@@ -82,16 +90,17 @@
 
   let isPlaying = $derived(playerStore.state === "playing");
 
-  // Derive element opacities, glow radii, and saturation based on play and pulse intensity
-  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.05 + pulseIntensity * 0.75);
-  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.15 + pulseIntensity * 0.85);
-  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.1 + pulseIntensity * 0.9);
+  // Derive element opacities, glow radii, and saturation based on play and specific band intensities
+  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.05 + bassIntensity * 0.75);
+  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.15 + midIntensity * 0.85);
+  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.1 + coronalIntensity * 0.9);
 
-  let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + pulseIntensity * 40);
-  let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + pulseIntensity * 30);
-  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 32 : 24 + pulseIntensity * 16);
+  let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + bassIntensity * 40);
+  let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + midIntensity * 30);
+  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 32 : 24 + coronalIntensity * 16);
 
-  let saturationVal = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.15 + pulseIntensity * 2.35);
+  let maxIntensity = $derived(Math.max(bassIntensity, midIntensity, coronalIntensity));
+  let saturationVal = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.15 + maxIntensity * 2.35);
 </script>
 
 <button
