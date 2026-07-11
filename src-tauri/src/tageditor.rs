@@ -185,16 +185,9 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
 
 pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<SuggestedTags> {
     let client_key = std::env::var("ACOUSTID_API_KEY").unwrap_or_else(|_| "8Xt5vjYtOS".to_string());
-    let encoded_fingerprint =
-        percent_encoding::utf8_percent_encode(fingerprint, percent_encoding::NON_ALPHANUMERIC)
-            .to_string();
-    let url = format!(
-        "https://api.acoustid.org/v2/lookup?client={}&meta=recordings+releasegroups+releases&duration={}&fingerprint={}",
-        client_key, duration_sec, encoded_fingerprint
-    );
 
     eprintln!(
-        "[Luminous Backend] AcoustID: Querying API lookup service (duration: {}s)...",
+        "[Luminous Backend] AcoustID: Querying API lookup service via POST (duration: {}s)...",
         duration_sec
     );
 
@@ -203,15 +196,30 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
         .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
         .build()?;
 
-    let response = client.get(&url).send().await?;
+    let params = [
+        ("client", client_key),
+        ("meta", "recordings releasegroups releases".to_string()),
+        ("duration", duration_sec.to_string()),
+        ("fingerprint", fingerprint.to_string()),
+    ];
+
+    let response = client
+        .post("https://api.acoustid.org/v2/lookup")
+        .form(&params)
+        .send()
+        .await?;
+
     if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
         eprintln!(
-            "[Luminous Backend] AcoustID: API request failed with status: {}",
-            response.status()
+            "[Luminous Backend] AcoustID: API request failed with status: {}. Body: {}",
+            status, body
         );
         return Err(anyhow!(
-            "AcoustID API request failed: {}",
-            response.status()
+            "AcoustID API request failed: {}. Details: {}",
+            status,
+            body
         ));
     }
 
