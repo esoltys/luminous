@@ -70,7 +70,8 @@
 
   <!-- Playlist quick access (if tab is playlists) -->
   {#if collectionStore.activeTab === 'playlists'}
-    <div class="flex-1 overflow-y-auto px-4 py-2 border-t border-brand-border">
+    <!-- Playlist quick access header & form (Fixed at top) -->
+    <div class="pl-4 pr-4 pt-3 border-t border-brand-border flex-shrink-0">
       <div class="flex items-center justify-between text-xs text-brand-text-secondary font-semibold mb-2">
         <span>PLAYLISTS</span>
       </div>
@@ -80,11 +81,14 @@
           placeholder="New playlist..."
           class="bg-brand-main border border-brand-border rounded px-2 py-1 text-xs w-full text-brand-text-primary focus:outline-none focus:border-brand-accent"
         />
-        <button type="submit" class="bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded p-1">
+        <button type="submit" class="bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded p-1 cursor-pointer">
           <Plus class="w-3.5 h-3.5 text-white" />
         </button>
       </form>
+    </div>
 
+    <!-- Scrollable Playlists List -->
+    <div class="flex-1 min-h-0 overflow-y-auto pl-4 pr-1 mr-4 pb-4 playlists-scroll-container">
       <ul class="space-y-1 text-xs">
         {#each playlistsStore.playlists as pl}
           <li class="group flex items-center justify-between rounded px-2 py-1.5 {playlistsStore.activePlaylistId === pl.id ? 'bg-brand-main text-brand-accent font-medium' : 'text-brand-text-secondary/75 hover:bg-brand-main/40 hover:text-brand-text-primary'}">
@@ -134,3 +138,20 @@
     {/if}
   </div>
 </aside>
+
+<style>
+  .playlists-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .playlists-scroll-container::-webkit-scrollbar {
+    width: 6px;
+  }
+  .playlists-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .playlists-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+</style>

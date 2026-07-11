@@ -65,10 +65,7 @@
   let dragOverIndex = $state<number | null>(null);
 
   function handleDragStart(event: DragEvent, index: number) {
-    // Defer setting draggedIndex to prevent Chrome/Webkit from immediately canceling the drag due to synchronous DOM updates
-    setTimeout(() => {
-      draggedIndex = index;
-    }, 0);
+    draggedIndex = index;
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", index.toString());
@@ -209,7 +206,7 @@
             {#each playlistsStore.activePlaylistTracks as item, index}
               {@const unavailable = isItemUnavailable(item)}
               <tr
-                draggable={!unavailable}
+                draggable={!unavailable ? "true" : "false"}
                 ondragstart={(e) => !unavailable && handleDragStart(e, index)}
                 ondragover={(e) => handleDragOver(e, index)}
                 ondragenter={(e) => handleDragEnter(e, index)}
