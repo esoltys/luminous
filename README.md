@@ -4,10 +4,20 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.31.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases)
-[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-40%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Release](https://img.shields.io/badge/Release-0.43.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-43%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 
-Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. You can download the compiled binaries for Windows and Linux from the [GitHub Releases](https://github.com/esoltys/luminous/releases) page.
+Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface.
+
+<p align="center">
+  <a href="https://github.com/esoltys/luminous/releases/latest">
+    <img src="docs/download-linux.svg" width="380" alt="Download for Linux" />
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/esoltys/luminous/releases/latest">
+    <img src="docs/download-windows.svg" width="380" alt="Download for Windows" />
+  </a>
+</p>
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
