@@ -186,8 +186,19 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
 pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<SuggestedTags> {
     let client_key = std::env::var("ACOUSTID_API_KEY").unwrap_or_else(|_| "8Xt5vjYtOS".to_string());
 
+    let masked_key = if client_key.len() > 4 {
+        format!(
+            "{}***{}",
+            &client_key[..2],
+            &client_key[client_key.len() - 2..]
+        )
+    } else {
+        "***".to_string()
+    };
+
     eprintln!(
-        "[Luminous Backend] AcoustID: Querying API lookup service via POST (duration: {}s)...",
+        "[Luminous Backend] AcoustID: Querying API lookup service via POST (client key: {}, duration: {}s)...",
+        masked_key,
         duration_sec
     );
 
@@ -289,4 +300,39 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
 
     eprintln!("[Luminous Backend] AcoustID: No matching recording found in AcoustID database");
     Err(anyhow!("no matching audio recordings found on AcoustID"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_debug_lookup() {
+        let db_path = "C:\\Users\\ericj\\AppData\\Roaming\\org.luminous.app\\luminous.db";
+        println!("Checking database at {}", db_path);
+        let conn = rusqlite::Connection::open(db_path).unwrap();
+        let path_str: String = conn
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                rusqlite::params![1336],
+                |row| row.get(0),
+            )
+            .expect("Could not find song 1336 in database");
+        println!("Found path: {}", path_str);
+
+        let path = std::path::PathBuf::from(path_str);
+        let (fingerprint, duration_sec) = generate_fingerprint(&path).unwrap();
+        println!(
+            "Generated fingerprint length: {}, duration: {}s",
+            fingerprint.len(),
+            duration_sec
+        );
+
+        let suggestions = lookup_acoustid(&fingerprint, duration_sec).await;
+        match suggestions {
+            Ok(s) => println!("Success! Suggestions: {:?}", s),
+            Err(e) => println!("Error during AcoustID lookup: {:?}", e),
+        }
+    }
 }
