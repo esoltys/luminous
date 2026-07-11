@@ -143,7 +143,7 @@
   <div class="flex-1 overflow-y-auto p-6">
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
-      <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/40">
+      <div class="w-full border border-brand-border rounded-lg overflow-x-auto bg-brand-sidebar/40">
         <table class="w-full text-left text-sm border-collapse">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
@@ -273,7 +273,7 @@
       </div>
     {:else if collectionStore.activeSubTab === "albums"}
       <!-- Albums Card Grid View -->
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+      <div class={filteredAlbums.length <= 4 ? "flex flex-row flex-wrap gap-6" : "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6"}>
         {#each filteredAlbums as album}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -306,7 +306,7 @@
                 }
               }
             }}
-            class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
+            class="{filteredAlbums.length <= 4 ? 'w-48 shrink-0' : 'w-full'} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
           >
             <div class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent border border-brand-border overflow-hidden relative">
               <CoverArt

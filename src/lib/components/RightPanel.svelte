@@ -1,6 +1,6 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
-  import { ChevronRight, Music, Clock, Volume2 } from "lucide-svelte";
+  import { Music, Clock, Volume2 } from "lucide-svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -33,18 +33,11 @@
   class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
 >
   <!-- Header -->
-  <div class="h-20 flex items-center justify-between px-6 border-b border-brand-border">
+  <div class="h-20 flex items-center px-6 border-b border-brand-border">
     <h2 class="text-lg font-bold text-brand-text-primary flex items-center gap-2">
       <Music class="w-5 h-5" />
       Now Playing
     </h2>
-    <button
-      onclick={onClose}
-      class="p-1 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors focus:outline-none"
-      title="Close Panel"
-    >
-      <ChevronRight class="w-5 h-5" />
-    </button>
   </div>
 
   <!-- Content -->
