@@ -153,7 +153,7 @@
 
   <!-- Reactive Logo Brand -->
   <div class="flex-shrink-0">
-    <ReactiveLogoBrand size="md" />
+    <ReactiveLogoBrand size="xl" />
   </div>
 </header>
 

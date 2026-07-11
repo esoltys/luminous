@@ -6,7 +6,7 @@
   import { onMount, onDestroy } from "svelte";
 
   interface Props {
-    size?: "sm" | "md" | "lg";
+    size?: "sm" | "md" | "lg" | "xl";
     className?: string;
   }
 
@@ -16,7 +16,8 @@
   const sizeMap = {
     sm: "w-8 h-8",
     md: "w-12 h-12",
-    lg: "w-16 h-16"
+    lg: "w-16 h-16",
+    xl: "w-20 h-20"
   };
 
   // State variables for pulsing
@@ -159,7 +160,7 @@
   >
     <defs>
       <!-- Reactive gradient based on theme colors -->
-      <linearGradient id="reactiveGradient" x1="0%" y1="20%" x2="100%" y2="50%">
+      <linearGradient id="reactiveGradient" x1="0%" y1="50%" x2="100%" y2="50%">
         <stop offset="0%" stop-color={stop1} />
         <stop offset="30%" stop-color={stop2} />
         <stop offset="65%" stop-color={stop3} />

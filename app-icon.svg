@@ -5,8 +5,8 @@
       <rect x="32" y="32" width="448" height="448" rx="105" ry="105" />
     </clipPath>
     
-    <!-- Asymmetrical Sunrise Gradient: Deep Left Shadow to Right White-Heat -->
-    <linearGradient id="sunriseGradient" x1="0%" y1="20%" x2="100%" y2="50%">
+    <!-- Symmetrical Sunrise Gradient: Deep Left Shadow to Right White-Heat -->
+    <linearGradient id="sunriseGradient" x1="0%" y1="50%" x2="100%" y2="50%">
       <stop offset="0%" stop-color="#3a0d00" />    <!-- Muted, deep shadow silhouette red -->
       <stop offset="30%" stop-color="#c83200" />   <!-- Rich mid-glow orange-red -->
       <stop offset="65%" stop-color="#ff7300" />   <!-- Vibrant Zest Orange core -->
