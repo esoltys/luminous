@@ -84,52 +84,6 @@
     }
   }
 
-  // Reactive dependencies to trigger stop color calculations when activeThemeId or currentSong changes
-  let activeThemeId = $derived(themeStore.activeThemeId);
-  let currentSong = $derived(playerStore.currentSong);
-
-  // Compute reactive gradient colors based on active theme accent colors
-  let stop1 = $derived.by(() => {
-    const _t = activeThemeId;
-    const _s = currentSong;
-    if (typeof document === "undefined") return "#3a0d00";
-    const accent = getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#8b5cf6";
-    return darken(accent, 0.6) || "#3a0d00";
-  });
-
-  let stop2 = $derived.by(() => {
-    const _t = activeThemeId;
-    const _s = currentSong;
-    if (typeof document === "undefined") return "#c83200";
-    const accent = getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#8b5cf6";
-    return darken(accent, 0.2) || "#c83200";
-  });
-
-  let stop3 = $derived.by(() => {
-    const _t = activeThemeId;
-    const _s = currentSong;
-    if (typeof document === "undefined") return "#ff7300";
-    return getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim() || "#ff7300";
-  });
-
-  let stop4 = $derived.by(() => {
-    const _t = activeThemeId;
-    const _s = currentSong;
-    if (typeof document === "undefined") return "#ffcc00";
-    return getComputedStyle(document.documentElement).getPropertyValue("--color-accent-hover").trim() || "#a78bfa";
-  });
-
-  function darken(hex: string, amount: number): string {
-    if (!hex.startsWith("#")) return hex;
-    const usePound = hex[0] === "#";
-    const col = usePound ? hex.slice(1) : hex;
-    const num = parseInt(col, 16);
-    const r = Math.max(0, Math.floor(((num / 65536) % 256) * (1 - amount)));
-    const g = Math.max(0, Math.floor(((num / 256) % 256) * (1 - amount)));
-    const b = Math.max(0, Math.floor((num % 256) * (1 - amount)));
-    return (usePound ? "#" : "") + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
-  }
-
   let isPlaying = $derived(playerStore.state === "playing");
 
   // Derive element opacities, glow radii, and saturation based on play and pulse intensity
@@ -160,10 +114,10 @@
     <defs>
       <!-- Reactive gradient based on theme colors -->
       <linearGradient id="reactiveGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-        <stop offset="0%" stop-color={stop1} />
-        <stop offset="30%" stop-color={stop2} />
-        <stop offset="65%" stop-color={stop3} />
-        <stop offset="88%" stop-color={stop4} />
+        <stop offset="0%" stop-color="var(--logo-stop-1, #3a0d00)" />
+        <stop offset="30%" stop-color="var(--logo-stop-2, #c83200)" />
+        <stop offset="65%" stop-color="var(--logo-stop-3, #ff7300)" />
+        <stop offset="88%" stop-color="var(--logo-stop-4, #ffcc00)" />
         <stop offset="100%" stop-color="#ffffff" />
       </linearGradient>
 

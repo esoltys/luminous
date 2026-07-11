@@ -250,6 +250,26 @@ function getFallbackColors(): ExtractedColors {
   };
 }
 
+function calculateLogoStops(accentHex: string, accentHoverHex: string) {
+  const darken = (hex: string, amount: number): string => {
+    if (!hex || !hex.startsWith("#")) return hex || "";
+    const usePound = hex[0] === "#";
+    const col = usePound ? hex.slice(1) : hex;
+    const num = parseInt(col, 16);
+    const r = Math.max(0, Math.floor(((num / 65536) % 256) * (1 - amount)));
+    const g = Math.max(0, Math.floor(((num / 256) % 256) * (1 - amount)));
+    const b = Math.max(0, Math.floor((num % 256) * (1 - amount)));
+    return (usePound ? "#" : "") + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+  };
+
+  return {
+    stop1: darken(accentHex, 0.6),
+    stop2: darken(accentHex, 0.2),
+    stop3: accentHex,
+    stop4: accentHoverHex
+  };
+}
+
 class ThemeStore {
   activeThemeId = $state<string>("luminous-violet");
   customThemes = $state<Theme[]>([]);
@@ -376,6 +396,13 @@ class ThemeStore {
     root.style.setProperty("--color-artwork-accent", colors.accent);
     root.style.setProperty("--color-artwork-accent-hover", colors.accentHover);
     root.style.setProperty("--color-artwork-border", colors.border);
+
+    // Apply logo stop variables
+    const stops = calculateLogoStops(colors.accent, colors.accentHover);
+    root.style.setProperty("--logo-stop-1", stops.stop1);
+    root.style.setProperty("--logo-stop-2", stops.stop2);
+    root.style.setProperty("--logo-stop-3", stops.stop3);
+    root.style.setProperty("--logo-stop-4", stops.stop4);
   }
 
   resetArtworkColors() {
@@ -387,6 +414,13 @@ class ThemeStore {
     root.style.setProperty("--color-artwork-accent", "#8b5cf6");
     root.style.setProperty("--color-artwork-accent-hover", "#a78bfa");
     root.style.setProperty("--color-artwork-border", "#1f1b2e");
+
+    // Apply logo stop variables
+    const stops = calculateLogoStops("#8b5cf6", "#a78bfa");
+    root.style.setProperty("--logo-stop-1", stops.stop1);
+    root.style.setProperty("--logo-stop-2", stops.stop2);
+    root.style.setProperty("--logo-stop-3", stops.stop3);
+    root.style.setProperty("--logo-stop-4", stops.stop4);
   }
 
   applyActiveTheme() {
@@ -411,6 +445,16 @@ class ThemeStore {
         --color-border: ${theme.colors["color-border"]};
       }
     `;
+
+    // Only apply static theme logo stops if we are NOT on dynamic-artwork theme
+    if (theme.id !== "dynamic-artwork") {
+      const stops = calculateLogoStops(theme.colors["color-accent"], theme.colors["color-accent-hover"]);
+      const root = document.documentElement;
+      root.style.setProperty("--logo-stop-1", stops.stop1);
+      root.style.setProperty("--logo-stop-2", stops.stop2);
+      root.style.setProperty("--logo-stop-3", stops.stop3);
+      root.style.setProperty("--logo-stop-4", stops.stop4);
+    }
   }
 }
 
