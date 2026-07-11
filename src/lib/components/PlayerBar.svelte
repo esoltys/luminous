@@ -19,7 +19,8 @@
     Shuffle,
     Repeat,
     Repeat1,
-    Disc
+    Disc,
+    PanelBottomOpen
   } from "lucide-svelte";
 
   // Helper to format nanoseconds to M:SS
@@ -216,8 +217,15 @@
       onchange={releaseVolumeFocus}
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
-      class="w-24 accent-brand-accent h-1 bg-brand-border rounded-lg appearance-none cursor-pointer"
-    />
-
+      />
+    {#if !collectionStore.playerBarOpen}
+      <button 
+        onclick={() => collectionStore.togglePlayerBar()}
+        class="text-brand-text-secondary hover:text-brand-accent transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
+        title="Restore Full Interface"
+      >
+        <PanelBottomOpen class="w-4.5 h-4.5" />
+      </button>
+    {/if}
   </div>
 </footer>

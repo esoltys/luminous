@@ -64,7 +64,7 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<header in:fade={{ duration: 600 }} class="fixed top-0 left-0 w-full h-20 bg-brand-secondary border-b border-brand-border flex items-center px-6 gap-6 z-40">
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-secondary border-b border-brand-border flex items-center px-6 gap-6 z-40">
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
