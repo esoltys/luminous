@@ -1,7 +1,6 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { ChevronRight, Music, Clock, Volume2 } from "lucide-svelte";
-  import { slide } from "svelte/transition";
 
   interface Props {
     isOpen?: boolean;
@@ -30,7 +29,6 @@
 </script>
 
 <aside
-  transition:slide={{ axis: "x", duration: 350 }}
   style="width: {width}px;"
   class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
 >
