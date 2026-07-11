@@ -104,12 +104,12 @@
 
   <!-- Button Link -->
   <g class="button-group" transform="translate(24, 68)">
-    <rect width="210" height="38" rx="8" class="button" />
+    <rect width="240" height="38" rx="8" class="button" />
     <!-- Download Icon -->
     <path d="M12 3v10m0 0l-3-3m3 3l3-3M5 17h14" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(12, 7) scale(0.9)" />
     <text x="38" y="24" class="button-text">Download .exe / .msi</text>
   </g>
 
   <!-- Subtext Description -->
-  <text x="24" y="138" class="desc">Official installers and portable binaries for Windows 10/11 x64</text>
+  <text x="24" y="138" class="desc">Installers and portable binaries for Windows x64</text>
 </svg>
