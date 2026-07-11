@@ -117,13 +117,16 @@
     aria-hidden="true"
   >
     <defs>
-      <!-- Reactive gradient based on theme colors -->
-      <linearGradient id="reactiveGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <!-- Bass Gradient (Ambient Glow): Deep Accent to Accent -->
+      <linearGradient id="bassGradient" x1="0%" y1="50%" x2="100%" y2="50%">
         <stop offset="0%" stop-color="var(--logo-stop-1, #3a0d00)" />
-        <stop offset="30%" stop-color="var(--logo-stop-2, #c83200)" />
-        <stop offset="65%" stop-color="var(--logo-stop-3, #ff7300)" />
-        <stop offset="88%" stop-color="var(--logo-stop-4, #ffcc00)" />
-        <stop offset="100%" stop-color="#ffffff" />
+        <stop offset="100%" stop-color="var(--logo-stop-3, #ff7300)" />
+      </linearGradient>
+
+      <!-- Mid Gradient (Eclipse Ring): Deep Accent Hover to Accent Hover -->
+      <linearGradient id="midGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+        <stop offset="0%" stop-color="var(--logo-stop-2, #5a1d00)" />
+        <stop offset="100%" stop-color="var(--logo-stop-4, #ffcc00)" />
       </linearGradient>
 
       <!-- Adaptive glow filter -->
@@ -147,7 +150,7 @@
         cx="280"
         cy="256"
         r={bgRadius}
-        fill="url(#reactiveGradient)"
+        fill="url(#bassGradient)"
         opacity={bgOpacity}
         filter="url(#adaptiveGlow)"
         style="transition: r 0.05s ease-out;"
@@ -158,7 +161,7 @@
         cx="256"
         cy="256"
         r={ringRadius}
-        stroke="url(#reactiveGradient)"
+        stroke="url(#midGradient)"
         stroke-width="26"
         fill="none"
         opacity={ringOpacity}
