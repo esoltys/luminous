@@ -162,8 +162,9 @@ bun run tauri build
 
 ### AcoustID / Chromaprint Setup (Optional)
 
-To enable AcoustID audio fingerprinting and automatic metadata lookup, the `fpcalc` utility must be installed:
+To enable AcoustID audio fingerprinting and automatic metadata lookup, you need both the `fpcalc` utility and a valid AcoustID API key:
 
+#### 1. Install `fpcalc`
 *   **Linux (Ubuntu/Debian)**:
     ```bash
     sudo apt install libchromaprint-tools
@@ -174,6 +175,23 @@ To enable AcoustID audio fingerprinting and automatic metadata lookup, the `fpca
     # Windows PowerShell
     $env:FPCALC_PATH="C:\path\to\fpcalc.exe"
     ```
+
+#### 2. Get and Set an AcoustID API Key
+1. Register or log in to the [AcoustID Website](https://acoustid.org/).
+2. Go to the [My Applications](https://acoustid.org/my-applications) page and register Luminous as a new application to generate a free **Client API Key**.
+3. Set the key as the `ACOUSTID_API_KEY` environment variable before starting the application:
+   *   **Linux/macOS**:
+       ```bash
+       export ACOUSTID_API_KEY="your_api_key_here"
+       ```
+   *   **Windows (PowerShell)**:
+       ```powershell
+       $env:ACOUSTID_API_KEY="your_api_key_here"
+       ```
+   *   **Windows (Command Prompt)**:
+       ```cmd
+       set ACOUSTID_API_KEY=your_api_key_here
+       ```
 
 ---
 
