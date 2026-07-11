@@ -48,17 +48,13 @@
         if (data && data.length > 0) {
           // Weight the bins so that higher frequencies (right-side of visualizer)
           // have a much stronger influence on the logo brightness/luminance.
-          let weightedSum = 0;
-          let weightTotal = 0;
-          for (let i = 0; i < data.length; i++) {
-            // Quadratic weight scaling from 0.1 (low bass) to 8.1 (high treble)
-            const weight = 0.1 + Math.pow(i / (data.length - 1), 2) * 8.0;
-            weightedSum += data[i] * weight;
-            weightTotal += weight;
-          }
-          const avg = weightedSum / weightTotal; // True weighted average
-          // Scale so that an average of ~0.034 gives ~75% pulse intensity
-          pulseIntensity = Math.min(1.0, avg * 22);
+          // The visualizer height is scaled by val * 14.0.
+          // Therefore, the maximum height of a bar is reached when val = 1.0 / 14.0 ≈ 0.0714.
+          // We look at the highest bar (the top edge of the active spectrum) to define the pulsing.
+          const maxVal = Math.max(...data);
+          
+          // Map maxVal to pulseIntensity: a top edge at 80% height (val ≈ 0.057) gives ~75% intensity.
+          pulseIntensity = Math.min(1.0, maxVal * 13.0);
         } else {
           pulseIntensity = 0;
         }
