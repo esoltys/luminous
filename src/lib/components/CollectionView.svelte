@@ -144,7 +144,7 @@
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
       <div class="w-full border border-brand-border rounded-lg overflow-x-auto bg-brand-sidebar/40">
-        <table class="w-full text-left text-sm border-collapse">
+        <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10"></th>
@@ -382,7 +382,7 @@
       </div>
     {:else if collectionStore.activeSubTab === "artists"}
       <!-- Artists List Grid View -->
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
         {#each filteredArtists as artist}
           <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
             <div class="w-20 h-20 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
