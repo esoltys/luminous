@@ -1,7 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { ListMusic, Settings, RefreshCw, Plus, Trash2, SlidersHorizontal, FileText } from "lucide-svelte";
+  import { ListMusic, Settings, RefreshCw, Plus, Trash2, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { slide } from "svelte/transition";
 
@@ -35,13 +35,6 @@
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0">
-  <!-- Brand / Title -->
-  <div class="h-16 flex items-center px-6 border-b border-brand-border">
-    <h1 class="text-xl font-bold tracking-wider text-brand-accent flex items-center gap-2">
-      Collections
-    </h1>
-  </div>
-
   <!-- Navigation -->
   <nav class="p-4 space-y-1">
     <button
@@ -86,13 +79,6 @@
       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
     >
       <Settings class="w-4 h-4" /> Settings
-    </button>
-
-    <button
-      onclick={() => { collectionStore.activeTab = "equalizer"; }}
-      class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 {collectionStore.activeTab === 'equalizer' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'}"
-    >
-      <SlidersHorizontal class="w-4 h-4" /> Equalizer
     </button>
 
     <button

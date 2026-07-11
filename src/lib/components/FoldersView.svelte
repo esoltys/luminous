@@ -4,8 +4,36 @@
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
+  import Equalizer from "./Equalizer.svelte";
 
-  let settingsTab = $state<"folders" | "themes" | "formats">("folders");
+  let settingsTab = $state<"folders" | "themes" | "equalizer" | "formats">("folders");
+  let isTabInitialized = $state(false);
+
+  onMount(async () => {
+    try {
+      const settings = await invoke<Record<string, string>>("get_all_app_settings");
+      if (settings && settings.active_settings_tab) {
+        const savedTab = settings.active_settings_tab;
+        if (savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
+          settingsTab = savedTab as any;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to restore active_settings_tab:", e);
+    } finally {
+      isTabInitialized = true;
+    }
+  });
+
+  $effect(() => {
+    if (isTabInitialized) {
+      invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab }).catch((err) => {
+        console.error("Failed to save active_settings_tab:", err);
+      });
+    }
+  });
 
   // Folders operations
   async function handleAddDirectory() {
@@ -146,6 +174,12 @@
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         UI Themes
+      </button>
+      <button
+        onclick={() => { settingsTab = "equalizer"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        Equalizer
       </button>
       <button
         onclick={() => { settingsTab = "formats"; }}
@@ -390,6 +424,11 @@
             <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
           </div>
         </div>
+      </div>
+    {:else if settingsTab === "equalizer"}
+      <!-- Equalizer Section -->
+      <div class="space-y-6">
+        <Equalizer />
       </div>
     {:else if settingsTab === "formats"}
       <!-- File Formats Filter Section -->

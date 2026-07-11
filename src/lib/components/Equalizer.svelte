@@ -120,13 +120,11 @@
   onMount(loadConfig);
 </script>
 
-<div class="flex-1 flex flex-col p-8 overflow-y-auto bg-brand-main text-brand-text-primary">
-  <div class="flex items-center justify-between mb-8 pb-4 border-b border-brand-border">
+<div class="flex flex-col text-brand-text-primary">
+  <div class="flex items-center justify-between mb-6 pb-4 border-b border-brand-border">
     <div>
-      <h2 class="text-2xl font-bold flex items-center gap-2.5 text-brand-accent">
-        <SlidersHorizontal class="w-6 h-6" /> Graphic Equalizer
-      </h2>
-      <p class="text-xs text-brand-text-secondary mt-1">Shape your frequency response with a 10-band cascaded peaking filter</p>
+      <h3 class="text-sm font-bold text-brand-text-primary">Graphic Equalizer</h3>
+      <p class="text-xs text-brand-text-secondary/70 mt-0.5">Shape your frequency response with a 10-band cascaded peaking filter</p>
     </div>
 
     <!-- Toggle & Presets controls -->

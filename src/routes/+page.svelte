@@ -4,7 +4,6 @@
   import CollectionView from "../lib/components/CollectionView.svelte";
   import PlaylistView from "../lib/components/PlaylistView.svelte";
   import FoldersView from "../lib/components/FoldersView.svelte";
-  import Equalizer from "../lib/components/Equalizer.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { collectionStore } from "../lib/stores/collection.svelte";
@@ -68,7 +67,17 @@
         const settings = await invoke<Record<string, string>>("get_all_app_settings");
         if (settings) {
           if (settings.active_tab) {
-            collectionStore.activeTab = settings.active_tab as any;
+            if (settings.active_tab === "equalizer") {
+              collectionStore.activeTab = "settings";
+              invoke("set_app_setting", { key: "active_tab", value: "settings" }).catch((err) => {
+                console.error("Failed to save migrated active_tab:", err);
+              });
+              invoke("set_app_setting", { key: "active_settings_tab", value: "equalizer" }).catch((err) => {
+                console.error("Failed to save migrated active_settings_tab:", err);
+              });
+            } else {
+              collectionStore.activeTab = settings.active_tab as any;
+            }
           }
           if (settings.active_sub_tab) {
             collectionStore.activeSubTab = settings.active_sub_tab as any;
@@ -112,8 +121,6 @@
       <PlaylistView />
     {:else if collectionStore.activeTab === "settings"}
       <FoldersView />
-    {:else if collectionStore.activeTab === "equalizer"}
-      <Equalizer />
     {:else if collectionStore.activeTab === "lyrics"}
       <LyricsView />
     {/if}

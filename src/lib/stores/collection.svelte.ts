@@ -22,7 +22,7 @@ class CollectionStore {
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
-  activeTab = $state<"collection" | "playlists" | "settings" | "equalizer" | "lyrics">("collection");
+  activeTab = $state<"collection" | "playlists" | "settings" | "lyrics">("collection");
   activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 
   // Layout panel states
@@ -138,7 +138,7 @@ class CollectionStore {
     }
   }
 
-  navigateTo(tab: "collection" | "playlists" | "settings" | "equalizer" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
+  navigateTo(tab: "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
     this.activeTab = tab;
     if (subTab) {
       this.activeSubTab = subTab;
