@@ -42,3 +42,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 
 ## Design Principles
 - **State Preservation**: Luminous must always save and restore the state the user left/closed the application in. When reopened, the user should be returned exactly to where they were (e.g., same sidebar view/tab, same song selection, same player track/position/volume, same equalizer presets/enabled state).
+
+## Browser Automation & Verification
+- On Windows development environments, the built-in browser subagent's `open_browser_url` tool is unsupported (as local Chrome mode is only supported on Linux).
+- To perform visual verification, interactive testing, or take screenshots on Windows, use the `chrome-devtools-mcp` server tools directly via `call_mcp_tool`:
+  1. Open a new page/tab using `new_page` with the target URL (e.g., local dev server).
+  2. Wait for page elements to render using `wait_for` (specifying a list of target text strings).
+  3. Inspect page structures and find element unique IDs using `take_snapshot` (which lists page elements and their `uid` from the accessibility tree).
+  4. Perform clicks using `click` with the element's `uid`.
+  5. Capture screenshots using `take_screenshot` (saving to the workspace or artifact directory).
