@@ -111,8 +111,31 @@
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Top bar with Filter Info -->
-  <div class="h-12 px-6 border-b border-brand-border flex items-center justify-end">
-    <div class="text-xs text-brand-text-secondary">
+  <div class="h-12 px-6 border-b border-brand-border flex items-center justify-between">
+    <!-- Filter Pills (Left) -->
+    <div class="flex items-center gap-2">
+      <button
+        onclick={() => { collectionStore.activeSubTab = "songs"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Tracks ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+      </button>
+      <button
+        onclick={() => { collectionStore.activeSubTab = "albums"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
+      </button>
+      <button
+        onclick={() => { collectionStore.activeSubTab = "artists"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
+      </button>
+    </div>
+
+    <!-- Showing Count (Right) -->
+    <div class="text-xs text-brand-text-secondary font-medium">
       {#if collectionStore.activeSubTab === "songs"}
         Showing {filteredSongs.length} tracks
       {:else if collectionStore.activeSubTab === "albums"}

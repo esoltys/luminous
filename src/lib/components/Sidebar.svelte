@@ -3,7 +3,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { ListMusic, Settings, RefreshCw, Plus, Trash2, FileText } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { slide } from "svelte/transition";
+
 
   let { width = 256 }: { width?: number } = $props();
 
@@ -44,28 +44,7 @@
       <ListMusic class="w-4 h-4" /> Collection
     </button>
 
-    {#if collectionStore.activeTab === 'collection'}
-      <div transition:slide={{ duration: 250 }} class="pl-8 pr-2 py-1 space-y-1 text-xs overflow-hidden">
-        <button
-          onclick={() => { collectionStore.activeSubTab = "songs"; }}
-          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'songs' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
-        >
-          Tracks ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
-        </button>
-        <button
-          onclick={() => { collectionStore.activeSubTab = "albums"; }}
-          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'albums' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
-        >
-          Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
-        </button>
-        <button
-          onclick={() => { collectionStore.activeSubTab = "artists"; }}
-          class="w-full text-left py-1.5 px-2 rounded {collectionStore.activeSubTab === 'artists' ? 'text-brand-accent font-semibold' : 'text-brand-text-secondary/60 hover:text-brand-text-primary'}"
-        >
-          Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
-        </button>
-      </div>
-    {/if}
+
 
     <button
       onclick={() => { collectionStore.activeTab = "playlists"; }}
