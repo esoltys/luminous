@@ -189,9 +189,9 @@
     </div>
 
     <!-- Tracks List Scrollable Container -->
-    <div class="flex-1 overflow-y-auto p-6 relative z-10">
-      <div class="w-full border border-brand-border rounded-lg overflow-hidden bg-brand-sidebar/30 backdrop-blur-md">
-        <table class="w-full text-left text-sm border-collapse">
+    <div class="flex-1 overflow-hidden p-6 relative z-10 flex flex-col">
+      <div class="flex-1 overflow-auto border border-brand-border rounded-lg bg-brand-sidebar/30 backdrop-blur-md">
+        <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">#</th>
