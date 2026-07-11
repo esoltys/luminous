@@ -170,7 +170,7 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
           const saturation = max === 0 ? 0 : chroma / max;
           const brightness = max / 255;
 
-          if (saturation > maxSaturation && brightness > 0.3 && brightness < 0.85) {
+          if (saturation > maxSaturation && brightness > 0.3 && brightness < 0.99) {
             maxSaturation = saturation;
             accent = color;
           }
@@ -273,6 +273,7 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
 class ThemeStore {
   activeThemeId = $state<string>("luminous-violet");
   customThemes = $state<Theme[]>([]);
+  artworkColors = $state<ExtractedColors | null>(null);
 
   constructor() {}
 
@@ -355,9 +356,15 @@ class ThemeStore {
 
     let url: string | null = null;
     if (song.art_manual) {
-      url = getCoverArtUrl(`luminous-art://${song.art_manual}`);
+      if (song.art_manual.startsWith("http://") || song.art_manual.startsWith("https://") || song.art_manual.startsWith("/")) {
+        url = song.art_manual;
+      } else {
+        url = getCoverArtUrl(`luminous-art://${song.art_manual}`);
+      }
     } else if (song.art_automatic) {
-      if (song.art_automatic.startsWith("album-")) {
+      if (song.art_automatic.startsWith("http://") || song.art_automatic.startsWith("https://") || song.art_automatic.startsWith("/")) {
+        url = song.art_automatic;
+      } else if (song.art_automatic.startsWith("album-")) {
         url = getCoverArtUrl(`luminous-art://${song.art_automatic}`);
       } else {
         url = getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
@@ -388,6 +395,7 @@ class ThemeStore {
   }
 
   applyArtworkColors(colors: ExtractedColors) {
+    this.artworkColors = colors;
     if (typeof document === "undefined") return;
     const root = document.documentElement;
     root.style.setProperty("--color-artwork-primary", colors.primary);
@@ -406,6 +414,7 @@ class ThemeStore {
   }
 
   resetArtworkColors() {
+    this.artworkColors = null;
     if (typeof document === "undefined") return;
     const root = document.documentElement;
     root.style.setProperty("--color-artwork-primary", "#0d0b18");
@@ -446,10 +455,17 @@ class ThemeStore {
       }
     `;
 
-    // Only apply static theme logo stops if we are NOT on dynamic-artwork theme
-    if (theme.id !== "dynamic-artwork") {
+    // Apply logo stops based on active theme or dynamic colors
+    const root = document.documentElement;
+    if (theme.id === "dynamic-artwork") {
+      const colors = this.artworkColors || getFallbackColors();
+      const stops = calculateLogoStops(colors.accent, colors.accentHover);
+      root.style.setProperty("--logo-stop-1", stops.stop1);
+      root.style.setProperty("--logo-stop-2", stops.stop2);
+      root.style.setProperty("--logo-stop-3", stops.stop3);
+      root.style.setProperty("--logo-stop-4", stops.stop4);
+    } else {
       const stops = calculateLogoStops(theme.colors["color-accent"], theme.colors["color-accent-hover"]);
-      const root = document.documentElement;
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);
