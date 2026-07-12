@@ -1,6 +1,6 @@
 [package]
 name = "luminous"
-version = "0.31.0"
+version = "0.43.0"
 description = "Luminous Music Player — A modern, elegant music player"
 authors = ["Eric James Soltys <ericjamessoltys@outlook.com>"]
 edition = "2021"
