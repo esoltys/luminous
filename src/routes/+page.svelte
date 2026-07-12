@@ -114,7 +114,7 @@
 
 <div class="flex flex-col h-full overflow-hidden bg-brand-main font-sans">
   <!-- Main View Content Area -->
-  <div class="flex-1 min-w-0 overflow-y-auto">
+  <div class="flex-1 min-w-0 overflow-hidden flex flex-col">
     {#if collectionStore.activeTab === "collection"}
       <CollectionView />
     {:else if collectionStore.activeTab === "playlists"}

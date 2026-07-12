@@ -86,7 +86,7 @@
     <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
       
       <!-- FRONT FACE: Normal App Layout -->
-      <div class="flip-face flex flex-col">
+      <div class="flip-face flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
         <!-- Top Navigation Ribbon -->
         <div class="flex-shrink-0 z-40 overflow-hidden">
           <TopNavigation />
@@ -120,7 +120,7 @@
           {/if}
 
           <!-- Central Content Area -->
-          <main class="flex-1 bg-brand-main overflow-y-auto">
+          <main class="flex-1 bg-brand-main overflow-hidden flex flex-col">
             {@render children()}
           </main>
 
@@ -152,7 +152,7 @@
       </div>
 
       <!-- BACK FACE: Immersive Dedicated Album Artwork Screen -->
-      <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center p-8 select-none">
+      <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center p-8 select-none {!collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
         <!-- Immersive Ambient Blurred Background -->
         {#if playerStore.currentSong}
           <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">

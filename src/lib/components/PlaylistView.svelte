@@ -61,11 +61,16 @@
   }
 
   // Drag and drop state and handlers
-  let draggedIndex = $state<number | null>(null);
+  let draggedIndex: number | null = null; // synchronous logical drag state
+  let visualDraggedIndex = $state<number | null>(null); // deferred reactive visual drag state
   let dragOverIndex = $state<number | null>(null);
 
   function handleDragStart(event: DragEvent, index: number) {
     draggedIndex = index;
+    // Defer reactive UI style change to prevent Chrome from immediately canceling the drag
+    setTimeout(() => {
+      visualDraggedIndex = index;
+    }, 0);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", index.toString());
@@ -94,6 +99,7 @@
 
   function handleDragEnd() {
     draggedIndex = null;
+    visualDraggedIndex = null;
     dragOverIndex = null;
   }
 
@@ -105,6 +111,7 @@
       }
     }
     draggedIndex = null;
+    visualDraggedIndex = null;
     dragOverIndex = null;
   }
 
@@ -219,9 +226,9 @@
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-brand-sidebar/40 cursor-grab active:cursor-grabbing'}
                   {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}
-                  {draggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
-                  {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index
-                    ? (index < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
+                  {visualDraggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
+                  {dragOverIndex === index && visualDraggedIndex !== null && visualDraggedIndex !== index
+                    ? (index < visualDraggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
                     : ''
                   }"
               >
