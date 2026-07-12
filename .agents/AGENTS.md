@@ -22,6 +22,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - When working on a bug or feature, always work in a dedicated git worktree. Do not merge the temporary branch or delete the worktree until the user has approved the changes.
 - Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before merging.
 - Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
+- **Creating Issues**: When asked to create a bug/issue on GitHub:
+  1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`).
+  2. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
+  3. Write the issue body to a temporary scratch file in the workspace or the artifacts scratch directory.
+  4. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
+  5. Verify the created issue by running `gh issue view <id>`.
 
 ## Package Manager
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).
