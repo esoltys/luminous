@@ -259,10 +259,25 @@
 [00:54.00] We're up all night to get lucky
 [00:57.00] We're up all night to get lucky`;
 
+  const callbacks = {};
+  let nextCallbackId = 1;
   const eventListeners = {};
 
   // Define window.__TAURI_INTERNALS__ and implement invoke & ipc
   window.__TAURI_INTERNALS__ = {
+    transformCallback: function (callback, once = false) {
+      const id = nextCallbackId++;
+      callbacks[id] = (data) => {
+        if (once) {
+          delete callbacks[id];
+        }
+        callback(data);
+      };
+      return id;
+    },
+    unregisterCallback: function (id) {
+      delete callbacks[id];
+    },
     invoke: async function (cmd, args = {}) {
       console.log(`[Tauri Mock Invoke] cmd: ${cmd}`, args);
 
@@ -400,6 +415,23 @@
         case "set_repeat_mode":
           return null;
 
+        case "plugin:event|listen": {
+          const { event, handler } = args;
+          if (!eventListeners[event]) {
+            eventListeners[event] = [];
+          }
+          eventListeners[event].push(handler);
+          return handler;
+        }
+
+        case "plugin:event|unlisten": {
+          const { event, eventId } = args;
+          if (eventListeners[event]) {
+            eventListeners[event] = eventListeners[event].filter(h => h !== eventId);
+          }
+          return null;
+        }
+
         default:
           console.warn(`[Tauri Mock] Unhandled command: ${cmd}`, args);
           return null;
@@ -452,7 +484,7 @@
       });
 
       for (const handlerId of eventListeners["spectrum-data"]) {
-        const cb = window[`_${handlerId}`];
+        const cb = callbacks[handlerId];
         if (typeof cb === "function") {
           cb({ event: "spectrum-data", payload: mockFFT });
         }
