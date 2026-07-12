@@ -9,15 +9,12 @@
 
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface.
 
-<p align="center">
-  <a href="https://github.com/esoltys/luminous/releases/latest">
-    <img src="docs/download-linux.svg" width="380" alt="Download for Linux" />
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/esoltys/luminous/releases/latest">
-    <img src="docs/download-windows.svg" width="380" alt="Download for Windows" />
-  </a>
-</p>
+### Downloads
+
+Luminous is currently in pre-release. You can download the latest installers and portable binaries directly from the [GitHub Releases](https://github.com/esoltys/luminous/releases/latest) page:
+
+* **🐧 Linux** `Pre-Release` — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
+* **🪟 Windows** `Pre-Release` — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
