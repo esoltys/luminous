@@ -112,7 +112,7 @@
 >
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 512 512"
+    viewBox="100 96 320 320"
     class="{sizeMap[size]} {className} select-none"
     aria-hidden="true"
   >
@@ -131,8 +131,8 @@
 
       <!-- Adaptive glow filter -->
       <filter id="adaptiveGlow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="28" result="blur1" />
-        <feGaussianBlur stdDeviation="10" result="blur2" />
+        <feGaussianBlur stdDeviation="12" result="blur1" />
+        <feGaussianBlur stdDeviation="4" result="blur2" />
         <feMerge>
           <feMergeNode in="blur1" />
           <feMergeNode in="blur2" />
