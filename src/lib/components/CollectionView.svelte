@@ -38,8 +38,12 @@
     return gradients[index];
   }
 
-  let sortField = $state<keyof Song>("title");
-  let sortAsc = $state(true);
+  let sortField = $state<keyof Song>(
+    (typeof window !== "undefined" && localStorage.getItem("sort_song_field") as keyof Song) || "title"
+  );
+  let sortAsc = $state(
+    typeof window !== "undefined" ? localStorage.getItem("sort_song_asc") !== "false" : true
+  );
 
   // Trigger search on collectionStore when query changes
   $effect(() => {
@@ -72,11 +76,31 @@
     });
   });
 
-  let albumSortField = $state<"album" | "artist" | "year" | "track_count">("album");
-  let albumSortAsc = $state(true);
+  let albumSortField = $state<"album" | "artist" | "year" | "track_count">(
+    (typeof window !== "undefined" && localStorage.getItem("sort_album_field") as any) || "album"
+  );
+  let albumSortAsc = $state(
+    typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
+  );
 
-  let artistSortField = $state<"name" | "album_count" | "song_count">("name");
-  let artistSortAsc = $state(true);
+  let artistSortField = $state<"name" | "album_count" | "song_count">(
+    (typeof window !== "undefined" && localStorage.getItem("sort_artist_field") as any) || "name"
+  );
+  let artistSortAsc = $state(
+    typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true
+  );
+
+  // Save sorting states to localStorage when they change
+  $effect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sort_song_field", sortField);
+      localStorage.setItem("sort_song_asc", sortAsc.toString());
+      localStorage.setItem("sort_album_field", albumSortField);
+      localStorage.setItem("sort_album_asc", albumSortAsc.toString());
+      localStorage.setItem("sort_artist_field", artistSortField);
+      localStorage.setItem("sort_artist_asc", artistSortAsc.toString());
+    }
+  });
 
   // Computed sorted albums list
   let sortedAlbums = $derived.by(() => {
@@ -160,32 +184,26 @@
   <!-- Top bar with Filter Info -->
   <div class="h-12 px-6 border-b border-brand-border flex items-center justify-between">
     <!-- Filter Pills (Left) -->
-    {#if collectionStore.activeSubTab === "songs"}
-      <div class="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-xl py-1 select-none flex-nowrap flex-shrink-0">
-        <button
-          onclick={() => { collectionStore.activeSubTab = "artists"; }}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar"
-        >
-          Artists ({collectionStore.stats.total_artists})
-        </button>
-        <button
-          onclick={() => { collectionStore.activeSubTab = "albums"; }}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar"
-        >
-          Albums ({collectionStore.stats.total_albums})
-        </button>
-        <button
-          onclick={() => { collectionStore.activeSubTab = "songs"; }}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm"
-        >
-          Songs ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
-        </button>
-      </div>
-    {:else}
-      <div class="text-sm font-semibold text-brand-text-primary capitalize select-none">
-        {collectionStore.activeSubTab}
-      </div>
-    {/if}
+    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-xl py-1 select-none flex-nowrap flex-shrink-0">
+      <button
+        onclick={() => { collectionStore.activeSubTab = "artists"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Artists ({collectionStore.stats.total_artists})
+      </button>
+      <button
+        onclick={() => { collectionStore.activeSubTab = "albums"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Albums ({collectionStore.stats.total_albums})
+      </button>
+      <button
+        onclick={() => { collectionStore.activeSubTab = "songs"; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+      >
+        Songs ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+      </button>
+    </div>
 
     <!-- Showing Count & Sort Dropdown (Right) -->
     <div class="flex items-center gap-4">
@@ -206,6 +224,8 @@
             <option value="artist-false">Sort: Artist (Z-A)</option>
             <option value="album-true">Sort: Album (A-Z)</option>
             <option value="album-false">Sort: Album (Z-A)</option>
+            <option value="track-true">Sort: Track # (1-9)</option>
+            <option value="track-false">Sort: Track # (9-1)</option>
             <option value="length_nanosec-true">Sort: Duration (Shortest)</option>
             <option value="length_nanosec-false">Sort: Duration (Longest)</option>
           </select>
@@ -270,8 +290,11 @@
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-          <div class="grid grid-cols-[48px_2fr_1.5fr_1.5fr_96px_80px] items-center py-3 px-4">
-            <div class="text-center w-12"></div>
+          <div class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center py-3 px-4">
+            <div class="text-center w-9"></div>
+            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+              # {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
+            </button>
             <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
               Title {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
@@ -317,20 +340,32 @@
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 ondblclick={() => handlePlaySong(song)}
-                class="grid grid-cols-[48px_2fr_1.5fr_1.5fr_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm"
+                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
+                  {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}"
               >
-                <div class="text-center flex justify-center">
+                <div class="text-center flex justify-center relative w-9 h-6 items-center">
+                  {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
+                    <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute group-hover:opacity-0 transition-opacity">
+                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
+                      <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
+                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                    </div>
+                  {/if}
                   <button
                     onclick={() => handlePlaySong(song)}
-                    class="opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-opacity cursor-pointer"
+                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-all duration-150 cursor-pointer"
+                    title="Play track"
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>
                 </div>
-                <div class="font-medium text-brand-text-primary truncate pr-4 flex items-center gap-2 min-w-0">
+                <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0 font-medium">
+                  {song.track !== undefined && song.track !== null ? song.track : "—"}
+                </div>
+                <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
                   <button
                     onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
-                    class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium text-brand-text-primary"
+                    class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-hover' : 'text-brand-text-primary'}"
                     title="Filter by title: {song.title || 'Unknown Title'}"
                   >
                     {song.title || "Unknown Title"}

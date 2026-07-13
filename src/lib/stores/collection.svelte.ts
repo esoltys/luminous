@@ -22,8 +22,24 @@ class CollectionStore {
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
-  activeTab = $state<"collection" | "playlists" | "settings" | "lyrics">("collection");
-  activeSubTab = $state<"songs" | "albums" | "artists">("songs");
+  private _activeTab = $state<"collection" | "playlists" | "settings" | "lyrics">("collection");
+  private _activeSubTab = $state<"songs" | "albums" | "artists">("songs");
+
+  get activeTab() { return this._activeTab; }
+  set activeTab(val) {
+    this._activeTab = val;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("navigation_activeTab", val);
+    }
+  }
+
+  get activeSubTab() { return this._activeSubTab; }
+  set activeSubTab(val) {
+    this._activeSubTab = val;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("navigation_activeSubTab", val);
+    }
+  }
 
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
@@ -54,6 +70,12 @@ class CollectionStore {
 
         const savedImmersive = localStorage.getItem("layout_immersiveMode");
         if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
+
+        const savedTab = localStorage.getItem("navigation_activeTab");
+        if (savedTab) this._activeTab = savedTab as any;
+
+        const savedSubTab = localStorage.getItem("navigation_activeSubTab");
+        if (savedSubTab) this._activeSubTab = savedSubTab as any;
       }
 
       await this.refreshDirectories();

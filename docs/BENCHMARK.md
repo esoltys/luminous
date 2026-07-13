@@ -11,16 +11,16 @@ This file contains automated performance results measuring the rendering and sor
 
 | Operation | Target / Field | Avg Execution Time | Matching Count | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Search/Filter** | Query: `"Special"` | 0.773 ms | 100 | Passed |
-| **Sort** | Title (Ascending) | 31.793 ms | 10,000 | Passed |
-| **Sort** | Artist (Descending) | 54.442 ms | 10,000 | Passed |
-| **Sort** | Duration (Ascending) | 46.261 ms | 10,000 | Passed |
+| **Search/Filter** | Query: `"Special"` | 0.771 ms | 100 | Passed |
+| **Sort** | Title (Ascending) | 28.038 ms | 10,000 | Passed |
+| **Sort** | Artist (Descending) | 48.335 ms | 10,000 | Passed |
+| **Sort** | Duration (Ascending) | 41.988 ms | 10,000 | Passed |
 
 ## Rendering Performance (DOM Mounting)
 
 | Component | Target / List Type | Avg Mount Time (JSDOM) | Virtualization Status | FPS |
 | :--- | :--- | :--- | :--- | :--- |
-| **CollectionView** | Tracks (`VirtualList`) | 56.06 ms | Active (`svelte-virtual-list-ts`) | ~60 FPS |
+| **CollectionView** | Tracks (`VirtualList`) | 51.90 ms | Active (`svelte-virtual-list-ts`) | ~60 FPS |
 
 > [!NOTE]
 > The JSDOM rendering time measures initial mounting, layout scaffolding, and initial virtual chunk rendering. Actual browser paint performance under virtualized viewport updates runs consistently at 60 FPS because only visible rows (`20` items) are rendered in the DOM.
