@@ -104,7 +104,7 @@
 
   // Computed sorted albums list
   let sortedAlbums = $derived.by(() => {
-    const list = [...collectionStore.albums];
+    const list = [...collectionStore.filteredAlbums];
     const field = albumSortField;
     const asc = albumSortAsc;
 
@@ -127,7 +127,7 @@
 
   // Computed sorted artists list
   let sortedArtists = $derived.by(() => {
-    const list = [...collectionStore.artists];
+    const list = [...collectionStore.filteredArtists];
     const field = artistSortField;
     const asc = artistSortAsc;
 
@@ -189,13 +189,13 @@
         onclick={() => { collectionStore.activeSubTab = "artists"; }}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Artists ({collectionStore.stats.total_artists})
+        Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
       </button>
       <button
         onclick={() => { collectionStore.activeSubTab = "albums"; }}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Albums ({collectionStore.stats.total_albums})
+        Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
       </button>
       <button
         onclick={() => { collectionStore.activeSubTab = "songs"; }}
