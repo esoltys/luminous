@@ -20,7 +20,13 @@
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      collectionStore.setSidebarWidth(Math.max(180, Math.min(400, startWidth + deltaX)));
+      let newWidth = startWidth + deltaX;
+      if (newWidth < 120) {
+        newWidth = 64;
+      } else {
+        newWidth = Math.max(180, Math.min(400, newWidth));
+      }
+      collectionStore.setSidebarWidth(newWidth);
     }
 
     function onPointerUp() {
@@ -57,11 +63,21 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setSidebarWidth(Math.max(180, collectionStore.sidebarWidth - 10));
+      const currentWidth = collectionStore.sidebarWidth;
+      if (currentWidth === 180) {
+        collectionStore.setSidebarWidth(64);
+      } else if (currentWidth > 180) {
+        collectionStore.setSidebarWidth(Math.max(180, currentWidth - 10));
+      }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setSidebarWidth(Math.min(400, collectionStore.sidebarWidth + 10));
+      const currentWidth = collectionStore.sidebarWidth;
+      if (currentWidth === 64) {
+        collectionStore.setSidebarWidth(180);
+      } else {
+        collectionStore.setSidebarWidth(Math.min(400, currentWidth + 10));
+      }
     }
   }
 
@@ -105,7 +121,7 @@
               <div 
                 role="separator"
                 aria-valuenow={collectionStore.sidebarWidth}
-                aria-valuemin={180}
+                aria-valuemin={64}
                 aria-valuemax={400}
                 aria-label="Resize Left Sidebar"
                 tabindex="0"
