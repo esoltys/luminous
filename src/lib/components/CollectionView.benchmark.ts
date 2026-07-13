@@ -10,19 +10,19 @@ import { fileURLToPath } from "url";
 // Mock Tauri invoke
 vi.mock("@tauri-apps/api/core", () => {
   // Define mock data inside the hoisted mock block to avoid TDZ (temporal dead zone) errors
-  const mockSongs = Array.from({ length: 10000 }, (_, i) => ({
+  const mockSongs = Array.from({ length: 100000 }, (_, i) => ({
     id: i,
     source: "collection" as const,
     filetype: "MP3" as const,
     path: `/music/track_${i}.mp3`,
     title: `Track ${i % 100 === 0 ? "Special" : ""} ${i}`,
-    artist: `Artist ${i % 100}`,
-    album: `Album ${i % 50}`,
+    artist: `Artist ${i % 1000}`,
+    album: `Album ${i % 500}`,
     length_nanosec: (180 + (i % 120)) * 1_000_000_000,
     lyrics: i % 10 === 0 ? "[00:00.00] Lyrics line" : undefined,
   }));
 
-  const mockAlbums = Array.from({ length: 50 }, (_, i) => ({
+  const mockAlbums = Array.from({ length: 500 }, (_, i) => ({
     album: `Album ${i}`,
     artist: `Artist ${i * 2}`,
     year: 2020 + (i % 5),
@@ -32,7 +32,7 @@ vi.mock("@tauri-apps/api/core", () => {
     art_manual: null,
   }));
 
-  const mockArtists = Array.from({ length: 100 }, (_, i) => ({
+  const mockArtists = Array.from({ length: 1000 }, (_, i) => ({
     name: `Artist ${i}`,
     album_count: 5,
     song_count: 100,
@@ -67,11 +67,11 @@ vi.mock("@tauri-apps/api/core", () => {
       }
       if (cmd === "get_library_stats") {
         return {
-          total_songs: 10000,
-          total_artists: 100,
-          total_albums: 50,
-          total_duration_nanosec: 3000 * 1_000_000_000,
-          total_filesize_bytes: 50 * 1024 * 1024 * 1024,
+          total_songs: 100000,
+          total_artists: 1000,
+          total_albums: 500,
+          total_duration_nanosec: 30000 * 1_000_000_000,
+          total_filesize_bytes: 500 * 1024 * 1024 * 1024,
         };
       }
       if (cmd === "get_directories") return [];
@@ -96,8 +96,8 @@ describe("CollectionView Virtualization Benchmark", () => {
     await collectionStore.refreshStats();
   });
 
-  test("Run 10k Tracks Benchmark and Output Results", async () => {
-    console.log("Starting Benchmark with 10k tracks...");
+  test("Run 100k Tracks Benchmark and Output Results", async () => {
+    console.log("Starting Benchmark with 100k tracks...");
 
     // 1. Benchmark Filtering Performance (asynchronous search + store filter)
     const filterTimes: number[] = [];
@@ -168,21 +168,21 @@ describe("CollectionView Virtualization Benchmark", () => {
     // Output results to BENCHMARK.md
     const benchmarkResults = `# Luminous Virtualization & Operations Benchmark Results
 
-This file contains automated performance results measuring the rendering and sorting/filtering operations on a mock dataset of **10,000 tracks**.
+This file contains automated performance results measuring the rendering and sorting/filtering operations on a mock dataset of **100,000 tracks**.
 
 ## Test Environment Specs (Simulated/JSDOM)
 - **Host OS**: Windows
 - **Vite/Vitest Environment**: jsdom
-- **Dataset Size**: 10,000 songs, 50 albums, 100 artists
+- **Dataset Size**: 100,000 songs, 500 albums, 1,000 artists
 
-## Operations Performance Metrics (10k Tracks)
+## Operations Performance Metrics (100k Tracks)
 
 | Operation | Target / Field | Avg Execution Time | Matching Count | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **Search/Filter** | Query: \`"Special"\` | ${avgFilterTime.toFixed(3)} ms | ${searchResultCount} | Passed |
-| **Sort** | Title (Ascending) | ${avgSortTimeTitle.toFixed(3)} ms | 10,000 | Passed |
-| **Sort** | Artist (Descending) | ${avgSortTimeArtist.toFixed(3)} ms | 10,000 | Passed |
-| **Sort** | Duration (Ascending) | ${avgSortTimeDuration.toFixed(3)} ms | 10,000 | Passed |
+| **Sort** | Title (Ascending) | ${avgSortTimeTitle.toFixed(3)} ms | 100,000 | Passed |
+| **Sort** | Artist (Descending) | ${avgSortTimeArtist.toFixed(3)} ms | 100,000 | Passed |
+| **Sort** | Duration (Ascending) | ${avgSortTimeDuration.toFixed(3)} ms | 100,000 | Passed |
 
 ## Rendering Performance (DOM Mounting)
 
@@ -206,8 +206,8 @@ This file contains automated performance results measuring the rendering and sor
     console.log(`Benchmark completed. Results written to: ${benchmarkFile}`);
 
     // Standard expectations to ensure tests compile/run fine
-    expect(collectionStore.songs.length).toBe(10000);
-    expect(avgFilterTime).toBeLessThan(100); // Filtering 10k tracks should be < 100ms
-    expect(avgSortTimeTitle).toBeLessThan(100); // Sorting 10k tracks should be < 100ms
-  });
+    expect(collectionStore.songs.length).toBe(100000);
+    expect(avgFilterTime).toBeLessThan(500); // Filtering 100k tracks should be < 500ms
+    expect(avgSortTimeTitle).toBeLessThan(500); // Sorting 100k tracks should be < 500ms
+  }, 60000);
 });
