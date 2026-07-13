@@ -9,8 +9,14 @@
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import { Music } from 'lucide-svelte';
+  import { onMount } from 'svelte';
   
   let { children } = $props();
+  let isLinux = $state(false);
+
+  onMount(() => {
+    isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+  });
 
   // Pointer drag resizing for Sidebar (left-to-right increase)
   function startResizeSidebar(e: PointerEvent) {
@@ -97,12 +103,12 @@
 
 <div class="flex flex-col h-screen overflow-hidden bg-brand-main">
   <!-- 3D Flip Container for everything above the PlayerBar -->
-  <div class="flex-1 relative overflow-hidden flip-perspective">
+  <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
     <!-- Inner Card Wrapper -->
     <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
       
       <!-- FRONT FACE: Normal App Layout -->
-      <div class="flip-face flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+      <div class="flip-face flip-front flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
         <!-- Top Navigation Ribbon -->
         <div class="flex-shrink-0 z-40 overflow-hidden">
           <TopNavigation />
@@ -248,15 +254,48 @@
 
   .flip-face {
     backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    transform: rotateY(0deg);
+    transform-style: preserve-3d;
   }
 
   .flip-back {
     transform: rotateY(180deg);
+  }
+
+  /* Disable 3D flip on Linux/WebKit and use simple, clean opacity cross-fade */
+  .no-3d .flip-card {
+    transform-style: flat;
+    transform: none !important;
+    transition: none;
+  }
+
+  .no-3d .flip-face {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    transform: none !important;
+    transition: opacity 0.4s ease-in-out;
+  }
+
+  .no-3d .flip-front {
+    opacity: 1;
+  }
+
+  .no-3d .flip-card.flipped .flip-front {
+    opacity: 0;
+  }
+
+  .no-3d .flip-back {
+    opacity: 0;
+  }
+
+  .no-3d .flip-card.flipped .flip-back {
+    opacity: 1;
   }
 
   :global(body) {
