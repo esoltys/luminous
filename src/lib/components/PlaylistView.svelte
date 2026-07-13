@@ -293,7 +293,7 @@
                     <span class="text-brand-text-secondary/40 italic text-xs">File not found</span>
                   {:else if item.song?.artist}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", item.song?.artist || ""); }}
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.artist || ""); }}
                       class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
                       title="Filter by artist: {item.song.artist}"
                     >
@@ -308,7 +308,7 @@
                     <span class="text-brand-text-secondary/40 italic text-xs">{item.song?.album ?? ""}</span>
                   {:else if item.song?.album}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "albums", item.song?.album || ""); }}
+                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.album || ""); }}
                       class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
                       title="Filter by album: {item.song.album}"
                     >

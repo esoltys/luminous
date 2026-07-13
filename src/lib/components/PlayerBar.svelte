@@ -112,7 +112,7 @@
       </div>
       {#if playerStore.currentSong?.artist}
         <button
-          onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "artists", playerStore.currentSong?.artist || ""); }}
+          onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.artist || ""); }}
           class="text-xs text-brand-text-secondary/70 hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate cursor-pointer"
           title="Filter by artist: {playerStore.currentSong.artist}"
         >
