@@ -430,7 +430,11 @@ impl CollectionScanner {
         // if they differ (true various-artist albums), it comes back as NULL.
         let mut stmt = conn.prepare(
             "SELECT
-                NULLIF(MAX(NULLIF(album_artist, '')), '') AS album_artist,
+                CASE
+                    WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 1 THEN MAX(NULLIF(album_artist, ''))
+                    WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 0 AND COUNT(DISTINCT NULLIF(artist, '')) = 1 THEN MAX(NULLIF(artist, ''))
+                    ELSE NULL
+                END AS album_artist,
                 album,
                 MIN(year) AS year,
                 COUNT(*) AS track_count,
@@ -856,4 +860,142 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
             }
         })
         .expect("failed to spawn watcher thread");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{FileType, Song, SongSource};
+    use std::sync::Arc;
+
+    #[test]
+    fn test_get_albums_artist_resolution() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_coll_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        // Helper to insert a song
+        let insert_song = |path: &str,
+                           title: &str,
+                           artist: Option<&str>,
+                           album: Option<&str>,
+                           album_artist: Option<&str>| {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: artist.map(|s| s.to_string()),
+                album: album.map(|s| s.to_string()),
+                album_artist: album_artist.map(|s| s.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // Scenario 1: Album where all tracks have the same artist, and album_artist is None
+        insert_song(
+            "path/1.mp3",
+            "Track 1",
+            Some("Artist A"),
+            Some("Album One"),
+            None,
+        );
+        insert_song(
+            "path/2.mp3",
+            "Track 2",
+            Some("Artist A"),
+            Some("Album One"),
+            None,
+        );
+
+        // Scenario 2: Album with different artists, and album_artist is None (Various Artists fallback)
+        insert_song(
+            "path/3.mp3",
+            "Track 3",
+            Some("Artist B"),
+            Some("Album Two"),
+            None,
+        );
+        insert_song(
+            "path/4.mp3",
+            "Track 4",
+            Some("Artist C"),
+            Some("Album Two"),
+            None,
+        );
+
+        // Scenario 3: Album where all tracks have same album_artist but different track artists
+        insert_song(
+            "path/5.mp3",
+            "Track 5",
+            Some("Artist B"),
+            Some("Album Three"),
+            Some("Artist A"),
+        );
+        insert_song(
+            "path/6.mp3",
+            "Track 6",
+            Some("Artist C"),
+            Some("Album Three"),
+            Some("Artist A"),
+        );
+
+        // Scenario 4: Album where tracks have different album_artists
+        insert_song(
+            "path/7.mp3",
+            "Track 7",
+            Some("Artist X"),
+            Some("Album Four"),
+            Some("Artist Y"),
+        );
+        insert_song(
+            "path/8.mp3",
+            "Track 8",
+            Some("Artist Z"),
+            Some("Album Four"),
+            Some("Artist W"),
+        );
+
+        let albums = scanner.get_albums().unwrap();
+
+        // Helper to find album by name
+        let find_album = |name: &str| -> &serde_json::Value {
+            albums
+                .iter()
+                .find(|a| a["album"].as_str() == Some(name))
+                .unwrap()
+        };
+
+        // Assert Album One -> album_artist is "Artist A"
+        let album_one = find_album("Album One");
+        assert_eq!(album_one["artist"].as_str(), Some("Artist A"));
+        assert_eq!(album_one["track_count"].as_i64(), Some(2));
+
+        // Assert Album Two -> album_artist is None (will fall back to Various Artists in UI)
+        let album_two = find_album("Album Two");
+        assert_eq!(album_two["artist"].as_str(), None);
+        assert_eq!(album_two["track_count"].as_i64(), Some(2));
+
+        // Assert Album Three -> album_artist is "Artist A"
+        let album_three = find_album("Album Three");
+        assert_eq!(album_three["artist"].as_str(), Some("Artist A"));
+        assert_eq!(album_three["track_count"].as_i64(), Some(2));
+
+        // Assert Album Four -> album_artist is None (Various Artists fallback)
+        let album_four = find_album("Album Four");
+        assert_eq!(album_four["artist"].as_str(), None);
+        assert_eq!(album_four["track_count"].as_i64(), Some(2));
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
