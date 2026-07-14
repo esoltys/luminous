@@ -45,6 +45,12 @@ export class PlayerStore {
         this.currentSong = event.payload.song || undefined;
         themeStore.updateArtworkColors(this.currentSong);
       });
+
+      // Check for startup file argument
+      const startupFile = await invoke<string | null>("get_startup_file");
+      if (startupFile) {
+        await this.openAndPlay([startupFile]);
+      }
     } catch (err) {
       console.error("Failed to initialize PlayerStore:", err);
     }
@@ -65,6 +71,10 @@ export class PlayerStore {
   // Playback Control Actions
   async playSong(songId: number) {
     await invoke("play_song", { songId });
+  }
+
+  async openAndPlay(paths: string[]) {
+    await invoke("open_and_play", { paths });
   }
 
   async playSongs(songIds: number[], startIndex: number) {

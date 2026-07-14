@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { playerStore } from "../stores/player.svelte";
+  import { open } from "@tauri-apps/plugin-dialog";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
 
@@ -27,6 +29,39 @@
   function clearSearch() {
     collectionStore.searchQuery = "";
     collectionStore.search("");
+  }
+
+  async function handleOpenFiles() {
+    try {
+      const selected = await open({
+        multiple: true,
+        directory: false,
+        title: "Open Audio Files or Playlists",
+        filters: [
+          {
+            name: "Supported Files",
+            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u"]
+          },
+          {
+            name: "Audio Files",
+            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"]
+          },
+          {
+            name: "Playlists",
+            extensions: ["m3u"]
+          }
+        ]
+      });
+
+      if (selected) {
+        const paths = Array.isArray(selected) ? selected : [selected];
+        if (paths.length > 0) {
+          await playerStore.openAndPlay(paths);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to open files/playlists:", err);
+    }
   }
 
 
@@ -83,6 +118,16 @@
       placeholder="Search tracks, albums, artists... (Ctrl+L)"
       class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
     />
+
+    <!-- Open Files/Playlists button -->
+    <button
+      type="button"
+      onclick={handleOpenFiles}
+      class="p-1 text-brand-text-secondary hover:text-brand-accent transition-colors flex-shrink-0 cursor-pointer"
+      title="Open Audio Files or Playlists (*.m3u)"
+    >
+      <FolderOpen class="w-4 h-4" />
+    </button>
 
     <!-- Search feedback / progress -->
     {#if collectionStore.searchLoading}

@@ -305,3 +305,181 @@ pub async fn set_repeat_mode(mode: RepeatMode, state: State<'_, AppState>) -> Re
     state.player.lock().await.set_repeat_mode(mode);
     Ok(())
 }
+
+#[tauri::command]
+pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+    use rusqlite::params;
+    use rusqlite::OptionalExtension;
+    use std::path::Path;
+
+    let mut resolved_paths = Vec::new();
+
+    for path_str in paths {
+        let path = Path::new(&path_str);
+        if !path.exists() {
+            continue;
+        }
+
+        if path.is_file() {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+
+            if ext == "m3u" {
+                // Parse M3U playlist file
+                let content = std::fs::read_to_string(path)
+                    .map_err(|e| format!("Failed to read M3U file '{}': {}", path_str, e))?;
+                let parent_dir = path.parent();
+
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+
+                    let mut item_path = std::path::PathBuf::from(line);
+                    if item_path.is_relative() {
+                        if let Some(parent) = parent_dir {
+                            item_path = parent.join(item_path);
+                        }
+                    }
+
+                    if item_path.exists() && item_path.is_file() {
+                        let is_audio = item_path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|e| {
+                                crate::collection::AUDIO_EXTENSIONS
+                                    .contains(&e.to_ascii_lowercase().as_str())
+                            })
+                            .unwrap_or(false);
+
+                        if is_audio {
+                            resolved_paths.push(item_path);
+                        }
+                    }
+                }
+            } else {
+                let is_audio = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| {
+                        crate::collection::AUDIO_EXTENSIONS
+                            .contains(&e.to_ascii_lowercase().as_str())
+                    })
+                    .unwrap_or(false);
+
+                if is_audio {
+                    resolved_paths.push(path.to_path_buf());
+                }
+            }
+        }
+    }
+
+    if resolved_paths.is_empty() {
+        return Err("No supported audio files found to play.".to_string());
+    }
+
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let mut songs = Vec::with_capacity(resolved_paths.len());
+
+    for item_path in resolved_paths {
+        let item_path_str = item_path.to_string_lossy().to_string();
+
+        // Check if exists in db
+        let existing: Option<crate::models::Song> = conn
+            .query_row(
+                &format!(
+                    "SELECT {} FROM songs WHERE path = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                ),
+                params![item_path_str],
+                crate::collection::row_to_song,
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+
+        if let Some(s) = existing {
+            songs.push(s);
+        } else {
+            // Read tags and upsert
+            match crate::collection::read_tags(&item_path) {
+                Ok(mut song) => {
+                    // Extract or scan artwork
+                    if song.art_embedded {
+                        let artist = song
+                            .album_artist
+                            .as_deref()
+                            .unwrap_or(song.artist.as_deref().unwrap_or(""));
+                        let album = song.album.as_deref().unwrap_or("");
+                        if let Ok(Some(cached_filename)) = state
+                            .cover_manager
+                            .extract_embedded_art(&item_path, artist, album)
+                        {
+                            song.art_automatic = Some(cached_filename);
+                            song.art_unset = false;
+                        }
+                    } else if let Some(folder_art_path) =
+                        state.cover_manager.scan_folder_art(&item_path)
+                    {
+                        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+                        song.art_unset = false;
+                    }
+
+                    if let Err(e) = crate::collection::upsert_song(&conn, &song) {
+                        log::error!("Failed to upsert song {}: {}", item_path_str, e);
+                        continue;
+                    }
+
+                    // Fetch the inserted song to get its ID and full state
+                    let inserted: Result<crate::models::Song, _> = conn.query_row(
+                        &format!(
+                            "SELECT {} FROM songs WHERE path = ?1",
+                            crate::collection::SONG_SELECT_COLS
+                        ),
+                        params![item_path_str],
+                        crate::collection::row_to_song,
+                    );
+
+                    match inserted {
+                        Ok(s) => songs.push(s),
+                        Err(e) => {
+                            log::error!("Failed to fetch upserted song {}: {}", item_path_str, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to read tags for local file {}: {}",
+                        item_path_str,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    if songs.is_empty() {
+        return Err("Failed to load any of the selected tracks.".to_string());
+    }
+
+    let items = songs
+        .into_iter()
+        .enumerate()
+        .map(|(i, s)| crate::models::PlaylistItem::new_song(0, i as i32, s))
+        .collect::<Vec<_>>();
+
+    let mut player = state.player.lock().await;
+    player
+        .play_playlist(items, 0, 0)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_startup_file(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let mut lock = state.startup_file.lock().await;
+    Ok(lock.take())
+}

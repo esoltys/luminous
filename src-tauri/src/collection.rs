@@ -517,7 +517,7 @@ impl CollectionScanner {
 // Audio file detection
 // ---------------------------------------------------------------------------
 
-const AUDIO_EXTENSIONS: &[&str] = &[
+pub(crate) const AUDIO_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape",
     "tta", "dsf", "dff", "asf", "wma", "m4b",
 ];
@@ -569,7 +569,7 @@ fn detect_filetype(path: &Path) -> FileType {
 // Tag reading via lofty
 // ---------------------------------------------------------------------------
 
-fn read_tags(path: &Path) -> Result<Song> {
+pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
     let filesize = std::fs::metadata(path).ok().map(|m| m.len() as i64);
@@ -633,7 +633,7 @@ fn read_tags(path: &Path) -> Result<Song> {
 // Database upsert
 // ---------------------------------------------------------------------------
 
-fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
+pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
     conn.execute(
         &format!(
             "INSERT INTO songs ({}) VALUES ({})
@@ -688,7 +688,7 @@ fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()> {
 // SQL column helpers
 // ---------------------------------------------------------------------------
 
-const SONG_SELECT_COLS: &str = "
+pub(crate) const SONG_SELECT_COLS: &str = "
     id, source, filetype, path, url, stream_url,
     title, titlesort, artist, artistsort,
     album, albumsort, album_artist, album_artist_sort,
@@ -715,7 +715,7 @@ const SONG_INSERT_COLS: &str = "
 const SONG_INSERT_PLACEHOLDERS: &str =
     "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24";
 
-fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
+pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
         id: row.get(0)?,
         source: row.get::<_, i64>(1).map(SongSource::from)?,

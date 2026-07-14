@@ -44,6 +44,7 @@ pub struct AppState {
     pub playlists: Arc<Mutex<PlaylistManager>>,
     pub cover_manager: Arc<CoverManager>,
     pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
+    pub startup_file: Mutex<Option<String>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -297,6 +298,28 @@ pub fn run() {
                 })
                 .expect("failed to spawn event thread");
 
+            let args: Vec<String> = std::env::args().collect();
+            let startup_path = if args.len() > 1 {
+                let p = &args[1];
+                let path = std::path::Path::new(p);
+                if path.exists() && path.is_file() {
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    if ext == "m3u" || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str()) {
+                        Some(p.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             let watcher = Arc::new(parking_lot::Mutex::new(None));
             let state = AppState {
                 db,
@@ -306,6 +329,7 @@ pub fn run() {
                 playlists,
                 cover_manager,
                 watcher,
+                startup_file: Mutex::new(startup_path),
             };
 
             // Start background directory watcher
@@ -404,6 +428,8 @@ pub fn run() {
             commands::player::play_song,
             commands::player::play_songs,
             commands::player::play_playlist_item,
+            commands::player::open_and_play,
+            commands::player::get_startup_file,
             commands::player::pause,
             commands::player::resume,
             commands::player::stop,

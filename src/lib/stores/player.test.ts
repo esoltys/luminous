@@ -114,4 +114,10 @@ describe("PlayerStore", () => {
     expect(store.volume).toBe(0);
     expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 0 });
   });
+
+  it("should trigger open_and_play invoke on openAndPlay", async () => {
+    const testPaths = ["/path/to/song.mp3", "/path/to/playlist.m3u"];
+    await store.openAndPlay(testPaths);
+    expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: testPaths });
+  });
 });
