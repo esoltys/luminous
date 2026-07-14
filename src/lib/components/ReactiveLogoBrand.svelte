@@ -50,15 +50,16 @@
         }
         const data = event.payload;
         if (data && data.length > 0) {
-          // Segment the 32 spectrum bins into Bass (left), Mids (middle), and Coronal/Treble (right)
-          const bassPeak = Math.max(...data.slice(0, 10), 0);
-          const midPeak = Math.max(...data.slice(10, 22), 0);
-          const coronalPeak = Math.max(...data.slice(22, 32), 0);
+          // Segment and average the 32 spectrum bins into Bass, Mids, and Coronal/Treble
+          // to prevent single-bin noise/leakage from driving unrelated components
+          const bassAvg = data.slice(0, 8).reduce((sum, v) => sum + v, 0) / 8;
+          const midAvg = data.slice(8, 20).reduce((sum, v) => sum + v, 0) / 12;
+          const coronalAvg = data.slice(20, 32).reduce((sum, v) => sum + v, 0) / 12;
 
-          // Calibrate each band's multiplier (higher gain for coronal treble due to lower natural energy)
-          bassIntensity = Math.min(1.0, bassPeak * 14.0);
-          midIntensity = Math.min(1.0, midPeak * 14.0);
-          coronalIntensity = Math.min(1.0, coronalPeak * 22.0);
+          // Calibrate each band's multiplier for average energy values
+          bassIntensity = Math.min(1.0, bassAvg * 28.0);
+          midIntensity = Math.min(1.0, midAvg * 28.0);
+          coronalIntensity = Math.min(1.0, coronalAvg * 45.0);
         } else {
           bassIntensity = 0;
           midIntensity = 0;
@@ -91,9 +92,9 @@
   let isPlaying = $derived(playerStore.state === "playing");
 
   // Derive element opacities, glow radii, and saturation based on play and specific band intensities
-  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.05 + midIntensity * 0.75);
-  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.15 + coronalIntensity * 0.85);
-  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.1 + bassIntensity * 0.9);
+  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.0 + midIntensity * 0.8);
+  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.05 + coronalIntensity * 0.9);
+  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.05 + bassIntensity * 0.95);
 
   let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + midIntensity * 40);
   let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + coronalIntensity * 30);
