@@ -91,13 +91,13 @@
   let isPlaying = $derived(playerStore.state === "playing");
 
   // Derive element opacities, glow radii, and saturation based on play and specific band intensities
-  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.05 + bassIntensity * 0.75);
-  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.15 + midIntensity * 0.85);
-  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.1 + coronalIntensity * 0.9);
+  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.05 + midIntensity * 0.75);
+  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.15 + coronalIntensity * 0.85);
+  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.1 + bassIntensity * 0.9);
 
-  let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + bassIntensity * 40);
-  let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + midIntensity * 30);
-  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 32 : 24 + coronalIntensity * 16);
+  let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + midIntensity * 40);
+  let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + coronalIntensity * 30);
+  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 32 : 24 + bassIntensity * 16);
 
   let maxIntensity = $derived(Math.max(bassIntensity, midIntensity, coronalIntensity));
   let saturationVal = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.15 + maxIntensity * 2.35);
