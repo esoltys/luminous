@@ -28,6 +28,8 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
   3. Write the issue body to a temporary scratch file in the workspace or the artifacts scratch directory.
   4. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
   5. Verify the created issue by running `gh issue view <id>`.
+- **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
+
 
 ## Package Manager
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).
