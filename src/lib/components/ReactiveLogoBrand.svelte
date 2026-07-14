@@ -112,7 +112,7 @@
 >
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="100 96 320 320"
+    viewBox="70 66 380 380"
     class="{sizeMap[size]} {className} select-none"
     aria-hidden="true"
   >
