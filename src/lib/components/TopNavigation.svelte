@@ -85,7 +85,7 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar border-b border-brand-border flex items-center px-6 gap-6 z-40" class:glass-surface={themeStore.isGlassTheme}>
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar border-b border-brand-border flex items-center px-6 gap-6 z-40 overflow-hidden rounded-bl-2xl rounded-br-2xl" class:glass-surface={themeStore.isGlassTheme}>
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button

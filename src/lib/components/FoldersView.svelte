@@ -173,7 +173,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-6 max-w-4xl space-y-6">
+  <div class="flex-1 overflow-y-auto p-6 pb-24 max-w-4xl space-y-6">
     {#if settingsTab === "folders"}
       <!-- Watched Folders Section -->
       <div class="flex justify-between items-center">

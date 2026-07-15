@@ -101,8 +101,10 @@
   }
 </script>
 
-<div class="flex flex-col h-screen overflow-hidden bg-brand-main">
-  <!-- 3D Flip Container for everything above the PlayerBar -->
+<div class="relative flex flex-col h-screen overflow-hidden bg-brand-main">
+  <!-- 3D Flip Container fills the full window height; the PlayerBar floats
+       on top of it (absolute, below) so scrolled content passes underneath
+       the glass footer instead of stopping above it. -->
   <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
     <!-- Inner Card Wrapper -->
     <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
@@ -232,8 +234,10 @@
     </div>
   </div>
 
-  <!-- Full-Width Player Bar at Bottom (Always Visible, mt-auto keeps bottom-aligned) -->
-  <div class="flex-shrink-0 z-40 overflow-hidden mt-auto">
+  <!-- Floating PlayDock: inset from all edges (not flush) so it reads as a
+       floating glass dock, and the content behind it can still scroll
+       underneath the gap for the blur to have something to blur. -->
+  <div class="absolute inset-x-4 bottom-4 z-40">
     <PlayerBar />
   </div>
 </div>
@@ -268,7 +272,15 @@
     transform: rotateY(180deg);
   }
 
-  /* Disable 3D flip on Linux/WebKit and use simple, clean opacity cross-fade */
+  /* Disable 3D flip on Linux/WebKit and use simple, clean opacity cross-fade.
+     `perspective` alone (with no rotation left to apply) still forces its
+     subtree into a separate 3D compositing layer, which is enough to break
+     WebKitGTK's backdrop-filter sampling for elements outside that subtree
+     (e.g. the glass PlayerBar) — so drop it here too, not just the transform. */
+  .flip-perspective.no-3d {
+    perspective: none;
+  }
+
   .no-3d .flip-card {
     transform-style: flat;
     transform: none !important;
