@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
+import { hexToRgb, rgbToHex, pickAccessibleOnColor } from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -29,20 +30,92 @@ export interface ExtractedColors {
   border: string;
 }
 
+/**
+ * The System theme's brand accent is pulled from app-icon.svg's own
+ * sunrise gradient rather than an unrelated color — its "Vibrant Zest
+ * Orange core" (65% stop) as the base accent, its "golden horizon" (88%
+ * stop) as the hover. ReactiveLogoBrand's live gradient is computed from
+ * this same accent (see calculateLogoStops() below), so the in-app logo
+ * actually matches the real icon shown in the OS taskbar/dock instead of
+ * rendering as an arbitrary hue. Not extracted programmatically from the
+ * SVG at build/runtime — overkill for a static, rarely-changing asset,
+ * and would still require guessing which of five gradient stops is "the"
+ * brand color; using the exact hex the icon's own source comments already
+ * label as the core color is simpler and unambiguous.
+ */
+const BRAND_ORANGE = "#ff7300";
+const BRAND_GOLD = "#ffcc00";
+
+/**
+ * "System" auto-theme: adapts to the OS light/dark preference. Panels
+ * (sidebar, player bar, top nav) get a "glass" treatment via
+ * backdrop-filter blur/saturate plus a tonal step from the canvas, applied
+ * in app.css's .glass-surface class. Colors here stay fully opaque hex
+ * (not rgba) on purpose — native <input type="color"> swatches in the
+ * theme builder can't represent alpha, so translucent values would
+ * silently break editing.
+ */
+export const LUMINOUS_DARK_COLORS: ThemeColors = {
+  "bg-main": "#08090c",
+  "bg-sidebar": "#1c1f29",
+  "bg-playerbar": "#191b23",
+  "color-accent": BRAND_ORANGE,
+  "color-accent-hover": BRAND_GOLD,
+  "color-text-primary": "#f1f3f8",
+  "color-text-secondary": "#a6adc4",
+  "color-border": "#2c2f3c"
+};
+
+/**
+ * The light-scheme accent is a deliberate trade-off, not a mechanical
+ * derivation: darkening BRAND_ORANGE enough to clear WCAG's 4.5:1 "text"
+ * threshold against the light canvas (~#994500) reads as brown/rust —
+ * that's not a bad color pick, it's what any orange dark enough for that
+ * ratio on a near-white background looks like. Since the accent is used
+ * almost entirely as icon/button/badge/active-state color in this app
+ * (not paragraph text), it's held to WCAG 1.4.11's 3:1 "non-text
+ * contrast" threshold (UI components, graphical objects) instead of
+ * 1.4.3's 4.5:1 "normal text" threshold — letting it stay much closer to
+ * the true brand orange.
+ */
+const LUMINOUS_LIGHT_ACCENT = "#d15e00";
+
+export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
+  "bg-main": "#e9eaf0",
+  "bg-sidebar": "#ffffff",
+  "bg-playerbar": "#ffffff",
+  "color-accent": LUMINOUS_LIGHT_ACCENT,
+  "color-accent-hover": blendToward(LUMINOUS_LIGHT_ACCENT, 255, 0.2),
+  "color-text-primary": "#16181d",
+  "color-text-secondary": "#5a6072",
+  "color-border": "#dcdce4"
+};
+
+/** Blends a hex color toward white (factor > 0) or black (factor < 0). */
+export function blendToward(hex: string, target: 0 | 255, amount: number): string {
+  const rgb = hexToRgb(hex);
+  const mix = (c: number) => Math.round(c + (target - c) * amount);
+  return rgbToHex(mix(rgb.r), mix(rgb.g), mix(rgb.b));
+}
+
+/**
+ * Derives an rgba() string from an opaque hex color for glass-panel
+ * rendering only. The "official" ThemeColors stay opaque hex everywhere
+ * else (native <input type="color"> swatches, contrast tests, "Import
+ * Active Colors") — alpha is applied here, one level removed, purely for
+ * the .glass-surface CSS custom properties so it can never reach a color
+ * picker's bound value.
+ */
+export function hexToRgbaString(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export const PREDEFINED_THEMES: Theme[] = [
   {
-    id: "luminous-violet",
-    name: "Luminous Violet",
-    colors: {
-      "bg-main": "#0d0b18",
-      "bg-sidebar": "#07050e",
-      "bg-playerbar": "#0a0813",
-      "color-accent": "#8b5cf6",
-      "color-accent-hover": "#a78bfa",
-      "color-text-primary": "#f3f4f6",
-      "color-text-secondary": "#9ca3af",
-      "color-border": "#1f1b2e"
-    }
+    id: "system",
+    name: "System",
+    colors: { ...LUMINOUS_DARK_COLORS }
   },
   {
     id: "ruby-red",
@@ -271,13 +344,16 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
 }
 
 class ThemeStore {
-  activeThemeId = $state<string>("nordic-blue");
+  activeThemeId = $state<string>("system");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
+  systemColorScheme = $state<"light" | "dark">("dark");
 
   constructor() {}
 
   async init() {
+    this.watchSystemColorScheme();
+
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings) {
@@ -302,11 +378,62 @@ class ThemeStore {
     }
   }
 
+  /**
+   * Reads the OS light/dark preference and listens for changes so the
+   * "Luminous" auto-theme (and its logo gradient, computed in JS from a
+   * literal hex accent) can react live without a page reload.
+   */
+  watchSystemColorScheme() {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    this.systemColorScheme = mq.matches ? "dark" : "light";
+    mq.addEventListener("change", (e) => {
+      this.systemColorScheme = e.matches ? "dark" : "light";
+      if (this.activeThemeId === "system") {
+        this.applyActiveTheme();
+      }
+    });
+  }
+
+  get isGlassTheme(): boolean {
+    return this.activeThemeId === "system";
+  }
+
   get currentTheme(): Theme {
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
-    return custom || PREDEFINED_THEMES.find(t => t.id === "nordic-blue") || PREDEFINED_THEMES[0];
+    return custom || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
+  }
+
+  /**
+   * The active theme's actual literal hex colors — resolves System's
+   * scheme-dependent palette and Dynamic Artwork's `var(--color-artwork-*)`
+   * references to real values. Use this (not currentTheme.colors, and
+   * never getComputedStyle of the live CSS custom properties) whenever a
+   * UI component needs the theme's true colors: reading the live CSS vars
+   * is unreliable while Design Tools' live-preview is active, since that
+   * preview temporarily overwrites those same custom properties with
+   * whatever's being edited.
+   */
+  get resolvedColors(): ThemeColors {
+    const theme = this.currentTheme;
+    if (theme.id === "system") {
+      return this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+    }
+    if (theme.id === "dynamic-artwork") {
+      const artColors = this.artworkColors || getFallbackColors();
+      return {
+        ...theme.colors,
+        "bg-main": artColors.primary,
+        "bg-sidebar": artColors.sidebar,
+        "bg-playerbar": artColors.playerbar,
+        "color-accent": artColors.accent,
+        "color-accent-hover": artColors.accentHover,
+        "color-border": artColors.border
+      };
+    }
+    return theme.colors;
   }
 
   async setTheme(themeId: string) {
@@ -344,7 +471,7 @@ class ThemeStore {
     });
 
     if (this.activeThemeId === themeId) {
-      await this.setTheme("nordic-blue");
+      await this.setTheme("system");
     }
   }
 
@@ -435,6 +562,26 @@ class ThemeStore {
   applyActiveTheme() {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
+    const isLuminous = theme.id === "system";
+    // The System theme's live colors come from whichever OS-scheme palette
+    // is active, not the static preview colors on the theme entry.
+    const colors = isLuminous
+      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
+      : theme.colors;
+
+    // Heuristically derived, not hand-picked: text rendered directly on
+    // the accent color (active nav items, filled buttons) needs contrast
+    // against whatever that accent happens to be — including a
+    // user-chosen custom-theme accent — not just the canvas-tuned
+    // text-primary/secondary. Computed for every theme, always kept in
+    // sync with the active accent. Dynamic Artwork's `color-accent` is a
+    // CSS var reference (not a literal hex), so resolve it to the real
+    // extracted color first.
+    const resolvedAccent = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).accent
+      : colors["color-accent"];
+    const accentContrastText = pickAccessibleOnColor(resolvedAccent);
+
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
       styleEl = document.createElement("style");
@@ -444,28 +591,58 @@ class ThemeStore {
 
     styleEl.innerHTML = `
       :root {
-        --bg-main: ${theme.colors["bg-main"]};
-        --bg-sidebar: ${theme.colors["bg-sidebar"]};
-        --bg-playerbar: ${theme.colors["bg-playerbar"]};
-        --color-accent: ${theme.colors["color-accent"]};
-        --color-accent-hover: ${theme.colors["color-accent-hover"]};
-        --color-text-primary: ${theme.colors["color-text-primary"]};
-        --color-text-secondary: ${theme.colors["color-text-secondary"]};
-        --color-border: ${theme.colors["color-border"]};
+        --bg-main: ${colors["bg-main"]};
+        --bg-sidebar: ${colors["bg-sidebar"]};
+        --bg-playerbar: ${colors["bg-playerbar"]};
+        --color-accent: ${colors["color-accent"]};
+        --color-accent-hover: ${colors["color-accent-hover"]};
+        --color-text-primary: ${colors["color-text-primary"]};
+        --color-text-secondary: ${colors["color-text-secondary"]};
+        --color-border: ${colors["color-border"]};
+        --color-accent-contrast: ${accentContrastText};
       }
     `;
 
-    // Apply logo stops based on active theme or dynamic colors
     const root = document.documentElement;
+    root.classList.toggle("theme-glass", isLuminous);
+
+    if (isLuminous) {
+      const isDark = this.systemColorScheme === "dark";
+      // These are rendering-only, separate from the opaque `colors` above —
+      // alpha never reaches a color picker, see hexToRgbaString().
+      root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(colors["bg-sidebar"], isDark ? 0.5 : 0.6));
+      root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(colors["bg-playerbar"], isDark ? 0.55 : 0.65));
+      root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
+
+      const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
+      // Two-layer glow (tight bright core + wide soft halo) reads as an
+      // actual glow rather than a flat blurred outline.
+      const glowNear = `0 0 24px 2px ${hexToRgbaString(colors["color-accent"], isDark ? 0.45 : 0.28)}`;
+      const glowFar = `0 0 90px 10px ${hexToRgbaString(colors["color-accent"], isDark ? 0.28 : 0.16)}`;
+      const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
+      root.style.setProperty("--glass-shadow", `${elevation}, ${glowNear}, ${glowFar}, ${highlight}`);
+    }
+
+    // Apply logo stops based on active theme or dynamic colors. The
+    // System theme always uses the true brand orange/gold here — never
+    // the scheme-adjusted UI accent, which in light mode is deliberately
+    // darkened for text contrast and would make the logo look muddy/wrong
+    // instead of matching the real app icon.
     if (theme.id === "dynamic-artwork") {
-      const colors = this.artworkColors || getFallbackColors();
-      const stops = calculateLogoStops(colors.accent, colors.accentHover);
+      const artColors = this.artworkColors || getFallbackColors();
+      const stops = calculateLogoStops(artColors.accent, artColors.accentHover);
+      root.style.setProperty("--logo-stop-1", stops.stop1);
+      root.style.setProperty("--logo-stop-2", stops.stop2);
+      root.style.setProperty("--logo-stop-3", stops.stop3);
+      root.style.setProperty("--logo-stop-4", stops.stop4);
+    } else if (isLuminous) {
+      const stops = calculateLogoStops(BRAND_ORANGE, BRAND_GOLD);
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);
       root.style.setProperty("--logo-stop-4", stops.stop4);
     } else {
-      const stops = calculateLogoStops(theme.colors["color-accent"], theme.colors["color-accent-hover"]);
+      const stops = calculateLogoStops(colors["color-accent"], colors["color-accent-hover"]);
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);

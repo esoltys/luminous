@@ -2,6 +2,7 @@
   import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { themeStore } from "../stores/theme.svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
@@ -84,7 +85,7 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-secondary border-b border-brand-border flex items-center px-6 gap-6 z-40">
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar border-b border-brand-border flex items-center px-6 gap-6 z-40" class:glass-surface={themeStore.isGlassTheme}>
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
@@ -177,10 +178,3 @@
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>
-
-<style>
-  header {
-    backdrop-filter: blur(8px);
-    background-color: rgba(10, 8, 19, 0.8);
-  }
-</style>

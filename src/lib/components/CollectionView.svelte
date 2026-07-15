@@ -334,7 +334,7 @@
                 {#if collectionStore.searchQuery}
                   <button
                     onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-                    class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary rounded-lg transition-colors font-medium cursor-pointer"
+                    class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-lg transition-colors font-medium cursor-pointer"
                   >
                     Clear Search Filter
                   </button>
@@ -495,8 +495,8 @@
                 }}
                 class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
               >
-                <div class="w-12 h-12 rounded-full bg-brand-accent text-brand-text-primary flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
-                  <Play class="w-5 h-5 fill-current ml-0.5 text-white" />
+                <div class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
+                  <Play class="w-5 h-5 fill-current ml-0.5" />
                 </div>
               </button>
             </div>

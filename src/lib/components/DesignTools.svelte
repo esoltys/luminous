@@ -27,17 +27,28 @@
     "color-border": "#1f1b2e"
   });
 
-  // Initialize from props
-  $effect.pre(() => {
-    if (newThemeName) {
-      themeName = newThemeName;
-    }
-    if (customColors) {
-      Object.assign(colorPresets, customColors);
+  // Seed from props once on mount only — NOT a continuous reactive pull.
+  // A two-way $effect.pre (pull from customColors) + $effect (push to
+  // customColors) pairing is a trap: $effect.pre runs before $effect in
+  // the same flush, so after a local reassignment of colorPresets (e.g.
+  // resetColors()), the pull effect fires first, reads the *stale*
+  // pre-change customColors, and overwrites the very value that was just
+  // reset — right before the push effect would have propagated it out.
+  let seededFromProps = false;
+  $effect(() => {
+    if (!seededFromProps) {
+      if (newThemeName) {
+        themeName = newThemeName;
+      }
+      if (customColors) {
+        Object.assign(colorPresets, customColors);
+      }
+      seededFromProps = true;
     }
   });
 
-  // Sync local state with parent customColors prop when provided
+  // One-directional: local edits (including resets) push out to the
+  // parent's customColors, so Simple/Advanced mode stay in sync.
   $effect(() => {
     if (customColors) {
       Object.assign(customColors, colorPresets);
@@ -88,38 +99,7 @@
   });
 
   function loadActiveThemeColors() {
-    if (typeof document === "undefined") return;
-    const rootStyle = getComputedStyle(document.documentElement);
-
-    const getHexColor = (prop: string, fallback: string): string => {
-      const val = rootStyle.getPropertyValue(prop).trim();
-      if (!val) return fallback;
-      if (val.startsWith("rgb")) {
-        const match = val.match(/\d+/g);
-        if (match && match.length >= 3) {
-          const r = parseInt(match[0]);
-          const g = parseInt(match[1]);
-          const b = parseInt(match[2]);
-          const toHex = (c: number) => {
-            const hex = c.toString(16);
-            return hex.length === 1 ? "0" + hex : hex;
-          };
-          return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-        }
-      }
-      return val.startsWith("#") ? val : fallback;
-    };
-
-    colorPresets = {
-      "bg-main": getHexColor("--bg-main", "#0d0b18"),
-      "bg-sidebar": getHexColor("--bg-sidebar", "#07050e"),
-      "bg-playerbar": getHexColor("--bg-playerbar", "#0a0813"),
-      "color-accent": getHexColor("--color-accent", "#8b5cf6"),
-      "color-accent-hover": getHexColor("--color-accent-hover", "#a78bfa"),
-      "color-text-primary": getHexColor("--color-text-primary", "#f3f4f6"),
-      "color-text-secondary": getHexColor("--color-text-secondary", "#9ca3af"),
-      "color-border": getHexColor("--color-border", "#1f1b2e"),
-    };
+    colorPresets = { ...themeStore.resolvedColors };
   }
 
   function applyLivePreview() {
@@ -276,7 +256,7 @@
                 <span class="text-[10px] text-brand-text-secondary/60">
                   Luminance: <span class="font-mono">{getLuminancePercent(hexValue)}</span>
                 </span>
-                <span class="text-[10px] font-semibold" style="color: {isLightColor(hexValue) ? '#fbbf24' : '#6ee7b7'}" title={isLightColor(hexValue) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
+                <span class="text-[10px] font-semibold text-brand-text-secondary" title={isLightColor(hexValue) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
                   {isLightColor(hexValue) ? 'Light bg' : 'Dark bg'}
                 </span>
               </div>
@@ -371,7 +351,7 @@
       <div class="flex gap-3">
         <button
           onclick={saveTheme}
-          class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
           {#if isEditing}
             <Check class="w-4 h-4" /> Save Changes

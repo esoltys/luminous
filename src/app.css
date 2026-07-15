@@ -9,19 +9,24 @@
   --color-brand-text-primary: var(--color-text-primary);
   --color-brand-text-secondary: var(--color-text-secondary);
   --color-brand-border: var(--color-border);
+  /* Heuristically derived (not hand-picked) — see ThemeStore.applyActiveTheme() */
+  --color-brand-accent-contrast: var(--color-accent-contrast);
 }
 
 @layer base {
   :root {
-    /* Default Nordic Blue Theme Colors */
-    --bg-main: #2e3440;
-    --bg-sidebar: #242933;
-    --bg-playerbar: #2b303c;
-    --color-accent: #88c0d0;
-    --color-accent-hover: #8fbcbb;
-    --color-text-primary: #eceff4;
-    --color-text-secondary: #d8dee9;
-    --color-border: #3b4252;
+    /* Default theme colors (Luminous, dark variant) — overwritten by
+       ThemeStore.applyActiveTheme() on load; this is only the first-paint
+       fallback before JS runs. */
+    --bg-main: #08090c;
+    --bg-sidebar: #1c1f29;
+    --bg-playerbar: #191b23;
+    --color-accent: #ff7300;
+    --color-accent-hover: #ffcc00;
+    --color-text-primary: #f1f3f8;
+    --color-text-secondary: #a6adc4;
+    --color-border: #2c2f3c;
+    --color-accent-contrast: #000000;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;
@@ -73,4 +78,36 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/*
+ * System auto-theme: frosted glass chrome panels (sidebar, player bar,
+ * right panel, top nav). Applied conditionally via class:glass-surface,
+ * only when the System theme is active.
+ *
+ * The --glass-* custom properties are computed by ThemeStore.
+ * applyActiveTheme() from the theme's own opaque hex colors (adding alpha
+ * only here, one level removed) — the "official" ThemeColors used by
+ * <input type="color"> swatches, contrast tests, and "Import Active
+ * Colors" stay fully opaque throughout, so this never conflicts with them.
+ *
+ * Recipe: translucent tinted background (real alpha, so backdrop-filter
+ * has something to blur/saturate) + a bright top inset highlight
+ * (specular edge, as if light is catching the glass) + a soft elevation
+ * shadow + a low-opacity accent-colored glow around the panel.
+ */
+.glass-surface {
+  position: relative;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: var(--glass-border-color, var(--color-border));
+  box-shadow: var(--glass-shadow, none);
+}
+
+.bg-brand-sidebar.glass-surface {
+  background-color: var(--glass-bg-sidebar);
+}
+
+.bg-brand-playerbar.glass-surface {
+  background-color: var(--glass-bg-playerbar);
 }

@@ -23,7 +23,7 @@
   <!-- Card Container -->
   <div class="relative rounded-lg overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
     <!-- Cover Art -->
-    <div class="relative aspect-square overflow-hidden bg-gray-900">
+    <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
       <CoverArt
         songId={song.id}
         artEmbedded={song.art_embedded}
@@ -36,7 +36,7 @@
       <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
         <button
           onclick={handlePlay}
-          class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-white shadow-lg"
+          class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg"
           title="Play"
         >
           <Play class="w-6 h-6 fill-current" />
