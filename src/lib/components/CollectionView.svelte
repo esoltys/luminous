@@ -21,6 +21,13 @@
     collectionStore.refreshLibrary();
   }
 
+  function getArtistAlbums(name: string | null): AlbumItem[] {
+    if (!name) return [];
+    return collectionStore.albums
+      .filter((a) => a.artist === name)
+      .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+  }
+
   function getArtistGradient(name: string | null): string {
     if (!name) return "from-purple-900 to-indigo-900";
     let hash = 0;
@@ -525,12 +532,32 @@
       </div>
     {:else if collectionStore.activeSubTab === "artists"}
       <!-- Artists List Grid View -->
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
         {#each sortedArtists as artist}
-          <div class="bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
-            <div class="w-20 h-20 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md">
-              {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
-            </div>
+          {@const artistAlbums = getArtistAlbums(artist.name)}
+          <div class="artist-card bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
+            {#if artistAlbums.length > 0}
+              <div class="artist-cover-stack relative w-24 h-24 mt-2 mb-4 shrink-0">
+                {#each artistAlbums.slice(0, 6) as album, i ((album.album ?? "unknown") + i)}
+                  <div
+                    class="cover-item absolute inset-0 rounded-lg overflow-hidden border border-brand-border/50 shadow-lg"
+                    style="z-index: {10 - i}; transform: translate({i * 12}px, {i * -9}px) rotate({i * 6}deg) scale({1 - i * 0.07}); opacity: {1 - i * 0.1};"
+                  >
+                    <CoverArt
+                      songId={undefined}
+                      artEmbedded={album.art_embedded}
+                      artAutomatic={album.art_automatic}
+                      artManual={album.art_manual}
+                      sizeClass="w-full h-full"
+                    />
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0">
+                {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
+              </div>
+            {/if}
             <button
               onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", artist.name || ""); }}
               class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-center truncate w-full cursor-pointer"
@@ -568,6 +595,28 @@
 {/if}
 
 <style>
+  .artist-card {
+    container-type: inline-size;
+  }
+  .cover-item:nth-child(n + 4) {
+    display: none;
+  }
+  @container (min-width: 150px) {
+    .cover-item:nth-child(4) {
+      display: block;
+    }
+  }
+  @container (min-width: 180px) {
+    .cover-item:nth-child(5) {
+      display: block;
+    }
+  }
+  @container (min-width: 210px) {
+    .cover-item:nth-child(6) {
+      display: block;
+    }
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
   }
