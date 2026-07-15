@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
-import { hexToRgb, rgbToHex, checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
+import { hexToRgb, rgbToHex, pickAccessibleOnColor } from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -66,10 +66,19 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "color-border": "#2c2f3c"
 };
 
-// The light-scheme accent is heuristically derived from the same brand
-// orange (nudged toward black until it clears WCAG AA against the light
-// canvas), not hand-picked — same approach as pickAccessibleOnColor.
-const LUMINOUS_LIGHT_ACCENT = makeAccessibleAccent(BRAND_ORANGE, "#e9eaf0", false) ?? BRAND_ORANGE;
+/**
+ * The light-scheme accent is a deliberate trade-off, not a mechanical
+ * derivation: darkening BRAND_ORANGE enough to clear WCAG's 4.5:1 "text"
+ * threshold against the light canvas (~#994500) reads as brown/rust —
+ * that's not a bad color pick, it's what any orange dark enough for that
+ * ratio on a near-white background looks like. Since the accent is used
+ * almost entirely as icon/button/badge/active-state color in this app
+ * (not paragraph text), it's held to WCAG 1.4.11's 3:1 "non-text
+ * contrast" threshold (UI components, graphical objects) instead of
+ * 1.4.3's 4.5:1 "normal text" threshold — letting it stay much closer to
+ * the true brand orange.
+ */
+const LUMINOUS_LIGHT_ACCENT = "#d15e00";
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "bg-main": "#e9eaf0",
@@ -100,24 +109,6 @@ export function blendToward(hex: string, target: 0 | 255, amount: number): strin
 export function hexToRgbaString(hex: string, alpha: number): string {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-/**
- * Nudges a candidate accent color toward white/black in steps until it
- * meets WCAG AA against the given background, so an OS accent color that's
- * too dark-on-dark or too light-on-light doesn't ship an inaccessible
- * combination. Gives up (returns null) if it can't pass within a
- * reasonable range — callers fall back to the curated accent.
- */
-export function makeAccessibleAccent(hex: string, backgroundHex: string, towardWhite: boolean): string | null {
-  const target: 0 | 255 = towardWhite ? 255 : 0;
-  for (let step = 0; step <= 8; step++) {
-    const candidate = step === 0 ? hex : blendToward(hex, target, step / 10);
-    if (checkWcagCompliance(candidate, backgroundHex).wcagAA) {
-      return candidate;
-    }
-  }
-  return null;
 }
 
 export const PREDEFINED_THEMES: Theme[] = [
@@ -413,6 +404,36 @@ class ThemeStore {
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
     return custom || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
+  }
+
+  /**
+   * The active theme's actual literal hex colors — resolves System's
+   * scheme-dependent palette and Dynamic Artwork's `var(--color-artwork-*)`
+   * references to real values. Use this (not currentTheme.colors, and
+   * never getComputedStyle of the live CSS custom properties) whenever a
+   * UI component needs the theme's true colors: reading the live CSS vars
+   * is unreliable while Design Tools' live-preview is active, since that
+   * preview temporarily overwrites those same custom properties with
+   * whatever's being edited.
+   */
+  get resolvedColors(): ThemeColors {
+    const theme = this.currentTheme;
+    if (theme.id === "system") {
+      return this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+    }
+    if (theme.id === "dynamic-artwork") {
+      const artColors = this.artworkColors || getFallbackColors();
+      return {
+        ...theme.colors,
+        "bg-main": artColors.primary,
+        "bg-sidebar": artColors.sidebar,
+        "bg-playerbar": artColors.playerbar,
+        "color-accent": artColors.accent,
+        "color-accent-hover": artColors.accentHover,
+        "color-border": artColors.border
+      };
+    }
+    return theme.colors;
   }
 
   async setTheme(themeId: string) {

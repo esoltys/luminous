@@ -84,38 +84,7 @@
   }
 
   function loadActiveThemeColors() {
-    if (typeof document === "undefined") return;
-    const rootStyle = getComputedStyle(document.documentElement);
-
-    const getHexColor = (prop: string, fallback: string): string => {
-      const val = rootStyle.getPropertyValue(prop).trim();
-      if (!val) return fallback;
-      if (val.startsWith("rgb")) {
-        const match = val.match(/\d+/g);
-        if (match && match.length >= 3) {
-          const r = parseInt(match[0]);
-          const g = parseInt(match[1]);
-          const b = parseInt(match[2]);
-          const toHex = (c: number) => {
-            const hex = c.toString(16);
-            return hex.length === 1 ? "0" + hex : hex;
-          };
-          return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-        }
-      }
-      return val.startsWith("#") ? val : fallback;
-    };
-
-    customColors = {
-      "bg-main": getHexColor("--bg-main", "#0d0b18"),
-      "bg-sidebar": getHexColor("--bg-sidebar", "#07050e"),
-      "bg-playerbar": getHexColor("--bg-playerbar", "#0a0813"),
-      "color-accent": getHexColor("--color-accent", "#8b5cf6"),
-      "color-accent-hover": getHexColor("--color-accent-hover", "#a78bfa"),
-      "color-text-primary": getHexColor("--color-text-primary", "#f3f4f6"),
-      "color-text-secondary": getHexColor("--color-text-secondary", "#9ca3af"),
-      "color-border": getHexColor("--color-border", "#1f1b2e"),
-    };
+    customColors = { ...themeStore.resolvedColors };
   }
 
   // Pre-fill theme builder with current active theme colors on mount and updates
