@@ -175,11 +175,13 @@
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div
+                <button
+                  type="button"
                   class="w-10 h-10 rounded-lg border-2 border-brand-border shadow-sm cursor-pointer hover:border-brand-accent transition-colors"
                   style="background-color: {hexValue}"
                   onclick={() => { selectedColorTool = key; }}
-                ></div>
+                  title={`Select ${label} for editing`}
+                ></button>
                 <div>
                   <p class="text-xs font-semibold text-brand-text-primary">{label}</p>
                   <p class="text-[10px] text-brand-text-secondary/60">{description}</p>
@@ -223,8 +225,9 @@
 
           <div class="space-y-3">
             <div>
-              <label class="text-xs font-semibold text-brand-text-primary block mb-1">Red: {rgb.r}</label>
+              <label for="red-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Red: {rgb.r}</label>
               <input
+                id="red-slider"
                 type="range"
                 min="0"
                 max="255"
@@ -234,8 +237,9 @@
               />
             </div>
             <div>
-              <label class="text-xs font-semibold text-brand-text-primary block mb-1">Green: {rgb.g}</label>
+              <label for="green-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Green: {rgb.g}</label>
               <input
+                id="green-slider"
                 type="range"
                 min="0"
                 max="255"
@@ -245,8 +249,9 @@
               />
             </div>
             <div>
-              <label class="text-xs font-semibold text-brand-text-primary block mb-1">Blue: {rgb.b}</label>
+              <label for="blue-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Blue: {rgb.b}</label>
               <input
+                id="blue-slider"
                 type="range"
                 min="0"
                 max="255"
