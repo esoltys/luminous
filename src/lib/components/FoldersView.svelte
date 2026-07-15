@@ -2,13 +2,14 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, type ThemeColors } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2 } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
+  import DesignTools from "./DesignTools.svelte";
 
-  let settingsTab = $state<"folders" | "themes" | "equalizer" | "formats">("folders");
+  let settingsTab = $state<"folders" | "themes" | "design-tools" | "equalizer" | "formats">("folders");
   let isTabInitialized = $state(false);
 
   onMount(async () => {
@@ -16,7 +17,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
+        if (savedTab === "folders" || savedTab === "themes" || savedTab === "design-tools" || savedTab === "equalizer" || savedTab === "formats") {
           settingsTab = savedTab as any;
         }
       }
@@ -174,6 +175,12 @@
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         UI Themes
+      </button>
+      <button
+        onclick={() => { settingsTab = "design-tools"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'design-tools' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        Design Tools
       </button>
       <button
         onclick={() => { settingsTab = "equalizer"; }}
@@ -425,6 +432,9 @@
           </div>
         </div>
       </div>
+    {:else if settingsTab === "design-tools"}
+      <!-- Design Tools Section -->
+      <DesignTools />
     {:else if settingsTab === "equalizer"}
       <!-- Equalizer Section -->
       <div class="space-y-6">
