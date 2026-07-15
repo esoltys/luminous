@@ -33,6 +33,8 @@
       rating: 5,
       playcount: 42,
       skipcount: 0,
+      lastplayed: 1720900000,
+      added: 1700000000,
       art_embedded: true,
       art_automatic: "/fixtures/random_access_memories.png",
       art_unset: false,
@@ -59,6 +61,8 @@
       rating: 5,
       playcount: 85,
       skipcount: 1,
+      lastplayed: 1720850000,
+      added: 1705000000,
       art_embedded: true,
       art_automatic: "/fixtures/after_hours.png",
       art_unset: false,
@@ -85,6 +89,8 @@
       rating: 5,
       playcount: 88,
       skipcount: 1,
+      lastplayed: 1720920000,
+      added: 1710000000,
       art_embedded: true,
       art_automatic: "/fixtures/hysteria.jpg",
       art_unset: false,
@@ -111,6 +117,8 @@
       rating: 5,
       playcount: 310,
       skipcount: 2,
+      lastplayed: 1720880000,
+      added: 1695000000,
       art_embedded: true,
       art_automatic: "/fixtures/led_zeppelin_iv.jpg",
       art_unset: false,
@@ -137,6 +145,8 @@
       rating: 4,
       playcount: 67,
       skipcount: 0,
+      lastplayed: 1720870000,
+      added: 1708000000,
       art_embedded: true,
       art_automatic: "/fixtures/mezzanine.png",
       art_unset: false,
@@ -163,6 +173,8 @@
       rating: 5,
       playcount: 450,
       skipcount: 5,
+      lastplayed: 1720930000,
+      added: 1690000000,
       art_embedded: true,
       art_automatic: "/fixtures/night_at_the_opera.png",
       art_unset: false,
@@ -315,6 +327,23 @@
 
         case "get_songs":
           return mockSongs;
+
+        case "get_recently_played":
+          return mockSongs
+            .filter(s => s.lastplayed)
+            .sort((a, b) => (b.lastplayed || 0) - (a.lastplayed || 0))
+            .slice(0, args.limit || 10);
+
+        case "get_most_frequently_played":
+          return mockSongs
+            .sort((a, b) => (b.playcount || 0) - (a.playcount || 0))
+            .slice(0, args.limit || 10);
+
+        case "get_recently_added":
+          return mockSongs
+            .filter(s => s.added)
+            .sort((a, b) => (b.added || 0) - (a.added || 0))
+            .slice(0, args.limit || 10);
 
         case "get_albums":
           return mockAlbums;
