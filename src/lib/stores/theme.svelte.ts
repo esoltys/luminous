@@ -602,10 +602,20 @@ class ThemeStore {
       root.style.setProperty("--glass-shadow", `${elevation}, ${glowNear}, ${glowFar}, ${highlight}`);
     }
 
-    // Apply logo stops based on active theme or dynamic colors
+    // Apply logo stops based on active theme or dynamic colors. The
+    // System theme always uses the true brand orange/gold here — never
+    // the scheme-adjusted UI accent, which in light mode is deliberately
+    // darkened for text contrast and would make the logo look muddy/wrong
+    // instead of matching the real app icon.
     if (theme.id === "dynamic-artwork") {
       const artColors = this.artworkColors || getFallbackColors();
       const stops = calculateLogoStops(artColors.accent, artColors.accentHover);
+      root.style.setProperty("--logo-stop-1", stops.stop1);
+      root.style.setProperty("--logo-stop-2", stops.stop2);
+      root.style.setProperty("--logo-stop-3", stops.stop3);
+      root.style.setProperty("--logo-stop-4", stops.stop4);
+    } else if (isLuminous) {
+      const stops = calculateLogoStops(BRAND_ORANGE, BRAND_GOLD);
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);
