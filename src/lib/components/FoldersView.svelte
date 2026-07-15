@@ -12,6 +12,7 @@
   let settingsTab = $state<"folders" | "themes" | "equalizer" | "formats">("folders");
   let isTabInitialized = $state(false);
   let editingThemeId = $state<string | null>(null);
+  let useAdvancedBuilder = $state(false);
 
   onMount(async () => {
     try {
@@ -326,148 +327,139 @@
         {/if}
 
         <!-- Custom Theme Builder Form -->
-        {#if !editingThemeId || editingThemeId === '__new__'}
-          <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-            <div class="flex items-center gap-2 border-b border-brand-border pb-3">
+        <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+          <div class="flex items-center justify-between border-b border-brand-border pb-3">
+            <div class="flex items-center gap-2">
               <Palette class="w-5 h-5 text-brand-accent" />
               <h4 class="font-bold text-sm text-brand-text-primary">Custom Theme Builder</h4>
             </div>
+            <button
+              onclick={() => { useAdvancedBuilder = !useAdvancedBuilder; }}
+              class="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all border {useAdvancedBuilder ? 'bg-brand-accent text-white border-brand-accent' : 'bg-brand-main border-brand-border text-brand-text-secondary hover:border-brand-accent/40'}"
+            >
+              {useAdvancedBuilder ? '🔧 Advanced' : '◀ Simple'}
+            </button>
+          </div>
 
-            <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
-              <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
-                <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
-                <input
-                  id="theme-name-input"
-                  type="text"
-                  bind:value={newThemeName}
-                  placeholder="e.g. Emerald Coast, Cyberpunk..."
-                  class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
-                />
-              </div>
-              <div class="flex gap-2">
+          {#if useAdvancedBuilder}
+            <DesignTools themeId={null} />
+          {:else}
+            <div class="space-y-5">
+              <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+                <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
+                  <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
+                  <input
+                    id="theme-name-input"
+                    type="text"
+                    bind:value={newThemeName}
+                    placeholder="e.g. Emerald Coast, Cyberpunk..."
+                    class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
+                  />
+                </div>
                 <button
                   onclick={loadActiveThemeColors}
                   class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
                 >
                   <Palette class="w-4 h-4 text-brand-accent" /> Import Active Colors
                 </button>
+              </div>
+
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-2">
+                <!-- Main Background -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['bg-main']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Main View</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">bg-main</span>
+                  </div>
+                </div>
+
+                <!-- Sidebar Background -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['bg-sidebar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Sidebar</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">bg-sidebar</span>
+                  </div>
+                </div>
+
+                <!-- Player Bar Background -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['bg-playerbar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Player Bar</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">bg-playerbar</span>
+                  </div>
+                </div>
+
+                <!-- Accent Color -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['color-accent']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Accent</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">color-accent</span>
+                  </div>
+                </div>
+
+                <!-- Accent Hover Color -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['color-accent-hover']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Accent Hover</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">accent-hover</span>
+                  </div>
+                </div>
+
+                <!-- Primary Text -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['color-text-primary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Primary Text</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">text-primary</span>
+                  </div>
+                </div>
+
+                <!-- Secondary Text -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['color-text-secondary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Secondary Text</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">text-secondary</span>
+                  </div>
+                </div>
+
+                <!-- Border Color -->
+                <div class="flex items-center gap-3">
+                  <input type="color" bind:value={customColors['color-border']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-brand-text-primary">Borders</span>
+                    <span class="text-[10px] text-brand-text-secondary/50">color-border</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 pt-3 border-t border-brand-border">
                 <button
-                  onclick={() => { editingThemeId = '__new__'; }}
-                  class="bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
+                  onclick={saveCustomTheme}
+                  class="bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
                 >
-                  <Wand2 class="w-4 h-4" /> Design Tools
+                  Save Custom Theme
                 </button>
+                <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
               </div>
             </div>
+          {/if}
+        </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-2">
-            <!-- Main Background -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['bg-main']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Main View</span>
-                <span class="text-[10px] text-brand-text-secondary/50">bg-main</span>
-              </div>
-            </div>
-
-            <!-- Sidebar Background -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['bg-sidebar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Sidebar</span>
-                <span class="text-[10px] text-brand-text-secondary/50">bg-sidebar</span>
-              </div>
-            </div>
-
-            <!-- Player Bar Background -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['bg-playerbar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Player Bar</span>
-                <span class="text-[10px] text-brand-text-secondary/50">bg-playerbar</span>
-              </div>
-            </div>
-
-            <!-- Accent Color -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['color-accent']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Accent</span>
-                <span class="text-[10px] text-brand-text-secondary/50">color-accent</span>
-              </div>
-            </div>
-
-            <!-- Accent Hover Color -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['color-accent-hover']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Accent Hover</span>
-                <span class="text-[10px] text-brand-text-secondary/50">accent-hover</span>
-              </div>
-            </div>
-
-            <!-- Primary Text -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['color-text-primary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Primary Text</span>
-                <span class="text-[10px] text-brand-text-secondary/50">text-primary</span>
-              </div>
-            </div>
-
-            <!-- Secondary Text -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['color-text-secondary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Secondary Text</span>
-                <span class="text-[10px] text-brand-text-secondary/50">text-secondary</span>
-              </div>
-            </div>
-
-            <!-- Border Color -->
-            <div class="flex items-center gap-3">
-              <input type="color" bind:value={customColors['color-border']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-              <div class="flex flex-col">
-                <span class="text-xs font-semibold text-brand-text-primary">Borders</span>
-                <span class="text-[10px] text-brand-text-secondary/50">color-border</span>
-              </div>
-            </div>
-          </div>
-
-            <div class="flex items-center gap-3 pt-3 border-t border-brand-border">
-              <button
-                onclick={saveCustomTheme}
-                class="bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
-              >
-                Save Custom Theme
-              </button>
-              <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
-            </div>
-          </div>
-        {/if}
-
-        {#if editingThemeId === '__new__'}
+        {#if editingThemeId}
           <div class="border-t border-brand-border pt-6 mt-6">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-bold text-brand-text-primary">Design Tools - Create Theme</h3>
+              <h3 class="text-sm font-bold text-brand-text-primary">Edit Theme - Design Tools</h3>
               <button
                 onclick={() => { editingThemeId = null; }}
                 class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1 rounded border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
               >
                 ✕ Close
-              </button>
-            </div>
-            <DesignTools themeId={null} />
-          </div>
-        {:else if editingThemeId}
-          <div class="border-t border-brand-border pt-6 mt-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-bold text-brand-text-primary">Design Tools - Edit Theme</h3>
-              <button
-                onclick={() => { editingThemeId = null; }}
-                class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1 rounded border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
-              >
-                ✕ Close Editor
               </button>
             </div>
             <DesignTools themeId={editingThemeId} />
