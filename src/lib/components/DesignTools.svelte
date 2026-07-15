@@ -18,9 +18,9 @@
 
   let showAdvanced = $state(false);
   let selectedColorTool = $state<string>("primary");
-  let themeName = $state(newThemeName ?? "");
+  let themeName = $state("");
   let isEditing = $state(false);
-  let colorPresets = customColors ?? $state<ThemeColors>({
+  let colorPresets = $state<ThemeColors>({
     "bg-main": "#0d0b18",
     "bg-sidebar": "#07050e",
     "bg-playerbar": "#0a0813",
@@ -31,13 +31,17 @@
     "color-border": "#1f1b2e"
   });
 
-  // Sync local state with parent customColors prop when provided
-  $effect(() => {
-    if (customColors && colorPresets !== customColors) {
+  // Initialize from props
+  $effect.pre(() => {
+    if (newThemeName) {
+      themeName = newThemeName;
+    }
+    if (customColors) {
       Object.assign(colorPresets, customColors);
     }
   });
 
+  // Sync local state with parent customColors prop when provided
   $effect(() => {
     if (customColors) {
       Object.assign(customColors, colorPresets);

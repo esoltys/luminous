@@ -7,7 +7,7 @@
 
   let scrollContainer = $state<HTMLDivElement | undefined>(undefined);
   let canScrollLeft = $state(false);
-  let canScrollRight = $state(songs.length > 5);
+  let canScrollRight = $state(false);
 
   function updateScrollButtons() {
     if (!scrollContainer) return;
@@ -26,10 +26,6 @@
       behavior: "smooth",
     });
   }
-
-  $effect.pre(() => {
-    canScrollRight = songs.length > 5;
-  });
 
   $effect(() => {
     if (scrollContainer) {
