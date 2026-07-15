@@ -49,6 +49,7 @@ Luminous is currently in pre-release. You can download the latest installers and
 
 ## Product Highlights
 
+*   **Home Discovery & Personalized Curation**: Start your listening with a personalized home hub featuring time-of-day greetings and three smart curation rows: Recently Played, Most Played, and Recently Added. Browse your music with album cover carousels and discover tracks at a glance.
 *   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
 *   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
 *   **10-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and style-based presets.

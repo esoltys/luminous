@@ -132,7 +132,7 @@ async function main() {
 
   try {
     // Take screenshots of key views in their chosen themes
-    await capture("collection", "songs", "nordic-blue", "home.png");
+    await capture("home", "", "nordic-blue", "home.png");
     await capture("collection", "albums", "nordic-blue", "albums.png");
     await capture("collection", "artists", "nordic-blue", "artists.png");
     await capture("settings", "", "nordic-blue", "themes.png", async (page) => {
