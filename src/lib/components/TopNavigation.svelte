@@ -178,10 +178,3 @@
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>
-
-<style>
-  header {
-    backdrop-filter: blur(8px);
-    background-color: rgba(10, 8, 19, 0.8);
-  }
-</style>

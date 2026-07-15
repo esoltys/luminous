@@ -23,7 +23,7 @@
   <!-- Card Container -->
   <div class="relative rounded-lg overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
     <!-- Cover Art -->
-    <div class="relative aspect-square overflow-hidden bg-gray-900">
+    <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
       <CoverArt
         songId={song.id}
         artEmbedded={song.art_embedded}

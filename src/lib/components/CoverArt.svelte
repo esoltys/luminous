@@ -95,7 +95,7 @@
   });
 </script>
 
-<div class="{sizeClass} relative rounded overflow-hidden bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-400 group shrink-0">
+<div class="{sizeClass} relative rounded overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
   {#if imgSrc && !hasFailed}
     <img
       src={imgSrc}
@@ -108,13 +108,13 @@
       }}
     />
   {:else if isLoading}
-    <LoaderCircle class="w-1/2 h-1/2 animate-spin text-violet-400" />
+    <LoaderCircle class="w-1/2 h-1/2 animate-spin text-brand-accent" />
   {:else}
-    <div class="flex items-center justify-center w-full h-full bg-linear-to-b from-gray-800 to-gray-950">
+    <div class="flex items-center justify-center w-full h-full bg-linear-to-b from-brand-sidebar to-brand-main">
       {#if animateSpin}
-        <Disc class="w-1/2 h-1/2 animate-spin text-violet-400" style="animation-duration: 4s;" />
+        <Disc class="w-1/2 h-1/2 animate-spin text-brand-accent" style="animation-duration: 4s;" />
       {:else}
-        <Music class="w-1/2 h-1/2 text-gray-600" />
+        <Music class="w-1/2 h-1/2 text-brand-text-secondary/60" />
       {/if}
     </div>
   {/if}

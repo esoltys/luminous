@@ -59,6 +59,6 @@
   });
 </script>
 
-<div class="w-full h-[3px] rounded bg-gray-800 overflow-hidden relative opacity-60 hover:opacity-100 transition-opacity duration-200">
+<div class="w-full h-[3px] rounded bg-brand-border overflow-hidden relative opacity-60 hover:opacity-100 transition-opacity duration-200">
   <canvas bind:this={canvas} width="450" height="4" class="w-full h-full object-cover"></canvas>
 </div>

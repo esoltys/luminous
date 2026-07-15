@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
+import { hexToRgb, rgbToHex, checkWcagCompliance } from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -42,8 +43,8 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "bg-main": "#08090c",
   "bg-sidebar": "#1c1f29",
   "bg-playerbar": "#191b23",
-  "color-accent": "#7c9eff",
-  "color-accent-hover": "#93b1ff",
+  "color-accent": "#4d94ff",
+  "color-accent-hover": "#6fa8ff",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
   "color-border": "#2c2f3c"
@@ -53,12 +54,80 @@ export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "bg-main": "#e9eaf0",
   "bg-sidebar": "#ffffff",
   "bg-playerbar": "#ffffff",
-  "color-accent": "#4f46e5",
-  "color-accent-hover": "#6366f1",
+  "color-accent": "#1a64ca",
+  "color-accent-hover": "#4883d5",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
   "color-border": "#dcdce4"
 };
+
+/**
+ * Best-effort OS accent color detection via the CSS `AccentColor` system
+ * color (part of CSS Color Module Level 4). Reliably resolves on Windows
+ * via Chromium/WebView2; unsupported browsers/platforms (macOS WKWebView,
+ * Linux WebKitGTK) fail CSS.supports() and this returns null, so callers
+ * fall back to the curated LUMINOUS_*_COLORS accent above.
+ *
+ * Renders a real (invisible) element rather than reading the custom
+ * property string directly — `getComputedStyle` resolves standard
+ * properties like `color` to an actual rgb(...), but does NOT resolve
+ * custom properties, so `--x: AccentColor` would read back as the literal
+ * text "AccentColor" instead of a usable value.
+ */
+function detectSystemAccentHex(): string | null {
+  if (typeof document === "undefined" || typeof CSS === "undefined" || !CSS.supports) return null;
+  if (!CSS.supports("color", "AccentColor")) return null;
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.top = "-9999px";
+  probe.style.color = "AccentColor";
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  document.body.removeChild(probe);
+
+  const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(resolved);
+  if (!match) return null;
+  return rgbToHex(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+/** Blends a hex color toward white (factor > 0) or black (factor < 0). */
+export function blendToward(hex: string, target: 0 | 255, amount: number): string {
+  const rgb = hexToRgb(hex);
+  const mix = (c: number) => Math.round(c + (target - c) * amount);
+  return rgbToHex(mix(rgb.r), mix(rgb.g), mix(rgb.b));
+}
+
+/**
+ * Derives an rgba() string from an opaque hex color for glass-panel
+ * rendering only. The "official" ThemeColors stay opaque hex everywhere
+ * else (native <input type="color"> swatches, contrast tests, "Import
+ * Active Colors") — alpha is applied here, one level removed, purely for
+ * the .glass-surface CSS custom properties so it can never reach a color
+ * picker's bound value.
+ */
+export function hexToRgbaString(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Nudges a candidate accent color toward white/black in steps until it
+ * meets WCAG AA against the given background, so an OS accent color that's
+ * too dark-on-dark or too light-on-light doesn't ship an inaccessible
+ * combination. Gives up (returns null) if it can't pass within a
+ * reasonable range — callers fall back to the curated accent.
+ */
+export function makeAccessibleAccent(hex: string, backgroundHex: string, towardWhite: boolean): string | null {
+  const target: 0 | 255 = towardWhite ? 255 : 0;
+  for (let step = 0; step <= 8; step++) {
+    const candidate = step === 0 ? hex : blendToward(hex, target, step / 10);
+    if (checkWcagCompliance(candidate, backgroundHex).wcagAA) {
+      return candidate;
+    }
+  }
+  return null;
+}
 
 export const PREDEFINED_THEMES: Theme[] = [
   {
@@ -297,11 +366,20 @@ class ThemeStore {
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
   systemColorScheme = $state<"light" | "dark">("dark");
+  // Resolved OS accent color, validated for AA contrast against each
+  // scheme's canvas. Null when unsupported (non-Windows) or when the
+  // detected accent can't be made accessible — callers fall back to the
+  // curated LUMINOUS_*_COLORS accent in that case.
+  systemAccentDark = $state<string | null>(null);
+  systemAccentDarkHover = $state<string | null>(null);
+  systemAccentLight = $state<string | null>(null);
+  systemAccentLightHover = $state<string | null>(null);
 
   constructor() {}
 
   async init() {
     this.watchSystemColorScheme();
+    this.detectSystemAccent();
 
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
@@ -342,6 +420,34 @@ class ThemeStore {
         this.applyActiveTheme();
       }
     });
+  }
+
+  /**
+   * Best-effort, one-time OS accent color detection (there's no web API to
+   * watch for the user changing it later without relaunching). Validates
+   * the detected color separately against each scheme's canvas, since an
+   * accent tuned for dark backgrounds may need adjustment on light ones
+   * (or vice versa) to keep WCAG AA contrast.
+   */
+  detectSystemAccent() {
+    const raw = detectSystemAccentHex();
+    if (!raw) return;
+
+    const dark = makeAccessibleAccent(raw, LUMINOUS_DARK_COLORS["bg-main"], true);
+    if (dark) {
+      this.systemAccentDark = dark;
+      this.systemAccentDarkHover = blendToward(dark, 255, 0.2);
+    }
+
+    const light = makeAccessibleAccent(raw, LUMINOUS_LIGHT_COLORS["bg-main"], false);
+    if (light) {
+      this.systemAccentLight = light;
+      this.systemAccentLightHover = blendToward(light, 0, 0.2);
+    }
+
+    if (this.activeThemeId === "system") {
+      this.applyActiveTheme();
+    }
   }
 
   get isGlassTheme(): boolean {
@@ -482,11 +588,20 @@ class ThemeStore {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
     const isLuminous = theme.id === "system";
-    // The Luminous theme's live colors come from whichever OS-scheme
-    // palette is active, not the static preview colors on the theme entry.
-    const colors = isLuminous
-      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
-      : theme.colors;
+    // The System theme's live colors come from whichever OS-scheme palette
+    // is active, not the static preview colors on the theme entry — and
+    // prefer the detected+validated OS accent color over the curated one
+    // when available.
+    let colors = theme.colors;
+    if (isLuminous) {
+      const isDark = this.systemColorScheme === "dark";
+      const base = isDark ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      const accent = isDark ? this.systemAccentDark : this.systemAccentLight;
+      const accentHover = isDark ? this.systemAccentDarkHover : this.systemAccentLightHover;
+      colors = accent && accentHover
+        ? { ...base, "color-accent": accent, "color-accent-hover": accentHover }
+        : base;
+    }
 
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
@@ -510,6 +625,20 @@ class ThemeStore {
 
     const root = document.documentElement;
     root.classList.toggle("theme-glass", isLuminous);
+
+    if (isLuminous) {
+      const isDark = this.systemColorScheme === "dark";
+      // These are rendering-only, separate from the opaque `colors` above —
+      // alpha never reaches a color picker, see hexToRgbaString().
+      root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(colors["bg-sidebar"], isDark ? 0.5 : 0.6));
+      root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(colors["bg-playerbar"], isDark ? 0.55 : 0.65));
+      root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
+
+      const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
+      const glow = `0 0 40px 2px ${hexToRgbaString(colors["color-accent"], isDark ? 0.2 : 0.14)}`;
+      const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
+      root.style.setProperty("--glass-shadow", `${elevation}, ${glow}, ${highlight}`);
+    }
 
     // Apply logo stops based on active theme or dynamic colors
     if (theme.id === "dynamic-artwork") {
