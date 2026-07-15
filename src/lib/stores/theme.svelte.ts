@@ -1,7 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
-import { hexToRgb, rgbToHex, pickAccessibleOnColor } from "../utils/colorUtils";
+import {
+  hexToRgb,
+  rgbToHex,
+  pickAccessibleOnColor,
+  rgbToHsl,
+  hslToRgb,
+  quantizeMedianCut,
+  extractArchetypes,
+  checkWcagCompliance,
+  type ColorCount
+} from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -175,6 +185,84 @@ export const PREDEFINED_THEMES: Theme[] = [
   }
 ];
 
+// The Dynamic Artwork theme (PREDEFINED_THEMES below) hardcodes these as its
+// text colors regardless of the extracted background, so every background
+// surface buildExtractedColors() produces must stay readable against both.
+const ARTWORK_TEXT_PRIMARY = "#ffffff";
+const ARTWORK_TEXT_SECONDARY = "#e2e8f0";
+
+type Rgb = { r: number; g: number; b: number };
+
+/** Re-lightens/darkens an RGB color in HSL space, holding hue+saturation fixed. */
+function withLightness(rgb: Rgb, l: number): Rgb {
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  return hslToRgb(hsl.h, hsl.s, Math.min(1, Math.max(0, l)));
+}
+
+function clampLightness(rgb: Rgb, minL: number, maxL: number): Rgb {
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  if (hsl.l >= minL && hsl.l <= maxL) return rgb;
+  return withLightness(rgb, Math.min(Math.max(hsl.l, minL), maxL));
+}
+
+/** Steps lightness down in HSL space until both fixed artwork text colors clear WCAG AA, or L bottoms out. */
+function darkenUntilReadable(rgb: Rgb): Rgb {
+  let candidate = rgb;
+  let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  for (let i = 0; i < 30; i++) {
+    const hex = rgbToHex(candidate.r, candidate.g, candidate.b);
+    const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY, hex).wcagAA;
+    const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY, hex).wcagAA;
+    if (primaryOk && secondaryOk) return candidate;
+    if (hsl.l <= 0) return candidate;
+    hsl = { ...hsl, l: Math.max(0, hsl.l - 0.02) };
+    candidate = hslToRgb(hsl.h, hsl.s, hsl.l);
+  }
+  return candidate;
+}
+
+/**
+ * Derives the full artwork palette from a weighted color histogram using
+ * Median Cut quantization + Android Palette-style archetype scoring (#61),
+ * replacing flat population-dominance picking. That approach loses small,
+ * vibrant accent clusters on covers dominated by a huge neutral background
+ * (e.g. a mostly-black album with a tiny neon accent) because population
+ * alone decides the winner; scoring candidates by role (vibrant vs. muted,
+ * light vs. dark) instead keeps the accent regardless of how few pixels it
+ * covers. Every derived background surface is then validated with
+ * checkWcagCompliance() against the fixed Dynamic Artwork text colors,
+ * mirroring the pickAccessibleOnColor() pattern already used for text-on-accent.
+ */
+export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors {
+  const swatches = quantizeMedianCut(colorCounts, 24);
+  const archetypes = extractArchetypes(swatches);
+  const dominant = swatches.reduce((max, s) => (s.population > max.population ? s : max), swatches[0]);
+
+  const primaryBase = archetypes.darkVibrant || archetypes.darkMuted || dominant;
+  const primaryRgb = darkenUntilReadable(clampLightness(primaryBase, 0, 0.35));
+  const primaryHsl = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+
+  // extractArchetypes() always backfills vibrant with the dominant swatch
+  // when nothing clears its guard rails, so this is never null here.
+  const accentBase = archetypes.vibrant as (typeof swatches)[number];
+  const accentRgb = clampLightness(accentBase, 0.35, 0.75);
+  const accentHsl = rgbToHsl(accentRgb.r, accentRgb.g, accentRgb.b);
+
+  const sidebarRgb = withLightness(primaryRgb, primaryHsl.l - 0.025);
+  const playerbarRgb = withLightness(primaryRgb, primaryHsl.l - 0.012);
+  const borderRgb = withLightness(primaryRgb, primaryHsl.l + 0.14);
+  const accentHoverRgb = withLightness(accentRgb, Math.min(0.85, accentHsl.l + 0.1));
+
+  return {
+    primary: rgbToHex(primaryRgb.r, primaryRgb.g, primaryRgb.b),
+    sidebar: rgbToHex(sidebarRgb.r, sidebarRgb.g, sidebarRgb.b),
+    playerbar: rgbToHex(playerbarRgb.r, playerbarRgb.g, playerbarRgb.b),
+    accent: rgbToHex(accentRgb.r, accentRgb.g, accentRgb.b),
+    accentHover: rgbToHex(accentHoverRgb.r, accentHoverRgb.g, accentHoverRgb.b),
+    border: rgbToHex(borderRgb.r, borderRgb.g, borderRgb.b)
+  };
+}
+
 export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -208,7 +296,8 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
 
           count++;
 
-          // Quantize color
+          // Pre-quantize to a 16-step RGB grid so Median Cut works over a
+          // manageable candidate pool instead of up to 1600 raw pixels.
           const qr = Math.floor(r / 16) * 16;
           const qg = Math.floor(g / 16) * 16;
           const qb = Math.floor(b / 16) * 16;
@@ -222,82 +311,12 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
           return;
         }
 
-        const sortedColors = Array.from(colorBuckets.entries())
-          .sort((a, b) => b[1] - a[1])
-          .map(([key]) => {
-            const [r, g, b] = key.split(",").map(Number);
-            return { r, g, b };
-          });
-
-        const dominant = sortedColors[0] || { r: 139, g: 92, b: 246 };
-
-        // Find a saturated accent color
-        let accent = dominant;
-        let maxSaturation = 0;
-
-        for (const color of sortedColors) {
-          const { r, g, b } = color;
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const chroma = max - min;
-          const saturation = max === 0 ? 0 : chroma / max;
-          const brightness = max / 255;
-
-          if (saturation > maxSaturation && brightness > 0.3 && brightness < 0.99) {
-            maxSaturation = saturation;
-            accent = color;
-          }
-        }
-
-        if (maxSaturation < 0.15) {
-          accent = dominant;
-        }
-
-        const toHex = (c: number) => {
-          const hex = Math.min(255, Math.max(0, Math.round(c))).toString(16);
-          return hex.length === 1 ? "0" + hex : hex;
-        };
-
-        const rgbToHex = (r: number, g: number, b: number) => `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-
-        const adjustBrightness = (color: { r: number, g: number, b: number }, factor: number) => {
-          return {
-            r: Math.min(255, Math.max(0, color.r * factor)),
-            g: Math.min(255, Math.max(0, color.g * factor)),
-            b: Math.min(255, Math.max(0, color.b * factor))
-          };
-        };
-
-        // Darken primary background for dark-mode readability
-        let primaryColor = { ...dominant };
-        const primaryBrightness = (primaryColor.r * 0.299 + primaryColor.g * 0.587 + primaryColor.b * 0.114) / 255;
-        if (primaryBrightness > 0.15) {
-          primaryColor = adjustBrightness(primaryColor, 0.10 / primaryBrightness);
-        } else if (primaryBrightness < 0.05) {
-          primaryColor = adjustBrightness(primaryColor, 1.5);
-        }
-
-        const sidebarColor = adjustBrightness(primaryColor, 0.6);
-        const playerbarColor = adjustBrightness(primaryColor, 0.8);
-
-        // Normalize accent brightness
-        let accentColor = { ...accent };
-        const accentBrightness = (accentColor.r * 0.299 + accentColor.g * 0.587 + accentColor.b * 0.114) / 255;
-        if (accentBrightness < 0.45) {
-          accentColor = adjustBrightness(accentColor, 0.6 / Math.max(0.1, accentBrightness));
-        }
-
-        const accentHoverColor = adjustBrightness(accentColor, 1.2);
-        const borderColor = adjustBrightness(primaryColor, 2.2);
-
-        resolve({
-          primary: rgbToHex(primaryColor.r, primaryColor.g, primaryColor.b),
-          sidebar: rgbToHex(sidebarColor.r, sidebarColor.g, sidebarColor.b),
-          playerbar: rgbToHex(playerbarColor.r, playerbarColor.g, playerbarColor.b),
-          accent: rgbToHex(accentColor.r, accentColor.g, accentColor.b),
-          accentHover: rgbToHex(accentHoverColor.r, accentHoverColor.g, accentHoverColor.b),
-          border: rgbToHex(borderColor.r, borderColor.g, borderColor.b)
+        const colorCounts: ColorCount[] = Array.from(colorBuckets.entries()).map(([key, bucketCount]) => {
+          const [r, g, b] = key.split(",").map(Number);
+          return { r, g, b, count: bucketCount };
         });
+
+        resolve(buildExtractedColors(colorCounts));
       } catch (e) {
         console.error("Failed to process image colors:", e);
         resolve(getFallbackColors());

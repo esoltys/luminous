@@ -214,3 +214,265 @@ export function getWcagBadgeText(level: 'fail' | 'AA' | 'AAA'): string {
       return '✗ Below AA';
   }
 }
+
+export interface HSL {
+  h: number; // degrees, 0-360
+  s: number; // 0-1
+  l: number; // 0-1
+}
+
+/**
+ * Convert RGB (0-255) to HSL. Used to score candidate swatches against the
+ * Android Palette-style archetypes below — HSL's saturation/lightness axes
+ * map directly onto "vibrant vs muted" and "light vs dark" in a way RGB
+ * doesn't.
+ */
+export function rgbToHsl(r: number, g: number, b: number): HSL {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l };
+  }
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  switch (max) {
+    case r:
+      h = (g - b) / d + (g < b ? 6 : 0);
+      break;
+    case g:
+      h = (b - r) / d + 2;
+      break;
+    default:
+      h = (r - g) / d + 4;
+      break;
+  }
+  return { h: (h / 6) * 360, s, l };
+}
+
+/**
+ * Inverse of rgbToHsl. Used to derive a family of related shades (surface
+ * background, sidebar, border, accent hover, ...) from a single seed color
+ * by stepping lightness in HSL space while holding hue/saturation fixed —
+ * unlike naive RGB brightness multiplication, this can't drift the hue.
+ */
+export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return { r: v, g: v, b: v };
+  }
+
+  const hueToRgb = (p: number, q: number, t: number): number => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  };
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hNorm = h / 360;
+
+  return {
+    r: Math.round(hueToRgb(p, q, hNorm + 1 / 3) * 255),
+    g: Math.round(hueToRgb(p, q, hNorm) * 255),
+    b: Math.round(hueToRgb(p, q, hNorm - 1 / 3) * 255)
+  };
+}
+
+/** One of the six Android Palette / Spotify-style UI color roles. */
+export type Archetype = 'vibrant' | 'lightVibrant' | 'darkVibrant' | 'muted' | 'lightMuted' | 'darkMuted';
+
+interface ArchetypeTarget {
+  targetS: number;
+  minS: number;
+  maxS: number;
+  targetL: number;
+  minL: number;
+  maxL: number;
+}
+
+/**
+ * Aesthetic benchmarks each archetype is scored against. Guard rails
+ * (min/max) reject a candidate outright; target values shape the score of
+ * whatever passes the guard rails.
+ */
+export const ARCHETYPE_TARGETS: Record<Archetype, ArchetypeTarget> = {
+  vibrant: { targetS: 1.0, minS: 0.35, maxS: 1.0, targetL: 0.5, minL: 0.3, maxL: 0.7 },
+  lightVibrant: { targetS: 1.0, minS: 0.35, maxS: 1.0, targetL: 0.74, minL: 0.55, maxL: 1.0 },
+  darkVibrant: { targetS: 1.0, minS: 0.35, maxS: 1.0, targetL: 0.26, minL: 0.0, maxL: 0.45 },
+  muted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.5, minL: 0.3, maxL: 0.7 },
+  lightMuted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.74, minL: 0.55, maxL: 1.0 },
+  darkMuted: { targetS: 0.3, minS: 0.0, maxS: 0.4, targetL: 0.26, minL: 0.0, maxL: 0.45 }
+};
+
+const WEIGHT_SATURATION = 0.6;
+const WEIGHT_LUMINANCE = 0.3;
+const WEIGHT_POPULATION = 0.1;
+
+/**
+ * Scores how well a candidate swatch fits an archetype: 0 if it falls
+ * outside the archetype's saturation/lightness guard rails, otherwise a
+ * weighted blend of closeness-to-target and population (so a huge but
+ * off-target background can't outscore a smaller, better-matching swatch —
+ * the exact failure mode that made naive dominant-color extraction lose
+ * small vibrant accents on mostly-black covers).
+ */
+export function scoreSwatch(hsl: HSL, population: number, maxPopulation: number, target: ArchetypeTarget): number {
+  const { s, l } = hsl;
+  if (s < target.minS || s > target.maxS || l < target.minL || l > target.maxL) {
+    return 0;
+  }
+  const satScore = (1 - Math.abs(s - target.targetS)) * WEIGHT_SATURATION;
+  const lumScore = (1 - Math.abs(l - target.targetL)) * WEIGHT_LUMINANCE;
+  const popScore = (population / maxPopulation) * WEIGHT_POPULATION;
+  return satScore + lumScore + popScore;
+}
+
+export interface ColorCount {
+  r: number;
+  g: number;
+  b: number;
+  count: number;
+}
+
+export interface Swatch {
+  r: number;
+  g: number;
+  b: number;
+  population: number;
+}
+
+type RgbChannel = 'r' | 'g' | 'b';
+
+function widestChannel(box: ColorCount[]): { axis: RgbChannel; range: number } {
+  let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+  for (const c of box) {
+    if (c.r < minR) minR = c.r;
+    if (c.r > maxR) maxR = c.r;
+    if (c.g < minG) minG = c.g;
+    if (c.g > maxG) maxG = c.g;
+    if (c.b < minB) minB = c.b;
+    if (c.b > maxB) maxB = c.b;
+  }
+  const ranges: Record<RgbChannel, number> = { r: maxR - minR, g: maxG - minG, b: maxB - minB };
+  const axis = (Object.keys(ranges) as RgbChannel[]).reduce((a, b) => (ranges[b] > ranges[a] ? b : a));
+  return { axis, range: ranges[axis] };
+}
+
+/**
+ * Median Cut color quantization: reduces a weighted color histogram down to
+ * at most `maxSwatches` representative colors. Chosen over flat/K-Means
+ * bucketing because each split is driven by color *range*, not population —
+ * a box containing both a huge near-black background and a handful of
+ * neon-blue pixels has a huge range on the blue channel, so it keeps
+ * getting split until the neon cluster is isolated into its own swatch,
+ * rather than being averaged away into "dark gray".
+ */
+export function quantizeMedianCut(colors: ColorCount[], maxSwatches: number): Swatch[] {
+  if (colors.length === 0) return [];
+
+  const boxes: ColorCount[][] = [colors.slice()];
+
+  while (boxes.length < maxSwatches) {
+    let splitIdx = -1;
+    let splitAxis: RgbChannel = 'r';
+    let widestRange = 0;
+
+    for (let i = 0; i < boxes.length; i++) {
+      if (boxes[i].length <= 1) continue;
+      const { axis, range } = widestChannel(boxes[i]);
+      if (range > widestRange) {
+        widestRange = range;
+        splitIdx = i;
+        splitAxis = axis;
+      }
+    }
+
+    if (splitIdx === -1) break; // no box left with more than one distinct color
+
+    const box = boxes[splitIdx];
+    box.sort((a, b) => a[splitAxis] - b[splitAxis]);
+    const totalCount = box.reduce((sum, c) => sum + c.count, 0);
+
+    let cumulative = 0;
+    let cutAt = 1;
+    for (let i = 0; i < box.length; i++) {
+      cumulative += box[i].count;
+      if (cumulative >= totalCount / 2) {
+        cutAt = i + 1;
+        break;
+      }
+    }
+    cutAt = Math.min(Math.max(cutAt, 1), box.length - 1);
+
+    boxes.splice(splitIdx, 1, box.slice(0, cutAt), box.slice(cutAt));
+  }
+
+  return boxes
+    .map(box => {
+      let rSum = 0, gSum = 0, bSum = 0, population = 0;
+      for (const c of box) {
+        rSum += c.r * c.count;
+        gSum += c.g * c.count;
+        bSum += c.b * c.count;
+        population += c.count;
+      }
+      return {
+        r: Math.round(rSum / population),
+        g: Math.round(gSum / population),
+        b: Math.round(bSum / population),
+        population
+      };
+    })
+    .sort((a, b) => b.population - a.population);
+}
+
+/**
+ * Evaluates every candidate swatch against all six archetype targets and
+ * returns the best match for each. If no candidate clears "vibrant"'s
+ * guard rails at all (e.g. an entirely desaturated cover), vibrant falls
+ * back to the dominant-by-population swatch so the UI always has an accent
+ * rather than nothing. Other archetypes are left null when unmatched —
+ * callers chain their own role-appropriate fallbacks (e.g. darkVibrant →
+ * darkMuted → dominant) since "no good light-vibrant swatch" isn't
+ * necessarily a problem the way "no accent at all" is.
+ */
+export function extractArchetypes(swatches: Swatch[]): Record<Archetype, Swatch | null> {
+  const result = {} as Record<Archetype, Swatch | null>;
+  if (swatches.length === 0) {
+    for (const key of Object.keys(ARCHETYPE_TARGETS) as Archetype[]) result[key] = null;
+    return result;
+  }
+
+  const maxPopulation = Math.max(...swatches.map(s => s.population));
+
+  for (const [key, target] of Object.entries(ARCHETYPE_TARGETS) as [Archetype, ArchetypeTarget][]) {
+    let best: Swatch | null = null;
+    let bestScore = 0;
+    for (const swatch of swatches) {
+      const hsl = rgbToHsl(swatch.r, swatch.g, swatch.b);
+      const score = scoreSwatch(hsl, swatch.population, maxPopulation, target);
+      if (score > bestScore) {
+        bestScore = score;
+        best = swatch;
+      }
+    }
+    result[key] = best;
+  }
+
+  if (!result.vibrant) {
+    result.vibrant = swatches.reduce((max, s) => (s.population > max.population ? s : max), swatches[0]);
+  }
+
+  return result;
+}

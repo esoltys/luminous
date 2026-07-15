@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
+import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, buildExtractedColors } from "./theme.svelte";
+import { checkWcagCompliance, pickAccessibleOnColor, hexToRgb, rgbToHsl } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("does not include the removed Luminous Violet theme", () => {
@@ -79,5 +79,46 @@ describe("on-accent text contrast (heuristically derived, not hand-picked)", () 
   it("picks white for a dark accent and black for a light accent", () => {
     expect(pickAccessibleOnColor("#1a1a2e")).toBe("#ffffff");
     expect(pickAccessibleOnColor("#f5f5f5")).toBe("#000000");
+  });
+});
+
+describe("buildExtractedColors (archetype-based artwork color extraction, #61)", () => {
+  // The failure mode #61 exists to fix: a moody-rock-album stand-in that's
+  // ~99.5% near-black background with a tiny neon-blue accent cluster.
+  // Flat population-dominance extraction loses the neon entirely.
+  const darkCoverWithNeonAccent = [
+    { r: 5, g: 5, b: 5, count: 1000 },
+    { r: 20, g: 40, b: 255, count: 5 }
+  ];
+
+  it("picks the small neon cluster as the accent instead of losing it to the black background", () => {
+    const colors = buildExtractedColors(darkCoverWithNeonAccent);
+    const accentRgb = hexToRgb(colors.accent);
+    expect(accentRgb.b).toBeGreaterThan(150);
+  });
+
+  it("keeps the primary background dark enough for the fixed Dynamic Artwork text colors", () => {
+    const colors = buildExtractedColors(darkCoverWithNeonAccent);
+    expect(checkWcagCompliance("#ffffff", colors.primary).wcagAA).toBe(true);
+    expect(checkWcagCompliance("#e2e8f0", colors.primary).wcagAA).toBe(true);
+  });
+
+  it("keeps sidebar/playerbar darker than, and border lighter than, the primary background", () => {
+    const colors = buildExtractedColors([{ r: 80, g: 40, b: 160, count: 1000 }]);
+    const luminanceOf = (hex: string) => checkWcagCompliance("#000000", hex).ratio;
+    expect(luminanceOf(colors.sidebar)).toBeLessThanOrEqual(luminanceOf(colors.primary));
+    expect(luminanceOf(colors.playerbar)).toBeLessThanOrEqual(luminanceOf(colors.primary));
+    expect(luminanceOf(colors.border)).toBeGreaterThanOrEqual(luminanceOf(colors.primary));
+  });
+
+  it("keeps the accent in a visible lightness range even for a fully desaturated dominant color", () => {
+    // No candidate clears any archetype's saturation guard rail here, so
+    // extractArchetypes() falls back to the dominant swatch for vibrant —
+    // this proves that fallback still gets lightness-normalized rather
+    // than handed back near-black.
+    const colors = buildExtractedColors([{ r: 8, g: 8, b: 8, count: 1000 }]);
+    const rgb = hexToRgb(colors.accent);
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    expect(hsl.l).toBeGreaterThanOrEqual(0.3);
   });
 });
