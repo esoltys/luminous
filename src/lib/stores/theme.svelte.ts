@@ -29,20 +29,41 @@ export interface ExtractedColors {
   border: string;
 }
 
+/**
+ * "Luminous" auto-theme: adapts to the OS light/dark preference. Panels
+ * (sidebar, player bar, top nav) get a "glass" treatment via backdrop-filter
+ * blur/saturate plus a tonal step from the canvas, applied in app.css's
+ * .glass-surface class. Colors here stay fully opaque hex (not rgba) on
+ * purpose — native <input type="color"> swatches in the theme builder can't
+ * represent alpha, so translucent values would silently break editing.
+ */
+export const LUMINOUS_DARK_COLORS: ThemeColors = {
+  "bg-main": "#0b0d12",
+  "bg-sidebar": "#14161e",
+  "bg-playerbar": "#121319",
+  "color-accent": "#7c9eff",
+  "color-accent-hover": "#93b1ff",
+  "color-text-primary": "#f1f3f8",
+  "color-text-secondary": "#a6adc4",
+  "color-border": "#242631"
+};
+
+export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
+  "bg-main": "#f5f6fa",
+  "bg-sidebar": "#ffffff",
+  "bg-playerbar": "#ffffff",
+  "color-accent": "#4f46e5",
+  "color-accent-hover": "#6366f1",
+  "color-text-primary": "#16181d",
+  "color-text-secondary": "#5a6072",
+  "color-border": "#e4e4ea"
+};
+
 export const PREDEFINED_THEMES: Theme[] = [
   {
-    id: "luminous-violet",
-    name: "Luminous Violet",
-    colors: {
-      "bg-main": "#0d0b18",
-      "bg-sidebar": "#07050e",
-      "bg-playerbar": "#0a0813",
-      "color-accent": "#8b5cf6",
-      "color-accent-hover": "#a78bfa",
-      "color-text-primary": "#f3f4f6",
-      "color-text-secondary": "#9ca3af",
-      "color-border": "#1f1b2e"
-    }
+    id: "luminous",
+    name: "Luminous",
+    colors: { ...LUMINOUS_DARK_COLORS }
   },
   {
     id: "ruby-red",
@@ -271,13 +292,16 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
 }
 
 class ThemeStore {
-  activeThemeId = $state<string>("nordic-blue");
+  activeThemeId = $state<string>("luminous");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
+  systemColorScheme = $state<"light" | "dark">("dark");
 
   constructor() {}
 
   async init() {
+    this.watchSystemColorScheme();
+
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings) {
@@ -302,11 +326,32 @@ class ThemeStore {
     }
   }
 
+  /**
+   * Reads the OS light/dark preference and listens for changes so the
+   * "Luminous" auto-theme (and its logo gradient, computed in JS from a
+   * literal hex accent) can react live without a page reload.
+   */
+  watchSystemColorScheme() {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    this.systemColorScheme = mq.matches ? "dark" : "light";
+    mq.addEventListener("change", (e) => {
+      this.systemColorScheme = e.matches ? "dark" : "light";
+      if (this.activeThemeId === "luminous") {
+        this.applyActiveTheme();
+      }
+    });
+  }
+
+  get isGlassTheme(): boolean {
+    return this.activeThemeId === "luminous";
+  }
+
   get currentTheme(): Theme {
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
-    return custom || PREDEFINED_THEMES.find(t => t.id === "nordic-blue") || PREDEFINED_THEMES[0];
+    return custom || PREDEFINED_THEMES.find(t => t.id === "luminous") || PREDEFINED_THEMES[0];
   }
 
   async setTheme(themeId: string) {
@@ -344,7 +389,7 @@ class ThemeStore {
     });
 
     if (this.activeThemeId === themeId) {
-      await this.setTheme("nordic-blue");
+      await this.setTheme("luminous");
     }
   }
 
@@ -435,6 +480,13 @@ class ThemeStore {
   applyActiveTheme() {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
+    const isLuminous = theme.id === "luminous";
+    // The Luminous theme's live colors come from whichever OS-scheme
+    // palette is active, not the static preview colors on the theme entry.
+    const colors = isLuminous
+      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
+      : theme.colors;
+
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
       styleEl = document.createElement("style");
@@ -444,28 +496,30 @@ class ThemeStore {
 
     styleEl.innerHTML = `
       :root {
-        --bg-main: ${theme.colors["bg-main"]};
-        --bg-sidebar: ${theme.colors["bg-sidebar"]};
-        --bg-playerbar: ${theme.colors["bg-playerbar"]};
-        --color-accent: ${theme.colors["color-accent"]};
-        --color-accent-hover: ${theme.colors["color-accent-hover"]};
-        --color-text-primary: ${theme.colors["color-text-primary"]};
-        --color-text-secondary: ${theme.colors["color-text-secondary"]};
-        --color-border: ${theme.colors["color-border"]};
+        --bg-main: ${colors["bg-main"]};
+        --bg-sidebar: ${colors["bg-sidebar"]};
+        --bg-playerbar: ${colors["bg-playerbar"]};
+        --color-accent: ${colors["color-accent"]};
+        --color-accent-hover: ${colors["color-accent-hover"]};
+        --color-text-primary: ${colors["color-text-primary"]};
+        --color-text-secondary: ${colors["color-text-secondary"]};
+        --color-border: ${colors["color-border"]};
       }
     `;
 
-    // Apply logo stops based on active theme or dynamic colors
     const root = document.documentElement;
+    root.classList.toggle("theme-glass", isLuminous);
+
+    // Apply logo stops based on active theme or dynamic colors
     if (theme.id === "dynamic-artwork") {
-      const colors = this.artworkColors || getFallbackColors();
-      const stops = calculateLogoStops(colors.accent, colors.accentHover);
+      const artColors = this.artworkColors || getFallbackColors();
+      const stops = calculateLogoStops(artColors.accent, artColors.accentHover);
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);
       root.style.setProperty("--logo-stop-4", stops.stop4);
     } else {
-      const stops = calculateLogoStops(theme.colors["color-accent"], theme.colors["color-accent-hover"]);
+      const stops = calculateLogoStops(colors["color-accent"], colors["color-accent-hover"]);
       root.style.setProperty("--logo-stop-1", stops.stop1);
       root.style.setProperty("--logo-stop-2", stops.stop2);
       root.style.setProperty("--logo-stop-3", stops.stop3);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
-  import { themeStore, PREDEFINED_THEMES, type ThemeColors } from "../stores/theme.svelte";
+  import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2 } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -73,10 +73,20 @@
     "color-border": "#1f1b2e"
   });
 
+  // The Luminous theme's live colors depend on the OS light/dark preference,
+  // not the static (dark) preview baked into its PREDEFINED_THEMES entry —
+  // use the current system scheme so its swatch matches what's on screen.
+  function getPreviewColors(theme: Theme): ThemeColors {
+    if (theme.id === "luminous") {
+      return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+    }
+    return theme.colors;
+  }
+
   function loadActiveThemeColors() {
     if (typeof document === "undefined") return;
     const rootStyle = getComputedStyle(document.documentElement);
-    
+
     const getHexColor = (prop: string, fallback: string): string => {
       const val = rootStyle.getPropertyValue(prop).trim();
       if (!val) return fallback;
@@ -258,6 +268,7 @@
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Predefined Themes</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {#each PREDEFINED_THEMES as theme}
+              {@const previewColors = getPreviewColors(theme)}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
                 class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
@@ -272,10 +283,10 @@
                 </div>
                 <!-- Miniature colors preview -->
                 <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-                  <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}" title="Sidebar"></div>
-                  <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}" title="Main View"></div>
-                  <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}" title="Player Bar"></div>
-                  <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}" title="Accent"></div>
+                  <div class="w-[30%]" style="background-color: {previewColors['bg-sidebar']}" title="Sidebar"></div>
+                  <div class="w-[50%]" style="background-color: {previewColors['bg-main']}" title="Main View"></div>
+                  <div class="w-[10%]" style="background-color: {previewColors['bg-playerbar']}" title="Player Bar"></div>
+                  <div class="w-[10%]" style="background-color: {previewColors['color-accent']}" title="Accent"></div>
                 </div>
               </button>
             {/each}

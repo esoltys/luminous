@@ -1,6 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { themeStore } from "../stores/theme.svelte";
   import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
@@ -35,7 +36,7 @@
   }
 </script>
 
-<aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0">
+<aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Navigation -->
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button

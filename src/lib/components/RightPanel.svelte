@@ -1,5 +1,6 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
+  import { themeStore } from "../stores/theme.svelte";
   import { Music, Clock, Volume2 } from "lucide-svelte";
 
   interface Props {
@@ -31,6 +32,7 @@
 <aside
   style="width: {width}px;"
   class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
+  class:glass-surface={themeStore.isGlassTheme}
 >
   <!-- Header -->
   <div class="h-20 flex items-center px-6 border-b border-brand-border">

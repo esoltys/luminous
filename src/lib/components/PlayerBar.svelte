@@ -2,6 +2,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { themeStore } from "../stores/theme.svelte";
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import MoodBar from "./MoodBar.svelte";
@@ -79,7 +80,7 @@
   }
 </script>
 
-<footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border-t border-brand-border flex items-center justify-between px-6 text-brand-text-secondary select-none">
+<footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border-t border-brand-border flex items-center justify-between px-6 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <CoverArt

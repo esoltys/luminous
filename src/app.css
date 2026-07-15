@@ -13,15 +13,17 @@
 
 @layer base {
   :root {
-    /* Default Nordic Blue Theme Colors */
-    --bg-main: #2e3440;
-    --bg-sidebar: #242933;
-    --bg-playerbar: #2b303c;
-    --color-accent: #88c0d0;
-    --color-accent-hover: #8fbcbb;
-    --color-text-primary: #eceff4;
-    --color-text-secondary: #d8dee9;
-    --color-border: #3b4252;
+    /* Default theme colors (Luminous, dark variant) — overwritten by
+       ThemeStore.applyActiveTheme() on load; this is only the first-paint
+       fallback before JS runs. */
+    --bg-main: #0b0d12;
+    --bg-sidebar: #14161e;
+    --bg-playerbar: #121319;
+    --color-accent: #7c9eff;
+    --color-accent-hover: #93b1ff;
+    --color-text-primary: #f1f3f8;
+    --color-text-secondary: #a6adc4;
+    --color-border: #242631;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;
@@ -73,4 +75,23 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/*
+ * Luminous auto-theme: frosted chrome panels (sidebar, player bar, right
+ * panel, top nav). Applied conditionally via class:glass-surface, only
+ * when the Luminous theme is active. backdrop-filter blur/saturate gives
+ * the panels a "glass" texture; the dark-mode sheen adds a soft top
+ * highlight reminiscent of frosted glass catching light.
+ */
+.glass-surface {
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-surface {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 45%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
 }
