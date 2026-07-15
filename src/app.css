@@ -21,12 +21,12 @@
     --bg-main: #08090c;
     --bg-sidebar: #1c1f29;
     --bg-playerbar: #191b23;
-    --color-accent: #4d94ff;
-    --color-accent-hover: #6fa8ff;
+    --color-accent: #ff7300;
+    --color-accent-hover: #ffcc00;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
     --color-border: #2c2f3c;
-    --color-accent-contrast: #ffffff;
+    --color-accent-contrast: #000000;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;

@@ -31,31 +31,52 @@ export interface ExtractedColors {
 }
 
 /**
- * "System" auto-theme: adapts to the OS light/dark preference (and, where
- * supported, the OS accent color). Panels (sidebar, player bar, top nav)
- * get a "glass" treatment via backdrop-filter blur/saturate plus a tonal
- * step from the canvas, applied in app.css's .glass-surface class. Colors
- * here stay fully opaque hex (not rgba) on purpose — native
- * <input type="color"> swatches in the theme builder can't represent
- * alpha, so translucent values would silently break editing.
+ * The System theme's brand accent is pulled from app-icon.svg's own
+ * sunrise gradient rather than an unrelated color — its "Vibrant Zest
+ * Orange core" (65% stop) as the base accent, its "golden horizon" (88%
+ * stop) as the hover. ReactiveLogoBrand's live gradient is computed from
+ * this same accent (see calculateLogoStops() below), so the in-app logo
+ * actually matches the real icon shown in the OS taskbar/dock instead of
+ * rendering as an arbitrary hue. Not extracted programmatically from the
+ * SVG at build/runtime — overkill for a static, rarely-changing asset,
+ * and would still require guessing which of five gradient stops is "the"
+ * brand color; using the exact hex the icon's own source comments already
+ * label as the core color is simpler and unambiguous.
+ */
+const BRAND_ORANGE = "#ff7300";
+const BRAND_GOLD = "#ffcc00";
+
+/**
+ * "System" auto-theme: adapts to the OS light/dark preference. Panels
+ * (sidebar, player bar, top nav) get a "glass" treatment via
+ * backdrop-filter blur/saturate plus a tonal step from the canvas, applied
+ * in app.css's .glass-surface class. Colors here stay fully opaque hex
+ * (not rgba) on purpose — native <input type="color"> swatches in the
+ * theme builder can't represent alpha, so translucent values would
+ * silently break editing.
  */
 export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "bg-main": "#08090c",
   "bg-sidebar": "#1c1f29",
   "bg-playerbar": "#191b23",
-  "color-accent": "#4d94ff",
-  "color-accent-hover": "#6fa8ff",
+  "color-accent": BRAND_ORANGE,
+  "color-accent-hover": BRAND_GOLD,
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
   "color-border": "#2c2f3c"
 };
 
+// The light-scheme accent is heuristically derived from the same brand
+// orange (nudged toward black until it clears WCAG AA against the light
+// canvas), not hand-picked — same approach as pickAccessibleOnColor.
+const LUMINOUS_LIGHT_ACCENT = makeAccessibleAccent(BRAND_ORANGE, "#e9eaf0", false) ?? BRAND_ORANGE;
+
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "bg-main": "#e9eaf0",
   "bg-sidebar": "#ffffff",
   "bg-playerbar": "#ffffff",
-  "color-accent": "#1a64ca",
-  "color-accent-hover": "#4883d5",
+  "color-accent": LUMINOUS_LIGHT_ACCENT,
+  "color-accent-hover": blendToward(LUMINOUS_LIGHT_ACCENT, 255, 0.2),
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
   "color-border": "#dcdce4"
