@@ -84,7 +84,9 @@ async function main() {
     theme: string,
     filename: string,
     afterLoad?: (page: import("playwright").Page) => Promise<void>,
-    isImmersive = false
+    isImmersive = false,
+    sidebarOpen = true,
+    rightPanelOpen = true
   ) {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
@@ -103,6 +105,8 @@ async function main() {
         excluded_formats: "[]"
       };
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
+      window.localStorage.setItem("layout_sidebarOpen", "${sidebarOpen ? 'true' : 'false'}");
+      window.localStorage.setItem("layout_rightPanelOpen", "${rightPanelOpen ? 'true' : 'false'}");
     `);
 
     await page.goto("http://localhost:1420");
@@ -132,7 +136,7 @@ async function main() {
 
   try {
     // Take screenshots of key views in their chosen themes
-    await capture("home", "", "nordic-blue", "home.png");
+    await capture("home", "", "nordic-blue", "home.png", undefined, false, false, false);
     await capture("collection", "albums", "nordic-blue", "albums.png");
     await capture("collection", "artists", "nordic-blue", "artists.png");
     await capture("settings", "", "nordic-blue", "themes.png", async (page) => {
