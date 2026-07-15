@@ -2,7 +2,7 @@
 
 ## Summary
 
-This implementation adds a comprehensive **Design Tools** panel to the Luminous settings, providing advanced theme customization capabilities beyond the basic color pickers. Users now have fine-grained control over every color in their theme with RGB sliders, live preview, and theme export functionality.
+This implementation integrates comprehensive **Design Tools** into the existing **UI Themes** settings tab, providing advanced theme customization capabilities beyond the basic color pickers. Users now have fine-grained control over every color in their theme with RGB sliders, live preview, theme import/export, and the ability to edit existing themes. All theme-related functionality is consolidated in one place.
 
 ## Implementation Details
 
@@ -34,20 +34,25 @@ This implementation adds a comprehensive **Design Tools** panel to the Luminous 
   - WCAG badge colors and text
 
 **DesignTools.svelte** (`src/lib/components/DesignTools.svelte`)
-- Advanced color customization interface with:
+- Advanced color customization interface integrated into UI Themes tab
+- Supports both creating new themes and editing existing custom themes
+- Features:
   - Color palette display for all 8 theme colors
   - Hex color input fields for direct color specification
-  - RGB slider controls for precise color adjustment
+  - RGB slider controls for precise color adjustment (0-255 per channel)
   - **Luminance indicators** for each color showing perceptual brightness
   - **Light/Dark badges** (🔆 Light / 🌙 Dark) indicating visual weight
   - **Contrast metrics** for selected color against all backgrounds
   - **WCAG compliance badges** showing AA/AAA status
   - Live preview of selected color in a large preview box
   - Copy-to-clipboard functionality for hex values
-  - Theme export to JSON format
+  - **Theme export to JSON** format for sharing/backup
+  - **Theme import from JSON** files (file picker integration)
   - Theme saving with custom names
   - UI section previews (sidebar, main view, player bar)
   - Reset functionality to revert to current active theme
+  - Edit mode for modifying existing custom themes
+  - Unified workflow with FoldersView for theme management
 
 ### Frontend Changes
 
@@ -135,16 +140,29 @@ This implementation adds a comprehensive **Design Tools** panel to the Luminous 
 1. **Access Design Tools**
    - Launch the app
    - Navigate to Settings (gear icon or menu)
-   - Click the "Design Tools" tab
+   - Click the "UI Themes" tab
+   - Scroll to "Custom Theme Builder Form" section
    - Verify the interface displays all color controls
    - Verify luminance percentages and light/dark badges display for each color
 
-2. **Test Color Adjustment**
+2. **Create New Theme**
+   - In the UI Themes tab, scroll to Custom Theme Builder
+   - Enter a theme name (e.g., "My Custom Theme")
    - Click on any color swatch to select it
    - Adjust RGB sliders and observe the large preview box
    - Type hex values directly into hex input field
    - Verify app UI updates live as colors change
    - **Watch luminance percentage update in real-time**
+   - Click "Save as Custom Theme"
+   - Verify theme appears in Custom Themes list
+
+3. **Edit Existing Theme**
+   - In Custom Themes list, click the "Edit" button next to any custom theme
+   - Verify Design Tools loads with the theme's colors
+   - Verify the header shows "Edit Theme: [Theme Name]"
+   - Modify colors as desired
+   - Click "Save Changes" to update the theme
+   - Verify changes are reflected in theme preview
 
 3. **Test Luminance & Light/Dark Classification**
    - Select a light color (e.g., #FFFFFF)
@@ -182,10 +200,20 @@ This implementation adds a comprehensive **Design Tools** panel to the Luminous 
    - Verify metrics are preserved with theme
 
 7. **Test Export**
-   - Customize colors
+   - Customize colors in Design Tools
    - Click "Export Theme" button
    - Verify JSON file downloads with theme data
-   - Check JSON structure contains all 8 colors
+   - Check JSON structure contains all 8 colors and theme name
+   - Verify file can be shared with other users
+
+8. **Test Import**
+   - In Design Tools (create or edit mode), click "Import Theme" button
+   - Select a previously exported theme JSON file
+   - Verify colors load from the JSON file
+   - Verify theme name populates from the import
+   - Modify if needed and save as new theme or update existing
+   - Test importing a corrupted/invalid JSON file
+   - Verify error message is shown
    - Verify exported JSON can be shared with others
 
 8. **Test Accessibility**
