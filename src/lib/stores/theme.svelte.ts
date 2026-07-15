@@ -635,9 +635,12 @@ class ThemeStore {
       root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
 
       const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
-      const glow = `0 0 40px 2px ${hexToRgbaString(colors["color-accent"], isDark ? 0.2 : 0.14)}`;
+      // Two-layer glow (tight bright core + wide soft halo) reads as an
+      // actual glow rather than a flat blurred outline.
+      const glowNear = `0 0 24px 2px ${hexToRgbaString(colors["color-accent"], isDark ? 0.45 : 0.28)}`;
+      const glowFar = `0 0 90px 10px ${hexToRgbaString(colors["color-accent"], isDark ? 0.28 : 0.16)}`;
       const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
-      root.style.setProperty("--glass-shadow", `${elevation}, ${glow}, ${highlight}`);
+      root.style.setProperty("--glass-shadow", `${elevation}, ${glowNear}, ${glowFar}, ${highlight}`);
     }
 
     // Apply logo stops based on active theme or dynamic colors
