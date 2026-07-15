@@ -61,7 +61,8 @@
   const backgroundTargets: { bg: keyof ThemeColors; label: string }[] = [
     { bg: "bg-main", label: "Main" },
     { bg: "bg-sidebar", label: "Sidebar" },
-    { bg: "bg-playerbar", label: "Player Bar" }
+    { bg: "bg-playerbar", label: "Player Bar" },
+    { bg: "color-accent", label: "Accent" }
   ];
 
   function initializeTheme() {
@@ -326,7 +327,7 @@
           />
 
           <!-- Contrast against every background -->
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             {#each backgroundTargets as target}
               {@const contrast = getContrastMetrics(hexValue, colorPresets[target.bg])}
               <div class="bg-brand-main rounded-lg p-2 flex flex-col items-center gap-1" title={getWcagBadgeText(contrast.compliance.level)}>
