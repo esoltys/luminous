@@ -76,7 +76,7 @@
       {#if frequentlyPlayed.length > 0}
         <div>
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            Your Favorites
+            Most Played
           </h2>
           <CurationCarousel songs={frequentlyPlayed} />
         </div>

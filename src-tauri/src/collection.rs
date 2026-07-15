@@ -516,8 +516,8 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND lastplayed IS NOT NULL
-             ORDER BY lastplayed DESC
+             WHERE source IN (1, 2) AND unavailable = 0
+             ORDER BY lastplayed DESC NULLS LAST, mtime DESC
              LIMIT ?1",
             SONG_SELECT_COLS
         );
@@ -533,8 +533,8 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND playcount > 0
-             ORDER BY playcount DESC
+             WHERE source IN (1, 2) AND unavailable = 0
+             ORDER BY playcount DESC, lastplayed DESC NULLS LAST
              LIMIT ?1",
             SONG_SELECT_COLS
         );
