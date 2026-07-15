@@ -333,16 +333,25 @@
               <Palette class="w-5 h-5 text-brand-accent" />
               <h4 class="font-bold text-sm text-brand-text-primary">Custom Theme Builder</h4>
             </div>
-            <button
-              onclick={() => { useAdvancedBuilder = !useAdvancedBuilder; }}
-              class="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all border {useAdvancedBuilder ? 'bg-brand-accent text-white border-brand-accent' : 'bg-brand-main border-brand-border text-brand-text-secondary hover:border-brand-accent/40'}"
-            >
-              {useAdvancedBuilder ? '🔧 Advanced' : '◀ Simple'}
-            </button>
+            <!-- Simple/Advanced Toggle -->
+            <div class="flex items-center gap-2 bg-brand-main rounded-full p-0.5 border border-brand-border">
+              <button
+                onclick={() => { useAdvancedBuilder = false; }}
+                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              >
+                Simple
+              </button>
+              <button
+                onclick={() => { useAdvancedBuilder = true; }}
+                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              >
+                Advanced
+              </button>
+            </div>
           </div>
 
           {#if useAdvancedBuilder}
-            <DesignTools themeId={null} />
+            <DesignTools {customColors} {newThemeName} />
           {:else}
             <div class="space-y-5">
               <div class="flex flex-col md:flex-row gap-4 items-end justify-between">

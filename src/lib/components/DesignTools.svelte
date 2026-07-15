@@ -14,13 +14,13 @@
     getWcagBadgeText
   } from "../utils/colorUtils";
 
-  let { themeId = null }: { themeId: string | null } = $props();
+  let { themeId = null, customColors = undefined, newThemeName = undefined }: { themeId?: string | null; customColors?: ThemeColors; newThemeName?: string } = $props();
 
   let showAdvanced = $state(false);
   let selectedColorTool = $state<string>("primary");
-  let themeName = $state("");
+  let themeName = $state(newThemeName ?? "");
   let isEditing = $state(false);
-  let colorPresets = $state<ThemeColors>({
+  let colorPresets = customColors ?? $state<ThemeColors>({
     "bg-main": "#0d0b18",
     "bg-sidebar": "#07050e",
     "bg-playerbar": "#0a0813",
@@ -29,6 +29,19 @@
     "color-text-primary": "#f3f4f6",
     "color-text-secondary": "#9ca3af",
     "color-border": "#1f1b2e"
+  });
+
+  // Sync local state with parent customColors prop when provided
+  $effect(() => {
+    if (customColors && colorPresets !== customColors) {
+      Object.assign(colorPresets, customColors);
+    }
+  });
+
+  $effect(() => {
+    if (customColors) {
+      Object.assign(customColors, colorPresets);
+    }
   });
 
   const colorLabels: Record<string, { label: string; description: string }> = {
@@ -222,20 +235,6 @@
 </script>
 
 <div class="flex flex-col gap-6 w-full h-full">
-  <!-- Header -->
-  <div class="border-b border-brand-border pb-4">
-    <div class="flex items-center gap-3 mb-2">
-      <Palette class="w-5 h-5 text-brand-accent" />
-      <h2 class="text-lg font-bold text-brand-text-primary">
-        {isEditing ? `Edit Theme: ${themeName}` : 'Design Tools - Create Theme'}
-      </h2>
-    </div>
-    <p class="text-sm text-brand-text-secondary">
-      {isEditing
-        ? 'Modify the theme colors below and save your changes'
-        : 'Customize your app\'s appearance with advanced design controls'}
-    </p>
-  </div>
 
   <!-- Color Customization Grid -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -281,8 +280,8 @@
                 <span class="text-[10px] text-brand-text-secondary/60">
                   Luminance: <span class="font-mono">{getLuminancePercent(colorPresets[key as keyof ThemeColors])}</span>
                 </span>
-                <span class="text-[10px] font-semibold" style="color: {isLightColor(colorPresets[key as keyof ThemeColors]) ? '#fbbf24' : '#6ee7b7'}">
-                  {isLightColor(colorPresets[key as keyof ThemeColors]) ? '🔆 Light' : '🌙 Dark'}
+                <span class="text-[10px] font-semibold" style="color: {isLightColor(colorPresets[key as keyof ThemeColors]) ? '#fbbf24' : '#6ee7b7'}" title={isLightColor(colorPresets[key as keyof ThemeColors]) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
+                  {isLightColor(colorPresets[key as keyof ThemeColors]) ? 'Light bg' : 'Dark bg'}
                 </span>
               </div>
             </div>
@@ -366,8 +365,8 @@
               </div>
               <p class="text-[10px] text-brand-text-secondary/60">
                 {isLightColor(colorPresets[selectedColorTool as keyof ThemeColors])
-                  ? "🔆 Perceived as LIGHT - Use dark text"
-                  : "🌙 Perceived as DARK - Use light text"}
+                  ? "Perceived as LIGHT - Use dark text for contrast"
+                  : "Perceived as DARK - Use light text for contrast"}
               </p>
             </div>
 
