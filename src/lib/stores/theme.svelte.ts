@@ -30,39 +30,40 @@ export interface ExtractedColors {
 }
 
 /**
- * "Luminous" auto-theme: adapts to the OS light/dark preference. Panels
- * (sidebar, player bar, top nav) get a "glass" treatment via backdrop-filter
- * blur/saturate plus a tonal step from the canvas, applied in app.css's
- * .glass-surface class. Colors here stay fully opaque hex (not rgba) on
- * purpose — native <input type="color"> swatches in the theme builder can't
- * represent alpha, so translucent values would silently break editing.
+ * "System" auto-theme: adapts to the OS light/dark preference (and, where
+ * supported, the OS accent color). Panels (sidebar, player bar, top nav)
+ * get a "glass" treatment via backdrop-filter blur/saturate plus a tonal
+ * step from the canvas, applied in app.css's .glass-surface class. Colors
+ * here stay fully opaque hex (not rgba) on purpose — native
+ * <input type="color"> swatches in the theme builder can't represent
+ * alpha, so translucent values would silently break editing.
  */
 export const LUMINOUS_DARK_COLORS: ThemeColors = {
-  "bg-main": "#0b0d12",
-  "bg-sidebar": "#14161e",
-  "bg-playerbar": "#121319",
+  "bg-main": "#08090c",
+  "bg-sidebar": "#1c1f29",
+  "bg-playerbar": "#191b23",
   "color-accent": "#7c9eff",
   "color-accent-hover": "#93b1ff",
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#242631"
+  "color-border": "#2c2f3c"
 };
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
-  "bg-main": "#f5f6fa",
+  "bg-main": "#e9eaf0",
   "bg-sidebar": "#ffffff",
   "bg-playerbar": "#ffffff",
   "color-accent": "#4f46e5",
   "color-accent-hover": "#6366f1",
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
-  "color-border": "#e4e4ea"
+  "color-border": "#dcdce4"
 };
 
 export const PREDEFINED_THEMES: Theme[] = [
   {
-    id: "luminous",
-    name: "Luminous",
+    id: "system",
+    name: "System",
     colors: { ...LUMINOUS_DARK_COLORS }
   },
   {
@@ -292,7 +293,7 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
 }
 
 class ThemeStore {
-  activeThemeId = $state<string>("luminous");
+  activeThemeId = $state<string>("system");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
   systemColorScheme = $state<"light" | "dark">("dark");
@@ -337,21 +338,21 @@ class ThemeStore {
     this.systemColorScheme = mq.matches ? "dark" : "light";
     mq.addEventListener("change", (e) => {
       this.systemColorScheme = e.matches ? "dark" : "light";
-      if (this.activeThemeId === "luminous") {
+      if (this.activeThemeId === "system") {
         this.applyActiveTheme();
       }
     });
   }
 
   get isGlassTheme(): boolean {
-    return this.activeThemeId === "luminous";
+    return this.activeThemeId === "system";
   }
 
   get currentTheme(): Theme {
     const predefined = PREDEFINED_THEMES.find(t => t.id === this.activeThemeId);
     if (predefined) return predefined;
     const custom = this.customThemes.find(t => t.id === this.activeThemeId);
-    return custom || PREDEFINED_THEMES.find(t => t.id === "luminous") || PREDEFINED_THEMES[0];
+    return custom || PREDEFINED_THEMES.find(t => t.id === "system") || PREDEFINED_THEMES[0];
   }
 
   async setTheme(themeId: string) {
@@ -389,7 +390,7 @@ class ThemeStore {
     });
 
     if (this.activeThemeId === themeId) {
-      await this.setTheme("luminous");
+      await this.setTheme("system");
     }
   }
 
@@ -480,7 +481,7 @@ class ThemeStore {
   applyActiveTheme() {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
-    const isLuminous = theme.id === "luminous";
+    const isLuminous = theme.id === "system";
     // The Luminous theme's live colors come from whichever OS-scheme
     // palette is active, not the static preview colors on the theme entry.
     const colors = isLuminous

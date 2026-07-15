@@ -7,8 +7,8 @@ describe("PREDEFINED_THEMES", () => {
     expect(PREDEFINED_THEMES.some(t => t.id === "luminous-violet")).toBe(false);
   });
 
-  it("includes the new Luminous auto-theme", () => {
-    expect(PREDEFINED_THEMES.some(t => t.id === "luminous")).toBe(true);
+  it("includes the new System auto-theme", () => {
+    expect(PREDEFINED_THEMES.some(t => t.id === "system")).toBe(true);
   });
 
   it("still includes Nordic Blue (only Luminous Violet was removed)", () => {

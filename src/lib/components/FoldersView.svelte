@@ -73,11 +73,11 @@
     "color-border": "#1f1b2e"
   });
 
-  // The Luminous theme's live colors depend on the OS light/dark preference,
+  // The System theme's live colors depend on the OS light/dark preference,
   // not the static (dark) preview baked into its PREDEFINED_THEMES entry —
   // use the current system scheme so its swatch matches what's on screen.
   function getPreviewColors(theme: Theme): ThemeColors {
-    if (theme.id === "luminous") {
+    if (theme.id === "system") {
       return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     return theme.colors;

@@ -16,14 +16,14 @@
     /* Default theme colors (Luminous, dark variant) — overwritten by
        ThemeStore.applyActiveTheme() on load; this is only the first-paint
        fallback before JS runs. */
-    --bg-main: #0b0d12;
-    --bg-sidebar: #14161e;
-    --bg-playerbar: #121319;
+    --bg-main: #08090c;
+    --bg-sidebar: #1c1f29;
+    --bg-playerbar: #191b23;
     --color-accent: #7c9eff;
     --color-accent-hover: #93b1ff;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
-    --color-border: #242631;
+    --color-border: #2c2f3c;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;
@@ -78,20 +78,31 @@
 }
 
 /*
- * Luminous auto-theme: frosted chrome panels (sidebar, player bar, right
+ * System auto-theme: frosted chrome panels (sidebar, player bar, right
  * panel, top nav). Applied conditionally via class:glass-surface, only
- * when the Luminous theme is active. backdrop-filter blur/saturate gives
- * the panels a "glass" texture; the dark-mode sheen adds a soft top
- * highlight reminiscent of frosted glass catching light.
+ * when the System theme is active.
+ *
+ * Note on backdrop-filter: these panels sit as normal flex siblings, not
+ * overlapping any other content, so there's nothing behind them for blur
+ * to meaningfully reveal — a browser limitation of this layout, not a
+ * missing feature. backdrop-filter is still applied (real glassmorphism
+ * CSS, and it will matter if a panel ever overlaps scrolled content), but
+ * the actual visible "glass" identity here comes from the diagonal sheen
+ * + inset highlight + shadow below, layered as background-image/box-shadow
+ * on top of the panel's own (opaque) theme color — so it never conflicts
+ * with the <input type="color"> swatches bound to that same color.
  */
 .glass-surface {
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  position: relative;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   .glass-surface {
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 45%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 55%);
+    box-shadow: 0 8px 30px rgba(15, 15, 20, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 }
