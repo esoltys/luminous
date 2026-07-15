@@ -137,7 +137,7 @@
       >
         <Shuffle class="w-4 h-4" />
         {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-text-primary rounded-full px-0.5 scale-75">
+          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
             {playerStore.shuffleMode === 'inside_album' ? 'IA' : playerStore.shuffleMode === 'albums' ? 'AL' : 'AR'}
           </span>
         {/if}
@@ -150,16 +150,16 @@
       {#if playerStore.state === 'playing'}
         <button
           onclick={() => playerStore.pause()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
         >
-          <Pause class="w-4 h-4 fill-current text-white" />
+          <Pause class="w-4 h-4 fill-current" />
         </button>
       {:else}
         <button
           onclick={() => playerStore.resume()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
         >
-          <Play class="w-4 h-4 fill-current text-white ml-0.5" />
+          <Play class="w-4 h-4 fill-current ml-0.5" />
         </button>
       {/if}
 
@@ -178,7 +178,7 @@
           <Repeat class="w-4 h-4" />
         {/if}
         {#if playerStore.repeatMode !== 'off' && playerStore.repeatMode !== 'track' && playerStore.repeatMode !== 'playlist'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-text-primary rounded-full px-0.5 scale-75">
+          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
             {playerStore.repeatMode === 'album' ? 'AL' : '1x'}
           </span>
         {/if}

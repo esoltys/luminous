@@ -36,7 +36,7 @@
       <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
         <button
           onclick={handlePlay}
-          class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-white shadow-lg"
+          class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg"
           title="Play"
         >
           <Play class="w-6 h-6 fill-current" />

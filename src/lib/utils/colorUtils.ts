@@ -147,6 +147,20 @@ export function suggestTextColor(backgroundColor: string): string {
 }
 
 /**
+ * Picks whichever of pure white or pure black has higher contrast against
+ * a background — the best possible binary choice by definition, unlike
+ * suggestTextColor()'s fixed luminance threshold. Used where a color is
+ * heuristically derived (e.g. text rendered directly on an arbitrary,
+ * possibly user-chosen, accent color) rather than hand-picked per theme,
+ * so it can't silently fail WCAG AA the way a fixed choice could.
+ */
+export function pickAccessibleOnColor(backgroundColor: string): string {
+  const whiteContrast = calculateContrastRatio('#ffffff', backgroundColor);
+  const blackContrast = calculateContrastRatio('#000000', backgroundColor);
+  return whiteContrast >= blackContrast ? '#ffffff' : '#000000';
+}
+
+/**
  * Get full color metrics for a hex color
  */
 export function getColorMetrics(hex: string): ColorMetrics {

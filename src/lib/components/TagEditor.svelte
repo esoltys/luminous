@@ -333,7 +333,7 @@
         <button
           onclick={handleSave}
           disabled={isLoading || !!errorMsg || isSaving}
-          class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50"
+          class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50"
         >
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />

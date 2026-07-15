@@ -178,25 +178,25 @@
     <div class="flex bg-brand-sidebar border border-brand-border rounded-xl p-0.5 text-xs shadow-sm">
       <button
         onclick={() => { settingsTab = "folders"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'folders' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'folders' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         Watched Folders
       </button>
       <button
         onclick={() => { settingsTab = "themes"; editingThemeId = null; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         UI Themes
       </button>
       <button
         onclick={() => { settingsTab = "equalizer"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         Equalizer
       </button>
       <button
         onclick={() => { settingsTab = "formats"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         File Formats
       </button>
@@ -211,7 +211,7 @@
         <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">Watched Folders</h3>
         <button
           onclick={handleAddDirectory}
-          class="bg-brand-accent hover:bg-brand-accent-hover text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-brand-accent/20 cursor-pointer"
+          class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-brand-accent/20 cursor-pointer"
         >
           <Plus class="w-4 h-4" /> Add Folder
         </button>
@@ -276,7 +276,7 @@
                 <div class="flex items-center justify-between w-full">
                   <span class="font-semibold text-sm text-brand-text-primary">{theme.name}</span>
                   {#if themeStore.activeThemeId === theme.id}
-                    <div class="w-5 h-5 rounded-full bg-brand-accent text-white flex items-center justify-center scale-90 shadow">
+                    <div class="w-5 h-5 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-90 shadow">
                       <Check class="w-3 h-3 stroke-[3]" />
                     </div>
                   {/if}
@@ -303,7 +303,7 @@
                     <div class="flex items-center gap-2">
                       <span class="font-medium text-sm text-brand-text-primary">{theme.name}</span>
                       {#if themeStore.activeThemeId === theme.id}
-                        <div class="w-4 h-4 rounded-full bg-brand-accent text-white flex items-center justify-center scale-90 shadow">
+                        <div class="w-4 h-4 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-90 shadow">
                           <Check class="w-2.5 h-2.5 stroke-[3]" />
                         </div>
                       {/if}
@@ -318,7 +318,7 @@
                   <div class="flex gap-2">
                     <button
                       onclick={() => { editingThemeId = theme.id; }}
-                      class="px-3 py-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-white transition-colors cursor-pointer"
+                      class="px-3 py-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
                       title="Edit Theme"
                     >
                       Edit
@@ -348,13 +348,13 @@
             <div class="flex items-center gap-2 bg-brand-main rounded-full p-0.5 border border-brand-border">
               <button
                 onclick={() => { useAdvancedBuilder = false; }}
-                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               >
                 Simple
               </button>
               <button
                 onclick={() => { useAdvancedBuilder = true; }}
-                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               >
                 Advanced
               </button>
@@ -461,7 +461,7 @@
               <div class="flex items-center gap-3 pt-3 border-t border-brand-border">
                 <button
                   onclick={saveCustomTheme}
-                  class="bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
+                  class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
                 >
                   Save Custom Theme
                 </button>
@@ -511,7 +511,7 @@
                     {isChecked ? 'Enabled' : 'Excluded'}
                   </span>
                 </div>
-                <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors {isChecked ? 'bg-brand-accent border-brand-accent text-white' : 'border-brand-border bg-black/10'}">
+                <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors {isChecked ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast' : 'border-brand-border bg-black/10'}">
                   {#if isChecked}
                     <Check class="w-3 h-3 stroke-[3]" />
                   {/if}

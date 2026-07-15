@@ -191,7 +191,7 @@
           </button>
           <button
             onclick={startEditing}
-            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
+            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
           >
             <Edit3 class="w-3.5 h-3.5" /> Edit
           </button>

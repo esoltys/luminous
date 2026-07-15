@@ -371,7 +371,7 @@
       <div class="flex gap-3">
         <button
           onclick={saveTheme}
-          class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
           {#if isEditing}
             <Check class="w-4 h-4" /> Save Changes

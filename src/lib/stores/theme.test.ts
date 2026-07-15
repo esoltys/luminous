@@ -1,12 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  PREDEFINED_THEMES,
-  LUMINOUS_DARK_COLORS,
-  LUMINOUS_LIGHT_COLORS,
-  blendToward,
-  makeAccessibleAccent
-} from "./theme.svelte";
-import { checkWcagCompliance } from "../utils/colorUtils";
+import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "./theme.svelte";
+import { checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("does not include the removed Luminous Violet theme", () => {
@@ -44,43 +38,34 @@ describe.each([
   });
 });
 
-describe("blendToward", () => {
-  it("blends toward white", () => {
-    expect(blendToward("#000000", 255, 0.5)).toBe("#808080");
+describe("on-accent text contrast (heuristically derived, not hand-picked)", () => {
+  // Every predefined theme's accent color needs a readable text/icon color
+  // rendered directly on top of it (active nav items, filled buttons) —
+  // this is what ThemeStore.applyActiveTheme() computes into
+  // --color-accent-contrast for every theme, including custom ones.
+  // Dynamic Artwork's accent is a CSS var reference, not a literal hex,
+  // so it can't be tested this way — its live extracted color is
+  // validated at runtime instead.
+  const themesWithLiteralAccent = PREDEFINED_THEMES.filter(t => t.id !== "dynamic-artwork");
+
+  it.each(themesWithLiteralAccent.map(t => [t.name, t.colors["color-accent"]] as const))(
+    "%s: picks a text color that meets WCAG AA against its own accent",
+    (_name, accent) => {
+      const onColor = pickAccessibleOnColor(accent);
+      expect(checkWcagCompliance(onColor, accent).wcagAA).toBe(true);
+    }
+  );
+
+  it.each([
+    ["Luminous dark", LUMINOUS_DARK_COLORS["color-accent"]],
+    ["Luminous light", LUMINOUS_LIGHT_COLORS["color-accent"]]
+  ])("%s: picks a text color that meets WCAG AA against its own accent", (_name, accent) => {
+    const onColor = pickAccessibleOnColor(accent);
+    expect(checkWcagCompliance(onColor, accent).wcagAA).toBe(true);
   });
 
-  it("blends toward black", () => {
-    expect(blendToward("#ffffff", 0, 0.5)).toBe("#808080");
-  });
-
-  it("returns the original color at amount 0", () => {
-    expect(blendToward("#336699", 255, 0)).toBe("#336699");
-  });
-});
-
-describe("makeAccessibleAccent", () => {
-  it("returns the color unchanged when it already passes AA", () => {
-    // Near-black on white already has very high contrast
-    expect(makeAccessibleAccent("#111111", "#ffffff", false)).toBe("#111111");
-  });
-
-  it("lightens a too-dark accent toward white until it passes AA on a dark background", () => {
-    // A near-black "accent" has almost no contrast against a near-black background
-    const result = makeAccessibleAccent("#0a0a0a", "#08090c", true);
-    expect(result).not.toBeNull();
-    expect(checkWcagCompliance(result!, "#08090c").wcagAA).toBe(true);
-  });
-
-  it("darkens a too-light accent toward black until it passes AA on a light background", () => {
-    const result = makeAccessibleAccent("#fafafa", "#ffffff", false);
-    expect(result).not.toBeNull();
-    expect(checkWcagCompliance(result!, "#ffffff").wcagAA).toBe(true);
-  });
-
-  it("gives up and returns null for a background it can never contrast against (mid-gray toward the same tone)", () => {
-    // Blending gray toward white can never separate itself enough from a
-    // background that is itself near-white — should exhaust the search.
-    const result = makeAccessibleAccent("#eeeeee", "#f5f5f5", true);
-    expect(result).toBeNull();
+  it("picks white for a dark accent and black for a light accent", () => {
+    expect(pickAccessibleOnColor("#1a1a2e")).toBe("#ffffff");
+    expect(pickAccessibleOnColor("#f5f5f5")).toBe("#000000");
   });
 });

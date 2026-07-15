@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
-import { hexToRgb, rgbToHex, checkWcagCompliance } from "../utils/colorUtils";
+import { hexToRgb, rgbToHex, checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -60,36 +60,6 @@ export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "color-text-secondary": "#5a6072",
   "color-border": "#dcdce4"
 };
-
-/**
- * Best-effort OS accent color detection via the CSS `AccentColor` system
- * color (part of CSS Color Module Level 4). Reliably resolves on Windows
- * via Chromium/WebView2; unsupported browsers/platforms (macOS WKWebView,
- * Linux WebKitGTK) fail CSS.supports() and this returns null, so callers
- * fall back to the curated LUMINOUS_*_COLORS accent above.
- *
- * Renders a real (invisible) element rather than reading the custom
- * property string directly — `getComputedStyle` resolves standard
- * properties like `color` to an actual rgb(...), but does NOT resolve
- * custom properties, so `--x: AccentColor` would read back as the literal
- * text "AccentColor" instead of a usable value.
- */
-function detectSystemAccentHex(): string | null {
-  if (typeof document === "undefined" || typeof CSS === "undefined" || !CSS.supports) return null;
-  if (!CSS.supports("color", "AccentColor")) return null;
-
-  const probe = document.createElement("div");
-  probe.style.position = "fixed";
-  probe.style.top = "-9999px";
-  probe.style.color = "AccentColor";
-  document.body.appendChild(probe);
-  const resolved = getComputedStyle(probe).color;
-  document.body.removeChild(probe);
-
-  const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(resolved);
-  if (!match) return null;
-  return rgbToHex(Number(match[1]), Number(match[2]), Number(match[3]));
-}
 
 /** Blends a hex color toward white (factor > 0) or black (factor < 0). */
 export function blendToward(hex: string, target: 0 | 255, amount: number): string {
@@ -366,20 +336,11 @@ class ThemeStore {
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
   systemColorScheme = $state<"light" | "dark">("dark");
-  // Resolved OS accent color, validated for AA contrast against each
-  // scheme's canvas. Null when unsupported (non-Windows) or when the
-  // detected accent can't be made accessible — callers fall back to the
-  // curated LUMINOUS_*_COLORS accent in that case.
-  systemAccentDark = $state<string | null>(null);
-  systemAccentDarkHover = $state<string | null>(null);
-  systemAccentLight = $state<string | null>(null);
-  systemAccentLightHover = $state<string | null>(null);
 
   constructor() {}
 
   async init() {
     this.watchSystemColorScheme();
-    this.detectSystemAccent();
 
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
@@ -420,34 +381,6 @@ class ThemeStore {
         this.applyActiveTheme();
       }
     });
-  }
-
-  /**
-   * Best-effort, one-time OS accent color detection (there's no web API to
-   * watch for the user changing it later without relaunching). Validates
-   * the detected color separately against each scheme's canvas, since an
-   * accent tuned for dark backgrounds may need adjustment on light ones
-   * (or vice versa) to keep WCAG AA contrast.
-   */
-  detectSystemAccent() {
-    const raw = detectSystemAccentHex();
-    if (!raw) return;
-
-    const dark = makeAccessibleAccent(raw, LUMINOUS_DARK_COLORS["bg-main"], true);
-    if (dark) {
-      this.systemAccentDark = dark;
-      this.systemAccentDarkHover = blendToward(dark, 255, 0.2);
-    }
-
-    const light = makeAccessibleAccent(raw, LUMINOUS_LIGHT_COLORS["bg-main"], false);
-    if (light) {
-      this.systemAccentLight = light;
-      this.systemAccentLightHover = blendToward(light, 0, 0.2);
-    }
-
-    if (this.activeThemeId === "system") {
-      this.applyActiveTheme();
-    }
   }
 
   get isGlassTheme(): boolean {
@@ -589,19 +522,23 @@ class ThemeStore {
     const theme = this.currentTheme;
     const isLuminous = theme.id === "system";
     // The System theme's live colors come from whichever OS-scheme palette
-    // is active, not the static preview colors on the theme entry — and
-    // prefer the detected+validated OS accent color over the curated one
-    // when available.
-    let colors = theme.colors;
-    if (isLuminous) {
-      const isDark = this.systemColorScheme === "dark";
-      const base = isDark ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
-      const accent = isDark ? this.systemAccentDark : this.systemAccentLight;
-      const accentHover = isDark ? this.systemAccentDarkHover : this.systemAccentLightHover;
-      colors = accent && accentHover
-        ? { ...base, "color-accent": accent, "color-accent-hover": accentHover }
-        : base;
-    }
+    // is active, not the static preview colors on the theme entry.
+    const colors = isLuminous
+      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
+      : theme.colors;
+
+    // Heuristically derived, not hand-picked: text rendered directly on
+    // the accent color (active nav items, filled buttons) needs contrast
+    // against whatever that accent happens to be — including a
+    // user-chosen custom-theme accent — not just the canvas-tuned
+    // text-primary/secondary. Computed for every theme, always kept in
+    // sync with the active accent. Dynamic Artwork's `color-accent` is a
+    // CSS var reference (not a literal hex), so resolve it to the real
+    // extracted color first.
+    const resolvedAccent = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).accent
+      : colors["color-accent"];
+    const accentContrastText = pickAccessibleOnColor(resolvedAccent);
 
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
@@ -620,6 +557,7 @@ class ThemeStore {
         --color-text-primary: ${colors["color-text-primary"]};
         --color-text-secondary: ${colors["color-text-secondary"]};
         --color-border: ${colors["color-border"]};
+        --color-accent-contrast: ${accentContrastText};
       }
     `;
 
