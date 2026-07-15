@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor } from "../utils/colorUtils";
+import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, buildExtractedColors } from "./theme.svelte";
+import { checkWcagCompliance, pickAccessibleOnColor, hexToRgb, rgbToHsl } from "../utils/colorUtils";
 
 describe("PREDEFINED_THEMES", () => {
   it("does not include the removed Luminous Violet theme", () => {
@@ -16,10 +16,21 @@ describe("PREDEFINED_THEMES", () => {
   });
 });
 
+const rubyRedColors = PREDEFINED_THEMES.find(t => t.id === "ruby-red")!.colors;
+const nordicBlueColors = PREDEFINED_THEMES.find(t => t.id === "nordic-blue")!.colors;
+const retroAmberColors = PREDEFINED_THEMES.find(t => t.id === "retro-amber")!.colors;
+
 describe.each([
   ["dark", LUMINOUS_DARK_COLORS],
-  ["light", LUMINOUS_LIGHT_COLORS]
-] as const)("Luminous %s palette accessibility", (_scheme, palette) => {
+  ["light", LUMINOUS_LIGHT_COLORS],
+  // Ruby Red / Nordic Blue / Retro Amber are generatePaletteFromSeed()
+  // output (#61 step 3), not hand-picked — this coverage is what "stay
+  // consistent if the generation heuristic improves later" (the issue's
+  // own rationale for the seed+generator move) actually guards.
+  ["Ruby Red (generated)", rubyRedColors],
+  ["Nordic Blue (generated)", nordicBlueColors],
+  ["Retro Amber (generated)", retroAmberColors]
+] as const)("%s palette accessibility", (_scheme, palette) => {
   const surfaces: (keyof typeof palette)[] = ["bg-main", "bg-sidebar", "bg-playerbar"];
 
   it.each(surfaces)("primary text meets WCAG AA against %s", (surface) => {
@@ -30,6 +41,17 @@ describe.each([
   it.each(surfaces)("secondary text meets WCAG AA against %s", (surface) => {
     const result = checkWcagCompliance(palette["color-text-secondary"], palette[surface]);
     expect(result.wcagAA).toBe(true);
+  });
+});
+
+describe("generated predefined themes' accent contrast against bg-main (WCAG 1.4.11 3:1 non-text threshold)", () => {
+  it.each([
+    ["Ruby Red", rubyRedColors],
+    ["Nordic Blue", nordicBlueColors],
+    ["Retro Amber", retroAmberColors]
+  ] as const)("%s", (_name, colors) => {
+    const result = checkWcagCompliance(colors["color-accent"], colors["bg-main"]);
+    expect(result.ratio).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -79,5 +101,46 @@ describe("on-accent text contrast (heuristically derived, not hand-picked)", () 
   it("picks white for a dark accent and black for a light accent", () => {
     expect(pickAccessibleOnColor("#1a1a2e")).toBe("#ffffff");
     expect(pickAccessibleOnColor("#f5f5f5")).toBe("#000000");
+  });
+});
+
+describe("buildExtractedColors (archetype-based artwork color extraction, #61)", () => {
+  // The failure mode #61 exists to fix: a moody-rock-album stand-in that's
+  // ~99.5% near-black background with a tiny neon-blue accent cluster.
+  // Flat population-dominance extraction loses the neon entirely.
+  const darkCoverWithNeonAccent = [
+    { r: 5, g: 5, b: 5, count: 1000 },
+    { r: 20, g: 40, b: 255, count: 5 }
+  ];
+
+  it("picks the small neon cluster as the accent instead of losing it to the black background", () => {
+    const colors = buildExtractedColors(darkCoverWithNeonAccent);
+    const accentRgb = hexToRgb(colors.accent);
+    expect(accentRgb.b).toBeGreaterThan(150);
+  });
+
+  it("keeps the primary background dark enough for the fixed Dynamic Artwork text colors", () => {
+    const colors = buildExtractedColors(darkCoverWithNeonAccent);
+    expect(checkWcagCompliance("#ffffff", colors.primary).wcagAA).toBe(true);
+    expect(checkWcagCompliance("#e2e8f0", colors.primary).wcagAA).toBe(true);
+  });
+
+  it("keeps sidebar/playerbar darker than, and border lighter than, the primary background", () => {
+    const colors = buildExtractedColors([{ r: 80, g: 40, b: 160, count: 1000 }]);
+    const luminanceOf = (hex: string) => checkWcagCompliance("#000000", hex).ratio;
+    expect(luminanceOf(colors.sidebar)).toBeLessThanOrEqual(luminanceOf(colors.primary));
+    expect(luminanceOf(colors.playerbar)).toBeLessThanOrEqual(luminanceOf(colors.primary));
+    expect(luminanceOf(colors.border)).toBeGreaterThanOrEqual(luminanceOf(colors.primary));
+  });
+
+  it("keeps the accent in a visible lightness range even for a fully desaturated dominant color", () => {
+    // No candidate clears any archetype's saturation guard rail here, so
+    // extractArchetypes() falls back to the dominant swatch for vibrant —
+    // this proves that fallback still gets lightness-normalized rather
+    // than handed back near-black.
+    const colors = buildExtractedColors([{ r: 8, g: 8, b: 8, count: 1000 }]);
+    const rgb = hexToRgb(colors.accent);
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    expect(hsl.l).toBeGreaterThanOrEqual(0.3);
   });
 });
