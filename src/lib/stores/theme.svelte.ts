@@ -88,7 +88,7 @@ export const PREDEFINED_THEMES: Theme[] = [
   },
   {
     id: "dynamic-artwork",
-    name: "Dynamic Artwork 💿",
+    name: "Dynamic Artwork",
     colors: {
       "bg-main": "var(--color-artwork-primary)",
       "bg-sidebar": "var(--color-artwork-sidebar)",

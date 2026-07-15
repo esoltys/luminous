@@ -40,7 +40,7 @@
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button
       onclick={() => { collectionStore.activeTab = "home"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'home' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'home' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title="Home"
     >
       <Home class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
@@ -51,7 +51,7 @@
 
     <button
       onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "songs"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title="Collection"
     >
       <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
@@ -62,7 +62,7 @@
 
     <button
       onclick={() => { collectionStore.activeTab = "playlists"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'playlists' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'playlists' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title="Playlists"
     >
       <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
@@ -73,7 +73,7 @@
 
     <button
       onclick={() => { collectionStore.activeTab = "lyrics"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title="Lyrics"
     >
       <FileText class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
@@ -84,7 +84,7 @@
 
     <button
       onclick={() => { collectionStore.activeTab = "settings"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title="Settings"
     >
       <Settings class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
@@ -117,7 +117,7 @@
     <div class="flex-1 min-h-0 overflow-y-auto pl-4 pr-1 mr-4 pb-4 playlists-scroll-container">
       <ul class="space-y-1 text-xs">
         {#each playlistsStore.playlists as pl}
-          <li class="group flex items-center justify-between rounded px-2 py-1.5 {playlistsStore.activePlaylistId === pl.id ? 'bg-brand-main text-brand-accent font-medium' : 'text-brand-text-secondary/75 hover:bg-brand-main/40 hover:text-brand-text-primary'}">
+          <li class="group flex items-center justify-between rounded px-2 py-1.5 {playlistsStore.activePlaylistId === pl.id ? 'bg-brand-main text-brand-accent font-medium' : 'text-brand-text-secondary/75 hover:bg-brand-accent/10 hover:text-brand-accent-hover'}">
             <button
               onclick={() => playlistsStore.selectPlaylist(pl.id)}
               class="w-full text-left truncate"

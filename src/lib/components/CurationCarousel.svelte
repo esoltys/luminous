@@ -7,7 +7,7 @@
 
   let scrollContainer = $state<HTMLDivElement | undefined>(undefined);
   let canScrollLeft = $state(false);
-  let canScrollRight = $state(songs.length > 5);
+  let canScrollRight = $state(false);
 
   function updateScrollButtons() {
     if (!scrollContainer) return;
@@ -27,10 +27,6 @@
     });
   }
 
-  $effect.pre(() => {
-    canScrollRight = songs.length > 5;
-  });
-
   $effect(() => {
     if (scrollContainer) {
       scrollContainer.addEventListener("scroll", updateScrollButtons);
@@ -42,12 +38,12 @@
   });
 </script>
 
-<div class="relative group">
+<div class="relative group/carousel">
   <!-- Left arrow -->
   {#if canScrollLeft}
     <button
       onclick={() => scroll("left")}
-      class="absolute left-0 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/50 hover:bg-black/70 rounded-full p-2"
+      class="absolute left-0 top-1/2 -translate-y-1/2 z-10 opacity-0 group-carousel/hover:opacity-100 transition-opacity duration-200 bg-black/50 hover:bg-black/70 rounded-full p-2"
       title="Scroll left"
     >
       <ChevronLeft class="w-6 h-6 text-white" />
@@ -68,7 +64,7 @@
   {#if canScrollRight}
     <button
       onclick={() => scroll("right")}
-      class="absolute right-0 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/50 hover:bg-black/70 rounded-full p-2"
+      class="absolute right-0 top-1/2 -translate-y-1/2 z-10 opacity-0 group-carousel/hover:opacity-100 transition-opacity duration-200 bg-black/50 hover:bg-black/70 rounded-full p-2"
       title="Scroll right"
     >
       <ChevronRight class="w-6 h-6 text-white" />
