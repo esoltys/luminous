@@ -1,6 +1,17 @@
 <script lang="ts">
   import { themeStore, PREDEFINED_THEMES, type ThemeColors, type Theme } from "../stores/theme.svelte";
-  import { Palette, Plus, Trash2, Copy, Download, Upload, Eye, RotateCcw } from "lucide-svelte";
+  import { Palette, Plus, Trash2, Copy, Download, Upload, Eye, RotateCcw, AlertCircle, CheckCircle } from "lucide-svelte";
+  import {
+    hexToRgb,
+    rgbToHex,
+    calculateLuminance,
+    isLightColor,
+    calculateContrastRatio,
+    checkWcagCompliance,
+    formatLuminance,
+    getWcagBadgeColor,
+    getWcagBadgeText
+  } from "../utils/colorUtils";
 
   let showAdvanced = $state(false);
   let selectedColorTool = $state<string>("primary");
@@ -84,24 +95,6 @@
     `;
   }
 
-  function hexToRgb(hex: string): { r: number; g: number; b: number } {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-      ? {
-          r: parseInt(result[1], 16),
-          g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16)
-        }
-      : { r: 0, g: 0, b: 0 };
-  }
-
-  function rgbToHex(r: number, g: number, b: number): string {
-    const toHex = (c: number) => {
-      const hex = c.toString(16);
-      return hex.length === 1 ? "0" + hex : hex;
-    };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  }
 
   function updateColorFromRgb(key: keyof ThemeColors, r: number, g: number, b: number) {
     colorPresets[key] = rgbToHex(Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b)));
@@ -150,6 +143,17 @@
     const hex = colorPresets[selectedColorTool as keyof ThemeColors];
     navigator.clipboard.writeText(hex);
   }
+
+  function getContrastMetrics(foregroundHex: string, backgroundHex: string) {
+    const ratio = calculateContrastRatio(foregroundHex, backgroundHex);
+    const compliance = checkWcagCompliance(foregroundHex, backgroundHex);
+    return { ratio, compliance };
+  }
+
+  function getLuminancePercent(hex: string): string {
+    const lum = calculateLuminance(hex);
+    return formatLuminance(lum);
+  }
 </script>
 
 <div class="flex flex-col gap-6 max-w-4xl">
@@ -194,13 +198,23 @@
                 class="w-12 h-8 rounded cursor-pointer border border-brand-border bg-transparent"
               />
             </div>
-            <input
-              type="text"
-              bind:value={colorPresets[key as keyof ThemeColors]}
-              oninput={applyLivePreview}
-              class="w-full bg-brand-main border border-brand-border rounded px-3 py-2 text-xs font-mono text-brand-text-primary outline-none focus:border-brand-accent"
-              placeholder="#000000"
-            />
+            <div class="space-y-1">
+              <input
+                type="text"
+                bind:value={colorPresets[key as keyof ThemeColors]}
+                oninput={applyLivePreview}
+                class="w-full bg-brand-main border border-brand-border rounded px-3 py-2 text-xs font-mono text-brand-text-primary outline-none focus:border-brand-accent"
+                placeholder="#000000"
+              />
+              <div class="flex items-center justify-between px-1">
+                <span class="text-[10px] text-brand-text-secondary/60">
+                  Luminance: <span class="font-mono">{getLuminancePercent(colorPresets[key as keyof ThemeColors])}</span>
+                </span>
+                <span class="text-[10px] font-semibold" style="color: {isLightColor(colorPresets[key as keyof ThemeColors]) ? '#fbbf24' : '#6ee7b7'}">
+                  {isLightColor(colorPresets[key as keyof ThemeColors]) ? '🔆 Light' : '🌙 Dark'}
+                </span>
+              </div>
+            </div>
           </div>
         {/each}
       </div>
@@ -268,6 +282,56 @@
           >
             <Copy class="w-4 h-4" /> Copy HEX Value
           </button>
+
+          <!-- Color Metrics Section -->
+          <div class="border-t border-brand-border pt-4 space-y-3">
+            <h4 class="font-semibold text-xs text-brand-text-primary">CIE Color Metrics</h4>
+
+            <!-- Luminance -->
+            <div class="bg-brand-main rounded-lg p-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-brand-text-secondary">Relative Luminance (CIE)</span>
+                <span class="font-mono text-xs font-bold text-brand-accent">{getLuminancePercent(colorPresets[selectedColorTool as keyof ThemeColors])}</span>
+              </div>
+              <p class="text-[10px] text-brand-text-secondary/60">
+                {isLightColor(colorPresets[selectedColorTool as keyof ThemeColors])
+                  ? "🔆 Perceived as LIGHT - Use dark text"
+                  : "🌙 Perceived as DARK - Use light text"}
+              </p>
+            </div>
+
+            <!-- Contrast Ratios -->
+            <div class="space-y-2">
+              <h5 class="text-xs font-semibold text-brand-text-primary">Contrast Ratios</h5>
+
+              {#each [{ bg: 'bg-main', label: 'vs Main Background' }, { bg: 'bg-sidebar', label: 'vs Sidebar Background' }, { bg: 'bg-playerbar', label: 'vs Player Bar Background' }] as item}
+                {@const contrast = getContrastMetrics(colorPresets[selectedColorTool as keyof ThemeColors], colorPresets[item.bg as keyof ThemeColors])}
+                <div class="bg-brand-main rounded-lg p-3 space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-brand-text-secondary">{item.label}</span>
+                    <span class="font-mono text-xs font-bold">{contrast.ratio}:1</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    {#if contrast.compliance.level === 'AAA'}
+                      <CheckCircle class="w-3.5 h-3.5" style="color: #10b981;" />
+                    {:else if contrast.compliance.level === 'AA'}
+                      <AlertCircle class="w-3.5 h-3.5" style="color: #f59e0b;" />
+                    {:else}
+                      <AlertCircle class="w-3.5 h-3.5" style="color: #ef4444;" />
+                    {/if}
+                    <span class="text-[10px]" style="color: {getWcagBadgeColor(contrast.compliance.level)}">
+                      {getWcagBadgeText(contrast.compliance.level)}
+                    </span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+
+            <p class="text-[10px] text-brand-text-secondary/60 pt-2 border-t border-brand-border/50">
+              WCAG AA: 4.5:1 minimum for normal text<br />
+              WCAG AAA: 7:1 minimum for maximum accessibility
+            </p>
+          </div>
         </div>
       {/if}
     </div>
