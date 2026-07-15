@@ -36,7 +36,7 @@
   }
 </script>
 
-<aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0" class:glass-surface={themeStore.isGlassTheme}>
+<aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden rounded-tr-2xl rounded-br-2xl" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Navigation -->
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button
@@ -140,7 +140,7 @@
   {/if}
 
   <!-- Scanning status / trigger -->
-  <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} border-t border-brand-border bg-brand-main/40 text-xs flex-shrink-0">
+  <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} mb-24 border-t border-brand-border bg-brand-main/40 text-xs flex-shrink-0">
     {#if collectionStore.isScanning}
       {#if isCollapsed}
         <div 

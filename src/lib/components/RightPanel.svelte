@@ -1,7 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { Music, Clock, Volume2 } from "lucide-svelte";
+  import { Music, Clock } from "lucide-svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -11,27 +11,12 @@
 
   let { isOpen = true, width = 288, onClose }: Props = $props();
 
-  function formatDuration(nanosec: number): string {
-    if (!nanosec) return "0:00";
-    const totalSeconds = Math.floor(nanosec / 1_000_000_000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  }
-
   let currentSong = $derived(playerStore.currentSong);
-  let position = $derived(playerStore.positionNanosec);
-  let volume = $derived(playerStore.volume);
-  let isPlaying = $derived(playerStore.state === "playing");
-
-  let progressPercent = $derived(
-    currentSong?.length_nanosec ? (position / currentSong.length_nanosec) * 100 : 0
-  );
 </script>
 
 <aside
   style="width: {width}px;"
-  class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
+  class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden rounded-tl-2xl rounded-bl-2xl"
   class:glass-surface={themeStore.isGlassTheme}
 >
   <!-- Header -->
@@ -63,33 +48,8 @@
         </div>
       </div>
 
-      <!-- Progress Bar -->
-      <div class="space-y-2">
-        <div class="w-full bg-brand-border rounded-full h-1 overflow-hidden">
-          <div
-            class="bg-brand-accent h-1 rounded-full transition-all duration-300"
-            style="width: {progressPercent}%"
-          ></div>
-        </div>
-        <div class="flex justify-between text-xs text-brand-text-secondary/70">
-          <span>{formatDuration(position)}</span>
-          <span>{formatDuration(currentSong.length_nanosec || 0)}</span>
-        </div>
-      </div>
-
       <!-- Playback Info -->
       <div class="space-y-2 bg-brand-main/40 rounded-lg p-3">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-brand-text-secondary/60">Status</span>
-          <span class="text-brand-accent font-semibold capitalize">{isPlaying ? "Playing" : "Paused"}</span>
-        </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="flex items-center gap-1 text-brand-text-secondary/60">
-            <Volume2 class="w-3 h-3" />
-            Volume
-          </span>
-          <span class="text-brand-text-primary font-semibold">{Math.round(volume * 100)}%</span>
-        </div>
         {#if currentSong.bitrate}
           <div class="flex items-center justify-between text-xs">
             <span class="text-brand-text-secondary/60">Bitrate</span>
