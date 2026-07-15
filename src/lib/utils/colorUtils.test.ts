@@ -17,6 +17,7 @@ import {
   ARCHETYPE_TARGETS,
   quantizeMedianCut,
   extractArchetypes,
+  generatePaletteFromSeed,
   type Swatch
 } from "./colorUtils";
 
@@ -317,5 +318,60 @@ describe("extractArchetypes", () => {
     const swatches: Swatch[] = [{ r: 10, g: 10, b: 10, population: 900 }];
     const archetypes = extractArchetypes(swatches);
     expect(archetypes.lightVibrant).toBeNull();
+  });
+});
+
+describe("generatePaletteFromSeed", () => {
+  const seeds = ["#e11d48", "#88c0d0", "#d97706"];
+
+  it("returns all 8 ThemeColors keys", () => {
+    const palette = generatePaletteFromSeed("#e11d48");
+    expect(Object.keys(palette).sort()).toEqual(
+      [
+        "bg-main",
+        "bg-playerbar",
+        "bg-sidebar",
+        "color-accent",
+        "color-accent-hover",
+        "color-border",
+        "color-text-primary",
+        "color-text-secondary"
+      ].sort()
+    );
+  });
+
+  it("is deterministic for the same seed", () => {
+    expect(generatePaletteFromSeed("#88c0d0")).toEqual(generatePaletteFromSeed("#88c0d0"));
+  });
+
+  it("keeps both text colors at WCAG AA against every background surface", () => {
+    for (const seed of seeds) {
+      const p = generatePaletteFromSeed(seed);
+      for (const bg of [p["bg-main"], p["bg-sidebar"], p["bg-playerbar"]]) {
+        expect(checkWcagCompliance(p["color-text-primary"], bg).wcagAA).toBe(true);
+        expect(checkWcagCompliance(p["color-text-secondary"], bg).wcagAA).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the accent at WCAG 1.4.11's 3:1 non-text threshold against bg-main", () => {
+    for (const seed of seeds) {
+      const p = generatePaletteFromSeed(seed);
+      expect(checkWcagCompliance(p["color-accent"], p["bg-main"]).ratio).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("tints the dark background family toward the seed's hue instead of collapsing to gray", () => {
+    const redHue = rgbToHsl(...(Object.values(hexToRgb(generatePaletteFromSeed("#e11d48")["bg-main"])) as [number, number, number])).h;
+    const blueHue = rgbToHsl(...(Object.values(hexToRgb(generatePaletteFromSeed("#3b82f6")["bg-main"])) as [number, number, number])).h;
+    expect(Math.abs(redHue - blueHue)).toBeGreaterThan(30);
+  });
+
+  it("keeps bg-sidebar darkest, bg-playerbar in between, and border lighter than bg-main", () => {
+    const p = generatePaletteFromSeed("#d97706");
+    const lumOf = (hex: string) => calculateLuminance(hex);
+    expect(lumOf(p["bg-sidebar"])).toBeLessThanOrEqual(lumOf(p["bg-playerbar"]));
+    expect(lumOf(p["bg-playerbar"])).toBeLessThanOrEqual(lumOf(p["bg-main"]));
+    expect(lumOf(p["color-border"])).toBeGreaterThanOrEqual(lumOf(p["bg-main"]));
   });
 });

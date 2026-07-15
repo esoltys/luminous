@@ -10,6 +10,7 @@ import {
   quantizeMedianCut,
   extractArchetypes,
   checkWcagCompliance,
+  generatePaletteFromSeed,
   type ColorCount
 } from "../utils/colorUtils";
 
@@ -121,6 +122,20 @@ export function hexToRgbaString(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/**
+ * Ruby Red / Nordic Blue / Retro Amber are each defined as a single seed
+ * hue (their accent color) run through generatePaletteFromSeed()
+ * (colorUtils.ts) rather than 8 hand-picked hexes — "bake-once": computed
+ * from the seed every time this module loads, not hand-tuned per value, so
+ * every derived surface automatically keeps the WCAG guarantees
+ * generatePaletteFromSeed() enforces (#61). The seed is just the theme's
+ * previously hand-picked accent hex, chosen to preserve each theme's
+ * identifying hue rather than introduce a new one.
+ */
+const RUBY_RED_SEED = "#e11d48";
+const NORDIC_BLUE_SEED = "#88c0d0";
+const RETRO_AMBER_SEED = "#d97706";
+
 export const PREDEFINED_THEMES: Theme[] = [
   {
     id: "system",
@@ -130,44 +145,17 @@ export const PREDEFINED_THEMES: Theme[] = [
   {
     id: "ruby-red",
     name: "Ruby Red",
-    colors: {
-      "bg-main": "#1a0f12",
-      "bg-sidebar": "#10090a",
-      "bg-playerbar": "#150c0e",
-      "color-accent": "#e11d48",
-      "color-accent-hover": "#f43f5e",
-      "color-text-primary": "#f9fafb",
-      "color-text-secondary": "#d1d5db",
-      "color-border": "#281b1e"
-    }
+    colors: generatePaletteFromSeed(RUBY_RED_SEED)
   },
   {
     id: "nordic-blue",
     name: "Nordic Blue",
-    colors: {
-      "bg-main": "#2e3440",
-      "bg-sidebar": "#242933",
-      "bg-playerbar": "#2b303c",
-      "color-accent": "#88c0d0",
-      "color-accent-hover": "#8fbcbb",
-      "color-text-primary": "#eceff4",
-      "color-text-secondary": "#d8dee9",
-      "color-border": "#3b4252"
-    }
+    colors: generatePaletteFromSeed(NORDIC_BLUE_SEED)
   },
   {
     id: "retro-amber",
     name: "Retro Amber",
-    colors: {
-      "bg-main": "#0d0a00",
-      "bg-sidebar": "#060500",
-      "bg-playerbar": "#0a0800",
-      "color-accent": "#d97706",
-      "color-accent-hover": "#f59e0b",
-      "color-text-primary": "#fef3c7",
-      "color-text-secondary": "#b45309",
-      "color-border": "#1e1700"
-    }
+    colors: generatePaletteFromSeed(RETRO_AMBER_SEED)
   },
   {
     id: "dynamic-artwork",

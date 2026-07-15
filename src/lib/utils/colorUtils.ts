@@ -476,3 +476,90 @@ export function extractArchetypes(swatches: Swatch[]): Record<Archetype, Swatch 
 
   return result;
 }
+
+/** The 8-value palette shape every predefined/custom theme uses (structurally identical to theme.svelte.ts's ThemeColors — kept separate here to avoid a circular import). */
+export interface GeneratedThemePalette {
+  "bg-main": string;
+  "bg-sidebar": string;
+  "bg-playerbar": string;
+  "color-accent": string;
+  "color-accent-hover": string;
+  "color-text-primary": string;
+  "color-text-secondary": string;
+  "color-border": string;
+}
+
+const BG_MAIN_LIGHTNESS = 0.12;
+const BG_SIDEBAR_DELTA = -0.045;
+const BG_PLAYERBAR_DELTA = -0.02;
+const BORDER_DELTA = 0.13;
+const ACCENT_HOVER_DELTA = 0.12;
+
+function toHex(rgb: { r: number; g: number; b: number }): string {
+  return rgbToHex(rgb.r, rgb.g, rgb.b);
+}
+
+/**
+ * Derives a full 8-value theme palette from a single seed color using HSL
+ * lightness/saturation steps, validated against the same WCAG thresholds
+ * the hand-picked Luminous palettes already use: 4.5:1 ("normal text") for
+ * both text colors against every background surface, and WCAG 1.4.11's
+ * 3:1 ("non-text/UI-component") threshold for the accent against bg-main —
+ * the same trade-off `LUMINOUS_LIGHT_ACCENT` documents, since the accent is
+ * used almost entirely as icon/button/badge color, not paragraph text.
+ *
+ * The background family is tinted toward the seed's hue at low saturation
+ * (a moody near-black, not pure gray) rather than derived from the accent's
+ * exact lightness, mirroring the relationship already present across Ruby
+ * Red / Nordic Blue / Retro Amber: bg-sidebar darkest, bg-playerbar
+ * between it and bg-main, border lighter than bg-main.
+ */
+export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette {
+  const seedHsl = rgbToHsl(...(Object.values(hexToRgb(seedHex)) as [number, number, number]));
+
+  const bgSaturation = Math.min(seedHsl.s * 0.35, 0.25);
+  const bgMain = { h: seedHsl.h, s: bgSaturation, l: BG_MAIN_LIGHTNESS };
+  const bgSidebar = { h: seedHsl.h, s: bgSaturation, l: Math.max(0, BG_MAIN_LIGHTNESS + BG_SIDEBAR_DELTA) };
+  const bgPlayerbar = { h: seedHsl.h, s: bgSaturation, l: Math.max(0, BG_MAIN_LIGHTNESS + BG_PLAYERBAR_DELTA) };
+  const border = { h: seedHsl.h, s: bgSaturation, l: Math.min(1, BG_MAIN_LIGHTNESS + BORDER_DELTA) };
+
+  const accentSaturation = Math.max(seedHsl.s, 0.55);
+  const accentLightness = Math.min(Math.max(seedHsl.l, 0.45), 0.65);
+  const accent = { h: seedHsl.h, s: accentSaturation, l: accentLightness };
+  const accentHover = { h: seedHsl.h, s: accentSaturation, l: Math.min(0.85, accentLightness + ACCENT_HOVER_DELTA) };
+
+  let textPrimary = { h: seedHsl.h, s: 0.15, l: 0.97 };
+  let textSecondary = { h: seedHsl.h, s: 0.12, l: 0.82 };
+
+  const backgroundHexes = [toHex(hslToRgb(bgMain.h, bgMain.s, bgMain.l)), toHex(hslToRgb(bgSidebar.h, bgSidebar.s, bgSidebar.l)), toHex(hslToRgb(bgPlayerbar.h, bgPlayerbar.s, bgPlayerbar.l))];
+
+  const meetsAA = (hsl: HSL) => {
+    const hex = toHex(hslToRgb(hsl.h, hsl.s, hsl.l));
+    return backgroundHexes.every(bg => checkWcagCompliance(hex, bg).wcagAA);
+  };
+
+  for (let i = 0; i < 20 && !meetsAA(textPrimary); i++) {
+    textPrimary = { ...textPrimary, l: Math.min(1, textPrimary.l + 0.02) };
+  }
+  for (let i = 0; i < 20 && !meetsAA(textSecondary); i++) {
+    textSecondary = { ...textSecondary, l: Math.min(1, textSecondary.l + 0.02) };
+  }
+
+  let accentAdjusted = accent;
+  for (let i = 0; i < 20; i++) {
+    const accentHex = toHex(hslToRgb(accentAdjusted.h, accentAdjusted.s, accentAdjusted.l));
+    if (checkWcagCompliance(accentHex, backgroundHexes[0]).ratio >= 3) break;
+    accentAdjusted = { ...accentAdjusted, l: Math.min(0.85, accentAdjusted.l + 0.02) };
+  }
+
+  return {
+    "bg-main": backgroundHexes[0],
+    "bg-sidebar": backgroundHexes[1],
+    "bg-playerbar": backgroundHexes[2],
+    "color-accent": toHex(hslToRgb(accentAdjusted.h, accentAdjusted.s, accentAdjusted.l)),
+    "color-accent-hover": toHex(hslToRgb(accentHover.h, accentHover.s, accentHover.l)),
+    "color-text-primary": toHex(hslToRgb(textPrimary.h, textPrimary.s, textPrimary.l)),
+    "color-text-secondary": toHex(hslToRgb(textSecondary.h, textSecondary.s, textSecondary.l)),
+    "color-border": toHex(hslToRgb(border.h, border.s, border.l))
+  };
+}
