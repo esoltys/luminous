@@ -9,15 +9,16 @@
   import Equalizer from "./Equalizer.svelte";
   import DesignTools from "./DesignTools.svelte";
 
-  let settingsTab = $state<"folders" | "themes" | "design-tools" | "equalizer" | "formats">("folders");
+  let settingsTab = $state<"folders" | "themes" | "equalizer" | "formats">("folders");
   let isTabInitialized = $state(false);
+  let editingThemeId = $state<string | null>(null);
 
   onMount(async () => {
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "folders" || savedTab === "themes" || savedTab === "design-tools" || savedTab === "equalizer" || savedTab === "formats") {
+        if (savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
           settingsTab = savedTab as any;
         }
       }
@@ -171,16 +172,10 @@
         Watched Folders
       </button>
       <button
-        onclick={() => { settingsTab = "themes"; }}
+        onclick={() => { settingsTab = "themes"; editingThemeId = null; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         UI Themes
-      </button>
-      <button
-        onclick={() => { settingsTab = "design-tools"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'design-tools' ? 'bg-brand-accent text-white shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        Design Tools
       </button>
       <button
         onclick={() => { settingsTab = "equalizer"; }}
@@ -308,13 +303,22 @@
                       <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}"></div>
                     </div>
                   </button>
-                  <button
-                    onclick={() => themeStore.deleteCustomTheme(theme.id)}
-                    class="p-1.5 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
-                    title="Delete Theme"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button>
+                  <div class="flex gap-2">
+                    <button
+                      onclick={() => { editingThemeId = theme.id; }}
+                      class="px-3 py-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-white transition-colors cursor-pointer"
+                      title="Edit Theme"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onclick={() => themeStore.deleteCustomTheme(theme.id)}
+                      class="p-1.5 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
+                      title="Delete Theme"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               {/each}
             </div>
@@ -431,10 +435,22 @@
             <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
           </div>
         </div>
+
+        {#if editingThemeId}
+          <div class="border-t border-brand-border pt-6 mt-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-brand-text-primary">Design Tools - Edit Theme</h3>
+              <button
+                onclick={() => { editingThemeId = null; }}
+                class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1 rounded border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
+              >
+                ✕ Close Editor
+              </button>
+            </div>
+            <DesignTools themeId={editingThemeId} />
+          </div>
+        {/if}
       </div>
-    {:else if settingsTab === "design-tools"}
-      <!-- Design Tools Section -->
-      <DesignTools />
     {:else if settingsTab === "equalizer"}
       <!-- Equalizer Section -->
       <div class="space-y-6">

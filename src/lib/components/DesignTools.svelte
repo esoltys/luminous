@@ -1,6 +1,7 @@
 <script lang="ts">
   import { themeStore, PREDEFINED_THEMES, type ThemeColors, type Theme } from "../stores/theme.svelte";
-  import { Palette, Plus, Trash2, Copy, Download, Upload, Eye, RotateCcw, AlertCircle, CheckCircle } from "lucide-svelte";
+  import { Palette, Plus, Trash2, Copy, Download, Upload, Eye, RotateCcw, AlertCircle, CheckCircle, Check } from "lucide-svelte";
+  import { open } from "@tauri-apps/plugin-dialog";
   import {
     hexToRgb,
     rgbToHex,
@@ -13,9 +14,12 @@
     getWcagBadgeText
   } from "../utils/colorUtils";
 
+  let { themeId = null }: { themeId: string | null } = $props();
+
   let showAdvanced = $state(false);
   let selectedColorTool = $state<string>("primary");
   let themeName = $state("");
+  let isEditing = $state(false);
   let colorPresets = $state<ThemeColors>({
     "bg-main": "#0d0b18",
     "bg-sidebar": "#07050e",
@@ -37,6 +41,28 @@
     "color-text-secondary": { label: "Secondary Text", description: "Hints, labels, muted text" },
     "color-border": { label: "Border Color", description: "Dividers and outlines" }
   };
+
+  function initializeTheme() {
+    if (themeId) {
+      isEditing = true;
+      const theme = themeStore.customThemes.find(t => t.id === themeId);
+      if (theme) {
+        themeName = theme.name;
+        colorPresets = { ...theme.colors };
+        applyLivePreview();
+      }
+    } else {
+      isEditing = false;
+      themeName = "";
+      loadActiveThemeColors();
+    }
+  }
+
+  $effect(() => {
+    if (themeId) {
+      initializeTheme();
+    }
+  });
 
   function loadActiveThemeColors() {
     if (typeof document === "undefined") return;
@@ -106,14 +132,53 @@
       alert("Please enter a theme name");
       return;
     }
-    const id = "custom-" + themeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    await themeStore.addCustomTheme({
-      id,
-      name: themeName.trim(),
-      colors: { ...colorPresets },
-      isCustom: true
-    });
-    themeName = "";
+
+    if (isEditing && themeId) {
+      // Update existing theme
+      const theme = themeStore.customThemes.find(t => t.id === themeId);
+      if (theme) {
+        await themeStore.addCustomTheme({
+          ...theme,
+          name: themeName.trim(),
+          colors: { ...colorPresets }
+        });
+      }
+    } else {
+      // Create new theme
+      const id = "custom-" + themeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+      await themeStore.addCustomTheme({
+        id,
+        name: themeName.trim(),
+        colors: { ...colorPresets },
+        isCustom: true
+      });
+      themeName = "";
+    }
+  }
+
+  async function importTheme() {
+    try {
+      const file = await open({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        multiple: false
+      });
+
+      if (!file || typeof file !== 'string') return;
+
+      const content = await fetch(file).then(r => r.text());
+      const themeData = JSON.parse(content);
+
+      if (themeData.colors && typeof themeData.colors === 'object') {
+        colorPresets = { ...themeData.colors as ThemeColors };
+        themeName = themeData.name || 'Imported Theme';
+        applyLivePreview();
+      } else {
+        alert('Invalid theme file format');
+      }
+    } catch (e) {
+      console.error('Failed to import theme:', e);
+      alert('Failed to import theme. Please check the file format.');
+    }
   }
 
   function resetColors() {
@@ -156,14 +221,20 @@
   }
 </script>
 
-<div class="flex flex-col gap-6 max-w-4xl">
+<div class="flex flex-col gap-6 w-full h-full">
   <!-- Header -->
   <div class="border-b border-brand-border pb-4">
     <div class="flex items-center gap-3 mb-2">
       <Palette class="w-5 h-5 text-brand-accent" />
-      <h2 class="text-lg font-bold text-brand-text-primary">Design Tools</h2>
+      <h2 class="text-lg font-bold text-brand-text-primary">
+        {isEditing ? `Edit Theme: ${themeName}` : 'Design Tools - Create Theme'}
+      </h2>
     </div>
-    <p class="text-sm text-brand-text-secondary">Customize your app's appearance with advanced design controls</p>
+    <p class="text-sm text-brand-text-secondary">
+      {isEditing
+        ? 'Modify the theme colors below and save your changes'
+        : 'Customize your app\'s appearance with advanced design controls'}
+    </p>
   </div>
 
   <!-- Color Customization Grid -->
@@ -358,13 +429,23 @@
           onclick={saveTheme}
           class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          <Plus class="w-4 h-4" /> Save as Custom Theme
+          {#if isEditing}
+            <Check class="w-4 h-4" /> Save Changes
+          {:else}
+            <Plus class="w-4 h-4" /> Save as Custom Theme
+          {/if}
         </button>
         <button
           onclick={exportTheme}
           class="flex-1 bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
           <Download class="w-4 h-4" /> Export Theme
+        </button>
+        <button
+          onclick={importTheme}
+          class="flex-1 bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+        >
+          <Upload class="w-4 h-4" /> Import Theme
         </button>
       </div>
     </div>
