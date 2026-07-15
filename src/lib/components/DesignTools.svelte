@@ -1,23 +1,19 @@
 <script lang="ts">
   import { themeStore, PREDEFINED_THEMES, type ThemeColors, type Theme } from "../stores/theme.svelte";
-  import { Palette, Plus, Trash2, Copy, Download, Upload, Eye, RotateCcw, AlertCircle, CheckCircle, Check } from "lucide-svelte";
+  import { Plus, Download, Upload, Eye, RotateCcw, Check, X } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import {
-    hexToRgb,
-    rgbToHex,
     calculateLuminance,
     isLightColor,
     calculateContrastRatio,
     checkWcagCompliance,
     formatLuminance,
-    getWcagBadgeColor,
     getWcagBadgeText
   } from "../utils/colorUtils";
 
   let { themeId = null, customColors = undefined, newThemeName = undefined }: { themeId?: string | null; customColors?: ThemeColors; newThemeName?: string } = $props();
 
   let showAdvanced = $state(false);
-  let selectedColorTool = $state<string>("primary");
   let themeName = $state("");
   let isEditing = $state(false);
   let colorPresets = $state<ThemeColors>({
@@ -48,16 +44,25 @@
     }
   });
 
-  const colorLabels: Record<string, { label: string; description: string }> = {
+  const bgColorLabels: Record<string, { label: string; description: string }> = {
     "bg-main": { label: "Main Background", description: "Primary view and content area" },
     "bg-sidebar": { label: "Sidebar Background", description: "Left navigation panel" },
     "bg-playerbar": { label: "Player Bar", description: "Bottom playback controls" },
     "color-accent": { label: "Accent Color", description: "Buttons, highlights, focus states" },
     "color-accent-hover": { label: "Accent Hover", description: "Hover state for accent elements" },
-    "color-text-primary": { label: "Primary Text", description: "Main readable text" },
-    "color-text-secondary": { label: "Secondary Text", description: "Hints, labels, muted text" },
     "color-border": { label: "Border Color", description: "Dividers and outlines" }
   };
+
+  const textColorLabels: Record<string, { label: string; description: string }> = {
+    "color-text-primary": { label: "Primary Text", description: "Main readable text" },
+    "color-text-secondary": { label: "Secondary Text", description: "Hints, labels, muted text" }
+  };
+
+  const backgroundTargets: { bg: keyof ThemeColors; label: string }[] = [
+    { bg: "bg-main", label: "Main" },
+    { bg: "bg-sidebar", label: "Sidebar" },
+    { bg: "bg-playerbar", label: "Player Bar" }
+  ];
 
   function initializeTheme() {
     if (themeId) {
@@ -139,11 +144,6 @@
   }
 
 
-  function updateColorFromRgb(key: keyof ThemeColors, r: number, g: number, b: number) {
-    colorPresets[key] = rgbToHex(Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b)));
-    applyLivePreview();
-  }
-
   async function saveTheme() {
     if (themeName.trim() === "") {
       alert("Please enter a theme name");
@@ -221,11 +221,6 @@
     URL.revokeObjectURL(url);
   }
 
-  function copyToClipboard() {
-    const hex = colorPresets[selectedColorTool as keyof ThemeColors];
-    navigator.clipboard.writeText(hex);
-  }
-
   function getContrastMetrics(foregroundHex: string, backgroundHex: string) {
     const ratio = calculateContrastRatio(foregroundHex, backgroundHex);
     const compliance = checkWcagCompliance(foregroundHex, backgroundHex);
@@ -247,19 +242,15 @@
       <h3 class="font-bold text-sm text-brand-text-primary">Color Palette</h3>
 
       <div class="space-y-4">
-        {#each Object.entries(colorLabels) as [key, { label, description }]}
+        {#each Object.entries(bgColorLabels) as [key, { label, description }]}
           {@const hexValue = colorPresets[key as keyof ThemeColors]}
-          {@const rgb = hexToRgb(hexValue)}
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <button
-                  type="button"
-                  class="w-10 h-10 rounded-lg border-2 border-brand-border shadow-sm cursor-pointer hover:border-brand-accent transition-colors"
+                <div
+                  class="w-10 h-10 rounded-lg border-2 border-brand-border shadow-sm shrink-0"
                   style="background-color: {hexValue}"
-                  onclick={() => { selectedColorTool = key; }}
-                  title={`Select ${label} for editing`}
-                ></button>
+                ></div>
                 <div>
                   <p class="text-xs font-semibold text-brand-text-primary">{label}</p>
                   <p class="text-[10px] text-brand-text-secondary/60">{description}</p>
@@ -282,10 +273,10 @@
               />
               <div class="flex items-center justify-between px-1">
                 <span class="text-[10px] text-brand-text-secondary/60">
-                  Luminance: <span class="font-mono">{getLuminancePercent(colorPresets[key as keyof ThemeColors])}</span>
+                  Luminance: <span class="font-mono">{getLuminancePercent(hexValue)}</span>
                 </span>
-                <span class="text-[10px] font-semibold" style="color: {isLightColor(colorPresets[key as keyof ThemeColors]) ? '#fbbf24' : '#6ee7b7'}" title={isLightColor(colorPresets[key as keyof ThemeColors]) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
-                  {isLightColor(colorPresets[key as keyof ThemeColors]) ? 'Light bg' : 'Dark bg'}
+                <span class="text-[10px] font-semibold" style="color: {isLightColor(hexValue) ? '#fbbf24' : '#6ee7b7'}" title={isLightColor(hexValue) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
+                  {isLightColor(hexValue) ? 'Light bg' : 'Dark bg'}
                 </span>
               </div>
             </div>
@@ -301,113 +292,62 @@
       </button>
     </div>
 
-    <!-- Color Detail Editor -->
-    <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-6 space-y-5">
-      <h3 class="font-bold text-sm text-brand-text-primary">RGB Values</h3>
+    <!-- Text Colors -->
+    <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-6 space-y-6">
+      <h3 class="font-bold text-sm text-brand-text-primary">Text Colors</h3>
 
-      {#if selectedColorTool}
-        {@const key = selectedColorTool as keyof ThemeColors}
-        {@const rgb = hexToRgb(colorPresets[key])}
-        <div class="space-y-4">
-          <div class="w-full h-32 rounded-lg border-2 border-brand-border overflow-hidden shadow-sm" style="background-color: {colorPresets[key]}"></div>
-
-          <div class="space-y-3">
-            <div>
-              <label for="red-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Red: {rgb.r}</label>
-              <input
-                id="red-slider"
-                type="range"
-                min="0"
-                max="255"
-                bind:value={rgb.r}
-                oninput={() => updateColorFromRgb(key, rgb.r, rgb.g, rgb.b)}
-                class="w-full"
-              />
-            </div>
-            <div>
-              <label for="green-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Green: {rgb.g}</label>
-              <input
-                id="green-slider"
-                type="range"
-                min="0"
-                max="255"
-                bind:value={rgb.g}
-                oninput={() => updateColorFromRgb(key, rgb.r, rgb.g, rgb.b)}
-                class="w-full"
-              />
-            </div>
-            <div>
-              <label for="blue-slider" class="text-xs font-semibold text-brand-text-primary block mb-1">Blue: {rgb.b}</label>
-              <input
-                id="blue-slider"
-                type="range"
-                min="0"
-                max="255"
-                bind:value={rgb.b}
-                oninput={() => updateColorFromRgb(key, rgb.r, rgb.g, rgb.b)}
-                class="w-full"
-              />
-            </div>
-          </div>
-
-          <button
-            onclick={copyToClipboard}
-            class="w-full bg-brand-accent hover:bg-brand-accent-hover text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-          >
-            <Copy class="w-4 h-4" /> Copy HEX Value
-          </button>
-
-          <!-- Color Metrics Section -->
-          <div class="border-t border-brand-border pt-4 space-y-3">
-            <h4 class="font-semibold text-xs text-brand-text-primary">CIE Color Metrics</h4>
-
-            <!-- Luminance -->
-            <div class="bg-brand-main rounded-lg p-3 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-brand-text-secondary">Relative Luminance (CIE)</span>
-                <span class="font-mono text-xs font-bold text-brand-accent">{getLuminancePercent(colorPresets[selectedColorTool as keyof ThemeColors])}</span>
+      {#each Object.entries(textColorLabels) as [key, { label, description }]}
+        {@const hexValue = colorPresets[key as keyof ThemeColors]}
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-lg border-2 border-brand-border shadow-sm shrink-0"
+                style="background-color: {hexValue}"
+              ></div>
+              <div>
+                <p class="text-xs font-semibold text-brand-text-primary">{label}</p>
+                <p class="text-[10px] text-brand-text-secondary/60">{description}</p>
               </div>
-              <p class="text-[10px] text-brand-text-secondary/60">
-                {isLightColor(colorPresets[selectedColorTool as keyof ThemeColors])
-                  ? "Perceived as LIGHT - Use dark text for contrast"
-                  : "Perceived as DARK - Use light text for contrast"}
-              </p>
             </div>
+            <input
+              type="color"
+              bind:value={colorPresets[key as keyof ThemeColors]}
+              oninput={applyLivePreview}
+              class="w-12 h-8 rounded cursor-pointer border border-brand-border bg-transparent"
+            />
+          </div>
+          <input
+            type="text"
+            bind:value={colorPresets[key as keyof ThemeColors]}
+            oninput={applyLivePreview}
+            class="w-full bg-brand-main border border-brand-border rounded px-3 py-2 text-xs font-mono text-brand-text-primary outline-none focus:border-brand-accent"
+            placeholder="#000000"
+          />
 
-            <!-- Contrast Ratios -->
-            <div class="space-y-2">
-              <h5 class="text-xs font-semibold text-brand-text-primary">Contrast Ratios</h5>
-
-              {#each [{ bg: 'bg-main', label: 'vs Main Background' }, { bg: 'bg-sidebar', label: 'vs Sidebar Background' }, { bg: 'bg-playerbar', label: 'vs Player Bar Background' }] as item}
-                {@const contrast = getContrastMetrics(colorPresets[selectedColorTool as keyof ThemeColors], colorPresets[item.bg as keyof ThemeColors])}
-                <div class="bg-brand-main rounded-lg p-3 space-y-1">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs text-brand-text-secondary">{item.label}</span>
-                    <span class="font-mono text-xs font-bold">{contrast.ratio}:1</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    {#if contrast.compliance.level === 'AAA'}
-                      <CheckCircle class="w-3.5 h-3.5" style="color: #10b981;" />
-                    {:else if contrast.compliance.level === 'AA'}
-                      <AlertCircle class="w-3.5 h-3.5" style="color: #f59e0b;" />
-                    {:else}
-                      <AlertCircle class="w-3.5 h-3.5" style="color: #ef4444;" />
-                    {/if}
-                    <span class="text-[10px]" style="color: {getWcagBadgeColor(contrast.compliance.level)}">
-                      {getWcagBadgeText(contrast.compliance.level)}
-                    </span>
-                  </div>
+          <!-- Contrast against every background -->
+          <div class="grid grid-cols-3 gap-2">
+            {#each backgroundTargets as target}
+              {@const contrast = getContrastMetrics(hexValue, colorPresets[target.bg])}
+              <div class="bg-brand-main rounded-lg p-2 flex flex-col items-center gap-1" title={getWcagBadgeText(contrast.compliance.level)}>
+                <span class="text-[9px] text-brand-text-secondary/70">{target.label}</span>
+                <div class="flex items-center gap-1">
+                  <span class="font-mono text-xs font-bold">{Math.round(contrast.ratio)}:1</span>
+                  {#if contrast.compliance.wcagAA}
+                    <Check class="w-3 h-3" style="color: #10b981;" />
+                  {:else}
+                    <X class="w-3 h-3" style="color: #ef4444;" />
+                  {/if}
                 </div>
-              {/each}
-            </div>
-
-            <p class="text-[10px] text-brand-text-secondary/60 pt-2 border-t border-brand-border/50">
-              WCAG AA: 4.5:1 minimum for normal text<br />
-              WCAG AAA: 7:1 minimum for maximum accessibility
-            </p>
+              </div>
+            {/each}
           </div>
         </div>
-      {/if}
+      {/each}
+
+      <p class="text-[10px] text-brand-text-secondary/60 pt-2 border-t border-brand-border/50">
+        Checkmark = meets WCAG AA (4.5:1 minimum for normal text)
+      </p>
     </div>
   </div>
 
