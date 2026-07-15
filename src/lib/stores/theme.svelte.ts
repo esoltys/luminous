@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCoverArtUrl } from "../types";
 import type { Song } from "../types";
-import { hexToRgb, rgbToHex, pickAccessibleOnColor } from "../utils/colorUtils";
+import { hexToRgb, rgbToHex, pickAccessibleOnColor, isLightColor } from "../utils/colorUtils";
 
 export interface ThemeColors {
   "bg-main": string;
@@ -396,7 +396,9 @@ class ThemeStore {
   }
 
   get isGlassTheme(): boolean {
-    return this.activeThemeId === "system";
+    // Every theme gets the glass treatment now — chrome panels always
+    // render translucent/blurred, computed from whichever theme is active.
+    return true;
   }
 
   get currentTheme(): Theme {
@@ -476,8 +478,17 @@ class ThemeStore {
   }
 
   async updateArtworkColors(song: Song | undefined) {
+    // Extracted artwork colors only drive rendering (--logo-stop-*,
+    // --color-artwork-*) when the Dynamic Artwork theme is actually
+    // active — otherwise every track change would stomp whatever
+    // applyActiveTheme() correctly set for the current theme. The
+    // extraction itself still runs so artworkColors is ready the moment
+    // the user switches to Dynamic Artwork.
+    const isDynamicArtwork = this.currentTheme.id === "dynamic-artwork";
+
     if (!song) {
-      this.resetArtworkColors();
+      if (isDynamicArtwork) this.resetArtworkColors();
+      else this.artworkColors = null;
       return;
     }
 
@@ -508,16 +519,19 @@ class ThemeStore {
     }
 
     if (!url) {
-      this.resetArtworkColors();
+      if (isDynamicArtwork) this.resetArtworkColors();
+      else this.artworkColors = null;
       return;
     }
 
     try {
       const colors = await extractColorsFromImage(url);
-      this.applyArtworkColors(colors);
+      if (isDynamicArtwork) this.applyArtworkColors(colors);
+      else this.artworkColors = colors;
     } catch (e) {
       console.error("Failed to extract artwork colors:", e);
-      this.resetArtworkColors();
+      if (isDynamicArtwork) this.resetArtworkColors();
+      else this.artworkColors = null;
     }
   }
 
@@ -604,24 +618,35 @@ class ThemeStore {
     `;
 
     const root = document.documentElement;
-    root.classList.toggle("theme-glass", isLuminous);
+    root.classList.toggle("theme-glass", true);
 
-    if (isLuminous) {
-      const isDark = this.systemColorScheme === "dark";
-      // These are rendering-only, separate from the opaque `colors` above —
-      // alpha never reaches a color picker, see hexToRgbaString().
-      root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(colors["bg-sidebar"], isDark ? 0.5 : 0.6));
-      root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(colors["bg-playerbar"], isDark ? 0.55 : 0.65));
-      root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
+    // Glass rendering vars — computed for every theme (not just System) so
+    // all four chrome panels get the blur/tint/shine treatment regardless
+    // of which theme is active. isDark comes from this theme's own
+    // bg-main luminance rather than systemColorScheme, since only System
+    // tracks the OS scheme — every other theme has fixed colors.
+    // Rendering-only, separate from the opaque `colors` above — alpha
+    // never reaches a color picker, see hexToRgbaString().
+    const isDark = !isLightColor(colors["bg-main"]);
+    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(colors["bg-sidebar"], isDark ? 0.5 : 0.6));
+    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(colors["bg-playerbar"], isDark ? 0.78 : 0.85));
+    root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
 
-      const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
-      // Two-layer glow (tight bright core + wide soft halo) reads as an
-      // actual glow rather than a flat blurred outline.
-      const glowNear = `0 0 24px 2px ${hexToRgbaString(colors["color-accent"], isDark ? 0.45 : 0.28)}`;
-      const glowFar = `0 0 90px 10px ${hexToRgbaString(colors["color-accent"], isDark ? 0.28 : 0.16)}`;
-      const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
-      root.style.setProperty("--glass-shadow", `${elevation}, ${glowNear}, ${glowFar}, ${highlight}`);
-    }
+    const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
+    const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
+    root.style.setProperty("--glass-shadow", `${elevation}, ${highlight}`);
+
+    // PlayDock-only accent glow — kept out of --glass-shadow above since
+    // the other three panels don't get it. Two-layer glow (tight bright
+    // core + wide soft halo) reads as an actual glow rather than a flat
+    // blurred outline. Reuses resolvedAccent (computed above), not
+    // colors["color-accent"] directly: for Dynamic Artwork that's a CSS
+    // var() reference string, and hexToRgbaString() needs a literal hex —
+    // fed the reference string, hexToRgb()'s regex fails and silently
+    // falls back to black, rendering as an invisible glow.
+    const glowNear = `0 0 24px 2px ${hexToRgbaString(resolvedAccent, isDark ? 0.45 : 0.28)}`;
+    const glowFar = `0 0 90px 10px ${hexToRgbaString(resolvedAccent, isDark ? 0.28 : 0.16)}`;
+    root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
 
     // Apply logo stops based on active theme or dynamic colors. The
     // System theme always uses the true brand orange/gold here — never

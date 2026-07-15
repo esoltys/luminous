@@ -214,7 +214,7 @@
   </div>
 
   <!-- Lyrics Container Viewport -->
-  <div class="flex-1 overflow-y-auto px-6 py-12" bind:this={containerEl}>
+  <div class="flex-1 overflow-y-auto px-6 py-12 pb-24" bind:this={containerEl}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
         <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent" />

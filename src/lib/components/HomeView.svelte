@@ -56,7 +56,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto px-6 py-8 space-y-12">
+  <div class="flex-1 overflow-y-auto px-6 py-8 pb-24 space-y-12">
     {#if isLoading}
       <div class="flex items-center justify-center h-64">
         <div class="text-brand-text-secondary">Loading your collection...</div>

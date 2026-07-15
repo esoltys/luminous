@@ -80,7 +80,7 @@
   }
 </script>
 
-<footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border-t border-brand-border flex items-center justify-between px-6 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
+<footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <CoverArt
@@ -235,6 +235,30 @@
 </footer>
 
 <style>
+  /* Accent glow: only the PlayDock gets it, not the other glass panels —
+     extends the shared --glass-shadow (elevation + highlight, app.css)
+     with --glass-glow (theme.svelte.ts) rather than baking the glow into
+     the shared variable itself. */
+  footer.glass-surface {
+    box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
+  }
+
+  /* Liquid-glass "shine": a light-catching specular highlight on top of the
+     existing blur+tint (.glass-surface, app.css), modeled on the two-corner
+     inset highlight from https://codepen.io/lassiterda/pen/vEOpqMa. Plain
+     box-shadow — no backdrop-filter/SVG-filter interaction, so it renders
+     the same regardless of whether the blur itself composites. */
+  footer.glass-surface::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 1.5px 1.5px 1px 0 rgba(255, 255, 255, 0.45),
+      inset -1px -1px 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
   .volume-slider {
     -webkit-appearance: none;
     appearance: none;
