@@ -511,6 +511,57 @@ impl CollectionScanner {
         )?;
         Ok(stats)
     }
+
+    pub fn get_recently_played(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN (1, 2) AND unavailable = 0 AND lastplayed IS NOT NULL
+             ORDER BY lastplayed DESC
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    pub fn get_most_frequently_played(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN (1, 2) AND unavailable = 0 AND playcount > 0
+             ORDER BY playcount DESC
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    pub fn get_recently_added(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN (1, 2) AND unavailable = 0 AND added IS NOT NULL
+             ORDER BY added DESC
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
 }
 
 // ---------------------------------------------------------------------------

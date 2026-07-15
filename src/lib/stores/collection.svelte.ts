@@ -22,7 +22,7 @@ class CollectionStore {
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
-  private _activeTab = $state<"collection" | "playlists" | "settings" | "lyrics">("collection");
+  private _activeTab = $state<"home" | "collection" | "playlists" | "settings" | "lyrics">("collection");
   private _activeSubTab = $state<"songs" | "albums" | "artists">("songs");
 
   get activeTab() { return this._activeTab; }
@@ -160,7 +160,7 @@ class CollectionStore {
     }
   }
 
-  navigateTo(tab: "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
+  navigateTo(tab: "home" | "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
     this.activeTab = tab;
     if (subTab) {
       this.activeSubTab = subTab;

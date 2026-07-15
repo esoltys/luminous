@@ -424,6 +424,9 @@ pub fn run() {
             commands::collection::get_songs_by_album,
             commands::collection::get_albums,
             commands::collection::get_artists,
+            commands::collection::get_recently_played,
+            commands::collection::get_most_frequently_played,
+            commands::collection::get_recently_added,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

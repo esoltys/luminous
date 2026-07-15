@@ -1,7 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText } from "lucide-svelte";
+  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   let { width = 256 }: { width?: number } = $props();
@@ -38,6 +38,17 @@
 <aside style="width: {width}px;" class="bg-brand-sidebar border-r border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0">
   <!-- Navigation -->
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
+    <button
+      onclick={() => { collectionStore.activeTab = "home"; }}
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'home' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      title="Home"
+    >
+      <Home class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      {#if !isCollapsed}
+        Home
+      {/if}
+    </button>
+
     <button
       onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "songs"; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-text-primary shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-main/50 hover:text-brand-text-primary'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
