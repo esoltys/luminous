@@ -34,6 +34,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 ## Package Manager
 - Use **bun** for all JavaScript/TypeScript package management in this project (not npm, yarn, or pnpm).
 - Run scripts with `bun run <script>` and install packages with `bun add <package>`.
+- Use **bunx** for running one-off CLI tools (not npx/node). Example: `bunx some-tool` instead of `npx some-tool`.
 
 ## Tech Stack
 - **Frontend**: SvelteKit + Svelte 5 (Runes) + TypeScript + Tailwind CSS v4
