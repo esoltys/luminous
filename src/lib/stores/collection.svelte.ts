@@ -145,6 +145,9 @@ class CollectionStore {
   }
 
   async search(query: string) {
+    if (query.trim() !== "") {
+      this.selectedArtistName = null;
+    }
     this.searchQuery = query;
     if (query.trim() === "") {
       this.searchResults = [];
@@ -161,6 +164,7 @@ class CollectionStore {
   }
 
   navigateTo(tab: "home" | "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
+    this.selectedArtistName = null;
     this.activeTab = tab;
     if (subTab) {
       this.activeSubTab = subTab;
@@ -168,6 +172,15 @@ class CollectionStore {
     if (query !== undefined) {
       this.searchQuery = query;
     }
+  }
+
+  /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
+  selectedArtistName = $state<string | null>(null);
+
+  viewArtist(name: string) {
+    this.activeTab = "collection";
+    this.activeSubTab = "artists";
+    this.selectedArtistName = name;
   }
 
   isFormatExcluded(filetype: string): boolean {

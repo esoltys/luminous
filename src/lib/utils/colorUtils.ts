@@ -161,6 +161,41 @@ export function pickAccessibleOnColor(backgroundColor: string): string {
 }
 
 /**
+ * Clamps a color to a minimum contrast ratio against a background by
+ * stepping its HSL lightness toward black (light backgrounds) or white
+ * (dark backgrounds), holding hue+saturation fixed so it stays recognizably
+ * "the accent" rather than jumping to an unrelated color the way
+ * pickAccessibleOnColor()'s binary white/black choice would. Used to derive
+ * an "Accent Text" color — any accent-colored text/icon in the app should
+ * use this instead of the raw accent, since the raw accent's own contrast
+ * guarantee (enforced in theme.test.ts) is only checked against bg-main at
+ * theme-authoring time, not against every surface it might render on, and
+ * user-chosen custom/dynamic-artwork accents have no guarantee at all.
+ */
+export function clampForContrast(hex: string, backgroundHex: string, minRatio = 4.5): string {
+  if (calculateContrastRatio(hex, backgroundHex) >= minRatio) return hex;
+
+  const bgIsLight = isLightColor(backgroundHex);
+  const rgb = hexToRgb(hex);
+  let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  let candidateHex = hex;
+
+  for (let i = 0; i < 50; i++) {
+    const nextL = bgIsLight ? hsl.l - 0.02 : hsl.l + 0.02;
+    if (nextL < 0 || nextL > 1) break;
+    hsl = { ...hsl, l: nextL };
+    const candidateRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
+    candidateHex = rgbToHex(candidateRgb.r, candidateRgb.g, candidateRgb.b);
+    if (calculateContrastRatio(candidateHex, backgroundHex) >= minRatio) return candidateHex;
+  }
+
+  // Ran out of lightness room (e.g. a near-gray accent) without clearing
+  // minRatio — return the most extreme candidate reached rather than the
+  // original, since it's strictly closer to compliant.
+  return candidateHex;
+}
+
+/**
  * Get full color metrics for a hex color
  */
 export function getColorMetrics(hex: string): ColorMetrics {

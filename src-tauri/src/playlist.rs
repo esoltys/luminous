@@ -109,6 +109,39 @@ impl PlaylistManager {
         Ok(playlists)
     }
 
+    pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec,
+                    p.last_played_row, p.created,
+                    (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
+             FROM playlists p
+             WHERE EXISTS (
+                 SELECT 1 FROM playlist_items pi
+                 JOIN songs s ON s.id = pi.song_id
+                 WHERE pi.playlist_id = p.id
+                   AND COALESCE(NULLIF(s.album_artist, ''), s.artist) = ?1
+                   AND s.unavailable = 0
+             )
+             ORDER BY p.created",
+        )?;
+        let playlists = stmt
+            .query_map(params![artist], |row| {
+                Ok(Playlist {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    dynamic_enabled: row.get(2)?,
+                    dynamic_spec: row.get(3)?,
+                    last_played_row: row.get(4)?,
+                    created: row.get(5)?,
+                    track_count: row.get(6)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(playlists)
+    }
+
     // -----------------------------------------------------------------------
     // Playlist item operations
     // -----------------------------------------------------------------------

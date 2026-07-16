@@ -8,6 +8,8 @@
   import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { VirtualList } from "svelte-virtual-list-ts";
+  import { getArtistAlbums, getArtistGradient } from "../utils/artist";
+  import ArtistDetailView from "./ArtistDetailView.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -21,28 +23,8 @@
     collectionStore.refreshLibrary();
   }
 
-  function getArtistAlbums(name: string | null): AlbumItem[] {
-    if (!name) return [];
-    return collectionStore.albums
-      .filter((a) => a.artist === name)
-      .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-  }
-
-  function getArtistGradient(name: string | null): string {
-    if (!name) return "from-purple-900 to-indigo-900";
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % 5;
-    const gradients = [
-      "from-indigo-600 to-purple-600",
-      "from-rose-600 to-orange-600",
-      "from-emerald-600 to-teal-600",
-      "from-cyan-600 to-blue-600",
-      "from-amber-600 to-red-600"
-    ];
-    return gradients[index];
+  function getArtistAlbumsFor(name: string | null): AlbumItem[] {
+    return getArtistAlbums(collectionStore.albums, name);
   }
 
   let sortField = $state<keyof Song>(
@@ -187,26 +169,29 @@
   }
 </script>
 
+{#if collectionStore.selectedArtistName !== null}
+  <ArtistDetailView artistName={collectionStore.selectedArtistName} />
+{:else}
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Top bar with Filter Info -->
-  <div class="h-12 px-6 border-b border-brand-border flex items-center justify-between">
+  <div class="h-12 px-6 flex items-center justify-between">
     <!-- Filter Pills (Left) -->
     <div class="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-xl py-1 select-none flex-nowrap flex-shrink-0">
       <button
-        onclick={() => { collectionStore.activeSubTab = "artists"; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+        onclick={() => { collectionStore.activeSubTab = "artists"; collectionStore.selectedArtistName = null; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
         Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
       </button>
       <button
-        onclick={() => { collectionStore.activeSubTab = "albums"; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+        onclick={() => { collectionStore.activeSubTab = "albums"; collectionStore.selectedArtistName = null; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
         Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
       </button>
       <button
-        onclick={() => { collectionStore.activeSubTab = "songs"; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-brand-accent font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+        onclick={() => { collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; }}
+        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
         Songs ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
       </button>
@@ -292,7 +277,7 @@
   </div>
 
   <!-- Main View Scrollable Container -->
-  <div class="flex-1 p-6 pb-24 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}">
+  <div class="flex-1 px-6 pt-2 pb-24 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}">
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
@@ -322,7 +307,7 @@
           {#if filteredSongs.length === 0}
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                <Music class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+                <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
                 <h3 class="text-base font-semibold text-brand-text-primary mb-1">No tracks found</h3>
                 <p class="text-xs text-brand-text-secondary/60">
                   {#if collectionStore.searchQuery}
@@ -348,7 +333,7 @@
               <div
                 ondblclick={() => handlePlaySong(song)}
                 class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
-                  {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}"
+                  {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
                   {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
@@ -360,7 +345,7 @@
                   {/if}
                   <button
                     onclick={() => handlePlaySong(song)}
-                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-all duration-150 cursor-pointer"
+                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer"
                     title="Play track"
                   >
                     <Play class="w-4 h-4 fill-current" />
@@ -372,7 +357,7 @@
                 <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
                   <button
                     onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
-                    class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-hover' : 'text-brand-text-primary'}"
+                    class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
                     title="Filter by title: {song.title || 'Unknown Title'}"
                   >
                     {song.title || "Unknown Title"}
@@ -381,7 +366,7 @@
                     {song.filetype}
                   </span>
                   {#if song.lyrics && song.lyrics.trim() !== ""}
-                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shrink-0" title="Lyrics available">
+                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title="Lyrics available">
                       LRC
                     </span>
                   {/if}
@@ -389,9 +374,9 @@
                 <div class="text-brand-text-secondary/90 truncate pr-4 min-w-0">
                   {#if song.artist}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.artist || ""); }}
-                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90 text-left"
-                      title="Filter by artist: {song.artist}"
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90 text-left"
+                      title="View artist: {song.artist}"
                     >
                       {song.artist}
                     </button>
@@ -403,7 +388,7 @@
                   {#if song.album}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.album || ""); }}
-                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70 text-left"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70 text-left"
                       title="Filter by album: {song.album}"
                     >
                       {song.album}
@@ -416,14 +401,14 @@
                 <div class="flex items-center justify-center gap-2.5">
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
-                    class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors cursor-pointer"
+                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
                     title="Add to active playlist"
                   >
                     <Plus class="w-4 h-4" />
                   </button>
                   <button
                     onclick={() => openTagEditor(song.id)}
-                    class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors cursor-pointer"
+                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
                     title="Edit tags"
                   >
                     <Edit3 class="w-4 h-4" />
@@ -472,7 +457,7 @@
             }}
             class="{sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
           >
-            <div class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent border border-brand-border overflow-hidden relative">
+            <div class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative">
               <CoverArt
                 songId={undefined}
                 artEmbedded={album.art_embedded}
@@ -502,18 +487,22 @@
             </div>
             <button
               onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", album.album || ""); }}
-              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
               title="Filter by album: {album.album || 'Unknown Album'}"
             >
               {album.album || "Unknown Album"}
             </button>
-            <button
-              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", album.artist || ""); }}
-              class="text-xs text-brand-text-secondary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-              title="Filter by artist: {album.artist || 'Various Artists'}"
-            >
-              {album.artist || "Various Artists"}
-            </button>
+            {#if album.artist}
+              <button
+                onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
+                class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
+                title="View artist: {album.artist}"
+              >
+                {album.artist}
+              </button>
+            {:else}
+              <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">Various Artists</span>
+            {/if}
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
               <span>{album.track_count} tracks</span>
@@ -523,7 +512,7 @@
         {#if sortedAlbums.length === 0}
           <div class="col-span-full py-16 text-center">
             <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-              <FolderClosed class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+              <FolderClosed class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
               <h3 class="text-base font-semibold text-brand-text-primary mb-1">No albums found</h3>
               <p class="text-xs text-brand-text-secondary/60 font-medium">No albums found in your library.</p>
             </div>
@@ -534,8 +523,16 @@
       <!-- Artists List Grid View -->
       <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
         {#each sortedArtists as artist}
-          {@const artistAlbums = getArtistAlbums(artist.name)}
-          <div class="artist-card bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200">
+          {@const artistAlbums = getArtistAlbumsFor(artist.name)}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <div
+            role="button"
+            tabindex="0"
+            onclick={() => collectionStore.viewArtist(artist.name || "")}
+            onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); collectionStore.viewArtist(artist.name || ""); } }}
+            class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200 cursor-pointer"
+          >
             {#if artistAlbums.length > 0}
               <div class="artist-cover-stack relative w-24 h-24 mt-2 mb-4 shrink-0">
                 {#each artistAlbums.slice(0, 6) as album, i ((album.album ?? "unknown") + i)}
@@ -558,13 +555,12 @@
                 {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
               </div>
             {/if}
-            <button
-              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", artist.name || ""); }}
-              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-center truncate w-full cursor-pointer"
-              title="Filter by artist: {artist.name || 'Unknown Artist'}"
+            <span
+              class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-center truncate w-full"
+              title="View artist: {artist.name || 'Unknown Artist'}"
             >
               {artist.name || "Unknown Artist"}
-            </button>
+            </span>
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{artist.album_count} albums</span>
               <span>•</span>
@@ -575,7 +571,7 @@
         {#if sortedArtists.length === 0}
           <div class="col-span-full py-16 text-center">
             <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-              <Music class="w-12 h-12 text-brand-accent/40 mb-3 animate-pulse" />
+              <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
               <h3 class="text-base font-semibold text-brand-text-primary mb-1">No artists found</h3>
               <p class="text-xs text-brand-text-secondary/60 font-medium">No artists found in your library.</p>
             </div>
@@ -585,6 +581,7 @@
     {/if}
   </div>
 </div>
+{/if}
 
 {#if editingSongId !== null}
   <TagEditor
