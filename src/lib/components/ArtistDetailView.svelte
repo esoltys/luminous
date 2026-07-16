@@ -274,7 +274,7 @@
               <ListMusic class="w-10 h-10 text-white/80" />
             </div>
             <span class="font-semibold text-xs text-brand-text-primary truncate">{playlist.name}</span>
-            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">{playlist.track_count} tracks</span>
+            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">{playlist.track_count} songs</span>
           </button>
         {/each}
       </HorizontalScrollRow>

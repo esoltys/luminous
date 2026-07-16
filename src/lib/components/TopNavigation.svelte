@@ -113,7 +113,7 @@
       bind:this={searchInput}
       bind:value={collectionStore.searchQuery}
       type="text"
-      placeholder="Search tracks, albums, artists... (Ctrl+L)"
+      placeholder="Search songs, albums, artists... (Ctrl+L)"
       class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
     />
 

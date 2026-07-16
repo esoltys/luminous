@@ -173,7 +173,7 @@
           {playerStore.currentSong ? playerStore.currentSong.title : "No song playing"}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
-          {playerStore.currentSong ? `${playerStore.currentSong.artist || "Unknown Artist"} — ${playerStore.currentSong.album || "Unknown Album"}` : "Select a track to view lyrics"}
+          {playerStore.currentSong ? `${playerStore.currentSong.artist || "Unknown Artist"} — ${playerStore.currentSong.album || "Unknown Album"}` : "Select a song to view lyrics"}
         </p>
       </div>
     </div>

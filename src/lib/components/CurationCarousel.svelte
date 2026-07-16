@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { Song } from "../types";
+  import type { HomeItem } from "../types";
   import CarouselCard from "./CarouselCard.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
 
-  let { songs }: { songs: Song[] } = $props();
+  let { items }: { items: HomeItem[] } = $props();
 </script>
 
 <HorizontalScrollRow>
-  {#each songs as song (song.id)}
-    <CarouselCard {song} />
+  {#each items as item (item.type === 'song' ? 's_' + item.song.id : 'a_' + (item.album.album || '') + '_' + (item.album.artist || ''))}
+    <CarouselCard {item} />
   {/each}
 </HorizontalScrollRow>

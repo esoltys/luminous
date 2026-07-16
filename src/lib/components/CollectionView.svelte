@@ -266,7 +266,7 @@
 
       <div class="text-xs text-brand-text-secondary font-medium">
         {#if collectionStore.activeSubTab === "songs"}
-          Showing {filteredSongs.length} tracks
+          Showing {filteredSongs.length} songs
         {:else if collectionStore.activeSubTab === "albums"}
           Showing {sortedAlbums.length} albums
         {:else}
@@ -308,7 +308,7 @@
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">No tracks found</h3>
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1">No songs found</h3>
                 <p class="text-xs text-brand-text-secondary/60">
                   {#if collectionStore.searchQuery}
                     We couldn't find any songs matching "{collectionStore.searchQuery}". Try adjusting your keywords.
@@ -346,7 +346,7 @@
                   <button
                     onclick={() => handlePlaySong(song)}
                     class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer"
-                    title="Play track"
+                    title="Play song"
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>
@@ -505,7 +505,7 @@
             {/if}
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
-              <span>{album.track_count} tracks</span>
+              <span>{album.track_count} songs</span>
             </div>
           </div>
         {/each}
@@ -564,7 +564,7 @@
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{artist.album_count} albums</span>
               <span>•</span>
-              <span>{artist.song_count} tracks</span>
+              <span>{artist.song_count} songs</span>
             </div>
           </div>
         {/each}

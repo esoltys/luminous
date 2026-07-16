@@ -8150,22 +8150,157 @@ const mockArtists = [
         case "get_songs":
           return mockSongs;
 
-        case "get_recently_played":
-          return mockSongs
+        case "get_recently_played": {
+          const albumCounts = {};
+          for (const s of mockSongs) {
+            if (s.album) {
+              const artist = s.album_artist || s.artist || "";
+              const key = `${s.album}///${artist}`;
+              albumCounts[key] = (albumCounts[key] || 0) + 1;
+            }
+          }
+          const groupSongsIntoHomeItems = (songs, limit) => {
+            const items = [];
+            const seenAlbums = new Set();
+            for (const s of songs) {
+              if (items.length >= limit) break;
+              if (s.album) {
+                const artist = s.album_artist || s.artist || "";
+                const key = `${s.album}///${artist}`;
+                const count = albumCounts[key] || 0;
+                if (count > 1) {
+                  if (!seenAlbums.has(key)) {
+                    seenAlbums.add(key);
+                    items.push({
+                      type: "album",
+                      album: {
+                        artist: artist,
+                        album: s.album,
+                        year: s.year || null,
+                        track_count: count,
+                        art_embedded: s.art_embedded || false,
+                        art_automatic: s.art_automatic || null,
+                        art_manual: s.art_manual || null
+                      }
+                    });
+                  }
+                  continue;
+                }
+              }
+              items.push({
+                type: "song",
+                song: s
+              });
+            }
+            return items;
+          };
+
+          const recentSongs = mockSongs
             .filter(s => s.lastplayed)
-            .sort((a, b) => (b.lastplayed || 0) - (a.lastplayed || 0))
-            .slice(0, args.limit || 10);
+            .sort((a, b) => (b.lastplayed || 0) - (a.lastplayed || 0));
+          return groupSongsIntoHomeItems(recentSongs, args.limit || 10);
+        }
 
-        case "get_most_frequently_played":
-          return mockSongs
-            .sort((a, b) => (b.playcount || 0) - (a.playcount || 0))
-            .slice(0, args.limit || 10);
+        case "get_most_frequently_played": {
+          const albumCounts = {};
+          for (const s of mockSongs) {
+            if (s.album) {
+              const artist = s.album_artist || s.artist || "";
+              const key = `${s.album}///${artist}`;
+              albumCounts[key] = (albumCounts[key] || 0) + 1;
+            }
+          }
+          const groupSongsIntoHomeItems = (songs, limit) => {
+            const items = [];
+            const seenAlbums = new Set();
+            for (const s of songs) {
+              if (items.length >= limit) break;
+              if (s.album) {
+                const artist = s.album_artist || s.artist || "";
+                const key = `${s.album}///${artist}`;
+                const count = albumCounts[key] || 0;
+                if (count > 1) {
+                  if (!seenAlbums.has(key)) {
+                    seenAlbums.add(key);
+                    items.push({
+                      type: "album",
+                      album: {
+                        artist: artist,
+                        album: s.album,
+                        year: s.year || null,
+                        track_count: count,
+                        art_embedded: s.art_embedded || false,
+                        art_automatic: s.art_automatic || null,
+                        art_manual: s.art_manual || null
+                      }
+                    });
+                  }
+                  continue;
+                }
+              }
+              items.push({
+                type: "song",
+                song: s
+              });
+            }
+            return items;
+          };
 
-        case "get_recently_added":
-          return mockSongs
+          const frequentSongs = mockSongs
+            .sort((a, b) => (b.playcount || 0) - (a.playcount || 0));
+          return groupSongsIntoHomeItems(frequentSongs, args.limit || 10);
+        }
+
+        case "get_recently_added": {
+          const albumCounts = {};
+          for (const s of mockSongs) {
+            if (s.album) {
+              const artist = s.album_artist || s.artist || "";
+              const key = `${s.album}///${artist}`;
+              albumCounts[key] = (albumCounts[key] || 0) + 1;
+            }
+          }
+          const groupSongsIntoHomeItems = (songs, limit) => {
+            const items = [];
+            const seenAlbums = new Set();
+            for (const s of songs) {
+              if (items.length >= limit) break;
+              if (s.album) {
+                const artist = s.album_artist || s.artist || "";
+                const key = `${s.album}///${artist}`;
+                const count = albumCounts[key] || 0;
+                if (count > 1) {
+                  if (!seenAlbums.has(key)) {
+                    seenAlbums.add(key);
+                    items.push({
+                      type: "album",
+                      album: {
+                        artist: artist,
+                        album: s.album,
+                        year: s.year || null,
+                        track_count: count,
+                        art_embedded: s.art_embedded || false,
+                        art_automatic: s.art_automatic || null,
+                        art_manual: s.art_manual || null
+                      }
+                    });
+                  }
+                  continue;
+                }
+              }
+              items.push({
+                type: "song",
+                song: s
+              });
+            }
+            return items;
+          };
+
+          const addedSongs = mockSongs
             .filter(s => s.added)
-            .sort((a, b) => (b.added || 0) - (a.added || 0))
-            .slice(0, args.limit || 10);
+            .sort((a, b) => (b.added || 0) - (a.added || 0));
+          return groupSongsIntoHomeItems(addedSongs, args.limit || 10);
+        }
 
         case "get_albums":
           return mockAlbums;

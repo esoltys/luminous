@@ -225,3 +225,7 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
   }
   return uri;
 }
+
+export type HomeItem =
+  | { type: "song"; song: Song }
+  | { type: "album"; album: AlbumItem };

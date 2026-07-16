@@ -157,7 +157,7 @@
       <div class="flex items-center gap-3">
         <ListMusic class="w-5 h-5 text-brand-accent-text" />
         <h2 class="text-base font-bold text-brand-text-primary">{activePlaylist.name}</h2>
-        <span class="text-xs text-brand-text-secondary/60 font-medium">({playlistsStore.activePlaylistTracks.length} tracks)</span>
+        <span class="text-xs text-brand-text-secondary/60 font-medium">({playlistsStore.activePlaylistTracks.length} songs)</span>
       </div>
 
       <div class="flex items-center gap-3">
@@ -180,7 +180,7 @@
           <button
             onclick={removeUnavailableTracks}
             class="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
-            title="Remove all {unavailableCount} unavailable track{unavailableCount === 1 ? '' : 's'} from playlist"
+            title="Remove all {unavailableCount} unavailable song{unavailableCount === 1 ? '' : 's'} from playlist"
           >
             <AlertTriangle class="w-3.5 h-3.5" />
             Remove {unavailableCount} unavailable
@@ -249,7 +249,7 @@
                       onclick={() => !unavailable && handlePlayPlaylistItem(index)}
                       class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
                       disabled={unavailable}
-                      title="Play track"
+                      title="Play song"
                     >
                       <Play class="w-4 h-4 fill-current" />
                     </button>

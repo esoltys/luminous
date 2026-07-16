@@ -34,7 +34,7 @@
     {#if currentSong}
       <div class="space-y-3">
         <div class="space-y-1">
-          <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">Track</p>
+          <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">Song</p>
           <p class="text-sm font-semibold text-brand-text-primary truncate">{currentSong.title || "Unknown"}</p>
         </div>
 
@@ -99,7 +99,7 @@
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />
-        <p class="text-sm text-brand-text-secondary/60">No track playing</p>
+        <p class="text-sm text-brand-text-secondary/60">No song playing</p>
       </div>
     {/if}
   </div>

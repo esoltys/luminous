@@ -4,13 +4,13 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import type { Song } from "../types";
+  import type { HomeItem } from "../types";
   import CurationCarousel from "./CurationCarousel.svelte";
   import { Disc3 } from "lucide-svelte";
 
-  let recentlyPlayed = $state<Song[]>([]);
-  let frequentlyPlayed = $state<Song[]>([]);
-  let recentlyAdded = $state<Song[]>([]);
+  let recentlyPlayed = $state<HomeItem[]>([]);
+  let frequentlyPlayed = $state<HomeItem[]>([]);
+  let recentlyAdded = $state<HomeItem[]>([]);
   let isLoading = $state(true);
 
   function getTimeOfDayGreeting(): string {
@@ -25,9 +25,9 @@
     isLoading = true;
     try {
       const [recent, frequent, added] = await Promise.all([
-        invoke<Song[]>("get_recently_played", { limit: 10 }),
-        invoke<Song[]>("get_most_frequently_played", { limit: 10 }),
-        invoke<Song[]>("get_recently_added", { limit: 10 }),
+        invoke<HomeItem[]>("get_recently_played", { limit: 10 }),
+        invoke<HomeItem[]>("get_most_frequently_played", { limit: 10 }),
+        invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
       ]);
       recentlyPlayed = recent;
       frequentlyPlayed = frequent;
@@ -69,7 +69,7 @@
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
             Recently Played
           </h2>
-          <CurationCarousel songs={recentlyPlayed} />
+          <CurationCarousel items={recentlyPlayed} />
         </div>
       {/if}
 
@@ -79,7 +79,7 @@
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
             Most Played
           </h2>
-          <CurationCarousel songs={frequentlyPlayed} />
+          <CurationCarousel items={frequentlyPlayed} />
         </div>
       {/if}
 
@@ -89,7 +89,7 @@
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
             Recently Added
           </h2>
-          <CurationCarousel songs={recentlyAdded} />
+          <CurationCarousel items={recentlyAdded} />
         </div>
       {/if}
 
