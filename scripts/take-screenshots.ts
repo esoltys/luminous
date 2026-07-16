@@ -86,7 +86,9 @@ async function main() {
     afterLoad?: (page: import("playwright").Page) => Promise<void>,
     isImmersive = false,
     sidebarOpen = true,
-    rightPanelOpen = true
+    rightPanelOpen = false,
+    sidebarWidth = 64,
+    positionSeconds = 122
   ) {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
@@ -95,18 +97,60 @@ async function main() {
     // Inject the mock Tauri IPC bridge
     await page.addInitScript(mockCode);
 
+    const customThemes = [
+      {
+        id: "custom-rodrigo",
+        name: "Rodrigo",
+        colors: {
+          "bg-main": "#1c120c",
+          "bg-sidebar": "#150e09",
+          "bg-playerbar": "#160d09",
+          "color-accent": "#c97f4c",
+          "color-accent-hover": "#dca27a",
+          "color-text-primary": "#ffffff",
+          "color-text-secondary": "#baa7a1",
+          "color-border": "#3d261a"
+        },
+        isCustom: true
+      },
+      {
+        id: "custom-tom-petty",
+        name: "Tom Petty",
+        colors: {
+          "bg-main": "#1a0f0c",
+          "bg-sidebar": "#120a08",
+          "bg-playerbar": "#140c0a",
+          "color-accent": "#b83e20",
+          "color-accent-hover": "#d4583b",
+          "color-text-primary": "#ffffff",
+          "color-text-secondary": "#b3a19c",
+          "color-border": "#2d1814"
+        },
+        isCustom: true
+      }
+    ];
+
     // Pre-configure the mock settings on mount
     await page.addInitScript(`
       window.mockSettings = {
         active_theme_id: "${theme}",
-        custom_themes: "[]",
+        custom_themes: \`${JSON.stringify(customThemes)}\`,
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
         excluded_formats: "[]"
       };
+      window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
       window.localStorage.setItem("layout_sidebarOpen", "${sidebarOpen ? 'true' : 'false'}");
       window.localStorage.setItem("layout_rightPanelOpen", "${rightPanelOpen ? 'true' : 'false'}");
+      window.localStorage.setItem("layout_sidebarWidth", "${sidebarWidth}");
+      if ("${subTab}" === "artists") {
+        window.localStorage.setItem("sort_artist_field", "album_count");
+        window.localStorage.setItem("sort_artist_asc", "false");
+      } else if ("${subTab}" === "albums") {
+        window.localStorage.setItem("sort_album_field", "year");
+        window.localStorage.setItem("sort_album_asc", "false");
+      }
     `);
 
     await page.goto("http://localhost:1420");
@@ -136,18 +180,18 @@ async function main() {
 
   try {
     // Take screenshots of key views in their chosen themes
-    await capture("home", "", "nordic-blue", "home.png", undefined, false, false, false);
-    await capture("collection", "albums", "nordic-blue", "albums.png");
-    await capture("collection", "artists", "nordic-blue", "artists.png");
-    await capture("settings", "", "nordic-blue", "themes.png", async (page) => {
+    await capture("home", "", "custom-tom-petty", "home.png", undefined, false, true, false, 64, 68);
+    await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
+    await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
+    await capture("settings", "", "custom-tom-petty", "themes.png", async (page) => {
       // Click the "UI Themes" sub-tab inside the Settings view
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button"));
         const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
         if (t) (t as HTMLElement).click();
       });
-    });
-    await capture("collection", "songs", "nordic-blue", "now-playing.png", undefined, true);
+    }, false, true, false, 64, 156);
+    await capture("collection", "songs", "custom-tom-petty", "now-playing.png", undefined, true, false, false, 64, 82);
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
   } finally {
