@@ -11,10 +11,10 @@ Luminous is a high-performance desktop music player designed for modern local au
 
 ### Downloads
 
-Luminous is currently in pre-release. You can download the latest installers and portable binaries directly from the [GitHub Releases](https://github.com/esoltys/luminous/releases/latest) page:
+You can download the latest installers and portable binaries directly from the [GitHub Releases](https://github.com/esoltys/luminous/releases/latest) page:
 
-* **🐧 Linux** `Pre-Release` — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
-* **🪟 Windows** `Pre-Release` — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
+* **🐧 Linux** — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
+* **🪟 Windows** — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
