@@ -3,7 +3,6 @@ Luminous v0.43.0 introduces a major visual redesign, performance tuning, and tag
 ### 🌟 New Features & Redesign
 - **Three-Column Grid Shell**: Fully redesigned the main user interface layout with a top navigation ribbon for a more modern appearance.
 - **Immersive 3D Album Theater**: Pivots to a full-screen immersive album artwork view when bottom panel is toggled, including a premium 3D card flip transition.
-- **Tauri Mini Player Mode**: Supports window resizing/restoring into a compact, dedicated mini-player.
 - **Audio Visualizer Header Logo**: Implemented multi-band pulsing mapped directly to Bass (glow), Mids (outer ring), and Treble (inner burst) frequencies.
 - **AcoustID Tag Lookups**: Added automatic AcoustID metadata matching and fingerprint lookup, with error-handling, logger masking, and setup guidelines in the TagEditor UI.
 - **Global Keyboard Media Keys**: Integrated global media keys support for play, pause, next, and previous.
