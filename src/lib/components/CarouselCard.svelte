@@ -23,6 +23,7 @@
     if (item.type === "song") {
       await playerStore.playSong(item.song.id);
     } else {
+      collectionStore.viewAlbum(item.album.album || "");
       let songs = await invoke<Song[]>("get_songs_by_album", {
         album: item.album.album || "",
       });
@@ -35,9 +36,18 @@
     }
   }
 
-  function handleCardClick() {
+  async function handleCardClick() {
     if (item.type === "album") {
-      collectionStore.navigateTo("collection", "songs", item.album.album || "");
+      collectionStore.viewAlbum(item.album.album || "");
+      let songs = await invoke<Song[]>("get_songs_by_album", {
+        album: item.album.album || "",
+      });
+      // Filter out excluded formats
+      songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
+      if (songs.length > 0) {
+        const songIds = songs.map((s) => s.id);
+        playerStore.playSongs(songIds, 0);
+      }
     }
   }
 </script>
@@ -101,9 +111,16 @@
         </p>
       {:else}
         <!-- Album Title -->
-        <h3 class="text-sm font-semibold text-brand-text-primary truncate hover:text-brand-accent-text hover:underline transition-all" title={item.album.album || i18n.t('collection.unknownAlbum')}>
+        <button
+          onclick={(e) => {
+            e.stopPropagation();
+            collectionStore.viewAlbum(item.album.album || "");
+          }}
+          class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all text-left truncate w-full cursor-pointer focus:outline-hidden"
+          title={item.album.album || i18n.t('collection.unknownAlbum')}
+        >
           {item.album.album || i18n.t('collection.unknownAlbum')}
-        </h3>
+        </button>
 
         <!-- Album Artist -->
         {#if item.album.artist}

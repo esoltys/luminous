@@ -336,6 +336,12 @@ export const fr = {
     noReleasesFound: "Aucune sortie trouvée.",
     playlistsFeaturing: "Listes de lecture avec {artist}"
   },
+  albumDetail: {
+    backToAlbums: "Retour aux albums",
+    unknownGenre: "Genre inconnu",
+    statsLine: "{genre} · {year} · {duration}",
+    lossless: "Sans perte"
+  },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
   },

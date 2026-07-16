@@ -147,6 +147,7 @@ class CollectionStore {
   async search(query: string) {
     if (query.trim() !== "") {
       this.selectedArtistName = null;
+      this.selectedAlbumName = null;
     }
     this.searchQuery = query;
     if (query.trim() === "") {
@@ -165,6 +166,7 @@ class CollectionStore {
 
   navigateTo(tab: "home" | "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
     this.selectedArtistName = null;
+    this.selectedAlbumName = null;
     this.activeTab = tab;
     if (subTab) {
       this.activeSubTab = subTab;
@@ -177,10 +179,21 @@ class CollectionStore {
   /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
   selectedArtistName = $state<string | null>(null);
 
+  /** Selected album for the Album Detail view (rendered inside CollectionView). */
+  selectedAlbumName = $state<string | null>(null);
+
   viewArtist(name: string) {
+    this.selectedAlbumName = null;
     this.activeTab = "collection";
     this.activeSubTab = "artists";
     this.selectedArtistName = name;
+  }
+
+  viewAlbum(name: string) {
+    this.selectedArtistName = null;
+    this.activeTab = "collection";
+    this.activeSubTab = "albums";
+    this.selectedAlbumName = name;
   }
 
   isFormatExcluded(filetype: string): boolean {

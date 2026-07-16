@@ -11,6 +11,7 @@
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
+  import AlbumDetailView from "./AlbumDetailView.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -153,6 +154,18 @@
     playerStore.playSongs(songIds, index >= 0 ? index : 0);
   }
 
+  async function handlePlayAlbum(albumName: string) {
+    let songs = await invoke<Song[]>("get_songs_by_album", {
+      album: albumName,
+    });
+    // Filter out excluded formats
+    songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
+    if (songs.length > 0) {
+      const songIds = songs.map((s) => s.id);
+      playerStore.playSongs(songIds, 0);
+    }
+  }
+
   function formatDuration(ns: number | undefined): string {
     if (!ns) return "0:00";
     const sec = Math.floor(ns / 1_000_000_000);
@@ -170,7 +183,9 @@
   }
 </script>
 
-{#if collectionStore.selectedArtistName !== null}
+{#if collectionStore.selectedAlbumName !== null}
+  <AlbumDetailView albumName={collectionStore.selectedAlbumName} />
+{:else if collectionStore.selectedArtistName !== null}
   <ArtistDetailView artistName={collectionStore.selectedArtistName} />
 {:else}
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
@@ -388,7 +403,7 @@
                 <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0">
                   {#if song.album}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.album || ""); }}
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70 text-left"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
@@ -428,6 +443,10 @@
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
+            onclick={async () => {
+              collectionStore.viewAlbum(album.album || "");
+              await handlePlayAlbum(album.album || "");
+            }}
             ondblclick={async () => {
               const albumName = album.album || i18n.t('collection.unknownAlbum');
               const playlistName = i18n.t('collection.albumPlaylistName', { name: albumName });
@@ -458,7 +477,9 @@
             }}
             class="{sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
           >
-            <div class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative">
+            <div
+              class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative"
+            >
               <CoverArt
                 songId={undefined}
                 artEmbedded={album.art_embedded}
@@ -466,28 +487,16 @@
                 artManual={album.art_manual}
                 sizeClass="w-full h-full"
               />
-              <button
-                onclick={async (e) => {
-                  e.stopPropagation();
-                  let songs = await invoke<Song[]>("get_songs_by_album", {
-                    album: album.album || "",
-                  });
-                  // Filter out excluded formats
-                  songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
-                  if (songs.length > 0) {
-                    const songIds = songs.map((s) => s.id);
-                    playerStore.playSongs(songIds, 0);
-                  }
-                }}
+              <div
                 class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
               >
                 <div class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
                   <Play class="w-5 h-5 fill-current ml-0.5" />
                 </div>
-              </button>
+              </div>
             </div>
             <button
-              onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", album.album || ""); }}
+              onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
               class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
               title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
             >

@@ -50,6 +50,14 @@ declare global {
     mockPlaybackPositionSec?: number;
     __LUMINOUS_MOCK_LIBRARY__?: MockLibrary;
     __LUMINOUS_MOCK_FEATURED__?: { song?: Song; artist?: string };
+    __LUMINOUS_MOCK_CONFIG__?: {
+      theme?: string;
+      language?: string;
+      sidebarOpen?: boolean;
+      sidebarWidth?: number;
+      rightPanelOpen?: boolean;
+      positionSeconds?: number;
+    };
     __TAURI_INTERNALS__?: {
       transformCallback: (callback: IpcCallback, once?: boolean) => number;
       unregisterCallback: (id: number) => void;
@@ -68,13 +76,36 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 (function () {
   console.log("[Tauri Mock] Initializing Tauri IPC Mock layer...");
 
+  const isScreenshotMode = !!window.mockSettings;
+  const mockConfig = window.__LUMINOUS_MOCK_CONFIG__ || {};
+  const cleanThemeId = (theme: string) => {
+    return theme.trim().toLowerCase().replace(/\s+/g, "-");
+  };
+
   window.mockSettings = window.mockSettings || {
-    active_theme_id: "nordic-blue",
+    active_theme_id: mockConfig.theme ? cleanThemeId(mockConfig.theme) : "nordic-blue",
     custom_themes: "[]",
     active_tab: "collection",
     active_sub_tab: "songs",
     excluded_formats: "[]",
+    language: mockConfig.language || "en",
   };
+
+  if (mockConfig.language && window.mockSettings && !window.mockSettings.language) {
+    window.mockSettings.language = mockConfig.language;
+  }
+
+  if (!isScreenshotMode) {
+    if (mockConfig.sidebarOpen !== undefined) {
+      window.localStorage.setItem("layout_sidebarOpen", mockConfig.sidebarOpen ? "true" : "false");
+    }
+    if (mockConfig.sidebarWidth !== undefined) {
+      window.localStorage.setItem("layout_sidebarWidth", mockConfig.sidebarWidth.toString());
+    }
+    if (mockConfig.rightPanelOpen !== undefined) {
+      window.localStorage.setItem("layout_rightPanelOpen", mockConfig.rightPanelOpen ? "true" : "false");
+    }
+  }
 
   const STANDALONE_FALLBACK_SONG: Song = {
     id: 1,
@@ -215,6 +246,31 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_waveform_data: () => makeWaveform(),
     get_lyrics: () => library.lyrics,
+
+    get_cover_art_uri: (args): string | null => {
+      const songId = args.songId as number;
+      const song = library.songs.find((s) => s.id === songId);
+      if (song) {
+        if (song.art_manual) return `luminous-art://${song.art_manual}`;
+        if (song.art_automatic) return `luminous-art://${song.art_automatic}`;
+        if (song.art_embedded) {
+          const albumClean = song.album ? song.album.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
+          const artistClean = song.artist ? song.artist.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
+          return `luminous-art://local/${artistClean}_${albumClean}.jpg`;
+        }
+      }
+      return null;
+    },
+
+    fetch_remote_cover: (args): string | null => {
+      const songId = args.songId as number;
+      const song = library.songs.find((s) => s.id === songId);
+      if (song) {
+        if (song.art_manual) return song.art_manual;
+        if (song.art_automatic) return song.art_automatic;
+      }
+      return null;
+    },
 
     get_equalizer_state: (): EqualizerState => ({
       enabled: true,

@@ -105,13 +105,25 @@
 <footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
-    <CoverArt
-      songId={playerStore.currentSong?.id}
-      artEmbedded={playerStore.currentSong?.art_embedded}
-      artAutomatic={playerStore.currentSong?.art_automatic}
-      artManual={playerStore.currentSong?.art_manual}
-      sizeClass="w-12 h-12"
-    />
+    <button
+      onclick={(e) => {
+        if (playerStore.currentSong) {
+          e.stopPropagation();
+          collectionStore.viewAlbum(playerStore.currentSong.album || "");
+        }
+      }}
+      disabled={!playerStore.currentSong}
+      class="group relative rounded overflow-hidden focus:outline-hidden flex-shrink-0 cursor-pointer disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
+      title={playerStore.currentSong?.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : ""}
+    >
+      <CoverArt
+        songId={playerStore.currentSong?.id}
+        artEmbedded={playerStore.currentSong?.art_embedded}
+        artAutomatic={playerStore.currentSong?.art_automatic}
+        artManual={playerStore.currentSong?.art_manual}
+        sizeClass="w-12 h-12 transition-all duration-300 group-hover:scale-105"
+      />
+    </button>
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
         {#if playerStore.currentSong?.title}

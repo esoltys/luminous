@@ -87,6 +87,7 @@ async function main() {
   const libraryInitScript = `
     window.__LUMINOUS_MOCK_LIBRARY__ = ${JSON.stringify(mockLibrary)};
     window.__LUMINOUS_MOCK_FEATURED__ = ${JSON.stringify(featured)};
+    window.__LUMINOUS_MOCK_CONFIG__ = ${JSON.stringify(mockConfig)};
   `;
   const mockCode = compileMockScript();
 
@@ -177,8 +178,24 @@ async function main() {
     // Optional post-load interaction (e.g. clicking into a sub-tab)
     if (afterLoad) {
       await afterLoad(page);
-      await page.waitForTimeout(500);
     }
+    // Let any rendering and async effects fire
+    await page.waitForTimeout(600);
+    // Wait for all <img> tags to complete loading
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map((img) => {
+          if (img.complete) return;
+          return new Promise((resolve) => {
+            img.addEventListener("load", resolve);
+            img.addEventListener("error", resolve);
+          });
+        })
+      );
+    });
+    // Settle transitions
+    await page.waitForTimeout(400);
 
     const dir = path.join(__dirname, "../docs/screenshots");
     if (!fs.existsSync(dir)) {
@@ -186,17 +203,27 @@ async function main() {
     }
 
     const screenshotPath = path.join(dir, filename);
-    await page.screenshot({ path: screenshotPath });
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        if (fs.existsSync(screenshotPath)) {
+          fs.unlinkSync(screenshotPath);
+        }
+        await page.screenshot({ path: screenshotPath });
+        break;
+      } catch (err) {
+        attempts++;
+        if (attempts >= 3) throw err;
+        console.warn(`[Screenshot Automation] Screenshot capture for ${filename} failed (attempt ${attempts}), retrying in 300ms...`, err);
+        await page.waitForTimeout(300);
+      }
+    }
     console.log(`[Screenshot Automation] Saved screenshot to ${screenshotPath}`);
     await page.close();
   }
 
-  try {
-    // Take screenshots of key views in their chosen themes
-    await capture("home", "", "custom-tom-petty", "home.png", undefined, false, true, false, 64, 68);
-    await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
-    await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
-    await capture("collection", "artists", "custom-tom-petty", "artist-detail.png", async (page) => {
+  const actionRegistry: Record<string, (page: import("playwright").Page) => Promise<void>> = {
+    "click-artist": async (page) => {
       await page.evaluate((artistName) => {
         const cards = Array.from(document.querySelectorAll(".artist-card"));
         const targetCard = cards.find((c: Element) => {
@@ -207,16 +234,73 @@ async function main() {
           (targetCard as HTMLElement).click();
         }
       }, featured.artist);
-    }, false, true, false, 64, 38);
-    await capture("settings", "", "custom-tom-petty", "themes.png", async (page) => {
-      // Click the "UI Themes" sub-tab inside the Settings view
+    },
+    "click-album": async (page) => {
+      await page.evaluate((albumName) => {
+        const cards = Array.from(document.querySelectorAll(".bg-brand-sidebar"));
+        let targetCard = cards.find((c: Element) => {
+          const titleBtn = c.querySelector("button.font-semibold");
+          return titleBtn && titleBtn.textContent?.trim() === albumName;
+        });
+        if (!targetCard && cards.length > 0) {
+          targetCard = cards[0];
+        }
+        if (targetCard) {
+          const titleBtn = targetCard.querySelector("button.font-semibold");
+          if (titleBtn) {
+            (titleBtn as HTMLElement).click();
+          }
+        }
+      }, featured.song?.album);
+    },
+    "click-themes": async (page) => {
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button"));
         const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
         if (t) (t as HTMLElement).click();
       });
-    }, false, true, false, 64, 156);
-    await capture("collection", "songs", "custom-tom-petty", "now-playing.png", undefined, true, false, false, 64, 82);
+    }
+  };
+
+  const cleanThemeId = (theme: string) => {
+    return theme.trim().toLowerCase().replace(/\s+/g, "-");
+  };
+
+  try {
+    if (mockConfig.screenshots && mockConfig.screenshots.length > 0) {
+      const defaultTheme = mockConfig.theme ? cleanThemeId(mockConfig.theme) : "nordic-blue";
+      for (const s of mockConfig.screenshots) {
+        const afterLoad = s.action ? actionRegistry[s.action] : undefined;
+        const theme = s.theme || mockConfig.theme || "nordic-blue";
+        const isImmersive = s.isImmersive ?? false;
+        const sidebarOpen = s.sidebarOpen ?? mockConfig.sidebarOpen ?? true;
+        const rightPanelOpen = s.rightPanelOpen ?? mockConfig.rightPanelOpen ?? false;
+        const sidebarWidth = s.sidebarWidth ?? mockConfig.sidebarWidth ?? 64;
+        const positionSeconds = s.positionSeconds ?? mockConfig.positionSeconds ?? 122;
+
+        await capture(
+          s.tab,
+          s.subTab,
+          cleanThemeId(theme),
+          s.filename,
+          afterLoad,
+          isImmersive,
+          sidebarOpen,
+          rightPanelOpen,
+          sidebarWidth,
+          positionSeconds
+        );
+      }
+    } else {
+      // Predefined default captures fallback
+      await capture("home", "", "custom-tom-petty", "home.png", undefined, false, true, false, 64, 68);
+      await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
+      await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
+      await capture("collection", "artists", "custom-tom-petty", "artist-detail.png", actionRegistry["click-artist"], false, true, false, 64, 38);
+      await capture("collection", "albums", "custom-tom-petty", "album-detail.png", actionRegistry["click-album"], false, true, false, 64, 38);
+      await capture("settings", "", "custom-tom-petty", "themes.png", actionRegistry["click-themes"], false, true, false, 64, 156);
+      await capture("collection", "songs", "custom-tom-petty", "now-playing.png", undefined, true, false, false, 64, 82);
+    }
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
   } finally {

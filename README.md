@@ -21,7 +21,6 @@ You can download the latest installers and portable binaries directly from the G
 <p align="center">
   <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
 </p>
-
 <div align="center">
   <table>
     <tr>
@@ -30,28 +29,33 @@ You can download the latest installers and portable binaries directly from the G
         <img src="docs/screenshots/albums.png" alt="Albums Overview" />
       </td>
       <td width="50%">
-        <h4 align="center">Artists Overview</h4>
-        <img src="docs/screenshots/artists.png" alt="Artists Overview" />
+        <h4 align="center">Album Detail</h4>
+        <img src="docs/screenshots/album-detail.png" alt="Album Detail" />
       </td>
     </tr>
     <tr>
+      <td width="50%">
+        <h4 align="center">Artists Overview</h4>
+        <img src="docs/screenshots/artists.png" alt="Artists Overview" />
+      </td>
       <td width="50%">
         <h4 align="center">Artist Detail</h4>
         <img src="docs/screenshots/artist-detail.png" alt="Artist Detail" />
       </td>
+    </tr>
+    <tr>
       <td width="50%">
         <h4 align="center">Custom Theme Builder</h4>
         <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
       </td>
-    </tr>
-    <tr>
       <td colspan="2" align="center">
         <h4 align="center">Immersive Now Playing</h4>
-        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" style="max-width: 80%;" />
+        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
       </td>
     </tr>
   </table>
 </div>
+
 
 ---
 
@@ -61,7 +65,7 @@ You can download the latest installers and portable binaries directly from the G
 *   **Instant Search and Navigation**: Locate any track, album, or artist in your collection instantly using database-level SQLite FTS5 (Full-Text Search) with split-second response times.
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds using an incremental scanner that intelligently skips unchanged files based on modification times.
 *   **Immersive Audio Visualizers**: View your music with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
-*   **Ten-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and custom presets for various music genres.
+*   **Ten-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer and custom presets for various music genres.
 *   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched automatically from LRCLIB or plain text from Lyrics.ovh, complete with local caching and visual synced-lyrics indicators.
 *   **AcoustID Fingerprinting and Tag Editor**: Automatically identify tracks and correct metadata using AcoustID acoustic fingerprinting (via `fpcalc`), and write tags directly back to your local files.
 *   **Smart Cover Art Engine**: Extract embedded artwork automatically using lofty tag parsing, with automatic iTunes Search API fallback and local file deduplication.

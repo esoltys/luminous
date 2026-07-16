@@ -8,6 +8,7 @@ import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/ind
 import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = path.join(__dirname, "mock-config.json");
 const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
 const EXAMPLE_CONFIG_PATH = path.join(__dirname, "mock-config.example.json");
 
@@ -25,6 +26,20 @@ const FILE_TYPES = [
   "DSF", "DSDIFF", "ASF", "STREAM",
 ] as const;
 
+export interface ScreenshotConfig {
+  name: string;
+  tab: string;
+  subTab: string;
+  theme?: string;
+  filename: string;
+  action?: string;
+  isImmersive?: boolean;
+  sidebarOpen?: boolean;
+  rightPanelOpen?: boolean;
+  sidebarWidth?: number;
+  positionSeconds?: number;
+}
+
 export interface MockConfig {
   /** Absolute path to a real luminous.db. When set (and readable), overrides the bundled fixture data. */
   dbPath?: string;
@@ -34,6 +49,13 @@ export interface MockConfig {
   featuredArtist?: string;
   /** Cap on how many songs to pull from a real database. Defaults to 2000. */
   songLimit?: number;
+  theme?: string;
+  language?: string;
+  sidebarOpen?: boolean;
+  rightPanelOpen?: boolean;
+  sidebarWidth?: number;
+  positionSeconds?: number;
+  screenshots?: ScreenshotConfig[];
 }
 
 export interface MockLibrary {
@@ -62,6 +84,7 @@ function readJsonConfig(configPath: string): MockConfig {
  * without warning about a database that was never configured.
  */
 export function loadMockConfig(): MockConfig {
+  if (existsSync(CONFIG_PATH)) return readJsonConfig(CONFIG_PATH);
   if (existsSync(LOCAL_CONFIG_PATH)) return readJsonConfig(LOCAL_CONFIG_PATH);
   if (existsSync(EXAMPLE_CONFIG_PATH)) {
     const { dbPath: _dbPath, ...defaults } = readJsonConfig(EXAMPLE_CONFIG_PATH);

@@ -218,6 +218,23 @@ export interface ArtistItem {
 export function getCoverArtUrl(uri: string | null | undefined): string | null {
   if (!uri) return null;
   if (uri.startsWith("luminous-art://")) {
+    const isMock = typeof window !== "undefined" && (
+      (window as any).__LUMINOUS_MOCK_LIBRARY__ || 
+      (window as any).mockSettings
+    );
+    if (isMock) {
+      let cleanPath = uri.replace("luminous-art://", "");
+      if (cleanPath.startsWith("local/")) {
+        cleanPath = cleanPath.slice(6);
+      }
+      if (cleanPath.includes(":/") || cleanPath.includes(":\\") || cleanPath.startsWith("/")) {
+        return `/local-art/${encodeURIComponent(cleanPath)}`;
+      }
+      if (cleanPath.startsWith("album-")) {
+        return `/covers/${cleanPath}.jpg`;
+      }
+      return `/fixtures/${cleanPath}`;
+    }
     const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
     if (isWindows) {
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");

@@ -310,7 +310,7 @@
                     <span class="text-brand-text-secondary/40 italic text-xs">{item.song?.album ?? ""}</span>
                   {:else if item.song?.album}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.album || ""); }}
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
                       title={i18n.t('collection.filterByAlbum', { album: item.song.album })}
                     >
