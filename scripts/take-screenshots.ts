@@ -3,6 +3,8 @@ import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { compileMockScript } from "./compile-mock-script";
+import { loadMockConfig, loadMockLibrary, resolveFeatured } from "./mock-library";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,7 +78,17 @@ async function main() {
   const { chromium } = playwright;
   const browser = await chromium.launch({ headless: true });
 
-  const mockCode = fs.readFileSync(path.join(__dirname, "tauri-ipc-mock.js"), "utf8");
+  const mockConfig = loadMockConfig();
+  const mockLibrary = await loadMockLibrary(mockConfig);
+  const featured = resolveFeatured(mockLibrary, mockConfig);
+  console.log(
+    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${featured.artist ?? "none"}.`
+  );
+  const libraryInitScript = `
+    window.__LUMINOUS_MOCK_LIBRARY__ = ${JSON.stringify(mockLibrary)};
+    window.__LUMINOUS_MOCK_FEATURED__ = ${JSON.stringify(featured)};
+  `;
+  const mockCode = compileMockScript();
 
   async function capture(
     tab: string,
@@ -94,7 +106,8 @@ async function main() {
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    // Inject the mock Tauri IPC bridge
+    // Inject the mock library data, then the mock Tauri IPC bridge that reads it
+    await page.addInitScript(libraryInitScript);
     await page.addInitScript(mockCode);
 
     const customThemes = [
@@ -184,16 +197,16 @@ async function main() {
     await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
     await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
     await capture("collection", "artists", "custom-tom-petty", "artist-detail.png", async (page) => {
-      await page.evaluate(() => {
+      await page.evaluate((artistName) => {
         const cards = Array.from(document.querySelectorAll(".artist-card"));
         const targetCard = cards.find((c: Element) => {
           const nameSpan = c.querySelector("span");
-          return nameSpan && nameSpan.textContent?.trim() === "Eric Soltys";
+          return nameSpan && nameSpan.textContent?.trim() === artistName;
         });
         if (targetCard) {
           (targetCard as HTMLElement).click();
         }
-      });
+      }, featured.artist);
     }, false, true, false, 64, 38);
     await capture("settings", "", "custom-tom-petty", "themes.png", async (page) => {
       // Click the "UI Themes" sub-tab inside the Settings view

@@ -9,3 +9,6 @@ node_modules
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .claude
+
+# Local overrides for the Tauri IPC mock (see scripts/mock-config.example.json)
+scripts/mock-config.local.json
