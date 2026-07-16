@@ -176,6 +176,151 @@ impl Default for AudioEngine {
 // Decode thread — runs on a plain OS thread to avoid Send constraints
 // ---------------------------------------------------------------------------
 
+/// The CPAL output stream + its ring buffer, opened once and reused for the
+/// lifetime of the decode thread. Rebuilding the native WASAPI/CPAL
+/// device+stream on every track change is expensive, and after enough
+/// rebuilds — observed at roughly a dozen track changes, even spaced well
+/// apart, not just rapid bursts — it can wedge the OS audio subsystem
+/// entirely, hanging inside `build_output_stream`/`stream.play()` with no
+/// timeout and taking the whole player down with it (every playback command
+/// funnels through this same thread). Track changes now clear/reseed this
+/// same buffer and use `Stream::play()`/`pause()` instead of dropping and
+/// rebuilding the stream.
+struct AudioOutput {
+    stream: cpal::Stream,
+    producer: ringbuf::HeapProd<f32>,
+    consumer: Arc<Mutex<ringbuf::HeapCons<f32>>>,
+    played_samples: Arc<AtomicU64>,
+    sample_rate: u32,
+    channels: u16,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_output(
+    event_tx: &mpsc::Sender<AudioEvent>,
+    position: &Arc<AtomicU64>,
+    volume: &Arc<Mutex<f32>>,
+    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
+    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
+) -> Result<AudioOutput, String> {
+    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+    let host = cpal::default_host();
+    let device = host
+        .default_output_device()
+        .ok_or_else(|| "No audio output device".to_string())?;
+    let default_config = device
+        .default_output_config()
+        .map_err(|e| format!("Failed to get default output config: {e}"))?;
+    let mut config = default_config.config();
+
+    // Request a buffer size clamped to the device's supported range to prevent underruns
+    config.buffer_size = match default_config.buffer_size() {
+        cpal::SupportedBufferSize::Range { min, max } => {
+            cpal::BufferSize::Fixed(4096.clamp(*min, *max))
+        }
+        cpal::SupportedBufferSize::Unknown => cpal::BufferSize::Default,
+    };
+
+    let target_sample_rate = config.sample_rate.0;
+    let target_channels = config.channels;
+
+    // Update equalizer sample rate and channels format using target device values
+    if let Ok(mut eq) = equalizer.lock() {
+        eq.update_format(target_sample_rate, target_channels as usize);
+    }
+
+    // Buffer capacity based on target device format (approx. 2 seconds of audio)
+    let buffer_capacity = target_sample_rate as usize * target_channels as usize * 2;
+    let rb = HeapRb::<f32>::new(buffer_capacity);
+    let (prod, cons) = rb.split();
+
+    // Wrap consumer in a Mutex so that the decode thread can clear it upon
+    // Seek/track-change, while the audio callback can perform a
+    // non-blocking `try_lock()` on it.
+    let shared_consumer = Arc::new(Mutex::new(cons));
+    let shared_consumer_reader = Arc::clone(&shared_consumer);
+
+    let played_samples = Arc::new(AtomicU64::new(0));
+    let played_samples_cpal = Arc::clone(&played_samples);
+    let vol_ref = Arc::clone(volume);
+    let position_cpal = Arc::clone(position);
+    let visualizer_buf_cpal = Arc::clone(visualizer_buf);
+    let eq_cpal = Arc::clone(equalizer);
+
+    let stream = device
+        .build_output_stream(
+            &config,
+            move |output: &mut [f32], _| {
+                let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
+                let mut played = 0;
+
+                // Non-blocking try_lock ensures CPAL callback never stalls
+                if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
+                    for sample in output.iter_mut() {
+                        if let Some(s) = consumer.try_pop() {
+                            *sample = s;
+                            played += 1;
+                        } else {
+                            *sample = 0.0;
+                        }
+                    }
+                } else {
+                    for sample in output.iter_mut() {
+                        *sample = 0.0;
+                    }
+                }
+
+                // Apply equalizer DSP
+                if let Ok(mut eq) = eq_cpal.try_lock() {
+                    eq.process_interleaved(&mut output[..played]);
+                }
+
+                // Apply volume gain
+                for sample in output[..played].iter_mut() {
+                    *sample *= vol;
+                }
+
+                if played > 0 {
+                    let channels_u = target_channels as usize;
+                    let mut mono_samples = Vec::with_capacity(played / channels_u);
+                    for chunk in output[..played].chunks(channels_u) {
+                        let sum: f32 = chunk.iter().sum();
+                        mono_samples.push(sum / target_channels as f32);
+                    }
+                    visualizer_buf_cpal.push(&mono_samples);
+                }
+
+                let total_played =
+                    played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
+                let pos_ns = (total_played as f64 * 1_000_000_000.0
+                    / (target_sample_rate as f64 * target_channels as f64))
+                    as u64;
+                position_cpal.store(pos_ns, Ordering::Relaxed);
+            },
+            |err| log::error!("CPAL stream error: {err}"),
+            None,
+        )
+        .map_err(|e| format!("CPAL stream build failed: {e}"))?;
+
+    // Start paused — nothing decoded yet. The caller starts it once a track
+    // is actually ready to play.
+    if let Err(e) = stream.pause() {
+        let _ = event_tx.send(AudioEvent::Error {
+            message: format!("CPAL stream pause failed: {e}"),
+        });
+    }
+
+    Ok(AudioOutput {
+        stream,
+        producer: prod,
+        consumer: shared_consumer,
+        played_samples,
+        sample_rate: target_sample_rate,
+        channels: target_channels,
+    })
+}
+
 fn decode_thread(
     cmd_rx: mpsc::Receiver<AudioCommand>,
     event_tx: mpsc::Sender<AudioEvent>,
@@ -185,20 +330,22 @@ fn decode_thread(
     visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
 ) {
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+    use cpal::traits::StreamTrait;
     use symphonia::core::{
         audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
         formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
     };
 
-    // Keep current CPAL stream alive. Dropping it stops playback.
-    let mut _stream: Option<cpal::Stream> = None;
+    // The persistent output stream/ring buffer — built lazily on the first
+    // track this thread ever plays, then kept alive for every subsequent
+    // track, pause, and resume. See `AudioOutput` above.
+    let mut output: Option<AudioOutput> = None;
 
     let mut current_req = None;
     let mut paused_req: Option<PlayRequest> = None;
 
-    loop {
-        let req = match current_req.take() {
+    'main: loop {
+        let mut req = match current_req.take() {
             Some(r) => r,
             None => {
                 match cmd_rx.recv() {
@@ -218,7 +365,9 @@ fn decode_thread(
                         }
                     }
                     Ok(AudioCommand::Stop) => {
-                        _stream = None;
+                        if let Some(out) = output.as_ref() {
+                            let _ = out.stream.pause();
+                        }
                         paused_req = None;
                         position.store(0, Ordering::Relaxed);
                         if let Ok(mut s) = play_state.lock() {
@@ -239,8 +388,35 @@ fn decode_thread(
             }
         };
 
-        // Drop any existing stream
-        _stream = None;
+        // Coalesce a burst of rapid Play requests (e.g. mashing "skip") into
+        // just the last one, so a burst of clicks decodes/discards at most
+        // one superseded track instead of several in a row.
+        loop {
+            match cmd_rx.try_recv() {
+                Ok(AudioCommand::Play(newer)) => req = newer,
+                Ok(AudioCommand::SetVolume(v)) => {
+                    if let Ok(mut vol) = volume.lock() {
+                        *vol = v.clamp(0.0, 1.0);
+                    }
+                }
+                Ok(AudioCommand::Stop) => {
+                    if let Some(out) = output.as_ref() {
+                        let _ = out.stream.pause();
+                    }
+                    paused_req = None;
+                    position.store(0, Ordering::Relaxed);
+                    if let Ok(mut s) = play_state.lock() {
+                        *s = PlayState::Stopped;
+                    }
+                    let _ = event_tx.send(AudioEvent::Stopped);
+                    continue 'main;
+                }
+                // Pause/Resume/SeekTo target a track that hasn't started
+                // playing yet at this point — nothing meaningful to apply.
+                Ok(_) => {}
+                Err(_) => break,
+            }
+        }
 
         let path = match req.song.path.as_deref() {
             Some(p) => p.to_owned(),
@@ -333,135 +509,37 @@ fn decode_thread(
             .map(|c| c.count() as u16)
             .unwrap_or(2);
 
-        // Set up CPAL
-        let host = cpal::default_host();
-        let device = match host.default_output_device() {
-            Some(d) => d,
-            None => {
-                let _ = event_tx.send(AudioEvent::Error {
-                    message: "No audio output device".to_string(),
-                });
-                continue;
+        // Ensure the persistent output stream exists (built lazily on the
+        // first track this thread ever plays; reused for every track after).
+        if output.is_none() {
+            match build_output(&event_tx, &position, &volume, &visualizer_buf, &equalizer) {
+                Ok(o) => output = Some(o),
+                Err(message) => {
+                    let _ = event_tx.send(AudioEvent::Error { message });
+                    continue;
+                }
             }
-        };
-
-        let default_config = match device.default_output_config() {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = event_tx.send(AudioEvent::Error {
-                    message: format!("Failed to get default output config: {e}"),
-                });
-                continue;
-            }
-        };
-        let mut config = default_config.config();
-
-        // Request a buffer size clamped to the device's supported range to prevent underruns
-        config.buffer_size = match default_config.buffer_size() {
-            cpal::SupportedBufferSize::Range { min, max } => {
-                cpal::BufferSize::Fixed(4096.clamp(*min, *max))
-            }
-            cpal::SupportedBufferSize::Unknown => cpal::BufferSize::Default,
-        };
-
-        let target_sample_rate = config.sample_rate.0;
-        let target_channels = config.channels;
-
-        let vol_ref = Arc::clone(&volume);
-
-        // Update equalizer sample rate and channels format using target device values
-        if let Ok(mut eq) = equalizer.lock() {
-            eq.update_format(target_sample_rate, target_channels as usize);
         }
+        let out = output.as_mut().unwrap();
 
-        // Buffer capacity based on target device format (approx. 2 seconds of audio)
-        let buffer_capacity = target_sample_rate as usize * target_channels as usize * 2;
-        let rb = HeapRb::<f32>::new(buffer_capacity);
-        let (mut prod, cons) = rb.split();
-
-        // Wrap consumer in a Mutex so that the decode thread can clear it upon Seek/Stop,
-        // while the audio callback can perform a non-blocking `try_lock()` on it.
-        let shared_consumer = Arc::new(Mutex::new(cons));
-        let shared_consumer_reader = Arc::clone(&shared_consumer);
-
-        let played_samples = Arc::new(AtomicU64::new(
+        // Clear whatever was left in the buffer from the previous track and
+        // reset the played-sample counter for this track's start offset.
+        if let Ok(mut consumer) = out.consumer.lock() {
+            while consumer.try_pop().is_some() {}
+        }
+        let target_sample_rate = out.sample_rate;
+        let target_channels = out.channels;
+        let start_samples =
             (req.start_nanosec as f64 * target_sample_rate as f64 * target_channels as f64
-                / 1_000_000_000.0) as u64,
-        ));
-        let played_samples_cpal = Arc::clone(&played_samples);
-        let position_cpal = Arc::clone(&position);
-        let visualizer_buf_cpal = Arc::clone(&visualizer_buf);
-        let eq_cpal = Arc::clone(&equalizer);
+                / 1_000_000_000.0) as u64;
+        out.played_samples.store(start_samples, Ordering::Relaxed);
 
-        let stream = match device.build_output_stream(
-            &config,
-            move |output: &mut [f32], _| {
-                let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
-                let mut played = 0;
-
-                // Non-blocking try_lock ensures CPAL callback never stalls
-                if let Ok(mut consumer) = shared_consumer_reader.try_lock() {
-                    for sample in output.iter_mut() {
-                        if let Some(s) = consumer.try_pop() {
-                            *sample = s;
-                            played += 1;
-                        } else {
-                            *sample = 0.0;
-                        }
-                    }
-                } else {
-                    for sample in output.iter_mut() {
-                        *sample = 0.0;
-                    }
-                }
-
-                // Apply equalizer DSP
-                if let Ok(mut eq) = eq_cpal.try_lock() {
-                    eq.process_interleaved(&mut output[..played]);
-                }
-
-                // Apply volume gain
-                for sample in output[..played].iter_mut() {
-                    *sample *= vol;
-                }
-
-                if played > 0 {
-                    let channels_u = target_channels as usize;
-                    let mut mono_samples = Vec::with_capacity(played / channels_u);
-                    for chunk in output[..played].chunks(channels_u) {
-                        let sum: f32 = chunk.iter().sum();
-                        mono_samples.push(sum / target_channels as f32);
-                    }
-                    visualizer_buf_cpal.push(&mono_samples);
-                }
-
-                let total_played =
-                    played_samples_cpal.fetch_add(played as u64, Ordering::Relaxed) + played as u64;
-                let pos_ns = (total_played as f64 * 1_000_000_000.0
-                    / (target_sample_rate as f64 * target_channels as f64))
-                    as u64;
-                position_cpal.store(pos_ns, Ordering::Relaxed);
-            },
-            |err| log::error!("CPAL stream error: {err}"),
-            None,
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                let _ = event_tx.send(AudioEvent::Error {
-                    message: format!("CPAL stream build failed: {e}"),
-                });
-                continue;
-            }
-        };
-
-        if let Err(e) = stream.play() {
+        if let Err(e) = out.stream.play() {
             let _ = event_tx.send(AudioEvent::Error {
                 message: format!("CPAL stream play failed: {e}"),
             });
             continue;
         }
-
-        _stream = Some(stream);
 
         if let Ok(mut s) = play_state.lock() {
             *s = PlayState::Playing;
@@ -475,10 +553,12 @@ fn decode_thread(
 
         // Decode loop
         'decode: loop {
+            let out = output.as_mut().unwrap();
+
             // Non-blocking command check
             match cmd_rx.try_recv() {
                 Ok(AudioCommand::Pause) => {
-                    _stream = None;
+                    let _ = out.stream.pause();
                     if let Ok(mut s) = play_state.lock() {
                         *s = PlayState::Paused;
                     }
@@ -490,7 +570,7 @@ fn decode_thread(
                     break 'decode;
                 }
                 Ok(AudioCommand::Stop) => {
-                    _stream = None;
+                    let _ = out.stream.pause();
                     if let Ok(mut s) = play_state.lock() {
                         *s = PlayState::Stopped;
                     }
@@ -499,7 +579,6 @@ fn decode_thread(
                 }
                 Ok(AudioCommand::Play(new_req)) => {
                     current_req = Some(new_req);
-                    _stream = None;
                     let _ = event_tx.send(AudioEvent::Stopped);
                     break 'decode;
                 }
@@ -534,13 +613,13 @@ fn decode_thread(
                     }
 
                     // Clear the buffer after seek to avoid stale audio
-                    if let Ok(mut consumer) = shared_consumer.lock() {
+                    if let Ok(mut consumer) = out.consumer.lock() {
                         while consumer.try_pop().is_some() {}
                     }
                     let target_samples =
                         (target_ns as f64 * target_sample_rate as f64 * target_channels as f64
                             / 1_000_000_000.0) as u64;
-                    played_samples.store(target_samples, Ordering::Relaxed);
+                    out.played_samples.store(target_samples, Ordering::Relaxed);
                     position.store(target_ns, Ordering::Relaxed);
                     resampler =
                         Resampler::new(sample_rate, target_sample_rate, target_channels as usize);
@@ -558,11 +637,11 @@ fn decode_thread(
 
             // If decoder has reached the end of the file, wait until output buffer drains completely
             if eof_reached {
-                let is_empty = prod.occupied_len() == 0;
+                let is_empty = out.producer.occupied_len() == 0;
 
                 if is_empty {
                     let _ = event_tx.send(AudioEvent::TrackFinished { song_id });
-                    _stream = None;
+                    let _ = out.stream.pause();
                     if let Ok(mut s) = play_state.lock() {
                         *s = PlayState::Stopped;
                     }
@@ -575,7 +654,7 @@ fn decode_thread(
             }
 
             // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
-            let is_full = prod.occupied_len()
+            let is_full = out.producer.occupied_len()
                 > (target_sample_rate as usize * target_channels as usize * 3 / 2);
 
             if is_full {
@@ -606,7 +685,7 @@ fn decode_thread(
                             // Push samples into the shared playback buffer
                             let mut pushed = 0;
                             while pushed < resampled.len() {
-                                let written = prod.push_slice(&resampled[pushed..]);
+                                let written = out.producer.push_slice(&resampled[pushed..]);
                                 if written == 0 {
                                     // Ring buffer is full, sleep a bit and try again
                                     std::thread::sleep(std::time::Duration::from_millis(5));

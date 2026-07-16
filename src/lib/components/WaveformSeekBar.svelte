@@ -7,14 +7,26 @@
   let waveformData = $state<number[]>([]);
   let isDragging = $state(false);
 
-  // Fetch waveform when current song changes
+  // Guards a slow, still-in-flight request from a previously-skipped-past
+  // track from overwriting waveformData after a newer track has already
+  // taken over (e.g. the in-flight request settles just after another skip).
+  let waveformRequestId = 0;
+
+  // Fetch waveform when current song changes. get_waveform_data() falls back
+  // to a full offline decode of the audio file (decode_all_samples) on a
+  // cache miss, which is expensive — rapid-fire skips must not each trigger
+  // one, or a burst of skips queues up several concurrent full-file decodes
+  // that compete with real-time playback for CPU/disk and can make the
+  // whole app feel stuck until they drain. Debounced in the $effect below.
   async function loadWaveform(songId: number | undefined) {
+    const requestId = ++waveformRequestId;
     if (songId === undefined) {
       waveformData = [];
       return;
     }
     try {
       const data = await invoke<number[] | null>("get_waveform_data", { songId });
+      if (requestId !== waveformRequestId) return; // superseded by a newer track
       if (data) {
         waveformData = data;
       } else {
@@ -22,6 +34,7 @@
         waveformData = Array(150).fill(40);
       }
     } catch (e) {
+      if (requestId !== waveformRequestId) return;
       console.error("Failed to load waveform:", e);
       waveformData = Array(150).fill(40);
     }
@@ -83,9 +96,14 @@
     }
   }
 
-  // React to changes in currentSong using Svelte 5 $effect
+  // React to changes in currentSong using Svelte 5 $effect. Debounced: the
+  // cleanup callback cancels the pending timer whenever songId changes again
+  // before it fires, so a burst of rapid skips only ever loads the waveform
+  // for whichever track the user actually settles on.
   $effect(() => {
-    loadWaveform(playerStore.currentSong?.id);
+    const songId = playerStore.currentSong?.id;
+    const timer = setTimeout(() => loadWaveform(songId), 300);
+    return () => clearTimeout(timer);
   });
 
   $effect(() => {
