@@ -8176,6 +8176,12 @@ const mockArtists = [
         case "get_songs_by_album":
           return mockSongs.filter(s => s.album === args.album);
 
+        case "get_songs_by_artist":
+          return mockSongs.filter(s => s.artist === args.artist || s.album_artist === args.artist);
+
+        case "get_playlists_by_artist":
+          return [];
+
         case "get_playlists":
           return mockPlaylists;
 

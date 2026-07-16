@@ -24,22 +24,28 @@ Luminous is currently in pre-release. You can download the latest installers and
   <table>
     <tr>
       <td width="50%">
-        <h4 align="center">Albums Grid</h4>
-        <img src="docs/screenshots/albums.png" alt="Albums Grid" />
+        <h4 align="center">Albums Overview</h4>
+        <img src="docs/screenshots/albums.png" alt="Albums Overview" />
       </td>
       <td width="50%">
-        <h4 align="center">Artists Grid</h4>
-        <img src="docs/screenshots/artists.png" alt="Artists Grid" />
+        <h4 align="center">Artists Overview</h4>
+        <img src="docs/screenshots/artists.png" alt="Artists Overview" />
       </td>
     </tr>
     <tr>
       <td width="50%">
-        <h4 align="center">Immersive Now Playing</h4>
-        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
+        <h4 align="center">Artist Detail</h4>
+        <img src="docs/screenshots/artist-detail.png" alt="Artist Detail" />
       </td>
       <td width="50%">
         <h4 align="center">Custom Theme Builder</h4>
         <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center">
+        <h4 align="center">Immersive Now Playing</h4>
+        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" style="max-width: 80%;" />
       </td>
     </tr>
   </table>

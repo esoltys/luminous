@@ -183,6 +183,18 @@ async function main() {
     await capture("home", "", "custom-tom-petty", "home.png", undefined, false, true, false, 64, 68);
     await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
     await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
+    await capture("collection", "artists", "custom-tom-petty", "artist-detail.png", async (page) => {
+      await page.evaluate(() => {
+        const cards = Array.from(document.querySelectorAll(".artist-card"));
+        const targetCard = cards.find((c: Element) => {
+          const nameSpan = c.querySelector("span");
+          return nameSpan && nameSpan.textContent?.trim() === "Eric Soltys";
+        });
+        if (targetCard) {
+          (targetCard as HTMLElement).click();
+        }
+      });
+    }, false, true, false, 64, 38);
     await capture("settings", "", "custom-tom-petty", "themes.png", async (page) => {
       // Click the "UI Themes" sub-tab inside the Settings view
       await page.evaluate(() => {
