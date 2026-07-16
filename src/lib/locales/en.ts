@@ -336,6 +336,12 @@ export const en = {
     noReleasesFound: "No releases found.",
     playlistsFeaturing: "Playlists featuring {artist}"
   },
+  albumDetail: {
+    backToAlbums: "Back to Albums",
+    unknownGenre: "Unknown genre",
+    statsLine: "{genre} · {year} · {duration}",
+    lossless: "Lossless"
+  },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
   },

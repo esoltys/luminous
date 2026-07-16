@@ -107,7 +107,7 @@
   let discographyItems = $derived(showAll ? discographySource : discographySource.slice(0, POPULAR_CAP));
 
   function openAlbum(album: AlbumItem) {
-    collectionStore.navigateTo("collection", "songs", album.album || "");
+    collectionStore.viewAlbum(album.album || "");
   }
 
   function openPlaylist(id: number) {

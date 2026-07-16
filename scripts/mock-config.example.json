@@ -1,6 +1,63 @@
 {
   "dbPath": "/absolute/path/to/luminous.db",
-  "featuredSong": "You Wreck Me",
-  "featuredArtist": "Eric Soltys",
-  "songLimit": 2000
+  "songLimit": 2000,
+  "default": {
+    "language": "en",
+    "theme": "system",
+    "sidebarOpen": true,
+    "rightPanelOpen": false,
+    "sidebarWidth": 64,
+    "positionSeconds": 111,
+    "featuredSong": "You Wreck Me",
+    "featuredArtist": "Eric Soltys"
+  },
+  "screenshots": [
+    {
+      "name": "home",
+      "filename": "home.png",
+      "tab": "home",
+      "subTab": "",
+      "language": "fr"
+    },
+    {
+      "name": "albums",
+      "filename": "albums.png",
+      "tab": "collection",
+      "subTab": "albums"
+    },
+    {
+      "name": "artists",
+      "filename": "artists.png",
+      "tab": "collection",
+      "subTab": "artists"
+    },
+    {
+      "name": "artist-detail",
+      "filename": "artist-detail.png",
+      "tab": "collection",
+      "subTab": "artists",
+      "action": "click-artist"
+    },
+    {
+      "name": "album-detail",
+      "filename": "album-detail.png",
+      "tab": "collection",
+      "subTab": "albums",
+      "action": "click-album"
+    },
+    {
+      "name": "themes",
+      "filename": "themes.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-themes"
+    },
+    {
+      "name": "now-playing",
+      "filename": "now-playing.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "isImmersive": true
+    }
+  ]
 }

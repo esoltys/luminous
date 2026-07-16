@@ -8,6 +8,7 @@ import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/ind
 import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = path.join(__dirname, "mock-config.json");
 const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
 const EXAMPLE_CONFIG_PATH = path.join(__dirname, "mock-config.example.json");
 
@@ -25,15 +26,66 @@ const FILE_TYPES = [
   "DSF", "DSDIFF", "ASF", "STREAM",
 ] as const;
 
-export interface MockConfig {
-  /** Absolute path to a real luminous.db. When set (and readable), overrides the bundled fixture data. */
-  dbPath?: string;
+/** The subset of per-screenshot settings that also have a run-wide fallback under `default`. */
+export interface MockConfigDefaults {
+  language?: string;
+  theme?: string;
+  sidebarOpen?: boolean;
+  rightPanelOpen?: boolean;
+  sidebarWidth?: number;
+  positionSeconds?: number;
   /** Song title to feature in the mock "now playing" state and screenshots. */
   featuredSong?: string;
   /** Artist name to feature in screenshots (e.g. the artist-detail view). */
   featuredArtist?: string;
-  /** Cap on how many songs to pull from a real database. Defaults to 2000. */
+}
+
+export interface ScreenshotConfig extends MockConfigDefaults {
+  name: string;
+  tab: string;
+  subTab: string;
+  filename: string;
+  action?: string;
+  isImmersive?: boolean;
+}
+
+export interface MockConfig {
+  /** Absolute path to a real luminous.db. When set (and readable), overrides the bundled fixture data. Not overridable per-screenshot. */
+  dbPath?: string;
+  /** Cap on how many songs to pull from a real database. Defaults to 2000. Not overridable per-screenshot. */
   songLimit?: number;
+  /** Run-wide fallback values for the settings each screenshot entry may override. */
+  default?: MockConfigDefaults;
+  screenshots?: ScreenshotConfig[];
+}
+
+/** Effective settings for a single screenshot: `screenshot.*` wins, falling back to `config.default.*`, then a hardcoded default. */
+export interface ResolvedScreenshotSettings {
+  language: string;
+  theme: string;
+  sidebarOpen: boolean;
+  rightPanelOpen: boolean;
+  sidebarWidth: number;
+  positionSeconds: number;
+  featuredSong?: string;
+  featuredArtist?: string;
+}
+
+export function resolveScreenshotSettings(
+  config: MockConfig,
+  screenshot: Partial<ScreenshotConfig> = {}
+): ResolvedScreenshotSettings {
+  const d = config.default ?? {};
+  return {
+    language: screenshot.language ?? d.language ?? "en",
+    theme: screenshot.theme ?? d.theme ?? "nordic-blue",
+    sidebarOpen: screenshot.sidebarOpen ?? d.sidebarOpen ?? true,
+    rightPanelOpen: screenshot.rightPanelOpen ?? d.rightPanelOpen ?? false,
+    sidebarWidth: screenshot.sidebarWidth ?? d.sidebarWidth ?? 64,
+    positionSeconds: screenshot.positionSeconds ?? d.positionSeconds ?? 122,
+    featuredSong: screenshot.featuredSong ?? d.featuredSong,
+    featuredArtist: screenshot.featuredArtist ?? d.featuredArtist,
+  };
 }
 
 export interface MockLibrary {
@@ -62,6 +114,7 @@ function readJsonConfig(configPath: string): MockConfig {
  * without warning about a database that was never configured.
  */
 export function loadMockConfig(): MockConfig {
+  if (existsSync(CONFIG_PATH)) return readJsonConfig(CONFIG_PATH);
   if (existsSync(LOCAL_CONFIG_PATH)) return readJsonConfig(LOCAL_CONFIG_PATH);
   if (existsSync(EXAMPLE_CONFIG_PATH)) {
     const { dbPath: _dbPath, ...defaults } = readJsonConfig(EXAMPLE_CONFIG_PATH);
@@ -213,12 +266,15 @@ export interface FeaturedSelection {
   artist?: string;
 }
 
-export function resolveFeatured(library: MockLibrary, config: MockConfig): FeaturedSelection {
+export function resolveFeatured(
+  library: MockLibrary,
+  selection: { featuredSong?: string; featuredArtist?: string }
+): FeaturedSelection {
   const song =
-    (config.featuredSong && library.songs.find((s) => s.title === config.featuredSong)) || library.songs[0];
+    (selection.featuredSong && library.songs.find((s) => s.title === selection.featuredSong)) || library.songs[0];
   const artist =
-    (config.featuredArtist && library.artists.some((a) => a.name === config.featuredArtist)
-      ? config.featuredArtist
+    (selection.featuredArtist && library.artists.some((a) => a.name === selection.featuredArtist)
+      ? selection.featuredArtist
       : library.artists[0]?.name) ?? undefined;
   return { song, artist };
 }

@@ -218,6 +218,25 @@ export interface ArtistItem {
 export function getCoverArtUrl(uri: string | null | undefined): string | null {
   if (!uri) return null;
   if (uri.startsWith("luminous-art://")) {
+    const isMock = typeof window !== "undefined" && (
+      (window as any).__LUMINOUS_MOCK_LIBRARY__ || 
+      (window as any).mockSettings
+    );
+    if (isMock) {
+      let cleanPath = uri.replace("luminous-art://", "");
+      if (cleanPath.startsWith("local/")) {
+        cleanPath = cleanPath.slice(6);
+      }
+      if (cleanPath.includes(":/") || cleanPath.includes(":\\") || cleanPath.startsWith("/")) {
+        return `/local-art/${encodeURIComponent(cleanPath)}`;
+      }
+      if (cleanPath.startsWith("album-")) {
+        // Real DB rows already include the extension (see covermanager.rs); the
+        // dev server's /covers/ route falls back to trying .jpg/.png if not.
+        return `/covers/${cleanPath}`;
+      }
+      return `/fixtures/${cleanPath}`;
+    }
     const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
     if (isWindows) {
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
