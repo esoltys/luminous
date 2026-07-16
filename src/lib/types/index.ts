@@ -231,7 +231,9 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
         return `/local-art/${encodeURIComponent(cleanPath)}`;
       }
       if (cleanPath.startsWith("album-")) {
-        return `/covers/${cleanPath}.jpg`;
+        // Real DB rows already include the extension (see covermanager.rs); the
+        // dev server's /covers/ route falls back to trying .jpg/.png if not.
+        return `/covers/${cleanPath}`;
       }
       return `/fixtures/${cleanPath}`;
     }

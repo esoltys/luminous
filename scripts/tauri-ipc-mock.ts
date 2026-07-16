@@ -11,6 +11,7 @@ import type {
   AlbumItem,
   ArtistItem,
   FileType,
+  HomeItem,
   Playlist,
   PlayState,
   RepeatMode,
@@ -51,12 +52,14 @@ declare global {
     __LUMINOUS_MOCK_LIBRARY__?: MockLibrary;
     __LUMINOUS_MOCK_FEATURED__?: { song?: Song; artist?: string };
     __LUMINOUS_MOCK_CONFIG__?: {
-      theme?: string;
-      language?: string;
-      sidebarOpen?: boolean;
-      sidebarWidth?: number;
-      rightPanelOpen?: boolean;
-      positionSeconds?: number;
+      default?: {
+        theme?: string;
+        language?: string;
+        sidebarOpen?: boolean;
+        sidebarWidth?: number;
+        rightPanelOpen?: boolean;
+        positionSeconds?: number;
+      };
     };
     __TAURI_INTERNALS__?: {
       transformCallback: (callback: IpcCallback, once?: boolean) => number;
@@ -77,33 +80,36 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   console.log("[Tauri Mock] Initializing Tauri IPC Mock layer...");
 
   const isScreenshotMode = !!window.mockSettings;
-  const mockConfig = window.__LUMINOUS_MOCK_CONFIG__ || {};
+  const mockDefaults = window.__LUMINOUS_MOCK_CONFIG__?.default || {};
   const cleanThemeId = (theme: string) => {
     return theme.trim().toLowerCase().replace(/\s+/g, "-");
   };
 
   window.mockSettings = window.mockSettings || {
-    active_theme_id: mockConfig.theme ? cleanThemeId(mockConfig.theme) : "nordic-blue",
+    active_theme_id: mockDefaults.theme ? cleanThemeId(mockDefaults.theme) : "nordic-blue",
     custom_themes: "[]",
     active_tab: "collection",
     active_sub_tab: "songs",
     excluded_formats: "[]",
-    language: mockConfig.language || "en",
+    language: mockDefaults.language || "en",
   };
 
-  if (mockConfig.language && window.mockSettings && !window.mockSettings.language) {
-    window.mockSettings.language = mockConfig.language;
+  if (mockDefaults.language && window.mockSettings && !window.mockSettings.language) {
+    window.mockSettings.language = mockDefaults.language;
   }
 
   if (!isScreenshotMode) {
-    if (mockConfig.sidebarOpen !== undefined) {
-      window.localStorage.setItem("layout_sidebarOpen", mockConfig.sidebarOpen ? "true" : "false");
+    if (mockDefaults.sidebarOpen !== undefined) {
+      window.localStorage.setItem("layout_sidebarOpen", mockDefaults.sidebarOpen ? "true" : "false");
     }
-    if (mockConfig.sidebarWidth !== undefined) {
-      window.localStorage.setItem("layout_sidebarWidth", mockConfig.sidebarWidth.toString());
+    if (mockDefaults.sidebarWidth !== undefined) {
+      window.localStorage.setItem("layout_sidebarWidth", mockDefaults.sidebarWidth.toString());
     }
-    if (mockConfig.rightPanelOpen !== undefined) {
-      window.localStorage.setItem("layout_rightPanelOpen", mockConfig.rightPanelOpen ? "true" : "false");
+    if (mockDefaults.rightPanelOpen !== undefined) {
+      window.localStorage.setItem("layout_rightPanelOpen", mockDefaults.rightPanelOpen ? "true" : "false");
+    }
+    if (mockDefaults.positionSeconds !== undefined && window.mockPlaybackPositionSec === undefined) {
+      window.mockPlaybackPositionSec = mockDefaults.positionSeconds;
     }
   }
 
@@ -173,6 +179,54 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
   const noop = async () => null;
 
+  /**
+   * Mirrors `group_songs_into_home_items` in src-tauri/src/collection.rs: songs
+   * that belong to a multi-track album collapse into a single HomeItem::Album
+   * (deduped by album+artist), everything else stays a HomeItem::Song. Without
+   * this grouping, HomeView's keyed #each renders duplicate keys for every
+   * ungrouped song and crashes (see CurationCarousel.svelte's item key).
+   */
+  function groupSongsIntoHomeItems(songs: Song[], limit: number): HomeItem[] {
+    const items: HomeItem[] = [];
+    const seenAlbums = new Set<string>();
+
+    for (const song of songs) {
+      if (items.length >= limit) break;
+
+      const albumName = song.album?.trim();
+      if (albumName) {
+        const artistName = song.album_artist || song.artist || "";
+        const albumTrackCount = library.songs.filter(
+          (s) => s.album === song.album && (s.album_artist || s.artist || "") === artistName
+        ).length;
+
+        if (albumTrackCount > 1) {
+          const albumKey = `${song.album}::${artistName}`;
+          if (!seenAlbums.has(albumKey)) {
+            seenAlbums.add(albumKey);
+            items.push({
+              type: "album",
+              album: {
+                artist: artistName,
+                album: song.album,
+                year: song.year ?? null,
+                track_count: albumTrackCount,
+                art_embedded: song.art_embedded,
+                art_automatic: song.art_automatic ?? null,
+                art_manual: song.art_manual ?? null,
+              },
+            });
+          }
+          continue;
+        }
+      }
+
+      items.push({ type: "song", song });
+    }
+
+    return items;
+  }
+
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
 
@@ -206,20 +260,24 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_songs: () => library.songs,
 
-    get_recently_played: (args) =>
-      library.songs
+    get_recently_played: (args) => {
+      const sorted = library.songs
         .filter((s) => s.lastplayed)
-        .sort((a, b) => (b.lastplayed || 0) - (a.lastplayed || 0))
-        .slice(0, (args.limit as number) || 10),
+        .sort((a, b) => (b.lastplayed || 0) - (a.lastplayed || 0));
+      return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
+    },
 
-    get_most_frequently_played: (args) =>
-      [...library.songs].sort((a, b) => (b.playcount || 0) - (a.playcount || 0)).slice(0, (args.limit as number) || 10),
+    get_most_frequently_played: (args) => {
+      const sorted = [...library.songs].sort((a, b) => (b.playcount || 0) - (a.playcount || 0));
+      return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
+    },
 
-    get_recently_added: (args) =>
-      library.songs
+    get_recently_added: (args) => {
+      const sorted = library.songs
         .filter((s) => s.added)
-        .sort((a, b) => (b.added || 0) - (a.added || 0))
-        .slice(0, (args.limit as number) || 10),
+        .sort((a, b) => (b.added || 0) - (a.added || 0));
+      return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
+    },
 
     get_albums: () => library.albums,
     get_artists: () => library.artists,
@@ -312,6 +370,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "set_equalizer_enabled", "set_equalizer_preamp", "set_equalizer_band", "set_spectrum_enabled",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
+    "get_startup_file",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;
 

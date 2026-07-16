@@ -1,18 +1,32 @@
 // scripts/take-screenshots.ts
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
-import { loadMockConfig, loadMockLibrary, resolveFeatured } from "./mock-library";
+import { loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
+import type { FeaturedSelection } from "./mock-library";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function parseNameFilter(argv: string[]): string | undefined {
+  const eqArg = argv.find((a) => a.startsWith("--name="));
+  if (eqArg) return eqArg.slice("--name=".length);
+  const flagIndex = argv.indexOf("--name");
+  if (flagIndex !== -1) return argv[flagIndex + 1];
+  return undefined;
+}
 
 async function main() {
   if (process.env.CI) {
     console.log("[Screenshot Automation] Running in CI environment. Skipping screenshot generation.");
     process.exit(0);
+  }
+
+  const nameFilter = parseNameFilter(process.argv.slice(2));
+  if (nameFilter) {
+    console.log(`[Screenshot Automation] --name "${nameFilter}" given; only that screenshot will be captured.`);
   }
   console.log("[Screenshot Automation] Starting screenshot generation...");
 
@@ -42,10 +56,26 @@ async function main() {
     // console.error(`[Vite stderr] ${data}`);
   });
 
-  // Ensure devServer is terminated when process exits
+  // Ensure devServer is terminated when process exits. It's spawned with
+  // shell: true, so on Windows devServer.kill() only kills the cmd.exe
+  // wrapper and leaves the actual bun/vite process (and port 1420) orphaned;
+  // taskkill /t walks the whole process tree instead.
+  const killDevServer = () => {
+    if (!devServer.pid) return;
+    if (process.platform === "win32") {
+      try {
+        execSync(`taskkill /pid ${devServer.pid} /t /f`, { stdio: "ignore" });
+      } catch {
+        // Already exited.
+      }
+    } else {
+      devServer.kill("SIGTERM");
+    }
+  };
+
   const cleanup = () => {
     console.log("[Screenshot Automation] Cleaning up Vite server process...");
-    devServer.kill("SIGTERM");
+    killDevServer();
   };
 
   process.on("exit", cleanup);
@@ -68,7 +98,7 @@ async function main() {
 
   if (!ready) {
     console.error("[ERROR] Vite server failed to respond on port 1420.");
-    devServer.kill("SIGTERM");
+    killDevServer();
     process.exit(1);
   }
 
@@ -80,78 +110,73 @@ async function main() {
 
   const mockConfig = loadMockConfig();
   const mockLibrary = await loadMockLibrary(mockConfig);
-  const featured = resolveFeatured(mockLibrary, mockConfig);
+  const defaultFeatured = resolveFeatured(mockLibrary, {
+    featuredSong: mockConfig.default?.featuredSong,
+    featuredArtist: mockConfig.default?.featuredArtist,
+  });
   console.log(
-    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${featured.artist ?? "none"}.`
+    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}.`
   );
-  const libraryInitScript = `
-    window.__LUMINOUS_MOCK_LIBRARY__ = ${JSON.stringify(mockLibrary)};
-    window.__LUMINOUS_MOCK_FEATURED__ = ${JSON.stringify(featured)};
-    window.__LUMINOUS_MOCK_CONFIG__ = ${JSON.stringify(mockConfig)};
-  `;
+  // Library data (songs/albums/artists) is the same for every screenshot; only
+  // the "featured" selection and UI settings vary per-screenshot.
+  const libraryJson = JSON.stringify(mockLibrary);
   const mockCode = compileMockScript();
 
-  async function capture(
-    tab: string,
-    subTab: string,
-    theme: string,
-    filename: string,
-    afterLoad?: (page: import("playwright").Page) => Promise<void>,
+  interface CaptureOptions {
+    tab: string;
+    subTab: string;
+    theme: string;
+    filename: string;
+    featured: FeaturedSelection;
+    language?: string;
+    afterLoad?: (page: import("playwright").Page, featured: FeaturedSelection) => Promise<void>;
+    isImmersive?: boolean;
+    sidebarOpen?: boolean;
+    rightPanelOpen?: boolean;
+    sidebarWidth?: number;
+    positionSeconds?: number;
+  }
+
+  async function capture({
+    tab,
+    subTab,
+    theme,
+    filename,
+    featured,
+    language = "en",
+    afterLoad,
     isImmersive = false,
     sidebarOpen = true,
     rightPanelOpen = false,
     sidebarWidth = 64,
-    positionSeconds = 122
-  ) {
-    console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Immersive: ${isImmersive})...`);
+    positionSeconds = 122,
+  }: CaptureOptions) {
+    console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Language: ${language}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
+    page.on("console", (msg) => {
+      if (msg.type() === "error" || msg.type() === "warning") {
+        console.warn(`[Page ${msg.type()}] ${msg.text()}`);
+      }
+    });
+    page.on("pageerror", (err) => console.error(`[Page error] ${err.message}`));
 
     // Inject the mock library data, then the mock Tauri IPC bridge that reads it
-    await page.addInitScript(libraryInitScript);
+    await page.addInitScript(`
+      window.__LUMINOUS_MOCK_LIBRARY__ = ${libraryJson};
+      window.__LUMINOUS_MOCK_FEATURED__ = ${JSON.stringify(featured)};
+    `);
     await page.addInitScript(mockCode);
-
-    const customThemes = [
-      {
-        id: "custom-rodrigo",
-        name: "Rodrigo",
-        colors: {
-          "bg-main": "#1c120c",
-          "bg-sidebar": "#150e09",
-          "bg-playerbar": "#160d09",
-          "color-accent": "#c97f4c",
-          "color-accent-hover": "#dca27a",
-          "color-text-primary": "#ffffff",
-          "color-text-secondary": "#baa7a1",
-          "color-border": "#3d261a"
-        },
-        isCustom: true
-      },
-      {
-        id: "custom-tom-petty",
-        name: "Tom Petty",
-        colors: {
-          "bg-main": "#1a0f0c",
-          "bg-sidebar": "#120a08",
-          "bg-playerbar": "#140c0a",
-          "color-accent": "#b83e20",
-          "color-accent-hover": "#d4583b",
-          "color-text-primary": "#ffffff",
-          "color-text-secondary": "#b3a19c",
-          "color-border": "#2d1814"
-        },
-        isCustom: true
-      }
-    ];
 
     // Pre-configure the mock settings on mount
     await page.addInitScript(`
       window.mockSettings = {
         active_theme_id: "${theme}",
-        custom_themes: \`${JSON.stringify(customThemes)}\`,
+        custom_themes: "[]",
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
-        excluded_formats: "[]"
+        excluded_formats: "[]",
+        language: "${language}"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
@@ -177,7 +202,7 @@ async function main() {
 
     // Optional post-load interaction (e.g. clicking into a sub-tab)
     if (afterLoad) {
-      await afterLoad(page);
+      await afterLoad(page, featured);
     }
     // Let any rendering and async effects fire
     await page.waitForTimeout(600);
@@ -222,8 +247,8 @@ async function main() {
     await page.close();
   }
 
-  const actionRegistry: Record<string, (page: import("playwright").Page) => Promise<void>> = {
-    "click-artist": async (page) => {
+  const actionRegistry: Record<string, (page: import("playwright").Page, featured: FeaturedSelection) => Promise<void>> = {
+    "click-artist": async (page, featured) => {
       await page.evaluate((artistName) => {
         const cards = Array.from(document.querySelectorAll(".artist-card"));
         const targetCard = cards.find((c: Element) => {
@@ -235,7 +260,7 @@ async function main() {
         }
       }, featured.artist);
     },
-    "click-album": async (page) => {
+    "click-album": async (page, featured) => {
       await page.evaluate((albumName) => {
         const cards = Array.from(document.querySelectorAll(".bg-brand-sidebar"));
         let targetCard = cards.find((c: Element) => {
@@ -268,44 +293,57 @@ async function main() {
 
   try {
     if (mockConfig.screenshots && mockConfig.screenshots.length > 0) {
-      const defaultTheme = mockConfig.theme ? cleanThemeId(mockConfig.theme) : "nordic-blue";
-      for (const s of mockConfig.screenshots) {
+      const screenshotsToRun = nameFilter
+        ? mockConfig.screenshots.filter((s) => s.name === nameFilter)
+        : mockConfig.screenshots;
+      if (nameFilter && screenshotsToRun.length === 0) {
+        console.warn(`[Screenshot Automation] No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
+      }
+      for (const s of screenshotsToRun) {
+        const settings = resolveScreenshotSettings(mockConfig, s);
+        const featured = resolveFeatured(mockLibrary, settings);
         const afterLoad = s.action ? actionRegistry[s.action] : undefined;
-        const theme = s.theme || mockConfig.theme || "nordic-blue";
-        const isImmersive = s.isImmersive ?? false;
-        const sidebarOpen = s.sidebarOpen ?? mockConfig.sidebarOpen ?? true;
-        const rightPanelOpen = s.rightPanelOpen ?? mockConfig.rightPanelOpen ?? false;
-        const sidebarWidth = s.sidebarWidth ?? mockConfig.sidebarWidth ?? 64;
-        const positionSeconds = s.positionSeconds ?? mockConfig.positionSeconds ?? 122;
 
-        await capture(
-          s.tab,
-          s.subTab,
-          cleanThemeId(theme),
-          s.filename,
+        await capture({
+          tab: s.tab,
+          subTab: s.subTab,
+          theme: cleanThemeId(settings.theme),
+          filename: s.filename,
+          featured,
+          language: settings.language,
           afterLoad,
-          isImmersive,
-          sidebarOpen,
-          rightPanelOpen,
-          sidebarWidth,
-          positionSeconds
-        );
+          isImmersive: s.isImmersive ?? false,
+          sidebarOpen: settings.sidebarOpen,
+          rightPanelOpen: settings.rightPanelOpen,
+          sidebarWidth: settings.sidebarWidth,
+          positionSeconds: settings.positionSeconds,
+        });
       }
     } else {
       // Predefined default captures fallback
-      await capture("home", "", "custom-tom-petty", "home.png", undefined, false, true, false, 64, 68);
-      await capture("collection", "albums", "custom-tom-petty", "albums.png", undefined, false, true, false, 64, 102);
-      await capture("collection", "artists", "custom-tom-petty", "artists.png", undefined, false, true, false, 64, 38);
-      await capture("collection", "artists", "custom-tom-petty", "artist-detail.png", actionRegistry["click-artist"], false, true, false, 64, 38);
-      await capture("collection", "albums", "custom-tom-petty", "album-detail.png", actionRegistry["click-album"], false, true, false, 64, 38);
-      await capture("settings", "", "custom-tom-petty", "themes.png", actionRegistry["click-themes"], false, true, false, 64, 156);
-      await capture("collection", "songs", "custom-tom-petty", "now-playing.png", undefined, true, false, false, 64, 82);
+      const featured = defaultFeatured;
+      const fallbackCaptures: Array<{ name: string; opts: CaptureOptions }> = [
+        { name: "home", opts: { tab: "home", subTab: "", theme: "nordic-blue", filename: "home.png", featured, sidebarWidth: 64, positionSeconds: 68 } },
+        { name: "albums", opts: { tab: "collection", subTab: "albums", theme: "nordic-blue", filename: "albums.png", featured, sidebarWidth: 64, positionSeconds: 102 } },
+        { name: "artists", opts: { tab: "collection", subTab: "artists", theme: "nordic-blue", filename: "artists.png", featured, sidebarWidth: 64, positionSeconds: 38 } },
+        { name: "artist-detail", opts: { tab: "collection", subTab: "artists", theme: "nordic-blue", filename: "artist-detail.png", featured, afterLoad: actionRegistry["click-artist"], sidebarWidth: 64, positionSeconds: 38 } },
+        { name: "album-detail", opts: { tab: "collection", subTab: "albums", theme: "nordic-blue", filename: "album-detail.png", featured, afterLoad: actionRegistry["click-album"], sidebarWidth: 64, positionSeconds: 38 } },
+        { name: "themes", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "themes.png", featured, afterLoad: actionRegistry["click-themes"], sidebarWidth: 64, positionSeconds: 156 } },
+        { name: "now-playing", opts: { tab: "collection", subTab: "songs", theme: "nordic-blue", filename: "now-playing.png", featured, isImmersive: true, sidebarOpen: false, rightPanelOpen: false, sidebarWidth: 64, positionSeconds: 82 } },
+      ];
+      const toRun = nameFilter ? fallbackCaptures.filter((c) => c.name === nameFilter) : fallbackCaptures;
+      if (nameFilter && toRun.length === 0) {
+        console.warn(`[Screenshot Automation] No screenshot named "${nameFilter}". Available: ${fallbackCaptures.map((c) => c.name).join(", ")}`);
+      }
+      for (const c of toRun) {
+        await capture(c.opts);
+      }
     }
   } catch (err) {
     console.error("[Screenshot Automation] Error capturing screenshots:", err);
   } finally {
     await browser.close();
-    devServer.kill("SIGTERM");
+    killDevServer();
     console.log("[Screenshot Automation] All screenshots captured successfully.");
     process.exit(0);
   }
