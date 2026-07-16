@@ -130,14 +130,14 @@
 
     <!-- Toggle & Presets controls -->
     <div class="flex items-center gap-4">
-      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+      <div class="flex items-center gap-3 bg-brand-sidebar/40 border border-brand-border rounded-lg px-4 py-2">
         <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.enableEq')}</label>
         <input
           id="eq-toggle"
           type="checkbox"
           bind:checked={enabled}
           onchange={handleToggle}
-          class="w-4 h-4 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
+          class="w-4 h-4 shrink-0 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
         />
       </div>
 

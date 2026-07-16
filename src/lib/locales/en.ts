@@ -9,7 +9,10 @@ export const en = {
     create: "Create",
     noPlaylists: "No playlists yet",
     quickAccess: "Quick Access",
-    rescanLibrary: "Rescan Library"
+    rescanLibrary: "Rescan Library",
+    scanning: "Scanning",
+    scanningPhaseTooltip: "Scanning Phase: {phase} ({scanned}/{total})",
+    scanningPhaseLabel: "Phase: {phase}"
   },
   topNav: {
     goBack: "Go back",
@@ -22,7 +25,9 @@ export const en = {
     clearSearch: "Clear Search",
     toggleSidebar: "Toggle Left Sidebar",
     toggleImmersive: "Toggle Immersive Album Art Screen",
-    toggleRightPanel: "Toggle Right Panel"
+    toggleRightPanel: "Toggle Right Panel",
+    resizeSidebar: "Resize Left Sidebar",
+    resizeRightPanel: "Resize Right Panel"
   },
   home: {
     greetingMorning: "Good Morning",
@@ -60,6 +65,7 @@ export const en = {
     addPlaylistTooltip: "Add to active playlist",
     editTagsTooltip: "Edit tags",
     variousArtists: "Various Artists",
+    unknownSong: "Unknown Song",
     unknownArtist: "Unknown Artist",
     unknownAlbum: "Unknown Album",
     noAlbumsTitle: "No albums found",
@@ -85,7 +91,12 @@ export const en = {
     sortTracksDesc: "Sort: Tracks (Most)",
     sortTracksAsc: "Sort: Tracks (Least)",
     sortAlbumsDesc: "Sort: Albums (Most)",
-    sortAlbumsAsc: "Sort: Albums (Least)"
+    sortAlbumsAsc: "Sort: Albums (Least)",
+    albumsCount: "{count} albums",
+    oneAlbum: "1 album",
+    lyricsAvailable: "Lyrics available",
+    selectPlaylistFirstAlert: "Please select or create a playlist first from the Playlists tab.",
+    albumPlaylistName: "Album: {name}"
   },
   settings: {
     title: "Settings",
@@ -134,7 +145,35 @@ export const en = {
     excluded: "Excluded",
     selectMusicDirectory: "Select Music Directory",
     confirmRemoveFolder: "Stop watching folder: {path}?\nSongs from this folder will not be removed from your playlists but will be marked unavailable.",
-    enterThemeNameAlert: "Please enter a name for your custom theme."
+    enterThemeNameAlert: "Please enter a name for your custom theme.",
+    mainViewDescription: "Primary view and content area",
+    sidebarDescription: "Left navigation panel",
+    playerBarDescription: "Bottom playback controls",
+    accentDescription: "Buttons, highlights, focus states",
+    accentHoverDescription: "Hover state for accent elements",
+    bordersDescription: "Dividers and outlines",
+    primaryTextDescription: "Main readable text",
+    secondaryTextDescription: "Hints, labels, muted text",
+    colorPalette: "Color Palette",
+    resetToCurrentTheme: "Reset to Current Theme",
+    textColors: "Text Colors",
+    wcagHelpText: "Checkmark = meets WCAG AA (4.5:1 minimum for normal text)",
+    saveExportTheme: "Save & Export Theme",
+    exportTheme: "Export Theme",
+    importTheme: "Import Theme",
+    livePreview: "Live Preview",
+    sidebarPreview: "Sidebar Preview",
+    mainViewPreview: "Main View Preview",
+    playerBarPreview: "Player Bar Preview",
+    luminanceLabel: "Luminance:",
+    lightBg: "Light bg",
+    darkBg: "Dark bg",
+    lightBgTooltip: "Light background - use dark text for contrast",
+    darkBgTooltip: "Dark background - use light text for contrast",
+    hexPlaceholder: "#000000",
+    invalidThemeFile: "Invalid theme file format",
+    importThemeFailed: "Failed to import theme. Please check the file format.",
+    importedThemeDefaultName: "Imported Theme"
   },
   playlists: {
     title: "Playlists",
@@ -187,7 +226,8 @@ export const en = {
     plainTextNotice: "Synced lyrics not available. Showing plain text.",
     retrySearch: "Retry Search",
     editorLabel: "Lyrics Text (plain or LRC synced format)",
-    editorPlaceholder: "Paste synced LRC or plain text lyrics here..."
+    editorPlaceholder: "Paste synced LRC or plain text lyrics here...",
+    saveFailedPrefix: "Failed to save lyrics: "
   },
   playerBar: {
     previous: "Previous Track",
@@ -196,7 +236,18 @@ export const en = {
     next: "Next Track",
     repeat: "Repeat",
     shuffle: "Shuffle",
+    shuffleOff: "Off",
+    shuffleAll: "All",
+    shuffleInsideAlbum: "Inside Album",
+    shuffleAlbums: "Albums",
+    shuffleArtists: "Artists",
+    repeatOff: "Off",
+    repeatSong: "Song",
+    repeatAlbum: "Album",
+    repeatPlaylist: "Playlist",
+    repeatOneByOne: "One by One",
     volume: "Volume",
+    volumeSlider: "Volume Slider",
     queueTitle: "Play Queue",
     historyTitle: "Play History",
     queueTab: "Queue ({count})",
@@ -205,8 +256,6 @@ export const en = {
     clearHistory: "Clear History",
     nowPlaying: "Now Playing",
     notPlaying: "Nothing playing",
-    unknownTrack: "Unknown Track",
-    unknownArtist: "Unknown Artist",
     lyricsTooltip: "Show lyrics panel",
     equalizerTooltip: "Show equalizer settings",
     visualizerTooltip: "Toggle audio visualizer",
@@ -239,7 +288,10 @@ export const en = {
     discField: "Disc",
     lookupAcoustID: "Lookup AcoustID",
     lookingUp: "Looking up...",
-    matched: "Matched!"
+    matched: "Matched!",
+    acoustidFpcalcError: "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.",
+    acoustidApiKeyError: "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.",
+    saveFailedPrefix: "Failed to save tags: "
   },
   equalizer: {
     title: "10-Band Graphic Equalizer",
@@ -267,5 +319,32 @@ export const en = {
     "nordic-blue": "Nordic Blue",
     "retro-amber": "Retro Amber",
     "dynamic-artwork": "Dynamic Artwork"
+  },
+  artistDetail: {
+    backToArtists: "Back to Artists",
+    unknownGenre: "Unknown genre",
+    statsLine: "{genre} · {albumCount} albums • {songCount} songs • {duration} total",
+    playAll: "Play all",
+    shuffleAndPlay: "Shuffle and play",
+    discography: "Discography",
+    showLess: "Show less",
+    showAll: "Show all",
+    popularReleases: "Popular releases",
+    albumsFilter: "Albums",
+    singlesAndEps: "Singles and EPs",
+    singleEp: "Single/EP",
+    noReleasesFound: "No releases found.",
+    playlistsFeaturing: "Playlists featuring {artist}"
+  },
+  immersive: {
+    emptyStateText: "Select a song from your collection to start playing."
+  },
+  common: {
+    scrollLeft: "Scroll left",
+    scrollRight: "Scroll right",
+    albumArtAlt: "Album Art",
+    enableLogoPulse: "Click to enable logo pulsing",
+    disableLogoPulse: "Click to disable logo pulsing",
+    toggleLogoPulsing: "Toggle Luminous logo pulsing"
   }
 };

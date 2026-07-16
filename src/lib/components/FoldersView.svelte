@@ -45,7 +45,7 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Select Music Directory",
+        title: i18n.t('settings.selectMusicDirectory'),
       });
       if (selected && typeof selected === "string") {
         await collectionStore.addDirectory(selected);

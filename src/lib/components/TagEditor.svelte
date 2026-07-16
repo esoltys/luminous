@@ -89,9 +89,9 @@
       console.error("AcoustID lookup failed:", e);
       const str = e.toString();
       if (str.includes("fpcalc") || str.includes("chromaprint")) {
-        lookupErrorMsg = "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.";
+        lookupErrorMsg = i18n.t('tagEditor.acoustidFpcalcError');
       } else if (str.includes("invalid API key") || str.includes("API key")) {
-        lookupErrorMsg = "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.";
+        lookupErrorMsg = i18n.t('tagEditor.acoustidApiKeyError');
       } else {
         lookupErrorMsg = str;
       }
@@ -124,7 +124,7 @@
       onClose();
     } catch (e: any) {
       console.error("Failed to save tags:", e);
-      alert("Failed to save tags: " + e.toString());
+      alert(i18n.t('tagEditor.saveFailedPrefix') + e.toString());
     } finally {
       isSaving = false;
     }

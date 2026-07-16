@@ -4,6 +4,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     size?: "sm" | "md" | "lg" | "xl";
@@ -108,8 +109,8 @@
   type="button"
   onclick={togglePulsing}
   class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full transition-shadow duration-300"
-  title={isPulsingEnabled ? "Click to disable logo pulsing" : "Click to enable logo pulsing"}
-  aria-label="Toggle Luminous logo pulsing"
+  title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
+  aria-label={i18n.t('common.toggleLogoPulsing')}
 >
   <svg
     xmlns="http://www.w3.org/2000/svg"

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight } from "lucide-svelte";
   import type { Snippet } from "svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   let { children }: { children: Snippet } = $props();
 
@@ -46,7 +47,7 @@
     <button
       onclick={() => scroll("left")}
       class="absolute left-0 top-1/2 -translate-y-1/2 z-10 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 cursor-pointer"
-      title="Scroll left"
+      title={i18n.t('common.scrollLeft')}
     >
       <ChevronLeft class="w-6 h-6 text-white" />
     </button>
@@ -60,7 +61,7 @@
     <button
       onclick={() => scroll("right")}
       class="absolute right-0 top-1/2 -translate-y-1/2 z-10 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 cursor-pointer"
-      title="Scroll right"
+      title={i18n.t('common.scrollRight')}
     >
       <ChevronRight class="w-6 h-6 text-white" />
     </button>

@@ -265,7 +265,7 @@
                         <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
                       </span>
                       <span class="truncate line-through decoration-brand-text-secondary/40">
-                        {item.song?.title ?? i18n.t('playerBar.unknownTrack')}
+                        {item.song?.title ?? i18n.t('collection.unknownSong')}
                       </span>
                     {:else if item.song?.title}
                       <button
@@ -276,14 +276,14 @@
                         {item.song.title}
                       </button>
                     {:else}
-                      <span class="truncate">{i18n.t('playerBar.unknownTrack')}</span>
+                      <span class="truncate">{i18n.t('collection.unknownSong')}</span>
                     {/if}
                     {#if item.song && !unavailable}
                       <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                         {item.song.filetype}
                       </span>
                       {#if item.song.lyrics && item.song.lyrics.trim() !== ""}
-                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title="Lyrics available">
+                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
                           LRC
                         </span>
                       {/if}
@@ -302,7 +302,7 @@
                       {item.song.artist}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t('playerBar.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">

@@ -165,7 +165,7 @@
     if (playlistsStore.activePlaylistId !== null) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, [songId]);
     } else {
-      alert("Please select or create a playlist first from the Playlists tab.");
+      alert(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 </script>
@@ -359,15 +359,15 @@
                   <button
                     onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
                     class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                    title={i18n.t('collection.filterByTitle', { title: song.title || i18n.t('playerBar.unknownTrack') })}
+                    title={i18n.t('collection.filterByTitle', { title: song.title || i18n.t('collection.unknownSong') })}
                   >
-                    {song.title || i18n.t('playerBar.unknownTrack')}
+                    {song.title || i18n.t('collection.unknownSong')}
                   </button>
                   <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                     {song.filetype}
                   </span>
                   {#if song.lyrics && song.lyrics.trim() !== ""}
-                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title="Lyrics available">
+                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
                       LRC
                     </span>
                   {/if}
@@ -429,8 +429,8 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
             ondblclick={async () => {
-              const albumName = album.album || "Unknown Album";
-              const playlistName = `Album: ${albumName}`;
+              const albumName = album.album || i18n.t('collection.unknownAlbum');
+              const playlistName = i18n.t('collection.albumPlaylistName', { name: albumName });
               let existingPlaylist = playlistsStore.playlists.find(p => p.name === playlistName);
 
               if (existingPlaylist) {
@@ -563,7 +563,7 @@
               {artist.name || i18n.t('collection.unknownArtist')}
             </span>
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
-              <span>{artist.album_count} {artist.album_count === 1 ? 'album' : 'albums'}</span>
+              <span>{artist.album_count === 1 ? i18n.t('collection.oneAlbum') : i18n.t('collection.albumsCount', { count: artist.album_count })}</span>
               <span>•</span>
               <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
             </div>

@@ -79,6 +79,27 @@
     const nextIdx = (currentIdx + 1) % modes.length;
     playerStore.setRepeatMode(modes[nextIdx]);
   }
+
+  function shuffleModeLabel(mode: import("../types").ShuffleMode): string {
+    switch (mode) {
+      case "off": return i18n.t('playerBar.shuffleOff');
+      case "all": return i18n.t('playerBar.shuffleAll');
+      case "inside_album": return i18n.t('playerBar.shuffleInsideAlbum');
+      case "albums": return i18n.t('playerBar.shuffleAlbums');
+      case "artists": return i18n.t('playerBar.shuffleArtists');
+    }
+  }
+
+  function repeatModeLabel(mode: import("../types").RepeatMode): string {
+    switch (mode) {
+      case "off": return i18n.t('playerBar.repeatOff');
+      case "track": return i18n.t('playerBar.repeatSong');
+      case "album": return i18n.t('playerBar.repeatAlbum');
+      case "playlist": return i18n.t('playerBar.repeatPlaylist');
+      case "one_by_one": return i18n.t('playerBar.repeatOneByOne');
+      default: return mode;
+    }
+  }
 </script>
 
 <footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
@@ -97,7 +118,7 @@
           <button
             onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.title || ""); }}
             class="text-sm font-semibold text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
-            title="Filter by title: {playerStore.currentSong.title}"
+            title={i18n.t('collection.filterByTitle', { title: playerStore.currentSong.title })}
           >
             {playerStore.currentSong.title}
           </button>
@@ -122,7 +143,7 @@
         </button>
       {:else}
         <span class="text-xs text-brand-text-secondary/70 truncate">
-          {playerStore.currentSong ? i18n.t('playerBar.unknownArtist') : ""}
+          {playerStore.currentSong ? i18n.t('collection.unknownArtist') : ""}
         </span>
       {/if}
     </div>
@@ -134,7 +155,7 @@
       <button
         onclick={cycleShuffle}
         class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title={`${i18n.t('playerBar.shuffle')}: ${playerStore.shuffleMode}`}
+        title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)}`}
       >
         <Shuffle class="w-4 h-4" />
         {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
@@ -173,7 +194,7 @@
       <button
         onclick={cycleRepeat}
         class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title={`${i18n.t('playerBar.repeat')}: ${playerStore.repeatMode}`}
+        title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)}`}
       >
         {#if playerStore.repeatMode === 'track'}
           <Repeat1 class="w-4 h-4" />
@@ -223,7 +244,7 @@
       onkeyup={releaseVolumeFocus}
       class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
       style="background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) {playerStore.volume * 100}%, var(--color-border) {playerStore.volume * 100}%, var(--color-border) 100%)"
-      aria-label="Volume Slider"
+      aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volume')}
     />
     {#if collectionStore.immersiveMode}

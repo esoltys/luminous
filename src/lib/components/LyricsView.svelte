@@ -134,7 +134,7 @@
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
-      alert("Failed to save lyrics: " + e.toString());
+      alert(i18n.t('lyrics.saveFailedPrefix') + e.toString());
     }
   }
 
@@ -174,7 +174,7 @@
           {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
-          {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('playerBar.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}
+          {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('collection.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}
         </p>
       </div>
     </div>

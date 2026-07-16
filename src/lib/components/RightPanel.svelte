@@ -36,7 +36,7 @@
       <div class="space-y-3">
         <div class="space-y-1">
           <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.songLabel', {}, 'Song')}</p>
-          <p class="text-sm font-semibold text-brand-text-primary truncate">{currentSong.title || i18n.t('playerBar.unknownTrack')}</p>
+          <p class="text-sm font-semibold text-brand-text-primary truncate">{currentSong.title || i18n.t('collection.unknownSong')}</p>
         </div>
 
         <div class="space-y-1">
@@ -50,7 +50,7 @@
               {currentSong.artist}
             </button>
           {:else}
-            <p class="text-sm text-brand-text-secondary truncate">{i18n.t('playerBar.unknownArtist')}</p>
+            <p class="text-sm text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</p>
           {/if}
         </div>
 

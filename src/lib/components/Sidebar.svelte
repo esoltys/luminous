@@ -144,16 +144,16 @@
   <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} mb-24 text-xs flex-shrink-0">
     {#if collectionStore.isScanning}
       {#if isCollapsed}
-        <div 
+        <div
           class="flex items-center justify-center w-10 h-10 cursor-help"
-          title="Scanning Phase: {collectionStore.scanProgress?.phase || 'Scanning'} ({collectionStore.scanProgress?.scanned || 0}/{collectionStore.scanProgress?.total || 0})"
+          title={i18n.t('sidebar.scanningPhaseTooltip', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning'), scanned: collectionStore.scanProgress?.scanned || 0, total: collectionStore.scanProgress?.total || 0 })}
         >
           <RefreshCw class="w-5 h-5 animate-spin text-brand-accent-text" />
         </div>
       {:else}
         <div class="space-y-1.5 w-full">
           <div class="flex justify-between text-[10px] text-brand-text-secondary/60">
-            <span class="capitalize">Phase: {collectionStore.scanProgress?.phase || "Scanning"}</span>
+            <span class="capitalize">{i18n.t('sidebar.scanningPhaseLabel', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning') })}</span>
             <span>{collectionStore.scanProgress?.scanned || 0}/{collectionStore.scanProgress?.total || 0}</span>
           </div>
           <div class="w-full bg-brand-sidebar rounded-full h-1.5 overflow-hidden">

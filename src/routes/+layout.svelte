@@ -133,7 +133,7 @@
                 aria-valuenow={collectionStore.sidebarWidth}
                 aria-valuemin={64}
                 aria-valuemax={400}
-                aria-label="Resize Left Sidebar"
+                aria-label={i18n.t('topNav.resizeSidebar')}
                 tabindex="0"
                 class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
                 onpointerdown={startResizeSidebar}
@@ -161,7 +161,7 @@
                 aria-valuenow={collectionStore.rightPanelWidth}
                 aria-valuemin={220}
                 aria-valuemax={480}
-                aria-label="Resize Right Panel"
+                aria-label={i18n.t('topNav.resizeRightPanel')}
                 tabindex="0"
                 class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
                 onpointerdown={startResizeRightPanel}
@@ -213,23 +213,23 @@
             {#if playerStore.currentSong}
               <div>
                 <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-accent/25 rounded-full select-none">
-                  Now Playing
+                  {i18n.t('playerBar.nowPlaying')}
                 </span>
               </div>
               <h1 class="text-3xl md:text-5xl font-black text-brand-text-primary leading-tight tracking-tight select-text">
-                {playerStore.currentSong.title || "Unknown Title"}
+                {playerStore.currentSong.title || i18n.t('collection.unknownSong')}
               </h1>
               <p class="text-lg md:text-xl text-brand-text-secondary select-text font-medium">
-                {playerStore.currentSong.artist || "Unknown Artist"}
+                {playerStore.currentSong.artist || i18n.t('collection.unknownArtist')}
               </p>
               <p class="text-sm text-brand-text-secondary/60 italic truncate select-text">
-                {playerStore.currentSong.album || "Unknown Album"}
+                {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}
               </p>
             {:else}
               <div class="flex flex-col items-center justify-center text-center">
                 <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
-                <h2 class="text-2xl font-bold text-brand-text-primary">No track playing</h2>
-                <p class="text-sm text-brand-text-secondary/60 mt-1">Select a song from your collection to start playing.</p>
+                <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
+                <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
               </div>
             {/if}
           </div>

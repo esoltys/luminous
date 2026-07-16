@@ -2,6 +2,7 @@
   import { themeStore, PREDEFINED_THEMES, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { Plus, Download, Upload, Eye, RotateCcw, Check, X } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { i18n } from "../stores/i18n.svelte";
   import {
     calculateLuminance,
     isLightColor,
@@ -55,25 +56,25 @@
     }
   });
 
-  const bgColorLabels: Record<string, { label: string; description: string }> = {
-    "bg-main": { label: "Main Background", description: "Primary view and content area" },
-    "bg-sidebar": { label: "Sidebar Background", description: "Left navigation panel" },
-    "bg-playerbar": { label: "Player Bar", description: "Bottom playback controls" },
-    "color-accent": { label: "Accent Color", description: "Buttons, highlights, focus states" },
-    "color-accent-hover": { label: "Accent Hover", description: "Hover state for accent elements" },
-    "color-border": { label: "Border Color", description: "Dividers and outlines" }
-  };
+  const bgColorFields: { key: keyof ThemeColors; labelKey: string; descKey: string }[] = [
+    { key: "bg-main", labelKey: "settings.mainViewLabel", descKey: "settings.mainViewDescription" },
+    { key: "bg-sidebar", labelKey: "settings.sidebarLabel", descKey: "settings.sidebarDescription" },
+    { key: "bg-playerbar", labelKey: "settings.playerBarLabel", descKey: "settings.playerBarDescription" },
+    { key: "color-accent", labelKey: "settings.accentLabel", descKey: "settings.accentDescription" },
+    { key: "color-accent-hover", labelKey: "settings.accentHoverLabel", descKey: "settings.accentHoverDescription" },
+    { key: "color-border", labelKey: "settings.bordersLabel", descKey: "settings.bordersDescription" }
+  ];
 
-  const textColorLabels: Record<string, { label: string; description: string }> = {
-    "color-text-primary": { label: "Primary Text", description: "Main readable text" },
-    "color-text-secondary": { label: "Secondary Text", description: "Hints, labels, muted text" }
-  };
+  const textColorFields: { key: keyof ThemeColors; labelKey: string; descKey: string }[] = [
+    { key: "color-text-primary", labelKey: "settings.primaryTextLabel", descKey: "settings.primaryTextDescription" },
+    { key: "color-text-secondary", labelKey: "settings.secondaryTextLabel", descKey: "settings.secondaryTextDescription" }
+  ];
 
-  const backgroundTargets: { bg: keyof ThemeColors; label: string }[] = [
-    { bg: "bg-main", label: "Main" },
-    { bg: "bg-sidebar", label: "Sidebar" },
-    { bg: "bg-playerbar", label: "Player Bar" },
-    { bg: "color-accent", label: "Accent" }
+  const backgroundTargets: { bg: keyof ThemeColors; labelKey: string }[] = [
+    { bg: "bg-main", labelKey: "settings.mainViewLabel" },
+    { bg: "bg-sidebar", labelKey: "settings.sidebarLabel" },
+    { bg: "bg-playerbar", labelKey: "settings.playerBarLabel" },
+    { bg: "color-accent", labelKey: "settings.accentLabel" }
   ];
 
   function initializeTheme() {
@@ -130,7 +131,7 @@
 
   async function saveTheme() {
     if (themeName.trim() === "") {
-      alert("Please enter a theme name");
+      alert(i18n.t('settings.enterThemeNameAlert'));
       return;
     }
 
@@ -172,14 +173,14 @@
 
       if (themeData.colors && typeof themeData.colors === 'object') {
         colorPresets = { ...themeData.colors as ThemeColors };
-        themeName = themeData.name || 'Imported Theme';
+        themeName = themeData.name || i18n.t('settings.importedThemeDefaultName');
         applyLivePreview();
       } else {
-        alert('Invalid theme file format');
+        alert(i18n.t('settings.invalidThemeFile'));
       }
     } catch (e) {
       console.error('Failed to import theme:', e);
-      alert('Failed to import theme. Please check the file format.');
+      alert(i18n.t('settings.importThemeFailed'));
     }
   }
 
@@ -224,11 +225,11 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Main Color Picker -->
     <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-6 space-y-5">
-      <h3 class="font-bold text-sm text-brand-text-primary">Color Palette</h3>
+      <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.colorPalette')}</h3>
 
       <div class="space-y-4">
-        {#each Object.entries(bgColorLabels) as [key, { label, description }]}
-          {@const hexValue = colorPresets[key as keyof ThemeColors]}
+        {#each bgColorFields as { key, labelKey, descKey }}
+          {@const hexValue = colorPresets[key]}
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -237,13 +238,13 @@
                   style="background-color: {hexValue}"
                 ></div>
                 <div>
-                  <p class="text-xs font-semibold text-brand-text-primary">{label}</p>
-                  <p class="text-[10px] text-brand-text-secondary/60">{description}</p>
+                  <p class="text-xs font-semibold text-brand-text-primary">{i18n.t(labelKey)}</p>
+                  <p class="text-[10px] text-brand-text-secondary/60">{i18n.t(descKey)}</p>
                 </div>
               </div>
               <input
                 type="color"
-                bind:value={colorPresets[key as keyof ThemeColors]}
+                bind:value={colorPresets[key]}
                 oninput={applyLivePreview}
                 class="w-12 h-8 rounded cursor-pointer border border-brand-border bg-transparent"
               />
@@ -251,17 +252,17 @@
             <div class="space-y-1">
               <input
                 type="text"
-                bind:value={colorPresets[key as keyof ThemeColors]}
+                bind:value={colorPresets[key]}
                 oninput={applyLivePreview}
                 class="w-full bg-brand-main border border-brand-border rounded px-3 py-2 text-xs font-mono text-brand-text-primary outline-none focus:border-brand-accent"
-                placeholder="#000000"
+                placeholder={i18n.t('settings.hexPlaceholder')}
               />
               <div class="flex items-center justify-between px-1">
                 <span class="text-[10px] text-brand-text-secondary/60">
-                  Luminance: <span class="font-mono">{getLuminancePercent(hexValue)}</span>
+                  {i18n.t('settings.luminanceLabel')} <span class="font-mono">{getLuminancePercent(hexValue)}</span>
                 </span>
-                <span class="text-[10px] font-semibold text-brand-text-secondary" title={isLightColor(hexValue) ? 'Light background - use dark text for contrast' : 'Dark background - use light text for contrast'}>
-                  {isLightColor(hexValue) ? 'Light bg' : 'Dark bg'}
+                <span class="text-[10px] font-semibold text-brand-text-secondary" title={isLightColor(hexValue) ? i18n.t('settings.lightBgTooltip') : i18n.t('settings.darkBgTooltip')}>
+                  {isLightColor(hexValue) ? i18n.t('settings.lightBg') : i18n.t('settings.darkBg')}
                 </span>
               </div>
             </div>
@@ -273,16 +274,16 @@
         onclick={resetColors}
         class="w-full bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
       >
-        <RotateCcw class="w-4 h-4" /> Reset to Current Theme
+        <RotateCcw class="w-4 h-4" /> {i18n.t('settings.resetToCurrentTheme')}
       </button>
     </div>
 
     <!-- Text Colors -->
     <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-6 space-y-6">
-      <h3 class="font-bold text-sm text-brand-text-primary">Text Colors</h3>
+      <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.textColors')}</h3>
 
-      {#each Object.entries(textColorLabels) as [key, { label, description }]}
-        {@const hexValue = colorPresets[key as keyof ThemeColors]}
+      {#each textColorFields as { key, labelKey, descKey }}
+        {@const hexValue = colorPresets[key]}
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -291,23 +292,23 @@
                 style="background-color: {hexValue}"
               ></div>
               <div>
-                <p class="text-xs font-semibold text-brand-text-primary">{label}</p>
-                <p class="text-[10px] text-brand-text-secondary/60">{description}</p>
+                <p class="text-xs font-semibold text-brand-text-primary">{i18n.t(labelKey)}</p>
+                <p class="text-[10px] text-brand-text-secondary/60">{i18n.t(descKey)}</p>
               </div>
             </div>
             <input
               type="color"
-              bind:value={colorPresets[key as keyof ThemeColors]}
+              bind:value={colorPresets[key]}
               oninput={applyLivePreview}
               class="w-12 h-8 rounded cursor-pointer border border-brand-border bg-transparent"
             />
           </div>
           <input
             type="text"
-            bind:value={colorPresets[key as keyof ThemeColors]}
+            bind:value={colorPresets[key]}
             oninput={applyLivePreview}
             class="w-full bg-brand-main border border-brand-border rounded px-3 py-2 text-xs font-mono text-brand-text-primary outline-none focus:border-brand-accent"
-            placeholder="#000000"
+            placeholder={i18n.t('settings.hexPlaceholder')}
           />
 
           <!-- Contrast against every background -->
@@ -315,7 +316,7 @@
             {#each backgroundTargets as target}
               {@const contrast = getContrastMetrics(hexValue, colorPresets[target.bg])}
               <div class="bg-brand-main rounded-lg p-2 flex flex-col items-center gap-1" title={getWcagBadgeText(contrast.compliance.level)}>
-                <span class="text-[9px] text-brand-text-secondary/70">{target.label}</span>
+                <span class="text-[9px] text-brand-text-secondary/70">{i18n.t(target.labelKey)}</span>
                 <div class="flex items-center gap-1">
                   <span class="font-mono text-xs font-bold">{Math.round(contrast.ratio)}:1</span>
                   {#if contrast.compliance.wcagAA}
@@ -331,23 +332,23 @@
       {/each}
 
       <p class="text-[10px] text-brand-text-secondary/60 pt-2 border-t border-brand-border/50">
-        Checkmark = meets WCAG AA (4.5:1 minimum for normal text)
+        {i18n.t('settings.wcagHelpText')}
       </p>
     </div>
   </div>
 
   <!-- Theme Management -->
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-    <h3 class="font-bold text-sm text-brand-text-primary">Save & Export Theme</h3>
+    <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.saveExportTheme')}</h3>
 
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-1.5">
-        <label for="theme-name" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
+        <label for="theme-name" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
         <input
           id="theme-name"
           type="text"
           bind:value={themeName}
-          placeholder="e.g. Ocean Blue, Sunset..."
+          placeholder={i18n.t('settings.themeNamePlaceholder')}
           class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent"
         />
       </div>
@@ -358,22 +359,22 @@
           class="flex-1 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
           {#if isEditing}
-            <Check class="w-4 h-4" /> Save Changes
+            <Check class="w-4 h-4" /> {i18n.t('settings.saveChanges')}
           {:else}
-            <Plus class="w-4 h-4" /> Save as Custom Theme
+            <Plus class="w-4 h-4" /> {i18n.t('settings.saveCustom')}
           {/if}
         </button>
         <button
           onclick={exportTheme}
           class="flex-1 bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          <Download class="w-4 h-4" /> Export Theme
+          <Download class="w-4 h-4" /> {i18n.t('settings.exportTheme')}
         </button>
         <button
           onclick={importTheme}
           class="flex-1 bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
-          <Upload class="w-4 h-4" /> Import Theme
+          <Upload class="w-4 h-4" /> {i18n.t('settings.importTheme')}
         </button>
       </div>
     </div>
@@ -382,13 +383,13 @@
   <!-- UI Preview Section -->
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
     <h3 class="font-bold text-sm text-brand-text-primary flex items-center gap-2">
-      <Eye class="w-4 h-4" /> Live Preview
+      <Eye class="w-4 h-4" /> {i18n.t('settings.livePreview')}
     </h3>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <!-- Sidebar Preview -->
       <div class="space-y-2">
-        <p class="text-xs font-semibold text-brand-text-secondary">Sidebar Preview</p>
+        <p class="text-xs font-semibold text-brand-text-secondary">{i18n.t('settings.sidebarPreview')}</p>
         <div class="rounded-lg overflow-hidden border border-brand-border shadow-sm h-32" style="background-color: {colorPresets['bg-sidebar']}">
           <div class="p-2 space-y-1">
             <div class="h-2 rounded" style="background-color: {colorPresets['color-accent']}; width: 70%;"></div>
@@ -400,7 +401,7 @@
 
       <!-- Main View Preview -->
       <div class="space-y-2">
-        <p class="text-xs font-semibold text-brand-text-secondary">Main View Preview</p>
+        <p class="text-xs font-semibold text-brand-text-secondary">{i18n.t('settings.mainViewPreview')}</p>
         <div class="rounded-lg overflow-hidden border border-brand-border shadow-sm h-32" style="background-color: {colorPresets['bg-main']}">
           <div class="p-2 space-y-2">
             <div class="h-2 rounded" style="background-color: {colorPresets['color-text-primary']}; width: 100%;"></div>
@@ -412,7 +413,7 @@
 
       <!-- Player Bar Preview -->
       <div class="space-y-2">
-        <p class="text-xs font-semibold text-brand-text-secondary">Player Bar Preview</p>
+        <p class="text-xs font-semibold text-brand-text-secondary">{i18n.t('settings.playerBarPreview')}</p>
         <div class="rounded-lg overflow-hidden border border-brand-border shadow-sm h-32" style="background-color: {colorPresets['bg-playerbar']}">
           <div class="p-2 space-y-2">
             <div class="h-2 rounded" style="background-color: {colorPresets['color-accent']}; width: 100%;"></div>

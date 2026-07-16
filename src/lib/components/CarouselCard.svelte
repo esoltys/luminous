@@ -6,6 +6,7 @@
   import { Play } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import type { Song } from "../types";
+  import { i18n } from "../stores/i18n.svelte";
 
   let { item }: { item: HomeItem } = $props();
 
@@ -74,7 +75,7 @@
         <button
           onclick={handlePlay}
           class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg cursor-pointer"
-          title="Play"
+          title={i18n.t('playerBar.play')}
         >
           <Play class="w-6 h-6 fill-current" />
         </button>
@@ -86,12 +87,12 @@
       {#if item.type === "song"}
         <!-- Song Title -->
         <h3 class="text-sm font-semibold text-brand-text-primary truncate" title={item.song.title}>
-          {item.song.title || "Unknown Song"}
+          {item.song.title || i18n.t('collection.unknownSong')}
         </h3>
 
         <!-- Song Artist -->
         <p class="text-xs text-brand-text-secondary truncate" title={item.song.artist}>
-          {item.song.artist || "Unknown Artist"}
+          {item.song.artist || i18n.t('collection.unknownArtist')}
         </p>
 
         <!-- Song Duration -->
@@ -100,8 +101,8 @@
         </p>
       {:else}
         <!-- Album Title -->
-        <h3 class="text-sm font-semibold text-brand-text-primary truncate hover:text-brand-accent-text hover:underline transition-all" title={item.album.album || "Unknown Album"}>
-          {item.album.album || "Unknown Album"}
+        <h3 class="text-sm font-semibold text-brand-text-primary truncate hover:text-brand-accent-text hover:underline transition-all" title={item.album.album || i18n.t('collection.unknownAlbum')}>
+          {item.album.album || i18n.t('collection.unknownAlbum')}
         </h3>
 
         <!-- Album Artist -->
@@ -112,17 +113,17 @@
               collectionStore.viewArtist(item.album.artist || "");
             }}
             class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all truncate cursor-pointer text-left w-full"
-            title="View artist: {item.album.artist}"
+            title={i18n.t('collection.filterByArtist', { artist: item.album.artist })}
           >
             {item.album.artist}
           </button>
         {:else}
-          <p class="text-xs text-brand-text-secondary truncate">Unknown Artist</p>
+          <p class="text-xs text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</p>
         {/if}
 
         <!-- Album Tracks & Year -->
         <p class="text-xs text-brand-text-secondary/60">
-          {item.album.track_count} songs {#if item.album.year}({item.album.year}){/if}
+          {i18n.t('playlists.songsCount', { count: item.album.track_count })} {#if item.album.year}({item.album.year}){/if}
         </p>
       {/if}
     </div>

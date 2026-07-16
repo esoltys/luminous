@@ -9,7 +9,10 @@ export const fr = {
     create: "Créer",
     noPlaylists: "Aucune liste de lecture",
     quickAccess: "Accès rapide",
-    rescanLibrary: "Analyser la bibliothèque"
+    rescanLibrary: "Analyser la bibliothèque",
+    scanning: "Analyse",
+    scanningPhaseTooltip: "Phase d'analyse : {phase} ({scanned}/{total})",
+    scanningPhaseLabel: "Phase : {phase}"
   },
   topNav: {
     goBack: "Retour",
@@ -22,7 +25,9 @@ export const fr = {
     clearSearch: "Effacer la recherche",
     toggleSidebar: "Basculer la barre latérale gauche",
     toggleImmersive: "Basculer l'écran de pochette immersif",
-    toggleRightPanel: "Basculer le panneau droit"
+    toggleRightPanel: "Basculer le panneau droit",
+    resizeSidebar: "Redimensionner la barre latérale gauche",
+    resizeRightPanel: "Redimensionner le panneau droit"
   },
   home: {
     greetingMorning: "Bon matin",
@@ -60,6 +65,7 @@ export const fr = {
     addPlaylistTooltip: "Ajouter à la liste de lecture active",
     editTagsTooltip: "Modifier les métadonnées",
     variousArtists: "Artistes divers",
+    unknownSong: "Chanson inconnue",
     unknownArtist: "Artiste inconnu",
     unknownAlbum: "Album inconnu",
     noAlbumsTitle: "Aucun album trouvé",
@@ -85,7 +91,12 @@ export const fr = {
     sortTracksDesc: "Trier : Pistes (Plus grand nombre)",
     sortTracksAsc: "Trier : Pistes (Moins grand nombre)",
     sortAlbumsDesc: "Trier : Albums (Plus grand nombre)",
-    sortAlbumsAsc: "Trier : Albums (Moins grand nombre)"
+    sortAlbumsAsc: "Trier : Albums (Moins grand nombre)",
+    albumsCount: "{count} albums",
+    oneAlbum: "1 album",
+    lyricsAvailable: "Paroles disponibles",
+    selectPlaylistFirstAlert: "Veuillez sélectionner ou créer une liste de lecture d'abord depuis l'onglet Listes de lecture.",
+    albumPlaylistName: "Album : {name}"
   },
   settings: {
     title: "Paramètres",
@@ -134,7 +145,35 @@ export const fr = {
     excluded: "Exclu",
     selectMusicDirectory: "Sélectionner le répertoire de musique",
     confirmRemoveFolder: "Arrêter de surveiller le dossier : {path} ?\nLes chansons de ce dossier ne seront pas supprimées de vos listes de lecture mais seront marquées comme indisponibles.",
-    enterThemeNameAlert: "Veuillez saisir un nom pour votre thème personnalisé."
+    enterThemeNameAlert: "Veuillez saisir un nom pour votre thème personnalisé.",
+    mainViewDescription: "Vue principale et zone de contenu",
+    sidebarDescription: "Panneau de navigation gauche",
+    playerBarDescription: "Contrôles de lecture en bas",
+    accentDescription: "Boutons, surlignages, états de focus",
+    accentHoverDescription: "État de survol des éléments d'accentuation",
+    bordersDescription: "Séparateurs et contours",
+    primaryTextDescription: "Texte principal lisible",
+    secondaryTextDescription: "Indices, étiquettes, texte atténué",
+    colorPalette: "Palette de couleurs",
+    resetToCurrentTheme: "Réinitialiser au thème actuel",
+    textColors: "Couleurs du texte",
+    wcagHelpText: "Coche = conforme WCAG AA (minimum 4,5:1 pour le texte normal)",
+    saveExportTheme: "Enregistrer et exporter le thème",
+    exportTheme: "Exporter le thème",
+    importTheme: "Importer un thème",
+    livePreview: "Aperçu en direct",
+    sidebarPreview: "Aperçu de la barre latérale",
+    mainViewPreview: "Aperçu de la vue principale",
+    playerBarPreview: "Aperçu de la barre de lecture",
+    luminanceLabel: "Luminance :",
+    lightBg: "Fond clair",
+    darkBg: "Fond sombre",
+    lightBgTooltip: "Fond clair - utilisez du texte sombre pour le contraste",
+    darkBgTooltip: "Fond sombre - utilisez du texte clair pour le contraste",
+    hexPlaceholder: "#000000",
+    invalidThemeFile: "Format de fichier de thème invalide",
+    importThemeFailed: "Échec de l'importation du thème. Veuillez vérifier le format du fichier.",
+    importedThemeDefaultName: "Thème importé"
   },
   playlists: {
     title: "Listes de lecture",
@@ -187,7 +226,8 @@ export const fr = {
     plainTextNotice: "Paroles synchronisées non disponibles. Affichage du texte brut.",
     retrySearch: "Réessayer la recherche",
     editorLabel: "Texte des paroles (brut ou format synchronisé LRC)",
-    editorPlaceholder: "Coller les paroles au format LRC synchronisé ou texte brut ici..."
+    editorPlaceholder: "Coller les paroles au format LRC synchronisé ou texte brut ici...",
+    saveFailedPrefix: "Échec de l'enregistrement des paroles : "
   },
   playerBar: {
     previous: "Piste précédente",
@@ -196,7 +236,18 @@ export const fr = {
     next: "Piste suivante",
     repeat: "Répéter",
     shuffle: "Lecture aléatoire",
+    shuffleOff: "Désactivé",
+    shuffleAll: "Tout",
+    shuffleInsideAlbum: "Dans l'album",
+    shuffleAlbums: "Albums",
+    shuffleArtists: "Artistes",
+    repeatOff: "Désactivé",
+    repeatSong: "Chanson",
+    repeatAlbum: "Album",
+    repeatPlaylist: "Liste de lecture",
+    repeatOneByOne: "Une à la fois",
     volume: "Volume",
+    volumeSlider: "Curseur de volume",
     queueTitle: "File d'attente",
     historyTitle: "Historique d'écoute",
     queueTab: "File ({count})",
@@ -205,8 +256,6 @@ export const fr = {
     clearHistory: "Effacer l'historique",
     nowPlaying: "Lecture en cours",
     notPlaying: "Rien en cours de lecture",
-    unknownTrack: "Piste inconnue",
-    unknownArtist: "Artiste inconnu",
     lyricsTooltip: "Afficher les paroles",
     equalizerTooltip: "Afficher l'égaliseur",
     visualizerTooltip: "Activer/désactiver le visualiseur",
@@ -239,7 +288,10 @@ export const fr = {
     discField: "Disque",
     lookupAcoustID: "Rechercher AcoustID",
     lookingUp: "Recherche...",
-    matched: "Correspondance !"
+    matched: "Correspondance !",
+    acoustidFpcalcError: "La recherche AcoustID nécessite l'utilitaire « fpcalc ». Assurez-vous que « libchromaprint-tools » est installé sur votre système Linux, ou configurez « FPCALC_PATH ».",
+    acoustidApiKeyError: "La clé API AcoustID est invalide ou a expiré. Veuillez obtenir une clé API client gratuite sur https://acoustid.org/ et exécuter Luminous avec la variable d'environnement « ACOUSTID_API_KEY » définie.",
+    saveFailedPrefix: "Échec de l'enregistrement des tags : "
   },
   equalizer: {
     title: "Égaliseur graphique à 10 bandes",
@@ -267,5 +319,32 @@ export const fr = {
     "nordic-blue": "Bleu nordique",
     "retro-amber": "Ambre rétro",
     "dynamic-artwork": "Pochette dynamique"
+  },
+  artistDetail: {
+    backToArtists: "Retour aux artistes",
+    unknownGenre: "Genre inconnu",
+    statsLine: "{genre} · {albumCount} albums • {songCount} chansons • {duration} au total",
+    playAll: "Tout lire",
+    shuffleAndPlay: "Lecture aléatoire",
+    discography: "Discographie",
+    showLess: "Afficher moins",
+    showAll: "Afficher tout",
+    popularReleases: "Sorties populaires",
+    albumsFilter: "Albums",
+    singlesAndEps: "Singles et EPs",
+    singleEp: "Single/EP",
+    noReleasesFound: "Aucune sortie trouvée.",
+    playlistsFeaturing: "Listes de lecture avec {artist}"
+  },
+  immersive: {
+    emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
+  },
+  common: {
+    scrollLeft: "Défiler vers la gauche",
+    scrollRight: "Défiler vers la droite",
+    albumArtAlt: "Pochette d'album",
+    enableLogoPulse: "Cliquez pour activer la pulsation du logo",
+    disableLogoPulse: "Cliquez pour désactiver la pulsation du logo",
+    toggleLogoPulsing: "Basculer la pulsation du logo Luminous"
   }
 };
