@@ -77,7 +77,8 @@ luminous/
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
 │   │   ├── stores/           # Global stores (player, collection, playlists, theme)
-│   │   └── types/            # Frontend interfaces
+│   │   ├── types/            # Frontend interfaces
+│   │   └── utils/            # Shared utilities (color parsing, accessibility, etc.)
 │   └── routes/               # Layouts and navigation views
 └── src-tauri/                # Tauri + Rust Backend Core
     ├── src/
@@ -87,15 +88,16 @@ luminous/
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
     │   ├── equalizer.rs      # Biquad filter DSP configurations
+    │   ├── lib.rs            # Library entry point, background loops, & IPC registry
     │   ├── lyrics.rs         # LRCLIB & Lyrics.ovh client integrations
+    │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
     │   ├── models.rs         # Shared structs and types
     │   ├── moodbar.rs        # Spectral audio analysis scanner
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
     │   ├── playlist.rs       # Playlist manager & undo/redo command stack
     │   ├── tageditor.rs      # lofty tag writer & AcoustID fingerprint generator
     │   ├── waveform.rs       # Background audio peak analyzer
-    │   ├── commands/         # Tauri IPC command handlers
-    │   └── lib.rs            # App entry point, background loops, & IPC registry
+    │   └── commands/         # Tauri IPC command handlers
     └── Cargo.toml            # Rust dependencies (cpal, symphonia, rusqlite, lofty, rustfft)
 ```
 
