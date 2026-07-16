@@ -106,8 +106,22 @@
     }
   }
 
+  async function handleAddAlbumToPlaylist() {
+    if (songs.length === 0) return;
+    if (playlistsStore.activePlaylistId !== null) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map((s) => s.id));
+    } else {
+      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+    }
+  }
+
   function openTagEditor(songId: number) {
     editingSongId = songId;
+  }
+
+  function openAlbumTagEditor() {
+    if (songs.length === 0) return;
+    openTagEditor(songs[0].id);
   }
 
   function handleTagEditorSaved() {
@@ -185,6 +199,8 @@
           <span>{yearLabel}</span>
           <span>•</span>
         {/if}
+        <span>{i18n.t('playlists.songsCount', { count: songs.length })}</span>
+        <span>•</span>
         {#if isLossless}
           <span class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30 shadow-sm shrink-0">
             {i18n.t('albumDetail.lossless')}
@@ -210,6 +226,22 @@
         >
           <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
         </button>
+        <button
+          onclick={handleAddAlbumToPlaylist}
+          disabled={loading || songs.length === 0}
+          title={i18n.t('albumDetail.addAllToPlaylistTooltip')}
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+        >
+          <Plus class="w-4 h-4" />
+        </button>
+        <button
+          onclick={openAlbumTagEditor}
+          disabled={loading || songs.length === 0}
+          title={i18n.t('albumDetail.editInfoTooltip')}
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+        >
+          <Edit3 class="w-4 h-4" />
+        </button>
       </div>
     </div>
   </div>
@@ -219,10 +251,11 @@
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/30 overflow-hidden">
       <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-        <div class="grid grid-cols-[36px_40px_1fr_60px_80px] items-center py-2.5 px-4">
+        <div class="grid grid-cols-[36px_40px_1fr_60px_60px_80px] items-center py-2.5 px-4">
           <div class="text-center w-9"></div>
           <div class="text-left">{i18n.t('collection.tableHeaderTrack')}</div>
           <div class="text-left">{i18n.t('collection.tableHeaderTitle')}</div>
+          <div class="text-center">{i18n.t('collection.tableHeaderPlays')}</div>
           <div class="text-center">
             <Clock class="w-3.5 h-3.5 mx-auto" />
           </div>
@@ -247,7 +280,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
               ondblclick={() => handlePlaySong(song)}
-              class="grid grid-cols-[36px_40px_1fr_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
+              class="grid grid-cols-[36px_40px_1fr_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
                 {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
             >
               <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -283,6 +316,10 @@
                     LRC
                   </span>
                 {/if}
+              </div>
+
+              <div class="text-center text-brand-text-secondary/80 font-medium">
+                {song.playcount ?? 0}
               </div>
 
               <div class="text-center text-brand-text-secondary/80 font-medium">

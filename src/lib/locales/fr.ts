@@ -56,6 +56,7 @@ export const fr = {
     tableHeaderTitle: "Titre",
     tableHeaderArtist: "Artiste",
     tableHeaderAlbum: "Album",
+    tableHeaderPlays: "Lectures",
     tableHeaderDuration: "Durée",
     tableHeaderActions: "Actions",
     playSong: "Lire la chanson",
@@ -340,7 +341,9 @@ export const fr = {
     backToAlbums: "Retour aux albums",
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
-    lossless: "Sans perte"
+    lossless: "Sans perte",
+    addAllToPlaylistTooltip: "Ajouter toutes les chansons à la playlist active",
+    editInfoTooltip: "Modifier les infos de l'album"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
