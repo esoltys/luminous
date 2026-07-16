@@ -4,14 +4,14 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.50.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
-[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-50%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Release](https://img.shields.io/badge/Release-0.60.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-60%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface.
 
 ### Downloads
 
-You can download the latest installers and portable binaries directly from the [GitHub Releases](https://github.com/esoltys/luminous/releases/latest) page:
+You can download the latest installers and portable binaries directly from the GitHub Releases page:
 
 * **🐧 Linux** — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
 * **🪟 Windows** — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
@@ -55,16 +55,16 @@ You can download the latest installers and portable binaries directly from the [
 
 ## Product Highlights
 
-*   **Home Discovery & Personalized Curation**: Start your listening with a personalized home hub featuring time-of-day greetings and three smart curation rows: Recently Played, Most Played, and Recently Added. Browse your music with album cover carousels and discover tracks at a glance.
-*   **Dynamic Theme Engine & Customizer**: Switch between curated, elegant color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the app live.
-*   **Immersive Audio Visualizers**: View your sound with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
-*   **10-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and style-based presets.
-*   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched from LRCLIB and plain text from Lyrics.ovh, complete with local caching and visual lyrics indicators.
-*   **AcoustID Audio Fingerprinting & Tag Editor**: Automatically identify tracks and fix incorrect metadata using AcoustID acoustic fingerprinting (via `fpcalc`) and write edits directly back to your audio files.
-*   **High-Performance Library Scanning**: Index thousands of local tracks (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds using an incremental scanner that skips unchanged files based on modification times.
+*   **Personalized Home Hub**: Start your listening with a tailored dashboard featuring time-of-day greetings and smart curation rows: Recently Played, Most Played, and Recently Added. Browse your library with interactive cover art carousels and discover tracks at a glance.
+*   **Instant Search and Navigation**: Locate any track, album, or artist in your collection instantly using database-level SQLite FTS5 (Full-Text Search) with split-second response times.
+*   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds using an incremental scanner that intelligently skips unchanged files based on modification times.
+*   **Immersive Audio Visualizers**: View your music with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
+*   **Ten-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer featuring an interactive Catmull-Rom spline visualization and custom presets for various music genres.
+*   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched automatically from LRCLIB or plain text from Lyrics.ovh, complete with local caching and visual synced-lyrics indicators.
+*   **AcoustID Fingerprinting and Tag Editor**: Automatically identify tracks and correct metadata using AcoustID acoustic fingerprinting (via `fpcalc`), and write tags directly back to your local files.
 *   **Smart Cover Art Engine**: Extract embedded artwork automatically using lofty tag parsing, with automatic iTunes Search API fallback and local file deduplication.
-*   **Instant Search**: Locate any track, album, or artist in your collection instantly using database-level SQLite FTS5 (Full-Text Search).
-*   **Seamless State Preservation**: Never lose your place. Luminous automatically restores your active sidebar, playlist selections, player volume, queue state, and equalizer configuration when reopened.
+*   **Dynamic Theme Engine**: Switch between curated color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the application interface live.
+*   **Seamless State Preservation**: Never lose your place. Luminous automatically restores your active sidebar width, playlist selections, player volume, queue state, and equalizer configuration when the application is reopened.
 
 ---
 
