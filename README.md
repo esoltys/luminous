@@ -176,11 +176,7 @@ To enable AcoustID audio fingerprinting and automatic metadata lookup, you need 
     sudo apt install libchromaprint-tools
     ```
 *   **Windows**:
-    Download the binary from the [AcoustID Website](https://acoustid.org/chromaprint), extract it, and add the folder containing `fpcalc.exe` to your system `PATH`. Alternatively, you can set the `FPCALC_PATH` environment variable pointing directly to the binary:
-    ```powershell
-    # Windows PowerShell
-    $env:FPCALC_PATH="C:\path\to\fpcalc.exe"
-    ```
+    Download the binary from the [AcoustID Website](https://acoustid.org/chromaprint), extract it, and add the folder containing `fpcalc.exe` to your system `PATH`. Alternatively, you can set the `FPCALC_PATH` environment variable pointing directly to the binary.
 
 #### 2. Get and Set an AcoustID API Key
 1. Register or log in to the [AcoustID Website](https://acoustid.org/).
@@ -208,14 +204,4 @@ To run the standard cargo unit test suite:
 ```bash
 cd src-tauri
 cargo test
-```
-
-### Backend BDD Features (Cucumber)
-
-Luminous features are defined using Cucumber Gherkin specifications in the `features/` directory and implemented as integration tests in Rust using the `cucumber` crate.
-
-To run the Cucumber BDD test suite:
-```bash
-cd src-tauri
-cargo test --test equalizer_bdd
 ```
