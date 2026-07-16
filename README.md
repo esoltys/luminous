@@ -6,8 +6,10 @@
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
 [![Release](https://img.shields.io/badge/Release-0.60.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-60%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Made in Canada](https://img.shields.io/badge/Made%20in-Canada-FF0000?style=flat-square)](CREDITS.md)
+[![Language](https://img.shields.io/badge/Language-English%20%7C%20Fran%C3%A7ais-4B8BBE?style=flat-square)](#)
 
-Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface.
+Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. Made in Canada 🍁 and available in both English and French.
 
 ### Downloads
 
@@ -64,6 +66,7 @@ You can download the latest installers and portable binaries directly from the G
 *   **AcoustID Fingerprinting and Tag Editor**: Automatically identify tracks and correct metadata using AcoustID acoustic fingerprinting (via `fpcalc`), and write tags directly back to your local files.
 *   **Smart Cover Art Engine**: Extract embedded artwork automatically using lofty tag parsing, with automatic iTunes Search API fallback and local file deduplication.
 *   **Dynamic Theme Engine**: Switch between curated color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the application interface live.
+*   **Bilingual Interface**: Made in Canada 🍁 — the entire UI is fully translated between English and French, switchable instantly from the General settings tab.
 *   **Seamless State Preservation**: Never lose your place. Luminous automatically restores your active sidebar width, playlist selections, player volume, queue state, and equalizer configuration when the application is reopened.
 
 ---
