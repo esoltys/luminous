@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { Music, Disc, LoaderCircle } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     songId: number | undefined;
@@ -99,7 +100,7 @@
   {#if imgSrc && !hasFailed}
     <img
       src={imgSrc}
-      alt="Album Art"
+      alt={i18n.t('common.albumArtAlt')}
       class="w-full h-full object-cover transition-opacity duration-300 {isLoading ? 'opacity-0' : 'opacity-100'} {animateSpin ? 'animate-spin' : ''}"
       style={animateSpin ? "animation-duration: 6s;" : ""}
       onerror={() => {

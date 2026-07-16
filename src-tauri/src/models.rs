@@ -409,3 +409,23 @@ pub struct LibraryStats {
     pub total_duration_nanosec: i64,
     pub total_filesize_bytes: i64,
 }
+
+/// Represents an album summary on the Home page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlbumItem {
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub year: Option<i32>,
+    pub track_count: i32,
+    pub art_embedded: bool,
+    pub art_automatic: Option<String>,
+    pub art_manual: Option<String>,
+}
+
+/// Represents a dynamic item in the Home curation carousels (either a Song or an Album).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum HomeItem {
+    Song { song: Song },
+    Album { album: AlbumItem },
+}

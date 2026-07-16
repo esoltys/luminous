@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
+  import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
   import TagEditor from "./TagEditor.svelte";
 
@@ -157,7 +158,7 @@
       <div class="flex items-center gap-3">
         <ListMusic class="w-5 h-5 text-brand-accent-text" />
         <h2 class="text-base font-bold text-brand-text-primary">{activePlaylist.name}</h2>
-        <span class="text-xs text-brand-text-secondary/60 font-medium">({playlistsStore.activePlaylistTracks.length} tracks)</span>
+        <span class="text-xs text-brand-text-secondary/60 font-medium">({activePlaylist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: activePlaylist.track_count })})</span>
       </div>
 
       <div class="flex items-center gap-3">
@@ -165,14 +166,14 @@
         <button
           onclick={() => playlistsStore.undo()}
           class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title="Undo last playlist operation"
+          title={i18n.t('playlists.undoTooltip', {}, "Undo last playlist operation")}
         >
           <RotateCcw class="w-4 h-4" />
         </button>
         <button
           onclick={() => playlistsStore.redo()}
           class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title="Redo last playlist operation"
+          title={i18n.t('playlists.redoTooltip', {}, "Redo last playlist operation")}
         >
           <RotateCw class="w-4 h-4" />
         </button>
@@ -180,17 +181,18 @@
           <button
             onclick={removeUnavailableTracks}
             class="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
-            title="Remove all {unavailableCount} unavailable track{unavailableCount === 1 ? '' : 's'} from playlist"
+            title={i18n.t('playlists.removeUnavailableTooltip', { count: unavailableCount })}
           >
             <AlertTriangle class="w-3.5 h-3.5" />
-            Remove {unavailableCount} unavailable
+            {i18n.t('playlists.removeUnavailableBtn', { count: unavailableCount })}
           </button>
         {/if}
         <button
           onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
           class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-primary px-3 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
+          title={i18n.t('playlists.clearPlaylistTooltip')}
         >
-          Clear Playlist
+          {i18n.t('playlists.clearPlaylistBtn', {}, "Clear Playlist")}
         </button>
       </div>
     </div>
@@ -201,12 +203,12 @@
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">#</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">Title</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">Artist</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">Album</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">Duration</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">Actions</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">{i18n.t('playlists.tableHeaderTrack')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderTitle')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderArtist')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('collection.tableHeaderAlbum')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">{i18n.t('playlists.tableHeaderDuration')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t('collection.tableHeaderActions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -249,7 +251,7 @@
                       onclick={() => !unavailable && handlePlayPlaylistItem(index)}
                       class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
                       disabled={unavailable}
-                      title="Play track"
+                      title={i18n.t('playlists.playTrack')}
                     >
                       <Play class="w-4 h-4 fill-current" />
                     </button>
@@ -259,29 +261,29 @@
                   <div class="flex items-center gap-2 max-w-full">
                     {#if unavailable}
                       <!-- Unavailable track: show warning icon + last known title -->
-                      <span title="File not found on disk">
+                      <span title={i18n.t('playlists.fileNotFoundTooltip', {}, "File not found on disk")}>
                         <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
                       </span>
                       <span class="truncate line-through decoration-brand-text-secondary/40">
-                        {item.song?.title ?? "Unknown Title"}
+                        {item.song?.title ?? i18n.t('collection.unknownSong')}
                       </span>
                     {:else if item.song?.title}
                       <button
                         onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
                         class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                        title="Filter by title: {item.song.title}"
+                        title={i18n.t('collection.filterByTitle', { title: item.song.title })}
                       >
                         {item.song.title}
                       </button>
                     {:else}
-                      <span class="truncate">Unknown Title</span>
+                      <span class="truncate">{i18n.t('collection.unknownSong')}</span>
                     {/if}
                     {#if item.song && !unavailable}
                       <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                         {item.song.filetype}
                       </span>
                       {#if item.song.lyrics && item.song.lyrics.trim() !== ""}
-                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title="Lyrics available">
+                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
                           LRC
                         </span>
                       {/if}
@@ -290,17 +292,17 @@
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
                   {#if unavailable}
-                    <span class="text-brand-text-secondary/40 italic text-xs">File not found</span>
+                    <span class="text-brand-text-secondary/40 italic text-xs">{i18n.t('playlists.fileNotFoundText', {}, "File not found")}</span>
                   {:else if item.song?.artist}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
-                      title="View artist: {item.song.artist}"
+                      title={i18n.t('collection.filterByArtist', { artist: item.song.artist })}
                     >
                       {item.song.artist}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">Unknown Artist</span>
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
@@ -310,12 +312,12 @@
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.album || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
-                      title="Filter by album: {item.song.album}"
+                      title={i18n.t('collection.filterByAlbum', { album: item.song.album })}
                     >
                       {item.song.album}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">Unknown Album</span>
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
@@ -324,7 +326,7 @@
                     <button
                       onclick={() => item.song?.id && !unavailable && openTagEditor(item.song.id)}
                       class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30"
-                      title="Edit tags"
+                      title={i18n.t('collection.editTagsTooltip')}
                       disabled={!item.song || unavailable}
                     >
                       <Edit3 class="w-4 h-4" />
@@ -332,7 +334,7 @@
                     <button
                       onclick={() => handleRemoveItem(item.uuid)}
                       class="text-brand-text-secondary/60 hover:text-red-400 transition-colors"
-                      title="Remove from playlist"
+                      title={i18n.t('playlists.removeFromPlaylist')}
                     >
                       <Trash2 class="w-4 h-4" />
                     </button>
@@ -344,7 +346,7 @@
               <tr>
                 <td colspan="6" class="py-12 text-center text-brand-text-secondary/45">
                   <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
-                  Playlist is empty. Add songs from the Collection tab.
+                  {i18n.t('playlists.emptyPlaylistTitle')}. {i18n.t('playlists.emptyPlaylistText')}
                 </td>
               </tr>
             {/if}
@@ -356,8 +358,8 @@
     <!-- No playlist selected -->
     <div class="flex-1 flex flex-col items-center justify-center text-brand-text-secondary/60">
       <ListMusic class="w-16 h-16 mb-4 text-brand-text-secondary/30" />
-      <h2 class="text-lg font-bold text-brand-text-secondary/80 mb-1">No Playlist Selected</h2>
-      <p class="text-sm">Create or select a playlist from the sidebar to start.</p>
+      <h2 class="text-lg font-bold text-brand-text-secondary/80 mb-1">{i18n.t('playlists.noPlaylistsTitle')}</h2>
+      <p class="text-sm">{i18n.t('playlists.noPlaylistsText')}</p>
     </div>
   {/if}
 </div>

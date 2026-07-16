@@ -4,6 +4,7 @@
   import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     songId: number;
@@ -88,9 +89,9 @@
       console.error("AcoustID lookup failed:", e);
       const str = e.toString();
       if (str.includes("fpcalc") || str.includes("chromaprint")) {
-        lookupErrorMsg = "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.";
+        lookupErrorMsg = i18n.t('tagEditor.acoustidFpcalcError');
       } else if (str.includes("invalid API key") || str.includes("API key")) {
-        lookupErrorMsg = "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.";
+        lookupErrorMsg = i18n.t('tagEditor.acoustidApiKeyError');
       } else {
         lookupErrorMsg = str;
       }
@@ -123,7 +124,7 @@
       onClose();
     } catch (e: any) {
       console.error("Failed to save tags:", e);
-      alert("Failed to save tags: " + e.toString());
+      alert(i18n.t('tagEditor.saveFailedPrefix') + e.toString());
     } finally {
       isSaving = false;
     }
@@ -138,7 +139,7 @@
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
         <Sliders class="w-4 h-4 text-brand-accent-text" />
-        <h3 class="text-sm font-bold">Edit Track Metadata</h3>
+        <h3 class="text-sm font-bold">{i18n.t('tagEditor.title')}</h3>
       </div>
       <button onclick={onClose} disabled={isSaving} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50">
         <X class="w-4 h-4" />
@@ -150,19 +151,19 @@
       {#if isLoading}
         <div class="w-full py-16 flex flex-col items-center justify-center gap-3">
           <LoaderCircle class="w-6 h-6 animate-spin text-brand-accent-text" />
-          <span class="text-xs text-brand-text-secondary/60 font-medium">Reading tags...</span>
+          <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('tagEditor.readingTags')}</span>
         </div>
       {:else if errorMsg}
         <div class="w-full py-12 flex flex-col items-center justify-center gap-3 text-center">
           <AlertTriangle class="w-8 h-8 text-red-500" />
-          <p class="text-sm font-semibold text-red-400">Failed to read tags</p>
+          <p class="text-sm font-semibold text-red-400">{i18n.t('tagEditor.readFailed')}</p>
           <p class="text-xs text-brand-text-secondary/65 max-w-xs">{errorMsg}</p>
         </div>
       {:else}
         <div class="flex flex-col gap-4">
           <!-- File Path (read-only) -->
           <div class="flex flex-col gap-1 bg-brand-main border border-brand-border rounded-lg p-2.5">
-            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">Location</span>
+            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.locationField')}</span>
             <span class="text-[10px] text-brand-text-secondary break-all select-text font-mono">{path}</span>
           </div>
 
@@ -178,7 +179,7 @@
           <div class="grid grid-cols-2 gap-4">
             <!-- Title -->
             <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-title" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Title</label>
+              <label for="tag-title" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.titleField')}</label>
               <input
                 id="tag-title"
                 bind:value={title}
@@ -189,7 +190,7 @@
 
             <!-- Artist -->
             <div class="flex flex-col gap-1">
-              <label for="tag-artist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Artist</label>
+              <label for="tag-artist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.artistField')}</label>
               <input
                 id="tag-artist"
                 bind:value={artist}
@@ -200,7 +201,7 @@
 
             <!-- Album -->
             <div class="flex flex-col gap-1">
-              <label for="tag-album" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Album</label>
+              <label for="tag-album" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.albumField')}</label>
               <input
                 id="tag-album"
                 bind:value={album}
@@ -211,7 +212,7 @@
 
             <!-- Album Artist -->
             <div class="flex flex-col gap-1">
-              <label for="tag-albumartist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Album Artist</label>
+              <label for="tag-albumartist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.albumArtistField')}</label>
               <input
                 id="tag-albumartist"
                 bind:value={albumArtist}
@@ -222,7 +223,7 @@
 
             <!-- Composer -->
             <div class="flex flex-col gap-1">
-              <label for="tag-composer" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Composer</label>
+              <label for="tag-composer" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.composerField')}</label>
               <input
                 id="tag-composer"
                 bind:value={composer}
@@ -233,7 +234,7 @@
 
             <!-- Genre -->
             <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-genre" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Genre</label>
+              <label for="tag-genre" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.genreField')}</label>
               <input
                 id="tag-genre"
                 bind:value={genre}
@@ -244,7 +245,7 @@
 
             <!-- Year -->
             <div class="flex flex-col gap-1">
-              <label for="tag-year" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Year</label>
+              <label for="tag-year" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.yearField')}</label>
               <input
                 id="tag-year"
                 type="number"
@@ -260,7 +261,7 @@
 
             <!-- Track Number -->
             <div class="flex flex-col gap-1">
-              <label for="tag-track" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Track</label>
+              <label for="tag-track" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.trackField')}</label>
               <input
                 id="tag-track"
                 type="number"
@@ -276,7 +277,7 @@
 
             <!-- Disc Number -->
             <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-disc" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">Disc</label>
+              <label for="tag-disc" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.discField')}</label>
               <input
                 id="tag-disc"
                 type="number"
@@ -305,16 +306,16 @@
           >
             {#if isLookingUp}
               <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent-text" />
-              Looking up...
+              {i18n.t('tagEditor.lookingUp')}
             {:else}
               <Sparkles class="w-3.5 h-3.5 text-brand-accent-text" />
-              Lookup AcoustID
+              {i18n.t('tagEditor.lookupAcoustID')}
             {/if}
           </button>
           {#if lookupSucceeded}
             <div in:fade class="flex items-center gap-1.5 text-emerald-500 text-xs font-semibold">
               <Check class="w-3.5 h-3.5 font-bold animate-bounce" />
-              <span>Matched!</span>
+              <span>{i18n.t('tagEditor.matched')}</span>
             </div>
           {/if}
         </div>
@@ -328,7 +329,7 @@
           disabled={isSaving}
           class="bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all"
         >
-          Cancel
+          {i18n.t('tagEditor.cancelBtn')}
         </button>
         <button
           onclick={handleSave}
@@ -337,10 +338,10 @@
         >
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-            Saving...
+            {i18n.t('tagEditor.updatingTags')}
           {:else}
             <Save class="w-3.5 h-3.5" />
-            Save Tags
+            {i18n.t('tagEditor.saveBtn')}
           {/if}
         </button>
       </div>

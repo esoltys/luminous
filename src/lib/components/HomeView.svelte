@@ -4,30 +4,31 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import type { Song } from "../types";
+  import type { HomeItem } from "../types";
   import CurationCarousel from "./CurationCarousel.svelte";
   import { Disc3 } from "lucide-svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
-  let recentlyPlayed = $state<Song[]>([]);
-  let frequentlyPlayed = $state<Song[]>([]);
-  let recentlyAdded = $state<Song[]>([]);
+  let recentlyPlayed = $state<HomeItem[]>([]);
+  let frequentlyPlayed = $state<HomeItem[]>([]);
+  let recentlyAdded = $state<HomeItem[]>([]);
   let isLoading = $state(true);
 
   function getTimeOfDayGreeting(): string {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return "Good Morning";
-    if (hour >= 12 && hour < 17) return "Good Afternoon";
-    if (hour >= 17 && hour < 21) return "Good Evening";
-    return "Good Night";
+    if (hour >= 5 && hour < 12) return i18n.t("home.greetingMorning");
+    if (hour >= 12 && hour < 17) return i18n.t("home.greetingAfternoon");
+    if (hour >= 17 && hour < 21) return i18n.t("home.greetingEvening");
+    return i18n.t("home.greetingNight");
   }
 
   async function loadCuratedData() {
     isLoading = true;
     try {
       const [recent, frequent, added] = await Promise.all([
-        invoke<Song[]>("get_recently_played", { limit: 10 }),
-        invoke<Song[]>("get_most_frequently_played", { limit: 10 }),
-        invoke<Song[]>("get_recently_added", { limit: 10 }),
+        invoke<HomeItem[]>("get_recently_played", { limit: 10 }),
+        invoke<HomeItem[]>("get_most_frequently_played", { limit: 10 }),
+        invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
       ]);
       recentlyPlayed = recent;
       frequentlyPlayed = frequent;
@@ -53,23 +54,23 @@
         {getTimeOfDayGreeting()}
       </h1>
       <p class="text-sm text-brand-text-secondary mt-1">
-        Explore your music collection
+        {i18n.t('home.exploreSub')}
       </p>
     </div>
 
     <div class="px-6 pt-4 space-y-12">
     {#if isLoading}
       <div class="flex items-center justify-center h-64">
-        <div class="text-brand-text-secondary">Loading your collection...</div>
+        <div class="text-brand-text-secondary">{i18n.t('home.loading')}</div>
       </div>
     {:else}
       <!-- Recently Played Section -->
       {#if recentlyPlayed.length > 0}
         <div>
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            Recently Played
+            {i18n.t('home.recentlyPlayed')}
           </h2>
-          <CurationCarousel songs={recentlyPlayed} />
+          <CurationCarousel items={recentlyPlayed} />
         </div>
       {/if}
 
@@ -77,9 +78,9 @@
       {#if frequentlyPlayed.length > 0}
         <div>
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            Most Played
+            {i18n.t('home.mostPlayed')}
           </h2>
-          <CurationCarousel songs={frequentlyPlayed} />
+          <CurationCarousel items={frequentlyPlayed} />
         </div>
       {/if}
 
@@ -87,9 +88,9 @@
       {#if recentlyAdded.length > 0}
         <div>
           <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            Recently Added
+            {i18n.t('home.recentlyAdded')}
           </h2>
-          <CurationCarousel songs={recentlyAdded} />
+          <CurationCarousel items={recentlyAdded} />
         </div>
       {/if}
 
@@ -98,7 +99,7 @@
         <div class="flex flex-col items-center justify-center h-64 text-center">
           <Disc3 class="w-16 h-16 text-brand-text-secondary/30 mb-4" />
           <p class="text-brand-text-secondary">
-            Start adding music to see your personalized collections
+            {i18n.t('home.emptyState')}
           </p>
         </div>
       {/if}

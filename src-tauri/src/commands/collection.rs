@@ -1,6 +1,6 @@
 use crate::{
     collection::CollectionScanner,
-    models::{LibraryStats, MusicDirectory, Song},
+    models::{HomeItem, LibraryStats, MusicDirectory, Song},
     AppState,
 };
 use tauri::{AppHandle, State};
@@ -109,7 +109,7 @@ pub async fn get_artists(state: State<'_, AppState>) -> Result<Vec<serde_json::V
 pub async fn get_recently_played(
     limit: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<Vec<Song>, String> {
+) -> Result<Vec<HomeItem>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .get_recently_played(limit.unwrap_or(10))
@@ -120,7 +120,7 @@ pub async fn get_recently_played(
 pub async fn get_most_frequently_played(
     limit: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<Vec<Song>, String> {
+) -> Result<Vec<HomeItem>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .get_most_frequently_played(limit.unwrap_or(10))
@@ -131,7 +131,7 @@ pub async fn get_most_frequently_played(
 pub async fn get_recently_added(
     limit: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<Vec<Song>, String> {
+) -> Result<Vec<HomeItem>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .get_recently_added(limit.unwrap_or(10))

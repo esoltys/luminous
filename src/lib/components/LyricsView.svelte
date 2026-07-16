@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { FileText, Edit3, Save, X, RefreshCw, LoaderCircle } from "lucide-svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   interface LyricLine {
     timeMs: number;
@@ -133,7 +134,7 @@
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
-      alert("Failed to save lyrics: " + e.toString());
+      alert(i18n.t('lyrics.saveFailedPrefix') + e.toString());
     }
   }
 
@@ -170,10 +171,10 @@
       <FileText class="w-6 h-6 text-brand-accent-text" />
       <div>
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary">
-          {playerStore.currentSong ? playerStore.currentSong.title : "No song playing"}
+          {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">
-          {playerStore.currentSong ? `${playerStore.currentSong.artist || "Unknown Artist"} — ${playerStore.currentSong.album || "Unknown Album"}` : "Select a track to view lyrics"}
+          {playerStore.currentSong ? `${playerStore.currentSong.artist || i18n.t('collection.unknownArtist')} — ${playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}` : i18n.t('lyrics.lyricsHelpText')}
         </p>
       </div>
     </div>
@@ -185,28 +186,28 @@
           <button
             onclick={() => loadLyrics(playerStore.currentSong?.id, true)}
             class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
-            title="Refetch lyrics online"
+            title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}
           >
-            <RefreshCw class="w-3.5 h-3.5" /> Refetch
+            <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
           </button>
           <button
             onclick={startEditing}
             class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
           >
-            <Edit3 class="w-3.5 h-3.5" /> Edit
+            <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editTheme').split(' ')[0]}
           </button>
         {:else}
           <button
             onclick={() => { isEditing = false; }}
             class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
           >
-            <X class="w-3.5 h-3.5" /> Cancel
+            <X class="w-3.5 h-3.5" /> {i18n.t('settings.cancel')}
           </button>
           <button
             onclick={saveManualLyrics}
             class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-emerald-950/30 cursor-pointer"
           >
-            <Save class="w-3.5 h-3.5" /> Save
+            <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtn').split(' ')[0]}
           </button>
         {/if}
       </div>
@@ -218,17 +219,17 @@
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
         <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent-text" />
-        <span class="text-xs text-brand-text-secondary/60 font-medium">Fetching lyrics...</span>
+        <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('lyrics.fetching', {}, "Fetching lyrics...")}</span>
       </div>
     {:else if isEditing}
       <!-- Editor Mode -->
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
-        <label for="lyrics-editor" class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider">Lyrics Text (plain or LRC synced format)</label>
+        <label for="lyrics-editor" class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider">{i18n.t('lyrics.editorLabel', {}, "Lyrics Text (plain or LRC synced format)")}</label>
         <textarea
           id="lyrics-editor"
           bind:value={editText}
           class="flex-1 bg-brand-sidebar border border-brand-border rounded-xl p-4 text-sm font-mono text-brand-text-primary outline-none focus:border-brand-accent resize-none h-[calc(100vh-280px)] focus:ring-1 focus:ring-brand-accent"
-          placeholder="Paste synced LRC or plain text lyrics here..."
+          placeholder={i18n.t('lyrics.editorPlaceholder', {}, "Paste synced LRC or plain text lyrics here...")}
         ></textarea>
       </div>
     {:else if lyricsText}
@@ -253,7 +254,7 @@
           <!-- Plain Text View -->
           <div class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-            Synced lyrics not available. Showing plain text.
+            {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}
           </div>
           <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans">
             {lyricsText.startsWith("[synced:false]\n")
@@ -264,24 +265,24 @@
       </div>
     {:else if errorMsg}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <p class="text-sm font-semibold text-rose-400">Unable to load lyrics</p>
+        <p class="text-sm font-semibold text-rose-400">{i18n.t('lyrics.lyricsNotFound')}</p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <button
           onclick={() => loadLyrics(playerStore.currentSong?.id)}
           class="mt-2 bg-brand-main/50 hover:bg-brand-main/80 border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
         >
-          Retry Search
+          {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
         </button>
       </div>
     {:else}
       <div class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50">
         <FileText class="w-12 h-12 stroke-[1] text-brand-text-secondary/30 mb-2" />
         {#if playerStore.currentSong}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">No lyrics found for this song</p>
-          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">Try clicking 'Edit' above to manually paste the lyrics.</p>
+          <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('lyrics.lyricsNotFound')}</p>
+          <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
         {:else}
-          <p class="text-sm font-semibold text-brand-text-secondary/80">No song selected</p>
-          <p class="text-xs text-brand-text-secondary/50 mt-1">Start playback to fetch lyrics.</p>
+          <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('playerBar.notPlaying')}</p>
+          <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
         {/if}
       </div>
     {/if}

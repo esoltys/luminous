@@ -3,7 +3,10 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
-    models::{FileType, LibraryStats, MusicDirectory, ScanPhase, ScanProgress, Song, SongSource},
+    models::{
+        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, ScanPhase, ScanProgress, Song,
+        SongSource,
+    },
 };
 use anyhow::{Context, Result};
 use lofty::{
@@ -530,56 +533,171 @@ impl CollectionScanner {
         Ok(stats)
     }
 
-    pub fn get_recently_played(&self, limit: i64) -> Result<Vec<Song>> {
+    pub fn get_recently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
+        let query_limit = limit * 20;
         let sql = format!(
-            "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0
-             ORDER BY lastplayed DESC NULLS LAST, mtime DESC
-             LIMIT ?1",
-            SONG_SELECT_COLS
+            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+                    s.title, s.titlesort, s.artist, s.artistsort,
+                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+                    s.composer, s.composersort, s.performer, s.performersort,
+                    s.grouping, s.comment, s.lyrics,
+                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+                    s.bpm, s.mood, s.initial_key,
+                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
+                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
+                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
+                    s.cue_path,
+                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
+                    s.unavailable,
+                    (SELECT COUNT(*) FROM songs s2
+                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+                    ) AS album_track_count
+             FROM songs s
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY s.lastplayed DESC NULLS LAST, s.mtime DESC
+             LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs = stmt
-            .query_map(params![limit], row_to_song)?
+        let songs_with_counts: Vec<(Song, i64)> = stmt
+            .query_map(params![query_limit], |row| {
+                let song = row_to_song(row)?;
+                let count: i64 = row.get(52)?;
+                Ok((song, count))
+            })?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(songs)
+        Ok(group_songs_into_home_items(
+            songs_with_counts,
+            limit as usize,
+        ))
     }
 
-    pub fn get_most_frequently_played(&self, limit: i64) -> Result<Vec<Song>> {
+    pub fn get_most_frequently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
+        let query_limit = limit * 20;
         let sql = format!(
-            "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0
-             ORDER BY playcount DESC, lastplayed DESC NULLS LAST
-             LIMIT ?1",
-            SONG_SELECT_COLS
+            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+                    s.title, s.titlesort, s.artist, s.artistsort,
+                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+                    s.composer, s.composersort, s.performer, s.performersort,
+                    s.grouping, s.comment, s.lyrics,
+                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+                    s.bpm, s.mood, s.initial_key,
+                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
+                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
+                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
+                    s.cue_path,
+                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
+                    s.unavailable,
+                    (SELECT COUNT(*) FROM songs s2
+                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+                    ) AS album_track_count
+             FROM songs s
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY s.playcount DESC, s.lastplayed DESC NULLS LAST
+             LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs = stmt
-            .query_map(params![limit], row_to_song)?
+        let songs_with_counts: Vec<(Song, i64)> = stmt
+            .query_map(params![query_limit], |row| {
+                let song = row_to_song(row)?;
+                let count: i64 = row.get(52)?;
+                Ok((song, count))
+            })?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(songs)
+        Ok(group_songs_into_home_items(
+            songs_with_counts,
+            limit as usize,
+        ))
     }
 
-    pub fn get_recently_added(&self, limit: i64) -> Result<Vec<Song>> {
+    pub fn get_recently_added(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
+        let query_limit = limit * 20;
         let sql = format!(
-            "SELECT {} FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND added IS NOT NULL
-             ORDER BY added DESC
-             LIMIT ?1",
-            SONG_SELECT_COLS
+            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+                    s.title, s.titlesort, s.artist, s.artistsort,
+                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+                    s.composer, s.composersort, s.performer, s.performersort,
+                    s.grouping, s.comment, s.lyrics,
+                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+                    s.bpm, s.mood, s.initial_key,
+                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
+                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
+                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
+                    s.cue_path,
+                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
+                    s.unavailable,
+                    (SELECT COUNT(*) FROM songs s2
+                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+                    ) AS album_track_count
+             FROM songs s
+             WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
+             ORDER BY s.added DESC
+             LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs = stmt
-            .query_map(params![limit], row_to_song)?
+        let songs_with_counts: Vec<(Song, i64)> = stmt
+            .query_map(params![query_limit], |row| {
+                let song = row_to_song(row)?;
+                let count: i64 = row.get(52)?;
+                Ok((song, count))
+            })?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(songs)
+        Ok(group_songs_into_home_items(
+            songs_with_counts,
+            limit as usize,
+        ))
     }
+}
+
+fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64)>, limit: usize) -> Vec<HomeItem> {
+    use std::collections::HashSet;
+    let mut items = Vec::new();
+    let mut seen_albums = HashSet::new();
+
+    for (song, album_track_count) in songs_with_counts {
+        if items.len() >= limit {
+            break;
+        }
+
+        if let Some(ref album_name) = song.album {
+            if !album_name.trim().is_empty() && album_track_count > 1 {
+                let artist_name = song
+                    .album_artist
+                    .clone()
+                    .or_else(|| song.artist.clone())
+                    .unwrap_or_default();
+                let album_key = (album_name.clone(), artist_name.clone());
+
+                if !seen_albums.contains(&album_key) {
+                    seen_albums.insert(album_key);
+                    items.push(HomeItem::Album {
+                        album: AlbumItem {
+                            artist: Some(artist_name),
+                            album: Some(album_name.clone()),
+                            year: song.year,
+                            track_count: album_track_count as i32,
+                            art_embedded: song.art_embedded,
+                            art_automatic: song.art_automatic.clone(),
+                            art_manual: song.art_manual.clone(),
+                        },
+                    });
+                }
+                continue;
+            }
+        }
+
+        items.push(HomeItem::Song { song });
+    }
+
+    items
 }
 
 // ---------------------------------------------------------------------------

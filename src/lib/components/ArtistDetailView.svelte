@@ -8,6 +8,7 @@
   import { ArrowLeft, Play, Shuffle, ListMusic } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem } from "../types";
   import { getArtistAlbums, getArtistGradient } from "../utils/artist";
+  import { i18n } from "../stores/i18n.svelte";
 
   let { artistName }: { artistName: string } = $props();
 
@@ -48,7 +49,7 @@
       const g = (s.genre ?? "").trim();
       if (g !== "") counts.set(g, (counts.get(g) ?? 0) + 1);
     }
-    if (counts.size === 0) return "Unknown genre";
+    if (counts.size === 0) return i18n.t('artistDetail.unknownGenre');
     const maxCount = Math.max(...counts.values());
     const top = [...counts.entries()]
       .filter(([, c]) => c === maxCount)
@@ -172,11 +173,11 @@
         onclick={goBackToArtists}
         class="self-start flex items-center gap-1.5 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
       >
-        <ArrowLeft class="w-4 h-4" /> Back to Artists
+        <ArrowLeft class="w-4 h-4" /> {i18n.t('artistDetail.backToArtists')}
       </button>
       <h1 class="text-4xl sm:text-5xl font-black text-brand-text-primary leading-tight truncate">{artistName}</h1>
       <p class="text-sm text-brand-text-secondary">
-        {genreLabel} · {albums.length} albums • {songs.length} songs • {totalDurationLabel} total
+        {i18n.t('artistDetail.statsLine', { genre: genreLabel, albumCount: albums.length, songCount: songs.length, duration: totalDurationLabel })}
       </p>
       <div class="flex items-center gap-3 mt-2">
         <button
@@ -184,14 +185,14 @@
           disabled={loading || songs.length === 0}
           class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Play class="w-4 h-4 fill-current" /> Play all
+          <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
         </button>
         <button
           onclick={handleShufflePlay}
           disabled={loading || songs.length === 0}
           class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Shuffle class="w-4 h-4" /> Shuffle and play
+          <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
         </button>
       </div>
     </div>
@@ -200,13 +201,13 @@
   <!-- Discography -->
   <div class="px-8 pt-8">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold text-brand-text-primary">Discography</h2>
+      <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.discography')}</h2>
       {#if discographySource.length > POPULAR_CAP}
         <button
           onclick={() => { showAll = !showAll; }}
           class="text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
         >
-          {showAll ? "Show less" : "Show all"}
+          {showAll ? i18n.t('artistDetail.showLess') : i18n.t('artistDetail.showAll')}
         </button>
       {/if}
     </div>
@@ -216,19 +217,19 @@
         onclick={() => setDiscographyFilter("popular")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'popular' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Popular releases
+        {i18n.t('artistDetail.popularReleases')}
       </button>
       <button
         onclick={() => setDiscographyFilter("albums")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Albums
+        {i18n.t('artistDetail.albumsFilter')}
       </button>
       <button
         onclick={() => setDiscographyFilter("singles")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Singles and EPs
+        {i18n.t('artistDetail.singlesAndEps')}
       </button>
     </div>
 
@@ -248,22 +249,22 @@
                 sizeClass="w-full h-full"
               />
             </div>
-            <span class="font-semibold text-xs text-brand-text-primary truncate">{album.album || "Unknown Album"}</span>
+            <span class="font-semibold text-xs text-brand-text-primary truncate">{album.album || i18n.t('collection.unknownAlbum')}</span>
             <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-              {album.year || ""}{album.year ? " • " : ""}{album.track_count <= 7 ? "Single/EP" : "Album"}
+              {album.year || ""}{album.year ? " • " : ""}{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : i18n.t('collection.tableHeaderAlbum')}
             </span>
           </button>
         {/each}
       </HorizontalScrollRow>
     {:else if !loading}
-      <p class="text-xs text-brand-text-secondary/60 py-8 text-center">No releases found.</p>
+      <p class="text-xs text-brand-text-secondary/60 py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
     {/if}
   </div>
 
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
     <div class="px-8 pt-10 pb-24">
-      <h2 class="text-xl font-semibold text-brand-text-primary mb-4">Playlists featuring {artistName}</h2>
+      <h2 class="text-xl font-semibold text-brand-text-primary mb-4">{i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}</h2>
       <HorizontalScrollRow>
         {#each playlists as playlist (playlist.id)}
           <button
@@ -274,7 +275,7 @@
               <ListMusic class="w-10 h-10 text-white/80" />
             </div>
             <span class="font-semibold text-xs text-brand-text-primary truncate">{playlist.name}</span>
-            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">{playlist.track_count} tracks</span>
+            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">{i18n.t('playlists.songsCount', { count: playlist.track_count })}</span>
           </button>
         {/each}
       </HorizontalScrollRow>
