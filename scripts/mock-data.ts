@@ -8,6 +8,7 @@ interface TrackSeed {
   title: string;
   lengthSec: number;
   lastplayed?: number;
+  playcount?: number;
 }
 
 interface AlbumSeed {
@@ -32,7 +33,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 850,
     samplerate: 48000,
     tracks: [
-      { title: "Transmission Ley Lines", lengthSec: 315 },
+      { title: "Transmission Ley Lines", lengthSec: 315, playcount: 12 },
       { title: "Reverb from the Reservoir", lengthSec: 426 },
       { title: "Wind Carries the Signal", lengthSec: 358 },
     ],
@@ -47,7 +48,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     samplerate: 48000,
     tracks: [
       { title: "Origami Heartbeat", lengthSec: 95 },
-      { title: "Metro Sunset", lengthSec: 182 },
+      { title: "Metro Sunset", lengthSec: 182, playcount: 8 },
       { title: "Kaleidoscope Dreams", lengthSec: 140 },
     ],
   },
@@ -77,7 +78,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     tracks: [
       { title: "Wildflowers", lengthSec: 200 },
       { title: "You Don't Know How It Feels", lengthSec: 278 },
-      { title: "You Wreck Me", lengthSec: 203, lastplayed: 10003 },
+      { title: "You Wreck Me", lengthSec: 203, lastplayed: 10003, playcount: 20 },
     ],
   },
   {
@@ -90,7 +91,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 900,
     samplerate: 44100,
     tracks: [
-      { title: "Free Fallin'", lengthSec: 259 },
+      { title: "Free Fallin'", lengthSec: 259, lastplayed: 9500, playcount: 15 },
       { title: "I Won't Back Down", lengthSec: 170 },
       { title: "Runnin' Down a Dream", lengthSec: 259 },
     ],
@@ -104,7 +105,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 2900,
     samplerate: 96000,
     tracks: [
-      { title: "Risk It All", lengthSec: 204 },
+      { title: "Risk It All", lengthSec: 204, lastplayed: 8000, playcount: 5 },
       { title: "Cha Cha Cha", lengthSec: 237 },
       { title: "I Just Might", lengthSec: 213 },
     ],
@@ -118,7 +119,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 980,
     samplerate: 44100,
     tracks: [
-      { title: "Heartbeat Highway", lengthSec: 221 },
+      { title: "Heartbeat Highway", lengthSec: 221, playcount: 9 },
       { title: "Crush", lengthSec: 181 },
       { title: "Metal Heart", lengthSec: 174 },
     ],
@@ -132,7 +133,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 900,
     samplerate: 44100,
     tracks: [
-      { title: "Dandelion", lengthSec: 241 },
+      { title: "Dandelion", lengthSec: 241, lastplayed: 7000 },
       { title: "Choosin' Texas", lengthSec: 232 },
       { title: "We Know Us", lengthSec: 186 },
     ],
@@ -146,7 +147,7 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 950,
     samplerate: 44100,
     tracks: [
-      { title: "Run", lengthSec: 200 },
+      { title: "Run", lengthSec: 200, playcount: 3 },
       { title: "Better Days", lengthSec: 190 },
       { title: "Someday", lengthSec: 210 },
     ],
@@ -179,7 +180,7 @@ function buildSong(seed: AlbumSeed, track: TrackSeed, index: number): Song {
     channels: 2,
     filesize,
     rating: -1,
-    playcount: 0,
+    playcount: track.playcount ?? 0,
     skipcount: 0,
     lastplayed: track.lastplayed,
     added: 1783727350,
