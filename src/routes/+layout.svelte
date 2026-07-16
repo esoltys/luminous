@@ -9,13 +9,15 @@
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import { Music } from 'lucide-svelte';
+  import { i18n } from '../lib/stores/i18n.svelte';
   import { onMount } from 'svelte';
   
   let { children } = $props();
   let isLinux = $state(false);
 
-  onMount(() => {
+  onMount(async () => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+    await i18n.init();
   });
 
   // Pointer drag resizing for Sidebar (left-to-right increase)

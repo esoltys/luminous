@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
   import { SlidersHorizontal } from "lucide-svelte";
+  import { i18n } from "../stores/i18n.svelte";
 
   let enabled = $state(false);
   let preamp = $state(0.0);
@@ -123,14 +124,14 @@
 <div class="flex flex-col text-brand-text-primary">
   <div class="flex items-center justify-between mb-6 pb-4 border-b border-brand-border">
     <div>
-      <h3 class="text-sm font-bold text-brand-text-primary">Graphic Equalizer</h3>
-      <p class="text-xs text-brand-text-secondary/70 mt-0.5">Shape your frequency response with a 10-band cascaded peaking filter</p>
+      <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t('equalizer.title')}</h3>
+      <p class="text-xs text-brand-text-secondary/70 mt-0.5">{i18n.t('equalizer.subtitle')}</p>
     </div>
 
     <!-- Toggle & Presets controls -->
     <div class="flex items-center gap-4">
       <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
-        <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">Enable EQ</label>
+        <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.enableEq')}</label>
         <input
           id="eq-toggle"
           type="checkbox"
@@ -141,7 +142,7 @@
       </div>
 
       <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
-        <span class="text-xs font-semibold text-brand-text-secondary">Preset:</span>
+        <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
         <select
           bind:value={activePreset}
           onchange={() => selectPreset(activePreset)}
@@ -149,10 +150,12 @@
           style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
         >
           {#each presets as preset}
-            <option value={preset} class="bg-brand-main text-brand-text-primary">{preset}</option>
+            <option value={preset} class="bg-brand-main text-brand-text-primary">
+              {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
+            </option>
           {/each}
           {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>Custom</option>
+            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
           {/if}
         </select>
       </div>
@@ -166,7 +169,7 @@
       <!-- Preamp Slider -->
       <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 lg:col-span-1">
         <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-          <span>PRE-AMP</span>
+          <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
           <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary/50"}>
             {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
           </span>
@@ -204,9 +207,9 @@
           </defs>
         </svg>
         <div class="flex justify-between text-[8px] text-brand-text-secondary/40 px-1 font-mono uppercase">
-          <span>Bass</span>
-          <span>Mid</span>
-          <span>Treble</span>
+          <span>{i18n.t('equalizer.bass')}</span>
+          <span>{i18n.t('equalizer.mid')}</span>
+          <span>{i18n.t('equalizer.treble')}</span>
         </div>
       </div>
     </div>

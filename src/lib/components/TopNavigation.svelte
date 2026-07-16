@@ -3,6 +3,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
@@ -37,7 +38,7 @@
       const selected = await open({
         multiple: true,
         directory: false,
-        title: "Open Audio Files or Playlists",
+        title: i18n.t('topNav.openFilesTitle', {}, "Open Audio Files or Playlists"),
         filters: [
           {
             name: "Supported Files",
@@ -92,7 +93,7 @@
       onclick={goBack}
       disabled={historyIndex <= 0}
       class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      title="Go back"
+      title={i18n.t('topNav.goBack')}
     >
       <ChevronLeft class="w-5 h-5" />
     </button>
@@ -100,7 +101,7 @@
       onclick={goForward}
       disabled={historyIndex >= historyStack.length - 1}
       class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      title="Go forward"
+      title={i18n.t('topNav.goForward')}
     >
       <ChevronRight class="w-5 h-5" />
     </button>
@@ -113,7 +114,7 @@
       bind:this={searchInput}
       bind:value={collectionStore.searchQuery}
       type="text"
-      placeholder="Search songs, albums, artists... (Ctrl+L)"
+      placeholder={i18n.t('topNav.searchPlaceholder')}
       class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
     />
 
@@ -122,23 +123,23 @@
       type="button"
       onclick={handleOpenFiles}
       class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 cursor-pointer"
-      title="Open Audio Files or Playlists (*.m3u)"
+      title={i18n.t('topNav.openFilesTooltip')}
     >
       <FolderOpen class="w-4 h-4" />
     </button>
 
     <!-- Search feedback / progress -->
     {#if collectionStore.searchLoading}
-      <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title="Searching..."></div>
+      <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
     {:else if collectionStore.searchQuery}
       <span class="text-[10px] bg-brand-border/60 px-1.5 py-0.5 rounded text-brand-text-secondary font-mono flex-shrink-0 select-none">
-        {collectionStore.searchResults.length} tracks
+        {i18n.t('topNav.tracksCount', { count: collectionStore.searchResults.length })}
       </span>
       <button
         type="button"
         onclick={clearSearch}
         class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
-        title="Clear Search"
+        title={i18n.t('topNav.clearSearch')}
       >
         ✕
       </button>
@@ -150,21 +151,21 @@
     <button
       onclick={() => collectionStore.toggleSidebar()}
       class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
-      title="Toggle Left Sidebar"
+      title={i18n.t('topNav.toggleSidebar')}
     >
       <PanelLeft class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleImmersiveMode()}
       class="p-1.5 rounded-md transition-all cursor-pointer {!collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
-      title="Toggle Immersive Album Art Screen"
+      title={i18n.t('topNav.toggleImmersive')}
     >
       <PanelBottom class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleRightPanel()}
       class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
-      title="Toggle Right Panel"
+      title={i18n.t('topNav.toggleRightPanel')}
     >
       <PanelRight class="w-4 h-4" />
     </button>

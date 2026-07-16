@@ -4,12 +4,13 @@
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2 } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { i18n } from "../stores/i18n.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
   import DesignTools from "./DesignTools.svelte";
 
-  let settingsTab = $state<"folders" | "themes" | "equalizer" | "formats">("folders");
+  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats">("general");
   let isTabInitialized = $state(false);
   let editingThemeId = $state<string | null>(null);
   let useAdvancedBuilder = $state(false);
@@ -19,7 +20,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
+        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
           settingsTab = savedTab as any;
         }
       }
@@ -55,7 +56,7 @@
   }
 
   async function handleRemoveDirectory(path: string) {
-    if (confirm(`Stop watching folder: ${path}?\nSongs from this folder will not be removed from your playlists but will be marked unavailable.`)) {
+    if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
       await collectionStore.removeDirectory(path);
     }
   }
@@ -134,7 +135,7 @@
 
   async function saveCustomTheme() {
     if (newThemeName.trim() === "") {
-      alert("Please enter a name for your custom theme.");
+      alert(i18n.t('settings.enterThemeNameAlert'));
       return;
     }
 
@@ -164,49 +165,72 @@
   <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
     <div class="flex items-center gap-3">
       <Settings class="w-5 h-5 text-brand-accent-text" />
-      <h2 class="text-base font-bold text-brand-text-primary">Settings</h2>
+      <h2 class="text-base font-bold text-brand-text-primary">{i18n.t('settings.title')}</h2>
     </div>
 
     <!-- Sleek Tab Control -->
     <div class="flex bg-brand-sidebar border border-brand-border rounded-xl p-0.5 text-xs shadow-sm">
       <button
+        onclick={() => { settingsTab = "general"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'general' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        {i18n.t('settings.tabGeneral')}
+      </button>
+      <button
         onclick={() => { settingsTab = "folders"; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'folders' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
-        Watched Folders
+        {i18n.t('settings.tabFolders')}
       </button>
       <button
         onclick={() => { settingsTab = "themes"; editingThemeId = null; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
-        UI Themes
+        {i18n.t('settings.tabThemes')}
       </button>
       <button
         onclick={() => { settingsTab = "equalizer"; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
-        Equalizer
+        {i18n.t('settings.tabEqualizer')}
       </button>
       <button
         onclick={() => { settingsTab = "formats"; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
-        File Formats
+        {i18n.t('settings.tabFormats')}
       </button>
     </div>
   </div>
 
   <!-- Content Area -->
   <div class="flex-1 overflow-y-auto p-6 pb-24 max-w-4xl space-y-6">
-    {#if settingsTab === "folders"}
+    {#if settingsTab === "general"}
+      <!-- General Settings Section -->
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.generalTitle')}</h3>
+        <div class="flex flex-col gap-2 max-w-xs">
+          <label for="language-select" class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+          <select
+            id="language-select"
+            value={i18n.currentLocale}
+            onchange={(e) => i18n.setLocale(e.currentTarget.value as any)}
+            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+          >
+            <option value="en">{i18n.t('settings.languageEnglish')}</option>
+            <option value="fr">{i18n.t('settings.languageFrench')}</option>
+          </select>
+        </div>
+      </div>
+    {:else if settingsTab === "folders"}
       <!-- Watched Folders Section -->
       <div class="flex justify-between items-center">
-        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">Watched Folders</h3>
+        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabFolders')}</h3>
         <button
           onclick={handleAddDirectory}
           class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-brand-accent/20 cursor-pointer"
         >
-          <Plus class="w-4 h-4" /> Add Folder
+          <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
         </button>
       </div>
 
@@ -214,11 +238,9 @@
       <div class="bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
         <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
         <div class="space-y-1">
-          <h4 class="font-semibold text-brand-text-primary">How do Watched Folders work?</h4>
+          <h4 class="font-semibold text-brand-text-primary">{i18n.t('settings.folderHelpTitle')}</h4>
           <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
-            Luminous monitors these folders for audio files (MP3, FLAC, M4A, etc.). When you press "Rescan Library",
-            the scanner recursively searches these folders and adds new/updated tracks to your collection.
-            Luminous uses mtime-based hashing to perform fast incremental scans.
+            {i18n.t('settings.folderHelpText')}
           </p>
         </div>
       </div>
@@ -233,13 +255,13 @@
               </div>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                <p class="text-[10px] text-brand-text-secondary/50 mt-0.5">Recursive scanning active</p>
+                <p class="text-[10px] text-brand-text-secondary/50 mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
               </div>
             </div>
             <button
               onclick={() => handleRemoveDirectory(dir.path)}
               class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
-              title="Stop watching this folder"
+              title={i18n.t('settings.folderItemStopWatch')}
             >
               <Trash2 class="w-4 h-4" />
             </button>
@@ -249,8 +271,8 @@
         {#if collectionStore.directories.length === 0}
           <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary/60">
             <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
-            <h4 class="font-semibold text-brand-text-primary mb-1">No Watched Folders</h4>
-            <p class="text-xs text-brand-text-secondary/60 mb-4">Click "Add Folder" above to add your music directory.</p>
+            <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
+            <p class="text-xs text-brand-text-secondary/60 mb-4">{i18n.t('settings.noFoldersText')}</p>
           </div>
         {/if}
       </div>
@@ -258,7 +280,7 @@
       <!-- UI Themes Section -->
       <div class="space-y-6">
         <div>
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Predefined Themes</h3>
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes')}</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {#each PREDEFINED_THEMES as theme}
               {@const previewColors = getPreviewColors(theme)}
@@ -267,14 +289,14 @@
                 class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-2 border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
               >
                 <div class="flex items-center justify-between w-full">
-                  <span class="font-semibold text-sm text-brand-text-primary">{theme.name}</span>
+                  <span class="font-semibold text-sm text-brand-text-primary">{theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}</span>
                 </div>
                 <!-- Miniature colors preview -->
                 <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-                  <div class="w-[30%]" style="background-color: {previewColors['bg-sidebar']}" title="Sidebar"></div>
-                  <div class="w-[50%]" style="background-color: {previewColors['bg-main']}" title="Main View"></div>
-                  <div class="w-[10%]" style="background-color: {previewColors['bg-playerbar']}" title="Player Bar"></div>
-                  <div class="w-[10%]" style="background-color: {previewColors['color-accent']}" title="Accent"></div>
+                  <div class="w-[30%]" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                  <div class="w-[50%]" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                  <div class="w-[10%]" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                  <div class="w-[10%]" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
                 </div>
               </button>
             {/each}
@@ -283,7 +305,7 @@
 
         {#if themeStore.customThemes.length > 0}
           <div>
-            <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Custom Themes</h3>
+            <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.customThemes')}</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {#each themeStore.customThemes as theme}
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -298,23 +320,23 @@
                     <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
                   </div>
                   <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-                    <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}" title="Sidebar"></div>
-                    <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}" title="Main View"></div>
-                    <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}" title="Player Bar"></div>
-                    <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}" title="Accent"></div>
+                    <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                    <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                    <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                    <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
                   </div>
                   <div class="flex gap-2">
                     <button
                       onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
                       class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
-                      title="Edit Theme"
+                      title={i18n.t('settings.editTheme')}
                     >
-                      Edit
+                      {i18n.t('settings.editTheme').split(' ')[0]}
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
                       class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
-                      title="Delete Theme"
+                      title={i18n.t('settings.deleteTheme')}
                     >
                       <Trash2 class="w-3.5 h-3.5" />
                     </button>
@@ -331,7 +353,7 @@
             <div class="flex items-center gap-2">
               <Palette class="w-5 h-5 text-brand-accent-text" />
               <h4 class="font-bold text-sm text-brand-text-primary">
-                {editingTheme ? `Editing "${editingTheme.name}"` : 'Custom Theme Builder'}
+                {editingTheme ? i18n.t('settings.editingThemeTitle', { name: editingTheme.name }) : i18n.t('settings.customThemeBuilderTitle')}
               </h4>
             </div>
             <div class="flex items-center gap-2">
@@ -340,7 +362,7 @@
                   onclick={() => { editingThemeId = null; }}
                   class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {i18n.t('settings.cancel')}
                 </button>
               {/if}
               <!-- Simple/Advanced Toggle -->
@@ -349,13 +371,13 @@
                   onclick={() => { useAdvancedBuilder = false; }}
                   class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 >
-                  Simple
+                  {i18n.t('settings.simple')}
                 </button>
                 <button
                   onclick={() => { useAdvancedBuilder = true; }}
                   class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 >
-                  Advanced
+                  {i18n.t('settings.advanced')}
                 </button>
               </div>
             </div>
@@ -367,12 +389,12 @@
             <div class="space-y-5">
               <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
                 <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
-                  <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">Theme Name</label>
+                  <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
                   <input
                     id="theme-name-input"
                     type="text"
                     bind:value={newThemeName}
-                    placeholder="e.g. Emerald Coast, Cyberpunk..."
+                    placeholder={i18n.t('settings.themeNamePlaceholder')}
                     class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
                   />
                 </div>
@@ -380,7 +402,7 @@
                   onclick={loadActiveThemeColors}
                   class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
                 >
-                  <Palette class="w-4 h-4 text-brand-accent-text" /> Import Active Colors
+                  <Palette class="w-4 h-4 text-brand-accent-text" /> {i18n.t('settings.importColors')}
                 </button>
               </div>
 
@@ -389,7 +411,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['bg-main']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Main View</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">bg-main</span>
                   </div>
                 </div>
@@ -398,7 +420,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['bg-sidebar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Sidebar</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">bg-sidebar</span>
                   </div>
                 </div>
@@ -407,7 +429,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['bg-playerbar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Player Bar</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">bg-playerbar</span>
                   </div>
                 </div>
@@ -416,7 +438,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['color-accent']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Accent</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">color-accent</span>
                   </div>
                 </div>
@@ -425,7 +447,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['color-accent-hover']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Accent Hover</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">accent-hover</span>
                   </div>
                 </div>
@@ -434,7 +456,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['color-text-primary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Primary Text</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.primaryTextLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">text-primary</span>
                   </div>
                 </div>
@@ -443,7 +465,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['color-text-secondary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Secondary Text</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.secondaryTextLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">text-secondary</span>
                   </div>
                 </div>
@@ -452,7 +474,7 @@
                 <div class="flex items-center gap-3">
                   <input type="color" bind:value={customColors['color-border']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">Borders</span>
+                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary/50">color-border</span>
                   </div>
                 </div>
@@ -463,9 +485,9 @@
                   onclick={saveCustomTheme}
                   class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
                 >
-                  {editingThemeId ? 'Save Changes' : 'Save Custom Theme'}
+                  {editingThemeId ? i18n.t('settings.saveChanges') : i18n.t('settings.saveCustom')}
                 </button>
-                <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
+                <span class="text-[10px] text-brand-text-secondary/50">{i18n.t('settings.livePreviewInfo')}</span>
               </div>
             </div>
           {/if}
@@ -480,8 +502,8 @@
       <!-- File Formats Filter Section -->
       <div class="space-y-6">
         <div>
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">Filter Library by File Format</h3>
-          <p class="text-xs text-brand-text-secondary/60 mb-4">Uncheck formats you want to exclude from your library and playlists.</p>
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.formatsTitle')}</h3>
+          <p class="text-xs text-brand-text-secondary/60 mb-4">{i18n.t('settings.formatsSubtitle')}</p>
           
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {#each ["MP3", "FLAC", "WAV", "AAC", "ALAC", "OGG", "AIFF", "APE"] as format}
@@ -493,7 +515,7 @@
                 <div class="flex flex-col">
                   <span class="font-semibold text-sm text-brand-text-primary">{format}</span>
                   <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-                    {isChecked ? 'Enabled' : 'Excluded'}
+                    {isChecked ? i18n.t('settings.enabled') : i18n.t('settings.excluded')}
                   </span>
                 </div>
                 <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors {isChecked ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast' : 'border-brand-border bg-black/10'}">

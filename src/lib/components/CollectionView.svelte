@@ -7,6 +7,7 @@
   import TagEditor from "./TagEditor.svelte";
   import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
+  import { i18n } from "../stores/i18n.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
@@ -181,19 +182,19 @@
         onclick={() => { collectionStore.activeSubTab = "artists"; collectionStore.selectedArtistName = null; }}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Artists ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
+        {i18n.t('collection.artists', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists })}
       </button>
       <button
         onclick={() => { collectionStore.activeSubTab = "albums"; collectionStore.selectedArtistName = null; }}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Albums ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
+        {i18n.t('collection.albums', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums })}
       </button>
       <button
         onclick={() => { collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; }}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        Songs ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+        {i18n.t('collection.songs', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs })}
       </button>
     </div>
 
@@ -210,16 +211,16 @@
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
           >
-            <option value="title-true">Sort: Title (A-Z)</option>
-            <option value="title-false">Sort: Title (Z-A)</option>
-            <option value="artist-true">Sort: Artist (A-Z)</option>
-            <option value="artist-false">Sort: Artist (Z-A)</option>
-            <option value="album-true">Sort: Album (A-Z)</option>
-            <option value="album-false">Sort: Album (Z-A)</option>
-            <option value="track-true">Sort: Track # (1-9)</option>
-            <option value="track-false">Sort: Track # (9-1)</option>
-            <option value="length_nanosec-true">Sort: Duration (Shortest)</option>
-            <option value="length_nanosec-false">Sort: Duration (Longest)</option>
+            <option value="title-true">{i18n.t('collection.sortTitleAsc')}</option>
+            <option value="title-false">{i18n.t('collection.sortTitleDesc')}</option>
+            <option value="artist-true">{i18n.t('collection.sortArtistAsc')}</option>
+            <option value="artist-false">{i18n.t('collection.sortArtistDesc')}</option>
+            <option value="album-true">{i18n.t('collection.sortAlbumAsc')}</option>
+            <option value="album-false">{i18n.t('collection.sortAlbumDesc')}</option>
+            <option value="track-true">{i18n.t('collection.sortTrackAsc')}</option>
+            <option value="track-false">{i18n.t('collection.sortTrackDesc')}</option>
+            <option value="length_nanosec-true">{i18n.t('collection.sortDurationAsc')}</option>
+            <option value="length_nanosec-false">{i18n.t('collection.sortDurationDesc')}</option>
           </select>
         </div>
       {:else if collectionStore.activeSubTab === "albums"}
@@ -233,14 +234,14 @@
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
           >
-            <option value="album-true">Sort: Album Name (A-Z)</option>
-            <option value="album-false">Sort: Album Name (Z-A)</option>
-            <option value="artist-true">Sort: Artist Name (A-Z)</option>
-            <option value="artist-false">Sort: Artist Name (Z-A)</option>
-            <option value="year-false">Sort: Year (Newest)</option>
-            <option value="year-true">Sort: Year (Oldest)</option>
-            <option value="track_count-false">Sort: Tracks (Most)</option>
-            <option value="track_count-true">Sort: Tracks (Least)</option>
+            <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
+            <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
+            <option value="artist-true">{i18n.t('collection.sortArtistNameAsc')}</option>
+            <option value="artist-false">{i18n.t('collection.sortArtistNameDesc')}</option>
+            <option value="year-false">{i18n.t('collection.sortYearDesc')}</option>
+            <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
+            <option value="track_count-false">{i18n.t('collection.sortTracksDesc')}</option>
+            <option value="track_count-true">{i18n.t('collection.sortTracksAsc')}</option>
           </select>
         </div>
       {:else if collectionStore.activeSubTab === "artists"}
@@ -254,23 +255,23 @@
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
           >
-            <option value="name-true">Sort: Artist Name (A-Z)</option>
-            <option value="name-false">Sort: Artist Name (Z-A)</option>
-            <option value="album_count-false">Sort: Albums (Most)</option>
-            <option value="album_count-true">Sort: Albums (Least)</option>
-            <option value="song_count-false">Sort: Tracks (Most)</option>
-            <option value="song_count-true">Sort: Tracks (Least)</option>
+            <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
+            <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
+            <option value="album_count-false">{i18n.t('collection.sortAlbumsDesc')}</option>
+            <option value="album_count-true">{i18n.t('collection.sortAlbumsAsc')}</option>
+            <option value="song_count-false">{i18n.t('collection.sortTracksDesc')}</option>
+            <option value="song_count-true">{i18n.t('collection.sortTracksAsc')}</option>
           </select>
         </div>
       {/if}
 
       <div class="text-xs text-brand-text-secondary font-medium">
         {#if collectionStore.activeSubTab === "songs"}
-          Showing {filteredSongs.length} songs
+          {i18n.t('collection.showingSongs', { count: filteredSongs.length })}
         {:else if collectionStore.activeSubTab === "albums"}
-          Showing {sortedAlbums.length} albums
+          {i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
         {:else}
-          Showing {sortedArtists.length} artists
+          {i18n.t('collection.showingArtists', { count: sortedArtists.length })}
         {/if}
       </div>
     </div>
@@ -285,21 +286,21 @@
           <div class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center py-3 px-4">
             <div class="text-center w-9"></div>
             <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              # {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
+              {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
             <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              Title {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
+              {i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
             <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              Artist {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
+              {i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
             <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              Album {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
+              {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
             <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
               <Clock class="w-4 h-4" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
-            <div class="text-center">Actions</div>
+            <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
           </div>
         </div>
 
@@ -308,12 +309,12 @@
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">No songs found</h3>
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
                 <p class="text-xs text-brand-text-secondary/60">
                   {#if collectionStore.searchQuery}
-                    We couldn't find any songs matching "{collectionStore.searchQuery}". Try adjusting your keywords.
+                    {i18n.t('collection.noSongsSearchEmpty', { query: collectionStore.searchQuery })}
                   {:else}
-                    Your music library is currently empty. Click "Rescan Library" or add a folder to get started.
+                    {i18n.t('collection.noSongsLibraryEmpty')}
                   {/if}
                 </p>
                 {#if collectionStore.searchQuery}
@@ -321,7 +322,7 @@
                     onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
                     class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-lg transition-colors font-medium cursor-pointer"
                   >
-                    Clear Search Filter
+                    {i18n.t('collection.clearSearchFilter')}
                   </button>
                 {/if}
               </div>
@@ -346,7 +347,7 @@
                   <button
                     onclick={() => handlePlaySong(song)}
                     class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer"
-                    title="Play song"
+                    title={i18n.t('collection.playSong')}
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>
@@ -358,9 +359,9 @@
                   <button
                     onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
                     class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                    title="Filter by title: {song.title || 'Unknown Title'}"
+                    title={i18n.t('collection.filterByTitle', { title: song.title || i18n.t('playerBar.unknownTrack') })}
                   >
-                    {song.title || "Unknown Title"}
+                    {song.title || i18n.t('playerBar.unknownTrack')}
                   </button>
                   <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
                     {song.filetype}
@@ -376,12 +377,12 @@
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90 text-left"
-                      title="View artist: {song.artist}"
+                      title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">Unknown Artist</span>
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
                 <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0">
@@ -389,12 +390,12 @@
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.album || ""); }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70 text-left"
-                      title="Filter by album: {song.album}"
+                      title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">Unknown Album</span>
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
                 <div class="text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</div>
@@ -402,14 +403,14 @@
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
                     class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                    title="Add to active playlist"
+                    title={i18n.t('collection.addPlaylistTooltip')}
                   >
                     <Plus class="w-4 h-4" />
                   </button>
                   <button
                     onclick={() => openTagEditor(song.id)}
                     class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                    title="Edit tags"
+                    title={i18n.t('collection.editTagsTooltip')}
                   >
                     <Edit3 class="w-4 h-4" />
                   </button>
@@ -488,24 +489,24 @@
             <button
               onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", album.album || ""); }}
               class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
-              title="Filter by album: {album.album || 'Unknown Album'}"
+              title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
             >
-              {album.album || "Unknown Album"}
+              {album.album || i18n.t('collection.unknownAlbum')}
             </button>
             {#if album.artist}
               <button
                 onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
                 class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-                title="View artist: {album.artist}"
+                title={i18n.t('collection.filterByArtist', { artist: album.artist })}
               >
                 {album.artist}
               </button>
             {:else}
-              <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">Various Artists</span>
+              <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">{i18n.t('collection.variousArtists')}</span>
             {/if}
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
-              <span>{album.track_count} songs</span>
+              <span>{i18n.t('playlists.songsCount', { count: album.track_count })}</span>
             </div>
           </div>
         {/each}
@@ -513,8 +514,8 @@
           <div class="col-span-full py-16 text-center">
             <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
               <FolderClosed class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-              <h3 class="text-base font-semibold text-brand-text-primary mb-1">No albums found</h3>
-              <p class="text-xs text-brand-text-secondary/60 font-medium">No albums found in your library.</p>
+              <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noAlbumsTitle')}</h3>
+              <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('collection.noAlbumsText')}</p>
             </div>
           </div>
         {/if}
@@ -557,14 +558,14 @@
             {/if}
             <span
               class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-center truncate w-full"
-              title="View artist: {artist.name || 'Unknown Artist'}"
+              title={i18n.t('collection.filterByArtist', { artist: artist.name || i18n.t('collection.unknownArtist') })}
             >
-              {artist.name || "Unknown Artist"}
+              {artist.name || i18n.t('collection.unknownArtist')}
             </span>
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
-              <span>{artist.album_count} albums</span>
+              <span>{artist.album_count} {artist.album_count === 1 ? 'album' : 'albums'}</span>
               <span>•</span>
-              <span>{artist.song_count} songs</span>
+              <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
             </div>
           </div>
         {/each}
@@ -572,8 +573,8 @@
           <div class="col-span-full py-16 text-center">
             <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
               <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-              <h3 class="text-base font-semibold text-brand-text-primary mb-1">No artists found</h3>
-              <p class="text-xs text-brand-text-secondary/60 font-medium">No artists found in your library.</p>
+              <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noArtistsTitle')}</h3>
+              <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('collection.noArtistsText')}</p>
             </div>
           </div>
         {/if}

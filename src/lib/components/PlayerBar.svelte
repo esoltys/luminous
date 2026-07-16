@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import MoodBar from "./MoodBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
@@ -102,7 +103,7 @@
           </button>
         {:else}
           <span class="text-sm font-semibold text-brand-text-primary truncate">
-            Not Playing
+            {i18n.t('playerBar.notPlaying')}
           </span>
         {/if}
         {#if playerStore.currentSong}
@@ -115,13 +116,13 @@
         <button
           onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
           class="text-xs text-brand-text-secondary/70 hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
-          title="View artist: {playerStore.currentSong.artist}"
+          title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
           {playerStore.currentSong.artist}
         </button>
       {:else}
         <span class="text-xs text-brand-text-secondary/70 truncate">
-          {playerStore.currentSong ? "Unknown Artist" : ""}
+          {playerStore.currentSong ? i18n.t('playerBar.unknownArtist') : ""}
         </span>
       {/if}
     </div>
@@ -133,7 +134,7 @@
       <button
         onclick={cycleShuffle}
         class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title="Shuffle Mode: {playerStore.shuffleMode}"
+        title={`${i18n.t('playerBar.shuffle')}: ${playerStore.shuffleMode}`}
       >
         <Shuffle class="w-4 h-4" />
         {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
@@ -143,7 +144,7 @@
         {/if}
       </button>
 
-      <button onclick={() => playerStore.previous()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
+      <button onclick={() => playerStore.previous()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
       </button>
 
@@ -151,6 +152,7 @@
         <button
           onclick={() => playerStore.pause()}
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          title={i18n.t('playerBar.pause')}
         >
           <Pause class="w-4 h-4 fill-current" />
         </button>
@@ -158,19 +160,20 @@
         <button
           onclick={() => playerStore.resume()}
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          title={i18n.t('playerBar.play')}
         >
           <Play class="w-4 h-4 fill-current ml-0.5" />
         </button>
       {/if}
 
-      <button onclick={() => playerStore.next()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
+      <button onclick={() => playerStore.next()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.next')}>
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
       <button
         onclick={cycleRepeat}
         class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title="Repeat Mode: {playerStore.repeatMode}"
+        title={`${i18n.t('playerBar.repeat')}: ${playerStore.repeatMode}`}
       >
         {#if playerStore.repeatMode === 'track'}
           <Repeat1 class="w-4 h-4" />
@@ -201,7 +204,7 @@
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>
-    <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
+    <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
       {#if isMuted || playerStore.volume === 0}
         <VolumeX class="w-4 h-4" />
       {:else}
@@ -221,12 +224,13 @@
       class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
       style="background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) {playerStore.volume * 100}%, var(--color-border) {playerStore.volume * 100}%, var(--color-border) 100%)"
       aria-label="Volume Slider"
+      title={i18n.t('playerBar.volume')}
     />
     {#if collectionStore.immersiveMode}
       <button 
         onclick={() => collectionStore.toggleImmersiveMode()}
         class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
-        title="Restore Full Interface"
+        title={i18n.t('playerBar.restoreInterface', {}, 'Restore Full Interface')}
       >
         <PanelBottomOpen class="w-4.5 h-4.5" />
       </button>

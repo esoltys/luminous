@@ -2,6 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
@@ -17,7 +18,7 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Select Music Directory",
+        title: i18n.t('settings.selectMusicDirectory'),
       });
       if (selected && typeof selected === "string") {
         await collectionStore.addDirectory(selected);
@@ -42,55 +43,55 @@
     <button
       onclick={() => { collectionStore.activeTab = "home"; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title="Home"
+      title={i18n.t('sidebar.home')}
     >
       <Home class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        Home
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.home')}</span>
       {/if}
     </button>
 
     <button
       onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title="Collection"
+      title={i18n.t('sidebar.collection')}
     >
       <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        Collection
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
       {/if}
     </button>
 
     <button
       onclick={() => { collectionStore.activeTab = "playlists"; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'playlists' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title="Playlists"
+      title={i18n.t('sidebar.playlists')}
     >
       <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        Playlists
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.playlists')}</span>
       {/if}
     </button>
 
     <button
       onclick={() => { collectionStore.activeTab = "lyrics"; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title="Lyrics"
+      title={i18n.t('sidebar.lyrics')}
     >
       <FileText class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        Lyrics
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.lyrics')}</span>
       {/if}
     </button>
 
     <button
       onclick={() => { collectionStore.activeTab = "settings"; }}
       class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title="Settings"
+      title={i18n.t('sidebar.settings')}
     >
       <Settings class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
       {#if !isCollapsed}
-        Settings
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.settings')}</span>
       {/if}
     </button>
   </nav>
@@ -100,12 +101,12 @@
     <!-- Playlist quick access header & form (Fixed at top) -->
     <div class="pl-4 pr-4 pt-3 border-t border-brand-border flex-shrink-0">
       <div class="flex items-center justify-between text-xs text-brand-text-secondary font-semibold mb-2">
-        <span>PLAYLISTS</span>
+        <span>{i18n.t('sidebar.quickAccess')}</span>
       </div>
       <form onsubmit={handleCreatePlaylist} class="flex items-center gap-1.5 mb-3">
         <input
           bind:value={newPlaylistName}
-          placeholder="New playlist..."
+          placeholder={i18n.t('playlists.createPlaylistPlaceholder')}
           class="bg-brand-main border border-brand-border rounded px-2 py-1 text-xs w-full text-brand-text-primary focus:outline-none focus:border-brand-accent"
         />
         <button type="submit" class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded p-1 cursor-pointer">
@@ -168,11 +169,11 @@
       <button
         onclick={() => collectionStore.startScan()}
         class="bg-brand-sidebar hover:bg-brand-main text-brand-text-primary transition-all border border-brand-border cursor-pointer flex items-center justify-center {isCollapsed ? 'w-10 h-10 rounded-xl p-0' : 'w-full gap-2 py-2 rounded-lg font-medium'}"
-        title={isCollapsed ? "Rescan Library" : ""}
+        title={isCollapsed ? i18n.t('sidebar.rescanLibrary') : ""}
       >
         <RefreshCw class={isCollapsed ? "w-5 h-5" : "w-3.5 h-3.5"} />
         {#if !isCollapsed}
-          Rescan Library
+          {i18n.t('sidebar.rescanLibrary')}
         {/if}
       </button>
     {/if}
