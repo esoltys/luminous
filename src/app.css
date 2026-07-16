@@ -6,6 +6,10 @@
   --color-brand-playerbar: var(--bg-playerbar);
   --color-brand-accent: var(--color-accent);
   --color-brand-accent-hover: var(--color-accent-hover);
+  /* Accent color clamped to WCAG AA 4.5:1 against bg-main — the only
+     accent-derived color allowed on text/icons (see ThemeStore.applyActiveTheme()). */
+  --color-brand-accent-text: var(--color-accent-text);
+  --color-brand-accent-text-hover: var(--color-accent-text-hover);
   --color-brand-text-primary: var(--color-text-primary);
   --color-brand-text-secondary: var(--color-text-secondary);
   --color-brand-border: var(--color-border);
@@ -21,12 +25,16 @@
     --bg-main: #08090c;
     --bg-sidebar: #1c1f29;
     --bg-playerbar: #191b23;
-    --color-accent: #ff7300;
-    --color-accent-hover: #ffcc00;
+    --color-accent: #6f7ea9;
+    --color-accent-hover: #8c98ba;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
     --color-border: #2c2f3c;
     --color-accent-contrast: #000000;
+    /* #6f7ea9 already clears WCAG AA 4.5:1 against bg-main (~4.96:1), so no
+       further clamping needed for this fallback — see clampForContrast(). */
+    --color-accent-text: #6f7ea9;
+    --color-accent-text-hover: #8c98ba;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;

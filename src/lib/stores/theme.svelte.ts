@@ -5,6 +5,7 @@ import {
   hexToRgb,
   rgbToHex,
   pickAccessibleOnColor,
+  clampForContrast,
   isLightColor,
   rgbToHsl,
   hslToRgb,
@@ -43,20 +44,28 @@ export interface ExtractedColors {
 }
 
 /**
- * The System theme's brand accent is pulled from app-icon.svg's own
- * sunrise gradient rather than an unrelated color — its "Vibrant Zest
- * Orange core" (65% stop) as the base accent, its "golden horizon" (88%
- * stop) as the hover. ReactiveLogoBrand's live gradient is computed from
- * this same accent (see calculateLogoStops() below), so the in-app logo
- * actually matches the real icon shown in the OS taskbar/dock instead of
- * rendering as an arbitrary hue. Not extracted programmatically from the
- * SVG at build/runtime — overkill for a static, rarely-changing asset,
- * and would still require guessing which of five gradient stops is "the"
- * brand color; using the exact hex the icon's own source comments already
- * label as the core color is simpler and unambiguous.
+ * Reserved for ReactiveLogoBrand's gradient only (see calculateLogoStops()
+ * below) — pulled from app-icon.svg's own sunrise gradient ("Vibrant Zest
+ * Orange core" / "golden horizon" stops) so the in-app logo always matches
+ * the real icon shown in the OS taskbar/dock, independent of whatever UI
+ * accent the active theme uses. Not extracted programmatically from the
+ * SVG at build/runtime — overkill for a static, rarely-changing asset, and
+ * would still require guessing which of five gradient stops is "the" brand
+ * color; using the exact hex the icon's own source comments already label
+ * as the core color is simpler and unambiguous.
  */
 const BRAND_ORANGE = "#ff7300";
 const BRAND_GOLD = "#ffcc00";
+
+/**
+ * Dusty slate blue, chosen over the original BRAND_ORANGE for the dark
+ * theme's UI accent (badges, buttons, sliders, active states) — clears the
+ * same strict 4.5:1 WCAG text-contrast threshold against the near-black
+ * canvas (~4.96:1) that BRAND_ORANGE cleared. Deliberately independent of
+ * BRAND_ORANGE/BRAND_GOLD, which stay logo-only (see above) so this swap
+ * doesn't touch the app-icon-matched logo gradient.
+ */
+const LUMINOUS_DARK_ACCENT = "#6f7ea9";
 
 /**
  * "System" auto-theme: adapts to the OS light/dark preference. Panels
@@ -71,26 +80,20 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "bg-main": "#08090c",
   "bg-sidebar": "#1c1f29",
   "bg-playerbar": "#191b23",
-  "color-accent": BRAND_ORANGE,
-  "color-accent-hover": BRAND_GOLD,
+  "color-accent": LUMINOUS_DARK_ACCENT,
+  "color-accent-hover": blendToward(LUMINOUS_DARK_ACCENT, 255, 0.2),
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
   "color-border": "#2c2f3c"
 };
 
 /**
- * The light-scheme accent is a deliberate trade-off, not a mechanical
- * derivation: darkening BRAND_ORANGE enough to clear WCAG's 4.5:1 "text"
- * threshold against the light canvas (~#994500) reads as brown/rust —
- * that's not a bad color pick, it's what any orange dark enough for that
- * ratio on a near-white background looks like. Since the accent is used
- * almost entirely as icon/button/badge/active-state color in this app
- * (not paragraph text), it's held to WCAG 1.4.11's 3:1 "non-text
- * contrast" threshold (UI components, graphical objects) instead of
- * 1.4.3's 4.5:1 "normal text" threshold — letting it stay much closer to
- * the true brand orange.
+ * Same hex as LUMINOUS_DARK_ACCENT — unlike the old orange accent (which
+ * had to darken into brown/rust to read against a light canvas), this slate
+ * blue already clears WCAG 1.4.11's 3:1 non-text threshold as-is (~3.34:1
+ * against this light canvas), so both schemes can share one literal color.
  */
-const LUMINOUS_LIGHT_ACCENT = "#d15e00";
+const LUMINOUS_LIGHT_ACCENT = LUMINOUS_DARK_ACCENT;
 
 export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "bg-main": "#e9eaf0",
@@ -604,6 +607,25 @@ class ThemeStore {
       : colors["color-accent"];
     const accentContrastText = pickAccessibleOnColor(resolvedAccent);
 
+    // "Accent Text" — the only accent-derived color allowed on text/icons
+    // (everything else must be Primary or Secondary text). Unlike
+    // resolvedAccent (used for solid-fill surfaces, where accentContrastText
+    // above supplies the on-top text color), this is the accent itself
+    // clamped to WCAG AA 4.5:1 against bg-main, since raw accent-as-text has
+    // no such guarantee for custom or Dynamic Artwork themes, and even
+    // hand-picked theme accents are only checked against bg-main directly —
+    // not the translucent accent-tinted surfaces (badges, hover states) text
+    // often actually renders on. Both bg-main and accent-hover need the same
+    // dynamic-artwork CSS-var-reference resolution as resolvedAccent above.
+    const resolvedBgMain = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).primary
+      : colors["bg-main"];
+    const resolvedAccentHover = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).accentHover
+      : colors["color-accent-hover"];
+    const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
+    const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
+
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
       styleEl = document.createElement("style");
@@ -622,6 +644,8 @@ class ThemeStore {
         --color-text-secondary: ${colors["color-text-secondary"]};
         --color-border: ${colors["color-border"]};
         --color-accent-contrast: ${accentContrastText};
+        --color-accent-text: ${accentText};
+        --color-accent-text-hover: ${accentTextHover};
       }
     `;
 

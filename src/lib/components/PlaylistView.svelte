@@ -155,7 +155,7 @@
     <!-- Top Header bar -->
     <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between relative z-10 bg-brand-main/40 backdrop-blur-md">
       <div class="flex items-center gap-3">
-        <ListMusic class="w-5 h-5 text-brand-accent" />
+        <ListMusic class="w-5 h-5 text-brand-accent-text" />
         <h2 class="text-base font-bold text-brand-text-primary">{activePlaylist.name}</h2>
         <span class="text-xs text-brand-text-secondary/60 font-medium">({playlistsStore.activePlaylistTracks.length} tracks)</span>
       </div>
@@ -225,7 +225,7 @@
                   {unavailable
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-brand-sidebar/40 cursor-grab active:cursor-grabbing'}
-                  {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-hover' : ''}
+                  {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
                   {visualDraggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
                   {dragOverIndex === index && visualDraggedIndex !== null && visualDraggedIndex !== index
                     ? (index < visualDraggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
@@ -247,7 +247,7 @@
                     {/if}
                     <button
                       onclick={() => !unavailable && handlePlayPlaylistItem(index)}
-                      class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent hover:text-brand-accent-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                      class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
                       disabled={unavailable}
                       title="Play track"
                     >
@@ -255,7 +255,7 @@
                     </button>
                   </div>
                 </td>
-                <td class="py-2.5 px-4 font-medium truncate max-w-xs {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : unavailable ? 'text-brand-text-secondary/50' : 'text-brand-text-primary'}">
+                <td class="py-2.5 px-4 font-medium truncate max-w-xs {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary/50' : 'text-brand-text-primary'}">
                   <div class="flex items-center gap-2 max-w-full">
                     {#if unavailable}
                       <!-- Unavailable track: show warning icon + last known title -->
@@ -268,7 +268,7 @@
                     {:else if item.song?.title}
                       <button
                         onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
-                        class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-hover' : 'text-brand-text-primary'}"
+                        class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
                         title="Filter by title: {item.song.title}"
                       >
                         {item.song.title}
@@ -281,7 +281,7 @@
                         {item.song.filetype}
                       </span>
                       {#if item.song.lyrics && item.song.lyrics.trim() !== ""}
-                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shrink-0" title="Lyrics available">
+                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title="Lyrics available">
                           LRC
                         </span>
                       {/if}
@@ -293,9 +293,9 @@
                     <span class="text-brand-text-secondary/40 italic text-xs">File not found</span>
                   {:else if item.song?.artist}
                     <button
-                      onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.artist || ""); }}
-                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
-                      title="Filter by artist: {item.song.artist}"
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      title="View artist: {item.song.artist}"
                     >
                       {item.song.artist}
                     </button>
@@ -309,7 +309,7 @@
                   {:else if item.song?.album}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.album || ""); }}
-                      class="hover:underline hover:text-brand-accent transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
                       title="Filter by album: {item.song.album}"
                     >
                       {item.song.album}
@@ -323,7 +323,7 @@
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={() => item.song?.id && !unavailable && openTagEditor(item.song.id)}
-                      class="text-brand-text-secondary/60 hover:text-brand-accent transition-colors disabled:opacity-30"
+                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30"
                       title="Edit tags"
                       disabled={!item.song || unavailable}
                     >

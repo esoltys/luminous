@@ -45,18 +45,19 @@
 </script>
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
-  <!-- Header -->
-  <div class="flex-shrink-0 px-6 py-8 border-b border-brand-border">
-    <h1 class="text-3xl font-bold text-brand-text-primary">
-      {getTimeOfDayGreeting()}
-    </h1>
-    <p class="text-sm text-brand-text-secondary mt-1">
-      Explore your music collection
-    </p>
-  </div>
-
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto px-6 py-8 pb-24 space-y-12">
+  <div class="flex-1 overflow-y-auto pb-24">
+    <!-- Header -->
+    <div class="px-6 pt-8">
+      <h1 class="text-3xl font-bold text-brand-text-primary">
+        {getTimeOfDayGreeting()}
+      </h1>
+      <p class="text-sm text-brand-text-secondary mt-1">
+        Explore your music collection
+      </p>
+    </div>
+
+    <div class="px-6 pt-4 space-y-12">
     {#if isLoading}
       <div class="flex items-center justify-center h-64">
         <div class="text-brand-text-secondary">Loading your collection...</div>
@@ -102,6 +103,7 @@
         </div>
       {/if}
     {/if}
+    </div>
   </div>
 </div>
 

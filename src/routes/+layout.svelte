@@ -176,7 +176,10 @@
       </div>
 
       <!-- BACK FACE: Immersive Dedicated Album Artwork Screen -->
-      <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center p-8 select-none {!collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+      <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
+           ≈ 96px) that overlays the bottom of this face, so the content centers within the
+           visible area above the dock rather than the full face height. -->
+      <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-8 pb-32 select-none {!collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
         <!-- Immersive Ambient Blurred Background -->
         {#if playerStore.currentSong}
           <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
@@ -207,7 +210,7 @@
           <div class="flex flex-col text-center md:text-left space-y-4 max-w-md">
             {#if playerStore.currentSong}
               <div>
-                <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent border border-brand-accent/25 rounded-full select-none">
+                <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-accent/25 rounded-full select-none">
                   Now Playing
                 </span>
               </div>

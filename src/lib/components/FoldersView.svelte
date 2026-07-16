@@ -87,11 +87,26 @@
     customColors = { ...themeStore.resolvedColors };
   }
 
-  // Pre-fill theme builder with current active theme colors on mount and updates
+  // Pre-fill theme builder with current active theme colors on mount and
+  // updates — skipped while editing an existing custom theme, since that
+  // case is seeded from the theme being edited instead (below).
   $effect(() => {
     const _themeId = themeStore.activeThemeId;
     const _songId = playerStore.currentSong?.id;
-    loadActiveThemeColors();
+    if (!editingThemeId) {
+      loadActiveThemeColors();
+    }
+  });
+
+  let editingTheme = $derived(themeStore.customThemes.find(t => t.id === editingThemeId));
+
+  // Seed the builder (Simple and Advanced share this same customColors/
+  // newThemeName state) from the theme being edited whenever Edit is clicked.
+  $effect(() => {
+    if (editingTheme) {
+      newThemeName = editingTheme.name;
+      customColors = { ...editingTheme.colors };
+    }
   });
 
   function handleLivePreview() {
@@ -123,15 +138,24 @@
       return;
     }
 
-    const id = "custom-" + newThemeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-    await themeStore.addCustomTheme({
-      id,
-      name: newThemeName.trim(),
-      colors: { ...customColors },
-      isCustom: true
-    });
-
-    newThemeName = "";
+    if (editingThemeId) {
+      await themeStore.addCustomTheme({
+        id: editingThemeId,
+        name: newThemeName.trim(),
+        colors: { ...customColors },
+        isCustom: true
+      });
+      editingThemeId = null;
+    } else {
+      const id = "custom-" + newThemeName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+      await themeStore.addCustomTheme({
+        id,
+        name: newThemeName.trim(),
+        colors: { ...customColors },
+        isCustom: true
+      });
+      newThemeName = "";
+    }
   }
 </script>
 
@@ -139,7 +163,7 @@
   <!-- Top Header bar -->
   <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <Settings class="w-5 h-5 text-brand-accent" />
+      <Settings class="w-5 h-5 text-brand-accent-text" />
       <h2 class="text-base font-bold text-brand-text-primary">Settings</h2>
     </div>
 
@@ -188,7 +212,7 @@
 
       <!-- Info Banner -->
       <div class="bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-        <HelpCircle class="w-5 h-5 text-brand-accent shrink-0 mt-0.5" />
+        <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
         <div class="space-y-1">
           <h4 class="font-semibold text-brand-text-primary">How do Watched Folders work?</h4>
           <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
@@ -204,7 +228,7 @@
         {#each collectionStore.directories as dir}
           <div class="flex items-center justify-between bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 hover:border-brand-border/80 transition-colors">
             <div class="flex items-center gap-3.5 min-w-0">
-              <div class="w-10 h-10 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent">
+              <div class="w-10 h-10 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text">
                 <Folder class="w-5 h-5" />
               </div>
               <div class="min-w-0">
@@ -240,15 +264,10 @@
               {@const previewColors = getPreviewColors(theme)}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
-                class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
+                class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-2 border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
               >
                 <div class="flex items-center justify-between w-full">
                   <span class="font-semibold text-sm text-brand-text-primary">{theme.name}</span>
-                  {#if themeStore.activeThemeId === theme.id}
-                    <div class="w-5 h-5 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-90 shadow">
-                      <Check class="w-3 h-3 stroke-[3]" />
-                    </div>
-                  {/if}
                 </div>
                 <!-- Miniature colors preview -->
                 <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
@@ -265,39 +284,39 @@
         {#if themeStore.customThemes.length > 0}
           <div>
             <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">Custom Themes</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {#each themeStore.customThemes as theme}
-                <div class="flex items-center justify-between bg-brand-sidebar/40 border rounded-xl p-4 transition-colors {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border hover:border-brand-border/80'}">
-                  <button onclick={() => themeStore.setTheme(theme.id)} class="flex-1 flex items-center justify-between text-left cursor-pointer mr-3">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium text-sm text-brand-text-primary">{theme.name}</span>
-                      {#if themeStore.activeThemeId === theme.id}
-                        <div class="w-4 h-4 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-90 shadow">
-                          <Check class="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      {/if}
-                    </div>
-                    <div class="flex gap-1 h-6 w-24 rounded overflow-hidden border border-brand-border/30 bg-black/10">
-                      <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}"></div>
-                      <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}"></div>
-                      <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}"></div>
-                      <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}"></div>
-                    </div>
-                  </button>
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <div
+                  onclick={() => themeStore.setTheme(theme.id)}
+                  role="button"
+                  tabindex="0"
+                  class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col gap-3 text-left transition-colors cursor-pointer w-full {themeStore.activeThemeId === theme.id ? 'border-2 border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border hover:border-brand-border/80'}"
+                >
+                  <div class="flex items-center justify-between w-full">
+                    <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
+                  </div>
+                  <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+                    <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}" title="Sidebar"></div>
+                    <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}" title="Main View"></div>
+                    <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}" title="Player Bar"></div>
+                    <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}" title="Accent"></div>
+                  </div>
                   <div class="flex gap-2">
                     <button
-                      onclick={() => { editingThemeId = theme.id; }}
-                      class="px-3 py-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
+                      onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
+                      class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
                       title="Edit Theme"
                     >
                       Edit
                     </button>
                     <button
-                      onclick={() => themeStore.deleteCustomTheme(theme.id)}
-                      class="p-1.5 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
+                      onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
+                      class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
                       title="Delete Theme"
                     >
-                      <Trash2 class="w-4 h-4" />
+                      <Trash2 class="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -310,28 +329,40 @@
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
           <div class="flex items-center justify-between border-b border-brand-border pb-3">
             <div class="flex items-center gap-2">
-              <Palette class="w-5 h-5 text-brand-accent" />
-              <h4 class="font-bold text-sm text-brand-text-primary">Custom Theme Builder</h4>
+              <Palette class="w-5 h-5 text-brand-accent-text" />
+              <h4 class="font-bold text-sm text-brand-text-primary">
+                {editingTheme ? `Editing "${editingTheme.name}"` : 'Custom Theme Builder'}
+              </h4>
             </div>
-            <!-- Simple/Advanced Toggle -->
-            <div class="flex items-center gap-2 bg-brand-main rounded-full p-0.5 border border-brand-border">
-              <button
-                onclick={() => { useAdvancedBuilder = false; }}
-                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              >
-                Simple
-              </button>
-              <button
-                onclick={() => { useAdvancedBuilder = true; }}
-                class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              >
-                Advanced
-              </button>
+            <div class="flex items-center gap-2">
+              {#if editingThemeId}
+                <button
+                  onclick={() => { editingThemeId = null; }}
+                  class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              {/if}
+              <!-- Simple/Advanced Toggle -->
+              <div class="flex items-center gap-2 bg-brand-main rounded-full p-0.5 border border-brand-border">
+                <button
+                  onclick={() => { useAdvancedBuilder = false; }}
+                  class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                >
+                  Simple
+                </button>
+                <button
+                  onclick={() => { useAdvancedBuilder = true; }}
+                  class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                >
+                  Advanced
+                </button>
+              </div>
             </div>
           </div>
 
           {#if useAdvancedBuilder}
-            <DesignTools {customColors} {newThemeName} />
+            <DesignTools {customColors} {newThemeName} themeId={editingThemeId} onSaved={() => { editingThemeId = null; }} />
           {:else}
             <div class="space-y-5">
               <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
@@ -349,7 +380,7 @@
                   onclick={loadActiveThemeColors}
                   class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
                 >
-                  <Palette class="w-4 h-4 text-brand-accent" /> Import Active Colors
+                  <Palette class="w-4 h-4 text-brand-accent-text" /> Import Active Colors
                 </button>
               </div>
 
@@ -432,28 +463,13 @@
                   onclick={saveCustomTheme}
                   class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
                 >
-                  Save Custom Theme
+                  {editingThemeId ? 'Save Changes' : 'Save Custom Theme'}
                 </button>
                 <span class="text-[10px] text-brand-text-secondary/50">Colors update the app instantly as you pick them!</span>
               </div>
             </div>
           {/if}
         </div>
-
-        {#if editingThemeId}
-          <div class="border-t border-brand-border pt-6 mt-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-bold text-brand-text-primary">Edit Theme - Design Tools</h3>
-              <button
-                onclick={() => { editingThemeId = null; }}
-                class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1 rounded border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
-              >
-                ✕ Close
-              </button>
-            </div>
-            <DesignTools themeId={editingThemeId} />
-          </div>
-        {/if}
       </div>
     {:else if settingsTab === "equalizer"}
       <!-- Equalizer Section -->

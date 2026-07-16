@@ -167,7 +167,7 @@
   <!-- Top Panel Toolbar -->
   <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
     <div class="flex items-center gap-3">
-      <FileText class="w-6 h-6 text-brand-accent" />
+      <FileText class="w-6 h-6 text-brand-accent-text" />
       <div>
         <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary">
           {playerStore.currentSong ? playerStore.currentSong.title : "No song playing"}
@@ -217,7 +217,7 @@
   <div class="flex-1 overflow-y-auto px-6 py-12 pb-24" bind:this={containerEl}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
-        <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent" />
+        <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent-text" />
         <span class="text-xs text-brand-text-secondary/60 font-medium">Fetching lyrics...</span>
       </div>
     {:else if isEditing}

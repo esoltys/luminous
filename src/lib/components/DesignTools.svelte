@@ -11,7 +11,7 @@
     getWcagBadgeText
   } from "../utils/colorUtils";
 
-  let { themeId = null, customColors = undefined, newThemeName = undefined }: { themeId?: string | null; customColors?: ThemeColors; newThemeName?: string } = $props();
+  let { themeId = null, customColors = undefined, newThemeName = undefined, onSaved = undefined }: { themeId?: string | null; customColors?: ThemeColors; newThemeName?: string; onSaved?: () => void } = $props();
 
   let showAdvanced = $state(false);
   let themeName = $state("");
@@ -85,17 +85,20 @@
         colorPresets = { ...theme.colors };
         applyLivePreview();
       }
-    } else {
+    } else if (isEditing) {
+      // Leaving edit mode (themeId went back to null/undefined) — drop back
+      // to the create-new-theme flow, reseeded from the current
+      // customColors/newThemeName props rather than left on stale edit state.
       isEditing = false;
-      themeName = "";
-      loadActiveThemeColors();
+      themeName = newThemeName ?? "";
+      if (customColors) {
+        colorPresets = { ...customColors };
+      }
     }
   }
 
   $effect(() => {
-    if (themeId) {
-      initializeTheme();
-    }
+    initializeTheme();
   });
 
   function loadActiveThemeColors() {
@@ -152,6 +155,7 @@
       });
       themeName = "";
     }
+    onSaved?.();
   }
 
   async function importTheme() {

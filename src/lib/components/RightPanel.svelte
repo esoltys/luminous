@@ -1,6 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import { Music, Clock } from "lucide-svelte";
 
   interface Props {
@@ -16,11 +17,11 @@
 
 <aside
   style="width: {width}px;"
-  class="relative bg-brand-sidebar border-l border-brand-border flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden rounded-tl-2xl rounded-bl-2xl"
+  class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
   class:glass-surface={themeStore.isGlassTheme}
 >
   <!-- Header -->
-  <div class="h-20 flex items-center px-6 border-b border-brand-border">
+  <div class="h-20 flex items-center px-6">
     <h2 class="text-lg font-bold text-brand-text-primary flex items-center gap-2">
       <Music class="w-5 h-5" />
       Now Playing
@@ -28,7 +29,7 @@
   </div>
 
   <!-- Content -->
-  <div class="flex-1 overflow-y-auto p-6 space-y-6">
+  <div class="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
     <!-- Current Song -->
     {#if currentSong}
       <div class="space-y-3">
@@ -39,7 +40,17 @@
 
         <div class="space-y-1">
           <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">Artist</p>
-          <p class="text-sm text-brand-text-secondary truncate">{currentSong.artist || "Unknown Artist"}</p>
+          {#if currentSong.artist}
+            <button
+              onclick={() => collectionStore.viewArtist(currentSong.album_artist?.trim() || currentSong.artist || "")}
+              class="text-sm text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 truncate cursor-pointer text-left"
+              title="View artist: {currentSong.artist}"
+            >
+              {currentSong.artist}
+            </button>
+          {:else}
+            <p class="text-sm text-brand-text-secondary truncate">Unknown Artist</p>
+          {/if}
         </div>
 
         <div class="space-y-1">
@@ -49,7 +60,7 @@
       </div>
 
       <!-- Playback Info -->
-      <div class="space-y-2 bg-brand-main/40 rounded-lg p-3">
+      <div class="space-y-2">
         {#if currentSong.bitrate}
           <div class="flex items-center justify-between text-xs">
             <span class="text-brand-text-secondary/60">Bitrate</span>

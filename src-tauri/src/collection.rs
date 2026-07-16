@@ -422,6 +422,24 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    pub fn get_songs_by_artist(&self, artist: &str) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?1
+               AND source IN (1, 2)
+               AND unavailable = 0
+             ORDER BY album, disc, track",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![artist], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Group only by album name so that tracks with different per-track artists

@@ -136,7 +136,7 @@
           type="checkbox"
           bind:checked={enabled}
           onchange={handleToggle}
-          class="w-4 h-4 text-brand-accent bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
+          class="w-4 h-4 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
         />
       </div>
 
@@ -216,7 +216,7 @@
       {#each gains as gain, idx}
         <div class="flex flex-col items-center justify-between h-full group">
           <!-- Gain display -->
-          <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
+          <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
             {gain > 0 ? "+" : ""}{gain.toFixed(1)}
           </span>
 

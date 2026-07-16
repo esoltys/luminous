@@ -137,7 +137,7 @@
     <!-- Header -->
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
-        <Sliders class="w-4 h-4 text-brand-accent" />
+        <Sliders class="w-4 h-4 text-brand-accent-text" />
         <h3 class="text-sm font-bold">Edit Track Metadata</h3>
       </div>
       <button onclick={onClose} disabled={isSaving} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50">
@@ -149,7 +149,7 @@
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       {#if isLoading}
         <div class="w-full py-16 flex flex-col items-center justify-center gap-3">
-          <LoaderCircle class="w-6 h-6 animate-spin text-brand-accent" />
+          <LoaderCircle class="w-6 h-6 animate-spin text-brand-accent-text" />
           <span class="text-xs text-brand-text-secondary/60 font-medium">Reading tags...</span>
         </div>
       {:else if errorMsg}
@@ -304,10 +304,10 @@
             class="flex items-center gap-1.5 bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
           >
             {#if isLookingUp}
-              <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent" />
+              <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent-text" />
               Looking up...
             {:else}
-              <Sparkles class="w-3.5 h-3.5 text-brand-accent" />
+              <Sparkles class="w-3.5 h-3.5 text-brand-accent-text" />
               Lookup AcoustID
             {/if}
           </button>

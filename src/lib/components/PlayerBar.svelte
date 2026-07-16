@@ -95,7 +95,7 @@
         {#if playerStore.currentSong?.title}
           <button
             onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.title || ""); }}
-            class="text-sm font-semibold text-brand-text-primary hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate cursor-pointer"
+            class="text-sm font-semibold text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
             title="Filter by title: {playerStore.currentSong.title}"
           >
             {playerStore.currentSong.title}
@@ -106,16 +106,16 @@
           </span>
         {/if}
         {#if playerStore.currentSong}
-          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent border border-brand-accent/20 shadow-sm shrink-0">
+          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
         {/if}
       </div>
       {#if playerStore.currentSong?.artist}
         <button
-          onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.artist || ""); }}
-          class="text-xs text-brand-text-secondary/70 hover:text-brand-accent hover:underline transition-all duration-150 text-left truncate cursor-pointer"
-          title="Filter by artist: {playerStore.currentSong.artist}"
+          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
+          class="text-xs text-brand-text-secondary/70 hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
+          title="View artist: {playerStore.currentSong.artist}"
         >
           {playerStore.currentSong.artist}
         </button>
@@ -132,7 +132,7 @@
     <div class="flex items-center gap-5">
       <button
         onclick={cycleShuffle}
-        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent font-bold' : 'text-brand-text-secondary/50'}"
+        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
         title="Shuffle Mode: {playerStore.shuffleMode}"
       >
         <Shuffle class="w-4 h-4" />
@@ -169,7 +169,7 @@
 
       <button
         onclick={cycleRepeat}
-        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent font-bold' : 'text-brand-text-secondary/50'}"
+        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
         title="Repeat Mode: {playerStore.repeatMode}"
       >
         {#if playerStore.repeatMode === 'track'}
@@ -225,7 +225,7 @@
     {#if collectionStore.immersiveMode}
       <button 
         onclick={() => collectionStore.toggleImmersiveMode()}
-        class="text-brand-text-secondary hover:text-brand-accent transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
+        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
         title="Restore Full Interface"
       >
         <PanelBottomOpen class="w-4.5 h-4.5" />

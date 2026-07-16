@@ -85,7 +85,7 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar border-b border-brand-border flex items-center px-6 gap-6 z-40 overflow-hidden rounded-bl-2xl rounded-br-2xl" class:glass-surface={themeStore.isGlassTheme}>
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-40 overflow-hidden" class:glass-surface={themeStore.isGlassTheme}>
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
@@ -106,9 +106,6 @@
     </button>
   </div>
 
-  <!-- Divider -->
-  <div class="w-px h-6 bg-brand-border"></div>
-
   <!-- Universal Search Bar -->
   <form onsubmit={handleSearch} class="flex-1 max-w-2xl flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent transition-colors">
     <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
@@ -124,7 +121,7 @@
     <button
       type="button"
       onclick={handleOpenFiles}
-      class="p-1 text-brand-text-secondary hover:text-brand-accent transition-colors flex-shrink-0 cursor-pointer"
+      class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 cursor-pointer"
       title="Open Audio Files or Playlists (*.m3u)"
     >
       <FolderOpen class="w-4 h-4" />
@@ -140,7 +137,7 @@
       <button
         type="button"
         onclick={clearSearch}
-        class="p-1 text-brand-text-secondary hover:text-brand-accent transition-colors flex-shrink-0 font-bold leading-none text-sm"
+        class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 font-bold leading-none text-sm"
         title="Clear Search"
       >
         ✕
@@ -152,21 +149,21 @@
   <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
     <button
       onclick={() => collectionStore.toggleSidebar()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
       title="Toggle Left Sidebar"
     >
       <PanelLeft class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleImmersiveMode()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {!collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {!collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
       title="Toggle Immersive Album Art Screen"
     >
       <PanelBottom class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleRightPanel()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
       title="Toggle Right Panel"
     >
       <PanelRight class="w-4 h-4" />
