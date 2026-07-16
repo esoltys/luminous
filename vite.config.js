@@ -1,12 +1,13 @@
 import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
+import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [tailwindcss(), sveltekit(), tauriIpcMockPlugin()],
   test: {
     globals: true,
     include: ["src/**/*.{test,spec}.{js,ts}"],

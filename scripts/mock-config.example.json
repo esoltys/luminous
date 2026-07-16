@@ -1,0 +1,6 @@
+{
+  "dbPath": "/absolute/path/to/luminous.db",
+  "featuredSong": "You Wreck Me",
+  "featuredArtist": "Eric Soltys",
+  "songLimit": 2000
+}
