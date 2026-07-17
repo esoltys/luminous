@@ -1,6 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home } from "lucide-svelte";
@@ -141,7 +142,7 @@
   {/if}
 
   <!-- Scanning status / trigger -->
-  <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} mb-24 text-xs flex-shrink-0">
+  <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} text-xs flex-shrink-0" class:mb-24={playerStore.hasEverPlayed}>
     {#if collectionStore.isScanning}
       {#if isCollapsed}
         <div

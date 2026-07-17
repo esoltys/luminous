@@ -247,7 +247,7 @@
   </div>
 
   <!-- Songs Table Section -->
-  <div class="px-6 md:px-8 py-6 pb-24">
+  <div class="px-6 md:px-8 py-6" class:pb-24={playerStore.hasEverPlayed}>
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/30 overflow-hidden">
       <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">

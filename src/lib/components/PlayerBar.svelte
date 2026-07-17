@@ -8,8 +8,6 @@
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import MoodBar from "./MoodBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
-  import { fade } from "svelte/transition";
-
 
   import {
     Play,
@@ -102,7 +100,7 @@
   }
 </script>
 
-<footer in:fade={{ duration: 600 }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
+<footer class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <button

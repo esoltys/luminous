@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PlayerStore } from "./player.svelte";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 describe("PlayerStore", () => {
   let store: PlayerStore;
@@ -119,5 +120,28 @@ describe("PlayerStore", () => {
     const testPaths = ["/path/to/song.mp3", "/path/to/playlist.m3u"];
     await store.openAndPlay(testPaths);
     expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: testPaths });
+  });
+
+  it("should latch hasEverPlayed once a track loads and keep it true after the track clears", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let trackChangedCallback: ((event: { payload: { song: unknown } }) => void) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "track-changed") trackChangedCallback = callback;
+      return () => {};
+    });
+
+    store = new PlayerStore();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(store.hasEverPlayed).toBe(false);
+
+    trackChangedCallback?.({ payload: { song: { id: 1, title: "Test Song" } } });
+    expect(store.hasEverPlayed).toBe(true);
+
+    trackChangedCallback?.({ payload: { song: null } });
+    expect(store.currentSong).toBeUndefined();
+    expect(store.hasEverPlayed).toBe(true);
+
+    if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
   });
 });

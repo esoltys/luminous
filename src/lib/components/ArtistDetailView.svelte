@@ -263,7 +263,7 @@
 
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
-    <div class="px-8 pt-10 pb-24">
+    <div class="px-8 pt-10" class:pb-24={playerStore.hasEverPlayed}>
       <h2 class="text-xl font-semibold text-brand-text-primary mb-4">{i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}</h2>
       <HorizontalScrollRow>
         {#each playlists as playlist (playlist.id)}
@@ -281,7 +281,7 @@
       </HorizontalScrollRow>
     </div>
   {:else}
-    <div class="pb-24"></div>
+    <div class:pb-24={playerStore.hasEverPlayed}></div>
   {/if}
 </div>
 

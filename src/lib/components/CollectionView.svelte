@@ -293,7 +293,7 @@
   </div>
 
   <!-- Main View Scrollable Container -->
-  <div class="flex-1 px-6 pt-2 pb-24 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}">
+  <div class="flex-1 px-6 pt-2 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}" class:pb-24={playerStore.hasEverPlayed}>
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">

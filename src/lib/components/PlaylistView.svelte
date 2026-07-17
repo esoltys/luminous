@@ -198,7 +198,7 @@
     </div>
 
     <!-- Tracks List Scrollable Container -->
-    <div class="flex-1 overflow-hidden p-6 pb-24 relative z-10 flex flex-col">
+    <div class="flex-1 overflow-hidden p-6 relative z-10 flex flex-col" class:pb-24={playerStore.hasEverPlayed}>
       <div class="flex-1 overflow-auto border border-brand-border rounded-lg bg-brand-sidebar/30 backdrop-blur-md">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
