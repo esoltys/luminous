@@ -18,6 +18,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { parseFile } from "music-metadata";
 import type { Song } from "../src/lib/types/index";
 
 export const EMBEDDED_ART_CACHE_DIR = path.join(os.tmpdir(), "luminous-mock-embedded-art");
@@ -47,7 +48,6 @@ export async function resolveEmbeddedArt(song: Song): Promise<string | undefined
   }
 
   try {
-    const { parseFile } = await import("music-metadata");
     const metadata = await parseFile(song.path);
     const picture = metadata.common.picture?.[0];
     if (!picture) return undefined;
