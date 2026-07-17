@@ -105,10 +105,11 @@
   async function pushParametricBand(index: number) {
     const band = parametric[index];
     if (!band) return;
+    activePreset = "Custom";
     await ensureEnabled();
+    // Band center frequencies are fixed — only gain and Q are adjustable.
     await invoke("set_parametric_band", {
       bandIdx: index,
-      freq: band.freq,
       gainDb: band.gain_db,
       q: band.q
     });
@@ -140,10 +141,6 @@
   const FREQ_MIN = 20;
   const FREQ_MAX = 20000;
   const FREQ_SPAN = Math.log(FREQ_MAX / FREQ_MIN);
-
-  function freqToUnit(freq: number): number {
-    return Math.log(Math.max(freq, FREQ_MIN) / FREQ_MIN) / FREQ_SPAN;
-  }
 
   function unitToFreq(unit: number): number {
     return Math.round(FREQ_MIN * Math.exp(unit * FREQ_SPAN));
@@ -403,42 +400,26 @@
         {/each}
       </div>
 
-      <!-- Selected band detail: frequency + Q -->
+      <!-- Selected band detail: Q only (band frequencies are fixed) -->
       {#if parametric[selectedBand]}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-              <span>{i18n.t('equalizer.bandLabel')} {selectedBand + 1} — {i18n.t('equalizer.frequency').toUpperCase()}</span>
-              <span class="text-brand-accent-text font-mono">{formatFreq(parametric[selectedBand].freq)}Hz</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.001"
-              value={freqToUnit(parametric[selectedBand].freq)}
-              oninput={(e) => {
-                parametric[selectedBand].freq = unitToFreq(parseFloat(e.currentTarget.value));
-                pushParametricBand(selectedBand);
-              }}
-              class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
-            />
+        <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+            <span>
+              {i18n.t('equalizer.bandLabel')} {selectedBand + 1}
+              <span class="text-brand-text-secondary/50 font-mono">· {formatFreq(parametric[selectedBand].freq)}Hz</span>
+              — {i18n.t('equalizer.qFactor').toUpperCase()}
+            </span>
+            <span class="text-brand-accent-text font-mono">{parametric[selectedBand].q.toFixed(1)}</span>
           </div>
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-              <span>{i18n.t('equalizer.qFactor').toUpperCase()}</span>
-              <span class="text-brand-accent-text font-mono">{parametric[selectedBand].q.toFixed(1)}</span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="10"
-              step="0.1"
-              bind:value={parametric[selectedBand].q}
-              oninput={() => pushParametricBand(selectedBand)}
-              class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
-            />
-          </div>
+          <input
+            type="range"
+            min="0.1"
+            max="10"
+            step="0.1"
+            bind:value={parametric[selectedBand].q}
+            oninput={() => pushParametricBand(selectedBand)}
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+          />
         </div>
       {/if}
     {/if}

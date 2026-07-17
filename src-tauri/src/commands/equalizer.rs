@@ -96,7 +96,6 @@ pub async fn set_equalizer_band(
 pub async fn set_parametric_band(
     state: State<'_, AppState>,
     band_idx: usize,
-    freq: f32,
     gain_db: f32,
     q: f32,
 ) -> Result<(), String> {
@@ -105,7 +104,7 @@ pub async fn set_parametric_band(
     }
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
-    eq.set_parametric_band(band_idx, freq, gain_db, q);
+    eq.set_parametric_band(band_idx, gain_db, q);
     save_eq_settings(&state.db, &eq);
     Ok(())
 }

@@ -233,13 +233,12 @@ impl Equalizer {
         }
     }
 
-    pub fn set_parametric_band(&mut self, band_idx: usize, freq: f32, gain_db: f32, q: f32) {
+    /// Update a parametric band's gain and Q. The center frequency is fixed
+    /// (set from `default_parametric_bands`) and is not user-adjustable.
+    pub fn set_parametric_band(&mut self, band_idx: usize, gain_db: f32, q: f32) {
         if band_idx < PARAMETRIC_BAND_COUNT {
-            self.parametric[band_idx] = ParametricBand {
-                freq: freq.clamp(PARAMETRIC_FREQ_MIN, PARAMETRIC_FREQ_MAX),
-                gain_db: gain_db.clamp(-12.0, 12.0),
-                q: q.clamp(PARAMETRIC_Q_MIN, PARAMETRIC_Q_MAX),
-            };
+            self.parametric[band_idx].gain_db = gain_db.clamp(-12.0, 12.0);
+            self.parametric[band_idx].q = q.clamp(PARAMETRIC_Q_MIN, PARAMETRIC_Q_MAX);
             self.recalculate_parametric_band(band_idx);
         }
     }
@@ -388,10 +387,11 @@ mod tests {
         eq.update_format(44100, 2);
         eq.enabled = true;
         eq.set_mode(EqMode::Parametric20);
-        // Band 10 defaults near 1 kHz region; pin it exactly for the test.
-        eq.set_parametric_band(10, 1000.0, 9.0, 2.0);
+        // Boost band 10 and probe at its fixed center frequency.
+        let center = eq.parametric[10].freq;
+        eq.set_parametric_band(10, 9.0, 2.0);
 
-        let original = sine(1000.0, 44100.0, 4096, 2);
+        let original = sine(center, 44100.0, 4096, 2);
         let mut processed = original.clone();
         eq.process_interleaved(&mut processed);
 
@@ -400,16 +400,18 @@ mod tests {
         let proc_rms = rms(&processed[2048..]);
         assert!(
             proc_rms > orig_rms * 1.5,
-            "expected boost at 1 kHz: orig {orig_rms}, processed {proc_rms}"
+            "expected boost at {center} Hz: orig {orig_rms}, processed {proc_rms}"
         );
     }
 
     #[test]
     fn parametric_band_values_are_clamped() {
         let mut eq = Equalizer::new();
-        eq.set_parametric_band(0, 5.0, 40.0, 100.0);
+        let fixed_freq = eq.parametric[0].freq;
+        eq.set_parametric_band(0, 40.0, 100.0);
         let band = eq.parametric[0];
-        assert_eq!(band.freq, PARAMETRIC_FREQ_MIN);
+        // Frequency is fixed — gain and Q clamp to their limits.
+        assert_eq!(band.freq, fixed_freq);
         assert_eq!(band.gain_db, 12.0);
         assert_eq!(band.q, PARAMETRIC_Q_MAX);
     }
