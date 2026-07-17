@@ -1,5 +1,6 @@
 {
-  "dbPath": "/absolute/path/to/luminous.db",
+  "//dbPath": "Optional. Auto-detected from the real app's Tauri app-data dir (e.g. %APPDATA%\\org.luminous.app\\luminous.db on Windows) if omitted. Set this to point at a different database instead.",
+  "dbPath": "",
   "songLimit": 2000,
   "default": {
     "language": "en",
