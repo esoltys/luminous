@@ -316,7 +316,7 @@ export const en = {
     enableEq: "Enable EQ",
     subtitle: "Shape your frequency response with a 10-band cascaded peaking filter",
     titleParametric: "20-Band Parametric Equalizer",
-    subtitleParametric: "Sculpt precise corrections with 20 adjustable frequency, gain and Q bands",
+    subtitleParametric: "Sculpt precise corrections across 20 fixed bands with adjustable gain and Q",
     modeLabel: "Mode",
     modeGraphic: "10-band graphic",
     modeParametric: "20-band parametric",

@@ -316,7 +316,7 @@ export const fr = {
     enableEq: "Activer l'égaliseur",
     subtitle: "Ajustez votre réponse en fréquence avec un filtre de crête en cascade à 10 bandes",
     titleParametric: "Égaliseur paramétrique à 20 bandes",
-    subtitleParametric: "Sculptez des corrections précises avec 20 bandes réglables en fréquence, gain et Q",
+    subtitleParametric: "Sculptez des corrections précises sur 20 bandes fixes, à gain et Q réglables",
     modeLabel: "Mode",
     modeGraphic: "Graphique 10 bandes",
     modeParametric: "Paramétrique 20 bandes",
