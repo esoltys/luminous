@@ -57,6 +57,7 @@ export const fr = {
     tableHeaderArtist: "Artiste",
     tableHeaderAlbum: "Album",
     tableHeaderPlays: "Lectures",
+    tableHeaderRating: "Note",
     tableHeaderDuration: "Durée",
     tableHeaderActions: "Actions",
     playSong: "Lire la chanson",
@@ -347,6 +348,12 @@ export const fr = {
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
+  },
+  rating: {
+    label: "Note",
+    setTooltip: "Noter {value} sur 5",
+    favoriteTooltip: "Ajouter aux favoris",
+    unfavoriteTooltip: "Retirer des favoris"
   },
   common: {
     scrollLeft: "Défiler vers la gauche",

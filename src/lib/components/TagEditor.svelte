@@ -5,6 +5,7 @@
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import StarRating from "./StarRating.svelte";
 
   interface Props {
     songId: number;
@@ -24,6 +25,7 @@
   let disc = $state<number | null>(null);
   let year = $state<number | null>(null);
   let path = $state("");
+  let rating = $state(-1);
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -48,6 +50,7 @@
         track: number | null;
         disc: number | null;
         year: number | null;
+        rating: number;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -60,6 +63,7 @@
       disc = details.disc;
       year = details.year;
       path = details.path;
+      rating = details.rating;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
@@ -127,6 +131,16 @@
       alert(i18n.t('tagEditor.saveFailedPrefix') + e.toString());
     } finally {
       isSaving = false;
+    }
+  }
+
+  // Rating lives in the library database only (never written to the file),
+  // so it saves immediately rather than waiting for the Save button.
+  async function handleRate(value: number) {
+    try {
+      rating = await invoke<number>("set_song_rating", { songId, rating: value });
+    } catch (e) {
+      console.error("Failed to save rating:", e);
     }
   }
 
@@ -241,6 +255,12 @@
                 disabled={isSaving}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
+            </div>
+
+            <!-- Rating (library-only, saves immediately) -->
+            <div class="flex flex-col gap-1.5 col-span-2">
+              <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
+              <StarRating {rating} onRate={handleRate} size="md" />
             </div>
 
             <!-- Year -->

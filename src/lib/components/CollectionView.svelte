@@ -4,6 +4,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import HeartToggle from "./HeartToggle.svelte";
   import TagEditor from "./TagEditor.svelte";
   import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
@@ -180,6 +181,11 @@
     } else {
       alert(i18n.t('collection.selectPlaylistFirstAlert'));
     }
+  }
+
+  async function toggleFavorite(song: Song) {
+    const next = song.rating === 5 ? -1 : 5;
+    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating: next });
   }
 </script>
 
@@ -415,6 +421,10 @@
                 </div>
                 <div class="text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</div>
                 <div class="flex items-center justify-center gap-2.5">
+                  <HeartToggle
+                    favorite={song.rating === 5}
+                    onToggle={() => toggleFavorite(song)}
+                  />
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
                     class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"

@@ -4,6 +4,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import StarRating from "./StarRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import { ArrowLeft, Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem } from "../types";
@@ -150,6 +151,10 @@
     const s = sec % 60;
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
+
+  async function rateSong(song: Song, rating: number) {
+    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
+  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll">
@@ -251,10 +256,11 @@
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/30 overflow-hidden">
       <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-        <div class="grid grid-cols-[36px_40px_1fr_60px_60px_80px] items-center py-2.5 px-4">
+        <div class="grid grid-cols-[36px_40px_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
           <div class="text-center w-9"></div>
           <div class="text-left">{i18n.t('collection.tableHeaderTrack')}</div>
           <div class="text-left">{i18n.t('collection.tableHeaderTitle')}</div>
+          <div class="text-center">{i18n.t('collection.tableHeaderRating')}</div>
           <div class="text-center">{i18n.t('collection.tableHeaderPlays')}</div>
           <div class="text-center">
             <Clock class="w-3.5 h-3.5 mx-auto" />
@@ -280,7 +286,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div
               ondblclick={() => handlePlaySong(song)}
-              class="grid grid-cols-[36px_40px_1fr_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
+              class="grid grid-cols-[36px_40px_1fr_96px_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
                 {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
             >
               <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -316,6 +322,10 @@
                     LRC
                   </span>
                 {/if}
+              </div>
+
+              <div class="flex justify-center">
+                <StarRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
               </div>
 
               <div class="text-center text-brand-text-secondary/80 font-medium">

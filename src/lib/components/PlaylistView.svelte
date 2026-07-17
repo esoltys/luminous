@@ -6,6 +6,8 @@
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
+  import { invoke } from "@tauri-apps/api/core";
+  import HeartToggle from "./HeartToggle.svelte";
   import TagEditor from "./TagEditor.svelte";
 
   let editingSongId = $state<number | null>(null);
@@ -59,6 +61,15 @@
     if (playlistsStore.activePlaylistId !== null) {
       playlistsStore.removeItemsFromPlaylist(playlistsStore.activePlaylistId, [uuid]);
     }
+  }
+
+  async function toggleFavorite(item: PlaylistItem) {
+    if (!item.song) return;
+    const next = item.song.rating === 5 ? -1 : 5;
+    item.song.rating = await invoke<number>("set_song_rating", {
+      songId: item.song.id,
+      rating: next,
+    });
   }
 
   // Drag and drop state and handlers
@@ -323,6 +334,12 @@
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
+                    {#if item.song && !unavailable}
+                      <HeartToggle
+                        favorite={item.song.rating === 5}
+                        onToggle={() => toggleFavorite(item)}
+                      />
+                    {/if}
                     <button
                       onclick={() => item.song?.id && !unavailable && openTagEditor(item.song.id)}
                       class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30"

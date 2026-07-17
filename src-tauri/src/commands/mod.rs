@@ -5,5 +5,6 @@ pub mod lyrics;
 pub mod player;
 pub mod playlist;
 pub mod settings;
+pub mod stats;
 pub mod tageditor;
 pub mod visualizer;

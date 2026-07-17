@@ -57,6 +57,7 @@ export const en = {
     tableHeaderArtist: "Artist",
     tableHeaderAlbum: "Album",
     tableHeaderPlays: "Plays",
+    tableHeaderRating: "Rating",
     tableHeaderDuration: "Duration",
     tableHeaderActions: "Actions",
     playSong: "Play song",
@@ -347,6 +348,12 @@ export const en = {
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
+  },
+  rating: {
+    label: "Rating",
+    setTooltip: "Rate {value} of 5",
+    favoriteTooltip: "Add to favorites",
+    unfavoriteTooltip: "Remove from favorites"
   },
   common: {
     scrollLeft: "Scroll left",

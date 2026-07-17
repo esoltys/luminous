@@ -15,6 +15,7 @@ pub struct SongDetails {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
+    pub rating: f32,
 }
 
 #[tauri::command]
@@ -24,7 +25,7 @@ pub async fn get_song_details(
 ) -> Result<SongDetails, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year 
+        "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year, rating
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -40,6 +41,7 @@ pub async fn get_song_details(
                 track: row.get(8).ok(),
                 disc: row.get(9).ok(),
                 year: row.get(10).ok(),
+                rating: row.get(11).unwrap_or(crate::stats::RATING_UNRATED),
             })
         },
     )

@@ -50,6 +50,16 @@ export class PlayerStore {
         themeStore.updateArtworkColors(this.currentSong);
       });
 
+      // Keep the current song's rating in sync when stats change elsewhere
+      // (rating edits in list views, scrobble-point playcount bumps).
+      await listen<{ song_id: number; rating?: number }>("song-stats-changed", (event) => {
+        if (this.currentSong && this.currentSong.id === event.payload.song_id) {
+          if (typeof event.payload.rating === "number") {
+            this.currentSong.rating = event.payload.rating;
+          }
+        }
+      });
+
       // Check for startup file argument
       const startupFile = await invoke<string | null>("get_startup_file");
       if (startupFile) {
@@ -150,6 +160,16 @@ export class PlayerStore {
   async setRepeatMode(mode: RepeatMode) {
     this.repeatMode = mode;
     await invoke("set_repeat_mode", { mode });
+  }
+
+  /** Heart = rating 5.0; unheart clears the rating. */
+  async toggleFavorite() {
+    if (!this.currentSong) return;
+    const next = this.currentSong.rating === 5 ? -1 : 5;
+    this.currentSong.rating = await invoke<number>("set_song_rating", {
+      songId: this.currentSong.id,
+      rating: next,
+    });
   }
 }
 
