@@ -18,6 +18,49 @@ function parseNameFilter(argv: string[]): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolves a `luminous-art://...` (or its Windows rewrite,
+ * `http://luminous-art.localhost/...`) request to a file under coversDir,
+ * mirroring the custom protocol handler in src-tauri/src/lib.rs exactly —
+ * there's no real Tauri backend in the browser to answer these requests, so
+ * without this every cover art image 404s.
+ */
+function resolveCoverArtPath(requestUrl: string, coversDir: string): string {
+  let trimmed = requestUrl;
+  if (requestUrl.startsWith("http://luminous-art.localhost/")) {
+    trimmed = requestUrl.slice("http://luminous-art.localhost/".length);
+  } else if (requestUrl.startsWith("luminous-art://")) {
+    trimmed = requestUrl.slice("luminous-art://".length);
+  }
+  if (trimmed.startsWith("localhost/")) {
+    trimmed = trimmed.slice("localhost/".length);
+  }
+  trimmed = trimmed.replace(/\/+$/, "");
+
+  if (trimmed.startsWith("local/")) {
+    return decodeURIComponent(trimmed.slice("local/".length));
+  }
+  return path.join(coversDir, decodeURIComponent(trimmed));
+}
+
+async function registerCoverArtRoute(page: import("playwright").Page, coversDir: string | undefined) {
+  if (!coversDir) return;
+  const handler = async (route: import("playwright").Route) => {
+    const filePath = resolveCoverArtPath(route.request().url(), coversDir);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      await route.fulfill({
+        status: 200,
+        contentType: filePath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg",
+        body: fs.readFileSync(filePath),
+      });
+    } else {
+      await route.fulfill({ status: 404, body: Buffer.alloc(0) });
+    }
+  };
+  await page.route("http://luminous-art.localhost/**", handler);
+  await page.route("luminous-art://**", handler);
+}
+
 async function main() {
   if (process.env.CI) {
     console.log("[Screenshot Automation] Running in CI environment. Skipping screenshot generation.");
@@ -121,6 +164,7 @@ async function main() {
   // the "featured" selection and UI settings vary per-screenshot.
   const libraryJson = JSON.stringify(mockLibrary);
   const mockCode = compileMockScript();
+  const coversDir = mockLibrary.dbPath ? path.join(path.dirname(mockLibrary.dbPath), "covers") : undefined;
 
   interface CaptureOptions {
     tab: string;
@@ -154,6 +198,7 @@ async function main() {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Language: ${language}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 800 });
+    await registerCoverArtRoute(page, coversDir);
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
         console.warn(`[Page ${msg.type()}] ${msg.text()}`);
