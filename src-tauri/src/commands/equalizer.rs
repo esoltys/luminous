@@ -1,23 +1,52 @@
+use crate::equalizer::{EqMode, Equalizer, ParametricBand, PARAMETRIC_BAND_COUNT};
 use crate::AppState;
 use tauri::State;
 
 #[derive(serde::Serialize)]
 pub struct EqualizerConfig {
     pub enabled: bool,
+    pub mode: EqMode,
     pub gains: [f32; 10],
     pub preamp: f32,
+    pub parametric: Vec<ParametricBand>,
 }
 
-fn save_eq_settings(db: &crate::db::Database, enabled: bool, preamp: f32, gains: &[f32; 10]) {
+impl EqualizerConfig {
+    fn from_eq(eq: &Equalizer) -> Self {
+        Self {
+            enabled: eq.enabled,
+            mode: eq.mode,
+            gains: eq.gains,
+            preamp: eq.preamp,
+            parametric: eq.parametric.to_vec(),
+        }
+    }
+}
+
+fn save_eq_settings(db: &crate::db::Database, eq: &Equalizer) {
     if let Ok(conn) = db.pool.get() {
-        let gains_str = gains
+        let gains_str = eq
+            .gains
             .iter()
             .map(|g| g.to_string())
             .collect::<Vec<String>>()
             .join(",");
+        let mode_str = match eq.mode {
+            EqMode::Graphic10 => "graphic10",
+            EqMode::Parametric20 => "parametric20",
+        };
+        let parametric_json = serde_json::to_string(&eq.parametric.to_vec()).unwrap_or_default();
         let _ = conn.execute(
-            "UPDATE equalizer_settings SET enabled = ?1, preamp = ?2, gains = ?3 WHERE id = 1",
-            rusqlite::params![if enabled { 1 } else { 0 }, preamp as f64, gains_str],
+            "UPDATE equalizer_settings
+             SET enabled = ?1, preamp = ?2, gains = ?3, mode = ?4, parametric = ?5
+             WHERE id = 1",
+            rusqlite::params![
+                if eq.enabled { 1 } else { 0 },
+                eq.preamp as f64,
+                gains_str,
+                mode_str,
+                parametric_json
+            ],
         );
     }
 }
@@ -26,11 +55,7 @@ fn save_eq_settings(db: &crate::db::Database, enabled: bool, preamp: f32, gains:
 pub async fn get_equalizer_state(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
     let engine = state.audio.lock().await;
     let eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
-    Ok(EqualizerConfig {
-        enabled: eq.enabled,
-        gains: eq.gains,
-        preamp: eq.preamp,
-    })
+    Ok(EqualizerConfig::from_eq(&eq))
 }
 
 #[tauri::command]
@@ -41,7 +66,16 @@ pub async fn set_equalizer_enabled(
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.enabled = enabled;
-    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
+    save_eq_settings(&state.db, &eq);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_equalizer_mode(state: State<'_, AppState>, mode: EqMode) -> Result<(), String> {
+    let engine = state.audio.lock().await;
+    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    eq.set_mode(mode);
+    save_eq_settings(&state.db, &eq);
     Ok(())
 }
 
@@ -54,8 +88,34 @@ pub async fn set_equalizer_band(
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_gain(band_idx, gain_db);
-    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
+    save_eq_settings(&state.db, &eq);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn set_parametric_band(
+    state: State<'_, AppState>,
+    band_idx: usize,
+    gain_db: f32,
+    q: f32,
+) -> Result<(), String> {
+    if band_idx >= PARAMETRIC_BAND_COUNT {
+        return Err(format!("band index {band_idx} out of range"));
+    }
+    let engine = state.audio.lock().await;
+    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    eq.set_parametric_band(band_idx, gain_db, q);
+    save_eq_settings(&state.db, &eq);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reset_parametric_bands(state: State<'_, AppState>) -> Result<EqualizerConfig, String> {
+    let engine = state.audio.lock().await;
+    let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
+    eq.load_parametric(crate::equalizer::default_parametric_bands());
+    save_eq_settings(&state.db, &eq);
+    Ok(EqualizerConfig::from_eq(&eq))
 }
 
 #[tauri::command]
@@ -66,7 +126,7 @@ pub async fn set_equalizer_preamp(
     let engine = state.audio.lock().await;
     let mut eq = engine.equalizer.lock().map_err(|e| e.to_string())?;
     eq.set_preamp(preamp_db);
-    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
+    save_eq_settings(&state.db, &eq);
     Ok(())
 }
 
@@ -88,12 +148,14 @@ pub async fn load_equalizer_preset(
         _ => [0.0; 10], // Flat
     };
 
+    // Always update the graphic gains so the preset is intact if the user
+    // switches back to 10-band; additionally map it onto the parametric bands
+    // when that mode is active so the same named presets work there too.
     eq.load_preset(gains);
-    save_eq_settings(&state.db, eq.enabled, eq.preamp, &eq.gains);
+    if eq.mode == EqMode::Parametric20 {
+        eq.load_preset_into_parametric(gains);
+    }
+    save_eq_settings(&state.db, &eq);
 
-    Ok(EqualizerConfig {
-        enabled: eq.enabled,
-        gains: eq.gains,
-        preamp: eq.preamp,
-    })
+    Ok(EqualizerConfig::from_eq(&eq))
 }

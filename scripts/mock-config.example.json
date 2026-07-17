@@ -54,6 +54,20 @@
       "action": "click-themes"
     },
     {
+      "name": "equalizer",
+      "filename": "equalizer.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-equalizer"
+    },
+    {
+      "name": "equalizer-parametric",
+      "filename": "equalizer-parametric.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-equalizer-parametric"
+    },
+    {
       "name": "now-playing",
       "filename": "now-playing.png",
       "tab": "collection",

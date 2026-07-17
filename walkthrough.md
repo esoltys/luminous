@@ -1,73 +1,124 @@
-# Walkthrough — Play Statistics & Track Ratings (#76)
+# Walkthrough — Exclusive Routing, Gapless Double-Buffering & 20-Band Parametric EQ (#47)
 
-Branch: `claude/issue-76-play-stats` (worktree `.claude/worktrees/issue-76`)
+Branch: `claude/issue-47-audio-pipeline` (worktree `.claude/worktrees/issue-47`)
 
-## What this fixes
+## What this delivers
 
-The `songs` table has always carried `rating`, `playcount`, `skipcount`, and
-`lastplayed` columns, and the Home view has always queried them — but **nothing
-ever wrote them**, so "Recently Played" and "Most Played" were permanently
-empty, and the "Plays" column in album detail was stuck at 0. This change adds
-the write paths plus a rating UX with a **single, user-selectable style**:
-**Heart** (default) or **5-Star**, chosen in Settings → General. One control
-style renders consistently across every surface — never both at once.
+Issue #47 asked for the audiophile pipeline core: bit-perfect routing, gapless
+track-to-track playback, and an upgrade from the 10-band EQ to a 20-band
+parametric one. This change lands the **pipeline contract** that three queued
+features (#77 loudness, #79 fades/crossfade, #82 radio streaming) build on, plus
+the full 20-band parametric EQ end to end.
+
+The headline behaviors:
+
+- **Gapless double-buffering** — the next track is decoded *ahead* of the
+  boundary and fed into the same output buffer, so album sides and DJ mixes play
+  through with no silence or click between tracks.
+- **Ordered, zero-allocation DSP chain** — `decode → loudness gain → EQ preamp →
+  EQ bands → fade envelope → volume → output`, with each stage skipped when it's
+  neutral (so a flat, EQ-off signal reaches the device untouched).
+- **20-band parametric EQ** — a new mode alongside the existing 10-band graphic
+  one, with per-band frequency / gain / Q, persisted and restored.
+
+## The gapless architecture (how it actually works)
+
+Rebuilding the CPAL device on every track wedges the OS audio subsystem (a hazard
+the existing code already documents), so the decode thread keeps **one** output
+stream and ring buffer for its whole life. Gapless rides on top of that:
+
+1. When the playing track is within 8 s of its end boundary, the engine emits a
+   new **`AboutToFinish`** event.
+2. The player computes the next track *without mutating any state*
+   (`peek_next_natural` — respects queue, shuffle order, repeat mode,
+   stop-after-current) and sends **`PreloadNext`**. The decode thread opens and
+   primes that track behind the current one.
+3. When the current file is exhausted, decoding **continues into the same ring
+   buffer** — no pause, no drain. The buffer never empties, so there's no gap.
+4. When the output callback actually consumes the last sample of the finished
+   track, the engine emits **`TrackTransitioned`**; the player then commits its
+   queue/index/scrobble bookkeeping — the same result as `on_track_finished`, but
+   without ever issuing a new `Play`.
+
+If the context changes mid-flight (you toggle shuffle, edit the queue), the primed
+track is dropped (`ClearPreload`) and `on_gapless_transition` self-heals by
+falling back to the normal advance. Pause/seek during the drain reopen the correct
+song. When nothing is preloaded (end of playlist, preload failure), the original
+drain-then-`TrackFinished` path still runs — so this is strictly additive.
+
+## Pipeline contract for #77 / #78 / #79 / #82
+
+Baked in now so those features don't force a second refactor (per the enrichment
+comment on the issue):
+
+- **Loudness gain slot (#77)** — a lock-free per-track multiplier applied *before*
+  the EQ preamp. `AudioEngine::set_loudness_gain`.
+- **Fade envelope slot (#79)** — a lock-free multiplier after the EQ, before
+  volume. `AudioEngine::set_fade_gain`. `AboutToFinish` is the crossfade trigger.
+- **`end_nanosec` boundary (#78)** — decode now truncates at the CUE cut, not just
+  at EOF. The engine half of CUE support, essentially free while restructuring.
+- **Source-agnostic decode (#82)** — file opening goes through `open_media_source`
+  returning a `Box<dyn MediaSource>`, so an HTTP radio stream slots in later.
+
+On exclusive routing: CPAL 0.15 drives WASAPI in shared mode only (no exclusive
+path in the crate), so true bit-perfect exclusive output would need a forked/newer
+CPAL. What this change guarantees instead is the **software half**: the DSP chain
+is a genuine passthrough when neutral — no resample, no gain, no EQ math runs — so
+nothing in our code alters the samples. I flagged the exclusive-mode limit rather
+than silently claiming it; happy to file a follow-up if you want to pursue it.
 
 ## Backend changes
 
 | File | Change |
 |------|--------|
-| `src-tauri/src/stats.rs` (new) | `record_play` (playcount+1, stamps lastplayed), `record_skip`, `set_rating` with half-star normalization (`-1` = unrated, else snapped to 0.5–5.0). Fully unit-tested. |
-| `src-tauri/src/player.rs` | `on_position_update` now records the listen when the existing 50% scrobble point is crossed (the old `TODO` at line 487) and returns the song id for event emission. New `note_manual_skip` records a skip only when the track hasn't reached its scrobble point. |
-| `src-tauri/src/commands/stats.rs` (new) | `set_song_rating` IPC command — persists, syncs the in-memory current song, emits `song-stats-changed`. |
-| `src-tauri/src/commands/player.rs` | `next_track` command now records the skip before advancing. |
-| `src-tauri/src/lib.rs` | Position tick loop emits `song-stats-changed` when a play is recorded; the `MediaTrackNext` media key also records skips. Command registered. |
-| `src-tauri/src/commands/tageditor.rs` | `get_song_details` now returns `rating`. |
-
-No DB migration needed — all columns already existed.
-
-**Semantics** (matching our reference implementation's model):
-- A track "counts" once it passes 50% of its duration → `playcount + 1`, `lastplayed = now`.
-- Skipping (next button, media key) *before* that point → `skipcount + 1`. Natural completion never counts as a skip; skipping after the 50% point doesn't either (it already counted as a play).
-- Heart = rating 5.0; unhearting clears to unrated. Stars can set any half-step from 0.5–5.0. Both styles share the same underlying `rating` column, so switching styles never loses data (a 3.5-star track simply shows as un-hearted in heart mode).
-- Every stats write emits a `song-stats-changed` event carrying the song's full current stats (`rating`, `playcount`, `skipcount`, `lastplayed`); the collection store, playlists store, album detail view, and player store all listen and patch their copies in place — a heart set in the play dock updates the playlist and album detail rows instantly, and vice versa.
+| `src-tauri/src/audio.rs` | Gapless double-buffer, `AboutToFinish`/`TrackTransitioned` events, `PreloadNext`/`ClearPreload` commands, `ActiveTrack` abstraction, `end_nanosec` truncation, ordered DSP chain with lock-free loudness/fade slots, pre-allocated visualizer scratch, `open_media_source` seam. |
+| `src-tauri/src/player.rs` | `peek_next_natural` (no-side-effect next-track resolution), `prepare_gapless_next`, `on_gapless_transition` (commit + self-heal). |
+| `src-tauri/src/lib.rs` | Event loop handles the two new events; EQ startup restore reads mode + parametric JSON. |
+| `src-tauri/src/commands/player.rs` | Shuffle/repeat changes clear a stale preload. |
+| `src-tauri/src/equalizer.rs` | New `Parametric20` mode + `ParametricBand {freq, gain_db, q}`, 20 log-spaced defaults, per-mode filter cascade, explicit-Q biquad. **10-band graphic API untouched** (BDD suite unchanged). |
+| `src-tauri/src/commands/equalizer.rs` | `set_equalizer_mode`, `set_parametric_band`, `reset_parametric_bands`; `get_equalizer_state` returns mode + parametric; `load_equalizer_preset` also maps the preset onto the parametric bands when that mode is active. |
+| `src-tauri/src/equalizer.rs` | `load_preset_into_parametric` + `interp_preset_gain` (log-frequency interpolation of a 10-band preset onto the 20 parametric bands). |
+| `src-tauri/src/db.rs` | Migration 4: `equalizer_settings.mode` + `.parametric` (JSON), backward-compatible defaults. |
 
 ## Frontend changes
 
 | Surface | Change |
 |---------|--------|
-| Settings → General | New **"Rating style"** dropdown: Heart (default) or 5-star, persisted via app settings (`rating_style`). |
-| `SongRating.svelte` (new) | The single rating control used everywhere — renders a heart or the star row per the setting. |
-| `StarRating.svelte` (new) | 5-star control with half-star precision (click left/right half of a star), hover preview, click-again-to-clear. Accent-colored fill per DESIGN.md. |
-| `HeartToggle.svelte` (new) | Favorite heart; filled accent when favorited. |
-| `prefs.svelte.ts` (new store) | Loads/saves the rating style. |
-| Collection → Songs | New sortable **Rating** column. |
-| Playlist view | New Rating column (blank for unavailable tracks). |
-| Player bar | Rating control next to the format badge for the current track. |
-| Album detail | New Rating column; the existing "Plays" column now actually increments. |
-| Tag editor | Rating row — saves immediately, DB-only (never written to the file). |
-| `utils/stats.ts` (new) | Shared `applySongStats` helper + event payload type used by all listeners. |
-| Stores | `player`, `collection`, and `playlists` stores (plus album detail's local list) subscribe to `song-stats-changed` and patch songs in place — cross-view sync. |
-| Locales | `rating.*`, `settings.ratingStyle*`, `collection.tableHeaderRating` keys in English and French. |
-| `vite.config.js` | Added the `svelteTesting` plugin — this repo's first Svelte *component* test needed the browser-condition resolution (also unblocks issue #35's component-test work). |
+| Settings → Equalizer | **Mode segmented control** (10-band graphic ⇄ 20-band parametric). The **preset dropdown works in both modes** (a preset maps onto the parametric bands); parametric additionally has a **Reset Bands** button (resets freq/gain/Q). |
+| `Equalizer.svelte` | 20 gain sliders; click a band to select it and reveal a **frequency (log-scaled) + Q** detail panel. A **response-curve preview shows only in parametric mode** — graphic bands have a fixed Q so the sliders already convey the shape, but each parametric band's Q changes its bandwidth, which is only visible on the curve. |
+| `en.ts` / `fr.ts` | New strings: parametric title/subtitle, mode labels, frequency/Q/band, reset. |
 
-## Verification
+## How to verify
 
-- `cargo test` — 7 passed (4 new stats tests: play increment + lastplayed stamp, skip isolation, rating persistence, normalization snap/clamp).
-- `cargo check` / `cargo fmt` — clean.
-- `bun run test:run` — 132 passed (6 StarRating + 5 SongRating component tests).
-- `bun run check` — 0 errors, 0 warnings.
+Dev server is running (`bun run tauri dev`). Suggested checks:
 
-## How to verify manually (dev server)
+1. **Gapless** — queue two tracks (ideally a continuous album) and let the first
+   play out; the second should start with no gap. Watching the logs you'll see
+   `AboutToFinish` → preload → `TrackTransitioned`.
+2. **Gapless + skip interaction** — while a track is near its end, hit next or
+   toggle shuffle; playback should stay correct (self-heal path).
+3. **Parametric EQ** — Settings → Equalizer → **20-band parametric**. Drag a band,
+   click it to pick a frequency and Q, hear the change live. Switch back to
+   10-band graphic — your graphic gains are preserved. Restart the app; mode and
+   bands persist.
+4. **Bit-perfect passthrough** — with the EQ disabled and preamp at 0, the signal
+   path is a pure copy.
 
-1. Play any track past its halfway point → the Home view's "Recently Played" / "Most Played" rows populate (revisit Home), and the album detail "Plays" count increments.
-2. Skip a track early (next button or media key) → `skipcount` increments (visible in DB; UI surface for skip counts comes with #13's column work).
-3. Heart a track **in the play dock** → the same track's heart updates instantly in Collection, the active playlist, and album detail (and vice versa from any list).
-4. Settings → General → switch "Rating style" to **5-star** → every rating control across the app becomes a star row; half-star clicks on the left half of a star; click the same value again to clear. Switch back to Heart — a 5.0-rated track shows a filled heart.
-5. Open the tag editor on any song → the Rating row shows the same value; changing it saves instantly without pressing Save.
-6. Sort the Collection songs table by the new Rating column header.
+Screenshots: `docs/screenshots/equalizer.png` (graphic) and
+`docs/screenshots/equalizer-parametric.png` (parametric).
 
-## Follow-ups this unblocks
+## Test status
 
-- #26 smart playlists (rating/playcount/lastplayed rule fields now have data)
-- #83 scrobbling (same play-completion hook)
-- #44 queue drawer History tab (`lastplayed` ordering)
+- `cargo test` — 18/18 (5 new equalizer unit tests, 3 new audio-helper tests)
+- `cargo test --test equalizer_bdd` — 3/3 (unchanged; graphic API preserved)
+- `bun run test:run` — 132/132
+- `bun run check` — 0 errors in app code (one pre-existing unrelated error in a
+  build script, `scripts/embedded-art-cache.ts`, missing `music-metadata` types)
+- `cargo build` / `cargo fmt` — clean
+
+## Notes / limitations
+
+- **Exclusive mode** isn't achieved (CPAL 0.15 is shared-mode only); the DSP chain
+  is a verified passthrough instead. Flagged above for a possible follow-up.
+- Loudness (#77) and fade (#79) slots are wired but dormant — their multipliers
+  stay at 1.0 until those features drive them.

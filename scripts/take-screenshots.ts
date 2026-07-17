@@ -284,6 +284,19 @@ async function main() {
         const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
         if (t) (t as HTMLElement).click();
       });
+    },
+    "click-equalizer": async (page) => {
+      // Locator click auto-waits for the button to be actionable — more
+      // reliable than a fixed-delay evaluate() when the settings sub-tabs
+      // haven't finished rendering yet.
+      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+      await page.waitForTimeout(400);
+    },
+    "click-equalizer-parametric": async (page) => {
+      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+      await page.waitForTimeout(400);
+      await page.getByRole("button", { name: "20-band parametric", exact: true }).click();
+      await page.waitForTimeout(400);
     }
   };
 
@@ -329,6 +342,8 @@ async function main() {
         { name: "artist-detail", opts: { tab: "collection", subTab: "artists", theme: "nordic-blue", filename: "artist-detail.png", featured, afterLoad: actionRegistry["click-artist"], sidebarWidth: 64, positionSeconds: 38 } },
         { name: "album-detail", opts: { tab: "collection", subTab: "albums", theme: "nordic-blue", filename: "album-detail.png", featured, afterLoad: actionRegistry["click-album"], sidebarWidth: 64, positionSeconds: 38 } },
         { name: "themes", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "themes.png", featured, afterLoad: actionRegistry["click-themes"], sidebarWidth: 64, positionSeconds: 156 } },
+        { name: "equalizer", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "equalizer.png", featured, afterLoad: actionRegistry["click-equalizer"], sidebarWidth: 64, positionSeconds: 92 } },
+        { name: "equalizer-parametric", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "equalizer-parametric.png", featured, afterLoad: actionRegistry["click-equalizer-parametric"], sidebarWidth: 64, positionSeconds: 92 } },
         { name: "now-playing", opts: { tab: "collection", subTab: "songs", theme: "nordic-blue", filename: "now-playing.png", featured, isImmersive: true, sidebarOpen: false, rightPanelOpen: false, sidebarWidth: 64, positionSeconds: 82 } },
       ];
       const toRun = nameFilter ? fallbackCaptures.filter((c) => c.name === nameFilter) : fallbackCaptures;
