@@ -40,28 +40,43 @@ impl LyricsManager {
         album: &str,
         duration_sec: u32,
     ) -> Result<String> {
+        let mut best_lyrics: Option<String> = None;
+
         // 1. Try LRCLIB primary (highly specific with track, album, and duration)
         if let Ok(lyrics) = self
             .fetch_lrclib(artist, title, Some(album), duration_sec)
             .await
         {
-            if !lyrics.trim().is_empty() {
+            if is_synced_lrc(&lyrics) {
                 return Ok(lyrics);
+            }
+            if best_lyrics.is_none() {
+                best_lyrics = Some(lyrics);
             }
         }
 
         // 1b. Try LRCLIB fallback (omitting the album, as album names can differ/remaster/etc.)
         if let Ok(lyrics) = self.fetch_lrclib(artist, title, None, duration_sec).await {
-            if !lyrics.trim().is_empty() {
+            if is_synced_lrc(&lyrics) {
                 return Ok(lyrics);
+            }
+            if best_lyrics.is_none() {
+                best_lyrics = Some(lyrics);
             }
         }
 
         // 2. Try Lyrics.ovh fallback (only needs artist & title, returns plain text)
         if let Ok(lyrics) = self.fetch_lyrics_ovh(artist, title).await {
-            if !lyrics.trim().is_empty() {
+            if is_synced_lrc(&lyrics) {
                 return Ok(lyrics);
             }
+            if best_lyrics.is_none() {
+                best_lyrics = Some(lyrics);
+            }
+        }
+
+        if let Some(lyrics) = best_lyrics {
+            return Ok(lyrics);
         }
 
         Err(anyhow!("no lyrics found on any online provider"))
@@ -75,7 +90,7 @@ impl LyricsManager {
         duration_sec: u32,
     ) -> Result<String> {
         let mut url = format!(
-            "https://lrclib.net/api/get?artist={}&track={}&duration={}",
+            "https://lrclib.net/api/get?artist_name={}&track_name={}&duration={}",
             percent_encoding::utf8_percent_encode(artist, percent_encoding::NON_ALPHANUMERIC),
             percent_encoding::utf8_percent_encode(title, percent_encoding::NON_ALPHANUMERIC),
             duration_sec
@@ -84,7 +99,7 @@ impl LyricsManager {
         if let Some(alb) = album {
             if !alb.trim().is_empty() {
                 url.push_str(&format!(
-                    "&album={}",
+                    "&album_name={}",
                     percent_encoding::utf8_percent_encode(alb, percent_encoding::NON_ALPHANUMERIC)
                 ));
             }
@@ -125,4 +140,23 @@ impl LyricsManager {
 
         Err(anyhow!("Lyrics.ovh returned no lyrics"))
     }
+}
+
+pub fn is_synced_lrc(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() < 6 {
+        return false;
+    }
+    for i in 0..(bytes.len() - 5) {
+        if bytes[i] == b'['
+            && bytes[i + 1].is_ascii_digit()
+            && bytes[i + 2].is_ascii_digit()
+            && bytes[i + 3] == b':'
+            && bytes[i + 4].is_ascii_digit()
+            && bytes[i + 5].is_ascii_digit()
+        {
+            return true;
+        }
+    }
+    false
 }

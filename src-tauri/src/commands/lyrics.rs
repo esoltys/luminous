@@ -1,24 +1,6 @@
+use crate::lyrics::is_synced_lrc;
 use crate::AppState;
 use tauri::State;
-
-fn is_synced_lrc(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    if bytes.len() < 6 {
-        return false;
-    }
-    for i in 0..(bytes.len() - 5) {
-        if bytes[i] == b'['
-            && bytes[i + 1].is_ascii_digit()
-            && bytes[i + 2].is_ascii_digit()
-            && bytes[i + 3] == b':'
-            && bytes[i + 4].is_ascii_digit()
-            && bytes[i + 5].is_ascii_digit()
-        {
-            return true;
-        }
-    }
-    false
-}
 
 #[tauri::command]
 pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
