@@ -2,6 +2,7 @@
 // library (mock-data.ts) or, if configured, a live read from a real Luminous
 // SQLite database. See mock-config.example.json for the config shape.
 import { existsSync, readFileSync } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index";
@@ -11,6 +12,38 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "mock-config.json");
 const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
 const EXAMPLE_CONFIG_PATH = path.join(__dirname, "mock-config.example.json");
+const TAURI_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.conf.json");
+
+/**
+ * The real app's db lives at `{tauri app_data_dir}/luminous.db` (see
+ * src-tauri/src/db.rs). Tauri's `app_data_dir()` resolves to the *Roaming*
+ * AppData folder on Windows (not Local — a common mix-up), Application
+ * Support on macOS, and XDG_DATA_HOME on Linux. Reading the identifier from
+ * tauri.conf.json instead of hardcoding it keeps this in sync automatically.
+ */
+function defaultDbPath(): string | undefined {
+  let identifier: string;
+  try {
+    identifier = JSON.parse(readFileSync(TAURI_CONF_PATH, "utf8")).identifier;
+  } catch {
+    return undefined;
+  }
+  if (!identifier) return undefined;
+
+  const home = os.homedir();
+  let appDataDir: string;
+  switch (process.platform) {
+    case "win32":
+      appDataDir = path.join(process.env.APPDATA ?? path.join(home, "AppData", "Roaming"), identifier);
+      break;
+    case "darwin":
+      appDataDir = path.join(home, "Library", "Application Support", identifier);
+      break;
+    default:
+      appDataDir = path.join(process.env.XDG_DATA_HOME ?? path.join(home, ".local", "share"), identifier);
+  }
+  return path.join(appDataDir, "luminous.db");
+}
 
 // Ordinal -> serde string, mirroring the #[serde(rename_all = ...)] enums in
 // src-tauri/src/models.rs. The real backend does this conversion for us; a
@@ -197,9 +230,11 @@ interface DbLibrary {
   playlistTracks: Record<number, Song[]>;
 }
 
-async function loadFromDatabase(dbPath: string, limit: number): Promise<DbLibrary | null> {
+async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing = false): Promise<DbLibrary | null> {
   if (!existsSync(dbPath)) {
-    console.warn(`[Mock Library] dbPath "${dbPath}" does not exist; using bundled fixture data.`);
+    if (!silentIfMissing) {
+      console.warn(`[Mock Library] dbPath "${dbPath}" does not exist; using bundled fixture data.`);
+    }
     return null;
   }
   try {
@@ -245,7 +280,11 @@ async function loadFromDatabase(dbPath: string, limit: number): Promise<DbLibrar
 
 export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Promise<MockLibrary> {
   const limit = config.songLimit ?? 2000;
-  const fromDb = config.dbPath ? await loadFromDatabase(config.dbPath, limit) : null;
+  // An explicit dbPath is a firm request — warn if it's wrong. Falling back
+  // to the auto-detected Tauri app-data location is best-effort and should
+  // stay quiet when nothing's there (e.g. CI, or no desktop app installed).
+  const dbPath = config.dbPath || defaultDbPath();
+  const fromDb = dbPath ? await loadFromDatabase(dbPath, limit, !config.dbPath) : null;
 
   const songs = fromDb?.songs ?? FALLBACK_SONGS;
   const playlists = fromDb?.playlists ?? FALLBACK_PLAYLISTS;

@@ -159,7 +159,7 @@ async function main() {
         console.warn(`[Page ${msg.type()}] ${msg.text()}`);
       }
     });
-    page.on("pageerror", (err) => console.error(`[Page error] ${err.message}`));
+    page.on("pageerror", (err) => console.error(`[Page error] ${err.stack || err.message}`));
 
     // Inject the mock library data, then the mock Tauri IPC bridge that reads it
     await page.addInitScript(`
