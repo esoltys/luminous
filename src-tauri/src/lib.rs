@@ -141,14 +141,17 @@ pub fn run() {
 
             // Load and restore equalizer settings on startup
             if let Ok(conn) = db.pool.get() {
-                if let Ok((enabled, preamp, gains_str)) = conn.query_row(
-                    "SELECT enabled, preamp, gains FROM equalizer_settings WHERE id = 1",
+                if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
+                    "SELECT enabled, preamp, gains, mode, parametric
+                         FROM equalizer_settings WHERE id = 1",
                     [],
                     |row| {
                         Ok((
                             row.get::<_, i32>(0)? != 0,
                             row.get::<_, f64>(1)? as f32,
                             row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
                         ))
                     },
                 ) {
@@ -164,6 +167,19 @@ pub fn run() {
                         eq.enabled = enabled;
                         eq.preamp = preamp;
                         eq.load_preset(gains);
+                        if let Ok(bands) = serde_json::from_str::<
+                            Vec<crate::equalizer::ParametricBand>,
+                        >(&parametric_json)
+                        {
+                            if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
+                                let mut arr = crate::equalizer::default_parametric_bands();
+                                arr.copy_from_slice(&bands);
+                                eq.load_parametric(arr);
+                            }
+                        }
+                        if mode_str == "parametric20" {
+                            eq.set_mode(crate::equalizer::EqMode::Parametric20);
+                        }
                     }
                 }
             }
@@ -285,6 +301,24 @@ pub fn run() {
                                 }
                                 crate::audio::AudioEvent::TrackFinished { .. } => {
                                     let _ = p.on_track_finished().await;
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
+                                }
+                                crate::audio::AudioEvent::AboutToFinish { .. } => {
+                                    // Prime the next track so the engine can
+                                    // hand over gaplessly at the boundary.
+                                    if let Err(e) = p.prepare_gapless_next().await {
+                                        log::warn!("Gapless preload failed: {e}");
+                                    }
+                                }
+                                crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
+                                    let _ = p.on_gapless_transition(song_id).await;
+                                    let _ = app.emit(
+                                        "track-changed",
+                                        serde_json::json!({
+                                            "song": p.current_song.clone()
+                                        }),
+                                    );
                                     let state = p.get_state().await;
                                     let _ = app.emit("playback-state", state);
                                 }
@@ -475,7 +509,10 @@ pub fn run() {
             // Equalizer commands
             commands::equalizer::get_equalizer_state,
             commands::equalizer::set_equalizer_enabled,
+            commands::equalizer::set_equalizer_mode,
             commands::equalizer::set_equalizer_band,
+            commands::equalizer::set_parametric_band,
+            commands::equalizer::reset_parametric_bands,
             commands::equalizer::set_equalizer_preamp,
             commands::equalizer::load_equalizer_preset,
             // Lyrics commands

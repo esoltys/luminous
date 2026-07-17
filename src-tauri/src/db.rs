@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 3;
+const CURRENT_SCHEMA_VERSION: i32 = 4;
 
 pub struct Database {
     pub pool: DbPool,
@@ -87,6 +87,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![3],
+            )?;
+        }
+
+        if version < 4 {
+            log::info!("Running migration 4: parametric equalizer mode");
+            conn.execute_batch(MIGRATION_4)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![4],
             )?;
         }
 
@@ -285,6 +294,17 @@ CREATE TABLE IF NOT EXISTS app_state (
 
 const MIGRATION_3: &str = "
 ALTER TABLE songs ADD COLUMN unavailable BOOLEAN NOT NULL DEFAULT 0;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 4: parametric equalizer mode
+//   mode:       'graphic10' | 'parametric20'
+//   parametric: JSON array of 20 {freq, gain_db, q} bands ('' = defaults)
+// ---------------------------------------------------------------------------
+
+const MIGRATION_4: &str = "
+ALTER TABLE equalizer_settings ADD COLUMN mode TEXT NOT NULL DEFAULT 'graphic10';
+ALTER TABLE equalizer_settings ADD COLUMN parametric TEXT NOT NULL DEFAULT '';
 ";
 
 #[cfg(test)]

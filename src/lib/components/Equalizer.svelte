@@ -1,12 +1,28 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { SlidersHorizontal } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
+  type EqMode = "graphic10" | "parametric20";
+  interface ParametricBand {
+    freq: number;
+    gain_db: number;
+    q: number;
+  }
+  interface EqConfig {
+    enabled: boolean;
+    mode: EqMode;
+    preamp: number;
+    gains: number[];
+    parametric: ParametricBand[];
+  }
+
   let enabled = $state(false);
+  let mode = $state<EqMode>("graphic10");
   let preamp = $state(0.0);
   let gains = $state<number[]>(Array(10).fill(0.0));
+  let parametric = $state<ParametricBand[]>([]);
+  let selectedBand = $state(0);
   let activePreset = $state("Flat");
 
   const bandLabels = [
@@ -21,10 +37,12 @@
 
   async function loadConfig() {
     try {
-      const config = await invoke<{ enabled: boolean; preamp: number; gains: number[] }>("get_equalizer_state");
+      const config = await invoke<EqConfig>("get_equalizer_state");
       enabled = config.enabled;
+      mode = config.mode;
       preamp = config.preamp;
       gains = config.gains;
+      parametric = config.parametric;
       determinePresetName();
     } catch (e) {
       console.error("Failed to load equalizer state:", e);
@@ -63,6 +81,16 @@
     await invoke("set_equalizer_enabled", { enabled });
   }
 
+  async function handleModeChange(newMode: EqMode) {
+    if (mode === newMode) return;
+    mode = newMode;
+    try {
+      await invoke("set_equalizer_mode", { mode: newMode });
+    } catch (e) {
+      console.error("Failed to set equalizer mode:", e);
+    }
+  }
+
   async function handlePreampChange() {
     await ensureEnabled();
     await invoke("set_equalizer_preamp", { preampDb: preamp });
@@ -74,11 +102,32 @@
     await invoke("set_equalizer_band", { bandIdx: index, gainDb: gains[index] });
   }
 
+  async function pushParametricBand(index: number) {
+    const band = parametric[index];
+    if (!band) return;
+    await ensureEnabled();
+    await invoke("set_parametric_band", {
+      bandIdx: index,
+      freq: band.freq,
+      gainDb: band.gain_db,
+      q: band.q
+    });
+  }
+
+  async function resetParametric() {
+    try {
+      const config = await invoke<EqConfig>("reset_parametric_bands");
+      parametric = config.parametric;
+    } catch (e) {
+      console.error("Failed to reset parametric bands:", e);
+    }
+  }
+
   async function selectPreset(preset: string) {
     if (preset === "Custom") return;
     try {
       await ensureEnabled();
-      const config = await invoke<{ enabled: boolean; preamp: number; gains: number[] }>("load_equalizer_preset", { presetName: preset });
+      const config = await invoke<EqConfig>("load_equalizer_preset", { presetName: preset });
       gains = config.gains;
       activePreset = preset;
     } catch (e) {
@@ -86,14 +135,28 @@
     }
   }
 
-  // Smooth Catmull-Rom spline path generator for the SVG EQ envelope graphic
-  let curvePath = $derived.by(() => {
-    if (gains.length === 0) return "";
-    const pts = gains.map((g, i) => ({
-      x: (i / 9) * 100,
-      y: 20 - (g / 12.0) * 17
-    }));
+  // --- Log-frequency helpers (20 Hz – 20 kHz mapped to 0..1) ---
+  const FREQ_MIN = 20;
+  const FREQ_MAX = 20000;
+  const FREQ_SPAN = Math.log(FREQ_MAX / FREQ_MIN);
 
+  function freqToUnit(freq: number): number {
+    return Math.log(Math.max(freq, FREQ_MIN) / FREQ_MIN) / FREQ_SPAN;
+  }
+
+  function unitToFreq(unit: number): number {
+    return Math.round(FREQ_MIN * Math.exp(unit * FREQ_SPAN));
+  }
+
+  function formatFreq(freq: number): string {
+    if (freq >= 10000) return `${(freq / 1000).toFixed(0)}k`;
+    if (freq >= 1000) return `${(freq / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+    return `${Math.round(freq)}`;
+  }
+
+  // Smooth Catmull-Rom spline path generator for the SVG EQ envelope graphic
+  function splinePath(pts: { x: number; y: number }[]): string {
+    if (pts.length === 0) return "";
     let d = `M ${pts[0].x} ${pts[0].y}`;
 
     for (let i = 0; i < pts.length - 1; i++) {
@@ -112,6 +175,25 @@
       d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
     }
     return d;
+  }
+
+  let curvePath = $derived.by(() => {
+    if (mode === "parametric20") {
+      if (parametric.length === 0) return "";
+      const pts = parametric
+        .map((b) => ({
+          x: freqToUnit(b.freq) * 100,
+          y: 20 - (b.gain_db / 12.0) * 17
+        }))
+        .sort((a, b) => a.x - b.x);
+      return splinePath(pts);
+    }
+    if (gains.length === 0) return "";
+    const pts = gains.map((g, i) => ({
+      x: (i / 9) * 100,
+      y: 20 - (g / 12.0) * 17
+    }));
+    return splinePath(pts);
   });
 
   function verticalOrient(node: HTMLInputElement) {
@@ -122,14 +204,18 @@
 </script>
 
 <div class="flex flex-col text-brand-text-primary">
-  <div class="flex items-center justify-between mb-6 pb-4 border-b border-brand-border">
+  <div class="flex items-center justify-between mb-6 pb-4 border-b border-brand-border gap-4 flex-wrap">
     <div>
-      <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t('equalizer.title')}</h3>
-      <p class="text-xs text-brand-text-secondary/70 mt-0.5">{i18n.t('equalizer.subtitle')}</p>
+      <h3 class="text-sm font-bold text-brand-text-primary">
+        {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
+      </h3>
+      <p class="text-xs text-brand-text-secondary/70 mt-0.5">
+        {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
+      </p>
     </div>
 
-    <!-- Toggle & Presets controls -->
-    <div class="flex items-center gap-4">
+    <!-- Toggle, Mode & Presets controls -->
+    <div class="flex items-center gap-3 flex-wrap">
       <div class="flex items-center gap-3 bg-brand-sidebar/40 border border-brand-border rounded-lg px-4 py-2">
         <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.enableEq')}</label>
         <input
@@ -141,24 +227,51 @@
         />
       </div>
 
-      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
-        <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
-        <select
-          bind:value={activePreset}
-          onchange={() => selectPreset(activePreset)}
-          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
-          style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
+      <!-- Mode segmented control -->
+      <div class="flex items-center bg-brand-sidebar/40 border border-brand-border rounded-lg p-1" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+        <button
+          class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors cursor-pointer {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => handleModeChange("graphic10")}
+          aria-pressed={mode === "graphic10"}
         >
-          {#each presets as preset}
-            <option value={preset} class="bg-brand-main text-brand-text-primary">
-              {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
-            </option>
-          {/each}
-          {#if activePreset === "Custom"}
-            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
-          {/if}
-        </select>
+          {i18n.t('equalizer.modeGraphic')}
+        </button>
+        <button
+          class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors cursor-pointer {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          onclick={() => handleModeChange("parametric20")}
+          aria-pressed={mode === "parametric20"}
+        >
+          {i18n.t('equalizer.modeParametric')}
+        </button>
       </div>
+
+      {#if mode === "graphic10"}
+        <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
+          <select
+            bind:value={activePreset}
+            onchange={() => selectPreset(activePreset)}
+            class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
+          >
+            {#each presets as preset}
+              <option value={preset} class="bg-brand-main text-brand-text-primary">
+                {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
+              </option>
+            {/each}
+            {#if activePreset === "Custom"}
+              <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
+            {/if}
+          </select>
+        </div>
+      {:else}
+        <button
+          class="text-xs font-semibold px-3 py-2 bg-brand-sidebar/40 border border-brand-border rounded-lg text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          onclick={resetParametric}
+        >
+          {i18n.t('equalizer.resetBands')}
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -190,7 +303,7 @@
         <!-- Center line -->
         <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-brand-border pointer-events-none"></div>
         <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-          {#if gains.length === 10}
+          {#if curvePath}
             <path
               d={curvePath}
               fill="none"
@@ -214,36 +327,116 @@
       </div>
     </div>
 
-    <!-- Sliders Rack -->
-    <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-4 md:p-6">
-      {#each gains as gain, idx}
-        <div class="flex flex-col items-center justify-between h-full group">
-          <!-- Gain display -->
-          <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
-            {gain > 0 ? "+" : ""}{gain.toFixed(1)}
-          </span>
+    {#if mode === "graphic10"}
+      <!-- Graphic Sliders Rack -->
+      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-4 md:p-6">
+        {#each gains as gain, idx}
+          <div class="flex flex-col items-center justify-between h-full group">
+            <!-- Gain display -->
+            <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
+              {gain > 0 ? "+" : ""}{gain.toFixed(1)}
+            </span>
 
-          <!-- Slider track -->
-          <div class="h-40 md:h-48 flex items-center justify-center relative">
+            <!-- Slider track -->
+            <div class="h-40 md:h-48 flex items-center justify-center relative">
+              <input
+                type="range"
+                min="-12.0"
+                max="12.0"
+                step="0.5"
+                use:verticalOrient
+                bind:value={gains[idx]}
+                oninput={() => handleBandChange(idx)}
+                class="accent-brand-accent cursor-ns-resize"
+                style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 12px; height: 100%;"
+              />
+            </div>
+
+            <!-- Label -->
+            <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary/70 font-mono text-center tracking-tighter truncate w-full">
+              {bandLabels[idx]}
+            </span>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <!-- Parametric Sliders Rack -->
+      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-3 md:p-4">
+        {#each parametric as band, idx}
+          <div
+            class="flex flex-col items-center justify-between h-full group rounded-md transition-colors cursor-pointer {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
+            onclick={() => (selectedBand = idx)}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") selectedBand = idx; }}
+            aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
+          >
+            <!-- Gain display -->
+            <span class="text-[8px] font-mono font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
+              {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
+            </span>
+
+            <!-- Slider track -->
+            <div class="h-40 md:h-48 flex items-center justify-center relative">
+              <input
+                type="range"
+                min="-12.0"
+                max="12.0"
+                step="0.5"
+                use:verticalOrient
+                bind:value={parametric[idx].gain_db}
+                oninput={() => { selectedBand = idx; pushParametricBand(idx); }}
+                class="accent-brand-accent cursor-ns-resize"
+                style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 10px; height: 100%;"
+              />
+            </div>
+
+            <!-- Frequency label -->
+            <span class="text-[8px] font-medium font-mono text-center tracking-tighter truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary/70'}">
+              {formatFreq(band.freq)}
+            </span>
+          </div>
+        {/each}
+      </div>
+
+      <!-- Selected band detail: frequency + Q -->
+      {#if parametric[selectedBand]}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+              <span>{i18n.t('equalizer.bandLabel')} {selectedBand + 1} — {i18n.t('equalizer.frequency').toUpperCase()}</span>
+              <span class="text-brand-accent-text font-mono">{formatFreq(parametric[selectedBand].freq)}Hz</span>
+            </div>
             <input
               type="range"
-              min="-12.0"
-              max="12.0"
-              step="0.5"
-              use:verticalOrient
-              bind:value={gains[idx]}
-              oninput={() => handleBandChange(idx)}
-              class="accent-brand-accent cursor-ns-resize"
-              style="appearance: slider-vertical; -webkit-appearance: slider-vertical; width: 12px; height: 100%;"
+              min="0"
+              max="1"
+              step="0.001"
+              value={freqToUnit(parametric[selectedBand].freq)}
+              oninput={(e) => {
+                parametric[selectedBand].freq = unitToFreq(parseFloat(e.currentTarget.value));
+                pushParametricBand(selectedBand);
+              }}
+              class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
             />
           </div>
-
-          <!-- Label -->
-          <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary/70 font-mono text-center tracking-tighter truncate w-full">
-            {bandLabels[idx]}
-          </span>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+              <span>{i18n.t('equalizer.qFactor').toUpperCase()}</span>
+              <span class="text-brand-accent-text font-mono">{parametric[selectedBand].q.toFixed(1)}</span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="10"
+              step="0.1"
+              bind:value={parametric[selectedBand].q}
+              oninput={() => pushParametricBand(selectedBand)}
+              class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
         </div>
-      {/each}
-    </div>
+      {/if}
+    {/if}
   </div>
 </div>

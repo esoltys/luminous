@@ -296,12 +296,16 @@ pub async fn get_playback_state(state: State<'_, AppState>) -> Result<PlaybackSt
 #[tauri::command]
 pub async fn set_shuffle_mode(mode: ShuffleMode, state: State<'_, AppState>) -> Result<(), String> {
     state.player.lock().await.set_shuffle_mode(mode);
+    // A primed gapless next track may no longer match the new order — drop it
+    // and let the engine re-request a preload.
+    let _ = state.audio.lock().await.clear_preload();
     Ok(())
 }
 
 #[tauri::command]
 pub async fn set_repeat_mode(mode: RepeatMode, state: State<'_, AppState>) -> Result<(), String> {
     state.player.lock().await.set_repeat_mode(mode);
+    let _ = state.audio.lock().await.clear_preload();
     Ok(())
 }
 

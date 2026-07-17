@@ -14,6 +14,23 @@ use rand::seq::SliceRandom;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// A candidate for the gapless "next track" — resolved by peeking at the
+/// playback context without mutating it.
+struct GaplessTarget {
+    song: Song,
+    uuid: Option<String>,
+    kind: GaplessTargetKind,
+}
+
+enum GaplessTargetKind {
+    /// RepeatMode::Track — the current track plays again.
+    Replay,
+    /// The item at this virtual (shuffle-order) index.
+    Index(usize),
+    /// The first playable item in the play-next queue.
+    Queue,
+}
+
 pub struct Player {
     _db: Arc<Database>,
     audio: Arc<Mutex<AudioEngine>>,
@@ -355,6 +372,164 @@ impl Player {
             }
         }
         Ok(())
+    }
+
+    /// Read-only walk from a virtual index to the first playable item,
+    /// mirroring `play_at_index`'s skip-unavailable behavior.
+    fn peek_playable_index(&self, index: usize) -> Option<usize> {
+        let total = if self.shuffle_mode != ShuffleMode::Off {
+            self.shuffle_order.len()
+        } else {
+            self.playlist_items.len()
+        };
+        if total == 0 {
+            return None;
+        }
+        let mut candidate = index;
+        for _ in 0..total {
+            let item_index = if self.shuffle_mode != ShuffleMode::Off {
+                *self.shuffle_order.get(candidate)?
+            } else {
+                candidate
+            };
+            if self
+                .playlist_items
+                .get(item_index)
+                .map(Self::is_item_playable)
+                .unwrap_or(false)
+            {
+                return Some(candidate);
+            }
+            candidate = (candidate + 1) % total;
+        }
+        None
+    }
+
+    /// Determine what will play after the current track ends naturally,
+    /// without mutating any state. Mirrors `on_track_finished`'s decision
+    /// tree — used both to preload the gapless next track and to commit the
+    /// transition when the engine reports it happened.
+    fn peek_next_natural(&self) -> Option<GaplessTarget> {
+        if self.stop_after_current {
+            return None;
+        }
+
+        match self.repeat_mode {
+            RepeatMode::Track => {
+                self.current_index?; // only replay when a playlist track is loaded
+                let song = self.current_song.clone()?;
+                return Some(GaplessTarget {
+                    song,
+                    uuid: self.current_item_uuid.clone(),
+                    kind: GaplessTargetKind::Replay,
+                });
+            }
+            RepeatMode::Playlist => {
+                let idx = self.get_next_index().unwrap_or(0);
+                let candidate = self.peek_playable_index(idx)?;
+                return self.target_at_virtual_index(candidate);
+            }
+            _ => {}
+        }
+
+        // Queue first (peek without popping), then natural playlist order.
+        if let Some(item) = self.queue.iter().find(|i| Self::is_item_playable(i)) {
+            let song = item.song.clone()?;
+            return Some(GaplessTarget {
+                song,
+                uuid: Some(item.uuid.clone()),
+                kind: GaplessTargetKind::Queue,
+            });
+        }
+
+        let idx = self.get_next_index()?;
+        let candidate = self.peek_playable_index(idx)?;
+        self.target_at_virtual_index(candidate)
+    }
+
+    fn target_at_virtual_index(&self, candidate: usize) -> Option<GaplessTarget> {
+        let item_index = if self.shuffle_mode != ShuffleMode::Off {
+            *self.shuffle_order.get(candidate)?
+        } else {
+            candidate
+        };
+        let item = self.playlist_items.get(item_index)?;
+        let song = item.song.clone()?;
+        Some(GaplessTarget {
+            song,
+            uuid: Some(item.uuid.clone()),
+            kind: GaplessTargetKind::Index(candidate),
+        })
+    }
+
+    /// Respond to the engine's `AboutToFinish` signal: prime the next track
+    /// for a gapless handover. Does nothing when playback will naturally
+    /// stop after the current track.
+    pub async fn prepare_gapless_next(&mut self) -> Result<()> {
+        let Some(target) = self.peek_next_natural() else {
+            return Ok(());
+        };
+        let start_ns = target.song.beginning_nanosec.max(0) as u64;
+        self.audio
+            .lock()
+            .await
+            .preload_next(Box::new(target.song), start_ns)
+    }
+
+    /// Commit a completed gapless handover reported by the engine. Advances
+    /// queue/index/scrobble bookkeeping exactly as `on_track_finished` would,
+    /// but without issuing a new `Play` (the audio never stopped). If the
+    /// playback context changed since the preload (mode/queue edits), falls
+    /// back to the normal advance logic to self-heal.
+    pub async fn on_gapless_transition(&mut self, started_song_id: i64) -> Result<()> {
+        if self.stop_after_current {
+            self.stop_after_current = false;
+            return self.stop().await;
+        }
+
+        match self.peek_next_natural() {
+            Some(target) if target.song.id == started_song_id => {
+                let song = target.song;
+                self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
+                self.scrobbled = false;
+
+                match target.kind {
+                    GaplessTargetKind::Replay => {
+                        // Same track again — nothing else to update.
+                    }
+                    GaplessTargetKind::Index(candidate) => {
+                        self.current_song = Some(song);
+                        self.current_item_uuid = target.uuid;
+                        self.current_index = Some(candidate);
+                        if candidate > 0 && !self.played_indices.contains(&candidate) {
+                            self.played_indices.push(candidate);
+                        }
+                    }
+                    GaplessTargetKind::Queue => {
+                        // Drop unplayable fronts, then the item that just
+                        // started (mirrors next_track's queue handling).
+                        while let Some(front) = self.queue.front() {
+                            if Self::is_item_playable(front) {
+                                break;
+                            }
+                            self.queue.pop_front();
+                        }
+                        self.queue.pop_front();
+                        self.current_song = Some(song);
+                        self.current_item_uuid = target.uuid;
+                    }
+                }
+                Ok(())
+            }
+            _ => {
+                // The preloaded track no longer matches what should play —
+                // correct by running the normal advance (issues a real Play).
+                log::warn!(
+                    "Gapless transition to song {started_song_id} no longer matches playback context; correcting"
+                );
+                self.on_track_finished().await
+            }
+        }
     }
 
     /// Called when the audio engine reports a track has finished.
