@@ -249,11 +249,8 @@ pub async fn stop(state: State<'_, AppState>) -> Result<(), String> {
 pub async fn next_track(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     use tauri::Emitter;
     let mut player = state.player.lock().await;
-    if let Some(song_id) = player.note_manual_skip() {
-        let _ = app.emit(
-            "song-stats-changed",
-            serde_json::json!({ "song_id": song_id }),
-        );
+    if let Some(stats) = player.note_manual_skip() {
+        let _ = app.emit("song-stats-changed", stats);
     }
     player.next_track().await.map_err(|e| e.to_string())
 }

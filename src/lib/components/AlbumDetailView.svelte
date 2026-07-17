@@ -1,10 +1,12 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { applySongStats, type SongStatsPayload } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import StarRating from "./StarRating.svelte";
+  import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import { ArrowLeft, Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem } from "../types";
@@ -155,6 +157,24 @@
   async function rateSong(song: Song, rating: number) {
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
+
+  // Sync rating/playcount changes from other views and scrobble bumps into
+  // this view's locally fetched song list.
+  $effect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    listen<SongStatsPayload>("song-stats-changed", (event) => {
+      const song = songs.find((s) => s.id === event.payload.song_id);
+      if (song) applySongStats(song, event.payload);
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  });
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll">
@@ -325,7 +345,7 @@
               </div>
 
               <div class="flex justify-center">
-                <StarRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
+                <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
               </div>
 
               <div class="text-center text-brand-text-secondary/80 font-medium">

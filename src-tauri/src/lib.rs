@@ -199,11 +199,8 @@ pub fn run() {
                     };
                     if state == crate::models::PlayState::Playing {
                         let mut p = player_ticks.lock().await;
-                        if let Some(song_id) = p.on_position_update(pos) {
-                            let _ = app_handle_ticks.emit(
-                                "song-stats-changed",
-                                serde_json::json!({ "song_id": song_id }),
-                            );
+                        if let Some(stats) = p.on_position_update(pos) {
+                            let _ = app_handle_ticks.emit("song-stats-changed", stats);
                         }
                         let _ = app_handle_ticks.emit(
                             "playback-position",
@@ -373,11 +370,8 @@ pub fn run() {
                                     }
                                 }
                                 Code::MediaTrackNext => {
-                                    if let Some(song_id) = player.note_manual_skip() {
-                                        let _ = app_handle.emit(
-                                            "song-stats-changed",
-                                            serde_json::json!({ "song_id": song_id }),
-                                        );
+                                    if let Some(stats) = player.note_manual_skip() {
+                                        let _ = app_handle.emit("song-stats-changed", stats);
                                     }
                                     player.next_track().await
                                 }

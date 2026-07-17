@@ -481,9 +481,9 @@ impl Player {
     }
 
     /// Update position and check scrobble point. When the scrobble point is
-    /// crossed, the listen is recorded (playcount/lastplayed) and the song id
-    /// is returned so the caller can emit a `song-stats-changed` event.
-    pub fn on_position_update(&mut self, position_nanosec: u64) -> Option<i64> {
+    /// crossed, the listen is recorded (playcount/lastplayed) and the
+    /// `song-stats-changed` payload is returned for the caller to emit.
+    pub fn on_position_update(&mut self, position_nanosec: u64) -> Option<serde_json::Value> {
         let scrobble_at = self.scrobble_point_nanosec?;
         if self.scrobbled || position_nanosec < scrobble_at {
             return None;
@@ -495,7 +495,7 @@ impl Player {
         let song_id = self.current_song.as_ref()?.id;
         match self._db.pool.get() {
             Ok(conn) => match stats::record_play(&conn, song_id) {
-                Ok(()) => Some(song_id),
+                Ok(()) => Some(stats::stats_payload(&conn, song_id)),
                 Err(e) => {
                     log::warn!("Failed to record play for song {song_id}: {e}");
                     None
@@ -510,15 +510,15 @@ impl Player {
 
     /// Record a skip for the current track if it has not reached its scrobble
     /// point. Call before a user-initiated track change (never on natural
-    /// completion). Returns the skipped song id for event emission.
-    pub fn note_manual_skip(&mut self) -> Option<i64> {
+    /// completion). Returns the `song-stats-changed` payload for emission.
+    pub fn note_manual_skip(&mut self) -> Option<serde_json::Value> {
         if self.scrobbled {
             return None;
         }
         let song_id = self.current_song.as_ref()?.id;
         match self._db.pool.get() {
             Ok(conn) => match stats::record_skip(&conn, song_id) {
-                Ok(()) => Some(song_id),
+                Ok(()) => Some(stats::stats_payload(&conn, song_id)),
                 Err(e) => {
                     log::warn!("Failed to record skip for song {song_id}: {e}");
                     None

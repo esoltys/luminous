@@ -5,7 +5,7 @@
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import StarRating from "./StarRating.svelte";
+  import SongRating from "./SongRating.svelte";
 
   interface Props {
     songId: number;
@@ -260,7 +260,7 @@
             <!-- Rating (library-only, saves immediately) -->
             <div class="flex flex-col gap-1.5 col-span-2">
               <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
-              <StarRating {rating} onRate={handleRate} size="md" />
+              <SongRating {rating} onRate={handleRate} size="md" />
             </div>
 
             <!-- Year -->

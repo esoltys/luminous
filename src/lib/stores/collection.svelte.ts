@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem } from "../types";
+import { applySongStats, type SongStatsPayload } from "../utils/stats";
 
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
@@ -106,6 +107,15 @@ class CollectionStore {
       await listen("library-changed", () => {
         this.refreshStats();
         this.refreshLibrary();
+      });
+
+      // Keep cached song rows in sync with rating/playcount changes made
+      // anywhere in the app (player bar, other views, scrobble bumps).
+      await listen<SongStatsPayload>("song-stats-changed", (event) => {
+        for (const list of [this.songs, this.searchResults]) {
+          const song = list.find((s) => s.id === event.payload.song_id);
+          if (song) applySongStats(song, event.payload);
+        }
       });
     } catch (err) {
       console.error("Failed to initialize CollectionStore:", err);

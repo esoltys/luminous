@@ -4,7 +4,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import HeartToggle from "./HeartToggle.svelte";
+  import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
@@ -183,9 +183,8 @@
     }
   }
 
-  async function toggleFavorite(song: Song) {
-    const next = song.rating === 5 ? -1 : 5;
-    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating: next });
+  async function rateSong(song: Song, rating: number) {
+    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
 </script>
 
@@ -304,7 +303,7 @@
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-          <div class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center py-3 px-4">
+          <div class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center py-3 px-4">
             <div class="text-center w-9"></div>
             <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
               {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
@@ -317,6 +316,9 @@
             </button>
             <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
               {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
+            </button>
+            <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+              {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
             <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
               <Clock class="w-4 h-4" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
@@ -354,7 +356,7 @@
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 ondblclick={() => handlePlaySong(song)}
-                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
+                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
                   {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -419,12 +421,11 @@
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
+                <div class="flex justify-center">
+                  <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
+                </div>
                 <div class="text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</div>
                 <div class="flex items-center justify-center gap-2.5">
-                  <HeartToggle
-                    favorite={song.rating === 5}
-                    onToggle={() => toggleFavorite(song)}
-                  />
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
                     class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"

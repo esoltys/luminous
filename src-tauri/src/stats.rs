@@ -38,6 +38,33 @@ pub fn set_rating(conn: &Connection, song_id: i64, rating: f32) -> Result<f32> {
     Ok(normalized)
 }
 
+/// Build the `song-stats-changed` event payload carrying the song's current
+/// stats so every open view can sync without refetching.
+pub fn stats_payload(conn: &Connection, song_id: i64) -> serde_json::Value {
+    let row = conn.query_row(
+        "SELECT playcount, skipcount, lastplayed, rating FROM songs WHERE id = ?1",
+        params![song_id],
+        |r| {
+            Ok((
+                r.get::<_, i32>(0)?,
+                r.get::<_, i32>(1)?,
+                r.get::<_, Option<i64>>(2)?,
+                r.get::<_, f32>(3)?,
+            ))
+        },
+    );
+    match row {
+        Ok((playcount, skipcount, lastplayed, rating)) => serde_json::json!({
+            "song_id": song_id,
+            "playcount": playcount,
+            "skipcount": skipcount,
+            "lastplayed": lastplayed,
+            "rating": rating,
+        }),
+        Err(_) => serde_json::json!({ "song_id": song_id }),
+    }
+}
+
 /// Negative values clear the rating; anything else snaps to half-star steps
 /// within 0.5–5.0.
 pub fn normalize_rating(rating: f32) -> f32 {

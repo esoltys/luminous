@@ -4,7 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import HeartToggle from "./HeartToggle.svelte";
+  import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import MoodBar from "./MoodBar.svelte";
@@ -63,10 +63,6 @@
       playerStore.setVolume(0.0);
       isMuted = true;
     }
-  }
-
-  async function toggleCurrentFavorite() {
-    await playerStore.toggleFavorite();
   }
 
   function cycleShuffle() {
@@ -146,10 +142,9 @@
           <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
-          <HeartToggle
-            favorite={playerStore.currentSong.rating === 5}
-            onToggle={toggleCurrentFavorite}
-            sizeClass="w-3.5 h-3.5"
+          <SongRating
+            rating={playerStore.currentSong.rating}
+            onRate={(r) => playerStore.rateCurrent(r)}
           />
         {/if}
       </div>

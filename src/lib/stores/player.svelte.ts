@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState } from "../types";
+import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 
 export class PlayerStore {
@@ -50,13 +51,11 @@ export class PlayerStore {
         themeStore.updateArtworkColors(this.currentSong);
       });
 
-      // Keep the current song's rating in sync when stats change elsewhere
+      // Keep the current song's stats in sync when they change elsewhere
       // (rating edits in list views, scrobble-point playcount bumps).
-      await listen<{ song_id: number; rating?: number }>("song-stats-changed", (event) => {
+      await listen<SongStatsPayload>("song-stats-changed", (event) => {
         if (this.currentSong && this.currentSong.id === event.payload.song_id) {
-          if (typeof event.payload.rating === "number") {
-            this.currentSong.rating = event.payload.rating;
-          }
+          applySongStats(this.currentSong, event.payload);
         }
       });
 
@@ -162,13 +161,12 @@ export class PlayerStore {
     await invoke("set_repeat_mode", { mode });
   }
 
-  /** Heart = rating 5.0; unheart clears the rating. */
-  async toggleFavorite() {
+  /** Rate the current track (-1 clears; hearts map to 5.0 via SongRating). */
+  async rateCurrent(rating: number) {
     if (!this.currentSong) return;
-    const next = this.currentSong.rating === 5 ? -1 : 5;
     this.currentSong.rating = await invoke<number>("set_song_rating", {
       songId: this.currentSong.id,
-      rating: next,
+      rating,
     });
   }
 }

@@ -8,9 +8,11 @@ pub async fn set_song_rating(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<f32, String> {
-    let normalized = {
+    let (normalized, payload) = {
         let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-        crate::stats::set_rating(&conn, song_id, rating).map_err(|e| e.to_string())?
+        let normalized =
+            crate::stats::set_rating(&conn, song_id, rating).map_err(|e| e.to_string())?;
+        (normalized, crate::stats::stats_payload(&conn, song_id))
     };
 
     // Keep the in-memory current song in sync so playback state snapshots
@@ -24,10 +26,7 @@ pub async fn set_song_rating(
         }
     }
 
-    let _ = app.emit(
-        "song-stats-changed",
-        serde_json::json!({ "song_id": song_id, "rating": normalized }),
-    );
+    let _ = app.emit("song-stats-changed", payload);
 
     Ok(normalized)
 }
