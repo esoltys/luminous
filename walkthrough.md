@@ -76,15 +76,16 @@ than silently claiming it; happy to file a follow-up if you want to pursue it.
 | `src-tauri/src/lib.rs` | Event loop handles the two new events; EQ startup restore reads mode + parametric JSON. |
 | `src-tauri/src/commands/player.rs` | Shuffle/repeat changes clear a stale preload. |
 | `src-tauri/src/equalizer.rs` | New `Parametric20` mode + `ParametricBand {freq, gain_db, q}`, 20 log-spaced defaults, per-mode filter cascade, explicit-Q biquad. **10-band graphic API untouched** (BDD suite unchanged). |
-| `src-tauri/src/commands/equalizer.rs` | `set_equalizer_mode`, `set_parametric_band`, `reset_parametric_bands`; `get_equalizer_state` returns mode + parametric. |
+| `src-tauri/src/commands/equalizer.rs` | `set_equalizer_mode`, `set_parametric_band`, `reset_parametric_bands`; `get_equalizer_state` returns mode + parametric; `load_equalizer_preset` also maps the preset onto the parametric bands when that mode is active. |
+| `src-tauri/src/equalizer.rs` | `load_preset_into_parametric` + `interp_preset_gain` (log-frequency interpolation of a 10-band preset onto the 20 parametric bands). |
 | `src-tauri/src/db.rs` | Migration 4: `equalizer_settings.mode` + `.parametric` (JSON), backward-compatible defaults. |
 
 ## Frontend changes
 
 | Surface | Change |
 |---------|--------|
-| Settings → Equalizer | **Mode segmented control** (10-band graphic ⇄ 20-band parametric). Graphic keeps its preset dropdown; parametric gets a **Reset Bands** button. |
-| `Equalizer.svelte` | 20 gain sliders; click a band to select it and reveal a **frequency (log-scaled) + Q** detail panel; log-frequency curve preview for both modes. |
+| Settings → Equalizer | **Mode segmented control** (10-band graphic ⇄ 20-band parametric). The **preset dropdown works in both modes** (a preset maps onto the parametric bands); parametric additionally has a **Reset Bands** button (resets freq/gain/Q). |
+| `Equalizer.svelte` | 20 gain sliders; click a band to select it and reveal a **frequency (log-scaled) + Q** detail panel. A **response-curve preview shows only in parametric mode** — graphic bands have a fixed Q so the sliders already convey the shape, but each parametric band's Q changes its bandwidth, which is only visible on the curve. |
 | `en.ts` / `fr.ts` | New strings: parametric title/subtitle, mode labels, frequency/Q/band, reset. |
 
 ## How to verify
