@@ -63,7 +63,8 @@ You can download the latest installers and portable binaries directly from the G
 *   **Instant Search and Navigation**: Locate any track, album, or artist in your collection instantly using database-level SQLite FTS5 (Full-Text Search) with split-second response times.
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds using an incremental scanner that intelligently skips unchanged files based on modification times.
 *   **Immersive Audio Visualizers**: View your music with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
-*   **Ten-Band Graphic Equalizer**: Fine-tune your listening experience with a precise cascaded biquad DSP equalizer and custom presets for various music genres.
+*   **Gapless Playback**: Tracks flow into one another with no silence or clicks. The engine decodes the next track ahead of the boundary and hands over seamlessly — ideal for live albums, concept records, and DJ mixes.
+*   **Dual-Mode Equalizer**: Shape your sound with a 10-band graphic equalizer (cascaded biquad DSP and genre presets) or switch to a 20-band parametric mode with adjustable Q per band and a live response-curve preview. Both modes leave the signal untouched when disabled.
 *   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched automatically from LRCLIB or plain text from Lyrics.ovh, complete with local caching and visual synced-lyrics indicators.
 *   **AcoustID Fingerprinting and Tag Editor**: Automatically identify tracks and correct metadata using AcoustID acoustic fingerprinting (via `fpcalc`), and write tags directly back to your local files.
 *   **Smart Cover Art Engine**: Extract embedded artwork automatically using lofty tag parsing, with automatic iTunes Search API fallback and local file deduplication.
@@ -88,11 +89,11 @@ luminous/
 └── src-tauri/                # Tauri + Rust Backend Core
     ├── src/
     │   ├── analyzer.rs       # Real-time FFT spectrum processing
-    │   ├── audio.rs          # Symphonia decoding thread & CPAL playback loop
+    │   ├── audio.rs          # Symphonia decoding thread & CPAL playback loop with gapless double-buffering
     │   ├── collection.rs     # Lofty scanner & folder watcher
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
-    │   ├── equalizer.rs      # Biquad filter DSP configurations
+    │   ├── equalizer.rs      # Biquad DSP: 10-band graphic & 20-band parametric filters
     │   ├── lib.rs            # Library entry point, background loops, & IPC registry
     │   ├── lyrics.rs         # LRCLIB & Lyrics.ovh client integrations
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
