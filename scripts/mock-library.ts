@@ -6,6 +6,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index";
+import { hydrateEmbeddedArt } from "./embedded-art-cache";
 import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -280,16 +281,36 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
   }
 }
 
+/**
+ * The db path a given config actually resolves to: an explicit `dbPath`
+ * wins, otherwise the auto-detected default (see defaultDbPath above).
+ * Exported so anything else that needs to find the sibling covers/
+ * directory (e.g. the vite dev middleware serving /covers/*) resolves the
+ * exact same path loadMockLibrary used, instead of re-deriving it and
+ * silently diverging when dbPath is left unset.
+ */
+export function resolveDbPath(config: MockConfig): string | undefined {
+  return config.dbPath || defaultDbPath();
+}
+
 export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Promise<MockLibrary> {
   const limit = config.songLimit ?? 2000;
   // An explicit dbPath is a firm request — warn if it's wrong. Falling back
   // to the auto-detected Tauri app-data location is best-effort and should
   // stay quiet when nothing's there (e.g. CI, or no desktop app installed).
-  const dbPath = config.dbPath || defaultDbPath();
+  const dbPath = resolveDbPath(config);
   const fromDb = dbPath ? await loadFromDatabase(dbPath, limit, !config.dbPath) : null;
 
   const songs = fromDb?.songs ?? FALLBACK_SONGS;
   const playlists = fromDb?.playlists ?? FALLBACK_PLAYLISTS;
+
+  // Real songs with embedded (but never pre-cached) art would otherwise show
+  // the placeholder icon forever — the mock has no get_cover_art_uri command
+  // to extract it on demand like the real backend does. Do it upfront instead,
+  // before deriving albums/artists so their art_automatic picks it up too.
+  if (fromDb) {
+    await hydrateEmbeddedArt(songs);
+  }
 
   return {
     songs,

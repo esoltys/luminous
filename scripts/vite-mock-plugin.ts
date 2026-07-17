@@ -1,8 +1,22 @@
 import type { Plugin } from "vite";
 import { compileMockScript } from "./compile-mock-script";
-import { loadMockConfig, loadMockLibrary, resolveFeatured } from "./mock-library";
+import { EMBEDDED_ART_CACHE_DIR } from "./embedded-art-cache";
+import { loadMockConfig, loadMockLibrary, resolveDbPath, resolveFeatured } from "./mock-library";
 import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
+
+/** Tries `dir/filename`, then `dir/<filename without extension>.{jpg,png}`. */
+function findCoverFile(dir: string, filename: string): string | undefined {
+  const direct = join(dir, filename);
+  if (existsSync(direct)) return direct;
+
+  const baseName = filename.replace(/\.(jpg|jpeg|png)$/i, "");
+  for (const ext of ["jpg", "png"]) {
+    const candidate = join(dir, `${baseName}.${ext}`);
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
 
 export function tauriIpcMockPlugin(): Plugin {
   return {
@@ -14,29 +28,20 @@ export function tauriIpcMockPlugin(): Plugin {
 
         if (url.startsWith("/covers/")) {
           try {
-            const config = loadMockConfig();
-            const dbPath = config.dbPath || "";
-            const coversDir = dbPath ? join(dirname(dbPath), "covers") : "";
-            if (!coversDir) {
-              res.statusCode = 404;
-              res.end("No dbPath configured");
-              return;
-            }
-            const filename = decodeURIComponent(url.slice(8));
-            const baseName = filename.replace(/\.(jpg|png|jpeg)$/i, "");
-            
-            let filePath = join(coversDir, filename);
-            if (!existsSync(filePath)) {
-              const jpgPath = join(coversDir, `${baseName}.jpg`);
-              const pngPath = join(coversDir, `${baseName}.png`);
-              if (existsSync(jpgPath)) {
-                filePath = jpgPath;
-              } else if (existsSync(pngPath)) {
-                filePath = pngPath;
-              }
-            }
+            const filename = decodeURIComponent(url.slice("/covers/".length));
 
-            if (existsSync(filePath)) {
+            // Check the mock-only embedded-art extraction cache first (see
+            // embedded-art-cache.ts — it has no real-app equivalent), then
+            // fall back to the real app's covers/ directory alongside the
+            // resolved db (explicit dbPath or the auto-detected default —
+            // *not* the raw config value, which is empty whenever dbPath is
+            // left unset for auto-detection).
+            const dbPath = resolveDbPath(loadMockConfig());
+            const coversDir = dbPath ? join(dirname(dbPath), "covers") : undefined;
+            const filePath =
+              findCoverFile(EMBEDDED_ART_CACHE_DIR, filename) ?? (coversDir ? findCoverFile(coversDir, filename) : undefined);
+
+            if (filePath) {
               const mime = filePath.endsWith(".png") ? "image/png" : "image/jpeg";
               res.setHeader("Content-Type", mime);
               res.end(readFileSync(filePath));
