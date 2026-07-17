@@ -2,7 +2,6 @@
 
 ## Version Control
 
-- Always initialize a git repository for new projects.
 - Make atomic git commits at logical points (e.g., after completing each task phase, after scaffolding, after adding a major feature).
 - Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
