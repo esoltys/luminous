@@ -4,7 +4,8 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide } from 'svelte/transition';
+  import { slide, fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
@@ -241,10 +242,13 @@
 
   <!-- Floating PlayDock: inset from all edges (not flush) so it reads as a
        floating glass dock, and the content behind it can still scroll
-       underneath the gap for the blur to have something to blur. -->
-  <div class="absolute inset-x-4 bottom-4 z-40">
-    <PlayerBar />
-  </div>
+       underneath the gap for the blur to have something to blur. Hidden
+       entirely until a track has ever loaded this session (issue #71). -->
+  {#if playerStore.hasEverPlayed}
+    <div class="absolute inset-x-4 bottom-4 z-40" transition:fly={{ y: 40, duration: 300, easing: cubicOut }}>
+      <PlayerBar />
+    </div>
+  {/if}
 </div>
 
 <style>
