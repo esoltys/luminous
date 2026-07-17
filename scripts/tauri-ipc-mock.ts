@@ -28,10 +28,28 @@ interface AppSettings {
   [key: string]: string;
 }
 
+interface ParametricBand {
+  freq: number;
+  gain_db: number;
+  q: number;
+}
+
 interface EqualizerState {
   enabled: boolean;
+  mode: "graphic10" | "parametric20";
   preamp: number;
   gains: number[];
+  parametric: ParametricBand[];
+}
+
+// 20 log-spaced default bands mirroring equalizer::default_parametric_bands().
+function defaultParametricBands(): ParametricBand[] {
+  const octaves = Math.log2(16000 / 31.25); // 9 octaves
+  return Array.from({ length: 20 }, (_, i) => ({
+    freq: Math.round(31.25 * 2 ** ((octaves * i) / 19)),
+    gain_db: 0.0,
+    q: 1.1,
+  }));
 }
 
 interface MockLibrary {
@@ -330,16 +348,37 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return null;
     },
 
-    get_equalizer_state: (): EqualizerState => ({
-      enabled: true,
-      preamp: 3.0,
-      gains: [10.0, 8.0, 5.0, -3.0, -6.0, -4.0, 3.0, 6.0, 8.0, 10.0],
-    }),
+    get_equalizer_state: (): EqualizerState => {
+      // Shape a demo "smiley" parametric curve so the preview/screenshot
+      // shows structure rather than a flat line.
+      const shaped = defaultParametricBands();
+      const demoGains = [
+        9, 8, 6, 4, 2, 0, -2, -4, -5, -5, -4, -2, 0, 2, 4, 6, 7, 8, 9, 10,
+      ];
+      shaped.forEach((b, i) => (b.gain_db = demoGains[i] ?? 0));
+      return {
+        enabled: true,
+        mode: "graphic10",
+        preamp: 3.0,
+        gains: [10.0, 8.0, 5.0, -3.0, -6.0, -4.0, 3.0, 6.0, 8.0, 10.0],
+        parametric: shaped,
+      };
+    },
 
     load_equalizer_preset: (args): EqualizerState => ({
       enabled: true,
+      mode: "graphic10",
       preamp: 3.0,
       gains: EQ_PRESETS[args.presetName as string] ?? Array(10).fill(0.0),
+      parametric: defaultParametricBands(),
+    }),
+
+    reset_parametric_bands: (): EqualizerState => ({
+      enabled: true,
+      mode: "parametric20",
+      preamp: 3.0,
+      gains: Array(10).fill(0.0),
+      parametric: defaultParametricBands(),
     }),
 
     set_app_setting: (args) => {
@@ -368,6 +407,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
   const NOOP_COMMANDS = [
     "set_equalizer_enabled", "set_equalizer_preamp", "set_equalizer_band", "set_spectrum_enabled",
+    "set_equalizer_mode", "set_parametric_band",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",

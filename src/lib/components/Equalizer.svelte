@@ -39,10 +39,10 @@
     try {
       const config = await invoke<EqConfig>("get_equalizer_state");
       enabled = config.enabled;
-      mode = config.mode;
+      mode = config.mode ?? "graphic10";
       preamp = config.preamp;
       gains = config.gains;
-      parametric = config.parametric;
+      parametric = config.parametric ?? [];
       determinePresetName();
     } catch (e) {
       console.error("Failed to load equalizer state:", e);

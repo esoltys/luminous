@@ -284,6 +284,30 @@ async function main() {
         const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
         if (t) (t as HTMLElement).click();
       });
+    },
+    "click-equalizer": async (page) => {
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "Equalizer");
+        if (t) (t as HTMLElement).click();
+      });
+      await page.waitForTimeout(400);
+    },
+    "click-equalizer-parametric": async (page) => {
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const tab = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "Equalizer");
+        if (tab) (tab as HTMLElement).click();
+      });
+      await page.waitForTimeout(400);
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const mode = btns.find(
+          (b: Element) => (b as HTMLElement).textContent?.trim() === "20-band parametric"
+        );
+        if (mode) (mode as HTMLElement).click();
+      });
+      await page.waitForTimeout(400);
     }
   };
 
@@ -329,6 +353,8 @@ async function main() {
         { name: "artist-detail", opts: { tab: "collection", subTab: "artists", theme: "nordic-blue", filename: "artist-detail.png", featured, afterLoad: actionRegistry["click-artist"], sidebarWidth: 64, positionSeconds: 38 } },
         { name: "album-detail", opts: { tab: "collection", subTab: "albums", theme: "nordic-blue", filename: "album-detail.png", featured, afterLoad: actionRegistry["click-album"], sidebarWidth: 64, positionSeconds: 38 } },
         { name: "themes", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "themes.png", featured, afterLoad: actionRegistry["click-themes"], sidebarWidth: 64, positionSeconds: 156 } },
+        { name: "equalizer", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "equalizer.png", featured, afterLoad: actionRegistry["click-equalizer"], sidebarWidth: 64, positionSeconds: 92 } },
+        { name: "equalizer-parametric", opts: { tab: "settings", subTab: "", theme: "nordic-blue", filename: "equalizer-parametric.png", featured, afterLoad: actionRegistry["click-equalizer-parametric"], sidebarWidth: 64, positionSeconds: 92 } },
         { name: "now-playing", opts: { tab: "collection", subTab: "songs", theme: "nordic-blue", filename: "now-playing.png", featured, isImmersive: true, sidebarOpen: false, rightPanelOpen: false, sidebarWidth: 64, positionSeconds: 82 } },
       ];
       const toRun = nameFilter ? fallbackCaptures.filter((c) => c.name === nameFilter) : fallbackCaptures;
