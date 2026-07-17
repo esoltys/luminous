@@ -21,6 +21,7 @@ mod models;
 mod moodbar;
 mod player;
 mod playlist;
+mod stats;
 mod tageditor;
 mod waveform;
 
@@ -198,7 +199,9 @@ pub fn run() {
                     };
                     if state == crate::models::PlayState::Playing {
                         let mut p = player_ticks.lock().await;
-                        p.on_position_update(pos);
+                        if let Some(stats) = p.on_position_update(pos) {
+                            let _ = app_handle_ticks.emit("song-stats-changed", stats);
+                        }
                         let _ = app_handle_ticks.emit(
                             "playback-position",
                             serde_json::json!({
@@ -366,7 +369,12 @@ pub fn run() {
                                         player.resume().await
                                     }
                                 }
-                                Code::MediaTrackNext => player.next_track().await,
+                                Code::MediaTrackNext => {
+                                    if let Some(stats) = player.note_manual_skip() {
+                                        let _ = app_handle.emit("song-stats-changed", stats);
+                                    }
+                                    player.next_track().await
+                                }
                                 Code::MediaTrackPrevious => player.previous_track().await,
                                 Code::AudioVolumeUp => {
                                     let volume = player.get_state().await.volume;
@@ -480,6 +488,8 @@ pub fn run() {
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
+            // Stats commands
+            commands::stats::set_song_rating,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

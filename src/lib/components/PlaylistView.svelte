@@ -6,6 +6,8 @@
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
+  import { invoke } from "@tauri-apps/api/core";
+  import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
 
   let editingSongId = $state<number | null>(null);
@@ -59,6 +61,14 @@
     if (playlistsStore.activePlaylistId !== null) {
       playlistsStore.removeItemsFromPlaylist(playlistsStore.activePlaylistId, [uuid]);
     }
+  }
+
+  async function rateItem(item: PlaylistItem, rating: number) {
+    if (!item.song) return;
+    item.song.rating = await invoke<number>("set_song_rating", {
+      songId: item.song.id,
+      rating,
+    });
   }
 
   // Drag and drop state and handlers
@@ -207,6 +217,7 @@
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderTitle')}</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderArtist')}</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('collection.tableHeaderAlbum')}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">{i18n.t('collection.tableHeaderRating')}</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">{i18n.t('playlists.tableHeaderDuration')}</th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t('collection.tableHeaderActions')}</th>
             </tr>
@@ -320,6 +331,13 @@
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </td>
+                <td class="py-2.5 px-4 text-center">
+                  {#if item.song && !unavailable}
+                    <div class="flex justify-center">
+                      <SongRating rating={item.song.rating} onRate={(r) => rateItem(item, r)} />
+                    </div>
+                  {/if}
+                </td>
                 <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
@@ -344,7 +362,7 @@
             {/each}
             {#if playlistsStore.activePlaylistTracks.length === 0}
               <tr>
-                <td colspan="6" class="py-12 text-center text-brand-text-secondary/45">
+                <td colspan="7" class="py-12 text-center text-brand-text-secondary/45">
                   <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
                   {i18n.t('playlists.emptyPlaylistTitle')}. {i18n.t('playlists.emptyPlaylistText')}
                 </td>

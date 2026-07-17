@@ -1,40 +1,73 @@
-# Walkthrough: Hide the player bar when nothing is playing (#71)
+# Walkthrough — Play Statistics & Track Ratings (#76)
 
-## Summary
+Branch: `claude/issue-76-play-stats` (worktree `.claude/worktrees/issue-76`)
 
-The floating player bar (`PlayerBar.svelte`) no longer renders on first launch, before any track has ever been selected. It fades/slides in the moment a track starts playing, and — once shown in a session — stays visible even through pauses or an empty queue (matches the issue's requirement #5).
+## What this fixes
 
-## Changes
+The `songs` table has always carried `rating`, `playcount`, `skipcount`, and
+`lastplayed` columns, and the Home view has always queried them — but **nothing
+ever wrote them**, so "Recently Played" and "Most Played" were permanently
+empty, and the "Plays" column in album detail was stuck at 0. This change adds
+the write paths plus a rating UX with a **single, user-selectable style**:
+**Heart** (default) or **5-Star**, chosen in Settings → General. One control
+style renders consistently across every surface — never both at once.
 
-- **[player.svelte.ts](src/lib/stores/player.svelte.ts)** — added a sticky `hasEverPlayed` flag on `PlayerStore`. It flips to `true` the first time `currentSong` is set (via the initial `get_playback_state` fetch, `playback-state` events, or `track-changed` events) and never resets, even if the queue empties out later in the session.
-- **[+layout.svelte](src/routes/+layout.svelte)** — the floating PlayDock wrapper is now gated behind `{#if playerStore.hasEverPlayed}`, with a `fly` transition (slide up + fade, 300ms) for a smooth entrance instead of a jump cut.
-- **[PlayerBar.svelte](src/lib/components/PlayerBar.svelte)** — removed the now-redundant inner `in:fade` transition on the `<footer>`, since the parent `{#if}` block in the layout owns the enter/exit animation.
-- **Seven view files** — `pb-24` (the reserved bottom padding that kept content from being obscured by the always-on bar) is now conditional on `playerStore.hasEverPlayed` via `class:pb-24={...}`, so content expands to fill the freed space when the bar is hidden:
-  - [AlbumDetailView.svelte](src/lib/components/AlbumDetailView.svelte)
-  - [ArtistDetailView.svelte](src/lib/components/ArtistDetailView.svelte) (two spots — the playlists section and its empty-state spacer)
-  - [CollectionView.svelte](src/lib/components/CollectionView.svelte)
-  - [FoldersView.svelte](src/lib/components/FoldersView.svelte)
-  - [HomeView.svelte](src/lib/components/HomeView.svelte)
-  - [LyricsView.svelte](src/lib/components/LyricsView.svelte)
-  - [PlaylistView.svelte](src/lib/components/PlaylistView.svelte)
-- **[Sidebar.svelte](src/lib/components/Sidebar.svelte)** — the bottom scanning/"Rescan Library" section had the same hardcoded offset (`mb-24`, not `pb-24`) reserving space for the always-on bar, but wasn't in the issue's original file list. Fixed the same way — conditional on `playerStore.hasEverPlayed` — so it slides down to fill the sidebar when the bar is hidden.
-- **[player.test.ts](src/lib/stores/player.test.ts)** — new unit test covering the sticky-latch behavior: `hasEverPlayed` starts `false`, flips to `true` on the first `track-changed` event with a song, and stays `true` after a later `track-changed` event clears the song.
+## Backend changes
 
-## Verification performed
+| File | Change |
+|------|--------|
+| `src-tauri/src/stats.rs` (new) | `record_play` (playcount+1, stamps lastplayed), `record_skip`, `set_rating` with half-star normalization (`-1` = unrated, else snapped to 0.5–5.0). Fully unit-tested. |
+| `src-tauri/src/player.rs` | `on_position_update` now records the listen when the existing 50% scrobble point is crossed (the old `TODO` at line 487) and returns the song id for event emission. New `note_manual_skip` records a skip only when the track hasn't reached its scrobble point. |
+| `src-tauri/src/commands/stats.rs` (new) | `set_song_rating` IPC command — persists, syncs the in-memory current song, emits `song-stats-changed`. |
+| `src-tauri/src/commands/player.rs` | `next_track` command now records the skip before advancing. |
+| `src-tauri/src/lib.rs` | Position tick loop emits `song-stats-changed` when a play is recorded; the `MediaTrackNext` media key also records skips. Command registered. |
+| `src-tauri/src/commands/tageditor.rs` | `get_song_details` now returns `rating`. |
 
-- `bun run check` — 0 errors.
-- `bun run test:run` — 121/121 tests passing (including the new sticky-flag test).
-- Manual browser verification (frontend dev server + mocked Tauri IPC layer): confirmed the player bar is absent on a fresh load with no track loaded, the songs list fills the freed space, the bar animates in on a simulated `track-changed` event, and it remains visible (showing "Nothing playing") after the track clears again. Spot-checked `HomeView` for the same padding behavior.
-- Searched the whole `src/` tree for any other `pb-24`/`mb-24` offsets tied to the player bar — the 7 issue-listed views plus `Sidebar.svelte` were the complete set; nothing else missed.
+No DB migration needed — all columns already existed.
 
-## Note on this session
+**Semantics** (matching our reference implementation's model):
+- A track "counts" once it passes 50% of its duration → `playcount + 1`, `lastplayed = now`.
+- Skipping (next button, media key) *before* that point → `skipcount + 1`. Natural completion never counts as a skip; skipping after the 50% point doesn't either (it already counted as a play).
+- Heart = rating 5.0; unhearting clears to unrated. Stars can set any half-step from 0.5–5.0. Both styles share the same underlying `rating` column, so switching styles never loses data (a 3.5-star track simply shows as un-hearted in heart mode).
+- Every stats write emits a `song-stats-changed` event carrying the song's full current stats (`rating`, `playcount`, `skipcount`, `lastplayed`); the collection store, playlists store, album detail view, and player store all listen and patch their copies in place — a heart set in the play dock updates the playlist and album detail rows instantly, and vice versa.
 
-Partway through, the original worktree directory (`.claude/worktrees/issue-71-6c79ce`) was accidentally emptied. No commits were lost (nothing had been committed yet), but the in-progress uncommitted edits were — they were fully redone from scratch in this new worktree at `.worktrees/issue-71-6c79ce`, per your instruction to use `.worktrees/` instead of `.claude/worktrees/` going forward. The stale `.claude/worktrees/issue-71-6c79ce` directory is still on disk (now empty) — it's locked by this session's own process and couldn't be deleted from within the session; it'll need to be removed manually once this session ends.
+## Frontend changes
 
-## How to verify
+| Surface | Change |
+|---------|--------|
+| Settings → General | New **"Rating style"** dropdown: Heart (default) or 5-star, persisted via app settings (`rating_style`). |
+| `SongRating.svelte` (new) | The single rating control used everywhere — renders a heart or the star row per the setting. |
+| `StarRating.svelte` (new) | 5-star control with half-star precision (click left/right half of a star), hover preview, click-again-to-clear. Accent-colored fill per DESIGN.md. |
+| `HeartToggle.svelte` (new) | Favorite heart; filled accent when favorited. |
+| `prefs.svelte.ts` (new store) | Loads/saves the rating style. |
+| Collection → Songs | New sortable **Rating** column. |
+| Playlist view | New Rating column (blank for unavailable tracks). |
+| Player bar | Rating control next to the format badge for the current track. |
+| Album detail | New Rating column; the existing "Plays" column now actually increments. |
+| Tag editor | Rating row — saves immediately, DB-only (never written to the file). |
+| `utils/stats.ts` (new) | Shared `applySongStats` helper + event payload type used by all listeners. |
+| Stores | `player`, `collection`, and `playlists` stores (plus album detail's local list) subscribe to `song-stats-changed` and patch songs in place — cross-view sync. |
+| Locales | `rating.*`, `settings.ratingStyle*`, `collection.tableHeaderRating` keys in English and French. |
+| `vite.config.js` | Added the `svelteTesting` plugin — this repo's first Svelte *component* test needed the browser-condition resolution (also unblocks issue #35's component-test work). |
 
-`bun run tauri dev` is starting up now — once the window opens:
-1. On first launch (no track ever played), confirm the player bar is absent and the content area fills the space.
-2. Play any track — the bar should slide/fade in smoothly.
-3. Pause, or let the queue run out — the bar should stay visible.
-4. Check a few other views (Home, an album, a playlist, lyrics) to confirm nothing is hidden behind — or awkwardly gapped above — where the bar used to always be.
+## Verification
+
+- `cargo test` — 7 passed (4 new stats tests: play increment + lastplayed stamp, skip isolation, rating persistence, normalization snap/clamp).
+- `cargo check` / `cargo fmt` — clean.
+- `bun run test:run` — 132 passed (6 StarRating + 5 SongRating component tests).
+- `bun run check` — 0 errors, 0 warnings.
+
+## How to verify manually (dev server)
+
+1. Play any track past its halfway point → the Home view's "Recently Played" / "Most Played" rows populate (revisit Home), and the album detail "Plays" count increments.
+2. Skip a track early (next button or media key) → `skipcount` increments (visible in DB; UI surface for skip counts comes with #13's column work).
+3. Heart a track **in the play dock** → the same track's heart updates instantly in Collection, the active playlist, and album detail (and vice versa from any list).
+4. Settings → General → switch "Rating style" to **5-star** → every rating control across the app becomes a star row; half-star clicks on the left half of a star; click the same value again to clear. Switch back to Heart — a 5.0-rated track shows a filled heart.
+5. Open the tag editor on any song → the Rating row shows the same value; changing it saves instantly without pressing Save.
+6. Sort the Collection songs table by the new Rating column header.
+
+## Follow-ups this unblocks
+
+- #26 smart playlists (rating/playcount/lastplayed rule fields now have data)
+- #83 scrobbling (same play-completion hook)
+- #44 queue drawer History tab (`lastplayed` ordering)

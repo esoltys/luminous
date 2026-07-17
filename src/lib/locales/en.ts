@@ -57,6 +57,7 @@ export const en = {
     tableHeaderArtist: "Artist",
     tableHeaderAlbum: "Album",
     tableHeaderPlays: "Plays",
+    tableHeaderRating: "Rating",
     tableHeaderDuration: "Duration",
     tableHeaderActions: "Actions",
     playSong: "Play song",
@@ -110,6 +111,10 @@ export const en = {
     selectLanguage: "Language / Langue",
     languageEnglish: "English",
     languageFrench: "Français",
+    ratingStyle: "Rating style",
+    ratingStyleHeart: "Heart (favorite)",
+    ratingStyleStars: "5-star",
+    ratingStyleHint: "Heart marks a track as a favorite; 5-star allows half-step ratings. Both use the same underlying rating.",
     addFolder: "Add Folder",
     folderHelpTitle: "How do Watched Folders work?",
     folderHelpText: "Luminous monitors these folders for audio files (MP3, FLAC, M4A, etc.). When you press \"Rescan Library\", the scanner recursively searches these folders and adds new/updated tracks to your collection. Luminous uses mtime-based hashing to perform fast incremental scans.",
@@ -347,6 +352,12 @@ export const en = {
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
+  },
+  rating: {
+    label: "Rating",
+    setTooltip: "Rate {value} of 5",
+    favoriteTooltip: "Add to favorites",
+    unfavoriteTooltip: "Remove from favorites"
   },
   common: {
     scrollLeft: "Scroll left",

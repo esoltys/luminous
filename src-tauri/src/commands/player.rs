@@ -246,14 +246,13 @@ pub async fn stop(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn next_track(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .player
-        .lock()
-        .await
-        .next_track()
-        .await
-        .map_err(|e| e.to_string())
+pub async fn next_track(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    if let Some(stats) = player.note_manual_skip() {
+        let _ = app.emit("song-stats-changed", stats);
+    }
+    player.next_track().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

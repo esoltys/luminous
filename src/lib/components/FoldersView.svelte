@@ -5,6 +5,7 @@
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2 } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
@@ -220,6 +221,19 @@
             <option value="en">{i18n.t('settings.languageEnglish')}</option>
             <option value="fr">{i18n.t('settings.languageFrench')}</option>
           </select>
+        </div>
+        <div class="flex flex-col gap-2 max-w-xs">
+          <label for="rating-style-select" class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
+          <select
+            id="rating-style-select"
+            value={prefs.ratingStyle}
+            onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as any)}
+            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+          >
+            <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
+            <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
+          </select>
+          <p class="text-[10px] text-brand-text-secondary/60">{i18n.t('settings.ratingStyleHint')}</p>
         </div>
       </div>
     {:else if settingsTab === "folders"}

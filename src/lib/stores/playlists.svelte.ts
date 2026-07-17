@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { Playlist, PlaylistItem } from "../types";
+import { applySongStats, type SongStatsPayload } from "../utils/stats";
 
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
@@ -12,6 +14,16 @@ class PlaylistsStore {
 
   private async init() {
     try {
+      // Keep loaded playlist tracks in sync with rating/playcount changes
+      // made anywhere in the app.
+      await listen<SongStatsPayload>("song-stats-changed", (event) => {
+        for (const item of this.activePlaylistTracks) {
+          if (item.song?.id === event.payload.song_id) {
+            applySongStats(item.song, event.payload);
+          }
+        }
+      });
+
       await this.refreshPlaylists();
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_playlist_id) {

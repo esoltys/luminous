@@ -7,6 +7,7 @@ use crate::{
     audio::AudioEngine,
     db::Database,
     models::{PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song},
+    stats,
 };
 use anyhow::{anyhow, Result};
 use rand::seq::SliceRandom;
@@ -479,13 +480,53 @@ impl Player {
         }
     }
 
-    /// Update position and check scrobble point.
-    pub fn on_position_update(&mut self, position_nanosec: u64) {
-        if let Some(scrobble_at) = self.scrobble_point_nanosec {
-            if !self.scrobbled && position_nanosec >= scrobble_at {
-                self.scrobbled = true;
-                // TODO: Phase 3 — trigger scrobbler here
-                log::debug!("Scrobble point reached at {}ns", position_nanosec);
+    /// Update position and check scrobble point. When the scrobble point is
+    /// crossed, the listen is recorded (playcount/lastplayed) and the
+    /// `song-stats-changed` payload is returned for the caller to emit.
+    pub fn on_position_update(&mut self, position_nanosec: u64) -> Option<serde_json::Value> {
+        let scrobble_at = self.scrobble_point_nanosec?;
+        if self.scrobbled || position_nanosec < scrobble_at {
+            return None;
+        }
+        self.scrobbled = true;
+        log::debug!("Scrobble point reached at {}ns", position_nanosec);
+        // TODO: dispatch to online scrobbler services here once scrobbling lands
+
+        let song_id = self.current_song.as_ref()?.id;
+        match self._db.pool.get() {
+            Ok(conn) => match stats::record_play(&conn, song_id) {
+                Ok(()) => Some(stats::stats_payload(&conn, song_id)),
+                Err(e) => {
+                    log::warn!("Failed to record play for song {song_id}: {e}");
+                    None
+                }
+            },
+            Err(e) => {
+                log::warn!("Failed to get db connection for play stats: {e}");
+                None
+            }
+        }
+    }
+
+    /// Record a skip for the current track if it has not reached its scrobble
+    /// point. Call before a user-initiated track change (never on natural
+    /// completion). Returns the `song-stats-changed` payload for emission.
+    pub fn note_manual_skip(&mut self) -> Option<serde_json::Value> {
+        if self.scrobbled {
+            return None;
+        }
+        let song_id = self.current_song.as_ref()?.id;
+        match self._db.pool.get() {
+            Ok(conn) => match stats::record_skip(&conn, song_id) {
+                Ok(()) => Some(stats::stats_payload(&conn, song_id)),
+                Err(e) => {
+                    log::warn!("Failed to record skip for song {song_id}: {e}");
+                    None
+                }
+            },
+            Err(e) => {
+                log::warn!("Failed to get db connection for skip stats: {e}");
+                None
             }
         }
     }
