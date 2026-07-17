@@ -149,5 +149,5 @@
   onmousedown={handleMouseDown}
   class="relative flex-1 h-8 cursor-pointer flex items-center group select-none"
 >
-  <canvas bind:this={canvas} class="w-full h-7 opacity-75 group-hover:opacity-100 transition-opacity duration-200"></canvas>
+  <canvas bind:this={canvas} class="w-full h-7 opacity-100"></canvas>
 </div>
