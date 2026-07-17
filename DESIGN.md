@@ -1,5 +1,5 @@
 ---
-version: alpha
+version: 0.6
 name: Luminous
 description: >
   Dark-first desktop music player UI. Tokens below describe the default
