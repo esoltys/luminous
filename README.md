@@ -16,11 +16,15 @@ You can download the latest installers and portable binaries directly from the G
 * **🐧 Linux** — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
 * **🪟 Windows** — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
 
-<p align="center">
-  <img src="docs/screenshots/home.png" width="100%" alt="Home View" />
-</p>
+
 <div align="center">
   <table>
+    <tr>
+        <td colspan="2">
+            <h4 align="center">Home View</h4>
+            <img src="docs/screenshots/home.png" alt="Home View" />
+        </td>
+    </tr>
     <tr>
       <td width="50%">
         <h4 align="center">Albums Overview</h4>
@@ -46,10 +50,16 @@ You can download the latest installers and portable binaries directly from the G
         <h4 align="center">Custom Theme Builder</h4>
         <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
       </td>
-      <td colspan="2" align="center">
-        <h4 align="center">Immersive Now Playing</h4>
-        <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
+      <td width="50%>
+        <h4 align="center">Synced Lyrics</h4>
+        <img src="docs/screenshots/lyrics.png" alt="Synced Lyrics" />
       </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h4 align="center">Immersive Now Playing</h4>
+            <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
+        </td>
     </tr>
   </table>
 </div>
