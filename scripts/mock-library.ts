@@ -129,6 +129,8 @@ export interface MockLibrary {
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
   source: "database" | "fallback";
+  /** The db file actually used, when source is "database" — covers/ lives alongside it. */
+  dbPath?: string;
 }
 
 function readJsonConfig(configPath: string): MockConfig {
@@ -297,6 +299,7 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
     playlistTracks: fromDb?.playlistTracks ?? {},
     lyrics: FALLBACK_LYRICS,
     source: fromDb ? "database" : "fallback",
+    dbPath: fromDb ? dbPath : undefined,
   };
 }
 
