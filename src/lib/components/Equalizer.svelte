@@ -129,6 +129,7 @@
       await ensureEnabled();
       const config = await invoke<EqConfig>("load_equalizer_preset", { presetName: preset });
       gains = config.gains;
+      parametric = config.parametric;
       activePreset = preset;
     } catch (e) {
       console.error("Failed to load preset:", e);
@@ -154,45 +155,49 @@
     return `${Math.round(freq)}`;
   }
 
-  // Smooth Catmull-Rom spline path generator for the SVG EQ envelope graphic
+  // Smooth Catmull-Rom spline path for the SVG EQ envelope graphic.
   function splinePath(pts: { x: number; y: number }[]): string {
     if (pts.length === 0) return "";
     let d = `M ${pts[0].x} ${pts[0].y}`;
-
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = i > 0 ? pts[i - 1] : pts[i];
       const p1 = pts[i];
       const p2 = pts[i + 1];
       const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
-
-      // Calculate control points for smooth transition
       const cp1x = p1.x + (p2.x - p0.x) / 6;
       const cp1y = p1.y + (p2.y - p0.y) / 6;
-
       const cp2x = p2.x - (p3.x - p1.x) / 6;
       const cp2y = p2.y - (p3.y - p1.y) / 6;
-
       d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
     }
     return d;
   }
 
+  // Parametric-only curve preview. Unlike the graphic bands (fixed Q), each
+  // parametric band's Q changes its bandwidth — the gain sliders alone can't
+  // show that, but the combined response curve can. We approximate the
+  // response by summing each band's peaking-filter gain (in dB) across a log
+  // frequency sweep, so widening Q visibly broadens the bump.
+  function bandGainDb(band: ParametricBand, freq: number): number {
+    if (Math.abs(band.gain_db) < 0.01) return 0;
+    // Bell shape in log-frequency: full gain at center, falling off over a
+    // width set by Q (higher Q = narrower).
+    const octaves = Math.log2(freq / band.freq);
+    const bandwidth = 1 / Math.max(band.q, 0.1); // ~octaves to half-gain
+    const falloff = Math.exp(-((octaves / bandwidth) ** 2));
+    return band.gain_db * falloff;
+  }
+
   let curvePath = $derived.by(() => {
-    if (mode === "parametric20") {
-      if (parametric.length === 0) return "";
-      const pts = parametric
-        .map((b) => ({
-          x: freqToUnit(b.freq) * 100,
-          y: 20 - (b.gain_db / 12.0) * 17
-        }))
-        .sort((a, b) => a.x - b.x);
-      return splinePath(pts);
-    }
-    if (gains.length === 0) return "";
-    const pts = gains.map((g, i) => ({
-      x: (i / 9) * 100,
-      y: 20 - (g / 12.0) * 17
-    }));
+    if (parametric.length === 0) return "";
+    const SAMPLES = 96;
+    const pts = Array.from({ length: SAMPLES }, (_, i) => {
+      const unit = i / (SAMPLES - 1);
+      const freq = unitToFreq(unit);
+      const total = parametric.reduce((sum, b) => sum + bandGainDb(b, freq), 0);
+      const clamped = Math.max(-12, Math.min(12, total));
+      return { x: unit * 100, y: 20 - (clamped / 12.0) * 17 };
+    });
     return splinePath(pts);
   });
 
@@ -245,26 +250,26 @@
         </button>
       </div>
 
-      {#if mode === "graphic10"}
-        <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
-          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
-          <select
-            bind:value={activePreset}
-            onchange={() => selectPreset(activePreset)}
-            class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
-          >
-            {#each presets as preset}
-              <option value={preset} class="bg-brand-main text-brand-text-primary">
-                {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
-              </option>
-            {/each}
-            {#if activePreset === "Custom"}
-              <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
-            {/if}
-          </select>
-        </div>
-      {:else}
+      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+        <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
+        <select
+          bind:value={activePreset}
+          onchange={() => selectPreset(activePreset)}
+          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
+          style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
+        >
+          {#each presets as preset}
+            <option value={preset} class="bg-brand-main text-brand-text-primary">
+              {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
+            </option>
+          {/each}
+          {#if activePreset === "Custom"}
+            <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
+          {/if}
+        </select>
+      </div>
+
+      {#if mode === "parametric20"}
         <button
           class="text-xs font-semibold px-3 py-2 bg-brand-sidebar/40 border border-brand-border rounded-lg text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           onclick={resetParametric}
@@ -277,30 +282,29 @@
 
   <!-- Rack Container -->
   <div class="bg-brand-sidebar/20 border border-brand-border rounded-2xl p-6 md:p-8 flex flex-col gap-8 shadow-xl shadow-black/30">
-    <!-- Preamp and Spline Preview -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
-      <!-- Preamp Slider -->
-      <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 lg:col-span-1">
-        <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-          <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
-          <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary/50"}>
-            {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
-          </span>
-        </div>
-        <input
-          type="range"
-          min="-12.0"
-          max="12.0"
-          step="0.5"
-          bind:value={preamp}
-          oninput={handlePreampChange}
-          class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
-        />
+    <!-- Preamp -->
+    <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+      <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+        <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
+        <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary/50"}>
+          {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
+        </span>
       </div>
+      <input
+        type="range"
+        min="-12.0"
+        max="12.0"
+        step="0.5"
+        bind:value={preamp}
+        oninput={handlePreampChange}
+        class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+      />
+    </div>
 
-      <!-- EQ Curve Preview -->
-      <div class="lg:col-span-3 h-20 bg-brand-main border border-brand-border rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
-        <!-- Center line -->
+    {#if mode === "parametric20"}
+      <!-- Response curve preview — parametric only, because Q (bandwidth)
+           can't be read off the gain sliders but shapes the curve here. -->
+      <div class="h-24 bg-brand-main border border-brand-border rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
         <div class="absolute left-0 right-0 top-1/2 border-t border-dashed border-brand-border pointer-events-none"></div>
         <svg class="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
           {#if curvePath}
@@ -325,7 +329,7 @@
           <span>{i18n.t('equalizer.treble')}</span>
         </div>
       </div>
-    </div>
+    {/if}
 
     {#if mode === "graphic10"}
       <!-- Graphic Sliders Rack -->

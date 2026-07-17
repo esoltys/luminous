@@ -149,7 +149,13 @@ pub async fn load_equalizer_preset(
         _ => [0.0; 10], // Flat
     };
 
+    // Always update the graphic gains so the preset is intact if the user
+    // switches back to 10-band; additionally map it onto the parametric bands
+    // when that mode is active so the same named presets work there too.
     eq.load_preset(gains);
+    if eq.mode == EqMode::Parametric20 {
+        eq.load_preset_into_parametric(gains);
+    }
     save_eq_settings(&state.db, &eq);
 
     Ok(EqualizerConfig::from_eq(&eq))

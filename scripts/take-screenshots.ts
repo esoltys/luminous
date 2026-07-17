@@ -286,27 +286,16 @@ async function main() {
       });
     },
     "click-equalizer": async (page) => {
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button"));
-        const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "Equalizer");
-        if (t) (t as HTMLElement).click();
-      });
+      // Locator click auto-waits for the button to be actionable — more
+      // reliable than a fixed-delay evaluate() when the settings sub-tabs
+      // haven't finished rendering yet.
+      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-equalizer-parametric": async (page) => {
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button"));
-        const tab = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "Equalizer");
-        if (tab) (tab as HTMLElement).click();
-      });
+      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
       await page.waitForTimeout(400);
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button"));
-        const mode = btns.find(
-          (b: Element) => (b as HTMLElement).textContent?.trim() === "20-band parametric"
-        );
-        if (mode) (mode as HTMLElement).click();
-      });
+      await page.getByRole("button", { name: "20-band parametric", exact: true }).click();
       await page.waitForTimeout(400);
     }
   };

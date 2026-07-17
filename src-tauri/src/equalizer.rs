@@ -140,6 +140,30 @@ pub fn default_parametric_bands() -> [ParametricBand; PARAMETRIC_BAND_COUNT] {
     bands
 }
 
+/// Interpolate a 10-band graphic preset (gains defined at the `EQ_BANDS`
+/// frequencies) at an arbitrary frequency, in log-frequency space. Values
+/// below the first / above the last band clamp to the endpoint gains.
+fn interp_preset_gain(gains: &[f32; 10], freq: f32) -> f32 {
+    let lf = freq.max(1.0).log2();
+    let first = EQ_BANDS[0].log2();
+    let last = EQ_BANDS[9].log2();
+    if lf <= first {
+        return gains[0];
+    }
+    if lf >= last {
+        return gains[9];
+    }
+    for i in 0..9 {
+        let f0 = EQ_BANDS[i].log2();
+        let f1 = EQ_BANDS[i + 1].log2();
+        if lf >= f0 && lf <= f1 {
+            let t = (lf - f0) / (f1 - f0);
+            return gains[i] + t * (gains[i + 1] - gains[i]);
+        }
+    }
+    gains[9]
+}
+
 // ---------------------------------------------------------------------------
 // Equalizer — 10-band graphic or 20-band parametric cascade
 // ---------------------------------------------------------------------------
@@ -226,6 +250,18 @@ impl Equalizer {
 
     pub fn load_preset(&mut self, gains: [f32; 10]) {
         self.gains = gains;
+        self.recalculate();
+    }
+
+    /// Apply a 10-band graphic preset to the parametric bands by interpolating
+    /// the preset curve (in log-frequency space) at each parametric band's
+    /// center frequency, resetting Q to the default. Lets the parametric mode
+    /// reuse the same named presets as the graphic mode.
+    pub fn load_preset_into_parametric(&mut self, gains: [f32; 10]) {
+        for band in self.parametric.iter_mut() {
+            band.gain_db = interp_preset_gain(&gains, band.freq).clamp(-12.0, 12.0);
+            band.q = PARAMETRIC_DEFAULT_Q;
+        }
         self.recalculate();
     }
 
@@ -376,6 +412,35 @@ mod tests {
         assert_eq!(band.freq, PARAMETRIC_FREQ_MIN);
         assert_eq!(band.gain_db, 12.0);
         assert_eq!(band.q, PARAMETRIC_Q_MAX);
+    }
+
+    #[test]
+    fn preset_maps_onto_parametric_bands() {
+        let mut eq = Equalizer::new();
+        eq.update_format(44100, 2);
+        // Bass-boost-ish preset: strong low end, flat top.
+        let gains = [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        eq.load_preset_into_parametric(gains);
+        // Lowest parametric band (~31 Hz) should track the preset's low gain,
+        // and the highest (~16 kHz) should sit at the flat top.
+        assert!(eq.parametric[0].gain_db > 4.0);
+        assert!(eq.parametric[19].gain_db.abs() < 0.5);
+        // Q reset to default on every band.
+        for band in eq.parametric.iter() {
+            assert!((band.q - 1.1).abs() < 1e-4);
+        }
+    }
+
+    #[test]
+    fn interp_preset_gain_clamps_and_interpolates() {
+        let gains = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 9.0];
+        // Below first band clamps to gains[0]
+        assert_eq!(interp_preset_gain(&gains, 10.0), 3.0);
+        // Above last band clamps to gains[9]
+        assert_eq!(interp_preset_gain(&gains, 20000.0), 9.0);
+        // Midpoint between 8 kHz (3.0) and 16 kHz (9.0) in log space ≈ 6.0
+        let mid = interp_preset_gain(&gains, (8000.0f32 * 16000.0).sqrt());
+        assert!((mid - 6.0).abs() < 0.2);
     }
 
     #[test]
