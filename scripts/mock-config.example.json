@@ -73,6 +73,13 @@
       "tab": "collection",
       "subTab": "songs",
       "isImmersive": true
+    },
+    {
+      "name": "moodbar",
+      "filename": "moodbar.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "click-moodbar-toggle"
     }
   ]
 }

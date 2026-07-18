@@ -297,6 +297,10 @@ async function main() {
       await page.waitForTimeout(400);
       await page.getByRole("button", { name: "20-band parametric", exact: true }).click();
       await page.waitForTimeout(400);
+    },
+    "click-moodbar-toggle": async (page) => {
+      await page.getByTitle("Waveform mode — click to switch to moodbar").click();
+      await page.waitForTimeout(400);
     }
   };
 

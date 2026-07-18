@@ -1,14 +1,16 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
-  import MoodBar from "./MoodBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
+  import { deriveMoodmoji } from "../utils/moodmoji";
 
   import {
     Play,
@@ -21,8 +23,36 @@
     Repeat,
     Repeat1,
     Disc,
-    PanelBottomOpen
+    PanelBottomOpen,
+    AudioWaveform,
+    Palette
   } from "lucide-svelte";
+
+  // Moodmoji: a short emoji hash derived from the current track's moodbar
+  // data, shown as a tooltip near the track title rather than in dense list
+  // rows (per gap-analysis discussion on issue #25).
+  let moodmoji = $state<string | null>(null);
+
+  $effect(() => {
+    const songId = playerStore.currentSong?.id;
+    moodmoji = null; // clear immediately so the previous track's moodmoji never lingers
+    if (songId === undefined || !prefs.showMoodmoji) {
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const data = await invoke<number[] | null>("get_moodbar_data", { songId });
+        if (!cancelled) moodmoji = data ? deriveMoodmoji(data) : null;
+      } catch (e) {
+        if (!cancelled) moodmoji = null;
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  });
 
   // Helper to format nanoseconds to M:SS
   function formatTime(nanosec: number | undefined): string {
@@ -133,6 +163,14 @@
           >
             {playerStore.currentSong.title}
           </button>
+          {#if moodmoji}
+            <span
+              class="text-xs select-none flex-shrink-0"
+              title={i18n.t('playerBar.moodmojiTooltip', {}, "Moodmoji — a mood hash derived from this track's dominant frequency bands and energy")}
+            >
+              {moodmoji}
+            </span>
+          {/if}
         {:else}
           <span class="text-sm font-semibold text-brand-text-primary truncate">
             {i18n.t('playerBar.notPlaying')}
@@ -227,8 +265,20 @@
       <span>{formatTime(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
-        <!-- <MoodBar /> -->
       </div>
+      <button
+        onclick={() => prefs.toggleSeekBarMode()}
+        class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
+        title={prefs.seekBarMode === 'waveform'
+          ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to moodbar')
+          : i18n.t('playerBar.seekbarModeMoodbar', {}, 'Moodbar mode — click to switch to waveform')}
+      >
+        {#if prefs.seekBarMode === 'waveform'}
+          <AudioWaveform class="w-3 h-3" />
+        {:else}
+          <Palette class="w-3 h-3" />
+        {/if}
+      </button>
       <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
     </div>
   </div>

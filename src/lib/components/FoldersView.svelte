@@ -208,32 +208,64 @@
   <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-24={playerStore.hasEverPlayed}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.generalTitle')}</h3>
-        <div class="flex flex-col gap-2 max-w-xs">
-          <label for="language-select" class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
+        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.generalTitle')}</h3>
+
+        <!-- Language row -->
+        <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
+          <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
           <select
             id="language-select"
             value={i18n.currentLocale}
             onchange={(e) => i18n.setLocale(e.currentTarget.value as any)}
-            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
             <option value="en">{i18n.t('settings.languageEnglish')}</option>
             <option value="fr">{i18n.t('settings.languageFrench')}</option>
           </select>
         </div>
-        <div class="flex flex-col gap-2 max-w-xs">
-          <label for="rating-style-select" class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
+
+        <!-- Rating style row -->
+        <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
+          </div>
           <select
             id="rating-style-select"
             value={prefs.ratingStyle}
             onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as any)}
-            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
           </select>
-          <p class="text-[10px] text-brand-text-secondary/60">{i18n.t('settings.ratingStyleHint')}</p>
+        </div>
+
+        <!-- Show moodmoji row -->
+        <div class="flex items-center justify-between gap-4 py-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.showMoodmoji')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.showMoodmojiHint')}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs font-medium text-brand-text-secondary w-6">
+              {prefs.showMoodmoji ? i18n.t('common.on') : i18n.t('common.off')}
+            </span>
+            <button
+              id="moodmoji-toggle"
+              type="button"
+              role="switch"
+              aria-checked={prefs.showMoodmoji}
+              aria-label={i18n.t('settings.showMoodmoji')}
+              onclick={() => prefs.setShowMoodmoji(!prefs.showMoodmoji)}
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {prefs.showMoodmoji ? 'bg-brand-accent' : 'bg-brand-border'}"
+            >
+              <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {prefs.showMoodmoji ? 'translate-x-6' : 'translate-x-1'}"></span>
+            </button>
+          </div>
         </div>
       </div>
     {:else if settingsTab === "folders"}

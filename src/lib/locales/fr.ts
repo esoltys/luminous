@@ -114,6 +114,8 @@ export const fr = {
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",
     ratingStyleHint: "Le cœur marque une piste comme favorite ; les 5 étoiles permettent des notes par demi-étoile. Les deux utilisent la même note sous-jacente.",
+    showMoodmoji: "Afficher le moodmoji",
+    showMoodmojiHint: "Le moodmoji est une courte empreinte emoji affichée à côté du titre de la piste en cours de lecture. Elle est dérivée des données du mood bar de la piste : le premier emoji reflète sa bande de fréquence dominante (graves/médiums/aigus), le second son énergie spectrale globale (calme/équilibrée/intense).",
     addFolder: "Ajouter un dossier",
     folderHelpTitle: "Comment fonctionnent les dossiers surveillés ?",
     folderHelpText: "Luminous surveille ces dossiers à la recherche de fichiers audio (MP3, FLAC, M4A, etc.). Lorsque vous appuyez sur « Analyser la bibliothèque », le scanner effectue une recherche récursive dans ces dossiers et ajoute les nouvelles pistes ou les pistes mises à jour à votre collection. Luminous utilise un hachage basé sur l'heure de modification (mtime) pour effectuer des analyses incrémentielles rapides.",
@@ -274,6 +276,10 @@ export const fr = {
     lyricsTooltip: "Afficher les paroles",
     equalizerTooltip: "Afficher l'égaliseur",
     visualizerTooltip: "Activer/désactiver le visualiseur",
+    seekbarModeWaveform: "Mode forme d'onde — cliquez pour passer au mood bar",
+    seekbarModeMoodbar: "Mode mood bar — cliquez pour passer à la forme d'onde",
+    moodmojiTooltip: "Moodmoji — une empreinte d'ambiance dérivée des bandes de fréquence dominantes et de l'énergie de ce morceau",
+    moodbarLegend: "Mood bar — la couleur reflète l'équilibre fréquentiel du morceau : rouge = graves, vert = médiums, bleu = aigus ; les zones plus lumineuses portent plus d'énergie dans cette bande",
     songLabel: "Chanson",
     artistLabel: "Artiste",
     albumLabel: "Album",
@@ -405,6 +411,8 @@ export const fr = {
     albumArtAlt: "Pochette d'album",
     enableLogoPulse: "Cliquez pour activer la pulsation du logo",
     disableLogoPulse: "Cliquez pour désactiver la pulsation du logo",
-    toggleLogoPulsing: "Basculer la pulsation du logo Luminous"
+    toggleLogoPulsing: "Basculer la pulsation du logo Luminous",
+    on: "Activé",
+    off: "Désactivé"
   }
 };

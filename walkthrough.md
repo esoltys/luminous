@@ -1,140 +1,99 @@
-# Walkthrough — Loudness Normalization: EBU R128 Analysis with ReplayGain Fallback (#77)
+# Walkthrough — Moodbar Visualizer & Moodmoji (#25)
 
-Branch: `claude/goal-feature-77-1883a5` (worktree `.claude/worktrees/goal-feature-77-1883a5`)
+Branch: `feature/25-moodbar-improvements` (worktree `.claude/worktrees/goal-feature-77-1883a5`)
 
 ## What this delivers
 
-Issue #77 asked for consistent perceived loudness across tracks, so quiet
-acoustic albums and loud modern masters play back at a similar level. This
-lands the full pipeline: a background **EBU R128 (BS.1770) analyzer**, a
-**ReplayGain 2.0 tag fallback** for tracks not yet analyzed, a user-configurable
-**target level / mode / fallback gain**, and a compact settings section to
-control it — all riding on the `loudness_gain` DSP slot #47 already reserved.
+Issue #25 asked for a more useful moodbar (distinct, contrasting mood
+profiles per track) plus a "moodmoji" emoji hash next to the track. A
+gap-analysis comment on the issue found the moodbar component was fully
+built but **commented out of the UI**, and proposed re-introducing it as an
+alternate mode of the existing waveform seek bar rather than a separate
+strip. This lands both the original ask and that redesign:
 
-The headline behaviors:
-
-- **Background R128 analysis** — a low-priority thread decodes each
-  not-yet-analyzed local/collection track (most-recently-added first), computes
-  integrated loudness per ITU-R BS.1770-4, and writes
-  `songs.ebur128_integrated_loudness_lufs`. It never competes with playback or
-  scanning — one track at a time, throttled between tracks.
-- **ReplayGain tag fallback** — `REPLAYGAIN_TRACK_GAIN` / `REPLAYGAIN_ALBUM_GAIN`
-  tags are read at scan time and used until a track's own R128 analysis lands.
-- **Priority order at playback**: measured R128 loudness → ReplayGain tag
-  (track or album, per the user's mode setting) → a fixed fallback gain (default
-  -6 dB, safe against clipping unanalyzed/unknown tracks).
-- **Settings**: enable toggle (off by default), target level (-24..-14 LUFS,
-  default -18), track/album mode, fallback gain, and a live "N tracks remaining"
-  analysis-progress line — all in the existing Equalizer settings tab.
-
-## How the gain reaches the DSP chain
-
-`AudioEngine::set_loudness_gain` (the dormant slot #47 wired into
-`decode → loudness gain → EQ preamp → EQ bands → fade envelope → volume`) is a
-single atomic f32 — the audio callback never allocates or blocks to read it.
-
-The gain is computed and applied at three points in [player.rs](src-tauri/src/player.rs):
-
-1. **Every non-gapless track start** (`play_at_index`, the queue-direct-play
-   branch of `next_track`) — applied right before `audio.play(...)`, before any
-   of the new track's samples reach the buffer.
-2. **Gapless handovers** (`on_gapless_transition`) — applied exactly when the
-   engine reports `TrackTransitioned`, i.e. the moment the previous track's last
-   sample was actually consumed and the next one becomes audible. Setting it
-   earlier (at `AboutToFinish`/preload time) would wrongly affect the *previous*
-   track's still-draining tail, since the gain slot is global, not tagged per
-   buffered sample.
-3. **Settings changes** (`Player::refresh_loudness_gain`) — recomputes the gain
-   for whatever's currently playing, so toggling the target level is audible
-   immediately instead of waiting for the next track.
-
-## Analysis pipeline
-
-[loudness.rs](src-tauri/src/loudness.rs) is the new module:
-
-- `decode_channels` mirrors `analyzer::decode_all_samples`'s offline Symphonia
-  decode loop, but keeps channels deinterleaved (capped at stereo) instead of
-  downmixing to mono, since BS.1770 needs per-channel K-weighting before the
-  channels are combined.
-- `analyze_integrated_loudness` feeds those channels through the `bs1770` crate
-  (`ChannelLoudnessMeter` → `reduce_stereo` → `gated_mean`) to get LUFS.
-- `spawn_background_analyzer` is the worker thread: picks the next unanalyzed
-  track (`ebur128_integrated_loudness_lufs IS NULL`, newest-added first), and on
-  failure (corrupt/unsupported file) writes a sentinel value (`-100.0`, clearly
-  outside any real measurement) so it's never retried — `compute_gain_linear`
-  filters out anything outside a plausible LUFS range and falls through to the
-  ReplayGain/fallback path instead.
-- `compute_gain_linear` is the pure gain-math function (unit tested): measured
-  loudness takes priority; otherwise a ReplayGain tag (normalized to the
-  -18 LUFS RG reference, adjusted for the user's target) is used; otherwise the
-  fallback gain. Result is clamped to ±30/+12 dB before converting to linear, as
-  a backstop against runaway gain from bad tags or measurements.
-
-## Schema (migration 5)
-
-- `songs.replaygain_track_gain` / `replaygain_album_gain` (nullable REAL) —
-  parsed from lofty's `ItemKey::ReplayGainTrackGain` / `ReplayGainAlbumGain` at
-  scan time in [collection.rs](src-tauri/src/collection.rs).
-- `loudness_settings` table (single row) — `enabled`, `target_lufs`, `mode`
-  (`track`/`album`), `fallback_gain_db`.
-
-`ebur128_loudness_range_lu` (loudness range) was already in the schema from
-before this issue but is not populated — only integrated loudness is needed for
-gain computation, and adding LRA analysis didn't seem worth the complexity for
-this pass.
-
-## What's intentionally out of scope
-
-- **R128_TRACK_GAIN / R128_ALBUM_GAIN Opus tags** (a different fixed-point
-  encoding, -23 LUFS reference) aren't parsed — only the standard
-  `REPLAYGAIN_*` Vorbis/ID3 tags. Opus files without those tags simply use the
-  fallback gain until the background analyzer reaches them, which it always
-  eventually does.
-- **Surround/multichannel BS.1770 weighting** — analysis is capped at the first
-  two channels (mono/stereo covers the overwhelming majority of music files).
+- **Contrast-boosted moodbar** — `generate_moodbar` now applies a per-track,
+  per-channel min-max histogram stretch across all 150 points instead of a
+  fixed `*150.0` scale, so quiet/uniform masters still use the full 0–255
+  color range instead of clustering near black.
+- **Toggle mode on the seek bar** — the moodbar is no longer a separate
+  strip. A small toggle button next to the scrubber switches
+  `WaveformSeekBar` between waveform and moodbar rendering, same geometry
+  and seek interaction. The choice persists via `app_state`
+  (`seekbar_mode`), same pattern as rating style/language.
+- **Downsampled, region-based rendering** — the raw 150 points are averaged
+  into ~40 wider contiguous blocks so the strip reads as color *regions*
+  rather than a 150-bar "barcode." Unplayed segments blend toward a
+  **grayscale** version of the theme's border color (not its raw hue) — the
+  album-art-adaptive theme derives border color from the current track's
+  cover art, and blending toward that raw color fought with the moodbar's
+  own bass/mid/treble color coding. Played segments show full mood color
+  with a thin accent-colored cap, keeping accent as the only
+  interactive-emphasis hue per DESIGN.md.
+- **Color legend tooltip** — hovering the moodbar explains the mapping:
+  red = bass, green = mids, blue = treble, brighter = more energy in that
+  band (issue asked for "tooltips clarifying what the colors indicate").
+- **Moodmoji** — a 2-emoji hash derived from the moodbar data, shown next
+  to the now-playing track title (not in dense list rows, per the
+  gap-analysis comment). First emoji = dominant frequency band
+  (🥁 bass / 🎸 mid / 🔔 treble), second = overall spectral energy
+  (❄️ calm / 🍃 balanced / 🔥 intense — deliberately not faces, since
+  spectral energy isn't emotional valence: a sad, dense track can score
+  "intense" just as easily as a happy one). It clears immediately on track
+  change instead of showing the previous track's moodmoji until the fetch
+  debounce fires.
+- **Show moodmoji setting** — General Settings gained a toggle (default on)
+  to hide the moodmoji, with a description of what it is. Settings rows
+  were restyled to a standard label+description-left, control-right
+  pattern (title/description stacked on the left, control vertically
+  centered on the right, thin dividers between rows), replacing the
+  original footnote-style hint text.
 
 ## Files changed
 
-- [src-tauri/src/db.rs](src-tauri/src/db.rs) — migration 5.
-- [src-tauri/src/models.rs](src-tauri/src/models.rs) — `Song` RG fields,
-  `LoudnessSettings`, `LoudnessMode`, `LoudnessAnalysisProgress`.
-- [src-tauri/src/collection.rs](src-tauri/src/collection.rs) — RG tag ingestion,
-  column plumbing.
-- [src-tauri/src/commands/player.rs](src-tauri/src/commands/player.rs) — raw
-  song queries updated for the new columns.
-- [src-tauri/src/loudness.rs](src-tauri/src/loudness.rs) — new module (analysis,
-  gain math, background worker, settings persistence).
-- [src-tauri/src/player.rs](src-tauri/src/player.rs) — gain application at track
-  boundaries.
-- [src-tauri/src/commands/loudness.rs](src-tauri/src/commands/loudness.rs) — new
-  Tauri commands.
-- [src-tauri/src/lib.rs](src-tauri/src/lib.rs) — module/command registration,
-  background analyzer startup.
-- [src-tauri/Cargo.toml](src-tauri/Cargo.toml) — `bs1770` dependency.
-- [src/lib/components/Equalizer.svelte](src/lib/components/Equalizer.svelte) —
-  Loudness Normalization settings section.
+- [src-tauri/src/moodbar.rs](src-tauri/src/moodbar.rs) — per-track/per-channel
+  contrast stretch; minor clippy cleanup to the existing FFT loop.
+- [src/lib/components/WaveformSeekBar.svelte](src/lib/components/WaveformSeekBar.svelte) —
+  moodbar fetch/draw path, mode toggle wiring, downsampling, grayscale
+  theme-blend anchor, color legend tooltip.
+- [src/lib/components/PlayerBar.svelte](src/lib/components/PlayerBar.svelte) —
+  toggle button, moodmoji fetch/derive/display.
+- [src/lib/components/FoldersView.svelte](src/lib/components/FoldersView.svelte) —
+  General Settings toggle for moodmoji visibility; restyled rating-style and
+  language rows to match.
+- [src/lib/components/MoodBar.svelte](src/lib/components/MoodBar.svelte) —
+  deleted (superseded by the toggle mode).
+- [src/lib/utils/moodmoji.ts](src/lib/utils/moodmoji.ts) — new, the emoji
+  derivation.
+- [src/lib/stores/prefs.svelte.ts](src/lib/stores/prefs.svelte.ts) —
+  `seekBarMode` and `showMoodmoji` prefs, persisted via `set_app_setting`.
 - [src/lib/locales/en.ts](src/lib/locales/en.ts) /
-  [fr.ts](src/lib/locales/fr.ts) — `loudness.*` strings.
-- [scripts/tauri-ipc-mock.ts](scripts/tauri-ipc-mock.ts) — mock IPC for the new
-  commands (screenshot harness).
+  [fr.ts](src/lib/locales/fr.ts) — new tooltip/settings strings.
+- [scripts/tauri-ipc-mock.ts](scripts/tauri-ipc-mock.ts) /
+  [take-screenshots.ts](scripts/take-screenshots.ts) /
+  [mock-config.example.json](scripts/mock-config.example.json) — mocked
+  `get_moodbar_data` and a `click-moodbar-toggle` screenshot action for the
+  docs-screenshot harness.
 
 ## Testing / Verification
 
-- `cargo test --lib` — 23 passed (6 new `loudness::tests` covering the gain
-  priority order, target-level adjustment, sentinel filtering, and album/track
-  mode), 1 pre-existing ignored test.
-- `bun run check` — 0 errors.
-- `bun run take-screenshots --name=equalizer` — confirms the new section
-  renders correctly (see `docs/screenshots/equalizer.png`).
-- `bun run tauri dev` — launched against the real library; loaded, rendered
-  covers, and ran the new migration + background analyzer with no errors or
-  panics in the logs.
+- `bun run check` (svelte-check) — clean, no new errors.
+- `cargo check` / `cargo clippy -- -D warnings` — clean; fixed the two new
+  clippy lints introduced by this change plus one pre-existing lint in the
+  touched FFT loop.
+- `bun run test` — full suite (188 tests) passes, including `PlayerBar.test.ts`.
+- Visual verification was done live in `bun run tauri dev` — iterated
+  interactively on the emoji sets, downsampling, tooltip wording, settings
+  layout, and the theme-interference fix, with each change confirmed
+  against your running app.
+
+## What's intentionally out of scope
+
+- No real mood/valence classification (tempo, key/mode, onset density) —
+  moodmoji is explicitly a spectral-energy hash, not an emotion detector.
+- No change to the underlying `waveforms`/`moodbars` SQLite schema.
 
 ## Next steps for your approval
 
-- Try it live: enable Loudness Normalization in Settings → Equalizer, play a
-  few tracks from albums with very different mastering loudness, and confirm
-  the level feels more consistent. The "N tracks remaining" line should count
-  down as your library gets analyzed in the background.
-- Once you're happy, I'll merge this branch, clean up the worktree, and close
-  issue #77 referencing the merge commit.
+You've already reviewed each piece live as it landed. Once you confirm
+you're happy with the whole thing together, I'll merge this branch, clean
+up the worktree, and comment on + close issue #25.
