@@ -1,11 +1,9 @@
 <script lang="ts">
-  let { items = [], children }: { items: any[]; children?: any } = $props();
+  export let items: any[] = [];
 </script>
 
 <div data-testid="virtual-list-mock">
   {#each items as item}
-    {#if children}
-      {@render children({ item })}
-    {/if}
+    <slot {item} />
   {/each}
 </div>

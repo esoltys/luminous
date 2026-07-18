@@ -4,11 +4,13 @@ import { render, fireEvent } from "@testing-library/svelte";
 import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import type { Song, AlbumItem, ArtistItem } from "../types";
-import VirtualListMock from "./__mocks__/VirtualList.svelte";
 
-vi.mock("svelte-virtual-list-ts", () => ({
-  VirtualList: VirtualListMock,
-}));
+vi.mock("svelte-virtual-list-ts", async () => {
+  const mod = await import("./__mocks__/VirtualList.svelte");
+  return {
+    VirtualList: mod.default,
+  };
+});
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
