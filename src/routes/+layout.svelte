@@ -23,6 +23,17 @@
     await prefs.init();
   });
 
+  // There's no way to exit immersive mode when nothing is playing — the only
+  // toggle lives on the PlayerBar, which is itself hidden until a track has
+  // ever played this session. Force immersive mode off whenever there's
+  // nothing to show, so a stale "immersive" flag from a previous session
+  // (or playback stopping while immersive) never leaves the user stranded.
+  $effect(() => {
+    if (!playerStore.currentSong) {
+      collectionStore.exitImmersiveMode();
+    }
+  });
+
   // Pointer drag resizing for Sidebar (left-to-right increase)
   function startResizeSidebar(e: PointerEvent) {
     e.preventDefault();

@@ -244,6 +244,17 @@ class CollectionStore {
     }
   }
 
+  // Force immersive mode off — used when there's nothing playing, since the
+  // only way back out is a toggle on the PlayerBar, which is itself hidden
+  // until a track has ever played this session (issue #71).
+  exitImmersiveMode() {
+    if (!this.immersiveMode) return;
+    this.immersiveMode = false;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_immersiveMode", "false");
+    }
+  }
+
   toggleRightPanel() {
     this.rightPanelOpen = !this.rightPanelOpen;
     if (typeof window !== "undefined") {
