@@ -2,7 +2,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play } from "lucide-svelte";
+  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play, GripVertical } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
@@ -72,16 +72,11 @@
   }
 
   // Drag and drop state and handlers
-  let draggedIndex: number | null = null; // synchronous logical drag state
-  let visualDraggedIndex = $state<number | null>(null); // deferred reactive visual drag state
+  let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
 
   function handleDragStart(event: DragEvent, index: number) {
     draggedIndex = index;
-    // Defer reactive UI style change to prevent Chrome from immediately canceling the drag
-    setTimeout(() => {
-      visualDraggedIndex = index;
-    }, 0);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", index.toString());
@@ -89,7 +84,6 @@
   }
 
   function handleDragOver(event: DragEvent, index: number) {
-    if (draggedIndex === null) return;
     event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "move";
@@ -97,12 +91,19 @@
   }
 
   function handleDragEnter(event: DragEvent, index: number) {
-    if (draggedIndex === null) return;
     event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
     dragOverIndex = index;
   }
 
-  function handleDragLeave(index: number) {
+  function handleDragLeave(event: DragEvent, index: number) {
+    const currentTarget = event.currentTarget as HTMLElement | null;
+    const relatedTarget = event.relatedTarget as Node | null;
+    if (currentTarget && relatedTarget && currentTarget.contains(relatedTarget)) {
+      return;
+    }
     if (dragOverIndex === index) {
       dragOverIndex = null;
     }
@@ -110,19 +111,28 @@
 
   function handleDragEnd() {
     draggedIndex = null;
-    visualDraggedIndex = null;
     dragOverIndex = null;
   }
 
   function handleDrop(event: DragEvent, index: number) {
     event.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== index) {
+    let sourceIndex = draggedIndex;
+    if (sourceIndex === null && event.dataTransfer) {
+      const data = event.dataTransfer.getData("text/plain");
+      if (data) {
+        const parsed = parseInt(data, 10);
+        if (!isNaN(parsed)) {
+          sourceIndex = parsed;
+        }
+      }
+    }
+
+    if (sourceIndex !== null && sourceIndex !== index) {
       if (playlistsStore.activePlaylistId !== null) {
-        playlistsStore.reorderItem(playlistsStore.activePlaylistId, draggedIndex, index);
+        playlistsStore.reorderItem(playlistsStore.activePlaylistId, sourceIndex, index);
       }
     }
     draggedIndex = null;
-    visualDraggedIndex = null;
     dragOverIndex = null;
   }
 
@@ -230,7 +240,7 @@
                 ondragstart={(e) => !unavailable && handleDragStart(e, index)}
                 ondragover={(e) => handleDragOver(e, index)}
                 ondragenter={(e) => handleDragEnter(e, index)}
-                ondragleave={() => handleDragLeave(index)}
+                ondragleave={(e) => handleDragLeave(e, index)}
                 ondragend={handleDragEnd}
                 ondrop={(e) => handleDrop(e, index)}
                 ondblclick={() => !unavailable && handlePlayPlaylistItem(index)}
@@ -239,9 +249,8 @@
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-brand-sidebar/40 cursor-grab active:cursor-grabbing'}
                   {!unavailable && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
-                  {visualDraggedIndex === index ? 'opacity-40 bg-brand-sidebar/20' : ''}
-                  {dragOverIndex === index && visualDraggedIndex !== null && visualDraggedIndex !== index
-                    ? (index < visualDraggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
+                  {dragOverIndex === index && draggedIndex !== null && draggedIndex !== index
+                    ? (index < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
                     : ''
                   }"
               >
@@ -279,13 +288,16 @@
                         {item.song?.title ?? i18n.t('collection.unknownSong')}
                       </span>
                     {:else if item.song?.title}
-                      <button
+                      <span
+                        role="button"
+                        tabindex="0"
                         onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
+                        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); } }}
                         class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
                         title={i18n.t('collection.filterByTitle', { title: item.song.title })}
                       >
                         {item.song.title}
-                      </button>
+                      </span>
                     {:else}
                       <span class="truncate">{i18n.t('collection.unknownSong')}</span>
                     {/if}
@@ -295,13 +307,16 @@
                   {#if unavailable}
                     <span class="text-brand-text-secondary/40 italic text-xs">{i18n.t('playlists.fileNotFoundText', {}, "File not found")}</span>
                   {:else if item.song?.artist}
-                    <button
+                    <span
+                      role="button"
+                      tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); } }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
                       title={i18n.t('collection.filterByArtist', { artist: item.song.artist })}
                     >
                       {item.song.artist}
-                    </button>
+                    </span>
                   {:else}
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
@@ -310,13 +325,16 @@
                   {#if unavailable}
                     <span class="text-brand-text-secondary/40 italic text-xs">{item.song?.album ?? ""}</span>
                   {:else if item.song?.album}
-                    <button
+                    <span
+                      role="button"
+                      tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); } }}
                       class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
                       title={i18n.t('collection.filterByAlbum', { album: item.song.album })}
                     >
                       {item.song.album}
-                    </button>
+                    </span>
                   {:else}
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}

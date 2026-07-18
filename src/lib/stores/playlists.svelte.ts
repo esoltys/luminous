@@ -96,6 +96,12 @@ class PlaylistsStore {
   }
 
   async reorderItem(playlistId: number, fromIndex: number, toIndex: number) {
+    if (this.activePlaylistId === playlistId && fromIndex >= 0 && toIndex >= 0 && fromIndex < this.activePlaylistTracks.length && toIndex < this.activePlaylistTracks.length) {
+      const updated = [...this.activePlaylistTracks];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      this.activePlaylistTracks = updated;
+    }
     await invoke("reorder_playlist_item", { playlistId, from: fromIndex, to: toIndex });
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
