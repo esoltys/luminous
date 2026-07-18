@@ -273,7 +273,10 @@ export const fr = {
     releasedLabel: "Sortie",
     genreLabel: "Genre",
     composerLabel: "Compositeur",
-    restoreInterface: "Restaurer l'interface complète"
+    restoreInterface: "Restaurer l'interface complète",
+    loudnessAnalyzed: "Volume normalisé par analyse R128 : {gain}",
+    loudnessReplayGain: "Volume normalisé via le tag ReplayGain : {gain}",
+    loudnessFallback: "Aucune donnée de volume — gain de secours utilisé : {gain}"
   },
   tagEditor: {
     title: "Modifier les métadonnées",

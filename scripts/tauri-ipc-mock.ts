@@ -260,6 +260,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         shuffle_mode: "off" as ShuffleMode,
         repeat_mode: "all" as RepeatMode,
         stop_after_current: false,
+        loudness_source: "analyzed",
+        loudness_gain_db: -3.2,
       };
     },
 

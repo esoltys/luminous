@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState } from "../types";
+import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 
@@ -18,6 +18,8 @@ export class PlayerStore {
   shuffleMode = $state<ShuffleMode>("off");
   repeatMode = $state<RepeatMode>("off");
   stopAfterCurrent = $state<boolean>(false);
+  loudnessSource = $state<LoudnessGainSource>("disabled");
+  loudnessGainDb = $state<number | undefined>(undefined);
 
   constructor() {
     this.init();
@@ -80,6 +82,8 @@ export class PlayerStore {
     this.shuffleMode = state.shuffle_mode;
     this.repeatMode = state.repeat_mode;
     this.stopAfterCurrent = state.stop_after_current;
+    this.loudnessSource = state.loudness_source;
+    this.loudnessGainDb = state.loudness_gain_db;
   }
 
   // Playback Control Actions

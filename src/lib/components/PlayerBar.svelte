@@ -33,6 +33,31 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
+  // Loudness normalization (#77) badge label + tooltip
+  function loudnessBadgeLabel(): string {
+    switch (playerStore.loudnessSource) {
+      case "analyzed": return "R128";
+      case "replay_gain": return "RG";
+      case "fallback": return "—";
+      default: return "";
+    }
+  }
+
+  function loudnessBadgeTooltip(): string {
+    const gain = playerStore.loudnessGainDb;
+    const gainText = gain !== undefined ? `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB` : "";
+    switch (playerStore.loudnessSource) {
+      case "analyzed":
+        return i18n.t('playerBar.loudnessAnalyzed', { gain: gainText }, `Loudness normalized via R128 analysis: ${gainText}`);
+      case "replay_gain":
+        return i18n.t('playerBar.loudnessReplayGain', { gain: gainText }, `Loudness normalized via ReplayGain tag: ${gainText}`);
+      case "fallback":
+        return i18n.t('playerBar.loudnessFallback', { gain: gainText }, `No loudness data — using fallback gain: ${gainText}`);
+      default:
+        return "";
+    }
+  }
+
   // Handle seek progress bar click
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -142,6 +167,14 @@
           <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
+          {#if playerStore.loudnessSource !== "disabled"}
+            <span
+              class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-sidebar/60 text-brand-text-secondary border border-brand-border shadow-sm shrink-0"
+              title={loudnessBadgeTooltip()}
+            >
+              {loudnessBadgeLabel()}
+            </span>
+          {/if}
           <SongRating
             rating={playerStore.currentSong.rating}
             onRate={(r) => playerStore.rateCurrent(r)}

@@ -6,7 +6,7 @@
 use crate::{
     audio::AudioEngine,
     db::Database,
-    models::{PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song},
+    models::{LoudnessGainSource, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song},
     stats,
 };
 use anyhow::{anyhow, Result};
@@ -45,6 +45,11 @@ pub struct Player {
     pub repeat_mode: RepeatMode,
     pub stop_after_current: bool,
     pub volume: f32,
+
+    // Loudness normalization (#77) — where the currently applied gain came
+    // from, for the player-bar indicator.
+    current_loudness_source: LoudnessGainSource,
+    current_loudness_gain_db: Option<f32>,
 
     // Shuffle state
     /// The playlist items in their current order.
@@ -125,6 +130,8 @@ impl Player {
             repeat_mode,
             stop_after_current: false,
             volume,
+            current_loudness_source: LoudnessGainSource::Disabled,
+            current_loudness_gain_db: None,
             playlist_items: Vec::new(),
             shuffle_order: Vec::new(),
             current_index: None,
@@ -258,7 +265,7 @@ impl Player {
     /// boundary (`on_gapless_transition`) instead, since the DSP gain slot is
     /// global and flipping it early would affect the still-draining previous
     /// track's tail.
-    async fn apply_loudness_gain(&self, song: &Song) {
+    async fn apply_loudness_gain(&mut self, song: &Song) {
         let settings = match crate::loudness::get_settings(&self._db) {
             Ok(s) => s,
             Err(e) => {
@@ -266,23 +273,26 @@ impl Player {
                 return;
             }
         };
-        let gain = if settings.enabled {
-            crate::loudness::compute_gain_linear(
+        let (gain, source, gain_db) = if settings.enabled {
+            let result = crate::loudness::compute_gain(
                 song.ebur128_integrated_loudness_lufs,
                 song.replaygain_track_gain,
                 song.replaygain_album_gain,
                 &settings,
-            )
+            );
+            (result.linear, result.source, Some(result.gain_db))
         } else {
-            1.0
+            (1.0, LoudnessGainSource::Disabled, None)
         };
+        self.current_loudness_source = source;
+        self.current_loudness_gain_db = gain_db;
         self.audio.lock().await.set_loudness_gain(gain);
     }
 
     /// Re-apply the loudness gain for the currently playing track — called
     /// after a loudness setting changes, so the effect is heard immediately
     /// rather than waiting for the next track change.
-    pub async fn refresh_loudness_gain(&self) {
+    pub async fn refresh_loudness_gain(&mut self) {
         if let Some(song) = self.current_song.clone() {
             self.apply_loudness_gain(&song).await;
         }
@@ -694,6 +704,8 @@ impl Player {
             shuffle_mode: self.shuffle_mode,
             repeat_mode: self.repeat_mode,
             stop_after_current: self.stop_after_current,
+            loudness_source: self.current_loudness_source,
+            loudness_gain_db: self.current_loudness_gain_db,
         }
     }
 

@@ -364,6 +364,11 @@ pub struct PlaybackState {
     pub shuffle_mode: ShuffleMode,
     pub repeat_mode: RepeatMode,
     pub stop_after_current: bool,
+    /// Where the currently applied loudness-normalization gain came from
+    /// (#77), for a player-bar indicator.
+    pub loudness_source: LoudnessGainSource,
+    /// The applied gain in dB, when normalization is active for this track.
+    pub loudness_gain_db: Option<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -434,6 +439,23 @@ impl Default for LoudnessSettings {
 pub struct LoudnessAnalysisProgress {
     pub analyzed: u64,
     pub remaining: u64,
+}
+
+/// Where the currently applied loudness gain came from, for UI display next
+/// to the currently playing track (e.g. an "R128"/"RG" badge in the player
+/// bar).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LoudnessGainSource {
+    /// Normalization is off, or nothing is playing.
+    #[default]
+    Disabled,
+    /// Gain computed from this track's own R128 analysis.
+    Analyzed,
+    /// Gain derived from a ReplayGain tag (no R128 analysis yet).
+    ReplayGain,
+    /// Neither analysis nor a tag is available — the fixed fallback gain.
+    Fallback,
 }
 
 // ---------------------------------------------------------------------------

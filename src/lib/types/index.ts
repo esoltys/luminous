@@ -159,6 +159,7 @@ export interface Playlist {
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "one_by_one" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
+export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "fallback";
 
 export interface PlaybackState {
   state: PlayState;
@@ -170,6 +171,8 @@ export interface PlaybackState {
   shuffle_mode: ShuffleMode;
   repeat_mode: RepeatMode;
   stop_after_current: boolean;
+  loudness_source: LoudnessGainSource;
+  loudness_gain_db?: number;
 }
 
 export interface MusicDirectory {
