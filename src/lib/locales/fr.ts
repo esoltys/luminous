@@ -274,8 +274,6 @@ export const fr = {
     genreLabel: "Genre",
     composerLabel: "Compositeur",
     restoreInterface: "Restaurer l'interface complète",
-    loudnessAnalyzed: "Volume normalisé par analyse R128 : {gain}",
-    loudnessReplayGain: "Volume normalisé via le tag ReplayGain : {gain}",
     formatLabel: "Format",
     loudnessLabel: "Volume",
     loudnessSourceAnalyzed: "Analyse R128",

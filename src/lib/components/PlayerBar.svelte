@@ -33,21 +33,6 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
-  // Loudness normalization (#77) badge label + tooltip. Only shown when a
-  // real gain source is in play (analyzed or a ReplayGain tag) -- the
-  // fallback-gain case gets no badge, there's nothing informative to annotate.
-  function loudnessBadgeLabel(): string {
-    return playerStore.loudnessSource === "analyzed" ? "R128" : "RG";
-  }
-
-  function loudnessBadgeTooltip(): string {
-    const gain = playerStore.loudnessGainDb;
-    const gainText = gain !== undefined ? `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB` : "";
-    return playerStore.loudnessSource === "analyzed"
-      ? i18n.t('playerBar.loudnessAnalyzed', { gain: gainText }, `Loudness normalized via R128 analysis: ${gainText}`)
-      : i18n.t('playerBar.loudnessReplayGain', { gain: gainText }, `Loudness normalized via ReplayGain tag: ${gainText}`);
-  }
-
   // Handle seek progress bar click
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -157,14 +142,6 @@
           <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
-          {#if playerStore.loudnessSource === "analyzed" || playerStore.loudnessSource === "replay_gain"}
-            <span
-              class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-sidebar/60 text-brand-text-secondary border border-brand-border shadow-sm shrink-0"
-              title={loudnessBadgeTooltip()}
-            >
-              {loudnessBadgeLabel()}
-            </span>
-          {/if}
         {/if}
       </div>
       {#if playerStore.currentSong?.artist}
