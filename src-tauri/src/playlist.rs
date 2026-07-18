@@ -13,7 +13,17 @@ use uuid::Uuid;
 // Undo/Redo stack operations
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ClearedItem {
+    pub uuid: String,
+    pub position: i32,
+    pub song_id: Option<i64>,
+    pub item_type: i32,
+    pub url: Option<String>,
+    pub stream_url: Option<String>,
+    pub additional_metadata: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 enum PlaylistOp {
     Insert {
@@ -22,7 +32,11 @@ enum PlaylistOp {
     },
     Remove {
         playlist_id: i64,
-        items: Vec<(String, i32, i64)>, // (uuid, position, song_id)
+        items: Vec<ClearedItem>,
+    },
+    Clear {
+        playlist_id: i64,
+        items: Vec<ClearedItem>,
     },
     Move {
         playlist_id: i64,
@@ -36,6 +50,36 @@ pub struct PlaylistManager {
     db: Arc<Database>,
     undo_stack: Vec<PlaylistOp>,
     redo_stack: Vec<PlaylistOp>,
+}
+
+pub fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
+    let p = path.as_ref();
+    if let Ok(canonical) = std::fs::canonicalize(p) {
+        let s = canonical.to_string_lossy();
+        #[cfg(windows)]
+        let cleaned_s = if s.starts_with(r"\\?\") {
+            s[4..].to_string()
+        } else {
+            s.to_string()
+        };
+        #[cfg(not(windows))]
+        let cleaned_s = s.to_string();
+
+        return std::path::PathBuf::from(cleaned_s);
+    }
+
+    use std::path::Component;
+    let mut components = Vec::new();
+    for component in p.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                components.pop();
+            }
+            c => components.push(c),
+        }
+    }
+    components.iter().collect()
 }
 
 impl PlaylistManager {
@@ -144,6 +188,203 @@ impl PlaylistManager {
     }
 
     // -----------------------------------------------------------------------
+    // Import & Export
+    // -----------------------------------------------------------------------
+
+    pub fn import_playlist<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> Result<Playlist> {
+        use crate::playlist_parsers;
+
+        let path = file_path.as_ref();
+        let parsed = playlist_parsers::parse_playlist(path)?;
+
+        let playlist_name = parsed.title.unwrap_or_else(|| {
+            path.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Imported Playlist".to_string())
+        });
+
+        let playlist = self.create_playlist(&playlist_name)?;
+        let base_dir = path.parent();
+
+        let conn = self.db.pool.get()?;
+
+        for (pos, track) in parsed.tracks.iter().enumerate() {
+            let mut resolved_path = std::path::PathBuf::from(&track.path_or_url);
+            if resolved_path.is_relative() {
+                if let Some(base) = base_dir {
+                    resolved_path = base.join(&resolved_path);
+                }
+            }
+
+            let cleaned_path = clean_path(&resolved_path);
+            let path_str = cleaned_path.to_string_lossy().to_string();
+            let normalized_path_str = path_str.replace('/', "\\");
+
+            // 1. Try matching by exact path or normalized path in database
+            let matched_song_id: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM songs WHERE path = ?1 OR path = ?2 OR LOWER(REPLACE(path, '/', '\\')) = LOWER(?3) LIMIT 1",
+                    params![path_str, track.path_or_url, normalized_path_str],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            // Read metadata tags from file if missing from playlist track entry
+            let mut title = track.title.clone();
+            let mut artist = track.artist.clone();
+            let mut album = track.album.clone();
+
+            if (title.is_none() || artist.is_none()) && cleaned_path.is_file() {
+                if let Ok(tagged) = lofty::read_from_path(&cleaned_path) {
+                    use lofty::file::TaggedFileExt;
+                    use lofty::tag::Accessor;
+                    if let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) {
+                        if title.is_none() {
+                            title = tag.title().map(|s| s.to_string());
+                        }
+                        if artist.is_none() {
+                            artist = tag.artist().map(|s| s.to_string());
+                        }
+                        if album.is_none() {
+                            album = tag.album().map(|s| s.to_string());
+                        }
+                    }
+                }
+            }
+
+            if title.is_none() && cleaned_path.is_file() {
+                title = cleaned_path
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string());
+            }
+
+            // 2. Fallback matching by metadata (title, artist, duration +/- 2s)
+            let matched_song_id = if matched_song_id.is_some() {
+                matched_song_id
+            } else if let Some(ref t) = title {
+                if let Some(ref a) = artist {
+                    if let Some(dur) = track.duration_sec {
+                        conn.query_row(
+                            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) AND ABS((length_nanosec / 1000000000) - ?3) <= 2 LIMIT 1",
+                            params![t, a, dur],
+                            |row| row.get(0),
+                        ).ok()
+                    } else {
+                        conn.query_row(
+                            "SELECT id FROM songs WHERE LOWER(title) = LOWER(?1) AND LOWER(artist) = LOWER(?2) LIMIT 1",
+                            params![t, a],
+                            |row| row.get(0),
+                        ).ok()
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let uuid = Uuid::new_v4().to_string();
+
+            if let Some(song_id) = matched_song_id {
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url)
+                     VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+                    params![playlist.id, song_id, pos as i32, uuid, path_str],
+                )?;
+            } else {
+                // Save unmatched metadata in additional_metadata so track info isn't lost
+                let meta = serde_json::json!({
+                    "title": title,
+                    "artist": artist,
+                    "album": album,
+                    "path": path_str,
+                    "duration_sec": track.duration_sec,
+                });
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, additional_metadata)
+                     VALUES (?1, NULL, ?2, ?3, 0, ?4, ?5)",
+                    params![playlist.id, pos as i32, uuid, path_str, meta.to_string()],
+                )?;
+            }
+        }
+
+        Ok(playlist)
+    }
+
+    pub fn export_playlist<P: AsRef<std::path::Path>>(
+        &self,
+        playlist_id: i64,
+        export_path: P,
+        relative: bool,
+    ) -> Result<()> {
+        use crate::playlist_parsers::{self, ExportTrack, PlaylistFormat};
+
+        let path = export_path.as_ref();
+        let format = PlaylistFormat::from_path(path).ok_or_else(|| {
+            anyhow!(
+                "Unsupported playlist format for export path: {}",
+                path.display()
+            )
+        })?;
+
+        let conn = self.db.pool.get()?;
+        let playlist_name: String = conn.query_row(
+            "SELECT name FROM playlists WHERE id = ?1",
+            params![playlist_id],
+            |row| row.get(0),
+        )?;
+
+        let items = self.get_playlist_tracks(playlist_id)?;
+        let export_tracks: Vec<ExportTrack> = items
+            .iter()
+            .filter_map(|item| {
+                if let Some(ref song) = item.song {
+                    let p = if let Some(ref path) = song.path {
+                        std::path::Path::new(path)
+                    } else if let Some(ref url) = item.url {
+                        std::path::Path::new(url)
+                    } else {
+                        return None;
+                    };
+                    let dur_sec = song.length_nanosec.map(|ns| ns / 1_000_000_000);
+                    Some(ExportTrack {
+                        path: p,
+                        title: song.title.as_deref(),
+                        artist: song.artist.as_deref(),
+                        album: song.album.as_deref(),
+                        duration_sec: dur_sec,
+                    })
+                } else if let Some(ref url) = item.url {
+                    Some(ExportTrack {
+                        path: std::path::Path::new(url),
+                        title: None,
+                        artist: None,
+                        album: None,
+                        duration_sec: None,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let content = playlist_parsers::export_playlist(
+            &playlist_name,
+            &export_tracks,
+            format,
+            path,
+            relative,
+        )?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, content)?;
+
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
     // Playlist item operations
     // -----------------------------------------------------------------------
 
@@ -152,6 +393,7 @@ impl PlaylistManager {
         let mut stmt = conn.prepare(&format!(
             "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
                              pi.uuid, pi.type, pi.url, pi.stream_url,
+                             pi.additional_metadata,
                              -- song fields
                              s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
                              s.title, s.titlesort, s.artist, s.artistsort,
@@ -174,59 +416,92 @@ impl PlaylistManager {
 
         let items = stmt
             .query_map(params![playlist_id], |row| {
+                let additional_meta_str: Option<String> = row.get(8)?;
+
                 let song = if row.get::<_, Option<i64>>(2)?.is_some() {
                     Some(Song {
-                        id: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                        source: row.get::<_, i64>(9).map(crate::models::SongSource::from)?,
-                        filetype: row.get::<_, i64>(10).map(crate::models::FileType::from)?,
-                        path: row.get(11)?,
-                        url: row.get(12)?,
-                        stream_url: row.get(13)?,
-                        title: row.get(14)?,
-                        titlesort: row.get(15)?,
-                        artist: row.get(16)?,
-                        artistsort: row.get(17)?,
-                        album: row.get(18)?,
-                        albumsort: row.get(19)?,
-                        album_artist: row.get(20)?,
-                        album_artist_sort: row.get(21)?,
-                        composer: row.get(22)?,
-                        composersort: row.get(23)?,
-                        performer: row.get(24)?,
-                        performersort: row.get(25)?,
-                        grouping: row.get(26)?,
-                        comment: row.get(27)?,
-                        lyrics: row.get(28)?,
-                        track: row.get(29)?,
-                        disc: row.get(30)?,
-                        year: row.get(31)?,
-                        originalyear: row.get(32)?,
-                        genre: row.get(33)?,
-                        compilation: row.get(34)?,
-                        bpm: row.get(35)?,
-                        mood: row.get(36)?,
-                        initial_key: row.get(37)?,
-                        length_nanosec: row.get(38)?,
-                        beginning_nanosec: row.get::<_, Option<i64>>(39)?.unwrap_or(0),
-                        end_nanosec: row.get::<_, Option<i64>>(40)?.unwrap_or(0),
-                        bitrate: row.get(41)?,
-                        samplerate: row.get(42)?,
-                        bitdepth: row.get(43)?,
-                        channels: row.get(44)?,
-                        filesize: row.get(45)?,
-                        mtime: row.get(46)?,
-                        rating: row.get::<_, Option<f32>>(47)?.unwrap_or(-1.0),
-                        playcount: row.get::<_, Option<i32>>(48)?.unwrap_or(0),
-                        skipcount: row.get::<_, Option<i32>>(49)?.unwrap_or(0),
-                        lastplayed: row.get(50)?,
-                        lastseen: row.get(51)?,
-                        art_embedded: row.get(52)?,
-                        art_automatic: row.get(53)?,
-                        art_manual: row.get(54)?,
-                        art_unset: row.get(55)?,
-                        unavailable: row.get::<_, Option<bool>>(56)?.unwrap_or(false),
+                        id: row.get::<_, Option<i64>>(9)?.unwrap_or(0),
+                        source: row.get::<_, i64>(10).map(crate::models::SongSource::from)?,
+                        filetype: row.get::<_, i64>(11).map(crate::models::FileType::from)?,
+                        path: row.get(12)?,
+                        url: row.get(13)?,
+                        stream_url: row.get(14)?,
+                        title: row.get(15)?,
+                        titlesort: row.get(16)?,
+                        artist: row.get(17)?,
+                        artistsort: row.get(18)?,
+                        album: row.get(19)?,
+                        albumsort: row.get(20)?,
+                        album_artist: row.get(21)?,
+                        album_artist_sort: row.get(22)?,
+                        composer: row.get(23)?,
+                        composersort: row.get(24)?,
+                        performer: row.get(25)?,
+                        performersort: row.get(26)?,
+                        grouping: row.get(27)?,
+                        comment: row.get(28)?,
+                        lyrics: row.get(29)?,
+                        track: row.get(30)?,
+                        disc: row.get(31)?,
+                        year: row.get(32)?,
+                        originalyear: row.get(33)?,
+                        genre: row.get(34)?,
+                        compilation: row.get(35)?,
+                        bpm: row.get(36)?,
+                        mood: row.get(37)?,
+                        initial_key: row.get(38)?,
+                        length_nanosec: row.get(39)?,
+                        beginning_nanosec: row.get::<_, Option<i64>>(40)?.unwrap_or(0),
+                        end_nanosec: row.get::<_, Option<i64>>(41)?.unwrap_or(0),
+                        bitrate: row.get(42)?,
+                        samplerate: row.get(43)?,
+                        bitdepth: row.get(44)?,
+                        channels: row.get(45)?,
+                        filesize: row.get(46)?,
+                        mtime: row.get(47)?,
+                        rating: row.get::<_, Option<f32>>(48)?.unwrap_or(-1.0),
+                        playcount: row.get::<_, Option<i32>>(49)?.unwrap_or(0),
+                        skipcount: row.get::<_, Option<i32>>(50)?.unwrap_or(0),
+                        lastplayed: row.get(51)?,
+                        lastseen: row.get(52)?,
+                        art_embedded: row.get(53)?,
+                        art_automatic: row.get(54)?,
+                        art_manual: row.get(55)?,
+                        art_unset: row.get(56)?,
+                        unavailable: row.get::<_, Option<bool>>(57)?.unwrap_or(false),
                         ..Default::default()
                     })
+                } else if let Some(ref meta_json) = additional_meta_str {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(meta_json) {
+                        let title = val
+                            .get("title")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let artist = val
+                            .get("artist")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let album = val
+                            .get("album")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let path = val
+                            .get("path")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let dur_sec = val.get("duration_sec").and_then(|v| v.as_i64());
+                        Some(Song {
+                            title,
+                            artist,
+                            album,
+                            path,
+                            length_nanosec: dur_sec.map(|s| s * 1_000_000_000),
+                            unavailable: true,
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 };
@@ -240,7 +515,7 @@ impl PlaylistManager {
                     song,
                     url: row.get(6)?,
                     stream_url: row.get(7)?,
-                    additional_metadata: None,
+                    additional_metadata: additional_meta_str,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -287,16 +562,25 @@ impl PlaylistManager {
         let mut removed = Vec::new();
 
         for uuid in uuids {
-            let result: Result<(i32, Option<i64>), _> = conn.query_row(
-                "SELECT position, song_id FROM playlist_items WHERE uuid = ?1",
+            let result: Result<ClearedItem, _> = conn.query_row(
+                "SELECT uuid, position, song_id, type, url, stream_url, additional_metadata
+                 FROM playlist_items WHERE uuid = ?1",
                 params![uuid],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| {
+                    Ok(ClearedItem {
+                        uuid: row.get(0)?,
+                        position: row.get(1)?,
+                        song_id: row.get(2)?,
+                        item_type: row.get(3)?,
+                        url: row.get(4)?,
+                        stream_url: row.get(5)?,
+                        additional_metadata: row.get(6)?,
+                    })
+                },
             );
-            if let Ok((pos, song_id)) = result {
+            if let Ok(item) = result {
                 conn.execute("DELETE FROM playlist_items WHERE uuid = ?1", params![uuid])?;
-                if let Some(sid) = song_id {
-                    removed.push((uuid.clone(), pos, sid));
-                }
+                removed.push(item);
             }
         }
 
@@ -363,12 +647,40 @@ impl PlaylistManager {
         Ok(())
     }
 
-    pub fn clear_playlist(&self, playlist_id: i64) -> Result<()> {
+    pub fn clear_playlist(&mut self, playlist_id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT uuid, position, song_id, type, url, stream_url, additional_metadata
+             FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
+        )?;
+        let items: Vec<ClearedItem> = stmt
+            .query_map(params![playlist_id], |row| {
+                Ok(ClearedItem {
+                    uuid: row.get(0)?,
+                    position: row.get(1)?,
+                    song_id: row.get(2)?,
+                    item_type: row.get(3)?,
+                    url: row.get(4)?,
+                    stream_url: row.get(5)?,
+                    additional_metadata: row.get(6)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if items.is_empty() {
+            return Ok(());
+        }
+
         conn.execute(
             "DELETE FROM playlist_items WHERE playlist_id = ?1",
             params![playlist_id],
         )?;
+
+        self.undo_stack
+            .push(PlaylistOp::Clear { playlist_id, items });
+        self.redo_stack.clear();
+
         Ok(())
     }
 
@@ -394,14 +706,42 @@ impl PlaylistManager {
             }
             PlaylistOp::Remove { playlist_id, items } => {
                 let conn = self.db.pool.get()?;
-                for (uuid, pos, song_id) in items {
+                for item in items {
                     conn.execute(
-                        "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type)
-                         VALUES (?1, ?2, ?3, ?4, 0)",
-                        params![playlist_id, song_id, pos, uuid],
+                        "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, stream_url, additional_metadata)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        params![
+                            playlist_id,
+                            item.song_id,
+                            item.position,
+                            item.uuid,
+                            item.item_type,
+                            item.url,
+                            item.stream_url,
+                            item.additional_metadata,
+                        ],
                     )?;
                 }
                 self.renumber_positions(&conn, *playlist_id)?;
+            }
+            PlaylistOp::Clear { playlist_id, items } => {
+                let conn = self.db.pool.get()?;
+                for item in items {
+                    conn.execute(
+                        "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, stream_url, additional_metadata)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        params![
+                            playlist_id,
+                            item.song_id,
+                            item.position,
+                            item.uuid,
+                            item.item_type,
+                            item.url,
+                            item.stream_url,
+                            item.additional_metadata,
+                        ],
+                    )?;
+                }
             }
         }
         self.redo_stack.push(op);
@@ -432,10 +772,20 @@ impl PlaylistManager {
             }
             PlaylistOp::Remove { playlist_id, items } => {
                 let conn = self.db.pool.get()?;
-                for (uuid, _pos, _song_id) in items {
-                    conn.execute("DELETE FROM playlist_items WHERE uuid = ?1", params![uuid])?;
+                for item in items {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE uuid = ?1",
+                        params![&item.uuid],
+                    )?;
                 }
                 self.renumber_positions(&conn, *playlist_id)?;
+            }
+            PlaylistOp::Clear { playlist_id, .. } => {
+                let conn = self.db.pool.get()?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![playlist_id],
+                )?;
             }
         }
         self.undo_stack.push(op);
@@ -499,6 +849,90 @@ mod tests {
         assert_eq!(playlists.len(), 0);
 
         // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_clear_playlist_undo_redo() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        // Insert dummy song into DB
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, path) VALUES ('Test Song', 'Test Artist', '/test.mp3')",
+                [],
+            ).unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Clear Test").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+
+        // Clear playlist
+        manager.clear_playlist(pl.id).unwrap();
+        let tracks_after_clear = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks_after_clear.len(), 0);
+
+        // Undo clear
+        manager.undo().unwrap();
+        let tracks_after_undo = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks_after_undo.len(), 1);
+        assert_eq!(
+            tracks_after_undo[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Test Song")
+        );
+
+        // Redo clear
+        manager.redo().unwrap();
+        let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks_after_redo.len(), 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_import_relative_pls_resolution() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        let music_dir = temp_dir.join("Music");
+        std::fs::create_dir_all(&music_dir).unwrap();
+        let song_file = music_dir.join("song1.mp3");
+        std::fs::write(&song_file, b"dummy audio").unwrap();
+
+        let song_path_str = clean_path(&song_file).to_string_lossy().to_string();
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, path) VALUES ('Song One', 'Artist One', ?1)",
+                params![song_path_str],
+            )
+            .unwrap();
+        }
+
+        let downloads_dir = temp_dir.join("Downloads");
+        std::fs::create_dir_all(&downloads_dir).unwrap();
+        let pls_file = downloads_dir.join("playlist.pls");
+
+        let pls_content = format!("[playlist]\nNumberOfEntries=1\nFile1=../Music/song1.mp3\n");
+        std::fs::write(&pls_file, pls_content).unwrap();
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let imported = manager.import_playlist(&pls_file).unwrap();
+
+        let tracks = manager.get_playlist_tracks(imported.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Song One")
+        );
+
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

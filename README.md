@@ -60,6 +60,12 @@ You can download the latest installers and portable binaries directly from the G
             <img src="docs/screenshots/equalizer.png" alt="Dual-mode Equializer" />
         </td>
         <td width="50%">
+            <h4 align="center">Playlist Editor</h4>
+            <img src="docs/screenshots/playlist.png" alt="Playlist Editor" />
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
             <h4 align="center">Immersive Now Playing</h4>
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
         </td>

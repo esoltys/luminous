@@ -145,4 +145,24 @@ describe("PlaylistsStore", () => {
       expect(playlistsStore.activePlaylistTracks[0].song?.playcount).toBe(6);
     }
   });
+
+  it("imports playlist and selects it", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "import_playlist") {
+        return { id: 104, name: "Imported Rocks", track_count: 2, created: 1700000002, dynamic_enabled: false };
+      }
+      if (cmd === "get_playlists") return [...mockPlaylists, { id: 104, name: "Imported Rocks", track_count: 2, created: 1700000002, dynamic_enabled: false }];
+      if (cmd === "get_playlist_tracks") return [];
+      return null;
+    });
+
+    await playlistsStore.importPlaylist("/path/to/imported.m3u8");
+    expect(invoke).toHaveBeenCalledWith("import_playlist", { filePath: "/path/to/imported.m3u8" });
+    expect(playlistsStore.activePlaylistId).toBe(104);
+  });
+
+  it("exports playlist", async () => {
+    await playlistsStore.exportPlaylist(101, "/path/to/exported.m3u8", true);
+    expect(invoke).toHaveBeenCalledWith("export_playlist", { playlistId: 101, exportPath: "/path/to/exported.m3u8", relative: true });
+  });
 });

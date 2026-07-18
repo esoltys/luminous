@@ -131,6 +131,16 @@ class PlaylistsStore {
     }
     await this.refreshPlaylists();
   }
+
+  async importPlaylist(filePath: string) {
+    const playlist: Playlist = await invoke("import_playlist", { filePath });
+    await this.refreshPlaylists();
+    await this.selectPlaylist(playlist.id);
+  }
+
+  async exportPlaylist(playlistId: number, exportPath: string, relative: boolean = true) {
+    await invoke("export_playlist", { playlistId, exportPath, relative });
+  }
 }
 
 export const playlistsStore = new PlaylistsStore();

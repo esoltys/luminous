@@ -207,7 +207,17 @@ export const fr = {
     removeUnavailableTooltip: "Retirer les {count} chansons indisponibles de la liste",
     removeUnavailableBtn: "Retirer {count} indisponibles",
     fileNotFoundTooltip: "Fichier introuvable sur le disque",
-    fileNotFoundText: "Introuvable"
+    fileNotFoundText: "Introuvable",
+    importPlaylistBtn: "Importer une liste",
+    exportPlaylistBtn: "Exporter la liste",
+    importPlaylistTooltip: "Importer un fichier de liste (*.m3u, *.m3u8, *.pls, *.xspf)",
+    exportPlaylistTooltip: "Exporter la liste active vers un fichier",
+    renamePlaylistTooltip: "Renommer la liste de lecture",
+    exportModalTitle: "Options d'exportation",
+    useRelativePaths: "Utiliser des chemins d'accès relatifs (portables)",
+    useAbsolutePaths: "Utiliser des chemins d'accès absolus",
+    exportBtn: "Exporter",
+    cancelBtn: "Annuler"
   },
   lyrics: {
     title: "Paroles",

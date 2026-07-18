@@ -4,7 +4,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home } from "lucide-svelte";
+  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home, FolderInput } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   let { width = 256 }: { width?: number } = $props();
@@ -26,6 +26,21 @@
       }
     } catch (err) {
       console.error("Failed to open folder dialog:", err);
+    }
+  }
+
+  async function handleImportPlaylist() {
+    try {
+      const selected = await open({
+        multiple: false,
+        title: i18n.t('playlists.importPlaylistTooltip'),
+        filters: [{ name: 'Playlists (*.m3u, *.m3u8, *.pls, *.xspf)', extensions: ['m3u', 'm3u8', 'pls', 'xspf'] }],
+      });
+      if (selected && typeof selected === "string") {
+        await playlistsStore.importPlaylist(selected);
+      }
+    } catch (err) {
+      console.error("Failed to import playlist:", err);
     }
   }
 
@@ -103,6 +118,13 @@
     <div class="pl-4 pr-4 pt-3 border-t border-brand-border flex-shrink-0">
       <div class="flex items-center justify-between text-xs text-brand-text-secondary font-semibold mb-2">
         <span>{i18n.t('sidebar.quickAccess')}</span>
+        <button
+          onclick={handleImportPlaylist}
+          class="p-1 rounded hover:bg-brand-main text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
+          title={i18n.t('playlists.importPlaylistTooltip')}
+        >
+          <FolderInput class="w-3.5 h-3.5" />
+        </button>
       </div>
       <form onsubmit={handleCreatePlaylist} class="flex items-center gap-1.5 mb-3">
         <input

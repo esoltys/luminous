@@ -2,15 +2,80 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play, GripVertical } from "lucide-svelte";
+  import { Trash2, ListMusic, RotateCcw, RotateCw, Edit3, AlertTriangle, Play, GripVertical, FolderInput, FileOutput, Pencil, Check, X } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
   import { invoke } from "@tauri-apps/api/core";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
 
   let editingSongId = $state<number | null>(null);
+
+  // Inline title rename state
+  let isEditingTitle = $state(false);
+  let editTitleValue = $state("");
+
+  function startRename() {
+    if (activePlaylist) {
+      editTitleValue = activePlaylist.name;
+      isEditingTitle = true;
+    }
+  }
+
+  async function saveRename() {
+    if (!isEditingTitle) return;
+    if (activePlaylist && editTitleValue.trim() !== "" && editTitleValue.trim() !== activePlaylist.name) {
+      await playlistsStore.renamePlaylist(activePlaylist.id, editTitleValue.trim());
+    }
+    isEditingTitle = false;
+  }
+
+  function cancelRename() {
+    isEditingTitle = false;
+  }
+
+  // Import / Export handlers
+  async function handleImportPlaylist() {
+    try {
+      const selected = await open({
+        multiple: false,
+        title: i18n.t('playlists.importPlaylistTooltip'),
+        filters: [{ name: 'Playlists (*.m3u, *.m3u8, *.pls, *.xspf)', extensions: ['m3u', 'm3u8', 'pls', 'xspf'] }],
+      });
+      if (selected && typeof selected === "string") {
+        await playlistsStore.importPlaylist(selected);
+      }
+    } catch (err) {
+      console.error("Failed to import playlist:", err);
+    }
+  }
+
+  let showExportOptionsModal = $state(false);
+  let exportRelative = $state(true);
+
+  async function triggerExport() {
+    if (!activePlaylist) return;
+    try {
+      const savePath = await save({
+        title: i18n.t('playlists.exportPlaylistTooltip'),
+        defaultPath: `${activePlaylist.name}.m3u8`,
+        filters: [
+          { name: 'M3U8 Playlist (*.m3u8)', extensions: ['m3u8'] },
+          { name: 'M3U Playlist (*.m3u)', extensions: ['m3u'] },
+          { name: 'PLS Playlist (*.pls)', extensions: ['pls'] },
+          { name: 'XSPF Playlist (*.xspf)', extensions: ['xspf'] },
+        ],
+      });
+      if (savePath && typeof savePath === "string") {
+        await playlistsStore.exportPlaylist(activePlaylist.id, savePath, exportRelative);
+        showExportOptionsModal = false;
+      }
+    } catch (err) {
+      console.error("Failed to export playlist:", err);
+    }
+  }
 
   function openTagEditor(songId: number) {
     editingSongId = songId;
@@ -181,22 +246,73 @@
     <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between relative z-10 bg-brand-main/40 backdrop-blur-md">
       <div class="flex items-center gap-3">
         <ListMusic class="w-5 h-5 text-brand-accent-text" />
-        <h2 class="text-base font-bold text-brand-text-primary">{activePlaylist.name}</h2>
+        {#if isEditingTitle}
+          <div class="flex items-center gap-1">
+            <input
+              bind:value={editTitleValue}
+              onkeydown={(e) => { if (e.key === 'Enter') saveRename(); else if (e.key === 'Escape') cancelRename(); }}
+              class="bg-brand-sidebar border border-brand-accent text-brand-text-primary px-2 py-0.5 text-base font-bold rounded focus:outline-none"
+              autofocus
+            />
+            <button onclick={saveRename} class="p-1 text-emerald-400 hover:text-emerald-300 cursor-pointer" title="Save">
+              <Check class="w-4 h-4" />
+            </button>
+            <button onclick={cancelRename} class="p-1 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer" title="Cancel">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+        {:else}
+          <div class="flex items-center gap-2 group/title">
+            <h2
+              ondblclick={startRename}
+              class="text-base font-bold text-brand-text-primary cursor-pointer hover:text-brand-accent-text transition-colors"
+              title={i18n.t('playlists.renamePlaylistTooltip')}
+            >
+              {activePlaylist.name}
+            </h2>
+            <button
+              onclick={startRename}
+              class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-0.5 cursor-pointer"
+              title={i18n.t('playlists.renamePlaylistTooltip')}
+            >
+              <Pencil class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        {/if}
         <span class="text-xs text-brand-text-secondary/60 font-medium">({activePlaylist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: activePlaylist.track_count })})</span>
       </div>
 
       <div class="flex items-center gap-3">
+        <!-- Import / Export buttons -->
+        <button
+          onclick={handleImportPlaylist}
+          class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
+          title={i18n.t('playlists.importPlaylistTooltip')}
+        >
+          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
+          <span>{i18n.t('playlists.importPlaylistBtn')}</span>
+        </button>
+
+        <button
+          onclick={() => { showExportOptionsModal = true; }}
+          class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded transition-colors cursor-pointer"
+          title={i18n.t('playlists.exportPlaylistTooltip')}
+        >
+          <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
+          <span>{i18n.t('playlists.exportPlaylistBtn')}</span>
+        </button>
+
         <!-- Undo/Redo controls -->
         <button
           onclick={() => playlistsStore.undo()}
-          class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           title={i18n.t('playlists.undoTooltip', {}, "Undo last playlist operation")}
         >
           <RotateCcw class="w-4 h-4" />
         </button>
         <button
           onclick={() => playlistsStore.redo()}
-          class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+          class="p-1.5 rounded hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           title={i18n.t('playlists.redoTooltip', {}, "Redo last playlist operation")}
         >
           <RotateCw class="w-4 h-4" />
@@ -401,4 +517,39 @@
     onClose={() => { editingSongId = null; }}
     onSave={handleTagEditorSaved}
   />
+{/if}
+
+{#if showExportOptionsModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs select-none">
+    <div class="bg-brand-sidebar border border-brand-border rounded-xl p-5 w-96 shadow-2xl space-y-4">
+      <h3 class="text-base font-bold text-brand-text-primary flex items-center gap-2">
+        <FileOutput class="w-5 h-5 text-brand-accent-text" />
+        {i18n.t('playlists.exportModalTitle')}
+      </h3>
+      <div class="space-y-2.5 text-xs text-brand-text-secondary">
+        <label class="flex items-center gap-2 cursor-pointer hover:text-brand-text-primary transition-colors">
+          <input type="radio" name="exportPathType" bind:group={exportRelative} value={true} class="accent-brand-accent" />
+          <span>{i18n.t('playlists.useRelativePaths')}</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer hover:text-brand-text-primary transition-colors">
+          <input type="radio" name="exportPathType" bind:group={exportRelative} value={false} class="accent-brand-accent" />
+          <span>{i18n.t('playlists.useAbsolutePaths')}</span>
+        </label>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => { showExportOptionsModal = false; }}
+          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors cursor-pointer"
+        >
+          {i18n.t('playlists.cancelBtn')}
+        </button>
+        <button
+          onclick={triggerExport}
+          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
+        >
+          {i18n.t('playlists.exportBtn')}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}

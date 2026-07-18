@@ -146,3 +146,31 @@ pub async fn redo_playlist(state: State<'_, AppState>) -> Result<(), String> {
         .redo()
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn import_playlist(
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<Playlist, String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .import_playlist(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn export_playlist(
+    playlist_id: i64,
+    export_path: String,
+    relative: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .export_playlist(playlist_id, &export_path, relative)
+        .map_err(|e| e.to_string())
+}

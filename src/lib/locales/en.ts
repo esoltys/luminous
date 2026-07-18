@@ -207,7 +207,17 @@ export const en = {
     removeUnavailableTooltip: "Remove all {count} unavailable songs from playlist",
     removeUnavailableBtn: "Remove {count} unavailable",
     fileNotFoundTooltip: "File not found on disk",
-    fileNotFoundText: "File not found"
+    fileNotFoundText: "File not found",
+    importPlaylistBtn: "Import Playlist",
+    exportPlaylistBtn: "Export Playlist",
+    importPlaylistTooltip: "Import playlist file (*.m3u, *.m3u8, *.pls, *.xspf)",
+    exportPlaylistTooltip: "Export active playlist to file",
+    renamePlaylistTooltip: "Rename playlist",
+    exportModalTitle: "Export Playlist Options",
+    useRelativePaths: "Use relative (portable) file paths",
+    useAbsolutePaths: "Use absolute file paths",
+    exportBtn: "Export",
+    cancelBtn: "Cancel"
   },
   lyrics: {
     title: "Lyrics",

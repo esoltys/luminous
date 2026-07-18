@@ -22,6 +22,7 @@ pub mod models;
 pub mod moodbar;
 pub mod player;
 pub mod playlist;
+pub mod playlist_parsers;
 pub mod stats;
 pub mod tageditor;
 pub mod waveform;
@@ -503,6 +504,8 @@ pub fn run() {
             commands::playlist::clear_playlist,
             commands::playlist::undo_playlist,
             commands::playlist::redo_playlist,
+            commands::playlist::import_playlist,
+            commands::playlist::export_playlist,
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,
