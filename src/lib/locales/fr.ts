@@ -277,7 +277,11 @@ export const fr = {
     loudnessLabel: "Volume",
     loudnessSourceAnalyzed: "Analyse R128",
     loudnessSourceReplayGain: "Tag ReplayGain",
-    loudnessSourceFallback: "Gain de secours"
+    loudnessSourceFallback: "Gain de secours",
+    lyricsStatusLabel: "Paroles",
+    lyricsSynced: "Synchronisées (LRC)",
+    lyricsPlain: "Texte brut",
+    lyricsNone: "Non téléchargées"
   },
   tagEditor: {
     title: "Modifier les métadonnées",

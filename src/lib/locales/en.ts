@@ -277,7 +277,11 @@ export const en = {
     loudnessLabel: "Loudness",
     loudnessSourceAnalyzed: "R128 analysis",
     loudnessSourceReplayGain: "ReplayGain tag",
-    loudnessSourceFallback: "Fallback gain"
+    loudnessSourceFallback: "Fallback gain",
+    lyricsStatusLabel: "Lyrics",
+    lyricsSynced: "Synced (LRC)",
+    lyricsPlain: "Plain text",
+    lyricsNone: "Not downloaded"
   },
   tagEditor: {
     title: "Edit Metadata Tags",

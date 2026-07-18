@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { Music, Clock } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { lyricsStatus } from "../utils/lyrics";
 
   interface Props {
     isOpen?: boolean;
@@ -31,6 +32,15 @@
     if (gain === undefined) return "";
     return `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB`;
   });
+
+  function lyricsStatusLabel(): string {
+    if (!currentSong) return "";
+    switch (lyricsStatus(currentSong)) {
+      case "synced": return i18n.t('playerBar.lyricsSynced', {}, 'Synced (LRC)');
+      case "plain": return i18n.t('playerBar.lyricsPlain', {}, 'Plain text');
+      default: return i18n.t('playerBar.lyricsNone', {}, 'Not downloaded');
+    }
+  }
 </script>
 
 <aside
@@ -103,6 +113,10 @@
             <span class="text-brand-text-primary">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
           </div>
         {/if}
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-brand-text-secondary/60">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
+          <span class="text-brand-text-primary">{lyricsStatusLabel()}</span>
+        </div>
       </div>
 
       <!-- Additional Metadata -->
