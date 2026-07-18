@@ -80,6 +80,20 @@
       "tab": "collection",
       "subTab": "songs",
       "action": "click-moodbar-toggle"
+    },
+    {
+      "name": "lyrics",
+      "filename": "lyrics.png",
+      "tab": "lyrics",
+      "subTab": ""
+    },
+    {
+      "name": "playlist",
+      "filename": "playlist.png",
+      "tab": "playlists",
+      "subTab": "",
+      "sidebarWidth": 260,
+      "action": "click-playlist"
     }
   ]
 }

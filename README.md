@@ -4,8 +4,8 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.60.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
-[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-60%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Release](https://img.shields.io/badge/Release-0.67.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-68%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. Made in Canada 🍁 and available in both English and French.
 
@@ -65,7 +65,11 @@ You can download the latest installers and portable binaries directly from the G
         </td>
     </tr>
     <tr>
-        <td colspan="2">
+        <td width="50%">
+            <h4 align="center">Moodbar Toggle Mode</h4>
+            <img src="docs/screenshots/moodbar.png" alt="Moodbar Toggle Mode" />
+        </td>
+        <td width="50%">
             <h4 align="center">Immersive Now Playing</h4>
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
         </td>
@@ -82,10 +86,11 @@ You can download the latest installers and portable binaries directly from the G
 *   **Personalized Home Hub**: A tailored dashboard with Recently Played, Most Played, and Recently Added rows, plus cover art carousels for browsing.
 *   **Instant Search and Navigation**: Find any track, album, or artist instantly with split-second, database-level search.
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
-*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars, and SoundCloud-style peak waveform seek bars.
+*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a moodmoji hash and one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
 *   **Gapless Playback**: Tracks flow into one another with no silence or clicks — ideal for live albums, concept records, and DJ mixes.
 *   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
-*   **Automatic Volume Leveling**: Evens out volume across your library so you don't have to reach for the volume knob between songs.
+*   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
+*   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view.
 *   **Powerful Playlist Editor**: Drag to reorder, rename inline, undo/redo changes, and import or export M3U, M3U8, PLS, and XSPF files.
 *   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with local caching and plain-text fallback.
 *   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, then write tags back to your files.

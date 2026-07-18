@@ -301,6 +301,10 @@ async function main() {
     "click-moodbar-toggle": async (page) => {
       await page.getByTitle("Waveform mode — click to switch to moodbar").click();
       await page.waitForTimeout(400);
+    },
+    "click-playlist": async (page) => {
+      await page.locator(".playlists-scroll-container li button").first().click();
+      await page.waitForTimeout(400);
     }
   };
 
