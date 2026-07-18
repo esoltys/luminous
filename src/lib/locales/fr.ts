@@ -275,8 +275,7 @@ export const fr = {
     composerLabel: "Compositeur",
     restoreInterface: "Restaurer l'interface complète",
     loudnessAnalyzed: "Volume normalisé par analyse R128 : {gain}",
-    loudnessReplayGain: "Volume normalisé via le tag ReplayGain : {gain}",
-    loudnessFallback: "Aucune donnée de volume — gain de secours utilisé : {gain}"
+    loudnessReplayGain: "Volume normalisé via le tag ReplayGain : {gain}"
   },
   tagEditor: {
     title: "Modifier les métadonnées",

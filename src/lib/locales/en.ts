@@ -275,8 +275,7 @@ export const en = {
     composerLabel: "Composer",
     restoreInterface: "Restore Full Interface",
     loudnessAnalyzed: "Loudness normalized via R128 analysis: {gain}",
-    loudnessReplayGain: "Loudness normalized via ReplayGain tag: {gain}",
-    loudnessFallback: "No loudness data — using fallback gain: {gain}"
+    loudnessReplayGain: "Loudness normalized via ReplayGain tag: {gain}"
   },
   tagEditor: {
     title: "Edit Metadata Tags",

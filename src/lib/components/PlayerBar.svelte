@@ -33,29 +33,19 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
-  // Loudness normalization (#77) badge label + tooltip
+  // Loudness normalization (#77) badge label + tooltip. Only shown when a
+  // real gain source is in play (analyzed or a ReplayGain tag) -- the
+  // fallback-gain case gets no badge, there's nothing informative to annotate.
   function loudnessBadgeLabel(): string {
-    switch (playerStore.loudnessSource) {
-      case "analyzed": return "R128";
-      case "replay_gain": return "RG";
-      case "fallback": return "—";
-      default: return "";
-    }
+    return playerStore.loudnessSource === "analyzed" ? "R128" : "RG";
   }
 
   function loudnessBadgeTooltip(): string {
     const gain = playerStore.loudnessGainDb;
     const gainText = gain !== undefined ? `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB` : "";
-    switch (playerStore.loudnessSource) {
-      case "analyzed":
-        return i18n.t('playerBar.loudnessAnalyzed', { gain: gainText }, `Loudness normalized via R128 analysis: ${gainText}`);
-      case "replay_gain":
-        return i18n.t('playerBar.loudnessReplayGain', { gain: gainText }, `Loudness normalized via ReplayGain tag: ${gainText}`);
-      case "fallback":
-        return i18n.t('playerBar.loudnessFallback', { gain: gainText }, `No loudness data — using fallback gain: ${gainText}`);
-      default:
-        return "";
-    }
+    return playerStore.loudnessSource === "analyzed"
+      ? i18n.t('playerBar.loudnessAnalyzed', { gain: gainText }, `Loudness normalized via R128 analysis: ${gainText}`)
+      : i18n.t('playerBar.loudnessReplayGain', { gain: gainText }, `Loudness normalized via ReplayGain tag: ${gainText}`);
   }
 
   // Handle seek progress bar click
@@ -167,7 +157,7 @@
           <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
             {playerStore.currentSong.filetype}
           </span>
-          {#if playerStore.loudnessSource !== "disabled"}
+          {#if playerStore.loudnessSource === "analyzed" || playerStore.loudnessSource === "replay_gain"}
             <span
               class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-sidebar/60 text-brand-text-secondary border border-brand-border shadow-sm shrink-0"
               title={loudnessBadgeTooltip()}
@@ -175,10 +165,6 @@
               {loudnessBadgeLabel()}
             </span>
           {/if}
-          <SongRating
-            rating={playerStore.currentSong.rating}
-            onRate={(r) => playerStore.rateCurrent(r)}
-          />
         {/if}
       </div>
       {#if playerStore.currentSong?.artist}
@@ -255,6 +241,13 @@
           </span>
         {/if}
       </button>
+
+      {#if playerStore.currentSong}
+        <SongRating
+          rating={playerStore.currentSong.rating}
+          onRate={(r) => playerStore.rateCurrent(r)}
+        />
+      {/if}
     </div>
 
     <!-- Scrubber -->
