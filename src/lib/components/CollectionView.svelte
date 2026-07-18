@@ -386,14 +386,6 @@
                   >
                     {song.title || i18n.t('collection.unknownSong')}
                   </button>
-                  <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
-                    {song.filetype}
-                  </span>
-                  {#if song.lyrics && song.lyrics.trim() !== ""}
-                    <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
-                      LRC
-                    </span>
-                  {/if}
                 </div>
                 <div class="text-brand-text-secondary/90 truncate pr-4 min-w-0">
                   {#if song.artist}

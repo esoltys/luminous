@@ -96,7 +96,6 @@ export const en = {
     sortAlbumsAsc: "Sort: Albums (Least)",
     albumsCount: "{count} albums",
     oneAlbum: "1 album",
-    lyricsAvailable: "Lyrics available",
     selectPlaylistFirstAlert: "Please select or create a playlist first from the Playlists tab.",
     albumPlaylistName: "Album: {name}"
   },

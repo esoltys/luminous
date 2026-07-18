@@ -138,11 +138,6 @@
             {i18n.t('playerBar.notPlaying')}
           </span>
         {/if}
-        {#if playerStore.currentSong}
-          <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shadow-sm shrink-0">
-            {playerStore.currentSong.filetype}
-          </span>
-        {/if}
       </div>
       {#if playerStore.currentSong?.artist}
         <button

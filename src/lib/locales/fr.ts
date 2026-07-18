@@ -96,7 +96,6 @@ export const fr = {
     sortAlbumsAsc: "Trier : Albums (Moins grand nombre)",
     albumsCount: "{count} albums",
     oneAlbum: "1 album",
-    lyricsAvailable: "Paroles disponibles",
     selectPlaylistFirstAlert: "Veuillez sélectionner ou créer une liste de lecture d'abord depuis l'onglet Listes de lecture.",
     albumPlaylistName: "Album : {name}"
   },
