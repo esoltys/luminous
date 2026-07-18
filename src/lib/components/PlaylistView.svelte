@@ -80,6 +80,8 @@
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", index.toString());
+      event.dataTransfer.setData("text", index.toString());
+      event.dataTransfer.setData("application/x-playlist-index", index.toString());
     }
   }
 
@@ -110,8 +112,10 @@
   }
 
   function handleDragEnd() {
-    draggedIndex = null;
     dragOverIndex = null;
+    setTimeout(() => {
+      draggedIndex = null;
+    }, 100);
   }
 
   function handleDrop(event: DragEvent, index: number) {
@@ -254,8 +258,9 @@
                     : ''
                   }"
               >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative">
-                  <div class="relative w-4 h-4 mx-auto flex items-center justify-center">
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative cursor-grab active:cursor-grabbing">
+                  <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
+                    <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
                     {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === 'playing'}
                       <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                         <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
