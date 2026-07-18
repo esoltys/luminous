@@ -79,18 +79,20 @@ You can download the latest installers and portable binaries directly from the G
 
 ## Product Highlights
 
-*   **Personalized Home Hub**: Start your listening with a tailored dashboard featuring time-of-day greetings and smart curation rows: Recently Played, Most Played, and Recently Added. Browse your library with interactive cover art carousels and discover tracks at a glance.
-*   **Instant Search and Navigation**: Locate any track, album, or artist in your collection instantly using database-level SQLite FTS5 (Full-Text Search) with split-second response times.
-*   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds using an incremental scanner that intelligently skips unchanged files based on modification times.
-*   **Immersive Audio Visualizers**: View your music with a real-time 32-bar logarithmic spectrum analyzer rendering at 30 FPS, colorized spectral moodbars, and SoundCloud-style peak waveform seek bars.
-*   **Gapless Playback**: Tracks flow into one another with no silence or clicks. The engine decodes the next track ahead of the boundary and hands over seamlessly — ideal for live albums, concept records, and DJ mixes.
-*   **Dual-Mode Equalizer**: Shape your sound with a 10-band graphic equalizer (cascaded biquad DSP and genre presets) or switch to a 20-band parametric mode with adjustable Q per band and a live response-curve preview. Both modes leave the signal untouched when disabled.
-*   **Karaoke Synced Lyrics**: Enjoy real-time, scrolling synced lyrics (LRC) fetched automatically from LRCLIB or plain text from Lyrics.ovh, complete with local caching and visual synced-lyrics indicators.
-*   **AcoustID Fingerprinting and Tag Editor**: Automatically identify tracks and correct metadata using AcoustID acoustic fingerprinting (via `fpcalc`), and write tags directly back to your local files.
-*   **Smart Cover Art Engine**: Extract embedded artwork automatically using lofty tag parsing, with automatic iTunes Search API fallback and local file deduplication.
-*   **Dynamic Theme Engine**: Switch between curated color themes (such as Luminous Violet, Ruby Red, Nordic Blue, and Retro Amber) or design your own with an interactive, real-time Custom Theme Builder that updates the application interface live.
-*   **Bilingual Interface**: Made in Canada 🍁 — the entire UI is fully translated between English and French, switchable instantly from the General settings tab.
-*   **Seamless State Preservation**: Never lose your place. Luminous automatically restores your active sidebar width, playlist selections, player volume, queue state, and equalizer configuration when the application is reopened.
+*   **Personalized Home Hub**: A tailored dashboard with Recently Played, Most Played, and Recently Added rows, plus cover art carousels for browsing.
+*   **Instant Search and Navigation**: Find any track, album, or artist instantly with split-second, database-level search.
+*   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
+*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars, and SoundCloud-style peak waveform seek bars.
+*   **Gapless Playback**: Tracks flow into one another with no silence or clicks — ideal for live albums, concept records, and DJ mixes.
+*   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
+*   **Automatic Volume Leveling**: Evens out volume across your library so you don't have to reach for the volume knob between songs.
+*   **Powerful Playlist Editor**: Drag to reorder, rename inline, undo/redo changes, and import or export M3U, M3U8, PLS, and XSPF files.
+*   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with local caching and plain-text fallback.
+*   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, then write tags back to your files.
+*   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with an online fallback and duplicate cleanup.
+*   **Dynamic Theme Engine**: Curated color themes, or design your own live with the Custom Theme Builder.
+*   **Bilingual Interface**: Made in Canada 🍁 — fully translated between English and French, switchable instantly.
+*   **Seamless State Preservation**: Restores your sidebar, playlist selection, volume, queue, and equalizer settings on reopen.
 
 ---
 
@@ -231,3 +233,4 @@ To run the standard cargo unit test suite:
 cd src-tauri
 cargo test
 ```
+This also runs the Gherkin feature specs under [`features/`](features) — each `.feature` file has a matching test in `src-tauri/tests/`, so no separate command is needed to exercise them.
