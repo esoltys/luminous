@@ -11,6 +11,7 @@
   import { ArrowLeft, Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { loudnessBadge } from "../utils/loudness";
 
   let { albumName }: { albumName: string } = $props();
 
@@ -340,6 +341,11 @@
                 {#if song.lyrics && song.lyrics.trim() !== ""}
                   <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
                     LRC
+                  </span>
+                {/if}
+                {#if loudnessBadge(song)}
+                  <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
+                    {loudnessBadge(song)}
                   </span>
                 {/if}
               </div>

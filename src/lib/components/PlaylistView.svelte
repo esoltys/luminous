@@ -9,6 +9,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import { loudnessBadge } from "../utils/loudness";
 
   let editingSongId = $state<number | null>(null);
 
@@ -296,6 +297,11 @@
                       {#if item.song.lyrics && item.song.lyrics.trim() !== ""}
                         <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-accent/10 text-brand-accent-text border border-brand-accent/20 shrink-0" title={i18n.t('collection.lyricsAvailable')}>
                           LRC
+                        </span>
+                      {/if}
+                      {#if loudnessBadge(item.song)}
+                        <span class="px-1 py-0.5 text-[8px] font-semibold tracking-wider rounded uppercase bg-brand-sidebar text-brand-text-secondary border border-brand-border/50 shrink-0">
+                          {loudnessBadge(item.song)}
                         </span>
                       {/if}
                     {/if}

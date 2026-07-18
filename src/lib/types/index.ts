@@ -123,6 +123,10 @@ export interface Song {
   ebur128_integrated_loudness_lufs?: number;
   ebur128_loudness_range_lu?: number;
 
+  // ReplayGain 2.0 tag fallback (#77)
+  replaygain_track_gain?: number;
+  replaygain_album_gain?: number;
+
   // Streaming service IDs
   artist_id?: string;
   album_id?: string;
