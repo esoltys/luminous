@@ -4,6 +4,11 @@ import { render, fireEvent } from "@testing-library/svelte";
 import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import type { Song, AlbumItem, ArtistItem } from "../types";
+import VirtualListMock from "./__mocks__/VirtualList.svelte";
+
+vi.mock("svelte-virtual-list-ts", () => ({
+  VirtualList: VirtualListMock,
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
@@ -92,6 +97,13 @@ describe("CollectionView.svelte", () => {
     collectionStore.songs = mockSongs;
     collectionStore.albums = mockAlbums;
     collectionStore.artists = mockArtists;
+    collectionStore.stats = {
+      total_songs: 2,
+      total_albums: 1,
+      total_artists: 1,
+      total_duration_nanosec: 380_000_000_000,
+      total_filesize_bytes: 10_000_000,
+    };
     collectionStore.activeSubTab = "songs";
     collectionStore.selectedAlbumName = null;
     collectionStore.selectedArtistName = null;
