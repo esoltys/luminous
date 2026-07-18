@@ -75,6 +75,12 @@ impl Player {
         let mut volume = 1.0f32;
         let mut shuffle_mode = ShuffleMode::Off;
         let mut repeat_mode = RepeatMode::Off;
+        let mut restored_song: Option<Song> = None;
+        let mut restored_playlist_id: Option<i64> = None;
+        let mut restored_item_uuid: Option<String> = None;
+        let mut restored_position_ns: u64 = 0;
+        let mut playlist_items: Vec<PlaylistItem> = Vec::new();
+        let mut current_index: Option<usize> = None;
 
         // Query database settings on startup
         if let Ok(conn) = db.pool.get() {
@@ -118,28 +124,136 @@ impl Player {
                     _ => RepeatMode::Off,
                 };
             }
+
+            // Restore last played song & position
+            if let Ok(s_str) = conn.query_row(
+                "SELECT value FROM app_state WHERE key = 'last_song_id'",
+                [],
+                |row| row.get::<_, String>(0),
+            ) {
+                if let Ok(song_id) = s_str.parse::<i64>() {
+                    let sql = format!(
+                        "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
+                        crate::collection::SONG_SELECT_COLS
+                    );
+                    if let Ok(song) = conn.query_row(
+                        &sql,
+                        rusqlite::params![song_id],
+                        crate::collection::row_to_song,
+                    ) {
+                        restored_song = Some(song);
+                    }
+                }
+            }
+
+            if let Some(ref song) = restored_song {
+                if let Ok(p_str) = conn.query_row(
+                    "SELECT value FROM app_state WHERE key = 'last_playlist_id'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    if let Ok(pid) = p_str.parse::<i64>() {
+                        restored_playlist_id = Some(pid);
+                    }
+                }
+
+                if let Ok(uuid) = conn.query_row(
+                    "SELECT value FROM app_state WHERE key = 'last_item_uuid'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    restored_item_uuid = Some(uuid);
+                }
+
+                if let Ok(pos_str) = conn.query_row(
+                    "SELECT value FROM app_state WHERE key = 'last_position_nanosec'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    if let Ok(pos) = pos_str.parse::<u64>() {
+                        restored_position_ns = pos;
+                    }
+                }
+
+                if let Some(pid) = restored_playlist_id {
+                    if pid > 0 {
+                        if let Ok(items) =
+                            crate::playlist::PlaylistManager::get_playlist_tracks_from_conn(
+                                &conn, pid,
+                            )
+                        {
+                            if !items.is_empty() {
+                                playlist_items = items;
+                                if let Some(ref target_uuid) = restored_item_uuid {
+                                    current_index =
+                                        playlist_items.iter().position(|i| &i.uuid == target_uuid);
+                                }
+                                if current_index.is_none() {
+                                    current_index = playlist_items.iter().position(|i| {
+                                        i.song.as_ref().map(|s| s.id) == Some(song.id)
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if playlist_items.is_empty() {
+                    let uuid = restored_item_uuid
+                        .clone()
+                        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+                    let item = PlaylistItem {
+                        id: 0,
+                        playlist_id: restored_playlist_id.unwrap_or(0),
+                        position: 0,
+                        uuid: uuid.clone(),
+                        item_type: crate::models::PlaylistItemType::Song,
+                        song: Some(song.clone()),
+                        url: None,
+                        stream_url: None,
+                        additional_metadata: None,
+                    };
+                    restored_item_uuid = Some(uuid);
+                    playlist_items = vec![item];
+                    current_index = Some(0);
+                }
+            }
         }
 
-        Self {
+        let scrobble_point_nanosec = restored_song
+            .as_ref()
+            .and_then(|s| s.length_nanosec.map(|ns| (ns as u64) / 2));
+
+        let mut player = Self {
             _db: db,
             audio,
-            current_song: None,
-            current_playlist_id: None,
-            current_item_uuid: None,
+            current_song: restored_song.clone(),
+            current_playlist_id: restored_playlist_id,
+            current_item_uuid: restored_item_uuid,
             shuffle_mode,
             repeat_mode,
             stop_after_current: false,
             volume,
             current_loudness_source: LoudnessGainSource::Disabled,
             current_loudness_gain_db: None,
-            playlist_items: Vec::new(),
+            playlist_items,
             shuffle_order: Vec::new(),
-            current_index: None,
+            current_index,
             played_indices: Vec::new(),
             queue: std::collections::VecDeque::new(),
-            scrobble_point_nanosec: None,
+            scrobble_point_nanosec,
             scrobbled: false,
+        };
+
+        player.rebuild_shuffle_order();
+
+        if let Some(song) = restored_song {
+            if let Ok(engine) = player.audio.try_lock() {
+                let _ = engine.cue(Box::new(song), restored_position_ns);
+            }
         }
+
+        player
     }
 
     /// Load a playlist into the player and start playing the given index.
@@ -254,9 +368,52 @@ impl Player {
             self.played_indices.push(candidate);
         }
 
+        self.persist_current_song();
+        self.persist_position(start_ns);
+
         self.apply_loudness_gain(&song).await;
         let audio = self.audio.lock().await;
         audio.play(Box::new(song), start_ns)
+    }
+
+    pub fn persist_current_song(&self) {
+        if let Ok(conn) = self._db.pool.get() {
+            if let Some(song) = &self.current_song {
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_song_id', ?1)",
+                    rusqlite::params![song.id.to_string()],
+                );
+            } else {
+                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_song_id'", []);
+            }
+
+            if let Some(pid) = self.current_playlist_id {
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_playlist_id', ?1)",
+                    rusqlite::params![pid.to_string()],
+                );
+            } else {
+                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_playlist_id'", []);
+            }
+
+            if let Some(uuid) = &self.current_item_uuid {
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_item_uuid', ?1)",
+                    rusqlite::params![uuid],
+                );
+            } else {
+                let _ = conn.execute("DELETE FROM app_state WHERE key = 'last_item_uuid'", []);
+            }
+        }
+    }
+
+    pub fn persist_position(&self, position_nanosec: u64) {
+        if let Ok(conn) = self._db.pool.get() {
+            let _ = conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_position_nanosec', ?1)",
+                rusqlite::params![position_nanosec.to_string()],
+            );
+        }
     }
 
     /// Recompute and apply the loudness-normalization gain (#77) for a track
@@ -299,6 +456,8 @@ impl Player {
     }
 
     pub async fn pause(&self) -> Result<()> {
+        let pos = self.audio.lock().await.current_position_nanosec();
+        self.persist_position(pos);
         self.audio.lock().await.pause()
     }
 
@@ -309,10 +468,14 @@ impl Player {
     pub async fn stop(&mut self) -> Result<()> {
         self.current_song = None;
         self.current_item_uuid = None;
+        self.current_playlist_id = None;
+        self.persist_current_song();
+        self.persist_position(0);
         self.audio.lock().await.stop()
     }
 
     pub async fn seek_to(&self, position_nanosec: u64) -> Result<()> {
+        self.persist_position(position_nanosec);
         self.audio.lock().await.seek_to(position_nanosec)
     }
 
@@ -571,6 +734,8 @@ impl Player {
                         self.current_item_uuid = target.uuid;
                     }
                 }
+                self.persist_current_song();
+                self.persist_position(0);
                 Ok(())
             }
             _ => {
@@ -758,5 +923,79 @@ impl Player {
                 None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::sync::Arc;
+
+    fn setup_test_db() -> (Database, std::path::PathBuf) {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_player_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        (db, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn test_player_state_persistence_and_restoration() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        // Insert a dummy song into DB
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES (42, '/fake/path.mp3', 'Test Title', 'Test Artist', 'Test Album', 180000000000)",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_song_id', '42')",
+                [],
+            )
+            .unwrap();
+            conn.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_position_nanosec', '45000000000')", []).unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_playlist_id', '0')",
+                [],
+            )
+            .unwrap();
+            conn.execute("INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_item_uuid', 'test-uuid-123')", []).unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        assert!(player.current_song.is_some());
+        let restored = player.current_song.as_ref().unwrap();
+        assert_eq!(restored.id, 42);
+        assert_eq!(restored.title.as_deref(), Some("Test Title"));
+        assert_eq!(player.current_item_uuid.as_deref(), Some("test-uuid-123"));
+
+        let state = player.get_state().await;
+        assert_eq!(state.state, crate::models::PlayState::Paused);
+        assert_eq!(state.position_nanosec, 45_000_000_000);
+
+        // Test updating persistence
+        player.current_song = None;
+        player.persist_current_song();
+        player.persist_position(0);
+
+        let conn = db_arc.pool.get().unwrap();
+        let song_id_exists: Result<String, _> = conn.query_row(
+            "SELECT value FROM app_state WHERE key = 'last_song_id'",
+            [],
+            |r| r.get(0),
+        );
+        assert!(song_id_exists.is_err());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

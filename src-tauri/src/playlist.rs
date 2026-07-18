@@ -390,28 +390,35 @@ impl PlaylistManager {
 
     pub fn get_playlist_tracks(&self, playlist_id: i64) -> Result<Vec<PlaylistItem>> {
         let conn = self.db.pool.get()?;
+        Self::get_playlist_tracks_from_conn(&conn, playlist_id)
+    }
+
+    pub fn get_playlist_tracks_from_conn(
+        conn: &rusqlite::Connection,
+        playlist_id: i64,
+    ) -> Result<Vec<PlaylistItem>> {
         let mut stmt = conn.prepare(&format!(
             "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
-                             pi.uuid, pi.type, pi.url, pi.stream_url,
-                             pi.additional_metadata,
-                             -- song fields
-                             s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                             s.title, s.titlesort, s.artist, s.artistsort,
-                             s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                             s.composer, s.composersort, s.performer, s.performersort,
-                             s.grouping, s.comment, s.lyrics,
-                             s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                             s.bpm, s.mood, s.initial_key,
-                             s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                             s.bitrate, s.samplerate, s.bitdepth, s.channels,
-                             s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
-                             s.lastplayed, s.lastseen, s.art_embedded,
-                             s.art_automatic, s.art_manual, s.art_unset,
-                             s.unavailable
-                      FROM playlist_items pi
-                      LEFT JOIN songs s ON s.id = pi.song_id
-                      WHERE pi.playlist_id = ?1
-                      ORDER BY pi.position"
+                         pi.uuid, pi.type, pi.url, pi.stream_url,
+                         pi.additional_metadata,
+                         -- song fields
+                         s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+                         s.title, s.titlesort, s.artist, s.artistsort,
+                         s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+                         s.composer, s.composersort, s.performer, s.performersort,
+                         s.grouping, s.comment, s.lyrics,
+                         s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+                         s.bpm, s.mood, s.initial_key,
+                         s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+                         s.bitrate, s.samplerate, s.bitdepth, s.channels,
+                         s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
+                         s.lastplayed, s.lastseen, s.art_embedded,
+                         s.art_automatic, s.art_manual, s.art_unset,
+                         s.unavailable
+                  FROM playlist_items pi
+                  LEFT JOIN songs s ON s.id = pi.song_id
+                  WHERE pi.playlist_id = ?1
+                  ORDER BY pi.position"
         ))?;
 
         let items = stmt
