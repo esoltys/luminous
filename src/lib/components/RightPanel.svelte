@@ -48,16 +48,8 @@
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
   class:glass-surface={themeStore.isGlassTheme}
 >
-  <!-- Header -->
-  <div class="h-20 flex items-center px-6">
-    <h2 class="text-lg font-bold text-brand-text-primary flex items-center gap-2">
-      <Music class="w-5 h-5" />
-      {i18n.t('playerBar.nowPlaying')}
-    </h2>
-  </div>
-
   <!-- Content -->
-  <div class="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+  <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
     <!-- Current Song -->
     {#if currentSong}
       <div class="space-y-3">

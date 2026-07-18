@@ -23,9 +23,9 @@ export const en = {
     searching: "Searching...",
     tracksCount: "{count} tracks",
     clearSearch: "Clear Search",
-    toggleSidebar: "Toggle Left Sidebar",
+    toggleSidebar: "Toggle Menu Sidebar",
     toggleImmersive: "Toggle Immersive Album Art Screen",
-    toggleRightPanel: "Toggle Right Panel",
+    toggleRightPanel: "Toggle Detail Panel",
     resizeSidebar: "Resize Left Sidebar",
     resizeRightPanel: "Resize Right Panel"
   },

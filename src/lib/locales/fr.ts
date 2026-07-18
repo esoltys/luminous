@@ -23,9 +23,9 @@ export const fr = {
     searching: "Recherche...",
     tracksCount: "{count} pistes",
     clearSearch: "Effacer la recherche",
-    toggleSidebar: "Basculer la barre latérale gauche",
+    toggleSidebar: "Basculer le menu latéral",
     toggleImmersive: "Basculer l'écran de pochette immersif",
-    toggleRightPanel: "Basculer le panneau droit",
+    toggleRightPanel: "Basculer le panneau de détails",
     resizeSidebar: "Redimensionner la barre latérale gauche",
     resizeRightPanel: "Redimensionner le panneau droit"
   },

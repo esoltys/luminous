@@ -107,7 +107,14 @@
       const lyrics = await invoke<string>("get_lyrics", { songId });
       console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}`);
       lyricsText = lyrics;
-      
+
+      // Keep the shared player store in sync so other views (e.g. the Now
+      // Playing detail panel's Lyrics status) reflect a freshly downloaded
+      // or refetched lyric immediately, not just after the next track change.
+      if (playerStore.currentSong && playerStore.currentSong.id === songId) {
+        playerStore.currentSong.lyrics = lyrics;
+      }
+
       let cleanEditText = lyrics;
       if (cleanEditText.startsWith("[synced:false]\n")) {
         cleanEditText = cleanEditText.substring("[synced:false]\n".length);
@@ -131,6 +138,7 @@
       console.log(`[LyricsView] Manually saving lyrics for songId: ${playerStore.currentSong.id}`);
       await invoke("save_lyrics", { songId: playerStore.currentSong.id, lyrics: editText });
       lyricsText = editText;
+      playerStore.currentSong.lyrics = editText;
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
