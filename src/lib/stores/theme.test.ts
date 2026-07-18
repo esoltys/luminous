@@ -1,6 +1,17 @@
-import { describe, it, expect } from "vitest";
-import { PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, buildExtractedColors } from "./theme.svelte";
-import { checkWcagCompliance, pickAccessibleOnColor, hexToRgb, rgbToHsl } from "../utils/colorUtils";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+  PREDEFINED_THEMES,
+  LUMINOUS_DARK_COLORS,
+  LUMINOUS_LIGHT_COLORS,
+  buildExtractedColors,
+  ThemeStore,
+  blendToward,
+  hexToRgbaString,
+  extractColorsFromImage,
+  type Theme
+} from "./theme.svelte";
+import { checkWcagCompliance, pickAccessibleOnColor, hexToRgb, rgbToHsl, hslToRgb, rgbToHex } from "../utils/colorUtils";
+import { invoke } from "@tauri-apps/api/core";
 
 describe("PREDEFINED_THEMES", () => {
   it("does not include the removed Luminous Violet theme", () => {
@@ -23,10 +34,6 @@ const retroAmberColors = PREDEFINED_THEMES.find(t => t.id === "retro-amber")!.co
 describe.each([
   ["dark", LUMINOUS_DARK_COLORS],
   ["light", LUMINOUS_LIGHT_COLORS],
-  // Ruby Red / Nordic Blue / Retro Amber are generatePaletteFromSeed()
-  // output (#61 step 3), not hand-picked — this coverage is what "stay
-  // consistent if the generation heuristic improves later" (the issue's
-  // own rationale for the seed+generator move) actually guards.
   ["Ruby Red (generated)", rubyRedColors],
   ["Nordic Blue (generated)", nordicBlueColors],
   ["Retro Amber (generated)", retroAmberColors]
@@ -62,24 +69,12 @@ describe("accent color contrast against bg-main (used for accent icons/badges/ac
   });
 
   it("light scheme accent meets WCAG 1.4.11's 3:1 non-text/UI-component threshold", () => {
-    // Deliberately not held to the stricter 4.5:1 "normal text" bar here:
-    // any orange dark enough to clear 4.5:1 against this light canvas
-    // reads as brown/rust rather than the brand orange. The accent is
-    // used almost entirely as icon/button/badge/active-state color in
-    // this app, which WCAG 1.4.11 governs at 3:1, not 1.4.3's 4.5:1.
     const result = checkWcagCompliance(LUMINOUS_LIGHT_COLORS["color-accent"], LUMINOUS_LIGHT_COLORS["bg-main"]);
     expect(result.ratio).toBeGreaterThanOrEqual(3);
   });
 });
 
 describe("on-accent text contrast (heuristically derived, not hand-picked)", () => {
-  // Every predefined theme's accent color needs a readable text/icon color
-  // rendered directly on top of it (active nav items, filled buttons) —
-  // this is what ThemeStore.applyActiveTheme() computes into
-  // --color-accent-contrast for every theme, including custom ones.
-  // Dynamic Artwork's accent is a CSS var reference, not a literal hex,
-  // so it can't be tested this way — its live extracted color is
-  // validated at runtime instead.
   const themesWithLiteralAccent = PREDEFINED_THEMES.filter(t => t.id !== "dynamic-artwork");
 
   it.each(themesWithLiteralAccent.map(t => [t.name, t.colors["color-accent"]] as const))(
@@ -105,9 +100,6 @@ describe("on-accent text contrast (heuristically derived, not hand-picked)", () 
 });
 
 describe("buildExtractedColors (archetype-based artwork color extraction, #61)", () => {
-  // The failure mode #61 exists to fix: a moody-rock-album stand-in that's
-  // ~99.5% near-black background with a tiny neon-blue accent cluster.
-  // Flat population-dominance extraction loses the neon entirely.
   const darkCoverWithNeonAccent = [
     { r: 5, g: 5, b: 5, count: 1000 },
     { r: 20, g: 40, b: 255, count: 5 }
@@ -134,13 +126,156 @@ describe("buildExtractedColors (archetype-based artwork color extraction, #61)",
   });
 
   it("keeps the accent in a visible lightness range even for a fully desaturated dominant color", () => {
-    // No candidate clears any archetype's saturation guard rail here, so
-    // extractArchetypes() falls back to the dominant swatch for vibrant —
-    // this proves that fallback still gets lightness-normalized rather
-    // than handed back near-black.
     const colors = buildExtractedColors([{ r: 8, g: 8, b: 8, count: 1000 }]);
     const rgb = hexToRgb(colors.accent);
     const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
     expect(hsl.l).toBeGreaterThanOrEqual(0.3);
   });
 });
+
+describe("HSL & Color Utilities", () => {
+  it("blendToward correctly blends hex toward white and black", () => {
+    const whiteBlended = blendToward("#000000", 255, 0.5);
+    expect(whiteBlended.toLowerCase()).toBe("#808080");
+
+    const blackBlended = blendToward("#ffffff", 0, 0.5);
+    expect(blackBlended.toLowerCase()).toBe("#808080");
+  });
+
+  it("hexToRgbaString generates valid rgba strings", () => {
+    expect(hexToRgbaString("#ff0000", 0.5)).toBe("rgba(255, 0, 0, 0.5)");
+    expect(hexToRgbaString("#00ff00", 1)).toBe("rgba(0, 255, 0, 1)");
+  });
+
+  it("rgbToHsl and hslToRgb accurately roundtrip primary colors", () => {
+    const pureRedHsl = rgbToHsl(255, 0, 0);
+    expect(pureRedHsl.h).toBeCloseTo(0);
+    expect(pureRedHsl.s).toBeCloseTo(1);
+    expect(pureRedHsl.l).toBeCloseTo(0.5);
+
+    const pureRedRgb = hslToRgb(pureRedHsl.h, pureRedHsl.s, pureRedHsl.l);
+    expect(pureRedRgb).toEqual({ r: 255, g: 0, b: 0 });
+  });
+});
+
+describe("Custom Theme Builder & ThemeStore", () => {
+  let themeStore: ThemeStore;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    themeStore = new ThemeStore();
+  });
+
+  it("initializes and loads saved custom themes and active theme ID", async () => {
+    const mockCustomTheme: Theme = {
+      id: "custom-neon",
+      name: "Custom Neon",
+      colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#00ff00" },
+      isCustom: true
+    };
+
+    vi.mocked(invoke).mockResolvedValueOnce({
+      custom_themes: JSON.stringify([mockCustomTheme]),
+      active_theme_id: "custom-neon"
+    } as any);
+
+    await themeStore.init();
+
+    expect(themeStore.customThemes).toHaveLength(1);
+    expect(themeStore.customThemes[0].id).toBe("custom-neon");
+    expect(themeStore.activeThemeId).toBe("custom-neon");
+    expect(themeStore.currentTheme.name).toBe("Custom Neon");
+  });
+
+  it("adds and updates a custom theme, invoking set_app_setting", async () => {
+    const customTheme: Theme = {
+      id: "my-theme",
+      name: "My Theme",
+      colors: { ...LUMINOUS_DARK_COLORS, "color-accent": "#ff00ff" },
+      isCustom: true
+    };
+
+    await themeStore.addCustomTheme(customTheme);
+
+    expect(themeStore.customThemes).toContainEqual(customTheme);
+    expect(themeStore.activeThemeId).toBe("my-theme");
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "custom_themes",
+      value: JSON.stringify([customTheme])
+    });
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+      key: "active_theme_id",
+      value: "my-theme"
+    });
+  });
+
+  it("deletes a custom theme and resets to system theme if it was active", async () => {
+    const customTheme: Theme = {
+      id: "temp-theme",
+      name: "Temp Theme",
+      colors: { ...LUMINOUS_DARK_COLORS },
+      isCustom: true
+    };
+
+    await themeStore.addCustomTheme(customTheme);
+    expect(themeStore.activeThemeId).toBe("temp-theme");
+
+    await themeStore.deleteCustomTheme("temp-theme");
+
+    expect(themeStore.customThemes).toHaveLength(0);
+    expect(themeStore.activeThemeId).toBe("system");
+  });
+
+  it("resolves correct theme colors for system theme depending on systemColorScheme", () => {
+    themeStore.activeThemeId = "system";
+
+    themeStore.systemColorScheme = "dark";
+    expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
+
+    themeStore.systemColorScheme = "light";
+    expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+  });
+
+  it("resolves dynamic artwork colors with fallback when artworkColors is null", () => {
+    themeStore.activeThemeId = "dynamic-artwork";
+    themeStore.artworkColors = null;
+
+    const colors = themeStore.resolvedColors;
+    expect(colors["bg-main"]).toBe("#2e3440");
+    expect(colors["color-accent"]).toBe("#88c0d0");
+  });
+});
+
+describe("Image Extraction Fallbacks", () => {
+  it("extractColorsFromImage returns fallback colors when image fails to load", async () => {
+    class MockImage {
+      crossOrigin = "";
+      onerror: (() => void) | null = null;
+      onload: (() => void) | null = null;
+      set src(_url: string) {
+        setTimeout(() => this.onerror?.(), 0);
+      }
+    }
+
+    vi.stubGlobal("Image", MockImage);
+
+    const colors = await extractColorsFromImage("invalid-image-url.jpg");
+    expect(colors.primary).toBe("#2e3440");
+    expect(colors.accent).toBe("#88c0d0");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("updateArtworkColors resets or clears artwork colors when song is undefined or art unavailable", async () => {
+    const themeStore = new ThemeStore();
+
+    await themeStore.updateArtworkColors(undefined);
+    expect(themeStore.artworkColors).toBeNull();
+
+    themeStore.activeThemeId = "dynamic-artwork";
+    await themeStore.updateArtworkColors(undefined);
+    expect(themeStore.artworkColors).toBeNull();
+    expect(themeStore.resolvedColors["bg-main"]).toBe("#2e3440");
+  });
+});
+

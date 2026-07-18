@@ -354,7 +354,7 @@ function calculateLogoStops(accentHex: string, accentHoverHex: string) {
   };
 }
 
-class ThemeStore {
+export class ThemeStore {
   activeThemeId = $state<string>("system");
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
