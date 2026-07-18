@@ -16,32 +16,31 @@ You can download the latest installers and portable binaries directly from the G
 * **🐧 Linux** — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
 * **🪟 Windows** — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
 
-
 <div align="center">
   <table>
     <tr>
         <td colspan="2">
-            <h4 align="center">Home View</h4>
+            <h4 align="center">Home Hub</h4>
             <img src="docs/screenshots/home.png" alt="Home View" />
         </td>
     </tr>
     <tr>
       <td width="50%">
-        <h4 align="center">Albums Overview</h4>
+        <h4 align="center">Albums</h4>
         <img src="docs/screenshots/albums.png" alt="Albums Overview" />
       </td>
       <td width="50%">
-        <h4 align="center">Album Detail</h4>
+        <h4 align="center">Album View</h4>
         <img src="docs/screenshots/album-detail.png" alt="Album Detail" />
       </td>
     </tr>
     <tr>
       <td width="50%">
-        <h4 align="center">Artists Overview</h4>
+        <h4 align="center">Artists</h4>
         <img src="docs/screenshots/artists.png" alt="Artists Overview" />
       </td>
       <td width="50%">
-        <h4 align="center">Artist Detail</h4>
+        <h4 align="center">Artist View</h4>
         <img src="docs/screenshots/artist-detail.png" alt="Artist Detail" />
       </td>
     </tr>
@@ -50,7 +49,7 @@ You can download the latest installers and portable binaries directly from the G
         <h4 align="center">Custom Theme Builder</h4>
         <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
       </td>
-      <td width="50%>
+      <td width="50%">
         <h4 align="center">Synced Lyrics</h4>
         <img src="docs/screenshots/lyrics.png" alt="Synced Lyrics" />
       </td>
@@ -60,13 +59,14 @@ You can download the latest installers and portable binaries directly from the G
             <h4 align="center">Dual-mode Equalizer</h4>
             <img src="docs/screenshots/equalizer.png" alt="Dual-mode Equializer" />
         </td>
-        <td width="50%>
+        <td width="50%">
             <h4 align="center">Immersive Now Playing</h4>
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
         </td>
     </tr>
   </table>
 </div>
+
 
 
 ---
