@@ -1,6 +1,7 @@
 pub mod collection;
 pub mod cover;
 pub mod equalizer;
+pub mod loudness;
 pub mod lyrics;
 pub mod player;
 pub mod playlist;

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 4;
+const CURRENT_SCHEMA_VERSION: i32 = 5;
 
 pub struct Database {
     pub pool: DbPool,
@@ -96,6 +96,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![4],
+            )?;
+        }
+
+        if version < 5 {
+            log::info!("Running migration 5: loudness normalization (#77)");
+            conn.execute_batch(MIGRATION_5)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![5],
             )?;
         }
 
@@ -305,6 +314,28 @@ ALTER TABLE songs ADD COLUMN unavailable BOOLEAN NOT NULL DEFAULT 0;
 const MIGRATION_4: &str = "
 ALTER TABLE equalizer_settings ADD COLUMN mode TEXT NOT NULL DEFAULT 'graphic10';
 ALTER TABLE equalizer_settings ADD COLUMN parametric TEXT NOT NULL DEFAULT '';
+";
+
+// ---------------------------------------------------------------------------
+// Migration 5: loudness normalization (#77) — EBU R128 analysis with
+// ReplayGain 2.0 tag fallback. `replaygain_*_gain` are stored normalized to
+// the classic -18 LUFS ReplayGain reference level (R128_* Opus tags are
+// converted from their -23 LUFS reference at ingestion time).
+// ---------------------------------------------------------------------------
+
+const MIGRATION_5: &str = "
+ALTER TABLE songs ADD COLUMN replaygain_track_gain REAL;
+ALTER TABLE songs ADD COLUMN replaygain_album_gain REAL;
+
+CREATE TABLE IF NOT EXISTS loudness_settings (
+    id               INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled          INTEGER NOT NULL DEFAULT 0,
+    target_lufs      REAL NOT NULL DEFAULT -18.0,
+    mode             TEXT NOT NULL DEFAULT 'track',
+    fallback_gain_db REAL NOT NULL DEFAULT -6.0
+);
+INSERT OR IGNORE INTO loudness_settings (id, enabled, target_lufs, mode, fallback_gain_db)
+    VALUES (1, 0, -18.0, 'track', -6.0);
 ";
 
 #[cfg(test)]

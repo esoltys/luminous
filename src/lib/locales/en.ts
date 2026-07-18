@@ -328,6 +328,19 @@ export const en = {
     mid: "Mid",
     treble: "Treble"
   },
+  loudness: {
+    title: "Loudness Normalization",
+    subtitle: "Even out perceived volume across tracks using EBU R128 analysis, with ReplayGain tags as a fallback",
+    enable: "Enable",
+    targetLevel: "Target Level",
+    mode: "Normalize by",
+    modeTrack: "Track",
+    modeAlbum: "Album",
+    fallbackGain: "Fallback Gain",
+    fallbackGainHint: "Applied when a track has neither R128 analysis nor a ReplayGain tag",
+    analyzing: "Analyzing library: {remaining} track(s) remaining",
+    analyzed: "All tracks analyzed"
+  },
   themes: {
     system: "System",
     "ruby-red": "Ruby Red",

@@ -16,6 +16,7 @@ mod commands;
 mod covermanager;
 mod db;
 pub mod equalizer;
+mod loudness;
 mod lyrics;
 mod models;
 mod moodbar;
@@ -372,6 +373,9 @@ pub fn run() {
             // Start background directory watcher
             crate::collection::start_watcher(app.handle().clone(), &state);
 
+            // Start background EBU R128 loudness analyzer (#77)
+            crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
+
             app.manage(state);
 
             let media_shortcuts = [
@@ -515,6 +519,13 @@ pub fn run() {
             commands::equalizer::reset_parametric_bands,
             commands::equalizer::set_equalizer_preamp,
             commands::equalizer::load_equalizer_preset,
+            // Loudness normalization commands
+            commands::loudness::get_loudness_settings,
+            commands::loudness::set_loudness_enabled,
+            commands::loudness::set_loudness_target_lufs,
+            commands::loudness::set_loudness_mode,
+            commands::loudness::set_loudness_fallback_gain,
+            commands::loudness::get_loudness_analysis_remaining,
             // Lyrics commands
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,

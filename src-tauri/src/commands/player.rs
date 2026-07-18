@@ -22,7 +22,8 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
                 bitrate, samplerate, bitdepth, channels, filesize, mtime,
                 rating, playcount, skipcount, lastplayed, lastseen,
                 art_embedded, art_automatic, art_manual, art_unset,
-                cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu
+                cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
+                replaygain_track_gain, replaygain_album_gain
          FROM songs WHERE id = ?1",
             params![song_id],
             |row| {
@@ -78,6 +79,8 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
                     cue_path: row.get(48)?,
                     ebur128_integrated_loudness_lufs: row.get(49)?,
                     ebur128_loudness_range_lu: row.get(50)?,
+                    replaygain_track_gain: row.get(51)?,
+                    replaygain_album_gain: row.get(52)?,
                     ..Default::default()
                 })
             },
@@ -115,7 +118,8 @@ pub async fn play_songs(
                     bitrate, samplerate, bitdepth, channels, filesize, mtime,
                     rating, playcount, skipcount, lastplayed, lastseen,
                     art_embedded, art_automatic, art_manual, art_unset,
-                    cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu
+                    cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
+                    replaygain_track_gain, replaygain_album_gain
              FROM songs WHERE id = ?1",
             params![id],
             |row| {
@@ -171,6 +175,8 @@ pub async fn play_songs(
                     cue_path: row.get(48)?,
                     ebur128_integrated_loudness_lufs: row.get(49)?,
                     ebur128_loudness_range_lu: row.get(50)?,
+                    replaygain_track_gain: row.get(51)?,
+                    replaygain_album_gain: row.get(52)?,
                     ..Default::default()
                 })
             },

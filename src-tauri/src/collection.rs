@@ -550,7 +550,7 @@ impl CollectionScanner {
                     s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
                     s.cue_path,
                     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable,
+                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
                     (SELECT COUNT(*) FROM songs s2
                      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
                     ) AS album_track_count
@@ -563,7 +563,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(52)?;
+                let count: i64 = row.get(54)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -591,7 +591,7 @@ impl CollectionScanner {
                     s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
                     s.cue_path,
                     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable,
+                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
                     (SELECT COUNT(*) FROM songs s2
                      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
                     ) AS album_track_count
@@ -604,7 +604,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(52)?;
+                let count: i64 = row.get(54)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -632,7 +632,7 @@ impl CollectionScanner {
                     s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
                     s.cue_path,
                     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable,
+                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
                     (SELECT COUNT(*) FROM songs s2
                      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
                     ) AS album_track_count
@@ -645,7 +645,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(52)?;
+                let count: i64 = row.get(54)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -809,11 +809,28 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
         song.lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
 
+        // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
+        song.replaygain_track_gain = tag
+            .get_string(&ItemKey::ReplayGainTrackGain)
+            .and_then(parse_replaygain_db);
+        song.replaygain_album_gain = tag
+            .get_string(&ItemKey::ReplayGainAlbumGain)
+            .and_then(parse_replaygain_db);
+
         // Check for embedded art
         song.art_embedded = !tag.pictures().is_empty();
     }
 
     Ok(song)
+}
+
+/// Parse a ReplayGain gain tag value (e.g. "-6.2 dB", "-6.2") into a f64.
+fn parse_replaygain_db(s: &str) -> Option<f64> {
+    s.trim()
+        .trim_end_matches(|c: char| c.is_alphabetic() || c.is_whitespace())
+        .trim()
+        .parse::<f64>()
+        .ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -838,6 +855,8 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     art_automatic=excluded.art_automatic,
                     art_unset=excluded.art_unset,
                     filetype=excluded.filetype, source=excluded.source,
+                    replaygain_track_gain=excluded.replaygain_track_gain,
+                    replaygain_album_gain=excluded.replaygain_album_gain,
                     unavailable=0",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
         ),
@@ -866,6 +885,8 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.art_embedded,
             song.art_automatic,
             song.art_unset,
+            song.replaygain_track_gain,
+            song.replaygain_album_gain,
         ],
     )?;
     Ok(())
@@ -889,18 +910,20 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     art_embedded, art_automatic, art_manual, art_unset,
     cue_path,
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
-    unavailable
+    unavailable,
+    replaygain_track_gain, replaygain_album_gain
 ";
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
     composer, lyrics, comment, track, disc, year, genre,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
-    filesize, mtime, art_embedded, art_automatic, art_unset
+    filesize, mtime, art_embedded, art_automatic, art_unset,
+    replaygain_track_gain, replaygain_album_gain
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -956,6 +979,8 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         ebur128_integrated_loudness_lufs: row.get(49)?,
         ebur128_loudness_range_lu: row.get(50)?,
         unavailable: row.get::<_, Option<bool>>(51)?.unwrap_or(false),
+        replaygain_track_gain: row.get(52)?,
+        replaygain_album_gain: row.get(53)?,
         ..Default::default()
     })
 }

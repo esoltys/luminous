@@ -247,8 +247,45 @@ impl Player {
             self.played_indices.push(candidate);
         }
 
+        self.apply_loudness_gain(&song).await;
         let audio = self.audio.lock().await;
         audio.play(Box::new(song), start_ns)
+    }
+
+    /// Recompute and apply the loudness-normalization gain (#77) for a track
+    /// that is about to become audible. Called for every non-gapless track
+    /// start; for gapless handovers it's applied at the actual audible
+    /// boundary (`on_gapless_transition`) instead, since the DSP gain slot is
+    /// global and flipping it early would affect the still-draining previous
+    /// track's tail.
+    async fn apply_loudness_gain(&self, song: &Song) {
+        let settings = match crate::loudness::get_settings(&self._db) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("Failed to load loudness settings: {e}");
+                return;
+            }
+        };
+        let gain = if settings.enabled {
+            crate::loudness::compute_gain_linear(
+                song.ebur128_integrated_loudness_lufs,
+                song.replaygain_track_gain,
+                song.replaygain_album_gain,
+                &settings,
+            )
+        } else {
+            1.0
+        };
+        self.audio.lock().await.set_loudness_gain(gain);
+    }
+
+    /// Re-apply the loudness gain for the currently playing track — called
+    /// after a loudness setting changes, so the effect is heard immediately
+    /// rather than waiting for the next track change.
+    pub async fn refresh_loudness_gain(&self) {
+        if let Some(song) = self.current_song.clone() {
+            self.apply_loudness_gain(&song).await;
+        }
     }
 
     pub async fn pause(&self) -> Result<()> {
@@ -303,6 +340,7 @@ impl Player {
             self.current_item_uuid = Some(queued.uuid.clone());
             self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
             self.scrobbled = false;
+            self.apply_loudness_gain(&song).await;
             let audio = self.audio.lock().await;
             return audio.play(Box::new(song), start_ns);
         }
@@ -492,6 +530,10 @@ impl Player {
                 let song = target.song;
                 self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
                 self.scrobbled = false;
+                // The engine reports this exactly when the previous track's
+                // last sample was consumed and `song` became audible — the
+                // correct moment to flip the global loudness-gain slot.
+                self.apply_loudness_gain(&song).await;
 
                 match target.kind {
                     GaplessTargetKind::Replay => {

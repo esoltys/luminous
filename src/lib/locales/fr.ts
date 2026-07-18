@@ -328,6 +328,19 @@ export const fr = {
     mid: "Médium",
     treble: "Aigu"
   },
+  loudness: {
+    title: "Normalisation du volume",
+    subtitle: "Uniformisez le volume perçu entre les pistes grâce à l'analyse EBU R128, avec les tags ReplayGain en secours",
+    enable: "Activer",
+    targetLevel: "Niveau cible",
+    mode: "Normaliser par",
+    modeTrack: "Piste",
+    modeAlbum: "Album",
+    fallbackGain: "Gain de secours",
+    fallbackGainHint: "Appliqué lorsqu'une piste n'a ni analyse R128 ni tag ReplayGain",
+    analyzing: "Analyse de la bibliothèque : {remaining} piste(s) restante(s)",
+    analyzed: "Toutes les pistes ont été analysées"
+  },
   themes: {
     system: "Système",
     "ruby-red": "Rouge rubis",

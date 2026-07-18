@@ -205,6 +205,11 @@ pub struct Song {
     pub ebur128_integrated_loudness_lufs: Option<f64>,
     pub ebur128_loudness_range_lu: Option<f64>,
 
+    // ReplayGain 2.0 tag fallback (#77) — dB gain normalized to the -18 LUFS
+    // ReplayGain reference level, used when no R128 analysis is available yet.
+    pub replaygain_track_gain: Option<f64>,
+    pub replaygain_album_gain: Option<f64>,
+
     // Streaming service IDs
     pub artist_id: Option<String>,
     pub album_id: Option<String>,
@@ -368,6 +373,67 @@ pub enum PlayState {
     Stopped,
     Playing,
     Paused,
+}
+
+// ---------------------------------------------------------------------------
+// Loudness normalization (#77) — EBU R128 analysis with ReplayGain fallback
+// ---------------------------------------------------------------------------
+
+/// Which ReplayGain value to prefer when no R128 analysis is available.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LoudnessMode {
+    #[default]
+    Track,
+    Album,
+}
+
+impl LoudnessMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LoudnessMode::Track => "track",
+            LoudnessMode::Album => "album",
+        }
+    }
+}
+
+impl From<&str> for LoudnessMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "album" => LoudnessMode::Album,
+            _ => LoudnessMode::Track,
+        }
+    }
+}
+
+/// Persisted loudness-normalization settings (`loudness_settings` table).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct LoudnessSettings {
+    pub enabled: bool,
+    pub target_lufs: f32,
+    pub mode: LoudnessMode,
+    /// Gain applied (in dB) when a track has neither R128 analysis nor a
+    /// ReplayGain tag. Defaults to a conservative negative value to avoid
+    /// clipping unanalyzed, potentially loud tracks.
+    pub fallback_gain_db: f32,
+}
+
+impl Default for LoudnessSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            target_lufs: -18.0,
+            mode: LoudnessMode::Track,
+            fallback_gain_db: -6.0,
+        }
+    }
+}
+
+/// Background R128 analysis progress, emitted as `loudness-analysis-progress`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoudnessAnalysisProgress {
+    pub analyzed: u64,
+    pub remaining: u64,
 }
 
 // ---------------------------------------------------------------------------

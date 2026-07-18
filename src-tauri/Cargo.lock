@@ -416,6 +416,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bs1770"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6332c61c205ff066246fff2cb876cdf9009557200f96e15d88d156193b16775b"
+
+[[package]]
 name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2695,6 +2701,7 @@ name = "luminous"
 version = "0.60.0"
 dependencies = [
  "anyhow",
+ "bs1770",
  "chrono",
  "cpal",
  "cucumber",

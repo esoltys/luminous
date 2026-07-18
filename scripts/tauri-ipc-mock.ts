@@ -381,6 +381,15 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       parametric: defaultParametricBands(),
     }),
 
+    get_loudness_settings: () => ({
+      enabled: true,
+      target_lufs: -18.0,
+      mode: "track",
+      fallback_gain_db: -6.0,
+    }),
+
+    get_loudness_analysis_remaining: (): number => 3,
+
     set_app_setting: (args) => {
       if (args.key && window.mockSettings) {
         window.mockSettings[args.key as string] = args.value as string;
@@ -408,6 +417,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   const NOOP_COMMANDS = [
     "set_equalizer_enabled", "set_equalizer_preamp", "set_equalizer_band", "set_spectrum_enabled",
     "set_equalizer_mode", "set_parametric_band",
+    "set_loudness_enabled", "set_loudness_target_lufs", "set_loudness_mode", "set_loudness_fallback_gain",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",

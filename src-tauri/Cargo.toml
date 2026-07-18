@@ -53,6 +53,9 @@ lofty = "0.21"
 # --- FFT (spectrum analyzer, moodbar) ---
 rustfft = "6"
 
+# --- EBU R128 / BS.1770 loudness measurement (#77) ---
+bs1770 = "1"
+
 # --- File watching ---
 notify = { version = "6", features = ["serde"] }
 

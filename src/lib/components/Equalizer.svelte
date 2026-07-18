@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   type EqMode = "graphic10" | "parametric20";
@@ -202,7 +203,75 @@
     node.setAttribute("orient", "vertical");
   }
 
-  onMount(loadConfig);
+  // --- Loudness normalization (#77) ---
+  type LoudnessMode = "track" | "album";
+  interface LoudnessSettings {
+    enabled: boolean;
+    target_lufs: number;
+    mode: LoudnessMode;
+    fallback_gain_db: number;
+  }
+
+  let loudnessEnabled = $state(false);
+  let targetLufs = $state(-18.0);
+  let loudnessMode = $state<LoudnessMode>("track");
+  let fallbackGainDb = $state(-6.0);
+  let analysisRemaining = $state(0);
+  let unlistenAnalysis: (() => void) | undefined;
+
+  async function loadLoudnessSettings() {
+    try {
+      const settings = await invoke<LoudnessSettings>("get_loudness_settings");
+      loudnessEnabled = settings.enabled;
+      targetLufs = settings.target_lufs;
+      loudnessMode = settings.mode;
+      fallbackGainDb = settings.fallback_gain_db;
+    } catch (e) {
+      console.error("Failed to load loudness settings:", e);
+    }
+  }
+
+  async function loadAnalysisRemaining() {
+    try {
+      analysisRemaining = await invoke<number>("get_loudness_analysis_remaining");
+    } catch (e) {
+      console.error("Failed to load loudness analysis progress:", e);
+    }
+  }
+
+  async function handleLoudnessToggle() {
+    await invoke("set_loudness_enabled", { enabled: loudnessEnabled });
+  }
+
+  async function handleTargetLufsChange() {
+    await invoke("set_loudness_target_lufs", { targetLufs });
+  }
+
+  async function handleLoudnessModeChange(newMode: LoudnessMode) {
+    if (loudnessMode === newMode) return;
+    loudnessMode = newMode;
+    await invoke("set_loudness_mode", { mode: newMode });
+  }
+
+  async function handleFallbackGainChange() {
+    await invoke("set_loudness_fallback_gain", { fallbackGainDb });
+  }
+
+  onMount(async () => {
+    loadConfig();
+    loadLoudnessSettings();
+    loadAnalysisRemaining();
+    unlistenAnalysis = await listen<{ remaining: number }>(
+      "loudness-analysis-progress",
+      (event) => {
+        analysisRemaining = event.payload.remaining;
+      }
+    );
+  });
+
+  onDestroy(() => {
+    unlistenAnalysis?.();
+  });
 </script>
 
 <div class="flex flex-col text-brand-text-primary">
@@ -296,6 +365,90 @@
         oninput={handlePreampChange}
         class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
       />
+    </div>
+
+    <!-- Loudness Normalization (#77) -->
+    <div class="flex flex-col gap-3 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h4>
+          <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('loudness.subtitle')}</p>
+        </div>
+        <label class="flex items-center gap-2 shrink-0">
+          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('loudness.enable')}</span>
+          <input
+            type="checkbox"
+            bind:checked={loudnessEnabled}
+            onchange={handleLoudnessToggle}
+            class="w-4 h-4 shrink-0 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
+          />
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+            <span>{i18n.t('loudness.targetLevel')}</span>
+            <span class="text-brand-accent-text font-mono">{targetLufs.toFixed(1)} LUFS</span>
+          </div>
+          <input
+            type="range"
+            min="-24.0"
+            max="-14.0"
+            step="0.5"
+            bind:value={targetLufs}
+            oninput={handleTargetLufsChange}
+            disabled={!loudnessEnabled}
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <span class="text-xs font-bold text-brand-text-secondary">{i18n.t('loudness.mode')}</span>
+          <div class="flex items-center bg-brand-main border border-brand-border rounded-lg p-1" role="group" aria-label={i18n.t('loudness.mode')}>
+            <button
+              class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              onclick={() => handleLoudnessModeChange("track")}
+              aria-pressed={loudnessMode === "track"}
+              disabled={!loudnessEnabled}
+            >
+              {i18n.t('loudness.modeTrack')}
+            </button>
+            <button
+              class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              onclick={() => handleLoudnessModeChange("album")}
+              aria-pressed={loudnessMode === "album"}
+              disabled={!loudnessEnabled}
+            >
+              {i18n.t('loudness.modeAlbum')}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
+            <span>{i18n.t('loudness.fallbackGain')}</span>
+            <span class="text-brand-accent-text font-mono">{fallbackGainDb.toFixed(1)} dB</span>
+          </div>
+          <input
+            type="range"
+            min="-24.0"
+            max="0.0"
+            step="0.5"
+            bind:value={fallbackGainDb}
+            oninput={handleFallbackGainChange}
+            disabled={!loudnessEnabled}
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          />
+          <span class="text-[10px] text-brand-text-secondary/60">{i18n.t('loudness.fallbackGainHint')}</span>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-brand-text-secondary/70 border-t border-brand-border/60 pt-2">
+        {analysisRemaining > 0
+          ? i18n.t('loudness.analyzing', { remaining: analysisRemaining })
+          : i18n.t('loudness.analyzed')}
+      </p>
     </div>
 
     {#if mode === "parametric20"}
