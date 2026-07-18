@@ -14,6 +14,23 @@
   let { isOpen = true, width = 288, onClose }: Props = $props();
 
   let currentSong = $derived(playerStore.currentSong);
+
+  // Loudness normalization (#77) — expanded detail for the right panel
+  // (the player bar only has room for a compact "R128"/"RG" badge).
+  function loudnessSourceLabel(): string {
+    switch (playerStore.loudnessSource) {
+      case "analyzed": return i18n.t('playerBar.loudnessSourceAnalyzed', {}, 'R128 analysis');
+      case "replay_gain": return i18n.t('playerBar.loudnessSourceReplayGain', {}, 'ReplayGain tag');
+      case "fallback": return i18n.t('playerBar.loudnessSourceFallback', {}, 'Fallback gain');
+      default: return "";
+    }
+  }
+
+  let loudnessGainText = $derived.by(() => {
+    const gain = playerStore.loudnessGainDb;
+    if (gain === undefined) return "";
+    return `${gain > 0 ? "+" : ""}${gain.toFixed(1)} dB`;
+  });
 </script>
 
 <aside
@@ -72,6 +89,12 @@
           <div class="flex items-center justify-between text-xs">
             <span class="text-brand-text-secondary/60">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
             <span class="text-brand-text-primary">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
+          </div>
+        {/if}
+        {#if playerStore.loudnessSource !== "disabled"}
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
+            <span class="text-brand-text-primary">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
           </div>
         {/if}
       </div>
