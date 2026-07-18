@@ -89,13 +89,13 @@ describe("CollectionStore", () => {
 
     if (eventCallbacks["scan-progress"]) {
       eventCallbacks["scan-progress"]({
-        payload: { phase: "scanning", current_file: "song.mp3", files_processed: 5, total_files: 10 }
+        payload: { phase: "reading_tags", current_path: "song.mp3", scanned: 5, total: 10 }
       });
-      expect(collectionStore.scanProgress?.files_processed).toBe(5);
+      expect(collectionStore.scanProgress?.scanned).toBe(5);
       expect(collectionStore.isScanning).toBe(true);
 
       eventCallbacks["scan-progress"]({
-        payload: { phase: "done", current_file: "", files_processed: 10, total_files: 10 }
+        payload: { phase: "done", current_path: "", scanned: 10, total: 10 }
       });
       expect(collectionStore.isScanning).toBe(false);
     }

@@ -9,22 +9,22 @@
 //   collection — Library scanner + file watcher
 //   playlist  — Playlist CRUD + undo/redo
 
-mod analyzer;
-mod audio;
-mod collection;
-mod commands;
-mod covermanager;
-mod db;
+pub mod analyzer;
+pub mod audio;
+pub mod collection;
+pub mod commands;
+pub mod covermanager;
+pub mod db;
 pub mod equalizer;
-mod loudness;
-mod lyrics;
-mod models;
-mod moodbar;
-mod player;
-mod playlist;
-mod stats;
-mod tageditor;
-mod waveform;
+pub mod loudness;
+pub mod lyrics;
+pub mod models;
+pub mod moodbar;
+pub mod player;
+pub mod playlist;
+pub mod stats;
+pub mod tageditor;
+pub mod waveform;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};

@@ -11,6 +11,7 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 /// Current schema version. Increment when adding migrations.
 const CURRENT_SCHEMA_VERSION: i32 = 5;
 
+#[derive(Debug)]
 pub struct Database {
     pub pool: DbPool,
 }

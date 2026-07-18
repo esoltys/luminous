@@ -25,6 +25,7 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
+#[derive(Debug)]
 pub struct CollectionScanner {
     db: Arc<Database>,
 }

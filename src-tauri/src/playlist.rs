@@ -31,6 +31,7 @@ enum PlaylistOp {
     },
 }
 
+#[derive(Debug)]
 pub struct PlaylistManager {
     db: Arc<Database>,
     undo_stack: Vec<PlaylistOp>,
@@ -311,14 +312,12 @@ impl PlaylistManager {
         Ok(())
     }
 
-    pub fn reorder_playlist_item(&mut self, playlist_id: i64, from: i32, to: i32) -> Result<()> {
+    fn reorder_item_internal(&self, playlist_id: i64, from: i32, to: i32) -> Result<()> {
         let conn = self.db.pool.get()?;
-
         if from == to {
             return Ok(());
         }
 
-        // Move item at `from` to `to`, shifting others
         let uuid: String = conn.query_row(
             "SELECT uuid FROM playlist_items WHERE playlist_id = ?1 AND position = ?2",
             params![playlist_id, from],
@@ -344,6 +343,16 @@ impl PlaylistManager {
             params![to, uuid],
         )?;
 
+        Ok(())
+    }
+
+    pub fn reorder_playlist_item(&mut self, playlist_id: i64, from: i32, to: i32) -> Result<()> {
+        if from == to {
+            return Ok(());
+        }
+
+        self.reorder_item_internal(playlist_id, from, to)?;
+
         self.undo_stack.push(PlaylistOp::Move {
             playlist_id,
             from,
@@ -365,14 +374,70 @@ impl PlaylistManager {
 
     pub fn undo(&mut self) -> Result<()> {
         let op = self.undo_stack.pop().ok_or(anyhow!("nothing to undo"))?;
-        // TODO: reverse the operation
+        match &op {
+            PlaylistOp::Move {
+                playlist_id,
+                from,
+                to,
+            } => {
+                self.reorder_item_internal(*playlist_id, *to, *from)?;
+            }
+            PlaylistOp::Insert { playlist_id, items } => {
+                let conn = self.db.pool.get()?;
+                for (pos, _song_id) in items {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1 AND position = ?2",
+                        params![playlist_id, pos],
+                    )?;
+                }
+                self.renumber_positions(&conn, *playlist_id)?;
+            }
+            PlaylistOp::Remove { playlist_id, items } => {
+                let conn = self.db.pool.get()?;
+                for (uuid, pos, song_id) in items {
+                    conn.execute(
+                        "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type)
+                         VALUES (?1, ?2, ?3, ?4, 0)",
+                        params![playlist_id, song_id, pos, uuid],
+                    )?;
+                }
+                self.renumber_positions(&conn, *playlist_id)?;
+            }
+        }
         self.redo_stack.push(op);
         Ok(())
     }
 
     pub fn redo(&mut self) -> Result<()> {
         let op = self.redo_stack.pop().ok_or(anyhow!("nothing to redo"))?;
-        // TODO: re-apply the operation
+        match &op {
+            PlaylistOp::Move {
+                playlist_id,
+                from,
+                to,
+            } => {
+                self.reorder_item_internal(*playlist_id, *from, *to)?;
+            }
+            PlaylistOp::Insert { playlist_id, items } => {
+                let conn = self.db.pool.get()?;
+                for (pos, song_id) in items {
+                    let uuid = Uuid::new_v4().to_string();
+                    conn.execute(
+                        "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type)
+                         VALUES (?1, ?2, ?3, ?4, 0)",
+                        params![playlist_id, song_id, pos, uuid],
+                    )?;
+                }
+                self.renumber_positions(&conn, *playlist_id)?;
+            }
+            PlaylistOp::Remove { playlist_id, items } => {
+                let conn = self.db.pool.get()?;
+                for (uuid, _pos, _song_id) in items {
+                    conn.execute("DELETE FROM playlist_items WHERE uuid = ?1", params![uuid])?;
+                }
+                self.renumber_positions(&conn, *playlist_id)?;
+            }
+        }
         self.undo_stack.push(op);
         Ok(())
     }

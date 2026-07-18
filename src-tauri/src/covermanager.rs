@@ -5,6 +5,7 @@ use rusqlite::params;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct CoverManager {
     db: Arc<Database>,
     covers_dir: PathBuf,

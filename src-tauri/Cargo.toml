@@ -82,10 +82,40 @@ percent-encoding = "2"
 
 [dev-dependencies]
 cucumber = { version = "0.20", features = ["macros"] }
+tempfile = "3"
 
 [[test]]
 name = "equalizer_bdd"
 harness = false
+
+[[test]]
+name = "library_scan_bdd"
+harness = false
+
+[[test]]
+name = "playlists_bdd"
+harness = false
+
+[[test]]
+name = "playback_controls_bdd"
+harness = false
+
+[[test]]
+name = "lyrics_bdd"
+harness = false
+
+[[test]]
+name = "cover_art_bdd"
+harness = false
+
+[[test]]
+name = "tag_editor_bdd"
+harness = false
+
+[[test]]
+name = "design_tools_bdd"
+harness = false
+
 
 [profile.release]
 panic = "abort"

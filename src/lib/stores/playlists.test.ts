@@ -9,20 +9,26 @@ describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
 
   const mockPlaylists: Playlist[] = [
-    { id: 101, name: "Favorites", track_count: 3, created_at: "2026-01-01" },
-    { id: 102, name: "Workout", track_count: 5, created_at: "2026-01-02" }
+    { id: 101, name: "Favorites", track_count: 3, created: 1700000000, dynamic_enabled: false },
+    { id: 102, name: "Workout", track_count: 5, created: 1700000001, dynamic_enabled: false }
   ];
 
   const mockTracks: PlaylistItem[] = [
     {
+      id: 1,
+      playlist_id: 101,
+      position: 0,
+      item_type: "song",
       uuid: "item-1",
-      song: { id: 10, title: "Energy Song", artist: "Artist A", user_rating: 4, play_count: 5 } as any,
-      added_at: "2026-01-01"
+      song: { id: 10, title: "Energy Song", artist: "Artist A", rating: 4, playcount: 5 } as any
     },
     {
+      id: 2,
+      playlist_id: 101,
+      position: 1,
+      item_type: "song",
       uuid: "item-2",
-      song: { id: 20, title: "Run Song", artist: "Artist B", user_rating: 5, play_count: 12 } as any,
-      added_at: "2026-01-01"
+      song: { id: 20, title: "Run Song", artist: "Artist B", rating: 5, playcount: 12 } as any
     }
   ];
 
@@ -132,11 +138,11 @@ describe("PlaylistsStore", () => {
 
     if (eventCallbacks["song-stats-changed"]) {
       eventCallbacks["song-stats-changed"]({
-        payload: { song_id: 10, user_rating: 5, play_count: 6 }
+        payload: { song_id: 10, rating: 5, playcount: 6 }
       });
 
-      expect(playlistsStore.activePlaylistTracks[0].song.user_rating).toBe(5);
-      expect(playlistsStore.activePlaylistTracks[0].song.play_count).toBe(6);
+      expect(playlistsStore.activePlaylistTracks[0].song?.rating).toBe(5);
+      expect(playlistsStore.activePlaylistTracks[0].song?.playcount).toBe(6);
     }
   });
 });
