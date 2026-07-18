@@ -21,12 +21,12 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
             let mut planner = FftPlanner::new();
             let fft = planner.plan_fft_forward(fft_size);
 
-            let mut data = Vec::with_capacity(points * 3);
+            let mut bands = Vec::with_capacity(points);
             for i in 0..points {
                 let start = i * block_size;
                 let end = start + fft_size;
                 if end > samples.len() {
-                    data.extend_from_slice(&[0, 0, 0]);
+                    bands.push((0.0, 0.0, 0.0));
                     continue;
                 }
 
@@ -48,10 +48,9 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
                 let mut mid_count = 0;
                 let mut treble_count = 0;
 
-                for k in 1..(fft_size / 2) {
+                for (k, sample) in buffer.iter().enumerate().skip(1).take(fft_size / 2 - 1) {
                     let freq = (k as f32 * sample_rate as f32) / fft_size as f32;
-                    let magnitude =
-                        (buffer[k].re * buffer[k].re + buffer[k].im * buffer[k].im).sqrt();
+                    let magnitude = (sample.re * sample.re + sample.im * sample.im).sqrt();
 
                     if freq < 250.0 {
                         bass_sum += magnitude;
@@ -81,14 +80,40 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
                     0.0
                 };
 
-                // Scale spectral energy to RGB values with log offset boosting
-                let r_u8 = ((r * 150.0).clamp(0.0, 255.0)) as u8;
-                let g_u8 = ((g * 150.0).clamp(0.0, 255.0)) as u8;
-                let b_u8 = ((b * 150.0).clamp(0.0, 255.0)) as u8;
+                bands.push((r, g, b));
+            }
 
-                data.push(r_u8);
-                data.push(g_u8);
-                data.push(b_u8);
+            // Per-track contrast boost: stretch each channel's histogram across
+            // its own observed min/max before quantizing, instead of a fixed
+            // *150.0 scale. A flat *150.0 scale leaves quiet/uniform masters
+            // (most modern tracks) clustered near black — every track ends up
+            // looking the same muddy strip regardless of its actual internal
+            // energy variation. Per-channel min-max stretch guarantees every
+            // track uses the full 0-255 range, so its own internal structure
+            // (not just its absolute loudness) drives the color contrast.
+            let channel_range = |sel: fn(&(f32, f32, f32)) -> f32| -> (f32, f32) {
+                let min = bands.iter().map(&sel).fold(f32::INFINITY, f32::min);
+                let max = bands.iter().map(&sel).fold(f32::NEG_INFINITY, f32::max);
+                (min, max)
+            };
+            let (r_min, r_max) = channel_range(|b| b.0);
+            let (g_min, g_max) = channel_range(|b| b.1);
+            let (b_min, b_max) = channel_range(|b| b.2);
+
+            let stretch = |v: f32, min: f32, max: f32| -> u8 {
+                let range = max - min;
+                if range < f32::EPSILON {
+                    0
+                } else {
+                    (((v - min) / range) * 255.0).clamp(0.0, 255.0) as u8
+                }
+            };
+
+            let mut data = Vec::with_capacity(points * 3);
+            for (r, g, b) in bands {
+                data.push(stretch(r, r_min, r_max));
+                data.push(stretch(g, g_min, g_max));
+                data.push(stretch(b, b_min, b_max));
             }
             data
         }

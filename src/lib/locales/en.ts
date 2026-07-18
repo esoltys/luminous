@@ -114,6 +114,8 @@ export const en = {
     ratingStyleHeart: "Heart (favorite)",
     ratingStyleStars: "5-star",
     ratingStyleHint: "Heart marks a track as a favorite; 5-star allows half-step ratings. Both use the same underlying rating.",
+    showMoodmoji: "Show moodmoji",
+    showMoodmojiHint: "Moodmoji is a short emoji hash shown next to the now-playing track title. It's derived from the track's moodbar data: the first emoji reflects its dominant frequency band (bass/mid/treble), the second its overall spectral energy (calm/balanced/intense).",
     addFolder: "Add Folder",
     folderHelpTitle: "How do Watched Folders work?",
     folderHelpText: "Luminous monitors these folders for audio files (MP3, FLAC, M4A, etc.). When you press \"Rescan Library\", the scanner recursively searches these folders and adds new/updated tracks to your collection. Luminous uses mtime-based hashing to perform fast incremental scans.",
@@ -274,6 +276,10 @@ export const en = {
     lyricsTooltip: "Show lyrics panel",
     equalizerTooltip: "Show equalizer settings",
     visualizerTooltip: "Toggle audio visualizer",
+    seekbarModeWaveform: "Waveform mode — click to switch to moodbar",
+    seekbarModeMoodbar: "Moodbar mode — click to switch to waveform",
+    moodmojiTooltip: "Moodmoji — a mood hash derived from this track's dominant frequency bands and energy",
+    moodbarLegend: "Moodbar — color reflects the track's frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band",
     songLabel: "Song",
     artistLabel: "Artist",
     albumLabel: "Album",
@@ -405,6 +411,8 @@ export const en = {
     albumArtAlt: "Album Art",
     enableLogoPulse: "Click to enable logo pulsing",
     disableLogoPulse: "Click to disable logo pulsing",
-    toggleLogoPulsing: "Toggle Luminous logo pulsing"
+    toggleLogoPulsing: "Toggle Luminous logo pulsing",
+    on: "On",
+    off: "Off"
   }
 };

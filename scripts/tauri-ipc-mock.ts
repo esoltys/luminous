@@ -195,6 +195,23 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     return peaks;
   }
 
+  // Mirrors the contrast-boosted, per-channel-normalized output of
+  // generate_moodbar() in src-tauri/src/moodbar.rs: three independent bands
+  // (bass/mid/treble) each spanning the full 0-255 range, so the mock
+  // exercises the same "distinct, highly contrasting" visual the real
+  // per-track histogram stretch produces, rather than a flat/uniform strip.
+  function makeMoodbar(): number[] {
+    const data: number[] = [];
+    for (let i = 0; i < 150; i++) {
+      const t = i / 150;
+      const r = (Math.sin(t * Math.PI * 4) * 0.5 + 0.5) ** 1.5;
+      const g = (Math.sin(t * Math.PI * 5.7 + 1.5) * 0.5 + 0.5) ** 1.5;
+      const b = (Math.sin(t * Math.PI * 3.1 + 3.0) * 0.5 + 0.5) ** 1.5;
+      data.push(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+    }
+    return data;
+  }
+
   const noop = async () => null;
 
   /**
@@ -323,6 +340,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
 
     get_waveform_data: () => makeWaveform(),
+    get_moodbar_data: () => makeMoodbar(),
     get_lyrics: () => library.lyrics,
 
     get_cover_art_uri: (args): string | null => {
