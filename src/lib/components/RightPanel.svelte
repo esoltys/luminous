@@ -79,6 +79,12 @@
 
       <!-- Playback Info -->
       <div class="space-y-2">
+        {#if currentSong.filetype}
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
+            <span class="text-brand-text-primary uppercase">{currentSong.filetype}</span>
+          </div>
+        {/if}
         {#if currentSong.bitrate}
           <div class="flex items-center justify-between text-xs">
             <span class="text-brand-text-secondary/60">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
