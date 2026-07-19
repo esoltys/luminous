@@ -191,12 +191,14 @@
     {:else}
       <button
         onclick={() => collectionStore.startScan()}
-        class="bg-brand-sidebar hover:bg-brand-main text-brand-text-primary transition-all border border-brand-border cursor-pointer flex items-center justify-center {isCollapsed ? 'w-10 h-10 rounded-xl p-0' : 'w-full gap-2 py-2 rounded-lg font-medium'}"
+        class="bg-brand-sidebar hover:bg-brand-main text-brand-text-primary transition-all border border-brand-border cursor-pointer flex items-center justify-center {isCollapsed ? 'w-10 h-10 rounded-xl p-0' : 'w-full gap-2 px-3 py-2 rounded-lg'}"
         title={isCollapsed ? i18n.t('sidebar.rescanLibrary') : ""}
       >
-        <RefreshCw class={isCollapsed ? "w-5 h-5" : "w-3.5 h-3.5"} />
+        <RefreshCw class="{isCollapsed ? 'w-5 h-5' : 'w-3.5 h-3.5'} shrink-0" />
         {#if !isCollapsed}
-          {i18n.t('sidebar.rescanLibrary')}
+          <span class="text-xs font-medium text-center leading-tight truncate">
+            {i18n.t('sidebar.rescanLibrary')}
+          </span>
         {/if}
       </button>
     {/if}

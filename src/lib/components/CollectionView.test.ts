@@ -161,4 +161,15 @@ describe("CollectionView.svelte", () => {
     const { getByText } = render(CollectionView);
     expect(getByText(/no songs found/i)).toBeInTheDocument();
   });
+
+  it("opens context menu on right-click of a song row", async () => {
+    collectionStore.activeSubTab = "songs";
+    const { getByText, getAllByText } = render(CollectionView);
+
+    const songRow = getByText("Alpha Song").closest("div[ondblclick], div.grid")!;
+    await fireEvent.contextMenu(songRow);
+
+    expect(getByText("Play Song")).toBeInTheDocument();
+    expect(getAllByText("Add to Active Playlist")[0]).toBeInTheDocument();
+  });
 });
