@@ -49,6 +49,7 @@ pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
 
 pub enum AudioCommand {
     Play(PlayRequest),
+    Cue(PlayRequest),
     Pause,
     Resume,
     Stop,
@@ -174,6 +175,20 @@ impl AudioEngine {
     pub fn play(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
         self.cmd_tx
             .send(AudioCommand::Play(PlayRequest {
+                song,
+                start_nanosec,
+            }))
+            .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
+    pub fn cue(&self, song: Box<Song>, start_nanosec: u64) -> Result<()> {
+        if let Ok(mut s) = self.play_state.lock() {
+            *s = crate::models::PlayState::Paused;
+        }
+        self.position_nanosec
+            .store(start_nanosec, Ordering::Relaxed);
+        self.cmd_tx
+            .send(AudioCommand::Cue(PlayRequest {
                 song,
                 start_nanosec,
             }))
@@ -598,6 +613,58 @@ fn decode_thread(
                         paused_req = None;
                         r
                     }
+                    Ok(AudioCommand::Cue(r)) => {
+                        if output.is_none() {
+                            match build_output(
+                                &event_tx,
+                                &position,
+                                &volume,
+                                &visualizer_buf,
+                                &equalizer,
+                                &loudness_gain,
+                                &fade_gain,
+                            ) {
+                                Ok(o) => output = Some(o),
+                                Err(message) => {
+                                    let _ = event_tx.send(AudioEvent::Error { message });
+                                    continue;
+                                }
+                            }
+                        }
+                        let out = output.as_mut().unwrap();
+                        let target_sample_rate = out.sample_rate;
+                        let target_channels = out.channels;
+
+                        match ActiveTrack::open(
+                            r.song.clone(),
+                            r.start_nanosec,
+                            target_sample_rate,
+                            target_channels as usize,
+                        ) {
+                            Ok(_) => {
+                                if let Ok(mut consumer) = out.consumer.lock() {
+                                    while consumer.try_pop().is_some() {}
+                                }
+                                let start_samples = samples_for_ns(
+                                    r.start_nanosec,
+                                    target_sample_rate,
+                                    target_channels,
+                                );
+                                out.played_samples.store(start_samples, Ordering::Relaxed);
+                                let _ = out.stream.pause();
+                                if let Ok(mut s) = play_state.lock() {
+                                    *s = PlayState::Paused;
+                                }
+                                position.store(r.start_nanosec, Ordering::Relaxed);
+                                paused_req = Some(r);
+                                let _ = event_tx.send(AudioEvent::Paused);
+                            }
+                            Err(message) => {
+                                let _ = event_tx.send(AudioEvent::Error { message });
+                            }
+                        }
+                        continue;
+                    }
                     Ok(AudioCommand::Resume) => {
                         if let Some(r) = paused_req.take() {
                             let cur_pos = position.load(Ordering::Relaxed);
@@ -859,6 +926,7 @@ fn decode_thread(
                 Err(mpsc::TryRecvError::Empty) => {} // no pending command
                 Err(mpsc::TryRecvError::Disconnected) => break 'decode,
                 Ok(AudioCommand::Resume) => {} // already playing
+                Ok(AudioCommand::Cue(_)) => {} // already playing
             }
 
             // Complete a pending gapless handover once the output callback

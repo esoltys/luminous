@@ -118,6 +118,21 @@ pub async fn reorder_playlist_item(
 }
 
 #[tauri::command]
+pub async fn reorder_playlist_items(
+    playlist_id: i64,
+    from_indices: Vec<i32>,
+    to_index: i32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .reorder_playlist_items_batch(playlist_id, &from_indices, to_index)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn clear_playlist(playlist_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     state
         .playlists

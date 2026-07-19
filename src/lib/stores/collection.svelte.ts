@@ -193,6 +193,8 @@ class CollectionStore {
   selectedAlbumName = $state<string | null>(null);
 
   viewArtist(name: string) {
+    this.searchQuery = "";
+    this.searchResults = [];
     this.selectedAlbumName = null;
     this.activeTab = "collection";
     this.activeSubTab = "artists";
@@ -200,6 +202,8 @@ class CollectionStore {
   }
 
   viewAlbum(name: string) {
+    this.searchQuery = "";
+    this.searchResults = [];
     this.selectedArtistName = null;
     this.activeTab = "collection";
     this.activeSubTab = "albums";

@@ -165,4 +165,22 @@ describe("PlaylistsStore", () => {
     await playlistsStore.exportPlaylist(101, "/path/to/exported.m3u8", true);
     expect(invoke).toHaveBeenCalledWith("export_playlist", { playlistId: 101, exportPath: "/path/to/exported.m3u8", relative: true });
   });
+
+  it("handles batch reordering of playlist items", async () => {
+    playlistsStore.activePlaylistId = 101;
+    await playlistsStore.reorderItemsBatch(101, [0, 1], 2);
+    expect(invoke).toHaveBeenCalledWith("reorder_playlist_items", { playlistId: 101, fromIndices: [0, 1], toIndex: 2 });
+  });
+
+  it("deduplicates playlist items by removing duplicate track entries", async () => {
+    playlistsStore.activePlaylistId = 101;
+    playlistsStore.activePlaylistTracks = [
+      mockTracks[0],
+      mockTracks[1],
+      { ...mockTracks[0], uuid: "item-dup" },
+    ];
+
+    await playlistsStore.deduplicatePlaylist(101);
+    expect(invoke).toHaveBeenCalledWith("remove_from_playlist", { playlistId: 101, uuids: ["item-dup"] });
+  });
 });

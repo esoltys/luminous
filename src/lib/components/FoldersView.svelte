@@ -251,7 +251,7 @@
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.showMoodmojiHint')}</p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs font-medium text-brand-text-secondary w-6">
+            <span class="text-xs font-medium text-brand-text-secondary text-right min-w-[3.5rem]">
               {prefs.showMoodmoji ? i18n.t('common.on') : i18n.t('common.off')}
             </span>
             <button

@@ -131,6 +131,13 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             // Initialize database (creates file + runs migrations)
             let db = Arc::new(
@@ -209,6 +216,7 @@ pub fn run() {
             let player_ticks = Arc::clone(&player);
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+                let mut tick_counter: u32 = 0;
                 loop {
                     interval.tick().await;
                     let (pos, state) = {
@@ -219,6 +227,10 @@ pub fn run() {
                         let mut p = player_ticks.lock().await;
                         if let Some(stats) = p.on_position_update(pos) {
                             let _ = app_handle_ticks.emit("song-stats-changed", stats);
+                        }
+                        tick_counter = tick_counter.wrapping_add(1);
+                        if tick_counter % 4 == 0 {
+                            p.persist_position(pos);
                         }
                         let _ = app_handle_ticks.emit(
                             "playback-position",
@@ -501,6 +513,7 @@ pub fn run() {
             commands::playlist::add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::reorder_playlist_item,
+            commands::playlist::reorder_playlist_items,
             commands::playlist::clear_playlist,
             commands::playlist::undo_playlist,
             commands::playlist::redo_playlist,

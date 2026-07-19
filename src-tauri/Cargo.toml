@@ -21,6 +21,7 @@ tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
 
 # --- Serialization ---
 serde = { version = "1", features = ["derive"] }

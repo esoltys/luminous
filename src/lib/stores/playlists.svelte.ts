@@ -108,6 +108,49 @@ class PlaylistsStore {
     }
   }
 
+  async reorderItemsBatch(playlistId: number, fromIndices: number[], toIndex: number) {
+    if (fromIndices.length === 0) return;
+    if (fromIndices.length === 1) {
+      return this.reorderItem(playlistId, fromIndices[0], toIndex);
+    }
+    await invoke("reorder_playlist_items", { playlistId, fromIndices, toIndex });
+    if (this.activePlaylistId === playlistId) {
+      await this.selectPlaylist(playlistId);
+    }
+  }
+
+  async deduplicatePlaylist(playlistId: number) {
+    const tracks = this.activePlaylistId === playlistId
+      ? this.activePlaylistTracks
+      : await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId });
+    
+    const seen = new Set<string>();
+    const duplicateUuids: string[] = [];
+
+    for (const item of tracks) {
+      let key = "";
+      if (item.song?.id) {
+        key = `song-${item.song.id}`;
+      } else if (item.song?.title && item.song?.artist) {
+        key = `meta-${item.song.title.toLowerCase().trim()}-${item.song.artist.toLowerCase().trim()}`;
+      } else if (item.url) {
+        key = `url-${item.url}`;
+      } else {
+        key = `uuid-${item.uuid}`;
+      }
+
+      if (seen.has(key)) {
+        duplicateUuids.push(item.uuid);
+      } else {
+        seen.add(key);
+      }
+    }
+
+    if (duplicateUuids.length > 0) {
+      await this.removeItemsFromPlaylist(playlistId, duplicateUuids);
+    }
+  }
+
   async clearPlaylist(playlistId: number) {
     await invoke("clear_playlist", { playlistId });
     if (this.activePlaylistId === playlistId) {

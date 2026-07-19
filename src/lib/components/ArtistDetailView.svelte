@@ -4,6 +4,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import PlaylistCard from "./PlaylistCard.svelte";
+  import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import { ArrowLeft, Play, Shuffle, ListMusic } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem } from "../types";
@@ -15,6 +17,13 @@
   let songs = $state<Song[]>([]);
   let playlists = $state<Playlist[]>([]);
   let loading = $state(true);
+
+  let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
+
+  function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
+    event.preventDefault();
+    albumContextMenuState = { x: event.clientX, y: event.clientY, album };
+  }
 
   let albums = $derived(getArtistAlbums(collectionStore.albums, artistName));
 
@@ -175,7 +184,7 @@
       >
         <ArrowLeft class="w-4 h-4" /> {i18n.t('artistDetail.backToArtists')}
       </button>
-      <h1 class="text-4xl sm:text-5xl font-black text-brand-text-primary leading-tight truncate">{artistName}</h1>
+      <h1 class="text-4xl sm:text-5xl font-black text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
       <p class="text-sm text-brand-text-secondary">
         {i18n.t('artistDetail.statsLine', { genre: genreLabel, albumCount: albums.length, songCount: songs.length, duration: totalDurationLabel })}
       </p>
@@ -238,6 +247,7 @@
         {#each discographyItems as album (album.album)}
           <button
             onclick={() => openAlbum(album)}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
             class="w-40 shrink-0 bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer"
           >
             <div class="aspect-square bg-brand-main rounded-lg mb-2 overflow-hidden border border-brand-border">
@@ -267,16 +277,7 @@
       <h2 class="text-xl font-semibold text-brand-text-primary mb-4">{i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}</h2>
       <HorizontalScrollRow>
         {#each playlists as playlist (playlist.id)}
-          <button
-            onclick={() => openPlaylist(playlist.id)}
-            class="w-40 shrink-0 bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer"
-          >
-            <div class="aspect-square rounded-lg mb-2 overflow-hidden border border-brand-border bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center">
-              <ListMusic class="w-10 h-10 text-white/80" />
-            </div>
-            <span class="font-semibold text-xs text-brand-text-primary truncate">{playlist.name}</span>
-            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">{i18n.t('playlists.songsCount', { count: playlist.track_count })}</span>
-          </button>
+          <PlaylistCard {playlist} onClick={() => openPlaylist(playlist.id)} />
         {/each}
       </HorizontalScrollRow>
     </div>
@@ -284,6 +285,32 @@
     <div class:pb-24={playerStore.hasEverPlayed}></div>
   {/if}
 </div>
+
+{#if albumContextMenuState}
+  {@const album = albumContextMenuState.album}
+  <AlbumContextMenu
+    x={albumContextMenuState.x}
+    y={albumContextMenuState.y}
+    albumName={album.album || i18n.t("collection.unknownAlbum")}
+    artistName={album.artist || artistName}
+    onPlay={async () => {
+      let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
+      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
+      if (songs.length > 0) {
+        playerStore.playSongs(songs.map(s => s.id), 0);
+      }
+    }}
+    onAddToPlaylist={async () => {
+      let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
+      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
+      if (songs.length > 0 && playlistsStore.activePlaylistId !== null) {
+        await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map(s => s.id));
+      }
+    }}
+    onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}
+    onClose={() => { albumContextMenuState = null; }}
+  />
+{/if}
 
 <style>
   :global(.carousel-scroll) {

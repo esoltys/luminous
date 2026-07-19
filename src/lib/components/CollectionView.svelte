@@ -13,10 +13,105 @@
   import { getArtistAlbums, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
+  import SongContextMenu from "./SongContextMenu.svelte";
+  import AlbumContextMenu from "./AlbumContextMenu.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
   let editingSongId = $state<number | null>(null);
+  let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+  let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
+
+  let selectedSongIds = $state<Set<number>>(new Set());
+  let lastSelectedSongId = $state<number | null>(null);
+
+  function handleContextMenu(event: MouseEvent, song: Song) {
+    event.preventDefault();
+    if (!selectedSongIds.has(song.id)) {
+      selectedSongIds = new Set([song.id]);
+      lastSelectedSongId = song.id;
+    }
+    contextMenuState = { x: event.clientX, y: event.clientY, song };
+  }
+
+  function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
+    event.preventDefault();
+    albumContextMenuState = { x: event.clientX, y: event.clientY, album };
+  }
+
+  function handleSongClick(e: MouseEvent, song: Song) {
+    if (e.shiftKey && lastSelectedSongId !== null) {
+      const idx1 = filteredSongs.findIndex((s) => s.id === lastSelectedSongId);
+      const idx2 = filteredSongs.findIndex((s) => s.id === song.id);
+      if (idx1 !== -1 && idx2 !== -1) {
+        const start = Math.min(idx1, idx2);
+        const end = Math.max(idx1, idx2);
+        const newSet = new Set(e.ctrlKey || e.metaKey ? selectedSongIds : []);
+        for (let i = start; i <= end; i++) {
+          newSet.add(filteredSongs[i].id);
+        }
+        selectedSongIds = newSet;
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      const newSet = new Set(selectedSongIds);
+      if (newSet.has(song.id)) {
+        newSet.delete(song.id);
+      } else {
+        newSet.add(song.id);
+      }
+      selectedSongIds = newSet;
+      lastSelectedSongId = song.id;
+    } else {
+      selectedSongIds = new Set([song.id]);
+      lastSelectedSongId = song.id;
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (collectionStore.activeTab !== "collection" || collectionStore.activeSubTab !== "songs") return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      selectedSongIds = new Set(filteredSongs.map((s) => s.id));
+    } else if (e.key === "Escape") {
+      selectedSongIds = new Set();
+    }
+  }
+
+  function handleWindowMouseDown(e: MouseEvent) {
+    if (selectedSongIds.size === 0) return;
+    const target = e.target as HTMLElement;
+    if (!target) return;
+    if (
+      target.closest("[data-song-row]") ||
+      target.closest("[role='menu']") ||
+      target.closest("[data-floating-toolbar]") ||
+      target.closest("button") ||
+      target.closest("input")
+    ) {
+      return;
+    }
+    selectedSongIds = new Set();
+  }
+
+  async function handleBulkAddToPlaylist() {
+    if (selectedSongIds.size === 0) return;
+    if (playlistsStore.activePlaylistId !== null) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, Array.from(selectedSongIds));
+    } else {
+      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+    }
+  }
+
+  function handlePlaySelected() {
+    if (selectedSongIds.size === 0) return;
+    const selectedList = filteredSongs.filter((s) => selectedSongIds.has(s.id));
+    if (selectedList.length > 0) {
+      playerStore.playSongs(selectedList.map((s) => s.id), 0);
+    }
+  }
 
   function openTagEditor(songId: number) {
     editingSongId = songId;
@@ -188,6 +283,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} onmousedown={handleWindowMouseDown} />
+
 {#if collectionStore.selectedAlbumName !== null}
   <AlbumDetailView albumName={collectionStore.selectedAlbumName} />
 {:else if collectionStore.selectedArtistName !== null}
@@ -355,9 +452,12 @@
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
+                data-song-row="true"
+                onclick={(e) => handleSongClick(e, song)}
                 ondblclick={() => handlePlaySong(song)}
-                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
-                  {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
+                oncontextmenu={(e) => handleContextMenu(e, song)}
+                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm cursor-pointer
+                  {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
                   {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
@@ -478,6 +578,7 @@
                 }
               }
             }}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
             class="{sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
           >
             <div
@@ -602,6 +703,84 @@
     onClose={() => { editingSongId = null; }}
     onSave={handleTagEditorSaved}
   />
+{/if}
+
+{#if contextMenuState}
+  {@const song = contextMenuState.song}
+  <SongContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    {song}
+    selectedCount={selectedSongIds.size}
+    onPlay={() => {
+      if (selectedSongIds.size > 1) {
+        handlePlaySelected();
+      } else {
+        handlePlaySong(song);
+      }
+    }}
+    onAddToPlaylist={() => {
+      if (selectedSongIds.size > 1) {
+        handleBulkAddToPlaylist();
+      } else {
+        handleAddSongToPlaylist(song.id);
+      }
+    }}
+    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onEditTags={() => openTagEditor(song.id)}
+    onClose={() => { contextMenuState = null; }}
+  />
+{/if}
+
+{#if albumContextMenuState}
+  {@const album = albumContextMenuState.album}
+  <AlbumContextMenu
+    x={albumContextMenuState.x}
+    y={albumContextMenuState.y}
+    albumName={album.album || i18n.t("collection.unknownAlbum")}
+    artistName={album.artist || undefined}
+    onPlay={() => handlePlayAlbum(album.album || "")}
+    onAddToPlaylist={async () => {
+      let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
+      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
+      if (songs.length > 0 && playlistsStore.activePlaylistId !== null) {
+        await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map(s => s.id));
+      }
+    }}
+    onGoToArtist={album.artist ? () => collectionStore.viewArtist(album.artist || "") : undefined}
+    onClose={() => { albumContextMenuState = null; }}
+  />
+{/if}
+
+{#if selectedSongIds.size > 0 && collectionStore.activeSubTab === 'songs'}
+  <div data-floating-toolbar="true" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <span class="text-brand-accent-text font-bold">
+      {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
+    </span>
+    <div class="h-4 w-px bg-brand-border/60"></div>
+    <button
+      onclick={handlePlaySelected}
+      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
+    >
+      <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
+      <span>{i18n.t('playlists.playSelected')}</span>
+    </button>
+    <button
+      onclick={handleBulkAddToPlaylist}
+      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
+    >
+      <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
+      <span>{i18n.t('playlists.contextMenuAddToPlaylist')}</span>
+    </button>
+    <div class="h-4 w-px bg-brand-border/60"></div>
+    <button
+      onclick={() => { selectedSongIds = new Set(); }}
+      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+    >
+      {i18n.t('playlists.clearSelection')}
+    </button>
+  </div>
 {/if}
 
 <style>

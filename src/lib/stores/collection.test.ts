@@ -163,11 +163,21 @@ describe("CollectionStore", () => {
     expect(collectionStore.filteredArtists[0].name).toBe("The Beatles");
   });
 
-  it("handles navigation helpers viewArtist and viewAlbum", () => {
+  it("handles navigation helpers viewArtist and viewAlbum and clears search terms", () => {
+    collectionStore.searchQuery = "some search";
+    collectionStore.searchResults = [{ id: 1 } as Song];
+
     collectionStore.viewArtist("Pink Floyd");
     expect(collectionStore.selectedArtistName).toBe("Pink Floyd");
     expect(collectionStore.activeTab).toBe("collection");
     expect(collectionStore.activeSubTab).toBe("artists");
+    expect(collectionStore.searchQuery).toBe("");
+    expect(collectionStore.searchResults).toHaveLength(0);
+
+    collectionStore.searchQuery = "another search";
+    collectionStore.viewAlbum("Dark Side");
+    expect(collectionStore.selectedAlbumName).toBe("Dark Side");
+    expect(collectionStore.searchQuery).toBe("");
 
     collectionStore.navigateTo("playlists");
     expect(collectionStore.activeTab).toBe("playlists");

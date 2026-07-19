@@ -178,7 +178,7 @@
     <div class="flex items-center gap-3">
       <FileText class="w-6 h-6 text-brand-accent-text" />
       <div>
-        <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary">
+        <h2 class="text-sm font-bold truncate max-w-xs md:max-w-md text-brand-text-primary py-0.5 leading-snug">
           {playerStore.currentSong ? playerStore.currentSong.title : i18n.t('playerBar.notPlaying')}
         </h2>
         <p class="text-[10px] text-brand-text-secondary/70 truncate max-w-xs md:max-w-md">

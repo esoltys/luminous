@@ -43,6 +43,10 @@ enum PlaylistOp {
         from: i32,
         to: i32,
     },
+    BatchMove {
+        playlist_id: i64,
+        moves: Vec<(String, i32, i32)>, // (uuid, old_pos, new_pos)
+    },
 }
 
 #[derive(Debug)]
@@ -390,28 +394,35 @@ impl PlaylistManager {
 
     pub fn get_playlist_tracks(&self, playlist_id: i64) -> Result<Vec<PlaylistItem>> {
         let conn = self.db.pool.get()?;
+        Self::get_playlist_tracks_from_conn(&conn, playlist_id)
+    }
+
+    pub fn get_playlist_tracks_from_conn(
+        conn: &rusqlite::Connection,
+        playlist_id: i64,
+    ) -> Result<Vec<PlaylistItem>> {
         let mut stmt = conn.prepare(&format!(
             "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
-                             pi.uuid, pi.type, pi.url, pi.stream_url,
-                             pi.additional_metadata,
-                             -- song fields
-                             s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                             s.title, s.titlesort, s.artist, s.artistsort,
-                             s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                             s.composer, s.composersort, s.performer, s.performersort,
-                             s.grouping, s.comment, s.lyrics,
-                             s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                             s.bpm, s.mood, s.initial_key,
-                             s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                             s.bitrate, s.samplerate, s.bitdepth, s.channels,
-                             s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
-                             s.lastplayed, s.lastseen, s.art_embedded,
-                             s.art_automatic, s.art_manual, s.art_unset,
-                             s.unavailable
-                      FROM playlist_items pi
-                      LEFT JOIN songs s ON s.id = pi.song_id
-                      WHERE pi.playlist_id = ?1
-                      ORDER BY pi.position"
+                         pi.uuid, pi.type, pi.url, pi.stream_url,
+                         pi.additional_metadata,
+                         -- song fields
+                         s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+                         s.title, s.titlesort, s.artist, s.artistsort,
+                         s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+                         s.composer, s.composersort, s.performer, s.performersort,
+                         s.grouping, s.comment, s.lyrics,
+                         s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+                         s.bpm, s.mood, s.initial_key,
+                         s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+                         s.bitrate, s.samplerate, s.bitdepth, s.channels,
+                         s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
+                         s.lastplayed, s.lastseen, s.art_embedded,
+                         s.art_automatic, s.art_manual, s.art_unset,
+                         s.unavailable
+                  FROM playlist_items pi
+                  LEFT JOIN songs s ON s.id = pi.song_id
+                  WHERE pi.playlist_id = ?1
+                  ORDER BY pi.position"
         ))?;
 
         let items = stmt
@@ -647,6 +658,113 @@ impl PlaylistManager {
         Ok(())
     }
 
+    pub fn reorder_playlist_items_batch(
+        &mut self,
+        playlist_id: i64,
+        from_indices: &[i32],
+        to_index: i32,
+    ) -> Result<()> {
+        if from_indices.is_empty() {
+            return Ok(());
+        }
+        if from_indices.len() == 1 {
+            return self.reorder_playlist_item(playlist_id, from_indices[0], to_index);
+        }
+
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT uuid, position FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
+        )?;
+        let items: Vec<(String, i32)> = stmt
+            .query_map(params![playlist_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if items.is_empty() {
+            return Ok(());
+        }
+
+        let mut valid_from: Vec<usize> = from_indices
+            .iter()
+            .filter_map(|&idx| {
+                if idx >= 0 && (idx as usize) < items.len() {
+                    Some(idx as usize)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        valid_from.sort_unstable();
+        valid_from.dedup();
+
+        if valid_from.is_empty() {
+            return Ok(());
+        }
+
+        let from_set: std::collections::HashSet<usize> = valid_from.iter().cloned().collect();
+
+        let moving_items: Vec<(String, i32)> = items
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| from_set.contains(idx))
+            .map(|(_, item)| item.clone())
+            .collect();
+
+        let remaining_items: Vec<(String, i32)> = items
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| !from_set.contains(idx))
+            .map(|(_, item)| item.clone())
+            .collect();
+
+        let first_from = valid_from[0];
+        let target_idx = (to_index as usize).min(items.len().saturating_sub(1));
+        let insert_pos = if first_from < target_idx {
+            remaining_items
+                .iter()
+                .filter(|(_, pos)| (*pos as usize) <= target_idx)
+                .count()
+        } else {
+            remaining_items
+                .iter()
+                .filter(|(_, pos)| (*pos as usize) < target_idx)
+                .count()
+        };
+
+        let mut new_order = Vec::with_capacity(items.len());
+        new_order.extend(remaining_items[..insert_pos].iter().cloned());
+        new_order.extend(moving_items);
+        new_order.extend(remaining_items[insert_pos..].iter().cloned());
+
+        let mut moves = Vec::new();
+        for (new_pos, (uuid, _)) in new_order.iter().enumerate() {
+            let new_pos = new_pos as i32;
+            if let Some((_, old_pos)) = items.iter().find(|(u, _)| u == uuid) {
+                if *old_pos != new_pos {
+                    moves.push((uuid.clone(), *old_pos, new_pos));
+                }
+            }
+        }
+
+        if moves.is_empty() {
+            return Ok(());
+        }
+
+        for (uuid, _, new_pos) in &moves {
+            conn.execute(
+                "UPDATE playlist_items SET position = ?1 WHERE uuid = ?2 AND playlist_id = ?3",
+                params![new_pos, uuid, playlist_id],
+            )?;
+        }
+
+        self.undo_stack
+            .push(PlaylistOp::BatchMove { playlist_id, moves });
+        self.redo_stack.clear();
+
+        Ok(())
+    }
+
     pub fn clear_playlist(&mut self, playlist_id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
@@ -743,6 +861,15 @@ impl PlaylistManager {
                     )?;
                 }
             }
+            PlaylistOp::BatchMove { playlist_id, moves } => {
+                let conn = self.db.pool.get()?;
+                for (uuid, old_pos, _) in moves {
+                    conn.execute(
+                        "UPDATE playlist_items SET position = ?1 WHERE uuid = ?2 AND playlist_id = ?3",
+                        params![old_pos, uuid, playlist_id],
+                    )?;
+                }
+            }
         }
         self.redo_stack.push(op);
         Ok(())
@@ -786,6 +913,15 @@ impl PlaylistManager {
                     "DELETE FROM playlist_items WHERE playlist_id = ?1",
                     params![playlist_id],
                 )?;
+            }
+            PlaylistOp::BatchMove { playlist_id, moves } => {
+                let conn = self.db.pool.get()?;
+                for (uuid, _, new_pos) in moves {
+                    conn.execute(
+                        "UPDATE playlist_items SET position = ?1 WHERE uuid = ?2 AND playlist_id = ?3",
+                        params![new_pos, uuid, playlist_id],
+                    )?;
+                }
             }
         }
         self.undo_stack.push(op);
@@ -932,6 +1068,51 @@ mod tests {
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("Song One")
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reorder_playlist_items_batch() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (1, 'Song 1')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (2, 'Song 2')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (3, 'Song 3')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (4, 'Song 4')", [])
+                .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Batch Test").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1, 2, 3, 4]).unwrap();
+
+        // Drag items [0, 1] (Song 1, Song 2) to the end (index 3, Song 4)
+        manager
+            .reorder_playlist_items_batch(pl.id, &[0, 1], 3)
+            .unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles: Vec<&str> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.as_deref().unwrap())
+            .collect();
+        assert_eq!(titles, vec!["Song 3", "Song 4", "Song 1", "Song 2"]);
+
+        // Test Undo
+        manager.undo().unwrap();
+        let tracks_undo = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles_undo: Vec<&str> = tracks_undo
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.as_deref().unwrap())
+            .collect();
+        assert_eq!(titles_undo, vec!["Song 1", "Song 2", "Song 3", "Song 4"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
