@@ -177,4 +177,65 @@ describe("PlaylistView.svelte", () => {
     await fireEvent.drop(rowTwo, { dataTransfer });
     expect(reorderSpy).toHaveBeenCalledWith(1, 0, 1);
   });
+
+  it("filters tracks by title or artist using the filter search input", async () => {
+    const { getByPlaceholderText, getByText, queryByText } = render(PlaylistView);
+    const input = getByPlaceholderText("Filter tracks...");
+
+    await fireEvent.input(input, { target: { value: "Track One" } });
+    expect(getByText("Track One")).toBeInTheDocument();
+    expect(queryByText("Track Two")).not.toBeInTheDocument();
+    expect(queryByText("Track Three")).not.toBeInTheDocument();
+  });
+
+  it("detects duplicate tracks and triggers deduplication", async () => {
+    playlistsStore.activePlaylistTracks = [
+      ...mockTracks,
+      {
+        id: 13,
+        playlist_id: 1,
+        position: 3,
+        item_type: "song",
+        uuid: "uuid-4-dup",
+        song: { ...mockTracks[0].song! },
+      },
+    ];
+
+    const dedupeSpy = vi.spyOn(playlistsStore, "deduplicatePlaylist");
+    const { getByText } = render(PlaylistView);
+
+    expect(getByText(/Remove 1 duplicate/)).toBeInTheDocument();
+    const btn = getByText(/Remove 1 duplicate/).closest("button")!;
+    await fireEvent.click(btn);
+
+    expect(dedupeSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("handles multi-selection with Shift+Click and shows batch floating bar", async () => {
+    const { getByText, queryByText } = render(PlaylistView);
+
+    const rowOne = getByText("Track One").closest("tr")!;
+    const rowThree = getByText("Track Three").closest("tr")!;
+
+    await fireEvent.click(rowOne);
+    await fireEvent.click(rowThree, { shiftKey: true });
+
+    expect(getByText("3 selected")).toBeInTheDocument();
+
+    const removeBtn = getByText("Remove Selected").closest("button")!;
+    const removeSpy = vi.spyOn(playlistsStore, "removeItemsFromPlaylist");
+    await fireEvent.click(removeBtn);
+
+    expect(removeSpy).toHaveBeenCalledWith(1, ["uuid-1", "uuid-2", "uuid-3"]);
+  });
+
+  it("opens context menu on right-click", async () => {
+    const { getByText, getAllByText } = render(PlaylistView);
+    const rowOne = getByText("Track One").closest("tr")!;
+
+    await fireEvent.contextMenu(rowOne);
+
+    expect(getAllByText("Play Selected").length).toBeGreaterThan(0);
+    expect(getByText("Remove from Playlist")).toBeInTheDocument();
+  });
 });
