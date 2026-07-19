@@ -285,6 +285,12 @@ impl Player {
         self.play_at_index(play_index).await
     }
 
+    /// Append items to the "play next" queue — played before the current
+    /// playlist order resumes, without disturbing what's currently playing.
+    pub fn queue_items(&mut self, items: Vec<PlaylistItem>) {
+        self.queue.extend(items);
+    }
+
     /// Returns true if the playlist item has a playable (present + available) song.
     fn is_item_playable(item: &PlaylistItem) -> bool {
         match &item.song {
@@ -995,6 +1001,48 @@ mod tests {
             |r| r.get(0),
         );
         assert!(song_id_exists.is_err());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_queue_items_appends_without_disturbing_playback() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        assert!(player.queue.is_empty());
+
+        let song_a = crate::models::Song {
+            id: 1,
+            title: Some("A".into()),
+            ..Default::default()
+        };
+        let song_b = crate::models::Song {
+            id: 2,
+            title: Some("B".into()),
+            ..Default::default()
+        };
+        let item_a = PlaylistItem::new_song(0, 0, song_a);
+        let item_b = PlaylistItem::new_song(0, 0, song_b);
+        let uuid_a = item_a.uuid.clone();
+        let uuid_b = item_b.uuid.clone();
+
+        // Queueing does not touch the current playlist or start playback.
+        player.queue_items(vec![item_a]);
+        assert_eq!(player.queue.len(), 1);
+        assert!(player.playlist_items.is_empty());
+        assert_eq!(
+            player.get_state().await.state,
+            crate::models::PlayState::Stopped
+        );
+
+        // A second call appends (FIFO order), it doesn't replace.
+        player.queue_items(vec![item_b]);
+        assert_eq!(player.queue.len(), 2);
+        assert_eq!(player.queue.front().unwrap().uuid, uuid_a);
+        assert_eq!(player.queue.back().unwrap().uuid, uuid_b);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

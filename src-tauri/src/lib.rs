@@ -490,6 +490,7 @@ pub fn run() {
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,
+            commands::player::queue_songs,
             commands::player::play_playlist_item,
             commands::player::open_and_play,
             commands::player::get_startup_file,
@@ -513,6 +514,7 @@ pub fn run() {
             commands::playlist::add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::reorder_playlist_item,
+            commands::playlist::reorder_playlist_items,
             commands::playlist::clear_playlist,
             commands::playlist::undo_playlist,
             commands::playlist::redo_playlist,
