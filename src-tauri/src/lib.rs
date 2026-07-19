@@ -490,7 +490,6 @@ pub fn run() {
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,
-            commands::player::queue_songs,
             commands::player::play_playlist_item,
             commands::player::open_and_play,
             commands::player::get_startup_file,
