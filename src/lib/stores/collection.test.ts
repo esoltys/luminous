@@ -81,11 +81,11 @@ describe("CollectionStore", () => {
     expect(invoke).toHaveBeenCalledWith("remove_directory", { path: "/music/pop" });
   });
 
-  it("handles directory scanning and scan-progress event", async () => {
+  it("handles directory scanning and scan-progress event with force option", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined as any);
-    await collectionStore.startScan();
+    await collectionStore.startScan(true);
     expect(collectionStore.isScanning).toBe(true);
-    expect(invoke).toHaveBeenCalledWith("scan_directories");
+    expect(invoke).toHaveBeenCalledWith("scan_directories", { force: true });
 
     if (eventCallbacks["scan-progress"]) {
       eventCallbacks["scan-progress"]({
@@ -98,7 +98,25 @@ describe("CollectionStore", () => {
         payload: { phase: "done", current_path: "", scanned: 10, total: 10 }
       });
       expect(collectionStore.isScanning).toBe(false);
+      expect(collectionStore.lastScanTime).not.toBeNull();
     }
+  });
+
+  it("handles pruneMissing songs call", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(3 as any);
+    const count = await collectionStore.pruneMissing();
+    expect(invoke).toHaveBeenCalledWith("prune_missing_songs");
+    expect(count).toBe(3);
+  });
+
+  it("toggles and persists watchFoldersRealtime and scanOnStartup settings", async () => {
+    await collectionStore.setWatchFoldersRealtime(false);
+    expect(collectionStore.watchFoldersRealtime).toBe(false);
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "watch_folders_realtime", value: "false" });
+
+    await collectionStore.setScanOnStartup(true);
+    expect(collectionStore.scanOnStartup).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("set_app_setting", { key: "scan_on_startup", value: "true" });
   });
 
   it("executes FTS search and updates search results and loading state", async () => {

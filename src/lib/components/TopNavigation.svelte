@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, Search, FolderOpen, RefreshCw, PanelLeft, PanelBottom, PanelRight } from "lucide-svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
@@ -9,6 +10,11 @@
   import { fade } from "svelte/transition";
 
   let searchInput: HTMLInputElement | undefined;
+
+  function navigateToFoldersSettings() {
+    collectionStore.activeTab = "settings";
+    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
+  }
 
   // Navigation history stack
   let historyStack = $state<string[]>([]);
@@ -117,6 +123,23 @@
       placeholder={i18n.t('topNav.searchPlaceholder')}
       class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
     />
+
+    <!-- Manage Library / Rescan button -->
+    <button
+      type="button"
+      onclick={navigateToFoldersSettings}
+      class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 cursor-pointer flex items-center gap-1.5"
+      title={collectionStore.isScanning
+        ? `${i18n.t('sidebar.scanProgressClickHint')} (${collectionStore.scanProgress?.scanned || 0}/${collectionStore.scanProgress?.total || 0})`
+        : i18n.t('sidebar.manageLibrary')}
+    >
+      <RefreshCw class="w-4 h-4 {collectionStore.isScanning ? 'animate-spin text-brand-accent-text' : ''}" />
+      {#if collectionStore.isScanning}
+        <span class="text-[10px] text-brand-accent-text font-mono font-medium">
+          {collectionStore.scanProgress?.scanned || 0}/{collectionStore.scanProgress?.total || 0}
+        </span>
+      {/if}
+    </button>
 
     <!-- Open Files/Playlists button -->
     <button

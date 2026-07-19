@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2 } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Clock, Activity, HardDrive } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
   import { prefs } from "../stores/prefs.svelte";
@@ -15,6 +15,14 @@
   let isTabInitialized = $state(false);
   let editingThemeId = $state<string | null>(null);
   let useAdvancedBuilder = $state(false);
+
+  let pruneMsg = $state<string | null>(null);
+
+  async function handlePruneMissing() {
+    const count = await collectionStore.pruneMissing();
+    pruneMsg = i18n.t('settings.pruneCompleteMsg', { count });
+    setTimeout(() => { pruneMsg = null; }, 4000);
+  }
 
   onMount(async () => {
     try {
@@ -321,6 +329,155 @@
             <p class="text-xs text-brand-text-secondary/60 mb-4">{i18n.t('settings.noFoldersText')}</p>
           </div>
         {/if}
+      </div>
+
+      <!-- Library Scanning & Maintenance Section -->
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+        <div class="border-b border-brand-border pb-3">
+          <div class="flex items-start gap-3">
+            <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0 {collectionStore.isScanning ? 'animate-spin' : ''}" />
+            <div class="space-y-1 min-w-0">
+              <h4 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scan Status & Progress Bar (when scanning) -->
+        {#if collectionStore.isScanning}
+          <div class="bg-brand-main/60 border border-brand-accent/30 rounded-xl p-4 space-y-2">
+            <div class="flex justify-between items-center text-xs font-semibold text-brand-text-primary">
+              <span class="capitalize flex items-center gap-2">
+                <RefreshCw class="w-4 h-4 animate-spin text-brand-accent-text" />
+                {i18n.t('settings.scanningPhase', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning') })}
+              </span>
+              <span>{collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total || 0}</span>
+            </div>
+            <div class="w-full bg-brand-sidebar rounded-full h-2 overflow-hidden border border-brand-border/40">
+              <div
+                class="bg-brand-accent h-2 rounded-full transition-all duration-300"
+                style="width: {collectionStore.scanProgress?.total ? (collectionStore.scanProgress.scanned / collectionStore.scanProgress.total) * 100 : 0}%"
+              ></div>
+            </div>
+            <p class="text-[10px] text-brand-text-secondary/60 truncate">{collectionStore.scanProgress?.current_path || ""}</p>
+          </div>
+        {/if}
+
+        <!-- Manual Action Buttons -->
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            onclick={() => collectionStore.startScan(false)}
+            disabled={collectionStore.isScanning}
+            class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-brand-accent/10 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw class="w-4 h-4 {collectionStore.isScanning ? 'animate-spin' : ''}" />
+            {i18n.t('settings.incrementalRescanBtn')}
+          </button>
+
+          <button
+            onclick={() => collectionStore.startScan(true)}
+            disabled={collectionStore.isScanning}
+            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            title={i18n.t('settings.forceFullScanHint')}
+          >
+            <RotateCcw class="w-4 h-4 text-brand-accent-text" />
+            {i18n.t('settings.forceFullScanBtn')}
+          </button>
+
+          <button
+            onclick={handlePruneMissing}
+            disabled={collectionStore.isScanning}
+            class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            title={i18n.t('settings.pruneMissingHint')}
+          >
+            <Sparkles class="w-4 h-4" />
+            {i18n.t('settings.pruneMissingBtn')}
+          </button>
+
+          {#if pruneMsg}
+            <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
+          {/if}
+        </div>
+
+        <!-- Configuration Toggles -->
+        <div class="pt-3 border-t border-brand-border/50 space-y-4">
+          <!-- Real-time Folder Watching -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
+              <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.watchRealtimeHint')}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs font-medium text-brand-text-secondary w-6">
+                {collectionStore.watchFoldersRealtime ? i18n.t('common.on') : i18n.t('common.off')}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={collectionStore.watchFoldersRealtime}
+                aria-label={i18n.t('settings.watchRealtimeLabel')}
+                onclick={() => collectionStore.setWatchFoldersRealtime(!collectionStore.watchFoldersRealtime)}
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {collectionStore.watchFoldersRealtime ? 'bg-brand-accent' : 'bg-brand-border'}"
+              >
+                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {collectionStore.watchFoldersRealtime ? 'translate-x-6' : 'translate-x-1'}"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Rescan on Startup -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
+              <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.scanOnStartupHint')}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs font-medium text-brand-text-secondary w-6">
+                {collectionStore.scanOnStartup ? i18n.t('common.on') : i18n.t('common.off')}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={collectionStore.scanOnStartup}
+                aria-label={i18n.t('settings.scanOnStartupLabel')}
+                onclick={() => collectionStore.setScanOnStartup(!collectionStore.scanOnStartup)}
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {collectionStore.scanOnStartup ? 'bg-brand-accent' : 'bg-brand-border'}"
+              >
+                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {collectionStore.scanOnStartup ? 'translate-x-6' : 'translate-x-1'}"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Library Stats & Last Scan Summary -->
+        <div class="pt-3 border-t border-brand-border/50 space-y-3">
+          {#if collectionStore.lastScanTime}
+            <div class="text-xs text-brand-text-secondary/70 flex items-center justify-between font-medium">
+              <span class="flex items-center gap-1.5">
+                <Clock class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+                {i18n.t('settings.lastScanned', { time: collectionStore.lastScanTime })}
+              </span>
+            </div>
+          {/if}
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
+            <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_songs.toLocaleString()}</p>
+          </div>
+          <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsAlbums')}</span>
+            <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_albums.toLocaleString()}</p>
+          </div>
+          <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
+            <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_artists.toLocaleString()}</p>
+          </div>
+          <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
+            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
+            <p class="text-base font-bold text-brand-text-primary mt-0.5">{(collectionStore.stats.total_filesize_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB</p>
+          </div>
+        </div>
+      </div>
       </div>
     {:else if settingsTab === "themes"}
       <!-- UI Themes Section -->

@@ -113,7 +113,8 @@ impl CollectionScanner {
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.
-    pub async fn scan_all(&self, app: AppHandle) -> Result<()> {
+    /// If `force` is true, skips mtime checks and re-reads metadata for all files.
+    pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
             return Ok(());
@@ -142,7 +143,7 @@ impl CollectionScanner {
         }
 
         let total = all_paths.len() as u64;
-        log::info!("Scan found {total} audio files");
+        log::info!("Scan found {total} audio files (force={force})");
 
         // Phase 2: read tags
         let _ = app.emit(
@@ -164,19 +165,21 @@ impl CollectionScanner {
             for path in &all_paths {
                 let path_str = path.to_string_lossy().to_string();
 
-                // mtime-based incremental scan: skip if mtime unchanged
-                let mtime = get_mtime(path).unwrap_or(0);
-                let existing_mtime: Option<i64> = conn
-                    .query_row(
-                        "SELECT mtime FROM songs WHERE path = ?1",
-                        params![path_str],
-                        |row| row.get(0),
-                    )
-                    .ok();
+                // mtime-based incremental scan: skip if mtime unchanged (unless force is requested)
+                if !force {
+                    let mtime = get_mtime(path).unwrap_or(0);
+                    let existing_mtime: Option<i64> = conn
+                        .query_row(
+                            "SELECT mtime FROM songs WHERE path = ?1 AND unavailable = 0",
+                            params![path_str],
+                            |row| row.get(0),
+                        )
+                        .ok();
 
-                if existing_mtime == Some(mtime) {
-                    scanned += 1;
-                    continue; // No change — skip tag re-read
+                    if existing_mtime == Some(mtime) {
+                        scanned += 1;
+                        continue; // No change — skip tag re-read
+                    }
                 }
 
                 // Read tags
@@ -994,9 +997,19 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 /// Sets unavailable = 1 instead of hard-deleting, so playlist items retain metadata.
 pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
     let conn = db.pool.get()?;
+    let path_fw = path_str.replace('\\', "/");
+    let path_bw = path_str.replace('/', "\\");
+
     let updated = conn.execute(
-        "UPDATE songs SET unavailable = 1 WHERE (path = ?1 OR path LIKE ?1 || '/%') AND unavailable = 0",
-        params![path_str],
+        "UPDATE songs SET unavailable = 1
+         WHERE (
+            path = ?1 OR path = ?2
+            OR path LIKE ?1 || '/%'
+            OR path LIKE ?1 || '\\%'
+            OR path LIKE ?2 || '/%'
+            OR path LIKE ?2 || '\\%'
+         ) AND unavailable = 0",
+        params![path_fw, path_bw],
     )?;
     Ok(updated)
 }
@@ -1053,6 +1066,23 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
         .name("luminous-watcher".to_string())
         .spawn(move || {
             for event in rx {
+                // Check if real-time folder watching is disabled in app settings
+                let realtime_enabled = if let Ok(conn) = db_for_thread.pool.get() {
+                    conn.query_row(
+                        "SELECT value FROM app_settings WHERE key = 'watch_folders_realtime'",
+                        [],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .map(|v| v != "false")
+                    .unwrap_or(true)
+                } else {
+                    true
+                };
+
+                if !realtime_enabled {
+                    continue;
+                }
+
                 for path in event.paths {
                     let path_str = path.to_string_lossy().to_string();
                     if !path.exists() {
@@ -1068,6 +1098,22 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 log::error!("Failed to delete path from db: {e}");
                             }
                         }
+                    } else if path.is_file() && is_audio_file(&path) {
+                        log::info!("Watcher detected file addition/change: {}", path_str);
+                        if let Ok(conn) = db_for_thread.pool.get() {
+                            if let Ok(song) = read_tags(&path) {
+                                let _ = upsert_song(&conn, &song);
+                                let _ = app_clone.emit("library-changed", ());
+                            }
+                        }
+                    } else if path.is_dir() {
+                        log::info!("Watcher detected directory addition/change: {}", path_str);
+                        let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
+                        let app_handle_scan = app_clone.clone();
+                        tauri::async_runtime::block_on(async move {
+                            let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                            let _ = app_handle_scan.emit("library-changed", ());
+                        });
                     }
                 }
             }
@@ -1209,6 +1255,44 @@ mod tests {
         assert_eq!(album_four["track_count"].as_i64(), Some(2));
 
         // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_delete_path_and_subpaths_windows_separators() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_prune_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let insert_test_song = |p: &str| {
+            let mut song = Song::default();
+            song.path = Some(p.to_string());
+            song.title = Some("Test Track".to_string());
+            song.source = SongSource::LocalFile;
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        insert_test_song(r"C:\Music\ArtistName\AlbumOne\song1.mp3");
+        insert_test_song(r"C:\Music\ArtistName\AlbumOne\song2.mp3");
+        insert_test_song(r"C:\Music\OtherArtist\song3.mp3");
+
+        let pruned = delete_path_and_subpaths(&db, r"C:\Music\ArtistName").unwrap();
+        assert_eq!(pruned, 2);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let songs = scanner.get_songs(100, 0).unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(
+            songs[0].path.as_deref(),
+            Some(r"C:\Music\OtherArtist\song3.mp3")
+        );
+
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

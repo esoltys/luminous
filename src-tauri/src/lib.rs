@@ -474,6 +474,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Collection commands
             commands::collection::scan_directories,
+            commands::collection::prune_missing_songs,
             commands::collection::add_directory,
             commands::collection::remove_directory,
             commands::collection::get_directories,

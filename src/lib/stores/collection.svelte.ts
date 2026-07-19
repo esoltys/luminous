@@ -49,6 +49,10 @@ class CollectionStore {
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
 
+  watchFoldersRealtime = $state<boolean>(true);
+  scanOnStartup = $state<boolean>(false);
+  lastScanTime = $state<string | null>(null);
+
   constructor() {
     this.init();
   }
@@ -83,13 +87,24 @@ class CollectionStore {
       await this.refreshStats();
       await this.refreshLibrary();
 
-      // Load excluded formats from backend settings
+      // Load excluded formats and scanning settings from backend settings
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      if (settings && settings.excluded_formats) {
-        try {
-          this.excludedFormats = JSON.parse(settings.excluded_formats);
-        } catch (e) {
-          console.error("Failed to parse excluded_formats:", e);
+      if (settings) {
+        if (settings.excluded_formats) {
+          try {
+            this.excludedFormats = JSON.parse(settings.excluded_formats);
+          } catch (e) {
+            console.error("Failed to parse excluded_formats:", e);
+          }
+        }
+        if (settings.watch_folders_realtime !== undefined) {
+          this.watchFoldersRealtime = settings.watch_folders_realtime !== "false";
+        }
+        if (settings.scan_on_startup !== undefined) {
+          this.scanOnStartup = settings.scan_on_startup === "true";
+        }
+        if (settings.last_scan_time) {
+          this.lastScanTime = settings.last_scan_time;
         }
       }
 
@@ -98,6 +113,11 @@ class CollectionStore {
         this.scanProgress = event.payload;
         this.isScanning = event.payload.phase !== "done";
         if (event.payload.phase === "done") {
+          const nowStr = new Date().toLocaleString();
+          this.lastScanTime = nowStr;
+          invoke("set_app_setting", { key: "last_scan_time", value: nowStr }).catch((err) => {
+            console.error("Failed to save last_scan_time:", err);
+          });
           this.refreshStats();
           this.refreshLibrary();
         }
@@ -117,9 +137,27 @@ class CollectionStore {
           if (song) applySongStats(song, event.payload);
         }
       });
+
+      if (this.scanOnStartup) {
+        this.startScan(false);
+      }
     } catch (err) {
       console.error("Failed to initialize CollectionStore:", err);
     }
+  }
+
+  async setWatchFoldersRealtime(enabled: boolean) {
+    this.watchFoldersRealtime = enabled;
+    await invoke("set_app_setting", { key: "watch_folders_realtime", value: String(enabled) }).catch(err => {
+      console.error("Failed to save watch_folders_realtime setting:", err);
+    });
+  }
+
+  async setScanOnStartup(enabled: boolean) {
+    this.scanOnStartup = enabled;
+    await invoke("set_app_setting", { key: "scan_on_startup", value: String(enabled) }).catch(err => {
+      console.error("Failed to save scan_on_startup setting:", err);
+    });
   }
 
   async refreshDirectories() {
@@ -146,12 +184,24 @@ class CollectionStore {
     await this.refreshDirectories();
   }
 
-  async startScan() {
+  async startScan(force: boolean = false) {
     this.isScanning = true;
-    invoke("scan_directories").catch((err) => {
+    invoke("scan_directories", { force }).catch((err) => {
       console.error("Failed to scan directories:", err);
       this.isScanning = false;
     });
+  }
+
+  async pruneMissing(): Promise<number> {
+    try {
+      const prunedCount = await invoke<number>("prune_missing_songs");
+      await this.refreshStats();
+      await this.refreshLibrary();
+      return prunedCount;
+    } catch (err) {
+      console.error("Failed to prune missing songs:", err);
+      return 0;
+    }
   }
 
   async search(query: string) {

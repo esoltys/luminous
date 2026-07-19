@@ -7,12 +7,21 @@
   import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home, FolderInput } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
+  import { invoke } from "@tauri-apps/api/core";
+
   let { width = 256 }: { width?: number } = $props();
 
   let showAddDirModal = $state(false);
   let newPlaylistName = $state("");
 
   let isCollapsed = $derived(width < 180);
+
+  function navigateToFoldersSettings() {
+    collectionStore.activeTab = "settings";
+    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" }).catch((err) => {
+      console.error("Failed to set active_settings_tab:", err);
+    });
+  }
 
   async function handleAddDirectory() {
     try {
@@ -163,46 +172,8 @@
     <div class="flex-1"></div>
   {/if}
 
-  <!-- Scanning status / trigger -->
-  <div class="{isCollapsed ? 'p-2 flex justify-center' : 'p-4'} text-xs flex-shrink-0" class:mb-24={playerStore.hasEverPlayed}>
-    {#if collectionStore.isScanning}
-      {#if isCollapsed}
-        <div
-          class="flex items-center justify-center w-10 h-10 cursor-help"
-          title={i18n.t('sidebar.scanningPhaseTooltip', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning'), scanned: collectionStore.scanProgress?.scanned || 0, total: collectionStore.scanProgress?.total || 0 })}
-        >
-          <RefreshCw class="w-5 h-5 animate-spin text-brand-accent-text" />
-        </div>
-      {:else}
-        <div class="space-y-1.5 w-full">
-          <div class="flex justify-between text-[10px] text-brand-text-secondary/60">
-            <span class="capitalize">{i18n.t('sidebar.scanningPhaseLabel', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning') })}</span>
-            <span>{collectionStore.scanProgress?.scanned || 0}/{collectionStore.scanProgress?.total || 0}</span>
-          </div>
-          <div class="w-full bg-brand-sidebar rounded-full h-1.5 overflow-hidden">
-            <div
-              class="bg-brand-accent h-1.5 rounded-full transition-all duration-300"
-              style="width: {collectionStore.scanProgress?.total ? (collectionStore.scanProgress.scanned / collectionStore.scanProgress.total) * 100 : 0}%"
-            ></div>
-          </div>
-          <p class="text-[10px] text-brand-text-secondary/50 truncate">{collectionStore.scanProgress?.current_path || ""}</p>
-        </div>
-      {/if}
-    {:else}
-      <button
-        onclick={() => collectionStore.startScan()}
-        class="bg-brand-sidebar hover:bg-brand-main text-brand-text-primary transition-all border border-brand-border cursor-pointer flex items-center justify-center {isCollapsed ? 'w-10 h-10 rounded-xl p-0' : 'w-full gap-2 px-3 py-2 rounded-lg'}"
-        title={isCollapsed ? i18n.t('sidebar.rescanLibrary') : ""}
-      >
-        <RefreshCw class="{isCollapsed ? 'w-5 h-5' : 'w-3.5 h-3.5'} shrink-0" />
-        {#if !isCollapsed}
-          <span class="text-xs font-medium text-center leading-tight truncate">
-            {i18n.t('sidebar.rescanLibrary')}
-          </span>
-        {/if}
-      </button>
-    {/if}
-  </div>
+  <!-- Bottom spacer for player bar -->
+  <div class:mb-24={playerStore.hasEverPlayed}></div>
 </aside>
 
 <style>
