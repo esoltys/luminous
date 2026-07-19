@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { Play, Plus, User } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { playerStore } from "../stores/player.svelte";
 
   let {
     x,
@@ -34,7 +35,11 @@
   let adjustedY = $derived.by(() => {
     if (typeof window === "undefined") return y;
     const menuHeight = 180;
-    return Math.min(y, window.innerHeight - menuHeight - 10);
+    // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top
+    // of page content once a track has ever played this session — clamp
+    // above it so the menu's lower items aren't hidden underneath it.
+    const dockClearance = playerStore.hasEverPlayed ? 96 : 0;
+    return Math.min(y, window.innerHeight - menuHeight - dockClearance - 10);
   });
 
   function handleWindowClick(e: MouseEvent) {
