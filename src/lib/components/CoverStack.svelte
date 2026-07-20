@@ -35,12 +35,11 @@
   function getTransform(i: number, count: number): string {
     if (count <= 1) return "none";
     if (direction === "right") {
-      // Offset center adjustment so the whole stack stays horizontally centered
-      const centerOffsetX = -((count - 1) * 6);
-      const x = centerOffsetX + i * 12;
-      const y = i * -8;
-      const rot = i * 6;
-      const scale = 1 - i * 0.06;
+      // Front cover (i = 0) stays centered at X=0 in the card container
+      const x = i * 7;
+      const y = i * -5;
+      const rot = i * 5;
+      const scale = 1 - i * 0.05;
       return `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`;
     } else {
       // Left stack (used in ArtistDetailView hero header)

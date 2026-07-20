@@ -49,11 +49,11 @@
   onclick={onClick}
   class="w-44 shrink-0 bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
-  <div class="aspect-square w-full rounded-lg mb-2.5 overflow-hidden border border-brand-border/60 bg-brand-main relative flex items-center justify-center">
+  <div class="aspect-square w-full rounded-lg mb-2.5 bg-brand-main relative flex items-center justify-center">
     {#if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-24 h-24" />
     {:else}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center">
+      <div class="w-full h-full rounded-lg bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/80" />
       </div>
     {/if}
