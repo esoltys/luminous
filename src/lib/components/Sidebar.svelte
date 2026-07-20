@@ -4,7 +4,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home, FolderInput } from "lucide-svelte";
+  import { Library, ListMusic, Settings, RefreshCw, Plus, Trash2, FileText, Home, FolderInput, Mic2, DiscAlbum, Music } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
 
   import { invoke } from "@tauri-apps/api/core";
@@ -76,16 +76,61 @@
       {/if}
     </button>
 
-    <button
-      onclick={() => { collectionStore.activeTab = "collection"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.collection')}
-    >
-      <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
-      {#if !isCollapsed}
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
+    <div class="w-full">
+      <button
+        onclick={() => { collectionStore.activeTab = "collection"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
+        class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+        title={i18n.t('sidebar.collection')}
+      >
+        <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+        {#if !isCollapsed}
+          <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
+        {/if}
+      </button>
+
+      {#if collectionStore.activeTab === 'collection' && !isCollapsed}
+        <div class="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-brand-accent/30 ml-4 my-1">
+          <button
+            onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "artists"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'artists' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <div class="flex items-center gap-2 truncate">
+              <Mic2 class="w-3.5 h-3.5" />
+              <span class="truncate">{i18n.t('sidebar.artists')}</span>
+            </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists})
+            </span>
+          </button>
+
+          <button
+            onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "albums"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'albums' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <div class="flex items-center gap-2 truncate">
+              <DiscAlbum class="w-3.5 h-3.5" />
+              <span class="truncate">{i18n.t('sidebar.albums')}</span>
+            </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums})
+            </span>
+          </button>
+
+          <button
+            onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'songs' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <div class="flex items-center gap-2 truncate">
+              <Music class="w-3.5 h-3.5" />
+              <span class="truncate">{i18n.t('sidebar.songs')}</span>
+            </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+            </span>
+          </button>
+        </div>
       {/if}
-    </button>
+    </div>
 
     <button
       onclick={() => { collectionStore.activeTab = "playlists"; }}

@@ -112,23 +112,11 @@ describe("CollectionView.svelte", () => {
     collectionStore.searchQuery = "";
   });
 
-  it("renders sub-tab filter pills for Artists, Albums, and Songs", () => {
-    const { getByRole } = render(CollectionView);
-    expect(getByRole("button", { name: /artists/i })).toBeInTheDocument();
-    expect(getByRole("button", { name: /albums/i })).toBeInTheDocument();
-    expect(getByRole("button", { name: /songs/i })).toBeInTheDocument();
-  });
-
-  it("switches active sub-tab when a filter pill is clicked", async () => {
-    const { getByRole } = render(CollectionView);
-
-    const albumsBtn = getByRole("button", { name: /albums/i });
-    await fireEvent.click(albumsBtn);
-    expect(collectionStore.activeSubTab).toBe("albums");
-
-    const artistsBtn = getByRole("button", { name: /artists/i });
-    await fireEvent.click(artistsBtn);
-    expect(collectionStore.activeSubTab).toBe("artists");
+  it("does not render top category filter pills in CollectionView", () => {
+    const { queryByRole } = render(CollectionView);
+    expect(queryByRole("button", { name: /artists \(/i })).toBeNull();
+    expect(queryByRole("button", { name: /albums \(/i })).toBeNull();
+    expect(queryByRole("button", { name: /songs \(/i })).toBeNull();
   });
 
   it("renders songs in Songs view sub-tab", () => {

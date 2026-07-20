@@ -7,7 +7,7 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
-  import { Play, Shuffle, Mic2 } from "lucide-svelte";
+  import { Play, Shuffle } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem } from "../types";
   import { getArtistAlbums } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
@@ -152,14 +152,6 @@
     <div class="flex items-end justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 max-w-xl">
-        <button
-          onclick={goBackToArtists}
-          class="self-start flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-accent-text hover:text-brand-accent-text-hover transition-colors cursor-pointer"
-        >
-          <Mic2 class="w-4 h-4" />
-          <span>{i18n.t('artistDetail.backToArtists')}</span>
-        </button>
-
         <h1 class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <!-- Summary Metadata Line -->

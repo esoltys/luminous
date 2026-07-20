@@ -511,11 +511,6 @@
       <div class="flex items-end justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
         <div class="flex flex-col justify-end gap-2 max-w-xl">
-          <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-accent-text">
-            <ListMusic class="w-4 h-4" />
-            <span>{i18n.t("playlists.title")}</span>
-          </div>
-
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input

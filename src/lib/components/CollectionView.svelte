@@ -296,31 +296,20 @@
   <ArtistDetailView artistName={collectionStore.selectedArtistName} />
 {:else}
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <!-- Top bar with Filter Info -->
+  <!-- Top bar with Filter Info / Sort controls -->
   <div class="h-12 px-6 flex items-center justify-between">
-    <!-- Filter Pills (Left) -->
-    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none max-w-xl py-1 select-none flex-nowrap flex-shrink-0">
-      <button
-        onclick={() => { collectionStore.activeSubTab = "artists"; collectionStore.selectedArtistName = null; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'artists' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-      >
-        {i18n.t('collection.artists', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredArtists.length : collectionStore.stats.total_artists })}
-      </button>
-      <button
-        onclick={() => { collectionStore.activeSubTab = "albums"; collectionStore.selectedArtistName = null; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-      >
-        {i18n.t('collection.albums', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredAlbums.length : collectionStore.stats.total_albums })}
-      </button>
-      <button
-        onclick={() => { collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; }}
-        class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {collectionStore.activeSubTab === 'songs' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-      >
-        {i18n.t('collection.songs', { count: collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs })}
-      </button>
+    <!-- Showing Count (Left) -->
+    <div class="text-xs text-brand-text-secondary font-medium">
+      {#if collectionStore.activeSubTab === "songs"}
+        {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
+      {:else if collectionStore.activeSubTab === "albums"}
+        {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
+      {:else}
+        {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
+      {/if}
     </div>
 
-    <!-- Showing Count & Sort Dropdown (Right) -->
+    <!-- Sort Dropdown (Right) -->
     <div class="flex items-center gap-4">
       {#if collectionStore.activeSubTab === "songs"}
         <div class="relative">
@@ -331,7 +320,8 @@
               sortField = field as keyof Song;
               sortAsc = asc === "true";
             }}
-            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
             <option value="title-true">{i18n.t('collection.sortTitleAsc')}</option>
             <option value="title-false">{i18n.t('collection.sortTitleDesc')}</option>
@@ -354,7 +344,8 @@
               albumSortField = field as "album" | "artist" | "year" | "track_count";
               albumSortAsc = asc === "true";
             }}
-            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
             <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
             <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
@@ -375,27 +366,18 @@
               artistSortField = field as "name" | "album_count" | "song_count";
               artistSortAsc = asc === "true";
             }}
-            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
+            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
+            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
             <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
             <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
             <option value="album_count-false">{i18n.t('collection.sortAlbumsDesc')}</option>
             <option value="album_count-true">{i18n.t('collection.sortAlbumsAsc')}</option>
-            <option value="song_count-false">{i18n.t('collection.sortTracksDesc')}</option>
-            <option value="song_count-true">{i18n.t('collection.sortTracksAsc')}</option>
+            <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
+            <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
           </select>
         </div>
       {/if}
-
-      <div class="text-xs text-brand-text-secondary font-medium">
-        {#if collectionStore.activeSubTab === "songs"}
-          {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
-        {:else if collectionStore.activeSubTab === "albums"}
-          {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
-        {:else}
-          {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
-        {/if}
-      </div>
     </div>
   </div>
 

@@ -9,7 +9,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { DiscAlbum, Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
+  import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -264,14 +264,6 @@
     <div class="flex items-end justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
-        <button
-          onclick={goBack}
-          class="self-start flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-accent-text hover:text-brand-accent-text-hover transition-colors cursor-pointer"
-        >
-          <DiscAlbum class="w-4 h-4" />
-          <span>{i18n.t('albumDetail.backToAlbums')}</span>
-        </button>
-
         <h1 class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
         </h1>
