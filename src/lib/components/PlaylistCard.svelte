@@ -43,17 +43,17 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
-  <div class="aspect-square w-full rounded-lg mb-2.5 bg-brand-main relative flex items-center justify-center">
+  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if topAlbums.length > 0}
-      <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-24 h-24" />
+      <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-36 h-36" />
     {:else}
-      <div class="w-full h-full rounded-lg bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
+      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/80" />
       </div>
     {/if}
-    <div class="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
+    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
       <button
         onclick={handlePlayButtonClick}
         class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
@@ -64,9 +64,13 @@
     </div>
   </div>
 
-  <span class="font-semibold text-xs text-brand-text-primary group-hover:text-brand-accent-text transition-colors truncate w-full">
+  <button
+    onclick={(e) => { e.stopPropagation(); onClick(); }}
+    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+    title={playlist.name}
+  >
     {playlist.name}
-  </span>
+  </button>
   <div class="flex items-center justify-between mt-0.5 text-[10px] text-brand-text-secondary/50">
     <span class="truncate">{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
     <span class="shrink-0">{playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}</span>

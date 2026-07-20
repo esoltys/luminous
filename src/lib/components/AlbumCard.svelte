@@ -109,14 +109,14 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
 >
   <div
-    class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text relative"
+    class="aspect-square bg-brand-main mb-3 flex items-center justify-center text-brand-accent-text relative"
   >
     <CoverStack
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
     <div
-      class="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20"
+      class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20"
     >
       <button
         onclick={handlePlayButtonClick}
