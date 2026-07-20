@@ -431,7 +431,6 @@ export const fr = {
     backToAlbums: "Retour aux albums",
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
-    lossless: "Sans perte",
     addAllToPlaylistTooltip: "Ajouter toutes les chansons à la playlist active",
     editInfoTooltip: "Modifier les infos de l'album"
   },
