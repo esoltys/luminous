@@ -10,7 +10,8 @@
 ## Project Structure
 
 - Rust source lives in `src-tauri/src/`; Svelte source in `src/`
-- Shared TypeScript types in `src/lib/types/`; Tauri IPC wrappers in `src/lib/ipc/`; Svelte 5 stores (Runes) in `src/lib/stores/`
+- Shared TypeScript types in `src/lib/types/`; Svelte 5 stores (Runes) in `src/lib/stores/`
+- No dedicated IPC wrapper layer — components and stores call Tauri commands directly via `invoke()` from `@tauri-apps/api/core`
 
 **Key frontend stores** (`src/lib/stores/*.svelte.ts`):
 
