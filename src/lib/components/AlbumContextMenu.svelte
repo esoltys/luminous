@@ -37,9 +37,9 @@
     if (typeof window === "undefined") return y;
     const menuHeight = 180;
     // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top
-    // of page content once a track has ever played this session — clamp
-    // above it so the menu's lower items aren't hidden underneath it.
-    const dockClearance = playerStore.hasEverPlayed ? 96 : 0;
+    // of page content whenever a song is loaded — clamp above it so the
+    // menu's lower items aren't hidden underneath it.
+    const dockClearance = playerStore.currentSong ? 96 : 0;
     return Math.min(y, window.innerHeight - menuHeight - dockClearance - 10);
   });
 

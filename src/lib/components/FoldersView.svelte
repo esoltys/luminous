@@ -228,7 +228,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-24={playerStore.hasEverPlayed}>
+  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-24={!!playerStore.currentSong}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">

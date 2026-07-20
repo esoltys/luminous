@@ -184,5 +184,5 @@
   <div class="flex-1"></div>
 
   <!-- Bottom spacer for player bar -->
-  <div class:mb-24={playerStore.hasEverPlayed}></div>
+  <div class:mb-24={!!playerStore.currentSong}></div>
 </aside>

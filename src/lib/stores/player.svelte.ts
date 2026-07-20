@@ -8,9 +8,6 @@ export class PlayerStore {
   // Reactive state using Svelte 5 Runes
   state = $state<PlayState>("stopped");
   currentSong = $state<Song | undefined>(undefined);
-  // Sticky for the session: once a track has ever loaded, the player bar
-  // stays visible even if currentSong later clears (e.g. queue ends).
-  hasEverPlayed = $state<boolean>(false);
   playlistId = $state<number | undefined>(undefined);
   playlistItemUuid = $state<string | undefined>(undefined);
   positionNanosec = $state<number>(0);
@@ -49,7 +46,6 @@ export class PlayerStore {
       // Listen for track changes
       await listen<{ song: Song | null }>("track-changed", (event) => {
         this.currentSong = event.payload.song || undefined;
-        if (this.currentSong) this.hasEverPlayed = true;
         themeStore.updateArtworkColors(this.currentSong);
       });
 
@@ -74,7 +70,6 @@ export class PlayerStore {
   private updateState(state: PlaybackState) {
     this.state = state.state;
     this.currentSong = state.current_song;
-    if (this.currentSong) this.hasEverPlayed = true;
     this.playlistId = state.playlist_id;
     this.playlistItemUuid = state.playlist_item_uuid;
     this.positionNanosec = state.position_nanosec;

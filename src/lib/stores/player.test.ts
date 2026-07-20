@@ -122,7 +122,7 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: testPaths });
   });
 
-  it("should latch hasEverPlayed once a track loads and keep it true after the track clears", async () => {
+  it("should clear currentSong when track-changed reports no song", async () => {
     const originalListenImpl = vi.mocked(listen).getMockImplementation();
     let trackChangedCallback: ((event: { payload: { song: unknown } }) => void) | undefined;
     vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
@@ -133,14 +133,13 @@ describe("PlayerStore", () => {
     store = new PlayerStore();
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(store.hasEverPlayed).toBe(false);
+    expect(store.currentSong).toBeFalsy();
 
     trackChangedCallback?.({ payload: { song: { id: 1, title: "Test Song" } } });
-    expect(store.hasEverPlayed).toBe(true);
+    expect(store.currentSong).toEqual({ id: 1, title: "Test Song" });
 
     trackChangedCallback?.({ payload: { song: null } });
     expect(store.currentSong).toBeUndefined();
-    expect(store.hasEverPlayed).toBe(true);
 
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
   });

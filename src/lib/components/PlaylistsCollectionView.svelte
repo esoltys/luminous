@@ -182,7 +182,7 @@
   <AutoPlaylistDetailView view={collectionStore.selectedAutoPlaylist} />
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-    <div class="flex-1 px-6 overflow-y-auto" class:pb-24={playerStore.hasEverPlayed}>
+    <div class="flex-1 px-6 overflow-y-auto" class:pb-24={!!playerStore.currentSong}>
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
         <!-- Showing Count (Left) -->
