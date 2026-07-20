@@ -68,7 +68,6 @@ export const fr = {
     tableHeaderDuration: "Durée",
     tableHeaderActions: "Actions",
     playSong: "Lire la chanson",
-    filterByTitle: "Filtrer par titre : {title}",
     filterByArtist: "Voir l'artiste : {artist}",
     filterByAlbum: "Filtrer par album : {album}",
     addPlaylistTooltip: "Ajouter à la liste de lecture active",

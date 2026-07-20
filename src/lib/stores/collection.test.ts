@@ -196,10 +196,6 @@ describe("CollectionStore", () => {
     collectionStore.viewAlbum("Dark Side");
     expect(collectionStore.selectedAlbumName).toBe("Dark Side");
     expect(collectionStore.searchQuery).toBe("");
-
-    collectionStore.navigateTo("playlists");
-    expect(collectionStore.activeTab).toBe("playlists");
-    expect(collectionStore.selectedArtistName).toBeNull();
   });
 
   it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {

@@ -420,13 +420,12 @@
                   {song.track !== undefined && song.track !== null ? song.track : "—"}
                 </div>
                 <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
-                  <button
-                    onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
-                    class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                    title={i18n.t('collection.filterByTitle', { title: song.title || i18n.t('collection.unknownSong') })}
+                  <span
+                    class="truncate font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                    title={song.title || i18n.t('collection.unknownSong')}
                   >
                     {song.title || i18n.t('collection.unknownSong')}
-                  </button>
+                  </span>
                 </div>
                 <div class="text-brand-text-secondary/90 truncate pr-4 min-w-0">
                   {#if song.artist}

@@ -68,7 +68,6 @@ export const en = {
     tableHeaderDuration: "Duration",
     tableHeaderActions: "Actions",
     playSong: "Play song",
-    filterByTitle: "Filter by title: {title}",
     filterByArtist: "View artist: {artist}",
     filterByAlbum: "Filter by album: {album}",
     addPlaylistTooltip: "Add to active playlist",

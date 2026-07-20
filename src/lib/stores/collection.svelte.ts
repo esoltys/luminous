@@ -319,18 +319,6 @@ class CollectionStore {
     }
   }
 
-  navigateTo(tab: "home" | "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    this.activeTab = tab;
-    if (subTab) {
-      this.activeSubTab = subTab;
-    }
-    if (query !== undefined) {
-      this.searchQuery = query;
-    }
-  }
-
   viewArtist(name: string) {
     this.searchQuery = "";
     this.searchResults = [];

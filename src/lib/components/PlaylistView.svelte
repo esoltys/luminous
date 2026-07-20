@@ -589,7 +589,7 @@
           <div class="relative w-48 h-36 hidden sm:block shrink-0">
             {#each topAlbums.slice(0, 6) as album, i (i)}
               <div
-                class="absolute bottom-0 right-0 w-28 h-28 rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+                class="absolute bottom-0 right-0 w-28 h-28 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
                 style="z-index: {10 - i}; transform: translate({i * -18}px, {i * -10}px) rotate({i * -5}deg) scale({1 - i * 0.05}); opacity: {1 - i * 0.07};"
               >
                 <CoverArt
@@ -795,12 +795,8 @@
                         </span>
                       {/if}
                       <span
-                        role="button"
-                        tabindex="0"
-                        onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
-                        onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); } }}
-                        class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                        title={i18n.t("collection.filterByTitle", { title: item.song.title })}
+                        class="truncate font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                        title={item.song.title}
                       >
                         {item.song.title}
                       </span>
