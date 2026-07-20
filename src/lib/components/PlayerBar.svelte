@@ -295,6 +295,19 @@
      the shared variable itself. */
   footer.glass-surface {
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
+    /* Unlike the other glass panels (Sidebar, TopNavigation, RightPanel),
+       the PlayDock floats as a *sibling* of +layout.svelte's
+       .flip-perspective 3D-transform container rather than living inside
+       it, sampling that container's content from outside for its blur.
+       Chromium-family engines (confirmed on Windows WebView2; already
+       worked around for Linux/WebKitGTK via .no-3d) can fail to composite
+       backdrop-filter correctly for an element outside a 3D-transformed
+       subtree it needs to sample — the tint renders but the blur silently
+       drops. Forcing this element onto its own explicit GPU layer
+       sidesteps the buggy automatic layer assignment. */
+    isolation: isolate;
+    will-change: backdrop-filter;
+    transform: translateZ(0);
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the
