@@ -202,6 +202,19 @@ describe("CollectionStore", () => {
     expect(collectionStore.selectedArtistName).toBeNull();
   });
 
+  it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {
+    collectionStore.viewAlbum("Dark Side of the Moon");
+    expect(localStorage.getItem("navigation_selectedAlbumName")).toBe("Dark Side of the Moon");
+    expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
+
+    collectionStore.viewArtist("Pink Floyd");
+    expect(localStorage.getItem("navigation_selectedArtistName")).toBe("Pink Floyd");
+    expect(localStorage.getItem("navigation_selectedAlbumName")).toBeNull();
+
+    collectionStore.selectedArtistName = null;
+    expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
+  });
+
   it("toggles and persists layout states (sidebar, right panel, immersive mode)", () => {
     const initialSidebar = collectionStore.sidebarOpen;
     collectionStore.toggleSidebar();

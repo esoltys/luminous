@@ -195,6 +195,40 @@ impl Player {
                                 }
                             }
                         }
+                    } else {
+                        // Ad-hoc queue (album/artist/search selection played via
+                        // play_song/play_songs/open_and_play — not a saved DB
+                        // playlist). Its track order only lives in the
+                        // `last_adhoc_song_ids` snapshot; without it we'd only
+                        // know the single current song and nothing to advance to.
+                        if let Ok(ids_json) = conn.query_row(
+                            "SELECT value FROM app_state WHERE key = 'last_adhoc_song_ids'",
+                            [],
+                            |row| row.get::<_, String>(0),
+                        ) {
+                            if let Ok(song_ids) = serde_json::from_str::<Vec<i64>>(&ids_json) {
+                                let sql = format!(
+                                    "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
+                                    crate::collection::SONG_SELECT_COLS
+                                );
+                                let mut items = Vec::with_capacity(song_ids.len());
+                                for (i, sid) in song_ids.iter().enumerate() {
+                                    if let Ok(s) = conn.query_row(
+                                        &sql,
+                                        rusqlite::params![sid],
+                                        crate::collection::row_to_song,
+                                    ) {
+                                        items.push(PlaylistItem::new_song(0, i as i32, s));
+                                    }
+                                }
+                                if !items.is_empty() {
+                                    playlist_items = items;
+                                    current_index = playlist_items.iter().position(|i| {
+                                        i.song.as_ref().map(|s| s.id) == Some(song.id)
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -268,6 +302,8 @@ impl Player {
         self.played_indices.clear();
         self.queue.clear();
         self.scrobbled = false;
+
+        self.persist_adhoc_queue();
 
         // Build shuffle order if needed
         self.rebuild_shuffle_order();
@@ -374,6 +410,34 @@ impl Player {
         self.apply_loudness_gain(&song).await;
         let audio = self.audio.lock().await;
         audio.play(Box::new(song), start_ns)
+    }
+
+    /// Persist the ordered song-id list for ad-hoc queues (`playlist_id ==
+    /// 0` — album/artist/search selections, not a saved DB playlist) so a
+    /// restart can rebuild the full playback context instead of just the
+    /// current song. Saved playlists don't need this: they're reloaded from
+    /// the `playlists`/`playlist_items` tables via `last_playlist_id`.
+    fn persist_adhoc_queue(&self) {
+        if let Ok(conn) = self._db.pool.get() {
+            if self.current_playlist_id == Some(0) {
+                let song_ids: Vec<i64> = self
+                    .playlist_items
+                    .iter()
+                    .filter_map(|i| i.song.as_ref().map(|s| s.id))
+                    .collect();
+                if let Ok(json) = serde_json::to_string(&song_ids) {
+                    let _ = conn.execute(
+                        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('last_adhoc_song_ids', ?1)",
+                        rusqlite::params![json],
+                    );
+                }
+            } else {
+                let _ = conn.execute(
+                    "DELETE FROM app_state WHERE key = 'last_adhoc_song_ids'",
+                    [],
+                );
+            }
+        }
     }
 
     pub fn persist_current_song(&self) {
@@ -995,6 +1059,55 @@ mod tests {
             |r| r.get(0),
         );
         assert!(song_id_exists.is_err());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_adhoc_queue_survives_restart() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // Simulate an ad-hoc selection (album/artist/search — playlist_id 0)
+        // starting on the middle track, then "quitting" mid-playback.
+        player.play_playlist(items, 1, 0).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 2);
+
+        // Reopening the app re-runs Player::new against the same DB.
+        let restarted = Player::new(db_arc.clone(), audio.clone());
+        assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
+        assert_eq!(restarted.playlist_items.len(), 3);
+        assert_eq!(restarted.current_index, Some(1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
