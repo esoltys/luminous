@@ -6,6 +6,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import SongRating from "./SongRating.svelte";
+  import { portal } from "../utils/portal";
 
   interface Props {
     songId: number;
@@ -147,7 +148,7 @@
   onMount(loadMetadata);
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
+<div use:portal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col text-brand-text-primary">
     <!-- Header -->
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">

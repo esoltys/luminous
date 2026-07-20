@@ -3,6 +3,7 @@
   import { Play, Trash2, User, Disc, Edit3 } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { portal } from "../utils/portal";
 
   let {
     x,
@@ -68,6 +69,7 @@
 </script>
 
 <div
+  use:portal
   bind:this={menuEl}
   style="left: {adjustedX}px; top: {adjustedY}px;"
   class="fixed z-50 w-52 bg-brand-sidebar border border-brand-border/80 rounded-xl shadow-2xl py-1.5 text-xs text-brand-text-primary backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 select-none"
