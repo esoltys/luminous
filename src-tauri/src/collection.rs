@@ -494,13 +494,33 @@ impl CollectionScanner {
                 FROM songs
                 WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
                 GROUP BY album
+             ),
+             artist_genres AS (
+                SELECT
+                    COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
+                    genre,
+                    COUNT(*) AS g_count
+                FROM songs
+                WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''
+                GROUP BY effective_artist, genre
+             ),
+             top_artist_genres AS (
+                SELECT effective_artist, genre
+                FROM (
+                    SELECT effective_artist, genre,
+                           ROW_NUMBER() OVER (PARTITION BY effective_artist ORDER BY g_count DESC, genre ASC) AS rn
+                    FROM artist_genres
+                )
+                WHERE rn = 1
              )
              SELECT
                 COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist,
                 COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN s.album END) AS album_count,
-                COUNT(*) AS song_count
+                COUNT(*) AS song_count,
+                tag.genre AS genre
              FROM songs s
              LEFT JOIN album_counts ac ON s.album = ac.album
+             LEFT JOIN top_artist_genres tag ON COALESCE(NULLIF(s.album_artist, ''), s.artist) = tag.effective_artist
              WHERE s.source IN (1, 2) AND s.unavailable = 0
              GROUP BY effective_artist
              ORDER BY effective_artist",
@@ -511,6 +531,7 @@ impl CollectionScanner {
                     "name": row.get::<_, Option<String>>(0)?,
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
+                    "genre": row.get::<_, Option<String>>(3)?,
                 }))
             })?
             .filter_map(|r| r.ok())

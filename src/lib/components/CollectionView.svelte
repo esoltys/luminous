@@ -174,10 +174,13 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
   );
 
-  let artistSortField = $state<"name" | "album_count" | "song_count">(
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("sort_artist_field") as "name" | "album_count" | "song_count")) ||
-      "name"
+  let artistSortField = $state<"name" | "genre" | "song_count">(
+    (() => {
+      if (typeof window === "undefined") return "name";
+      const saved = localStorage.getItem("sort_artist_field");
+      if (saved === "album_count") return "genre";
+      return (saved as "name" | "genre" | "song_count") || "name";
+    })()
   );
   let artistSortAsc = $state(
     typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true
@@ -225,8 +228,8 @@
     const asc = artistSortAsc;
 
     return list.sort((a, b) => {
-      let valA = a[field];
-      let valB = b[field];
+      let valA = field === "genre" ? (a.genre?.trim() || i18n.t('artistDetail.unknownGenre')) : a[field];
+      let valB = field === "genre" ? (b.genre?.trim() || i18n.t('artistDetail.unknownGenre')) : b[field];
 
       if (valA === null || valA === undefined) return asc ? 1 : -1;
       if (valB === null || valB === undefined) return asc ? -1 : 1;
@@ -522,7 +525,7 @@
                 value={`${artistSortField}-${artistSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
-                  artistSortField = field as "name" | "album_count" | "song_count";
+                  artistSortField = field as "name" | "genre" | "song_count";
                   artistSortAsc = asc === "true";
                 }}
                 class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
@@ -530,8 +533,8 @@
               >
                 <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
                 <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
-                <option value="album_count-false">{i18n.t('collection.sortAlbumsDesc')}</option>
-                <option value="album_count-true">{i18n.t('collection.sortAlbumsAsc')}</option>
+                <option value="genre-true">{i18n.t('collection.sortGenreAsc')}</option>
+                <option value="genre-false">{i18n.t('collection.sortGenreDesc')}</option>
                 <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
                 <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
               </select>
@@ -566,11 +569,9 @@
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}
-              {@const fullAlbumCount = artistAlbums.length > 0 ? artistAlbums.filter((a) => a.track_count > 7).length : artist.album_count}
               <ArtistCard
                 {artist}
                 {artistAlbums}
-                {fullAlbumCount}
                 onclick={() => collectionStore.viewArtist(artist.name || "")}
               />
             {/each}

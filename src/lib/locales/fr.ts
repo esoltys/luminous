@@ -104,6 +104,8 @@ export const fr = {
     sortSongsAsc: "Trier : Chansons (Moins grand nombre)",
     sortAlbumsDesc: "Trier : Albums (Plus grand nombre)",
     sortAlbumsAsc: "Trier : Albums (Moins grand nombre)",
+    sortGenreAsc: "Trier : Genre (A-Z)",
+    sortGenreDesc: "Trier : Genre (Z-A)",
     albumsCount: "{count} albums",
     oneAlbum: "1 album",
     selectPlaylistFirstAlert: "Veuillez sélectionner ou créer une liste de lecture d'abord depuis l'onglet Listes de lecture.",

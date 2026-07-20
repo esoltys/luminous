@@ -91,6 +91,13 @@ describe("CollectionView.svelte", () => {
       name: "Band A",
       album_count: 1,
       song_count: 1,
+      genre: "Rock",
+    },
+    {
+      name: "Band B",
+      album_count: 1,
+      song_count: 1,
+      genre: "Pop",
     },
   ];
 
@@ -102,7 +109,7 @@ describe("CollectionView.svelte", () => {
     collectionStore.stats = {
       total_songs: 2,
       total_albums: 1,
-      total_artists: 1,
+      total_artists: 2,
       total_duration_nanosec: 380_000_000_000,
       total_filesize_bytes: 10_000_000,
     };
@@ -134,11 +141,22 @@ describe("CollectionView.svelte", () => {
     expect(getByText("Album 1")).toBeInTheDocument();
   });
 
-  it("renders artists in Artists view sub-tab", () => {
+  it("renders artists and their genre in Artists view sub-tab", () => {
     collectionStore.activeSubTab = "artists";
     const { getByText } = render(CollectionView);
 
     expect(getByText("Band A")).toBeInTheDocument();
+    expect(getByText("Rock")).toBeInTheDocument();
+    expect(getByText("Band B")).toBeInTheDocument();
+    expect(getByText("Pop")).toBeInTheDocument();
+  });
+
+  it("renders Sort: Genre options in Artists sub-tab", () => {
+    collectionStore.activeSubTab = "artists";
+    const { getByText } = render(CollectionView);
+
+    expect(getByText("Sort: Genre (A-Z)")).toBeInTheDocument();
+    expect(getByText("Sort: Genre (Z-A)")).toBeInTheDocument();
   });
 
   it("displays empty state when no songs match search query", () => {

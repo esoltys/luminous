@@ -6,14 +6,14 @@
   interface Props {
     artist: ArtistItem;
     artistAlbums: AlbumItem[];
-    fullAlbumCount: number;
+    fullAlbumCount?: number;
     onclick?: (e: MouseEvent) => void;
   }
 
   let {
     artist,
     artistAlbums,
-    fullAlbumCount,
+    fullAlbumCount: _fullAlbumCount,
     onclick: customClick,
   }: Props = $props();
 
@@ -24,6 +24,8 @@
       artManual: album.art_manual,
     }))
   );
+
+  let genreLabel = $derived(artist.genre?.trim() || i18n.t('artistDetail.unknownGenre'));
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -50,7 +52,7 @@
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
   <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
-    <span>{fullAlbumCount === 1 ? i18n.t('collection.oneAlbum') : i18n.t('collection.albumsCount', { count: fullAlbumCount })}</span>
+    <span>{genreLabel}</span>
     <span>•</span>
     <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
   </div>

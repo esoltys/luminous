@@ -104,6 +104,8 @@ export const en = {
     sortSongsAsc: "Sort: Songs (Least)",
     sortAlbumsDesc: "Sort: Albums (Most)",
     sortAlbumsAsc: "Sort: Albums (Least)",
+    sortGenreAsc: "Sort: Genre (A-Z)",
+    sortGenreDesc: "Sort: Genre (Z-A)",
     albumsCount: "{count} albums",
     oneAlbum: "1 album",
     selectPlaylistFirstAlert: "Please select or create a playlist first from the Playlists tab.",

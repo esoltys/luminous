@@ -216,6 +216,7 @@ export interface ArtistItem {
   name: string | null;
   album_count: number;
   song_count: number;
+  genre?: string | null;
 }
 
 /**
