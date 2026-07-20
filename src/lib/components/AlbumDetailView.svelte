@@ -330,7 +330,7 @@
 
       <!-- Right: Full Album Cover Art -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
-        <div class="absolute inset-0 rounded-2xl overflow-hidden border border-brand-border/60 shadow-2xl">
+        <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverArt
             songId={undefined}
             artEmbedded={albumItem?.art_embedded}

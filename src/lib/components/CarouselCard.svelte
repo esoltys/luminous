@@ -31,7 +31,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="flex-shrink-0 w-48 group relative">
     <!-- Card Container -->
-    <div class="relative rounded-lg overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
+    <div class="relative overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
       <!-- Cover Art -->
       <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
         <CoverArt

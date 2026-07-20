@@ -60,7 +60,7 @@
 <div class="flex items-center justify-center w-full h-full my-auto select-none">
   {#if activeCovers.length > 0}
     {#if activeCovers.length === 1}
-      <div class="{sizeClass} rounded-lg overflow-hidden relative">
+      <div class="{sizeClass} overflow-hidden relative">
         <CoverArt
           songId={activeCovers[0].songId}
           artEmbedded={activeCovers[0].artEmbedded}
@@ -73,7 +73,7 @@
       <div class="relative {sizeClass} flex items-center justify-center shrink-0">
         {#each activeCovers as cover, i (i)}
           <div
-            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
+            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
             style="z-index: {10 - i}; transform: {getTransform(i, activeCovers.length)}; opacity: {getOpacity(i, activeCovers.length)};"
           >
             <CoverArt
@@ -92,7 +92,7 @@
       {fallbackName ? fallbackName.charAt(0).toUpperCase() : "?"}
     </div>
   {:else}
-    <div class="{sizeClass} bg-brand-main rounded-lg flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative mx-auto">
+    <div class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative mx-auto">
       <CoverArt
         songId={undefined}
         artEmbedded={false}

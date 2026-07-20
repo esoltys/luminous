@@ -212,7 +212,7 @@
         <!-- Center Container: Card and Details -->
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
           <!-- Floating Cover Art Frame -->
-          <div class="w-72 h-72 md:w-[380px] md:h-[380px] rounded-2xl overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+          <div class="w-72 h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
             <CoverArt
               songId={playerStore.currentSong?.id}
               artEmbedded={playerStore.currentSong?.art_embedded}

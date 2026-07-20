@@ -315,7 +315,7 @@
         {#if topCovers.length > 0}
           <CoverStack covers={topCovers} sizeClass="w-40 h-40" />
         {:else}
-          <div class="absolute inset-0 rounded-2xl overflow-hidden border border-brand-border/60 shadow-2xl bg-gradient-to-br {getArtistGradient(displayName)} flex items-center justify-center">
+          <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl bg-gradient-to-br {getArtistGradient(displayName)} flex items-center justify-center">
             <ListMusic class="w-16 h-16 text-white/80" />
           </div>
         {/if}
