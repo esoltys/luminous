@@ -648,7 +648,7 @@
 {/if}
 
 {#if selectedSongIds.size > 0 && collectionStore.activeSubTab === 'songs'}
-  <div data-floating-toolbar="true" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+  <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
     <span class="text-brand-accent-text font-bold">
       {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
     </span>

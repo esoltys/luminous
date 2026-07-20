@@ -890,7 +890,7 @@
 
     <!-- Floating Multi-Select Batch Toolbar -->
     {#if selectedUuids.size > 0}
-      <div data-floating-toolbar="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-accent/40 rounded-full px-5 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs animate-in slide-in-from-bottom-4 duration-200">
+      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-accent/40 rounded-full px-5 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs animate-in slide-in-from-bottom-4 duration-200" class:bottom-10={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
         <span class="font-bold text-brand-accent-text">
           {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
         </span>
