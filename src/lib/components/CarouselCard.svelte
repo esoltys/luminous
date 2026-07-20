@@ -1,11 +1,9 @@
 <script lang="ts">
   import type { HomeItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import AlbumCard from "./AlbumCard.svelte";
   import { Play } from "lucide-svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import type { Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
   let { item }: { item: HomeItem } = $props();
@@ -22,47 +20,20 @@
     e.stopPropagation();
     if (item.type === "song") {
       await playerStore.playSong(item.song.id);
-    } else {
-      collectionStore.viewAlbum(item.album.album || "");
-      let songs = await invoke<Song[]>("get_songs_by_album", {
-        album: item.album.album || "",
-      });
-      // Filter out excluded formats
-      songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
-      if (songs.length > 0) {
-        const songIds = songs.map((s) => s.id);
-        playerStore.playSongs(songIds, 0);
-      }
-    }
-  }
-
-  async function handleCardClick() {
-    if (item.type === "album") {
-      collectionStore.viewAlbum(item.album.album || "");
-      let songs = await invoke<Song[]>("get_songs_by_album", {
-        album: item.album.album || "",
-      });
-      // Filter out excluded formats
-      songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
-      if (songs.length > 0) {
-        const songIds = songs.map((s) => s.id);
-        playerStore.playSongs(songIds, 0);
-      }
     }
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  onclick={handleCardClick}
-  class="flex-shrink-0 w-48 group relative {item.type === 'album' ? 'cursor-pointer' : ''}"
->
-  <!-- Card Container -->
-  <div class="relative rounded-lg overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
-    <!-- Cover Art -->
-    <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
-      {#if item.type === "song"}
+{#if item.type === "album"}
+  <AlbumCard album={item.album} widthClass="w-48 shrink-0" />
+{:else}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="flex-shrink-0 w-48 group relative">
+    <!-- Card Container -->
+    <div class="relative rounded-lg overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
+      <!-- Cover Art -->
+      <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
         <CoverArt
           songId={item.song.id}
           artEmbedded={item.song.art_embedded}
@@ -70,31 +41,21 @@
           artManual={item.song.art_manual}
           sizeClass="w-full h-full"
         />
-      {:else}
-        <CoverArt
-          songId={undefined}
-          artEmbedded={item.album.art_embedded}
-          artAutomatic={item.album.art_automatic}
-          artManual={item.album.art_manual}
-          sizeClass="w-full h-full"
-        />
-      {/if}
 
-      <!-- Play Button Overlay -->
-      <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
-        <button
-          onclick={handlePlay}
-          class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg cursor-pointer"
-          title={i18n.t('playerBar.play')}
-        >
-          <Play class="w-6 h-6 fill-current" />
-        </button>
+        <!-- Play Button Overlay -->
+        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+          <button
+            onclick={handlePlay}
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg cursor-pointer"
+            title={i18n.t('playerBar.play')}
+          >
+            <Play class="w-6 h-6 fill-current" />
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- Metadata -->
-    <div class="p-3 space-y-2">
-      {#if item.type === "song"}
+      <!-- Metadata -->
+      <div class="p-3 space-y-2">
         <!-- Song Title -->
         <h3 class="text-sm font-semibold text-brand-text-primary truncate" title={item.song.title}>
           {item.song.title || i18n.t('collection.unknownSong')}
@@ -109,43 +70,10 @@
         <p class="text-xs text-brand-text-secondary/60">
           {formatDuration(item.song.length_nanosec)}
         </p>
-      {:else}
-        <!-- Album Title -->
-        <button
-          onclick={(e) => {
-            e.stopPropagation();
-            collectionStore.viewAlbum(item.album.album || "");
-          }}
-          class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all text-left truncate w-full cursor-pointer focus:outline-hidden"
-          title={item.album.album || i18n.t('collection.unknownAlbum')}
-        >
-          {item.album.album || i18n.t('collection.unknownAlbum')}
-        </button>
-
-        <!-- Album Artist -->
-        {#if item.album.artist}
-          <button
-            onclick={(e) => {
-              e.stopPropagation();
-              collectionStore.viewArtist(item.album.artist || "");
-            }}
-            class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all truncate cursor-pointer text-left w-full"
-            title={i18n.t('collection.filterByArtist', { artist: item.album.artist })}
-          >
-            {item.album.artist}
-          </button>
-        {:else}
-          <p class="text-xs text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</p>
-        {/if}
-
-        <!-- Album Tracks & Year -->
-        <p class="text-xs text-brand-text-secondary/60">
-          {item.album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: item.album.track_count })} {#if item.album.year}({item.album.year}){/if}
-        </p>
-      {/if}
+      </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
 </style>

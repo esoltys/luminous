@@ -15,6 +15,7 @@
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
+  import AlbumCard from "./AlbumCard.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -547,85 +548,11 @@
       <!-- Albums Card Grid View -->
       <div class={sortedAlbums.length <= 3 ? "flex flex-row flex-wrap gap-6" : "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6"}>
         {#each sortedAlbums as album}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div
-            onclick={async () => {
-              collectionStore.viewAlbum(album.album || "");
-              await handlePlayAlbum(album.album || "");
-            }}
-            ondblclick={async () => {
-              const albumName = album.album || i18n.t('collection.unknownAlbum');
-              const playlistName = i18n.t('collection.albumPlaylistName', { name: albumName });
-              let existingPlaylist = playlistsStore.playlists.find(p => p.name === playlistName);
-
-              if (existingPlaylist) {
-                await playlistsStore.selectPlaylist(existingPlaylist.id);
-                await playlistsStore.clearPlaylist(existingPlaylist.id);
-              } else {
-                await playlistsStore.createPlaylist(playlistName);
-              }
-
-              let songs = await invoke<Song[]>("get_songs_by_album", {
-                album: album.album || "",
-              });
-
-              // Filter out excluded formats
-              songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
-
-              if (songs.length > 0) {
-                const songIds = songs.map((s) => s.id);
-                if (playlistsStore.activePlaylistId !== null) {
-                  await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songIds);
-                  collectionStore.activeTab = "playlists";
-                  await playerStore.playPlaylistItem(playlistsStore.activePlaylistId, 0);
-                }
-              }
-            }}
+          <AlbumCard
+            {album}
+            widthClass={sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-            class="{sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
-          >
-            <div
-              class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative"
-            >
-              <CoverArt
-                songId={undefined}
-                artEmbedded={album.art_embedded}
-                artAutomatic={album.art_automatic}
-                artManual={album.art_manual}
-                sizeClass="w-full h-full"
-              />
-              <div
-                class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-              >
-                <div class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform">
-                  <Play class="w-5 h-5 fill-current ml-0.5" />
-                </div>
-              </div>
-            </div>
-            <button
-              onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
-              class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
-              title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
-            >
-              {album.album || i18n.t('collection.unknownAlbum')}
-            </button>
-            {#if album.artist}
-              <button
-                onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
-                class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-                title={i18n.t('collection.filterByArtist', { artist: album.artist })}
-              >
-                {album.artist}
-              </button>
-            {:else}
-              <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">{i18n.t('collection.variousArtists')}</span>
-            {/if}
-            <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
-              <span>{album.year || ""}</span>
-              <span>{album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count })}</span>
-            </div>
-          </div>
+          />
         {/each}
         {#if sortedAlbums.length === 0}
           <div class="col-span-full py-16 text-center">
