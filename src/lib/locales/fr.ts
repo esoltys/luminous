@@ -115,7 +115,7 @@ export const fr = {
     ratingStyleStars: "5 étoiles",
     ratingStyleHint: "Le cœur marque une piste comme favorite ; les 5 étoiles permettent des notes par demi-étoile. Les deux utilisent la même note sous-jacente.",
     showMoodmoji: "Afficher le moodmoji",
-    showMoodmojiHint: "Le moodmoji est une courte empreinte emoji affichée à côté du titre de la piste en cours de lecture. Elle est dérivée des données du mood bar de la piste : le premier emoji reflète sa bande de fréquence dominante (graves/médiums/aigus), le second son énergie spectrale globale (calme/équilibrée/intense).",
+    showMoodmojiHint: "Le moodmoji est une courte empreinte emoji affichée dans le panneau de détails pour la piste en cours de lecture. Elle est dérivée des données du mood bar de la piste : le premier emoji reflète sa bande de fréquence dominante (graves/médiums/aigus), le second son énergie spectrale globale (calme/équilibrée/intense).",
     addFolder: "Ajouter un dossier",
     folderHelpTitle: "Comment fonctionnent les dossiers surveillés ?",
     folderHelpText: "Luminous surveille ces dossiers à la recherche de fichiers audio (MP3, FLAC, M4A, etc.). Lorsque vous appuyez sur « Analyser la bibliothèque », le scanner effectue une recherche récursive dans ces dossiers et ajoute les nouvelles pistes ou les pistes mises à jour à votre collection. Luminous utilise un hachage basé sur l'heure de modification (mtime) pour effectuer des analyses incrémentielles rapides.",

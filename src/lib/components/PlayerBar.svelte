@@ -10,7 +10,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
-  import { deriveMoodmoji } from "../utils/moodmoji";
+
 
   import {
     Play,
@@ -27,32 +27,6 @@
     AudioWaveform,
     Palette
   } from "lucide-svelte";
-
-  // Moodmoji: a short emoji hash derived from the current track's moodbar
-  // data, shown as a tooltip near the track title rather than in dense list
-  // rows (per gap-analysis discussion on issue #25).
-  let moodmoji = $state<string | null>(null);
-
-  $effect(() => {
-    const songId = playerStore.currentSong?.id;
-    moodmoji = null; // clear immediately so the previous track's moodmoji never lingers
-    if (songId === undefined || !prefs.showMoodmoji) {
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const data = await invoke<number[] | null>("get_moodbar_data", { songId });
-        if (!cancelled) moodmoji = data ? deriveMoodmoji(data) : null;
-      } catch (e) {
-        if (!cancelled) moodmoji = null;
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  });
 
   // Helper to format nanoseconds to M:SS
   function formatTime(nanosec: number | undefined): string {
@@ -163,14 +137,6 @@
           >
             {playerStore.currentSong.title}
           </button>
-          {#if moodmoji}
-            <span
-              class="text-xs select-none flex-shrink-0"
-              title={i18n.t('playerBar.moodmojiTooltip', {}, "Moodmoji — a mood hash derived from this track's dominant frequency bands and energy")}
-            >
-              {moodmoji}
-            </span>
-          {/if}
         {:else}
           <span class="text-sm font-semibold text-brand-text-primary truncate">
             {i18n.t('playerBar.notPlaying')}

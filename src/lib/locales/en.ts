@@ -115,7 +115,7 @@ export const en = {
     ratingStyleStars: "5-star",
     ratingStyleHint: "Heart marks a track as a favorite; 5-star allows half-step ratings. Both use the same underlying rating.",
     showMoodmoji: "Show moodmoji",
-    showMoodmojiHint: "Moodmoji is a short emoji hash shown next to the now-playing track title. It's derived from the track's moodbar data: the first emoji reflects its dominant frequency band (bass/mid/treble), the second its overall spectral energy (calm/balanced/intense).",
+    showMoodmojiHint: "Moodmoji is a short emoji hash shown in the detail panel for the now-playing track. It's derived from the track's moodbar data: the first emoji reflects its dominant frequency band (bass/mid/treble), the second its overall spectral energy (calm/balanced/intense).",
     addFolder: "Add Folder",
     folderHelpTitle: "How do Watched Folders work?",
     folderHelpText: "Luminous monitors these folders for audio files (MP3, FLAC, M4A, etc.). When you press \"Rescan Library\", the scanner recursively searches these folders and adds new/updated tracks to your collection. Luminous uses mtime-based hashing to perform fast incremental scans.",
