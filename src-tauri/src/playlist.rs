@@ -101,7 +101,11 @@ impl PlaylistManager {
 
     pub fn create_playlist(&self, name: &str) -> Result<Playlist> {
         let conn = self.db.pool.get()?;
-        conn.execute("INSERT INTO playlists (name) VALUES (?1)", params![name])?;
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO playlists (name, updated) VALUES (?1, ?2)",
+            params![name, now],
+        )?;
         let id = conn.last_insert_rowid();
         Ok(Playlist {
             id,
@@ -109,7 +113,8 @@ impl PlaylistManager {
             dynamic_enabled: false,
             dynamic_spec: None,
             last_played_row: None,
-            created: chrono::Utc::now().timestamp(),
+            created: now,
+            updated: now,
             track_count: 0,
         })
     }
@@ -117,8 +122,8 @@ impl PlaylistManager {
     pub fn rename_playlist(&self, id: i64, name: &str) -> Result<()> {
         let conn = self.db.pool.get()?;
         conn.execute(
-            "UPDATE playlists SET name = ?1 WHERE id = ?2",
-            params![name, id],
+            "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+            params![name, chrono::Utc::now().timestamp(), id],
         )?;
         Ok(())
     }
@@ -134,7 +139,7 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec,
-                    p.last_played_row, p.created,
+                    p.last_played_row, p.created, p.updated,
                     COUNT(pi.id) as track_count
              FROM playlists p
              LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
@@ -150,7 +155,8 @@ impl PlaylistManager {
                     dynamic_spec: row.get(3)?,
                     last_played_row: row.get(4)?,
                     created: row.get(5)?,
-                    track_count: row.get(6)?,
+                    updated: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
+                    track_count: row.get(7)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -162,7 +168,7 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec,
-                    p.last_played_row, p.created,
+                    p.last_played_row, p.created, p.updated,
                     (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
              FROM playlists p
              WHERE EXISTS (
@@ -183,7 +189,8 @@ impl PlaylistManager {
                     dynamic_spec: row.get(3)?,
                     last_played_row: row.get(4)?,
                     created: row.get(5)?,
-                    track_count: row.get(6)?,
+                    updated: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
+                    track_count: row.get(7)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -193,9 +200,9 @@ impl PlaylistManager {
 
     /// Regenerates each genre "auto-playlist" — a system-managed `playlists` row
     /// with `dynamic_enabled = 1` and `dynamic_spec` set to the genre name — if
-    /// it's missing or its `created` timestamp is more than 24h old, and prunes
-    /// rows for genres no longer present in the library. Reuses `created` as the
-    /// "last (re)generated at" timestamp shown in the UI.
+    /// it's missing or its `updated` timestamp is more than 24h old, and prunes
+    /// rows for genres no longer present in the library. `updated` doubles as
+    /// the "last (re)generated at" timestamp shown in the UI.
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
@@ -221,15 +228,15 @@ impl PlaylistManager {
         for genre in &genres {
             let existing_row: Option<(i64, i64)> = conn
                 .query_row(
-                    "SELECT id, created FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
                     params![genre],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
                 )
                 .ok();
 
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, created)) => now - created > STALE_AFTER_SECS,
+                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
             };
             if !needs_generation {
                 continue;
@@ -240,7 +247,7 @@ impl PlaylistManager {
             let playlist_id = match existing_row {
                 Some((id, _)) => {
                     conn.execute(
-                        "UPDATE playlists SET created = ?1 WHERE id = ?2",
+                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
                     )?;
                     conn.execute(
@@ -251,7 +258,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created) VALUES (?1, 1, ?1, ?2)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?1, ?2, ?2)",
                         params![genre, now],
                     )?;
                     conn.last_insert_rowid()
@@ -634,6 +641,7 @@ impl PlaylistManager {
             )?;
             positions.push((pos, song_id));
         }
+        self.touch_updated(&conn, playlist_id)?;
 
         self.undo_stack.push(PlaylistOp::Insert {
             playlist_id,
@@ -673,6 +681,7 @@ impl PlaylistManager {
 
         // Re-number positions to be contiguous
         self.renumber_positions(&conn, playlist_id)?;
+        self.touch_updated(&conn, playlist_id)?;
 
         self.undo_stack.push(PlaylistOp::Remove {
             playlist_id,
@@ -680,6 +689,16 @@ impl PlaylistManager {
         });
         self.redo_stack.clear();
 
+        Ok(())
+    }
+
+    /// Bumps a playlist's `updated` timestamp to now — called whenever its
+    /// contents or name change, so "Updated" sort/display stays accurate.
+    fn touch_updated(&self, conn: &rusqlite::Connection, playlist_id: i64) -> Result<()> {
+        conn.execute(
+            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+            params![chrono::Utc::now().timestamp(), playlist_id],
+        )?;
         Ok(())
     }
 
@@ -723,6 +742,8 @@ impl PlaylistManager {
         }
 
         self.reorder_item_internal(playlist_id, from, to)?;
+        let conn = self.db.pool.get()?;
+        self.touch_updated(&conn, playlist_id)?;
 
         self.undo_stack.push(PlaylistOp::Move {
             playlist_id,
@@ -834,6 +855,7 @@ impl PlaylistManager {
             )?;
         }
 
+        self.touch_updated(&conn, playlist_id)?;
         self.undo_stack
             .push(PlaylistOp::BatchMove { playlist_id, moves });
         self.redo_stack.clear();
@@ -870,6 +892,7 @@ impl PlaylistManager {
             "DELETE FROM playlist_items WHERE playlist_id = ?1",
             params![playlist_id],
         )?;
+        self.touch_updated(&conn, playlist_id)?;
 
         self.undo_stack
             .push(PlaylistOp::Clear { playlist_id, items });
