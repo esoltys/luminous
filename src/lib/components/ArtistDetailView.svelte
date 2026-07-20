@@ -80,6 +80,13 @@
   let fullAlbums = $derived(albums.filter((a) => a.track_count > 7));
   let singlesAndEps = $derived(albums.filter((a) => a.track_count <= 7));
 
+  let albumsText = $derived(
+    fullAlbums.length === 1 ? i18n.t("collection.oneAlbum") : i18n.t("collection.albumsCount", { count: fullAlbums.length })
+  );
+  let songsText = $derived(
+    songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
+  );
+
   let albumPopularity = $derived.by(() => {
     const map = new Map<string, number>();
     for (const s of songs) {
@@ -157,7 +164,7 @@
 
         <!-- Summary Metadata Line -->
         <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
-          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albumCount: albums.length, songCount: songs.length, duration: totalDurationLabel })}</span>
+          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albums: albumsText, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 
         <!-- Action Buttons: Play All & Shuffle Play -->

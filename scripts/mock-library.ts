@@ -192,22 +192,29 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
 }
 
 export function deriveArtists(songs: Song[]): ArtistItem[] {
-  const albumsByArtist = new Map<string, Set<string>>();
+  const albumTrackCounts = new Map<string, number>();
+  for (const song of songs) {
+    if (song.album) {
+      albumTrackCounts.set(song.album, (albumTrackCounts.get(song.album) ?? 0) + 1);
+    }
+  }
+
+  const fullAlbumsByArtist = new Map<string, Set<string>>();
   const songCountByArtist = new Map<string, number>();
   for (const song of songs) {
     const artist = song.album_artist || song.artist;
     if (!artist) continue;
     songCountByArtist.set(artist, (songCountByArtist.get(artist) ?? 0) + 1);
-    if (song.album) {
-      if (!albumsByArtist.has(artist)) albumsByArtist.set(artist, new Set());
-      albumsByArtist.get(artist)!.add(song.album);
+    if (song.album && (albumTrackCounts.get(song.album) ?? 0) > 7) {
+      if (!fullAlbumsByArtist.has(artist)) fullAlbumsByArtist.set(artist, new Set());
+      fullAlbumsByArtist.get(artist)!.add(song.album);
     }
   }
   return [...songCountByArtist.keys()]
     .sort((a, b) => a.localeCompare(b))
     .map((name) => ({
       name,
-      album_count: albumsByArtist.get(name)?.size ?? 0,
+      album_count: fullAlbumsByArtist.get(name)?.size ?? 0,
       song_count: songCountByArtist.get(name) ?? 0,
     }));
 }

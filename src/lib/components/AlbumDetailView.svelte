@@ -296,7 +296,7 @@
             <span>{yearLabel}</span>
             <span>•</span>
           {/if}
-          <span>{i18n.t('playlists.songsCount', { count: songs.length })}</span>
+          <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
         </div>

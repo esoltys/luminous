@@ -140,7 +140,7 @@
 
         <!-- Album Tracks & Year -->
         <p class="text-xs text-brand-text-secondary/60">
-          {i18n.t('playlists.songsCount', { count: item.album.track_count })} {#if item.album.year}({item.album.year}){/if}
+          {item.album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: item.album.track_count })} {#if item.album.year}({item.album.year}){/if}
         </p>
       {/if}
     </div>

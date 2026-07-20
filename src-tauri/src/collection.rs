@@ -489,12 +489,19 @@ impl CollectionScanner {
     pub fn get_artists(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT
-                COALESCE(NULLIF(album_artist, ''), artist) AS effective_artist,
-                COUNT(DISTINCT album) AS album_count,
+            "WITH album_counts AS (
+                SELECT album, COUNT(*) AS track_count
+                FROM songs
+                WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
+                GROUP BY album
+             )
+             SELECT
+                COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist,
+                COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN s.album END) AS album_count,
                 COUNT(*) AS song_count
-             FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0
+             FROM songs s
+             LEFT JOIN album_counts ac ON s.album = ac.album
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
              GROUP BY effective_artist
              ORDER BY effective_artist",
         )?;
@@ -1267,6 +1274,62 @@ mod tests {
             songs[0].path.as_deref(),
             Some(r"C:\Music\OtherArtist\song3.mp3")
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_artists_album_count_filtering() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Artist A: Single with 1 track (track_count <= 7) -> should count as 0 albums
+        let song_a = Song {
+            artist: Some("Artist Single".to_string()),
+            album: Some("Single Album".to_string()),
+            title: Some("Single Track".to_string()),
+            source: SongSource::LocalFile,
+            path: Some(r"C:\Music\Artist Single\single.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_a).unwrap();
+
+        // Artist B: Full Album with 8 tracks (track_count > 7) -> should count as 1 album
+        for i in 1..=8 {
+            let song_b = Song {
+                artist: Some("Artist Full".to_string()),
+                album: Some("Full Album".to_string()),
+                title: Some(format!("Track {}", i)),
+                source: SongSource::LocalFile,
+                path: Some(format!(r"C:\Music\Artist Full\track{}.mp3", i)),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song_b).unwrap();
+        }
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let single_artist = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist Single"))
+            .unwrap();
+        assert_eq!(single_artist["album_count"].as_i64(), Some(0));
+        assert_eq!(single_artist["song_count"].as_i64(), Some(1));
+
+        let full_artist = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist Full"))
+            .unwrap();
+        assert_eq!(full_artist["album_count"].as_i64(), Some(1));
+        assert_eq!(full_artist["song_count"].as_i64(), Some(8));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

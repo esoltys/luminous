@@ -78,6 +78,6 @@
     {playlist.name}
   </span>
   <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-    {i18n.t("playlists.songsCount", { count: playlist.track_count })}
+    {playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}
   </span>
 </button>

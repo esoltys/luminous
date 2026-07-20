@@ -388,11 +388,11 @@
 
       <div class="text-xs text-brand-text-secondary font-medium">
         {#if collectionStore.activeSubTab === "songs"}
-          {i18n.t('collection.showingSongs', { count: filteredSongs.length })}
+          {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
         {:else if collectionStore.activeSubTab === "albums"}
-          {i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
+          {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
         {:else}
-          {i18n.t('collection.showingArtists', { count: sortedArtists.length })}
+          {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
         {/if}
       </div>
     </div>
@@ -623,7 +623,7 @@
             {/if}
             <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
               <span>{album.year || ""}</span>
-              <span>{i18n.t('playlists.songsCount', { count: album.track_count })}</span>
+              <span>{album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count })}</span>
             </div>
           </div>
         {/each}
@@ -642,6 +642,7 @@
       <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
         {#each sortedArtists as artist}
           {@const artistAlbums = getArtistAlbumsFor(artist.name)}
+          {@const fullAlbumCount = artistAlbums.length > 0 ? artistAlbums.filter((a) => a.track_count > 7).length : artist.album_count}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div
@@ -680,7 +681,7 @@
               {artist.name || i18n.t('collection.unknownArtist')}
             </span>
             <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
-              <span>{artist.album_count === 1 ? i18n.t('collection.oneAlbum') : i18n.t('collection.albumsCount', { count: artist.album_count })}</span>
+              <span>{fullAlbumCount === 1 ? i18n.t('collection.oneAlbum') : i18n.t('collection.albumsCount', { count: fullAlbumCount })}</span>
               <span>•</span>
               <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
             </div>
