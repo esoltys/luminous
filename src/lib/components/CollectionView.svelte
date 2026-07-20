@@ -383,7 +383,7 @@
   </div>
 
   <!-- Main View Scrollable Container -->
-  <div class="flex-1 px-6 pt-2 {collectionStore.activeSubTab === 'songs' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}" class:pb-24={playerStore.hasEverPlayed}>
+  <div class="flex-1 pt-2 {collectionStore.activeSubTab === 'songs' ? 'px-6 overflow-hidden flex flex-col' : 'pl-6 pr-4 overflow-y-auto'}" class:pb-24={playerStore.hasEverPlayed}>
     {#if collectionStore.activeSubTab === "songs"}
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
@@ -529,11 +529,11 @@
 
     {:else if collectionStore.activeSubTab === "albums"}
       <!-- Albums Card Grid View -->
-      <div class={sortedAlbums.length <= 3 ? "flex flex-row flex-wrap gap-6" : "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6"}>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
         {#each sortedAlbums as album}
           <AlbumCard
             {album}
-            widthClass={sortedAlbums.length <= 3 ? 'w-48 shrink-0' : 'w-full'}
+            widthClass="w-full"
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
@@ -549,7 +549,7 @@
       </div>
     {:else if collectionStore.activeSubTab === "artists"}
       <!-- Artists List Grid View -->
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
         {#each sortedArtists as artist}
           {@const artistAlbums = getArtistAlbumsFor(artist.name)}
           {@const fullAlbumCount = artistAlbums.length > 0 ? artistAlbums.filter((a) => a.track_count > 7).length : artist.album_count}
