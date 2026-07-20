@@ -235,7 +235,7 @@
         </div>
 
         <!-- Rating style row -->
-        <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
+        <div class="flex items-center justify-between gap-4 py-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
@@ -250,30 +250,6 @@
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
           </select>
-        </div>
-
-        <!-- Show moodmoji row -->
-        <div class="flex items-center justify-between gap-4 py-4">
-          <div class="flex flex-col gap-0.5 min-w-0">
-            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.showMoodmoji')}</span>
-            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.showMoodmojiHint')}</p>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="text-xs font-medium text-brand-text-secondary text-right min-w-[3.5rem]">
-              {prefs.showMoodmoji ? i18n.t('common.on') : i18n.t('common.off')}
-            </span>
-            <button
-              id="moodmoji-toggle"
-              type="button"
-              role="switch"
-              aria-checked={prefs.showMoodmoji}
-              aria-label={i18n.t('settings.showMoodmoji')}
-              onclick={() => prefs.setShowMoodmoji(!prefs.showMoodmoji)}
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {prefs.showMoodmoji ? 'bg-brand-accent' : 'bg-brand-border'}"
-            >
-              <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {prefs.showMoodmoji ? 'translate-x-6' : 'translate-x-1'}"></span>
-            </button>
-          </div>
         </div>
       </div>
     {:else if settingsTab === "folders"}

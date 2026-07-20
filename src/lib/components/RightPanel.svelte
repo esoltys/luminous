@@ -5,9 +5,6 @@
   import { Music, Clock } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
-  import { invoke } from "@tauri-apps/api/core";
-  import { prefs } from "../stores/prefs.svelte";
-  import { deriveMoodmoji } from "../utils/moodmoji";
 
   interface Props {
     isOpen?: boolean;
@@ -18,30 +15,6 @@
   let { isOpen = true, width = 288, onClose }: Props = $props();
 
   let currentSong = $derived(playerStore.currentSong);
-
-  // Moodmoji: emoji hash derived from the current track's moodbar data
-  let moodmoji = $state<string | null>(null);
-
-  $effect(() => {
-    const songId = currentSong?.id;
-    moodmoji = null; // clear immediately when current track changes
-    if (songId === undefined || !prefs.showMoodmoji) {
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const data = await invoke<number[] | null>("get_moodbar_data", { songId });
-        if (!cancelled) moodmoji = data ? deriveMoodmoji(data) : null;
-      } catch (e) {
-        if (!cancelled) moodmoji = null;
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  });
 
   // Loudness normalization (#77) — expanded detail for the right panel
   // (the player bar only has room for a compact "R128"/"RG" badge).
@@ -105,22 +78,6 @@
           <p class="text-sm text-brand-text-secondary truncate">{currentSong.album || i18n.t('collection.unknownAlbum')}</p>
         </div>
       </div>
-
-      <!-- Moodmoji display -->
-      {#if prefs.showMoodmoji && moodmoji}
-        <div class="p-3.5 rounded-xl bg-brand-border/20 border border-brand-border/40 flex items-center justify-between shadow-xs">
-          <div class="flex flex-col gap-0.5">
-            <span class="text-xs font-semibold text-brand-text-primary uppercase tracking-wide">Moodmoji</span>
-            <span class="text-[11px] text-brand-text-secondary/70">Audio mood signature</span>
-          </div>
-          <span
-            class="text-3xl select-none leading-none tracking-widest"
-            title={i18n.t('playerBar.moodmojiTooltip', {}, "Moodmoji — a mood hash derived from this track's dominant frequency bands and energy")}
-          >
-            {moodmoji}
-          </span>
-        </div>
-      {/if}
 
       <!-- Playback Info -->
       <div class="space-y-2">

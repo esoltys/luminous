@@ -6,7 +6,6 @@ export type SeekBarMode = "waveform" | "moodbar";
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
-  showMoodmoji = $state<boolean>(true);
 
   async init() {
     try {
@@ -16,9 +15,6 @@ class PrefsStore {
       }
       if (settings?.seekbar_mode === "waveform" || settings?.seekbar_mode === "moodbar") {
         this.seekBarMode = settings.seekbar_mode;
-      }
-      if (settings?.show_moodmoji === "false" || settings?.show_moodmoji === "true") {
-        this.showMoodmoji = settings.show_moodmoji === "true";
       }
     } catch (e) {
       console.error("Failed to load preference settings:", e);
@@ -43,14 +39,6 @@ class PrefsStore {
     }
   }
 
-  async setShowMoodmoji(show: boolean) {
-    this.showMoodmoji = show;
-    try {
-      await invoke("set_app_setting", { key: "show_moodmoji", value: String(show) });
-    } catch (e) {
-      console.error("Failed to save moodmoji visibility:", e);
-    }
-  }
 }
 
 export const prefs = new PrefsStore();

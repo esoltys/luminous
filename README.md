@@ -86,7 +86,7 @@ You can download the latest installers and portable binaries directly from the G
 *   **Personalized Home Hub**: A tailored dashboard with Recently Played, Most Played, and Recently Added rows, plus cover art carousels for browsing.
 *   **Instant Search and Navigation**: Find any track, album, or artist instantly with split-second, database-level search.
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
-*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a moodmoji hash and one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
+*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
 *   **Gapless Playback**: Tracks flow into one another with no silence or clicks — ideal for live albums, concept records, and DJ mixes.
 *   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
 *   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
