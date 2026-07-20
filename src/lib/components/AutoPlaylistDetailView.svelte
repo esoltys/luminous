@@ -20,7 +20,7 @@
   let kind = $derived(view.kind);
   let genre = $derived(view.genre);
   let playlistId = $derived(view.playlistId);
-  let created = $derived(view.created);
+  let updated = $derived(view.updated);
 
   let songs = $state<Song[]>([]);
   let loading = $state(true);
@@ -119,9 +119,9 @@
 
   let topCovers = $derived(songsToCoverStack(songs));
 
-  let createdLabel = $derived.by(() => {
-    if (kind !== "genre" || created === undefined) return null;
-    return new Date(created * 1000).toLocaleDateString();
+  let updatedLabel = $derived.by(() => {
+    if (kind !== "genre" || updated === undefined) return null;
+    return new Date(updated * 1000).toLocaleDateString();
   });
 
   let totalDurationLabel = $derived.by(() => {
@@ -269,9 +269,9 @@
           <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
-          {#if createdLabel}
+          {#if updatedLabel}
             <span>•</span>
-            <span>{i18n.t('playlists.createdOn', { date: createdLabel })}</span>
+            <span>{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
           {/if}
         </div>
 

@@ -27,6 +27,8 @@
 
   let topAlbums = $derived(songsToCoverStack(tracks.filter((t) => !!t.song).map((t) => t.song!)));
 
+  let updatedLabel = $derived(new Date(playlist.updated * 1000).toLocaleDateString());
+
   function handlePlayButtonClick(e: MouseEvent) {
     e.stopPropagation();
     const songIds = tracks.filter((t) => t.song && !t.song.unavailable).map((t) => t.song!.id);
@@ -65,7 +67,8 @@
   <span class="font-semibold text-xs text-brand-text-primary group-hover:text-brand-accent-text transition-colors truncate w-full">
     {playlist.name}
   </span>
-  <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-    {playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}
-  </span>
+  <div class="flex items-center justify-between mt-0.5 text-[10px] text-brand-text-secondary/50">
+    <span class="truncate">{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
+    <span class="shrink-0">{playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}</span>
+  </div>
 </div>

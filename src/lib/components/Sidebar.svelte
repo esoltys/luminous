@@ -137,6 +137,9 @@
               <Sparkles class="w-3.5 h-3.5" />
               <span class="truncate">{i18n.t('sidebar.playlistsAuto')}</span>
             </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({playlistsStore.visibleAutoPlaylistCount})
+            </span>
           </button>
 
           <button

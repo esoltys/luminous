@@ -19,7 +19,8 @@
     genre?: string;
     label: string;
     playlistId?: number;
-    created?: number;
+    updated?: number;
+    trackCount: number;
   }
 
   onMount(async () => {
@@ -31,38 +32,75 @@
     } catch (err) {
       console.error("Failed to sync genre auto-playlists:", err);
     }
+    await playlistsStore.refreshAutoPlaylistCounts();
   });
 
   let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled));
   let customPlaylists = $derived(playlistsStore.playlists.filter((p) => !p.dynamic_enabled));
 
-  let autoDefs = $derived.by((): AutoDef[] => [
-    { id: "auto:favourites", kind: "favourites", label: i18n.t("playlists.autoFavourites") },
-    { id: "auto:recently_added", kind: "recently_added", label: i18n.t("playlists.autoRecentlyAdded") },
-    ...genreAutoPlaylists.map((p) => ({
-      id: `auto:genre:${p.id}`,
-      kind: "genre" as const,
-      genre: p.dynamic_spec ?? p.name,
-      label: p.dynamic_spec ?? p.name,
-      playlistId: p.id,
-      created: p.created,
-    })),
-  ]);
+  // Auto-playlists that currently resolve to 0 songs are hidden entirely
+  // (e.g. a genre's tags got edited away, or no songs are rated 5 stars).
+  let autoDefs = $derived.by((): AutoDef[] => {
+    const defs: AutoDef[] = [];
+    if (playlistsStore.favouritesCount > 0) {
+      defs.push({
+        id: "auto:favourites",
+        kind: "favourites",
+        label: i18n.t("playlists.autoFavourites"),
+        trackCount: playlistsStore.favouritesCount,
+      });
+    }
+    if (playlistsStore.recentlyAddedCount > 0) {
+      defs.push({
+        id: "auto:recently_added",
+        kind: "recently_added",
+        label: i18n.t("playlists.autoRecentlyAdded"),
+        trackCount: playlistsStore.recentlyAddedCount,
+      });
+    }
+    for (const p of genreAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:genre:${p.id}`,
+          kind: "genre",
+          genre: p.dynamic_spec ?? p.name,
+          label: p.dynamic_spec ?? p.name,
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
+    return defs;
+  });
 
-  // ---- Auto grid sort (name only — track counts are fetched lazily per-card) ----
+  // ---- Auto grid sort (mirrors the Custom grid's field+direction sort) ----
+  let autoSortField = $state<"name" | "track_count" | "updated">(
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("sort_auto_playlist_field") as "name" | "track_count" | "updated")) ||
+      "name"
+  );
   let autoSortAsc = $state(
     typeof window !== "undefined" ? localStorage.getItem("sort_auto_playlist_asc") !== "false" : true
   );
 
   let sortedAutoDefs = $derived.by(() => {
+    const field = autoSortField;
     const asc = autoSortAsc;
-    return [...autoDefs].sort((a, b) => (asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label)));
+    return [...autoDefs].sort((a, b) => {
+      if (field === "name") {
+        return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
+      }
+      const valA = field === "track_count" ? a.trackCount : (a.updated ?? 0);
+      const valB = field === "track_count" ? b.trackCount : (b.updated ?? 0);
+      return asc ? valA - valB : valB - valA;
+    });
   });
 
   // ---- Custom grid sort ----
-  let customSortField = $state<"name" | "track_count" | "created">(
+  let customSortField = $state<"name" | "track_count" | "updated">(
     (typeof window !== "undefined" &&
-      (localStorage.getItem("sort_custom_playlist_field") as "name" | "track_count" | "created")) ||
+      (localStorage.getItem("sort_custom_playlist_field") as "name" | "track_count" | "updated")) ||
       "name"
   );
   let customSortAsc = $state(
@@ -71,6 +109,7 @@
 
   $effect(() => {
     if (typeof window !== "undefined") {
+      localStorage.setItem("sort_auto_playlist_field", autoSortField);
       localStorage.setItem("sort_auto_playlist_asc", autoSortAsc.toString());
       localStorage.setItem("sort_custom_playlist_field", customSortField);
       localStorage.setItem("sort_custom_playlist_asc", customSortAsc.toString());
@@ -84,8 +123,8 @@
       if (field === "name") {
         return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       }
-      const valA = field === "track_count" ? a.track_count : a.created;
-      const valB = field === "track_count" ? b.track_count : b.created;
+      const valA = field === "track_count" ? a.track_count : a.updated;
+      const valB = field === "track_count" ? b.track_count : b.updated;
       return asc ? valA - valB : valB - valA;
     });
   });
@@ -93,7 +132,7 @@
   function openAuto(def: AutoDef) {
     collectionStore.viewAutoPlaylist(
       def.kind === "genre"
-        ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, created: def.created }
+        ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
         : { kind: def.kind }
     );
   }
@@ -179,20 +218,28 @@
           <div class="relative">
             {#if collectionStore.playlistsSubTab === "auto"}
               <select
-                value={autoSortAsc}
-                onchange={(e) => { autoSortAsc = e.currentTarget.value === "true"; }}
+                value={`${autoSortField}-${autoSortAsc}`}
+                onchange={(e) => {
+                  const [field, asc] = e.currentTarget.value.split("-");
+                  autoSortField = field as "name" | "track_count" | "updated";
+                  autoSortAsc = asc === "true";
+                }}
                 class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
                 style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
               >
-                <option value="true">{i18n.t('playlists.sortNameAsc')}</option>
-                <option value="false">{i18n.t('playlists.sortNameDesc')}</option>
+                <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
+                <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
+                <option value="track_count-false">{i18n.t('playlists.sortTrackCountDesc')}</option>
+                <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
+                <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
+                <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
               </select>
             {:else}
               <select
                 value={`${customSortField}-${customSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
-                  customSortField = field as "name" | "track_count" | "created";
+                  customSortField = field as "name" | "track_count" | "updated";
                   customSortAsc = asc === "true";
                 }}
                 class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
@@ -202,8 +249,8 @@
                 <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
                 <option value="track_count-false">{i18n.t('playlists.sortTrackCountDesc')}</option>
                 <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
-                <option value="created-false">{i18n.t('playlists.sortCreatedNewest')}</option>
-                <option value="created-true">{i18n.t('playlists.sortCreatedOldest')}</option>
+                <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
+                <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
               </select>
             {/if}
           </div>
@@ -232,7 +279,8 @@
                 kind={def.kind}
                 genre={def.genre}
                 playlistId={def.playlistId}
-                created={def.created}
+                updated={def.updated}
+                trackCount={def.trackCount}
                 onClick={() => openAuto(def)}
               />
             {/each}

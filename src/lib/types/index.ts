@@ -157,6 +157,7 @@ export interface Playlist {
   dynamic_spec?: string;
   last_played_row?: number;
   created: number;
+  updated: number;
   track_count: number;
 }
 

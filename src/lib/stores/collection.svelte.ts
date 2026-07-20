@@ -16,7 +16,7 @@ export interface AutoPlaylistRef {
   /** For kind "genre": the materialized (dynamic_enabled) playlist row backing it. */
   playlistId?: number;
   /** For kind "genre": when this playlist's songs were last (re)generated. */
-  created?: number;
+  updated?: number;
 }
 
 class CollectionStore {

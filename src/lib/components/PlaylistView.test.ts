@@ -19,6 +19,7 @@ describe("PlaylistView.svelte", () => {
     name: "My Playlist",
     track_count: 3,
     created: 1700000000,
+    updated: 1700000000,
     dynamic_enabled: false,
   };
 

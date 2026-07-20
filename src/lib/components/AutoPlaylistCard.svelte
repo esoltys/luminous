@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play } from "lucide-svelte";
+  import { ListMusic, Play, Heart, Clock } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
@@ -14,12 +14,14 @@
     genre?: string;
     /** For kind "genre": the materialized playlist row backing it (refreshed at most every 24h). */
     playlistId?: number;
-    created?: number;
+    /** For kind "genre": when this playlist's songs were last (re)generated. */
+    updated?: number;
+    trackCount: number;
     onClick: () => void;
     widthClass?: string;
   }
 
-  let { label, kind, genre, playlistId, created, onClick, widthClass = "w-full" }: Props = $props();
+  let { label, kind, genre, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let songs = $state<Song[]>([]);
 
@@ -50,11 +52,15 @@
       });
   });
 
-  let topCovers = $derived(songsToCoverStack(songs));
+  // Favourites/Recently Added use a fixed icon cover instead of a CoverStack —
+  // they're rebuilt from the whole library on every load, so a coverstack of
+  // whichever songs happen to be in them right now reads as arbitrary rather
+  // than representative (unlike a genre or a user playlist).
+  let topCovers = $derived(kind === "genre" ? songsToCoverStack(songs) : []);
 
-  let createdLabel = $derived.by(() => {
-    if (kind !== "genre" || created === undefined) return null;
-    return new Date(created * 1000).toLocaleDateString();
+  let updatedLabel = $derived.by(() => {
+    if (kind !== "genre" || updated === undefined) return null;
+    return new Date(updated * 1000).toLocaleDateString();
   });
 
   function handlePlayButtonClick(e: MouseEvent) {
@@ -73,8 +79,16 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
   <div class="aspect-square w-full rounded-lg mb-2.5 bg-brand-main relative flex items-center justify-center">
-    {#if topCovers.length > 0}
+    {#if kind === "genre" && topCovers.length > 0}
       <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-24 h-24" />
+    {:else if kind === "favourites"}
+      <div class="w-full h-full rounded-lg bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
+        <Heart class="w-10 h-10 text-white/80 fill-current" />
+      </div>
+    {:else if kind === "recently_added"}
+      <div class="w-full h-full rounded-lg bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
+        <Clock class="w-10 h-10 text-white/80" />
+      </div>
     {:else}
       <div class="w-full h-full rounded-lg bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/80" />
@@ -94,11 +108,8 @@
   <span class="font-semibold text-xs text-brand-text-primary group-hover:text-brand-accent-text transition-colors truncate w-full">
     {label}
   </span>
-  <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-    {#if createdLabel}
-      {i18n.t('playlists.createdOn', { date: createdLabel })}
-    {:else}
-      {songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: songs.length })}
-    {/if}
-  </span>
+  <div class="flex items-center justify-between mt-0.5 text-[10px] text-brand-text-secondary/50">
+    <span class="truncate">{updatedLabel ? i18n.t('playlists.updatedOn', { date: updatedLabel }) : ""}</span>
+    <span class="shrink-0">{trackCount === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: trackCount })}</span>
+  </div>
 </div>
