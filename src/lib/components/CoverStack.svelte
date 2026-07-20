@@ -43,7 +43,7 @@
       const scale = 1 - i * 0.06;
       return `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`;
     } else {
-      // Left stack (used in headers)
+      // Left stack (used in ArtistDetailView hero header)
       const x = i * -18;
       const y = i * -10;
       const rot = i * -5;
@@ -58,24 +58,36 @@
   }
 </script>
 
-<div class="flex items-center justify-center w-full my-auto select-none">
+<div class="flex items-center justify-center w-full h-full my-auto select-none">
   {#if activeCovers.length > 0}
-    <div class="relative {sizeClass} flex items-center justify-center shrink-0">
-      {#each activeCovers as cover, i (i)}
-        <div
-          class="cover-item absolute inset-0 rounded-lg overflow-hidden border border-brand-border/50 shadow-lg transition-transform duration-200 {hoverEffect ? 'group-hover:scale-105' : ''}"
-          style="z-index: {10 - i}; transform: {getTransform(i, activeCovers.length)}; opacity: {getOpacity(i, activeCovers.length)};"
-        >
-          <CoverArt
-            songId={cover.songId}
-            artEmbedded={cover.artEmbedded}
-            artAutomatic={cover.artAutomatic}
-            artManual={cover.artManual}
-            sizeClass="w-full h-full"
-          />
-        </div>
-      {/each}
-    </div>
+    {#if activeCovers.length === 1}
+      <div class="{sizeClass} rounded-lg overflow-hidden relative">
+        <CoverArt
+          songId={activeCovers[0].songId}
+          artEmbedded={activeCovers[0].artEmbedded}
+          artAutomatic={activeCovers[0].artAutomatic}
+          artManual={activeCovers[0].artManual}
+          sizeClass="w-full h-full"
+        />
+      </div>
+    {:else}
+      <div class="relative {sizeClass} flex items-center justify-center shrink-0">
+        {#each activeCovers as cover, i (i)}
+          <div
+            class="cover-item absolute {direction === 'left' ? 'bottom-0 right-0 w-28 h-28' : 'inset-0'} rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300 {hoverEffect ? 'group-hover:scale-105' : ''}"
+            style="z-index: {10 - i}; transform: {getTransform(i, activeCovers.length)}; opacity: {getOpacity(i, activeCovers.length)};"
+          >
+            <CoverArt
+              songId={cover.songId}
+              artEmbedded={cover.artEmbedded}
+              artAutomatic={cover.artAutomatic}
+              artManual={cover.artManual}
+              sizeClass="w-full h-full"
+            />
+          </div>
+        {/each}
+      </div>
+    {/if}
   {:else if fallbackName}
     <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0 mx-auto">
       {fallbackName ? fallbackName.charAt(0).toUpperCase() : "?"}

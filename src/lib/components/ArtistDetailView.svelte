@@ -237,6 +237,7 @@
           <AlbumCard
             {album}
             widthClass="w-40 shrink-0"
+            showArtist={false}
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />

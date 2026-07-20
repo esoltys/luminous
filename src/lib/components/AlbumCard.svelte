@@ -12,6 +12,7 @@
     album: AlbumItem;
     covers?: CoverItem[];
     widthClass?: string;
+    showArtist?: boolean;
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
@@ -22,6 +23,7 @@
     album,
     covers,
     widthClass = "w-full",
+    showArtist = true,
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
@@ -132,19 +134,21 @@
   >
     {album.album || i18n.t('collection.unknownAlbum')}
   </button>
-  {#if album.artist}
-    <button
-      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
-      class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-      title={i18n.t('collection.filterByArtist', { artist: album.artist })}
-    >
-      {album.artist}
-    </button>
-  {:else}
-    <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">{i18n.t('collection.variousArtists')}</span>
+  {#if showArtist}
+    {#if album.artist}
+      <button
+        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
+        class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
+        title={i18n.t('collection.filterByArtist', { artist: album.artist })}
+      >
+        {album.artist}
+      </button>
+    {:else}
+      <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">{i18n.t('collection.variousArtists')}</span>
+    {/if}
   {/if}
   <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
     <span>{album.year || ""}</span>
-    <span>{album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count })}</span>
+    <span>{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : (album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count }))}</span>
   </div>
 </div>
