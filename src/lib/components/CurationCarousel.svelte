@@ -3,7 +3,11 @@
   import CarouselCard from "./CarouselCard.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
 
-  let { items }: { items: HomeItem[] } = $props();
+  interface Props {
+    items: HomeItem[];
+  }
+
+  let { items }: Props = $props();
 </script>
 
 <HorizontalScrollRow>
