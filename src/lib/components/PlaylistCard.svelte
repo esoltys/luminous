@@ -4,7 +4,7 @@
   import type { Playlist, PlaylistItem } from "../types";
   import { getArtistGradient } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
-  import CoverArt from "./CoverArt.svelte";
+  import CoverStack from "./CoverStack.svelte";
 
   let { playlist, onClick }: { playlist: Playlist; onClick: () => void } = $props();
 
@@ -51,22 +51,7 @@
 >
   <div class="aspect-square w-full rounded-lg mb-2.5 overflow-hidden border border-brand-border/60 bg-brand-main relative flex items-center justify-center">
     {#if topAlbums.length > 0}
-      <div class="relative w-24 h-24">
-        {#each topAlbums.slice(0, 6) as album, i (i)}
-          <div
-            class="absolute inset-0 rounded-lg overflow-hidden border border-brand-border/50 shadow-lg transition-transform duration-200 group-hover:scale-105"
-            style="z-index: {10 - i}; transform: translate({i * 9}px, {i * -6}px) rotate({i * 5}deg) scale({1 - i * 0.06}); opacity: {1 - i * 0.08};"
-          >
-            <CoverArt
-              songId={album.songId}
-              artEmbedded={album.artEmbedded}
-              artAutomatic={album.artAutomatic}
-              artManual={album.artManual}
-              sizeClass="w-full h-full"
-            />
-          </div>
-        {/each}
-      </div>
+      <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-24 h-24" />
     {:else}
       <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center">
         <ListMusic class="w-10 h-10 text-white/80" />

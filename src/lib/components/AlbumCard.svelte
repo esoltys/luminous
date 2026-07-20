@@ -3,13 +3,14 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import CoverArt from "./CoverArt.svelte";
+  import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import { Play } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
     album: AlbumItem;
+    covers?: CoverItem[];
     widthClass?: string;
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
@@ -19,6 +20,7 @@
 
   let {
     album,
+    covers,
     widthClass = "w-full",
     onclick: customClick,
     ondblclick: customDblClick,
@@ -107,15 +109,12 @@
   <div
     class="aspect-square bg-brand-main rounded-lg mb-3 flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative"
   >
-    <CoverArt
-      songId={undefined}
-      artEmbedded={album.art_embedded}
-      artAutomatic={album.art_automatic}
-      artManual={album.art_manual}
+    <CoverStack
+      covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass="w-full h-full"
     />
     <div
-      class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+      class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20"
     >
       <button
         onclick={handlePlayButtonClick}

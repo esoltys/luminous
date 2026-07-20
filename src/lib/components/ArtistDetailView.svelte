@@ -4,6 +4,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import CoverStack from "./CoverStack.svelte";
+  import AlbumCard from "./AlbumCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
@@ -26,6 +28,13 @@
   }
 
   let albums = $derived(getArtistAlbums(collectionStore.albums, artistName));
+  let headerCovers = $derived(
+    albums.map((a) => ({
+      artEmbedded: a.art_embedded,
+      artAutomatic: a.art_automatic,
+      artManual: a.art_manual,
+    }))
+  );
 
   $effect(() => {
     const requested = artistName;
@@ -180,21 +189,8 @@
 
       <!-- Right: 3D Stacked Album Cover Preview Header -->
       {#if albums.length > 0}
-        <div class="relative w-48 h-36 hidden sm:block shrink-0">
-          {#each albums.slice(0, 6) as album, i (((album.album ?? "unknown")) + i)}
-            <div
-              class="absolute bottom-0 right-0 w-28 h-28 rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
-              style="z-index: {10 - i}; transform: translate({i * -18}px, {i * -10}px) rotate({i * -5}deg) scale({1 - i * 0.05}); opacity: {1 - i * 0.07};"
-            >
-              <CoverArt
-                songId={undefined}
-                artEmbedded={album.art_embedded}
-                artAutomatic={album.art_automatic}
-                artManual={album.art_manual}
-                sizeClass="w-full h-full"
-              />
-            </div>
-          {/each}
+        <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
+          <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
         </div>
       {/if}
     </div>
@@ -238,25 +234,12 @@
     {#if discographyItems.length > 0}
       <HorizontalScrollRow>
         {#each discographyItems as album (album.album)}
-          <button
+          <AlbumCard
+            {album}
+            widthClass="w-40 shrink-0"
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
-            class="w-40 shrink-0 bg-brand-sidebar border border-brand-border/60 rounded-xl p-3 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer"
-          >
-            <div class="aspect-square bg-brand-main rounded-lg mb-2 overflow-hidden border border-brand-border">
-              <CoverArt
-                songId={undefined}
-                artEmbedded={album.art_embedded}
-                artAutomatic={album.art_automatic}
-                artManual={album.art_manual}
-                sizeClass="w-full h-full"
-              />
-            </div>
-            <span class="font-semibold text-xs text-brand-text-primary truncate">{album.album || i18n.t('collection.unknownAlbum')}</span>
-            <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-              {album.year || ""}{album.year ? " • " : ""}{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : i18n.t('collection.tableHeaderAlbum')}
-            </span>
-          </button>
+          />
         {/each}
       </HorizontalScrollRow>
     {:else if !loading}

@@ -16,6 +16,7 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
+  import ArtistCard from "./ArtistCard.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -552,49 +553,12 @@
         {#each sortedArtists as artist}
           {@const artistAlbums = getArtistAlbumsFor(artist.name)}
           {@const fullAlbumCount = artistAlbums.length > 0 ? artistAlbums.filter((a) => a.track_count > 7).length : artist.album_count}
-          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div
-            role="button"
-            tabindex="0"
+          <ArtistCard
+            {artist}
+            {artistAlbums}
+            {fullAlbumCount}
             onclick={() => collectionStore.viewArtist(artist.name || "")}
-            onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); collectionStore.viewArtist(artist.name || ""); } }}
-            class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200 cursor-pointer"
-          >
-            {#if artistAlbums.length > 0}
-              <div class="artist-cover-stack relative w-24 h-24 mt-2 mb-4 shrink-0">
-                {#each artistAlbums.slice(0, 6) as album, i ((album.album ?? "unknown") + i)}
-                  <div
-                    class="cover-item absolute inset-0 rounded-lg overflow-hidden border border-brand-border/50 shadow-lg"
-                    style="z-index: {10 - i}; transform: translate({i * 12}px, {i * -9}px) rotate({i * 6}deg) scale({1 - i * 0.07}); opacity: {1 - i * 0.1};"
-                  >
-                    <CoverArt
-                      songId={undefined}
-                      artEmbedded={album.art_embedded}
-                      artAutomatic={album.art_automatic}
-                      artManual={album.art_manual}
-                      sizeClass="w-full h-full"
-                    />
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(artist.name)} rounded-full mb-3 flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0">
-                {artist.name ? artist.name.charAt(0).toUpperCase() : "?"}
-              </div>
-            {/if}
-            <span
-              class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-center truncate w-full"
-              title={i18n.t('collection.filterByArtist', { artist: artist.name || i18n.t('collection.unknownArtist') })}
-            >
-              {artist.name || i18n.t('collection.unknownArtist')}
-            </span>
-            <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
-              <span>{fullAlbumCount === 1 ? i18n.t('collection.oneAlbum') : i18n.t('collection.albumsCount', { count: fullAlbumCount })}</span>
-              <span>•</span>
-              <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
-            </div>
-          </div>
+          />
         {/each}
         {#if sortedArtists.length === 0}
           <div class="col-span-full py-16 text-center">
@@ -698,35 +662,6 @@
 {/if}
 
 <style>
-  .artist-card {
-    container-type: inline-size;
-  }
-  .cover-item:nth-child(n + 4) {
-    display: none;
-  }
-  @container (min-width: 150px) {
-    .cover-item:nth-child(4) {
-      display: block;
-    }
-  }
-  @container (min-width: 180px) {
-    .cover-item:nth-child(5) {
-      display: block;
-    }
-  }
-  @container (min-width: 210px) {
-    .cover-item:nth-child(6) {
-      display: block;
-    }
-  }
-
-  .scrollbar-none {
-    scrollbar-width: none;
-  }
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
-
   :global(svelte-virtual-list-viewport) {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
