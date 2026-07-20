@@ -222,6 +222,8 @@ export const fr = {
     removeFromPlaylist: "Retirer de la liste de lecture",
     songsCount: "{count} chansons",
     oneSong: "1 chanson",
+    unknownGenre: "Genre inconnu",
+    statsLine: "{genre} · {songs} • {duration} au total",
     clearPlaylistBtn: "Vider la liste",
     undoTooltip: "Annuler la dernière opération",
     redoTooltip: "Rétablir la dernière opération",
@@ -257,7 +259,6 @@ export const fr = {
     contextMenuGoArtist: "Aller à l'artiste",
     contextMenuGoAlbum: "Aller à l'album",
     contextMenuEditTags: "Éditer les étiquettes",
-    summaryRuntime: "Durée totale : {runtime}",
     noFilterResults: "Aucune piste ne correspond à \"{query}\""
   },
   lyrics: {
@@ -411,7 +412,7 @@ export const fr = {
     "dynamic-artwork": "Pochette dynamique"
   },
   artistDetail: {
-    backToArtists: "Retour aux artistes",
+    backToArtists: "Voir les artistes",
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {albumCount} albums • {songCount} chansons • {duration} au total",
     playAll: "Tout lire",
@@ -419,9 +420,9 @@ export const fr = {
     discography: "Discographie",
     showLess: "Afficher moins",
     showAll: "Afficher tout",
-    popularReleases: "Sorties populaires",
-    albumsFilter: "Albums",
-    singlesAndEps: "Singles et EPs",
+    popularReleases: "Toutes les sorties ({count})",
+    albumsFilter: "Albums ({count})",
+    singlesAndEps: "Singles et EPs ({count})",
     singleEp: "Single/EP",
     noReleasesFound: "Aucune sortie trouvée.",
     playlistsFeaturing: "Listes de lecture avec {artist}"

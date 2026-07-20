@@ -553,16 +553,14 @@
           <!-- Summary Metadata Line -->
           <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
             <span>
-              {activePlaylist.track_count === 1
-                ? i18n.t("playlists.oneSong")
-                : i18n.t("playlists.songsCount", { count: activePlaylist.track_count })}
+              {i18n.t("playlists.statsLine", {
+                genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
+                songs: activePlaylist.track_count === 1
+                  ? i18n.t("playlists.oneSong")
+                  : i18n.t("playlists.songsCount", { count: activePlaylist.track_count }),
+                duration: totalRuntimeLabel,
+              })}
             </span>
-            <span>•</span>
-            <span>{i18n.t("playlists.summaryRuntime", { runtime: totalRuntimeLabel })}</span>
-            {#if genreSummaryLabel}
-              <span>•</span>
-              <span class="text-brand-text-primary/80 truncate">{genreSummaryLabel}</span>
-            {/if}
           </div>
 
           <!-- Action Buttons: Play All & Shuffle Play -->

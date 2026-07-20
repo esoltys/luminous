@@ -222,6 +222,8 @@ export const en = {
     removeFromPlaylist: "Remove from playlist",
     songsCount: "{count} songs",
     oneSong: "1 song",
+    unknownGenre: "Unknown genre",
+    statsLine: "{genre} · {songs} • {duration} total",
     clearPlaylistBtn: "Clear Playlist",
     undoTooltip: "Undo last playlist operation",
     redoTooltip: "Redo last playlist operation",
@@ -257,7 +259,6 @@ export const en = {
     contextMenuGoArtist: "Go to Artist",
     contextMenuGoAlbum: "Go to Album",
     contextMenuEditTags: "Edit Tags",
-    summaryRuntime: "Total runtime: {runtime}",
     noFilterResults: "No tracks match \"{query}\""
   },
   lyrics: {
@@ -411,7 +412,7 @@ export const en = {
     "dynamic-artwork": "Dynamic Artwork"
   },
   artistDetail: {
-    backToArtists: "Back to Artists",
+    backToArtists: "View Artists",
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {albumCount} albums • {songCount} songs • {duration} total",
     playAll: "Play all",
@@ -419,9 +420,9 @@ export const en = {
     discography: "Discography",
     showLess: "Show less",
     showAll: "Show all",
-    popularReleases: "Popular releases",
-    albumsFilter: "Albums",
-    singlesAndEps: "Singles and EPs",
+    popularReleases: "All releases ({count})",
+    albumsFilter: "Albums ({count})",
+    singlesAndEps: "Singles and EPs ({count})",
     singleEp: "Single/EP",
     noReleasesFound: "No releases found.",
     playlistsFeaturing: "Playlists featuring {artist}"

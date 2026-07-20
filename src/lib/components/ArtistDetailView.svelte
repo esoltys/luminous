@@ -7,9 +7,9 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
-  import { ArrowLeft, Play, Shuffle, ListMusic } from "lucide-svelte";
+  import { Play, Shuffle, Mic2 } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem } from "../types";
-  import { getArtistAlbums, getArtistGradient } from "../utils/artist";
+  import { getArtistAlbums } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
 
   let { artistName }: { artistName: string } = $props();
@@ -140,70 +140,64 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll">
-  <!-- Hero -->
-  <div class="relative h-72 sm:h-80 w-full overflow-hidden shrink-0">
-    <div class="absolute inset-0 z-0 opacity-25 blur-3xl scale-110 pointer-events-none">
-      {#if albums[0]}
-        <CoverArt
-          songId={undefined}
-          artEmbedded={albums[0].art_embedded}
-          artAutomatic={albums[0].art_automatic}
-          artManual={albums[0].art_manual}
-          sizeClass="w-full h-full object-cover"
-        />
-      {:else}
-        <div class="w-full h-full bg-gradient-to-br {getArtistGradient(artistName)}"></div>
-      {/if}
-    </div>
+  <!-- Stacked Cover Art Hero & Summary Banner Header -->
+  <div class="relative w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+    <div class="flex items-end justify-between gap-6 relative z-10">
+      <!-- Left Title & Summary Metadata -->
+      <div class="flex flex-col justify-end gap-2 max-w-xl">
+        <button
+          onclick={goBackToArtists}
+          class="self-start flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-accent-text hover:text-brand-accent-text-hover transition-colors cursor-pointer"
+        >
+          <Mic2 class="w-4 h-4" />
+          <span>{i18n.t('artistDetail.backToArtists')}</span>
+        </button>
 
-    {#if albums.length > 0}
-      <div class="absolute right-8 top-8 w-64 h-64 hidden md:block">
-        {#each albums.slice(0, 6) as album, i (((album.album ?? "unknown")) + i)}
-          <div
-            class="absolute inset-0 rounded-lg overflow-hidden border border-brand-border/50 shadow-2xl"
-            style="z-index: {10 - i}; transform: translate({i * 22}px, {i * -16}px) rotate({i * 7}deg) scale({1 - i * 0.06}); opacity: {1 - i * 0.08};"
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+
+        <!-- Summary Metadata Line -->
+        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
+          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albumCount: albums.length, songCount: songs.length, duration: totalDurationLabel })}</span>
+        </div>
+
+        <!-- Action Buttons: Play All & Shuffle Play -->
+        <div class="flex items-center gap-3 mt-3">
+          <button
+            onclick={handlePlayAll}
+            disabled={loading || songs.length === 0}
+            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
           >
-            <CoverArt
-              songId={undefined}
-              artEmbedded={album.art_embedded}
-              artAutomatic={album.art_automatic}
-              artManual={album.art_manual}
-              sizeClass="w-full h-full"
-            />
-          </div>
-        {/each}
+            <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
+          </button>
+          <button
+            onclick={handleShufflePlay}
+            disabled={loading || songs.length === 0}
+            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
+          </button>
+        </div>
       </div>
-    {/if}
 
-    <div class="absolute inset-0 z-10 bg-gradient-to-t from-brand-main via-brand-main/70 to-transparent"></div>
-
-    <div class="relative z-20 flex flex-col justify-end h-full p-8 gap-3">
-      <button
-        onclick={goBackToArtists}
-        class="self-start flex items-center gap-1.5 text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-      >
-        <ArrowLeft class="w-4 h-4" /> {i18n.t('artistDetail.backToArtists')}
-      </button>
-      <h1 class="text-4xl sm:text-5xl font-black text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
-      <p class="text-sm text-brand-text-secondary">
-        {i18n.t('artistDetail.statsLine', { genre: genreLabel, albumCount: albums.length, songCount: songs.length, duration: totalDurationLabel })}
-      </p>
-      <div class="flex items-center gap-3 mt-2">
-        <button
-          onclick={handlePlayAll}
-          disabled={loading || songs.length === 0}
-          class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
-        </button>
-        <button
-          onclick={handleShufflePlay}
-          disabled={loading || songs.length === 0}
-          class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
-        </button>
-      </div>
+      <!-- Right: 3D Stacked Album Cover Preview Header -->
+      {#if albums.length > 0}
+        <div class="relative w-48 h-36 hidden sm:block shrink-0">
+          {#each albums.slice(0, 6) as album, i (((album.album ?? "unknown")) + i)}
+            <div
+              class="absolute bottom-0 right-0 w-28 h-28 rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+              style="z-index: {10 - i}; transform: translate({i * -18}px, {i * -10}px) rotate({i * -5}deg) scale({1 - i * 0.05}); opacity: {1 - i * 0.07};"
+            >
+              <CoverArt
+                songId={undefined}
+                artEmbedded={album.art_embedded}
+                artAutomatic={album.art_automatic}
+                artManual={album.art_manual}
+                sizeClass="w-full h-full"
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -226,19 +220,19 @@
         onclick={() => setDiscographyFilter("popular")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'popular' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        {i18n.t('artistDetail.popularReleases')}
+        {i18n.t('artistDetail.popularReleases', { count: popularReleases.length })}
       </button>
       <button
         onclick={() => setDiscographyFilter("albums")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        {i18n.t('artistDetail.albumsFilter')}
+        {i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
       </button>
       <button
         onclick={() => setDiscographyFilter("singles")}
         class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
       >
-        {i18n.t('artistDetail.singlesAndEps')}
+        {i18n.t('artistDetail.singlesAndEps', { count: singlesAndEps.length })}
       </button>
     </div>
 
