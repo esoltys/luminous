@@ -114,15 +114,16 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
-- When working on a bug or feature, always work in a dedicated git worktree. Do not merge the temporary branch or delete the worktree until the user has approved the changes.
+- When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not merge the temporary branch or delete the worktree until the user has approved the changes.
 - Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before merging. When presenting the Walkthrough, also spin up the Tauri development server (`bun run tauri dev`) so the user can manually verify changes interactively instead of relying solely on screenshots.
 - Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
-- **Creating Issues**: When asked to create a bug/issue on GitHub:
-  1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`).
-  2. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
-  3. Write the issue body to a temporary scratch file in the workspace or the artifacts scratch directory.
-  4. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
-  5. Verify the created issue by running `gh issue view <id>`.
+- **Creating Issues & Pull Requests**:
+  1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`) when creating issues.
+  2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
+  3. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
+  4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
+  5. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
+  6. Verify the created issue by running `gh issue view <id>`.
 - **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## Git Hooks

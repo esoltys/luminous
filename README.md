@@ -6,6 +6,7 @@
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
 [![Release](https://img.shields.io/badge/Release-0.67.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-68%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](ROADMAP.md)
 
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. Made in Canada 🍁 and available in both English and French.
 

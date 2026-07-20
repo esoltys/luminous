@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Clock, Activity, HardDrive } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Clock, Activity, HardDrive, ExternalLink, Globe, Info, Shield } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -11,7 +11,16 @@
   import Equalizer from "./Equalizer.svelte";
   import DesignTools from "./DesignTools.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats">("general");
+  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats" | "about">("general");
+
+  async function openExternalUrl(url: string) {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+    } catch {
+      window.open(url, "_blank");
+    }
+  }
   let isTabInitialized = $state(false);
   let editingThemeId = $state<string | null>(null);
   let useAdvancedBuilder = $state(false);
@@ -29,7 +38,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
+        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats" || savedTab === "about") {
           settingsTab = savedTab;
         }
       }
@@ -208,6 +217,12 @@
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabFormats')}
+      </button>
+      <button
+        onclick={() => { settingsTab = "about"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'about' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        {i18n.t('settings.tabAbout')}
       </button>
     </div>
   </div>
@@ -705,6 +720,126 @@
               </button>
             {/each}
           </div>
+        </div>
+      </div>
+    {:else if settingsTab === "about"}
+      <!-- About & Credits Section -->
+      <div class="space-y-6 max-w-4xl">
+        <!-- Hero Header -->
+        <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow-md">
+          <img src="/app-icon.svg" alt="Luminous Logo" class="w-20 h-20 shrink-0 drop-shadow-md" />
+          <div class="space-y-2 text-center md:text-left flex-1 min-w-0">
+            <div class="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+              <h3 class="text-2xl font-bold text-brand-text-primary">Luminous Music Player</h3>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30">
+                v0.67.0
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                {i18n.t('settings.aboutLicense')}
+              </span>
+            </div>
+            <p class="text-sm text-brand-text-secondary">{i18n.t('settings.aboutTagline')}</p>
+            <p class="text-xs text-brand-text-secondary/70">
+              Created by <button onclick={() => openExternalUrl("https://esoltys.github.io/")} class="text-brand-accent-text hover:underline font-semibold cursor-pointer">Eric Soltys 🍁</button> in the BC Kootenays, Canada
+            </p>
+          </div>
+        </div>
+
+        <!-- External Links / Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onclick={() => openExternalUrl("https://github.com/esoltys/luminous")}
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center justify-between text-left transition-all group cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text group-hover:scale-105 transition-transform">
+                <Globe class="w-5 h-5" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutGitHubRepo')}</p>
+                <p class="text-[10px] text-brand-text-secondary/60">github.com/esoltys/luminous</p>
+              </div>
+            </div>
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+          </button>
+
+          <button
+            onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/CREDITS.md")}
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center justify-between text-left transition-all group cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text group-hover:scale-105 transition-transform">
+                <Info class="w-5 h-5" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutViewCredits')}</p>
+                <p class="text-[10px] text-brand-text-secondary/60">CREDITS.md</p>
+              </div>
+            </div>
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+          </button>
+
+          <button
+            onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/LICENSE")}
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center justify-between text-left transition-all group cursor-pointer"
+          >
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text group-hover:scale-105 transition-transform">
+                <Shield class="w-5 h-5" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutViewLicense')}</p>
+                <p class="text-[10px] text-brand-text-secondary/60">MIT License</p>
+              </div>
+            </div>
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+          </button>
+        </div>
+
+        <!-- Tech Stack Breakdown -->
+        <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2">
+            {i18n.t('settings.aboutCoreTech')}
+          </h4>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+              <p class="font-bold text-brand-text-primary">Rust & Tauri v2</p>
+              <p class="text-brand-text-secondary/70 leading-relaxed">High-performance native core, multi-threaded audio pipeline, SQLite connection pool, and OS integration.</p>
+            </div>
+
+            <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
+              <p class="font-bold text-brand-text-primary">Svelte 5 & TypeScript</p>
+              <p class="text-brand-text-secondary/70 leading-relaxed">Reactive Svelte 5 Runes state management, virtual list rendering, and Tailwind CSS v4 styling.</p>
+            </div>
+          </div>
+
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2 pt-2">
+            {i18n.t('settings.aboutAudioEngine')}
+          </h4>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
+              <p class="font-bold text-brand-text-primary">Symphonia & CPAL</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Allocation-free audio decoding and low-latency audio output.</p>
+            </div>
+            <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
+              <p class="font-bold text-brand-text-primary">rubato & bs1770</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Audio sample rate converter & EBU R128 loudness normalization.</p>
+            </div>
+            <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
+              <p class="font-bold text-brand-text-primary">rustfft & Lofty</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Real-time spectrum analysis, moodbars, and audio tag reading/writing.</p>
+            </div>
+          </div>
+
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2 pt-2">
+            {i18n.t('settings.aboutInfluences')}
+          </h4>
+
+          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+            {i18n.t('settings.aboutInfluencesText')}
+          </p>
         </div>
       </div>
     {/if}
