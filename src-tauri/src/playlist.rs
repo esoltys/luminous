@@ -1,6 +1,7 @@
 //! Playlist manager — CRUD, undo/redo, UUID-keyed items.
 
 use crate::{
+    collection::CollectionScanner,
     db::Database,
     models::{Playlist, PlaylistItem, PlaylistItemType, Song},
 };
@@ -188,6 +189,84 @@ impl PlaylistManager {
             .filter_map(|r| r.ok())
             .collect();
         Ok(playlists)
+    }
+
+    /// Regenerates each genre "auto-playlist" — a system-managed `playlists` row
+    /// with `dynamic_enabled = 1` and `dynamic_spec` set to the genre name — if
+    /// it's missing or its `created` timestamp is more than 24h old, and prunes
+    /// rows for genres no longer present in the library. Reuses `created` as the
+    /// "last (re)generated at" timestamp shown in the UI.
+    pub fn sync_genre_auto_playlists(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let genres = scanner.get_library_genres()?;
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        // Prune genre auto-playlists for genres no longer in the library.
+        let mut stmt =
+            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1")?;
+        let existing: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        for (id, genre) in &existing {
+            if !genres.contains(genre) {
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+            }
+        }
+
+        for genre in &genres {
+            let existing_row: Option<(i64, i64)> = conn
+                .query_row(
+                    "SELECT id, created FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    params![genre],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .ok();
+
+            let needs_generation = match existing_row {
+                None => true,
+                Some((_, created)) => now - created > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let songs = scanner.get_songs_by_genre(genre, 50)?;
+
+            let playlist_id = match existing_row {
+                Some((id, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET created = ?1 WHERE id = ?2",
+                        params![now, id],
+                    )?;
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created) VALUES (?1, 1, ?1, ?2)",
+                        params![genre, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            for (position, song) in songs.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+                )?;
+            }
+        }
+
+        Ok(())
     }
 
     // -----------------------------------------------------------------------
