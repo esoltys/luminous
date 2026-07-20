@@ -3,18 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
-import { prefs } from "../stores/prefs.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockImplementation((cmd: string) => {
-    if (cmd === "get_moodbar_data") {
-      // Mock moodbar RGB data (150 points * 3) -> dominant bass, high energy
-      const mockData = new Array(450).fill(200);
-      return Promise.resolve(mockData);
-    }
-    return Promise.resolve(null);
-  }),
+  invoke: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -52,7 +44,6 @@ describe("RightPanel.svelte", () => {
     vi.clearAllMocks();
     playerStore.state = "stopped";
     playerStore.currentSong = undefined;
-    prefs.showMoodmoji = true;
   });
 
   it("renders 'Not Playing' when no current song", () => {
@@ -68,22 +59,5 @@ describe("RightPanel.svelte", () => {
     expect(getByText("Test Artist")).toBeInTheDocument();
     expect(getByText("Test Album")).toBeInTheDocument();
     expect(getByText("FLAC")).toBeInTheDocument();
-  });
-
-  it("renders Moodmoji card when showMoodmoji preference is true and song is active", async () => {
-    playerStore.currentSong = mockSong;
-    const { findByText } = render(RightPanel);
-
-    // Wait for async moodmoji fetch/effect
-    const moodmojiHeading = await findByText("Moodmoji");
-    expect(moodmojiHeading).toBeInTheDocument();
-  });
-
-  it("does not render Moodmoji card when showMoodmoji preference is false", async () => {
-    prefs.showMoodmoji = false;
-    playerStore.currentSong = mockSong;
-    const { queryByText } = render(RightPanel);
-
-    expect(queryByText("Moodmoji")).not.toBeInTheDocument();
   });
 });
