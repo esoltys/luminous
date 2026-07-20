@@ -228,6 +228,13 @@
     }
   }
 
+  async function handleDeletePlaylist() {
+    if (!activePlaylist) return;
+    if (!confirm(i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name }))) return;
+    await playlistsStore.deletePlaylist(activePlaylist.id);
+    collectionStore.selectedPlaylistId = null;
+  }
+
   function handlePlayPlaylistItem(index: number) {
     const item = playlistsStore.activePlaylistTracks[index];
     if (!item || isItemUnavailable(item)) return;
@@ -688,6 +695,15 @@
           title={i18n.t("playlists.clearPlaylistTooltip")}
         >
           {i18n.t("playlists.clearPlaylistBtn")}
+        </button>
+
+        <button
+          onclick={handleDeletePlaylist}
+          class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+          title={i18n.t("playlists.deletePlaylistTooltip")}
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
         </button>
       </div>
     </div>

@@ -3,7 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import HomeView from "../lib/components/HomeView.svelte";
   import CollectionView from "../lib/components/CollectionView.svelte";
-  import PlaylistView from "../lib/components/PlaylistView.svelte";
+  import PlaylistsCollectionView from "../lib/components/PlaylistsCollectionView.svelte";
   import FoldersView from "../lib/components/FoldersView.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
@@ -121,7 +121,7 @@
     {:else if collectionStore.activeTab === "collection"}
       <CollectionView />
     {:else if collectionStore.activeTab === "playlists"}
-      <PlaylistView />
+      <PlaylistsCollectionView />
     {:else if collectionStore.activeTab === "settings"}
       <FoldersView />
     {:else if collectionStore.activeTab === "lyrics"}
