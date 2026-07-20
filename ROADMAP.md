@@ -51,7 +51,7 @@ timeline
 
 ### [Milestone 2.0 — Web & External Services Release](https://github.com/esoltys/luminous/milestone/2)
 
-**Focus**: Expanding Luminous beyond local files by integrating 3rd-party web services, streaming radio, cloud metadata, and developer automation APIs.
+**Focus**: Expanding Luminous beyond local files by integrating 3rd-party web services, streaming radio, cloud metadata, Discord social presence, and developer automation APIs.
 
 *   **Scrobbling & Play History Sync**:
     *   Native background scrobbling to **ListenBrainz** & **Last.fm** ([#83](https://github.com/esoltys/luminous/issues/83)).
@@ -61,6 +61,10 @@ timeline
     *   Live ICY metadata parsing for currently playing radio tracks.
 *   **Rich Web Context & Reviews**:
     *   Details pane context integrating MusicBrainz ID resolution, CritiqueBrainz album reviews, Wikipedia bios, and TheAudioDB ratings ([#23](https://github.com/esoltys/luminous/issues/23)).
+*   **Discord Integration & Smart Notifications**:
+    *   Discord Rich Presence (RPC) status broadcasting with live track metadata and album artwork ([#29](https://github.com/esoltys/luminous/issues/29)).
+    *   Discord-aware smart notifications with adaptive suppression during voice calls and active gaming sessions.
+    *   Unified OS desktop alerts and glassmorphic toast notifications for background tasks and scrobble status.
 *   **Developer Automation & Protocol Support**:
     *   Built-in **Model Context Protocol (MCP)** server for programmatic integration with AI agents and external tools ([#84](https://github.com/esoltys/luminous/issues/84)).
     *   User-editable JSON settings engine with VS Code style configuration UI ([#24](https://github.com/esoltys/luminous/issues/24)).
