@@ -45,6 +45,29 @@ class CollectionStore {
     }
   }
 
+  private _selectedArtistName = $state<string | null>(null);
+  private _selectedAlbumName = $state<string | null>(null);
+
+  /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
+  get selectedArtistName() { return this._selectedArtistName; }
+  set selectedArtistName(val) {
+    this._selectedArtistName = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_selectedArtistName", val);
+      else localStorage.removeItem("navigation_selectedArtistName");
+    }
+  }
+
+  /** Selected album for the Album Detail view (rendered inside CollectionView). */
+  get selectedAlbumName() { return this._selectedAlbumName; }
+  set selectedAlbumName(val) {
+    this._selectedAlbumName = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_selectedAlbumName", val);
+      else localStorage.removeItem("navigation_selectedAlbumName");
+    }
+  }
+
   // Layout panel states
   sidebarOpen = $state<boolean>(true);
   rightPanelOpen = $state<boolean>(true);
@@ -84,6 +107,14 @@ class CollectionStore {
 
         const savedSubTab = localStorage.getItem("navigation_activeSubTab");
         if (savedSubTab) this._activeSubTab = savedSubTab as ActiveSubTab;
+
+        // Restore the last-viewed Album/Artist detail view (mutually
+        // exclusive — CollectionView prefers the album when both are set).
+        const savedAlbum = localStorage.getItem("navigation_selectedAlbumName");
+        if (savedAlbum) this._selectedAlbumName = savedAlbum;
+
+        const savedArtist = localStorage.getItem("navigation_selectedArtistName");
+        if (savedArtist) this._selectedArtistName = savedArtist;
       }
 
       await this.refreshDirectories();
@@ -238,12 +269,6 @@ class CollectionStore {
       this.searchQuery = query;
     }
   }
-
-  /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
-  selectedArtistName = $state<string | null>(null);
-
-  /** Selected album for the Album Detail view (rendered inside CollectionView). */
-  selectedAlbumName = $state<string | null>(null);
 
   viewArtist(name: string) {
     this.searchQuery = "";
