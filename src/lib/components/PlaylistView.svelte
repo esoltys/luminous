@@ -31,6 +31,7 @@
   import TagEditor from "./TagEditor.svelte";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { portal } from "../utils/portal";
 
   let editingSongId = $state<number | null>(null);
@@ -227,9 +228,11 @@
     }
   }
 
+  let showDeleteConfirm = $state(false);
+
   async function handleDeletePlaylist() {
     if (!activePlaylist) return;
-    if (!confirm(i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name }))) return;
+    showDeleteConfirm = false;
     await playlistsStore.deletePlaylist(activePlaylist.id);
     collectionStore.selectedPlaylistId = null;
   }
@@ -697,7 +700,7 @@
         </button>
 
         <button
-          onclick={handleDeletePlaylist}
+          onclick={() => { showDeleteConfirm = true; }}
           class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
           title={i18n.t("playlists.deletePlaylistTooltip")}
         >
@@ -947,6 +950,17 @@
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
     onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if showDeleteConfirm && activePlaylist}
+  <ConfirmDialog
+    title={i18n.t("playlists.confirmDeletePlaylistTitle")}
+    message={i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name })}
+    confirmLabel={i18n.t("playlists.deletePlaylistBtn")}
+    cancelLabel={i18n.t("playlists.cancel")}
+    onConfirm={handleDeletePlaylist}
+    onCancel={() => { showDeleteConfirm = false; }}
   />
 {/if}
 

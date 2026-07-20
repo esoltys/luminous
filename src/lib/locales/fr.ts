@@ -253,6 +253,8 @@ export const fr = {
     tableHeaderDuration: "Durée",
     tableHeaderRemove: "Retirer",
     confirmDeletePlaylist: "Êtes-vous sûr de vouloir supprimer la liste de lecture « {name} » ?",
+    confirmDeletePlaylistTitle: "Supprimer la liste de lecture",
+    cancel: "Annuler",
     playTrack: "Lire la piste",
     removeFromPlaylist: "Retirer de la liste de lecture",
     songsCount: "{count} chansons",

@@ -253,6 +253,8 @@ export const en = {
     tableHeaderDuration: "Duration",
     tableHeaderRemove: "Remove",
     confirmDeletePlaylist: "Are you sure you want to delete the playlist \"{name}\"?",
+    confirmDeletePlaylistTitle: "Delete Playlist",
+    cancel: "Cancel",
     playTrack: "Play track",
     removeFromPlaylist: "Remove from playlist",
     songsCount: "{count} songs",
