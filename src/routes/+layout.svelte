@@ -24,10 +24,10 @@
   });
 
   // There's no way to exit immersive mode when nothing is playing — the only
-  // toggle lives on the PlayerBar, which is itself hidden until a track has
-  // ever played this session. Force immersive mode off whenever there's
-  // nothing to show, so a stale "immersive" flag from a previous session
-  // (or playback stopping while immersive) never leaves the user stranded.
+  // toggle lives on the PlayerBar, which is itself hidden whenever there's no
+  // current song. Force immersive mode off whenever there's nothing to show,
+  // so a stale "immersive" flag from a previous session (or playback
+  // stopping while immersive) never leaves the user stranded.
   $effect(() => {
     if (!playerStore.currentSong) {
       collectionStore.exitImmersiveMode();
@@ -212,7 +212,7 @@
         <!-- Center Container: Card and Details -->
         <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
           <!-- Floating Cover Art Frame -->
-          <div class="w-72 h-72 md:w-[380px] md:h-[380px] rounded-2xl overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+          <div class="w-72 h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
             <CoverArt
               songId={playerStore.currentSong?.id}
               artEmbedded={playerStore.currentSong?.art_embedded}
@@ -256,8 +256,9 @@
   <!-- Floating PlayDock: inset from all edges (not flush) so it reads as a
        floating glass dock, and the content behind it can still scroll
        underneath the gap for the blur to have something to blur. Hidden
-       entirely until a track has ever loaded this session (issue #71). -->
-  {#if playerStore.hasEverPlayed}
+       whenever there's no current song, so it doesn't linger showing
+       "Nothing playing" after the queue ends. -->
+  {#if playerStore.currentSong}
     <div class="absolute inset-x-4 bottom-4 z-40" transition:fly={{ y: 40, duration: 300, easing: cubicOut }}>
       <PlayerBar />
     </div>

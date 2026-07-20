@@ -107,6 +107,35 @@ pub async fn get_songs_by_artist(
 }
 
 #[tauri::command]
+pub async fn get_favourite_songs(state: State<'_, AppState>) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner.get_favourite_songs().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_recently_added_songs(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_recently_added_songs(limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_songs_by_genre(
+    genre: String,
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_by_genre(&genre, limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_albums(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.get_albums().map_err(|e| e.to_string())

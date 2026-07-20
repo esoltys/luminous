@@ -9,8 +9,8 @@ describe("PlaylistsStore", () => {
   let eventCallbacks: Record<string, Function> = {};
 
   const mockPlaylists: Playlist[] = [
-    { id: 101, name: "Favorites", track_count: 3, created: 1700000000, dynamic_enabled: false },
-    { id: 102, name: "Workout", track_count: 5, created: 1700000001, dynamic_enabled: false }
+    { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false },
+    { id: 102, name: "Workout", track_count: 5, created: 1700000001, updated: 1700000001, dynamic_enabled: false }
   ];
 
   const mockTracks: PlaylistItem[] = [

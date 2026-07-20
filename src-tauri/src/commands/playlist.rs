@@ -49,6 +49,16 @@ pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, 
 }
 
 #[tauri::command]
+pub async fn sync_genre_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .sync_genre_auto_playlists()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,

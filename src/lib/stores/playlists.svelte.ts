@@ -1,12 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Playlist, PlaylistItem } from "../types";
+import type { Playlist, PlaylistItem, Song } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
   activePlaylistTracks = $state<PlaylistItem[]>([]);
+
+  /** Live song counts for the virtual (non-materialized) auto-playlists. */
+  favouritesCount = $state(0);
+  recentlyAddedCount = $state(0);
+
+  /** Count of auto-playlists that currently have at least one song — used for
+   * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
+  get visibleAutoPlaylistCount(): number {
+    const genreCount = this.playlists.filter((p) => p.dynamic_enabled && p.track_count > 0).length;
+    return genreCount + (this.favouritesCount > 0 ? 1 : 0) + (this.recentlyAddedCount > 0 ? 1 : 0);
+  }
 
   constructor() {
     this.init();
@@ -25,6 +36,7 @@ class PlaylistsStore {
       });
 
       await this.refreshPlaylists();
+      this.refreshAutoPlaylistCounts();
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_playlist_id) {
         const plId = parseInt(settings.active_playlist_id, 10);
@@ -43,6 +55,19 @@ class PlaylistsStore {
 
   async refreshPlaylists() {
     this.playlists = await invoke("get_playlists");
+  }
+
+  async refreshAutoPlaylistCounts() {
+    try {
+      const [favourites, recentlyAdded] = await Promise.all([
+        invoke<Song[]>("get_favourite_songs"),
+        invoke<Song[]>("get_recently_added_songs", { limit: 50 }),
+      ]);
+      this.favouritesCount = favourites.length;
+      this.recentlyAddedCount = recentlyAdded.length;
+    } catch (err) {
+      console.error("Failed to refresh auto-playlist counts:", err);
+    }
   }
 
   async selectPlaylist(id: number) {

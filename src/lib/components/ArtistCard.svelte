@@ -37,11 +37,11 @@
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
   class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
 >
-  <div class="w-full flex justify-center items-center mt-2 mb-4">
+  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     <CoverStack
       covers={covers}
       fallbackName={artist.name || i18n.t('collection.unknownArtist')}
-      sizeClass="w-24 h-24"
+      sizeClass="w-36 h-36"
     />
   </div>
 

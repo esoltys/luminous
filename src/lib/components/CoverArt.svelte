@@ -96,7 +96,7 @@
   });
 </script>
 
-<div class="{sizeClass} relative rounded overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
+<div class="{sizeClass} relative overflow-hidden bg-brand-sidebar border border-brand-border flex items-center justify-center text-brand-text-secondary group shrink-0">
   {#if imgSrc && !hasFailed}
     <img
       src={imgSrc}

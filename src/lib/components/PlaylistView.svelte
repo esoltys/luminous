@@ -18,7 +18,6 @@
     Check,
     X,
     CopyPlus,
-    XCircle,
     Music,
     Shuffle,
     Search
@@ -32,6 +31,7 @@
   import TagEditor from "./TagEditor.svelte";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import { portal } from "../utils/portal";
 
   let editingSongId = $state<number | null>(null);
@@ -226,6 +226,15 @@
     if (activePlaylist && duplicateCount > 0) {
       playlistsStore.deduplicatePlaylist(activePlaylist.id);
     }
+  }
+
+  let showDeleteConfirm = $state(false);
+
+  async function handleDeletePlaylist() {
+    if (!activePlaylist) return;
+    showDeleteConfirm = false;
+    await playlistsStore.deletePlaylist(activePlaylist.id);
+    collectionStore.selectedPlaylistId = null;
   }
 
   function handlePlayPlaylistItem(index: number) {
@@ -582,7 +591,7 @@
           <div class="relative w-48 h-36 hidden sm:block shrink-0">
             {#each topAlbums.slice(0, 6) as album, i (i)}
               <div
-                class="absolute bottom-0 right-0 w-28 h-28 rounded-xl overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+                class="absolute bottom-0 right-0 w-28 h-28 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
                 style="z-index: {10 - i}; transform: translate({i * -18}px, {i * -10}px) rotate({i * -5}deg) scale({1 - i * 0.05}); opacity: {1 - i * 0.07};"
               >
                 <CoverArt
@@ -689,11 +698,20 @@
         >
           {i18n.t("playlists.clearPlaylistBtn")}
         </button>
+
+        <button
+          onclick={() => { showDeleteConfirm = true; }}
+          class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+          title={i18n.t("playlists.deletePlaylistTooltip")}
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
+        </button>
       </div>
     </div>
 
     <!-- Tracks List Container -->
-    <div class="p-6" class:pb-24={playerStore.hasEverPlayed}>
+    <div class="p-6" class:pb-24={!!playerStore.currentSong}>
       <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
@@ -779,12 +797,8 @@
                         </span>
                       {/if}
                       <span
-                        role="button"
-                        tabindex="0"
-                        onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); }}
-                        onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", item.song?.title || ""); } }}
-                        class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                        title={i18n.t("collection.filterByTitle", { title: item.song.title })}
+                        class="truncate font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                        title={item.song.title}
                       >
                         {item.song.title}
                       </span>
@@ -878,31 +892,31 @@
 
     <!-- Floating Multi-Select Batch Toolbar -->
     {#if selectedUuids.size > 0}
-      <div data-floating-toolbar="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-accent/40 rounded-full px-5 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs animate-in slide-in-from-bottom-4 duration-200">
-        <span class="font-bold text-brand-accent-text">
+      <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
+        <span class="text-brand-accent-text font-bold">
           {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
         </span>
         <div class="h-4 w-px bg-brand-border/60"></div>
         <button
           onclick={playSelected}
-          class="flex items-center gap-1.5 text-brand-text-primary hover:text-brand-accent-text font-semibold transition-colors cursor-pointer"
+          class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
         >
-          <Play class="w-3.5 h-3.5 fill-current" />
+          <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
           <span>{i18n.t("playlists.playSelected")}</span>
         </button>
         <button
           onclick={removeSelected}
-          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-semibold transition-colors cursor-pointer"
+          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
         >
           <Trash2 class="w-3.5 h-3.5" />
           <span>{i18n.t("playlists.removeSelected")}</span>
         </button>
+        <div class="h-4 w-px bg-brand-border/60"></div>
         <button
           onclick={() => { selectedUuids = new Set(); lastSelectedIndex = null; }}
-          class="p-1 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer ml-1"
-          title={i18n.t("playlists.clearSelection")}
+          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
         >
-          <XCircle class="w-4 h-4" />
+          {i18n.t("playlists.clearSelection")}
         </button>
       </div>
     {/if}
@@ -936,6 +950,17 @@
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
     onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if showDeleteConfirm && activePlaylist}
+  <ConfirmDialog
+    title={i18n.t("playlists.confirmDeletePlaylistTitle")}
+    message={i18n.t("playlists.confirmDeletePlaylist", { name: activePlaylist.name })}
+    confirmLabel={i18n.t("playlists.deletePlaylistBtn")}
+    cancelLabel={i18n.t("playlists.cancel")}
+    onConfirm={handleDeletePlaylist}
+    onCancel={() => { showDeleteConfirm = false; }}
   />
 {/if}
 

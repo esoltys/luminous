@@ -320,6 +320,7 @@ pub struct Playlist {
     pub dynamic_spec: Option<String>, // JSON-serialized smart playlist spec
     pub last_played_row: Option<i32>,
     pub created: i64,
+    pub updated: i64,
     pub track_count: i32, // joined field, not stored directly
 }
 

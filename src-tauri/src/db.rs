@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 5;
+const CURRENT_SCHEMA_VERSION: i32 = 6;
 
 #[derive(Debug)]
 pub struct Database {
@@ -106,6 +106,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![5],
+            )?;
+        }
+
+        if version < 6 {
+            log::info!("Running migration 6: playlist last-updated tracking");
+            conn.execute_batch(MIGRATION_6)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![6],
             )?;
         }
 
@@ -337,6 +346,17 @@ CREATE TABLE IF NOT EXISTS loudness_settings (
 );
 INSERT OR IGNORE INTO loudness_settings (id, enabled, target_lufs, mode, fallback_gain_db)
     VALUES (1, 0, -18.0, 'track', -6.0);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 6: playlist last-updated tracking. `updated` is bumped whenever a
+// playlist's contents or name change (or, for genre auto-playlists, whenever
+// they're regenerated) — `created` remains the original creation timestamp.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_6: &str = "
+ALTER TABLE playlists ADD COLUMN updated INTEGER;
+UPDATE playlists SET updated = created WHERE updated IS NULL;
 ";
 
 #[cfg(test)]

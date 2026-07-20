@@ -6,6 +6,19 @@ import { applySongStats, type SongStatsPayload } from "../utils/stats";
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics";
 export type ActiveSubTab = "songs" | "albums" | "artists";
 
+/** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
+export type PlaylistsSubTab = "auto" | "custom";
+
+/** An auto-playlist reference (Favourites, Recently Added, or a genre), for the auto-playlist detail view. */
+export interface AutoPlaylistRef {
+  kind: "favourites" | "recently_added" | "genre";
+  genre?: string;
+  /** For kind "genre": the materialized (dynamic_enabled) playlist row backing it. */
+  playlistId?: number;
+  /** For kind "genre": when this playlist's songs were last (re)generated. */
+  updated?: number;
+}
+
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   stats = $state<LibraryStats>({
@@ -28,6 +41,7 @@ class CollectionStore {
   searchLoading = $state<boolean>(false);
   private _activeTab = $state<ActiveTab>("collection");
   private _activeSubTab = $state<ActiveSubTab>("songs");
+  private _playlistsSubTab = $state<PlaylistsSubTab>("custom");
 
   get activeTab() { return this._activeTab; }
   set activeTab(val) {
@@ -45,8 +59,38 @@ class CollectionStore {
     }
   }
 
+  get playlistsSubTab() { return this._playlistsSubTab; }
+  set playlistsSubTab(val) {
+    this._playlistsSubTab = val;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("navigation_playlistsSubTab", val);
+    }
+  }
+
   private _selectedArtistName = $state<string | null>(null);
   private _selectedAlbumName = $state<string | null>(null);
+  private _selectedPlaylistId = $state<number | null>(null);
+  private _selectedAutoPlaylist = $state<AutoPlaylistRef | null>(null);
+
+  /** Selected real playlist for the Playlist Detail view (rendered inside PlaylistsCollectionView). */
+  get selectedPlaylistId() { return this._selectedPlaylistId; }
+  set selectedPlaylistId(val) {
+    this._selectedPlaylistId = val;
+    if (typeof window !== "undefined") {
+      if (val !== null) localStorage.setItem("navigation_selectedPlaylistId", String(val));
+      else localStorage.removeItem("navigation_selectedPlaylistId");
+    }
+  }
+
+  /** Selected auto-playlist for the read-only Auto-Playlist Detail view. */
+  get selectedAutoPlaylist() { return this._selectedAutoPlaylist; }
+  set selectedAutoPlaylist(val) {
+    this._selectedAutoPlaylist = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_selectedAutoPlaylist", JSON.stringify(val));
+      else localStorage.removeItem("navigation_selectedAutoPlaylist");
+    }
+  }
 
   /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
   get selectedArtistName() { return this._selectedArtistName; }
@@ -108,6 +152,9 @@ class CollectionStore {
         const savedSubTab = localStorage.getItem("navigation_activeSubTab");
         if (savedSubTab) this._activeSubTab = savedSubTab as ActiveSubTab;
 
+        const savedPlaylistsSubTab = localStorage.getItem("navigation_playlistsSubTab");
+        if (savedPlaylistsSubTab) this._playlistsSubTab = savedPlaylistsSubTab as PlaylistsSubTab;
+
         // Restore the last-viewed Album/Artist detail view (mutually
         // exclusive — CollectionView prefers the album when both are set).
         const savedAlbum = localStorage.getItem("navigation_selectedAlbumName");
@@ -115,6 +162,20 @@ class CollectionStore {
 
         const savedArtist = localStorage.getItem("navigation_selectedArtistName");
         if (savedArtist) this._selectedArtistName = savedArtist;
+
+        // Restore the last-viewed Playlist/Auto-Playlist detail view (mutually
+        // exclusive — PlaylistsCollectionView prefers the real playlist when both are set).
+        const savedPlaylistId = localStorage.getItem("navigation_selectedPlaylistId");
+        if (savedPlaylistId) this._selectedPlaylistId = parseInt(savedPlaylistId, 10);
+
+        const savedAutoPlaylist = localStorage.getItem("navigation_selectedAutoPlaylist");
+        if (savedAutoPlaylist) {
+          try {
+            this._selectedAutoPlaylist = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef;
+          } catch (e) {
+            console.error("Failed to parse saved selectedAutoPlaylist:", e);
+          }
+        }
       }
 
       await this.refreshDirectories();
@@ -258,18 +319,6 @@ class CollectionStore {
     }
   }
 
-  navigateTo(tab: "home" | "collection" | "playlists" | "settings" | "lyrics", subTab?: "songs" | "albums" | "artists", query?: string) {
-    this.selectedArtistName = null;
-    this.selectedAlbumName = null;
-    this.activeTab = tab;
-    if (subTab) {
-      this.activeSubTab = subTab;
-    }
-    if (query !== undefined) {
-      this.searchQuery = query;
-    }
-  }
-
   viewArtist(name: string) {
     this.searchQuery = "";
     this.searchResults = [];
@@ -286,6 +335,20 @@ class CollectionStore {
     this.activeTab = "collection";
     this.activeSubTab = "albums";
     this.selectedAlbumName = name;
+  }
+
+  viewPlaylist(id: number) {
+    this.activeTab = "playlists";
+    this.playlistsSubTab = "custom";
+    this.selectedAutoPlaylist = null;
+    this.selectedPlaylistId = id;
+  }
+
+  viewAutoPlaylist(ref: AutoPlaylistRef) {
+    this.activeTab = "playlists";
+    this.playlistsSubTab = "auto";
+    this.selectedPlaylistId = null;
+    this.selectedAutoPlaylist = ref;
   }
 
   isFormatExcluded(filetype: string): boolean {

@@ -137,7 +137,7 @@
 
   function openPlaylist(id: number) {
     playlistsStore.selectPlaylist(id);
-    collectionStore.activeTab = "playlists";
+    collectionStore.viewPlaylist(id);
   }
 
   async function handlePlayAll() {
@@ -250,16 +250,16 @@
 
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
-    <div class="px-8 pt-10" class:pb-24={playerStore.hasEverPlayed}>
+    <div class="px-8 pt-10" class:pb-24={!!playerStore.currentSong}>
       <h2 class="text-xl font-semibold text-brand-text-primary mb-4">{i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}</h2>
       <HorizontalScrollRow>
         {#each playlists as playlist (playlist.id)}
-          <PlaylistCard {playlist} onClick={() => openPlaylist(playlist.id)} />
+          <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist.id)} />
         {/each}
       </HorizontalScrollRow>
     </div>
   {:else}
-    <div class:pb-24={playerStore.hasEverPlayed}></div>
+    <div class:pb-24={!!playerStore.currentSong}></div>
   {/if}
 </div>
 

@@ -445,6 +445,84 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs favourited via the 5-star/heart rating, for the "Favourites" auto-playlist.
+    pub fn get_favourite_songs(&self) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE rating = 5
+               AND source IN (1, 2)
+               AND unavailable = 0
+             ORDER BY album_artist, album, disc, track",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map([], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Most recently added songs, for the "Recently Added" auto-playlist.
+    pub fn get_recently_added_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND added IS NOT NULL
+             ORDER BY added DESC
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Highest-rated, most-played songs in a genre, for per-genre auto-playlists.
+    pub fn get_songs_by_genre(&self, genre: &str, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE genre = ?1
+               AND source IN (1, 2)
+               AND unavailable = 0
+             ORDER BY rating DESC, playcount DESC
+             LIMIT ?2",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![genre, limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Distinct non-empty genres present in the library, used to build one
+    /// auto-playlist per genre.
+    pub fn get_library_genres(&self) -> Result<Vec<String>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT genre FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND genre IS NOT NULL
+               AND genre != ''
+             ORDER BY genre",
+        )?;
+        let genres = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(genres)
+    }
+
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Group only by album name so that tracks with different per-track artists

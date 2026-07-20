@@ -337,7 +337,7 @@
     </div>
 
     <!-- Main View Songs Container -->
-    <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col" class:pb-24={playerStore.hasEverPlayed}>
+    <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col" class:pb-24={!!playerStore.currentSong}>
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
@@ -420,13 +420,12 @@
                   {song.track !== undefined && song.track !== null ? song.track : "—"}
                 </div>
                 <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
-                  <button
-                    onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", song.title || ""); }}
-                    class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                    title={i18n.t('collection.filterByTitle', { title: song.title || i18n.t('collection.unknownSong') })}
+                  <span
+                    class="truncate font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                    title={song.title || i18n.t('collection.unknownSong')}
                   >
                     {song.title || i18n.t('collection.unknownSong')}
-                  </button>
+                  </span>
                 </div>
                 <div class="text-brand-text-secondary/90 truncate pr-4 min-w-0">
                   {#if song.artist}
@@ -483,7 +482,7 @@
 
   {:else}
     <!-- Scrollable Container for Albums / Artists Views -->
-    <div class="flex-1 px-6 overflow-y-auto" class:pb-24={playerStore.hasEverPlayed}>
+    <div class="flex-1 px-6 overflow-y-auto" class:pb-24={!!playerStore.currentSong}>
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
         <!-- Showing Count (Left) -->
@@ -649,7 +648,7 @@
 {/if}
 
 {#if selectedSongIds.size > 0 && collectionStore.activeSubTab === 'songs'}
-  <div data-floating-toolbar="true" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+  <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
     <span class="text-brand-accent-text font-bold">
       {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
     </span>

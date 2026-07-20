@@ -116,7 +116,7 @@
         }
       }}
       disabled={!playerStore.currentSong}
-      class="group relative rounded overflow-hidden focus:outline-hidden flex-shrink-0 cursor-pointer disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
+      class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 cursor-pointer disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
       title={playerStore.currentSong?.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : ""}
     >
       <CoverArt
@@ -129,19 +129,9 @@
     </button>
     <div class="flex flex-col truncate">
       <div class="flex items-center gap-2">
-        {#if playerStore.currentSong?.title}
-          <button
-            onclick={(e) => { e.stopPropagation(); collectionStore.navigateTo("collection", "songs", playerStore.currentSong?.title || ""); }}
-            class="text-sm font-semibold text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
-            title={i18n.t('collection.filterByTitle', { title: playerStore.currentSong.title })}
-          >
-            {playerStore.currentSong.title}
-          </button>
-        {:else}
-          <span class="text-sm font-semibold text-brand-text-primary truncate">
-            {i18n.t('playerBar.notPlaying')}
-          </span>
-        {/if}
+        <span class="text-sm font-semibold text-brand-text-primary truncate" title={playerStore.currentSong?.title}>
+          {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
+        </span>
       </div>
       {#if playerStore.currentSong?.artist}
         <button
