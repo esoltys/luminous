@@ -55,7 +55,7 @@
       <div class="space-y-3">
         <div class="space-y-1">
           <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.songLabel', {}, 'Song')}</p>
-          <p class="text-sm font-semibold text-brand-text-primary truncate">{currentSong.title || i18n.t('collection.unknownSong')}</p>
+          <p class="text-sm font-semibold text-brand-text-primary break-words">{currentSong.title || i18n.t('collection.unknownSong')}</p>
         </div>
 
         <div class="space-y-1">
@@ -63,72 +63,72 @@
           {#if currentSong.artist}
             <button
               onclick={() => collectionStore.viewArtist(currentSong.album_artist?.trim() || currentSong.artist || "")}
-              class="text-sm text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 truncate cursor-pointer text-left"
+              class="text-sm text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 break-words cursor-pointer text-left w-full"
               title={i18n.t('collection.filterByArtist', { artist: currentSong.artist })}
             >
               {currentSong.artist}
             </button>
           {:else}
-            <p class="text-sm text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</p>
+            <p class="text-sm text-brand-text-secondary break-words">{i18n.t('collection.unknownArtist')}</p>
           {/if}
         </div>
 
         <div class="space-y-1">
           <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.albumLabel', {}, 'Album')}</p>
-          <p class="text-sm text-brand-text-secondary truncate">{currentSong.album || i18n.t('collection.unknownAlbum')}</p>
+          <p class="text-sm text-brand-text-secondary break-words">{currentSong.album || i18n.t('collection.unknownAlbum')}</p>
         </div>
       </div>
 
       <!-- Playback Info -->
       <div class="space-y-2">
         {#if currentSong.filetype}
-          <div class="flex items-center justify-between text-xs">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
-            <span class="text-brand-text-primary uppercase">{currentSong.filetype}</span>
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
+            <span class="text-brand-text-primary uppercase text-right break-words min-w-0">{currentSong.filetype}</span>
           </div>
         {/if}
         {#if currentSong.bitrate}
-          <div class="flex items-center justify-between text-xs">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
-            <span class="text-brand-text-primary">{currentSong.bitrate} kbps</span>
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps</span>
           </div>
         {/if}
         {#if currentSong.samplerate}
-          <div class="flex items-center justify-between text-xs">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
-            <span class="text-brand-text-primary">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
           </div>
         {/if}
         {#if playerStore.loudnessSource !== "disabled"}
-          <div class="flex items-center justify-between text-xs">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
-            <span class="text-brand-text-primary">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
           </div>
         {/if}
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-brand-text-secondary/60">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
-          <span class="text-brand-text-primary">{lyricsStatusLabel()}</span>
+        <div class="flex items-start justify-between gap-3 text-xs">
+          <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
+          <span class="text-brand-text-primary text-right break-words min-w-0">{lyricsStatusLabel()}</span>
         </div>
       </div>
 
       <!-- Additional Metadata -->
       <div class="space-y-2 text-xs">
         {#if currentSong.year}
-          <div class="flex justify-between">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
-            <span class="text-brand-text-secondary">{currentSong.year}</span>
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.year}</span>
           </div>
         {/if}
         {#if currentSong.genre}
-          <div class="flex justify-between">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
-            <span class="text-brand-text-secondary">{currentSong.genre}</span>
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.genre}</span>
           </div>
         {/if}
         {#if currentSong.composer}
-          <div class="flex justify-between">
-            <span class="text-brand-text-secondary/60">{i18n.t('playerBar.composerLabel', {}, 'Composer')}</span>
-            <span class="text-brand-text-secondary truncate">{currentSong.composer}</span>
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.composerLabel', {}, 'Composer')}</span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.composer}</span>
           </div>
         {/if}
       </div>
