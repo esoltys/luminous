@@ -84,17 +84,24 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_auto_playlist_asc") !== "false" : true
   );
 
+  // Favourites/Recently Added are always pinned first, ahead of the sort
+  // order applied to genre auto-playlists (autoDefs already pushes them in
+  // that order, so pinning is just a stable partition, not a re-sort).
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    return [...autoDefs].sort((a, b) => {
-      if (field === "name") {
-        return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
-      }
-      const valA = field === "track_count" ? a.trackCount : (a.updated ?? 0);
-      const valB = field === "track_count" ? b.trackCount : (b.updated ?? 0);
-      return asc ? valA - valB : valB - valA;
-    });
+    const pinned = autoDefs.filter((d) => d.kind !== "genre");
+    const rest = autoDefs
+      .filter((d) => d.kind === "genre")
+      .sort((a, b) => {
+        if (field === "name") {
+          return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
+        }
+        const valA = field === "track_count" ? a.trackCount : (a.updated ?? 0);
+        const valB = field === "track_count" ? b.trackCount : (b.updated ?? 0);
+        return asc ? valA - valB : valB - valA;
+      });
+    return [...pinned, ...rest];
   });
 
   // ---- Custom grid sort ----
