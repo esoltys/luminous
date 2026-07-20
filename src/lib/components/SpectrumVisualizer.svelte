@@ -43,9 +43,10 @@
     const barGap = 2.5;
     const barWidth = (width - (numBars - 1) * barGap) / numBars;
 
-    // Dynamically read active theme colors from document styles
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#8b5cf6';
-    const hoverColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-hover').trim() || '#a78bfa';
+    // Dynamically read active theme colors from themeStore
+    const colors = themeStore.resolvedColors;
+    const accentColor = colors["color-accent"] || '#8b5cf6';
+    const hoverColor = colors["color-accent-hover"] || '#a78bfa';
 
     const rgb = hexToRgb(accentColor) || { r: 139, g: 92, b: 246 };
 
@@ -73,8 +74,9 @@
   }
 
   $effect(() => {
-    // Redraw when theme changes
+    // Redraw when theme or artwork colors change
     const _theme = themeStore.activeThemeId;
+    const _art = themeStore.artworkColors;
     draw();
   });
 

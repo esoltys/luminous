@@ -112,10 +112,11 @@
     const songLength = playerStore.currentSong?.length_nanosec || 1;
     const progressPct = playerStore.positionNanosec / songLength;
 
-    // Dynamically read active theme colors from document styles
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#8b5cf6';
-    const hoverColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-hover').trim() || '#a78bfa';
-    const borderCol = getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim() || '#374151';
+    // Dynamically read active theme colors from themeStore
+    const colors = themeStore.resolvedColors;
+    const accentColor = colors["color-accent"] || '#8b5cf6';
+    const hoverColor = colors["color-accent-hover"] || '#a78bfa';
+    const borderCol = colors["color-border"] || '#374151';
 
     if (prefs.seekBarMode === "moodbar") {
       drawMoodbar(ctx, width, height, progressPct, accentColor, borderCol);
@@ -247,10 +248,11 @@
   });
 
   $effect(() => {
-    // Redraw whenever position, length, theme, mode, or data updates
+    // Redraw whenever position, length, theme, artwork colors, mode, or data updates
     const _pos = playerStore.positionNanosec;
     const _len = playerStore.currentSong?.length_nanosec;
     const _theme = themeStore.activeThemeId;
+    const _art = themeStore.artworkColors;
     const _mode = prefs.seekBarMode;
     const _wave = waveformData;
     const _mood = moodbarData;
