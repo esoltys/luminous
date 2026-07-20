@@ -81,6 +81,7 @@ pub async fn lookup_acoustid_tags(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn save_song_tags(
     state: State<'_, AppState>,
     song_id: i64,

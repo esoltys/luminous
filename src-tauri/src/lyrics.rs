@@ -21,6 +21,12 @@ pub struct LyricsManager {
     client: Client,
 }
 
+impl Default for LyricsManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LyricsManager {
     pub fn new() -> Self {
         Self {

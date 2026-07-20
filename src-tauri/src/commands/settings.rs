@@ -32,10 +32,8 @@ pub async fn get_all_app_settings(
         .map_err(|e| e.to_string())?;
 
     let mut settings = HashMap::new();
-    for row in rows {
-        if let Ok((k, v)) = row {
-            settings.insert(k, v);
-        }
+    for (k, v) in rows.flatten() {
+        settings.insert(k, v);
     }
     Ok(settings)
 }

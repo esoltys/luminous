@@ -1126,14 +1126,8 @@ fn convert_channels(input: &[f32], from_channels: usize, to_channels: usize) -> 
                     output.push(val);
                 }
             }
-            (m, n) => {
-                for i in 0..n {
-                    if i < m {
-                        output.push(frame[i]);
-                    } else {
-                        output.push(0.0);
-                    }
-                }
+            (_, n) => {
+                output.extend((0..n).map(|i| frame.get(i).copied().unwrap_or(0.0)));
             }
         }
     }

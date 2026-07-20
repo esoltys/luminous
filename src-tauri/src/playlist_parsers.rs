@@ -72,8 +72,7 @@ pub fn parse_m3u(content: &str) -> Vec<ParsedTrack> {
             continue;
         }
 
-        if trimmed.starts_with("#EXTINF:") {
-            let meta = &trimmed["#EXTINF:".len()..];
+        if let Some(meta) = trimmed.strip_prefix("#EXTINF:") {
             if let Some((dur_str, rest)) = meta.split_once(',') {
                 if let Ok(dur) = dur_str.trim().parse::<f64>() {
                     if dur > 0.0 {
@@ -128,13 +127,13 @@ pub fn parse_pls(content: &str) -> Vec<ParsedTrack> {
             let key_lower = key.trim().to_ascii_lowercase();
             let val = val.trim();
 
-            if key_lower.starts_with("file") {
-                if let Ok(idx) = key_lower["file".len()..].parse::<usize>() {
+            if let Some(suffix) = key_lower.strip_prefix("file") {
+                if let Ok(idx) = suffix.parse::<usize>() {
                     let entry = entries.entry(idx).or_default();
                     entry.path_or_url = val.to_string();
                 }
-            } else if key_lower.starts_with("title") {
-                if let Ok(idx) = key_lower["title".len()..].parse::<usize>() {
+            } else if let Some(suffix) = key_lower.strip_prefix("title") {
+                if let Ok(idx) = suffix.parse::<usize>() {
                     let entry = entries.entry(idx).or_default();
                     if let Some((artist, title)) = val.split_once(" - ") {
                         entry.artist = Some(artist.trim().to_string());
@@ -143,8 +142,8 @@ pub fn parse_pls(content: &str) -> Vec<ParsedTrack> {
                         entry.title = Some(val.to_string());
                     }
                 }
-            } else if key_lower.starts_with("length") {
-                if let Ok(idx) = key_lower["length".len()..].parse::<usize>() {
+            } else if let Some(suffix) = key_lower.strip_prefix("length") {
+                if let Ok(idx) = suffix.parse::<usize>() {
                     if let Ok(len) = val.parse::<i64>() {
                         if len > 0 {
                             let entry = entries.entry(idx).or_default();
@@ -222,8 +221,8 @@ pub fn parse_xspf(content: &str) -> Result<ParsedPlaylist> {
 
         if let Some(loc) = location {
             // Unescape file:// URI if present
-            let path_or_url = if loc.starts_with("file://") {
-                let unencoded = percent_encoding::percent_decode_str(&loc["file://".len()..])
+            let path_or_url = if let Some(stripped) = loc.strip_prefix("file://") {
+                let unencoded = percent_encoding::percent_decode_str(stripped)
                     .decode_utf8_lossy()
                     .to_string();
                 #[cfg(windows)]

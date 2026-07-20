@@ -31,6 +31,12 @@ pub struct BiquadFilter {
     y2: f32,
 }
 
+impl Default for BiquadFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BiquadFilter {
     pub fn new() -> Self {
         Self {
@@ -179,6 +185,12 @@ pub struct Equalizer {
     channel_filters: Vec<Vec<BiquadFilter>>, // graphic cascade, per channel
     parametric_filters: Vec<Vec<BiquadFilter>>, // parametric cascade, per channel
     sample_rate: u32,
+}
+
+impl Default for Equalizer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Equalizer {

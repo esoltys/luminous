@@ -85,12 +85,10 @@ impl CollectionScanner {
         })?;
 
         let mut to_mark_unavailable = Vec::new();
-        for row in rows {
-            if let Ok((id, path)) = row {
-                let p = Path::new(&path);
-                if !p.exists() {
-                    to_mark_unavailable.push(id);
-                }
+        for (id, path) in rows.flatten() {
+            let p = Path::new(&path);
+            if !p.exists() {
+                to_mark_unavailable.push(id);
             }
         }
 
@@ -212,7 +210,7 @@ impl CollectionScanner {
                 scanned += 1;
 
                 // Emit progress every 50 files to avoid flooding
-                if scanned % 50 == 0 || scanned == total {
+                if scanned.is_multiple_of(50) || scanned == total {
                     let _ = app.emit(
                         "scan-progress",
                         ScanProgress {
@@ -541,23 +539,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let query_limit = limit * 20;
         let sql = format!(
-            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                    s.title, s.titlesort, s.artist, s.artistsort,
-                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                    s.composer, s.composersort, s.performer, s.performersort,
-                    s.grouping, s.comment, s.lyrics,
-                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                    s.bpm, s.mood, s.initial_key,
-                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
-                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
-                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
-                    s.cue_path,
-                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-                    (SELECT COUNT(*) FROM songs s2
-                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
-                    ) AS album_track_count
+            "SELECT {HOME_ITEM_SELECT_COLS}
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0
              ORDER BY s.lastplayed DESC NULLS LAST, s.mtime DESC
@@ -582,23 +564,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let query_limit = limit * 20;
         let sql = format!(
-            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                    s.title, s.titlesort, s.artist, s.artistsort,
-                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                    s.composer, s.composersort, s.performer, s.performersort,
-                    s.grouping, s.comment, s.lyrics,
-                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                    s.bpm, s.mood, s.initial_key,
-                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
-                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
-                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
-                    s.cue_path,
-                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-                    (SELECT COUNT(*) FROM songs s2
-                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
-                    ) AS album_track_count
+            "SELECT {HOME_ITEM_SELECT_COLS}
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0
              ORDER BY s.playcount DESC, s.lastplayed DESC NULLS LAST
@@ -623,23 +589,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let query_limit = limit * 20;
         let sql = format!(
-            "SELECT s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                    s.title, s.titlesort, s.artist, s.artistsort,
-                    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                    s.composer, s.composersort, s.performer, s.performersort,
-                    s.grouping, s.comment, s.lyrics,
-                    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                    s.bpm, s.mood, s.initial_key,
-                    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
-                    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
-                    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
-                    s.cue_path,
-                    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
-                    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-                    (SELECT COUNT(*) FROM songs s2
-                     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
-                    ) AS album_track_count
+            "SELECT {HOME_ITEM_SELECT_COLS}
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
@@ -698,7 +648,9 @@ fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64)>, limit: usize
             }
         }
 
-        items.push(HomeItem::Song { song });
+        items.push(HomeItem::Song {
+            song: Box::new(song),
+        });
     }
 
     items
@@ -917,6 +869,27 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     unavailable,
     replaygain_track_gain, replaygain_album_gain
 ";
+
+/// Song columns qualified with the `s` alias, plus a correlated `album_track_count`
+/// subquery. Shared by the home-screen queries (`get_recently_played`,
+/// `get_most_frequently_played`, `get_recently_added`), which all join on `songs s`.
+const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+    s.title, s.titlesort, s.artist, s.artistsort,
+    s.album, s.albumsort, s.album_artist, s.album_artist_sort,
+    s.composer, s.composersort, s.performer, s.performersort,
+    s.grouping, s.comment, s.lyrics,
+    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+    s.bpm, s.mood, s.initial_key,
+    s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
+    s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
+    s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
+    s.art_embedded, s.art_automatic, s.art_manual, s.art_unset,
+    s.cue_path,
+    s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
+    s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
+    (SELECT COUNT(*) FROM songs s2
+     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+    ) AS album_track_count";
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
@@ -1271,10 +1244,12 @@ mod tests {
         let conn = db.pool.get().unwrap();
 
         let insert_test_song = |p: &str| {
-            let mut song = Song::default();
-            song.path = Some(p.to_string());
-            song.title = Some("Test Track".to_string());
-            song.source = SongSource::LocalFile;
+            let song = Song {
+                path: Some(p.to_string()),
+                title: Some("Test Track".to_string()),
+                source: SongSource::LocalFile,
+                ..Default::default()
+            };
             upsert_song(&conn, &song).unwrap();
         };
 

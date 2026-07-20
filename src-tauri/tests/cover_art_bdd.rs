@@ -44,13 +44,8 @@ fn dir_with_embedded_art(w: &mut CoverArtWorld) {
 
 #[when("I trigger a library scan")]
 fn trigger_scan(w: &mut CoverArtWorld) {
-    if w.folder_art_path.is_some() {
-        let path_str = w
-            .folder_art_path
-            .as_ref()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+    if let Some(folder_art_path) = &w.folder_art_path {
+        let path_str = folder_art_path.to_string_lossy().to_string();
         let conn = w.db.pool.get().expect("db conn failed");
         conn.execute(
             "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE id = ?2",

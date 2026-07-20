@@ -514,6 +514,6 @@ pub struct AlbumItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum HomeItem {
-    Song { song: Song },
+    Song { song: Box<Song> },
     Album { album: AlbumItem },
 }

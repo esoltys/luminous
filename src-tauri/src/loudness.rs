@@ -169,36 +169,30 @@ fn decode_channels(path: &Path) -> Result<(Vec<Vec<f32>>, u32)> {
 
     let mut out_channels: Vec<Vec<f32>> = Vec::new();
 
-    loop {
-        match format.next_packet() {
-            Ok(packet) => {
-                if packet.track_id() != track_id {
-                    continue;
+    while let Ok(packet) = format.next_packet() {
+        if packet.track_id() != track_id {
+            continue;
+        }
+        match decoder.decode(&packet) {
+            Ok(decoded) => {
+                let spec = *decoded.spec();
+                let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                sample_buf.copy_interleaved_ref(decoded);
+
+                let channels = spec.channels.count().max(1);
+                let out_count = channels.min(2);
+                if out_channels.is_empty() {
+                    out_channels = vec![Vec::new(); out_count];
                 }
-                match decoder.decode(&packet) {
-                    Ok(decoded) => {
-                        let spec = *decoded.spec();
-                        let mut sample_buf =
-                            SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                        sample_buf.copy_interleaved_ref(decoded);
+                let decoded_samples = sample_buf.samples();
 
-                        let channels = spec.channels.count().max(1);
-                        let out_count = channels.min(2);
-                        if out_channels.is_empty() {
-                            out_channels = vec![Vec::new(); out_count];
-                        }
-                        let decoded_samples = sample_buf.samples();
-
-                        for chunk in decoded_samples.chunks(channels) {
-                            for (c, out) in out_channels.iter_mut().enumerate() {
-                                out.push(chunk[c]);
-                            }
-                        }
+                for chunk in decoded_samples.chunks(channels) {
+                    for (c, out) in out_channels.iter_mut().enumerate() {
+                        out.push(chunk[c]);
                     }
-                    Err(SymphoniaError::DecodeError(_)) => continue,
-                    Err(_) => break,
                 }
             }
+            Err(SymphoniaError::DecodeError(_)) => continue,
             Err(_) => break,
         }
     }

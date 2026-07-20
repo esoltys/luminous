@@ -61,10 +61,9 @@ pub fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
     if let Ok(canonical) = std::fs::canonicalize(p) {
         let s = canonical.to_string_lossy();
         #[cfg(windows)]
-        let cleaned_s = if s.starts_with(r"\\?\") {
-            s[4..].to_string()
-        } else {
-            s.to_string()
+        let cleaned_s = match s.strip_prefix(r"\\?\") {
+            Some(stripped) => stripped.to_string(),
+            None => s.to_string(),
         };
         #[cfg(not(windows))]
         let cleaned_s = s.to_string();
@@ -358,16 +357,14 @@ impl PlaylistManager {
                         album: song.album.as_deref(),
                         duration_sec: dur_sec,
                     })
-                } else if let Some(ref url) = item.url {
-                    Some(ExportTrack {
+                } else {
+                    item.url.as_ref().map(|url| ExportTrack {
                         path: std::path::Path::new(url),
                         title: None,
                         artist: None,
                         album: None,
                         duration_sec: None,
                     })
-                } else {
-                    None
                 }
             })
             .collect();
@@ -401,7 +398,7 @@ impl PlaylistManager {
         conn: &rusqlite::Connection,
         playlist_id: i64,
     ) -> Result<Vec<PlaylistItem>> {
-        let mut stmt = conn.prepare(&format!(
+        let mut stmt = conn.prepare(
             "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
                          pi.uuid, pi.type, pi.url, pi.stream_url,
                          pi.additional_metadata,
@@ -422,8 +419,8 @@ impl PlaylistManager {
                   FROM playlist_items pi
                   LEFT JOIN songs s ON s.id = pi.song_id
                   WHERE pi.playlist_id = ?1
-                  ORDER BY pi.position"
-        ))?;
+                  ORDER BY pi.position",
+        )?;
 
         let items = stmt
             .query_map(params![playlist_id], |row| {
@@ -1056,7 +1053,7 @@ mod tests {
         std::fs::create_dir_all(&downloads_dir).unwrap();
         let pls_file = downloads_dir.join("playlist.pls");
 
-        let pls_content = format!("[playlist]\nNumberOfEntries=1\nFile1=../Music/song1.mp3\n");
+        let pls_content = "[playlist]\nNumberOfEntries=1\nFile1=../Music/song1.mp3\n".to_string();
         std::fs::write(&pls_file, pls_content).unwrap();
 
         let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();

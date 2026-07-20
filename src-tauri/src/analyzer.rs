@@ -38,7 +38,7 @@ impl AudioVisualizerBuffer {
             return vec![0.0; size];
         }
 
-        let start = if len > size { len - size } else { 0 };
+        let start = len.saturating_sub(size);
         let mut result = Vec::with_capacity(size);
         for i in start..len {
             result.push(buf[i]);
@@ -78,10 +78,8 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
     // Calculate magnitudes of the first half (positive frequencies)
     let half_size = fft_size / 2;
     let mut spectrum = Vec::with_capacity(half_size);
-    for k in 0..half_size {
-        let magnitude = (complex_samples[k].re * complex_samples[k].re
-            + complex_samples[k].im * complex_samples[k].im)
-            .sqrt();
+    for sample in complex_samples.iter().take(half_size) {
+        let magnitude = (sample.re * sample.re + sample.im * sample.im).sqrt();
         spectrum.push(magnitude);
     }
 
@@ -89,7 +87,7 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
     let mut bins = vec![0.0f32; 32];
     let num_bins = bins.len();
 
-    for i in 0..num_bins {
+    for (i, bin) in bins.iter_mut().enumerate() {
         let start_pct = i as f32 / num_bins as f32;
         let end_pct = (i + 1) as f32 / num_bins as f32;
 
@@ -98,14 +96,10 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
         let end_idx =
             ((end_pct.powi(2) * half_size as f32) as usize).clamp(start_idx + 1, half_size);
 
-        let mut sum = 0.0;
-        let mut count = 0;
-        for idx in start_idx..end_idx {
-            sum += spectrum[idx];
-            count += 1;
-        }
+        let count = end_idx - start_idx;
+        let sum: f32 = spectrum[start_idx..end_idx].iter().sum();
 
-        bins[i] = if count > 0 { sum / count as f32 } else { 0.0 };
+        *bin = if count > 0 { sum / count as f32 } else { 0.0 };
     }
 
     bins
@@ -151,35 +145,29 @@ pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
 
     let mut samples = Vec::new();
 
-    loop {
-        match format.next_packet() {
-            Ok(packet) => {
-                if packet.track_id() != track_id {
-                    continue;
-                }
-                match decoder.decode(&packet) {
-                    Ok(decoded) => {
-                        let spec = *decoded.spec();
-                        let mut sample_buf =
-                            SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                        sample_buf.copy_interleaved_ref(decoded);
+    while let Ok(packet) = format.next_packet() {
+        if packet.track_id() != track_id {
+            continue;
+        }
+        match decoder.decode(&packet) {
+            Ok(decoded) => {
+                let spec = *decoded.spec();
+                let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                sample_buf.copy_interleaved_ref(decoded);
 
-                        let channels = spec.channels.count();
-                        let decoded_samples = sample_buf.samples();
+                let channels = spec.channels.count();
+                let decoded_samples = sample_buf.samples();
 
-                        if channels == 1 {
-                            samples.extend_from_slice(decoded_samples);
-                        } else {
-                            for chunk in decoded_samples.chunks(channels) {
-                                let sum: f32 = chunk.iter().sum();
-                                samples.push(sum / channels as f32);
-                            }
-                        }
+                if channels == 1 {
+                    samples.extend_from_slice(decoded_samples);
+                } else {
+                    for chunk in decoded_samples.chunks(channels) {
+                        let sum: f32 = chunk.iter().sum();
+                        samples.push(sum / channels as f32);
                     }
-                    Err(SymphoniaError::DecodeError(_)) => continue,
-                    Err(_) => break,
                 }
             }
+            Err(SymphoniaError::DecodeError(_)) => continue,
             Err(_) => break,
         }
     }

@@ -99,7 +99,7 @@ pub fn run() {
 
             if file_path.exists() && file_path.is_file() {
                 if let Ok(data) = std::fs::read(&file_path) {
-                    let mime = if file_path.extension().map_or(false, |e| e == "png") {
+                    let mime = if file_path.extension().is_some_and(|e| e == "png") {
                         "image/png"
                     } else {
                         "image/jpeg"
@@ -229,7 +229,7 @@ pub fn run() {
                             let _ = app_handle_ticks.emit("song-stats-changed", stats);
                         }
                         tick_counter = tick_counter.wrapping_add(1);
-                        if tick_counter % 4 == 0 {
+                        if tick_counter.is_multiple_of(4) {
                             p.persist_position(pos);
                         }
                         let _ = app_handle_ticks.emit(
