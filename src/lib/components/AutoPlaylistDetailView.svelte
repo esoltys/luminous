@@ -11,7 +11,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play, Shuffle, Plus, FolderPlus, Edit3, Clock, Music, ListMusic } from "lucide-svelte";
+  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -325,109 +325,125 @@
 
   <!-- Songs Table Section -->
   <div class="px-6 md:px-8 py-6" class:pb-24={!!playerStore.currentSong}>
-    <div class="border border-brand-border rounded-lg bg-brand-sidebar/30">
-      <!-- Table Header -->
-      <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-        <div class="grid grid-cols-[36px_40px_1fr_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
-          <div class="text-center w-9"></div>
-          <div class="text-left">{i18n.t('collection.tableHeaderTrack')}</div>
-          <div class="text-left">{i18n.t('collection.tableHeaderTitle')}</div>
-          <div class="text-left">{i18n.t('collection.tableHeaderArtist')}</div>
-          <div class="text-center">{i18n.t('collection.tableHeaderRating')}</div>
-          <div class="text-center">{i18n.t('collection.tableHeaderPlays')}</div>
-          <div class="text-center">
-            <Clock class="w-3.5 h-3.5 mx-auto" />
-          </div>
-          <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
-        </div>
-      </div>
-
-      <!-- Table Body -->
-      <div class="divide-y divide-brand-border/40 rounded-b-lg overflow-hidden">
-        {#if loading}
-          <div class="flex items-center justify-center py-16">
-            <div class="text-brand-text-secondary text-sm">{i18n.t('home.loading')}</div>
-          </div>
-        {:else if songs.length === 0}
-          <div class="py-16 text-center select-none">
-            <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
-            <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
-          </div>
-        {:else}
-          {#each songs as song, index (song.id)}
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div
-              data-song-row="true"
-              onclick={(e) => handleSongClick(e, song)}
-              ondblclick={() => handlePlaySong(song)}
-              oncontextmenu={(e) => handleContextMenu(e, song)}
-              class="grid grid-cols-[36px_40px_1fr_1fr_96px_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm cursor-pointer
-                {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
-            >
-              <div class="text-center flex justify-center relative w-9 h-6 items-center">
-                {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
-                  <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+    <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
+      <table class="w-full text-left text-sm border-collapse min-w-[800px]">
+        <thead>
+          <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">{i18n.t('playlists.tableHeaderTrack')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderTitle')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderArtist')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('collection.tableHeaderAlbum')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">{i18n.t('collection.tableHeaderRating')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">{i18n.t('playlists.tableHeaderDuration')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t('collection.tableHeaderActions')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#if loading}
+            <tr><td colspan="7" class="py-16 text-center">
+              <div class="text-brand-text-secondary text-sm">{i18n.t('home.loading')}</div>
+            </td></tr>
+          {:else if songs.length === 0}
+            <tr><td colspan="7" class="py-16 text-center select-none">
+              <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
+              <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
+            </td></tr>
+          {:else}
+            {#each songs as song, index (song.id)}
+              <tr
+                data-song-row="true"
+                onclick={(e) => handleSongClick(e, song)}
+                ondblclick={() => handlePlaySong(song)}
+                oncontextmenu={(e) => handleContextMenu(e, song)}
+                class="border-b border-brand-border/40 group transition-all duration-150 select-none cursor-pointer
+                  {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
+              >
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative">
+                  <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
+                    {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
+                      <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
+                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                      </div>
+                    {:else}
+                      <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
+                        {song.track !== undefined && song.track !== null ? song.track : index + 1}
+                      </span>
+                    {/if}
+                    <button
+                      onclick={(e) => { e.stopPropagation(); handlePlaySong(song); }}
+                      class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer"
+                      title={i18n.t('collection.playSong')}
+                    >
+                      <Play class="w-4 h-4 fill-current" />
+                    </button>
                   </div>
-                {/if}
-                <button
-                  onclick={() => handlePlaySong(song)}
-                  class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer"
-                  title={i18n.t('collection.playSong')}
-                >
-                  <Play class="w-3.5 h-3.5 fill-current" />
-                </button>
-              </div>
-
-              <div class="text-brand-text-secondary/70 truncate pr-4 font-medium">
-                {song.track !== undefined && song.track !== null ? song.track : index + 1}
-              </div>
-
-              <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
-                <span class="truncate {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
-                  {song.title || i18n.t('collection.unknownSong')}
-                </span>
-              </div>
-
-              <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0">
-                {song.artist || i18n.t('collection.unknownArtist')}
-              </div>
-
-              <div class="flex justify-center">
-                <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
-              </div>
-
-              <div class="text-center text-brand-text-secondary/80 font-medium">
-                {song.playcount ?? 0}
-              </div>
-
-              <div class="text-center text-brand-text-secondary/80 font-medium">
-                {formatDuration(song.length_nanosec)}
-              </div>
-
-              <div class="flex items-center justify-center gap-2.5">
-                <button
-                  onclick={() => handleAddSongToPlaylist(song.id)}
-                  class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                  title={i18n.t('collection.addPlaylistTooltip')}
-                >
-                  <Plus class="w-4 h-4" />
-                </button>
-                <button
-                  onclick={() => openTagEditor(song.id)}
-                  class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                  title={i18n.t('collection.editTagsTooltip')}
-                >
-                  <Edit3 class="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          {/each}
-        {/if}
-      </div>
+                </td>
+                <td class="py-2.5 px-4 font-medium truncate max-w-xs {selectedSongIds.has(song.id) || (playerStore.currentSong && playerStore.currentSong.id === song.id) ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
+                  <span class="truncate" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
+                </td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
+                  {#if song.artist}
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
+                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } }}
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      title={i18n.t('collection.filterByArtist', { artist: song.artist })}
+                    >
+                      {song.artist}
+                    </span>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
+                  {/if}
+                </td>
+                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
+                  {#if song.album}
+                    <span
+                      role="button"
+                      tabindex="0"
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
+                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); } }}
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      title={i18n.t('collection.filterByAlbum', { album: song.album })}
+                    >
+                      {song.album}
+                    </span>
+                  {:else}
+                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
+                  {/if}
+                </td>
+                <td class="py-2.5 px-4 text-center">
+                  <div class="flex justify-center" onclick={(e) => e.stopPropagation()} role="presentation">
+                    <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
+                  </div>
+                </td>
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</td>
+                <td class="py-2.5 px-4 text-center">
+                  <div class="flex items-center justify-center gap-2.5">
+                    <button
+                      onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
+                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                      title={i18n.t('collection.addPlaylistTooltip')}
+                    >
+                      <Plus class="w-4 h-4" />
+                    </button>
+                    <button
+                      onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
+                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                      title={i18n.t('collection.editTagsTooltip')}
+                    >
+                      <Edit3 class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          {/if}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
