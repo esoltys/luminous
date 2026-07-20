@@ -4,8 +4,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Clock, Activity, HardDrive } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { i18n } from "../stores/i18n.svelte";
-  import { prefs } from "../stores/prefs.svelte";
+  import { i18n, type Locale } from "../stores/i18n.svelte";
+  import { prefs, type RatingStyle } from "../stores/prefs.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
@@ -30,7 +30,7 @@
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
         if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats") {
-          settingsTab = savedTab as any;
+          settingsTab = savedTab;
         }
       }
     } catch (e) {
@@ -225,7 +225,7 @@
           <select
             id="language-select"
             value={i18n.currentLocale}
-            onchange={(e) => i18n.setLocale(e.currentTarget.value as any)}
+            onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
             class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
             style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >
@@ -243,7 +243,7 @@
           <select
             id="rating-style-select"
             value={prefs.ratingStyle}
-            onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as any)}
+            onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as RatingStyle)}
             class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
             style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
           >

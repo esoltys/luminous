@@ -3,6 +3,9 @@ import { listen } from "@tauri-apps/api/event";
 import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 
+export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics";
+export type ActiveSubTab = "songs" | "albums" | "artists";
+
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   stats = $state<LibraryStats>({
@@ -23,8 +26,8 @@ class CollectionStore {
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
-  private _activeTab = $state<"home" | "collection" | "playlists" | "settings" | "lyrics">("collection");
-  private _activeSubTab = $state<"songs" | "albums" | "artists">("songs");
+  private _activeTab = $state<ActiveTab>("collection");
+  private _activeSubTab = $state<ActiveSubTab>("songs");
 
   get activeTab() { return this._activeTab; }
   set activeTab(val) {
@@ -77,10 +80,10 @@ class CollectionStore {
         if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
 
         const savedTab = localStorage.getItem("navigation_activeTab");
-        if (savedTab) this._activeTab = savedTab as any;
+        if (savedTab) this._activeTab = savedTab as ActiveTab;
 
         const savedSubTab = localStorage.getItem("navigation_activeSubTab");
-        if (savedSubTab) this._activeSubTab = savedSubTab as any;
+        if (savedSubTab) this._activeSubTab = savedSubTab as ActiveSubTab;
       }
 
       await this.refreshDirectories();

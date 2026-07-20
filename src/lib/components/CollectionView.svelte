@@ -164,14 +164,18 @@
   });
 
   let albumSortField = $state<"album" | "artist" | "year" | "track_count">(
-    (typeof window !== "undefined" && localStorage.getItem("sort_album_field") as any) || "album"
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("sort_album_field") as "album" | "artist" | "year" | "track_count")) ||
+      "album"
   );
   let albumSortAsc = $state(
     typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
   );
 
   let artistSortField = $state<"name" | "album_count" | "song_count">(
-    (typeof window !== "undefined" && localStorage.getItem("sort_artist_field") as any) || "name"
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("sort_artist_field") as "name" | "album_count" | "song_count")) ||
+      "name"
   );
   let artistSortAsc = $state(
     typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true
@@ -323,7 +327,7 @@
             value={`${sortField}-${sortAsc}`}
             onchange={(e) => {
               const [field, asc] = e.currentTarget.value.split("-");
-              sortField = field as any;
+              sortField = field as keyof Song;
               sortAsc = asc === "true";
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
@@ -346,7 +350,7 @@
             value={`${albumSortField}-${albumSortAsc}`}
             onchange={(e) => {
               const [field, asc] = e.currentTarget.value.split("-");
-              albumSortField = field as any;
+              albumSortField = field as "album" | "artist" | "year" | "track_count";
               albumSortAsc = asc === "true";
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"
@@ -367,7 +371,7 @@
             value={`${artistSortField}-${artistSortAsc}`}
             onchange={(e) => {
               const [field, asc] = e.currentTarget.value.split("-");
-              artistSortField = field as any;
+              artistSortField = field as "name" | "album_count" | "song_count";
               artistSortAsc = asc === "true";
             }}
             class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium"

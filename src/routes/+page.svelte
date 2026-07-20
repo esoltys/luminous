@@ -7,7 +7,7 @@
   import FoldersView from "../lib/components/FoldersView.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
-  import { collectionStore } from "../lib/stores/collection.svelte";
+  import { collectionStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/collection.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
 
   let isInitialized = $state(false);
@@ -77,11 +77,11 @@
                 console.error("Failed to save migrated active_settings_tab:", err);
               });
             } else {
-              collectionStore.activeTab = settings.active_tab as any;
+              collectionStore.activeTab = settings.active_tab as ActiveTab;
             }
           }
           if (settings.active_sub_tab) {
-            collectionStore.activeSubTab = settings.active_sub_tab as any;
+            collectionStore.activeSubTab = settings.active_sub_tab as ActiveSubTab;
           }
         }
       } catch (e) {
