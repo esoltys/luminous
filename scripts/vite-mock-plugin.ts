@@ -82,6 +82,7 @@ export function tauriIpcMockPlugin(): Plugin {
           const featured = resolveFeatured(library, {
             featuredSong: config.default?.featuredSong,
             featuredArtist: config.default?.featuredArtist,
+            featuredAlbum: config.default?.featuredAlbum,
           });
           const body = [
             `window.__LUMINOUS_MOCK_LIBRARY__ = ${JSON.stringify(library)};`,

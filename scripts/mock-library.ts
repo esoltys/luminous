@@ -72,6 +72,8 @@ export interface MockConfigDefaults {
   featuredSong?: string;
   /** Artist name to feature in screenshots (e.g. the artist-detail view). */
   featuredArtist?: string;
+  /** Album title to feature in screenshots (e.g. the album-detail view). */
+  featuredAlbum?: string;
 }
 
 export interface ScreenshotConfig extends MockConfigDefaults {
@@ -103,6 +105,7 @@ export interface ResolvedScreenshotSettings {
   positionSeconds: number;
   featuredSong?: string;
   featuredArtist?: string;
+  featuredAlbum?: string;
 }
 
 export function resolveScreenshotSettings(
@@ -119,6 +122,7 @@ export function resolveScreenshotSettings(
     positionSeconds: screenshot.positionSeconds ?? d.positionSeconds ?? 122,
     featuredSong: screenshot.featuredSong ?? d.featuredSong,
     featuredArtist: screenshot.featuredArtist ?? d.featuredArtist,
+    featuredAlbum: screenshot.featuredAlbum ?? d.featuredAlbum,
   };
 }
 
@@ -327,11 +331,12 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
 export interface FeaturedSelection {
   song?: Song;
   artist?: string;
+  album?: string;
 }
 
 export function resolveFeatured(
   library: MockLibrary,
-  selection: { featuredSong?: string; featuredArtist?: string }
+  selection: { featuredSong?: string; featuredArtist?: string; featuredAlbum?: string }
 ): FeaturedSelection {
   const song =
     (selection.featuredSong && library.songs.find((s) => s.title === selection.featuredSong)) || library.songs[0];
@@ -339,5 +344,9 @@ export function resolveFeatured(
     (selection.featuredArtist && library.artists.some((a) => a.name === selection.featuredArtist)
       ? selection.featuredArtist
       : library.artists[0]?.name) ?? undefined;
-  return { song, artist };
+  const album =
+    (selection.featuredAlbum && library.albums.some((a) => a.album === selection.featuredAlbum)
+      ? selection.featuredAlbum
+      : library.albums[0]?.album) ?? undefined;
+  return { song, artist, album };
 }

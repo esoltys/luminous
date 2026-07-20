@@ -68,7 +68,7 @@ declare global {
     mockSettings?: AppSettings;
     mockPlaybackPositionSec?: number;
     __LUMINOUS_MOCK_LIBRARY__?: MockLibrary;
-    __LUMINOUS_MOCK_FEATURED__?: { song?: Song; artist?: string };
+    __LUMINOUS_MOCK_FEATURED__?: { song?: Song; artist?: string; album?: string };
     __LUMINOUS_MOCK_CONFIG__?: {
       default?: {
         theme?: string;
@@ -77,6 +77,9 @@ declare global {
         sidebarWidth?: number;
         rightPanelOpen?: boolean;
         positionSeconds?: number;
+        featuredSong?: string;
+        featuredArtist?: string;
+        featuredAlbum?: string;
       };
     };
     __TAURI_INTERNALS__?: {

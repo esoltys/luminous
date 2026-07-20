@@ -113,9 +113,10 @@ async function main() {
   const defaultFeatured = resolveFeatured(mockLibrary, {
     featuredSong: mockConfig.default?.featuredSong,
     featuredArtist: mockConfig.default?.featuredArtist,
+    featuredAlbum: mockConfig.default?.featuredAlbum,
   });
   console.log(
-    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}.`
+    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}. Featured album: ${defaultFeatured.album ?? "none"}.`
   );
   // Library data (songs/albums/artists) is the same for every screenshot; only
   // the "featured" selection and UI settings vary per-screenshot.
@@ -156,10 +157,20 @@ async function main() {
     await page.setViewportSize({ width: 1280, height: 800 });
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
-        console.warn(`[Page ${msg.type()}] ${msg.text()}`);
+        const text = msg.text();
+        if (text.includes("Cannot read properties of undefined (reading 'offsetHeight')")) {
+          return;
+        }
+        console.warn(`[Page ${msg.type()}] ${text}`);
       }
     });
-    page.on("pageerror", (err) => console.error(`[Page error] ${err.stack || err.message}`));
+    page.on("pageerror", (err) => {
+      const msg = err.stack || err.message || String(err);
+      if (msg.includes("Cannot read properties of undefined (reading 'offsetHeight')")) {
+        return;
+      }
+      console.error(`[Page error] ${msg}`);
+    });
 
     // Inject the mock library data, then the mock Tauri IPC bridge that reads it
     await page.addInitScript(`
@@ -276,7 +287,7 @@ async function main() {
             (titleBtn as HTMLElement).click();
           }
         }
-      }, featured.song?.album);
+      }, featured.album ?? featured.song?.album);
     },
     "click-themes": async (page) => {
       await page.evaluate(() => {
