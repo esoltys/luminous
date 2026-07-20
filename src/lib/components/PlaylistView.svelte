@@ -505,8 +505,9 @@
   {/if}
 
   {#if activePlaylist}
+    <div class="flex-1 overflow-y-auto relative z-10">
     <!-- Stacked Cover Art Hero & Summary Banner Header -->
-    <div class="relative w-full overflow-hidden shrink-0 border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 z-10">
+    <div class="relative w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
       <div class="flex items-end justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
         <div class="flex flex-col justify-end gap-2 max-w-xl">
@@ -698,9 +699,9 @@
       </div>
     </div>
 
-    <!-- Tracks List Scrollable Container -->
-    <div class="flex-1 overflow-hidden p-6 relative z-10 flex flex-col" class:pb-24={playerStore.hasEverPlayed}>
-      <div class="flex-1 overflow-auto border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
+    <!-- Tracks List Container -->
+    <div class="p-6" class:pb-24={playerStore.hasEverPlayed}>
+      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
@@ -879,38 +880,39 @@
           </tbody>
         </table>
       </div>
-
-      <!-- Floating Multi-Select Batch Toolbar -->
-      {#if selectedUuids.size > 0}
-        <div data-floating-toolbar="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-accent/40 rounded-full px-5 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs animate-in slide-in-from-bottom-4 duration-200">
-          <span class="font-bold text-brand-accent-text">
-            {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
-          </span>
-          <div class="h-4 w-px bg-brand-border/60"></div>
-          <button
-            onclick={playSelected}
-            class="flex items-center gap-1.5 text-brand-text-primary hover:text-brand-accent-text font-semibold transition-colors cursor-pointer"
-          >
-            <Play class="w-3.5 h-3.5 fill-current" />
-            <span>{i18n.t("playlists.playSelected")}</span>
-          </button>
-          <button
-            onclick={removeSelected}
-            class="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-semibold transition-colors cursor-pointer"
-          >
-            <Trash2 class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.removeSelected")}</span>
-          </button>
-          <button
-            onclick={() => { selectedUuids = new Set(); lastSelectedIndex = null; }}
-            class="p-1 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer ml-1"
-            title={i18n.t("playlists.clearSelection")}
-          >
-            <XCircle class="w-4 h-4" />
-          </button>
-        </div>
-      {/if}
     </div>
+    </div>
+
+    <!-- Floating Multi-Select Batch Toolbar -->
+    {#if selectedUuids.size > 0}
+      <div data-floating-toolbar="true" class="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-accent/40 rounded-full px-5 py-2 shadow-2xl backdrop-blur-xl flex items-center gap-4 text-xs animate-in slide-in-from-bottom-4 duration-200">
+        <span class="font-bold text-brand-accent-text">
+          {i18n.t("playlists.selectedCount", { count: selectedUuids.size })}
+        </span>
+        <div class="h-4 w-px bg-brand-border/60"></div>
+        <button
+          onclick={playSelected}
+          class="flex items-center gap-1.5 text-brand-text-primary hover:text-brand-accent-text font-semibold transition-colors cursor-pointer"
+        >
+          <Play class="w-3.5 h-3.5 fill-current" />
+          <span>{i18n.t("playlists.playSelected")}</span>
+        </button>
+        <button
+          onclick={removeSelected}
+          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-semibold transition-colors cursor-pointer"
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          <span>{i18n.t("playlists.removeSelected")}</span>
+        </button>
+        <button
+          onclick={() => { selectedUuids = new Set(); lastSelectedIndex = null; }}
+          class="p-1 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer ml-1"
+          title={i18n.t("playlists.clearSelection")}
+        >
+          <XCircle class="w-4 h-4" />
+        </button>
+      </div>
+    {/if}
   {:else}
     <!-- No playlist selected -->
     <div class="flex-1 flex flex-col items-center justify-center text-brand-text-secondary/60">
