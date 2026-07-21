@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 7;
+const CURRENT_SCHEMA_VERSION: i32 = 8;
 
 #[derive(Debug)]
 pub struct Database {
@@ -124,6 +124,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![7],
+            )?;
+        }
+
+        if version < 8 {
+            log::info!("Running migration 8: instrumental track flag (#12)");
+            conn.execute_batch(MIGRATION_8)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![8],
             )?;
         }
 
@@ -374,6 +383,14 @@ UPDATE playlists SET updated = created WHERE updated IS NULL;
 
 const MIGRATION_7: &str = "
 ALTER TABLE songs ADD COLUMN is_vbr BOOLEAN;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 8: instrumental track flag (#12)
+// ---------------------------------------------------------------------------
+
+const MIGRATION_8: &str = "
+ALTER TABLE songs ADD COLUMN is_instrumental BOOLEAN NOT NULL DEFAULT 0;
 ";
 
 #[cfg(test)]

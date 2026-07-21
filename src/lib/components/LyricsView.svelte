@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
-  import { FileText, Edit3, Save, X, RefreshCw, LoaderCircle } from "lucide-svelte";
+  import { FileText, Edit3, Save, X, RefreshCw, LoaderCircle, Music2 } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface LyricLine {
@@ -94,6 +94,13 @@
       return;
     }
 
+    if (playerStore.currentSong?.is_instrumental) {
+      console.log("[LyricsView] loadLyrics: track is instrumental, skipping fetch");
+      lyricsText = "";
+      errorMsg = "";
+      return;
+    }
+
     console.log(`[LyricsView] loadLyrics: fetching lyrics for songId: ${songId}, forceRefresh: ${forceRefresh}`);
     isLoading = true;
     errorMsg = "";
@@ -132,6 +139,25 @@
     }
   }
 
+  async function toggleInstrumental(isInstrumental: boolean) {
+    if (!playerStore.currentSong) return;
+    const songId = playerStore.currentSong.id;
+    try {
+      console.log(`[LyricsView] Setting instrumental=${isInstrumental} for songId: ${songId}`);
+      await invoke("set_instrumental", { songId, isInstrumental });
+      playerStore.currentSong.is_instrumental = isInstrumental;
+      if (isInstrumental) {
+        lyricsText = "";
+        errorMsg = "";
+      } else {
+        await loadLyrics(songId, true);
+      }
+    } catch (e: any) {
+      console.error("[LyricsView] Failed to toggle instrumental status:", e);
+      alert(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString());
+    }
+  }
+
   async function saveManualLyrics() {
     if (!playerStore.currentSong) return;
     try {
@@ -139,6 +165,10 @@
       await invoke("save_lyrics", { songId: playerStore.currentSong.id, lyrics: editText });
       lyricsText = editText;
       playerStore.currentSong.lyrics = editText;
+      if (playerStore.currentSong.is_instrumental) {
+        await invoke("set_instrumental", { songId: playerStore.currentSong.id, isInstrumental: false });
+        playerStore.currentSong.is_instrumental = false;
+      }
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
@@ -190,7 +220,14 @@
     <!-- Actions -->
     {#if playerStore.currentSong}
       <div class="flex items-center gap-2">
-        {#if !isEditing}
+        {#if playerStore.currentSong.is_instrumental}
+          <button
+            onclick={() => toggleInstrumental(false)}
+            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
+          >
+            <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
+          </button>
+        {:else if !isEditing}
           <button
             onclick={() => loadLyrics(playerStore.currentSong?.id, true)}
             class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
@@ -228,6 +265,27 @@
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
         <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent-text" />
         <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('lyrics.fetching', {}, "Fetching lyrics...")}</span>
+      </div>
+    {:else if playerStore.currentSong?.is_instrumental}
+      <!-- Instrumental View -->
+      <div class="w-full h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <div class="p-4 rounded-full bg-brand-sidebar border border-brand-border text-brand-accent shadow-inner">
+          <Music2 class="w-12 h-12 stroke-[1.5]" />
+        </div>
+        <div class="space-y-1 max-w-sm">
+          <h3 class="text-base font-bold text-brand-text-primary">
+            {i18n.t('lyrics.instrumentalTitle', {}, "Instrumental Track")}
+          </h3>
+          <p class="text-xs text-brand-text-secondary/70">
+            {i18n.t('lyrics.instrumentalDesc', {}, "This track is marked as instrumental. Online lyrics search is bypassed.")}
+          </p>
+        </div>
+        <button
+          onclick={() => toggleInstrumental(false)}
+          class="mt-2 bg-brand-main/60 hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
+        >
+          {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
+        </button>
       </div>
     {:else if isEditing}
       <!-- Editor Mode -->
@@ -275,12 +333,22 @@
       <div class="w-full h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
         <p class="text-sm font-semibold text-rose-400">{i18n.t('lyrics.lyricsNotFound')}</p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
-        <button
-          onclick={() => loadLyrics(playerStore.currentSong?.id)}
-          class="mt-2 bg-brand-main/50 hover:bg-brand-main/80 border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-        >
-          {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
-        </button>
+        <div class="flex items-center gap-2 mt-2">
+          <button
+            onclick={() => loadLyrics(playerStore.currentSong?.id)}
+            class="bg-brand-main/50 hover:bg-brand-main/80 border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+          >
+            {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
+          </button>
+          {#if playerStore.currentSong}
+            <button
+              onclick={() => toggleInstrumental(true)}
+              class="bg-brand-accent/20 hover:bg-brand-accent/30 border border-brand-accent/40 text-brand-accent-text px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            >
+              {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
+            </button>
+          {/if}
+        </div>
       </div>
     {:else}
       <div class="w-full h-full flex flex-col items-center justify-center gap-2 text-center text-brand-text-secondary/50">
@@ -288,6 +356,12 @@
         {#if playerStore.currentSong}
           <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('lyrics.lyricsNotFound')}</p>
           <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
+          <button
+            onclick={() => toggleInstrumental(true)}
+            class="mt-3 bg-brand-accent/20 hover:bg-brand-accent/30 border border-brand-accent/40 text-brand-accent-text px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+          >
+            {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
+          </button>
         {:else}
           <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('playerBar.notPlaying')}</p>
           <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>

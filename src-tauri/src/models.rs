@@ -219,6 +219,9 @@ pub struct Song {
     /// Set to `true` when the file is missing from disk (soft-delete).
     /// Song metadata is retained so playlists can display last-known info.
     pub unavailable: bool,
+
+    /// Set to `true` when marked as an instrumental track (suppresses online lyrics fetching).
+    pub is_instrumental: bool,
 }
 
 impl Song {

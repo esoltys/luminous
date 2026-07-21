@@ -552,6 +552,7 @@ pub fn run() {
             // Lyrics commands
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
+            commands::lyrics::set_instrumental,
             // Tag Editor commands
             commands::tageditor::get_song_details,
             commands::tageditor::lookup_acoustid_tags,
