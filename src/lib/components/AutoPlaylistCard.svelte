@@ -1,8 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Heart, Clock } from "lucide-svelte";
+  import { ListMusic, Play, Heart, Clock, Calendar, Music } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
-  import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -10,28 +9,30 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "genre";
+    kind: "favourites" | "recently_added" | "genre" | "decade";
     genre?: string;
-    /** For kind "genre": the materialized playlist row backing it (refreshed at most every 24h). */
+    decade?: string;
+    /** For kind "genre" or "decade": the materialized playlist row backing it (refreshed at most every 24h). */
     playlistId?: number;
-    /** For kind "genre": when this playlist's songs were last (re)generated. */
+    /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
     updated?: number;
     trackCount: number;
     onClick: () => void;
     widthClass?: string;
   }
 
-  let { label, kind, genre, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
+  let { label, kind, genre, decade, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let songs = $state<Song[]>([]);
 
   $effect(() => {
     const k = kind;
     const g = genre;
+    const d = decade;
     const pid = playlistId;
 
     const request =
-      k === "genre" && pid !== undefined
+      (k === "genre" || k === "decade") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
@@ -39,11 +40,13 @@
           ? invoke<Song[]>("get_favourite_songs")
           : k === "recently_added"
             ? invoke<Song[]>("get_recently_added_songs", { limit: 50 })
-            : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
+            : k === "decade"
+              ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
+              : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
 
     request
       .then((res) => {
-        if (kind === k && genre === g && playlistId === pid) {
+        if (kind === k && genre === g && decade === d && playlistId === pid) {
           songs = res;
         }
       })
@@ -55,11 +58,11 @@
   // Favourites/Recently Added use a fixed icon cover instead of a CoverStack —
   // they're rebuilt from the whole library on every load, so a coverstack of
   // whichever songs happen to be in them right now reads as arbitrary rather
-  // than representative (unlike a genre or a user playlist).
-  let topCovers = $derived(kind === "genre" ? songsToCoverStack(songs) : []);
+  // than representative (unlike a genre, decade, or user playlist).
+  let topCovers = $derived(kind === "genre" || kind === "decade" ? songsToCoverStack(songs) : []);
 
   let updatedLabel = $derived.by(() => {
-    if (kind !== "genre" || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -79,19 +82,29 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
-    {#if kind === "genre" && topCovers.length > 0}
-      <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-36 h-36" />
+    {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
+      <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg relative">
+        <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-36 h-36" />
+      </div>
     {:else if kind === "favourites"}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
-        <Heart class="w-10 h-10 text-white/80 fill-current" />
+      <div class="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <Heart class="w-10 h-10 text-white/90 fill-current" />
       </div>
     {:else if kind === "recently_added"}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
-        <Clock class="w-10 h-10 text-white/80" />
+      <div class="w-full h-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <Clock class="w-10 h-10 text-white/90" />
+      </div>
+    {:else if kind === "decade"}
+      <div class="w-full h-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <Calendar class="w-10 h-10 text-white/90" />
+      </div>
+    {:else if kind === "genre"}
+      <div class="w-full h-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <Music class="w-10 h-10 text-white/90" />
       </div>
     {:else}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(label)} flex items-center justify-center overflow-hidden border border-brand-border/60">
-        <ListMusic class="w-10 h-10 text-white/80" />
+      <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <ListMusic class="w-10 h-10 text-white/90" />
       </div>
     {/if}
     <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">

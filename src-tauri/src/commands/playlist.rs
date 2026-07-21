@@ -59,6 +59,28 @@ pub async fn sync_genre_auto_playlists(state: State<'_, AppState>) -> Result<(),
 }
 
 #[tauri::command]
+pub async fn sync_decade_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .sync_decade_auto_playlists()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_songs_by_decade(
+    state: State<'_, AppState>,
+    decade: String,
+    limit: Option<i64>,
+) -> Result<Vec<crate::models::Song>, String> {
+    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_by_decade(&decade, limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,

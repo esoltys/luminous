@@ -9,13 +9,14 @@ export type ActiveSubTab = "songs" | "albums" | "artists";
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 export type PlaylistsSubTab = "auto" | "custom";
 
-/** An auto-playlist reference (Favourites, Recently Added, or a genre), for the auto-playlist detail view. */
+/** An auto-playlist reference (Favourites, Recently Added, genre, or decade), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "genre";
+  kind: "favourites" | "recently_added" | "genre" | "decade";
   genre?: string;
-  /** For kind "genre": the materialized (dynamic_enabled) playlist row backing it. */
+  decade?: string;
+  /** For kind "genre" or "decade": the materialized (dynamic_enabled) playlist row backing it. */
   playlistId?: number;
-  /** For kind "genre": when this playlist's songs were last (re)generated. */
+  /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
   updated?: number;
 }
 

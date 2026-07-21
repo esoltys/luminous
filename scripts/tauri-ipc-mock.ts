@@ -329,9 +329,20 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_playlists_by_artist: () => [],
     get_playlists: () => library.playlists,
     sync_genre_auto_playlists: () => null,
+    sync_decade_auto_playlists: () => null,
     get_favourite_songs: () => library.songs.slice(0, 5),
     get_recently_added_songs: () => library.songs.slice(0, 5),
     get_songs_by_genre: (args) => library.songs.filter((s) => s.genre === args.genre),
+    get_songs_by_decade: (args) => {
+      const decadeStr = args.decade as string;
+      const yearStr = decadeStr.replace(/\D/g, "");
+      const startYear = parseInt(yearStr, 10);
+      if (isNaN(startYear)) return library.songs;
+      return library.songs.filter((s) => {
+        const y = s.year ?? s.originalyear;
+        return y !== undefined && y !== null && y >= startYear && y <= startYear + 9;
+      });
+    },
 
     get_playlist_tracks: (args) => {
       const playlistId = args.playlistId as number;

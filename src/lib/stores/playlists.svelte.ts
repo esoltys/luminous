@@ -33,6 +33,7 @@ class PlaylistsStore {
             applySongStats(item.song, event.payload);
           }
         }
+        this.refreshAutoPlaylistCounts();
       });
 
       await this.refreshPlaylists();
@@ -63,8 +64,9 @@ class PlaylistsStore {
         invoke<Song[]>("get_favourite_songs"),
         invoke<Song[]>("get_recently_added_songs", { limit: 50 }),
       ]);
-      this.favouritesCount = favourites.length;
-      this.recentlyAddedCount = recentlyAdded.length;
+      this.favouritesCount = Array.isArray(favourites) ? favourites.length : 0;
+      this.recentlyAddedCount = Array.isArray(recentlyAdded) ? recentlyAdded.length : 0;
+      await this.refreshPlaylists();
     } catch (err) {
       console.error("Failed to refresh auto-playlist counts:", err);
     }

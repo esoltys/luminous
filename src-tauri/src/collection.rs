@@ -527,6 +527,55 @@ impl CollectionScanner {
         Ok(genres)
     }
 
+    /// Distinct decades present in the library (e.g. "1980s", "1990s"), used to build one
+    /// auto-playlist per decade.
+    pub fn get_library_decades(&self) -> Result<Vec<String>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT (COALESCE(year, originalyear) / 10 * 10) AS decade_start
+             FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND COALESCE(year, originalyear) IS NOT NULL
+               AND COALESCE(year, originalyear) >= 1000
+               AND COALESCE(year, originalyear) <= 9999
+             ORDER BY decade_start ASC",
+        )?;
+        let decades = stmt
+            .query_map([], |row| {
+                let start: i32 = row.get(0)?;
+                Ok(format!("{}s", start))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(decades)
+    }
+
+    /// Highest-rated, most-played songs in a decade (e.g. "1980s"), for per-decade auto-playlists.
+    pub fn get_songs_by_decade(&self, decade: &str, limit: i64) -> Result<Vec<Song>> {
+        let (start, end) = match parse_decade_range(decade) {
+            Some(range) => range,
+            None => return Ok(Vec::new()),
+        };
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE COALESCE(year, originalyear) >= ?1
+               AND COALESCE(year, originalyear) <= ?2
+               AND source IN (1, 2)
+               AND unavailable = 0
+             ORDER BY rating DESC, playcount DESC
+             LIMIT ?3",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![start, end, limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Group only by album name so that tracks with different per-track artists
@@ -900,7 +949,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     title=excluded.title, artist=excluded.artist,
                     album=excluded.album, album_artist=excluded.album_artist,
                     track=excluded.track, disc=excluded.disc,
-                    year=excluded.year, genre=excluded.genre,
+                    year=excluded.year, originalyear=excluded.originalyear, genre=excluded.genre,
                     composer=excluded.composer, lyrics=excluded.lyrics,
                     comment=excluded.comment, length_nanosec=excluded.length_nanosec,
                     bitrate=excluded.bitrate, samplerate=excluded.samplerate,
@@ -929,6 +978,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.track,
             song.disc,
             song.year,
+            song.originalyear,
             song.genre,
             song.length_nanosec,
             song.bitrate,
@@ -992,14 +1042,14 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
-    composer, lyrics, comment, track, disc, year, genre,
+    composer, lyrics, comment, track, disc, year, originalyear, genre,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
     replaygain_track_gain, replaygain_album_gain
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -1425,4 +1475,62 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+
+    #[test]
+    fn test_parse_decade_range() {
+        assert_eq!(parse_decade_range("1980s"), Some((1980, 1989)));
+        assert_eq!(parse_decade_range("1990S"), Some((1990, 1999)));
+        assert_eq!(parse_decade_range("2000"), Some((2000, 2009)));
+        assert_eq!(parse_decade_range("2020s"), Some((2020, 2029)));
+        assert_eq!(parse_decade_range("invalid"), None);
+    }
+
+    #[test]
+    fn test_get_library_decades_and_songs() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_decade_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let s1 = Song {
+            title: Some("80s Song".to_string()),
+            year: Some(1984),
+            source: SongSource::LocalFile,
+            path: Some("/music/80s.mp3".to_string()),
+            ..Default::default()
+        };
+        let s2 = Song {
+            title: Some("90s Song".to_string()),
+            originalyear: Some(1995),
+            source: SongSource::LocalFile,
+            path: Some("/music/90s.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &s1).unwrap();
+        upsert_song(&conn, &s2).unwrap();
+
+        let scanner = CollectionScanner::new(db);
+        let decades = scanner.get_library_decades().unwrap();
+        assert_eq!(decades, vec!["1980s".to_string(), "1990s".to_string()]);
+
+        let songs_80s = scanner.get_songs_by_decade("1980s", 10).unwrap();
+        assert_eq!(songs_80s.len(), 1);
+        assert_eq!(songs_80s[0].title.as_deref(), Some("80s Song"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
+
+pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
+    let clean = decade.trim().trim_end_matches(['s', 'S']);
+    let year: i32 = clean.parse().ok()?;
+    let start = (year / 10) * 10;
+    let end = start + 9;
+    Some((start, end))
+}
+

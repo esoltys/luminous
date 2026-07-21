@@ -15,8 +15,9 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "genre";
+    kind: "favourites" | "recently_added" | "genre" | "decade";
     genre?: string;
+    decade?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -25,17 +26,19 @@
 
   onMount(async () => {
     try {
-      // Genre auto-playlists are materialized as real (dynamic_enabled) playlist
+      // Auto-playlists (genre and decade) are materialized as real (dynamic_enabled) playlist
       // rows, refreshed at most once every 24h — sync then re-pull the list.
       await invoke("sync_genre_auto_playlists");
+      await invoke("sync_decade_auto_playlists");
       await playlistsStore.refreshPlaylists();
     } catch (err) {
-      console.error("Failed to sync genre auto-playlists:", err);
+      console.error("Failed to sync auto-playlists:", err);
     }
     await playlistsStore.refreshAutoPlaylistCounts();
   });
 
-  let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled));
+  let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:")));
+  let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let customPlaylists = $derived(playlistsStore.playlists.filter((p) => !p.dynamic_enabled));
 
   // Auto-playlists that currently resolve to 0 songs are hidden entirely
@@ -58,13 +61,27 @@
         trackCount: playlistsStore.recentlyAddedCount,
       });
     }
+    for (const p of decadeAutoPlaylists) {
+      if (p.track_count > 0) {
+        const dec = p.dynamic_spec?.replace(/^decade:/, "") ?? p.name;
+        defs.push({
+          id: `auto:decade:${p.id}`,
+          kind: "decade",
+          decade: dec,
+          label: dec,
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
     for (const p of genreAutoPlaylists) {
       if (p.track_count > 0) {
         defs.push({
           id: `auto:genre:${p.id}`,
           kind: "genre",
-          genre: p.dynamic_spec ?? p.name,
-          label: p.dynamic_spec ?? p.name,
+          genre: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
+          label: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
@@ -85,14 +102,13 @@
   );
 
   // Favourites/Recently Added are always pinned first, ahead of the sort
-  // order applied to genre auto-playlists (autoDefs already pushes them in
-  // that order, so pinning is just a stable partition, not a re-sort).
+  // order applied to decade & genre auto-playlists.
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre");
+    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre")
+      .filter((d) => d.kind === "genre" || d.kind === "decade")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -140,7 +156,9 @@
     collectionStore.viewAutoPlaylist(
       def.kind === "genre"
         ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
-        : { kind: def.kind }
+        : def.kind === "decade"
+          ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
+          : { kind: def.kind }
     );
   }
 
@@ -285,6 +303,7 @@
                 label={def.label}
                 kind={def.kind}
                 genre={def.genre}
+                decade={def.decade}
                 playlistId={def.playlistId}
                 updated={def.updated}
                 trackCount={def.trackCount}

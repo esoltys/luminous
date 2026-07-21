@@ -521,6 +521,8 @@ pub fn run() {
             commands::playlist::rename_playlist,
             commands::playlist::get_playlists,
             commands::playlist::sync_genre_auto_playlists,
+            commands::playlist::sync_decade_auto_playlists,
+            commands::playlist::get_songs_by_decade,
             commands::playlist::get_playlists_by_artist,
             commands::playlist::get_playlist_tracks,
             commands::playlist::add_to_playlist,

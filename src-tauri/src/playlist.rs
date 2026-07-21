@@ -213,14 +213,15 @@ impl PlaylistManager {
 
         // Prune genre auto-playlists for genres no longer in the library.
         let mut stmt =
-            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1")?;
+            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND (dynamic_spec NOT LIKE 'decade:%')")?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt);
-        for (id, genre) in &existing {
-            if !genres.contains(genre) {
+        for (id, spec) in &existing {
+            let genre_name = spec.strip_prefix("genre:").unwrap_or(spec);
+            if !genres.contains(&genre_name.to_string()) {
                 conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
             }
         }
@@ -228,8 +229,8 @@ impl PlaylistManager {
         for genre in &genres {
             let existing_row: Option<(i64, i64)> = conn
                 .query_row(
-                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
-                    params![genre],
+                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND (dynamic_spec = ?1 OR dynamic_spec = ?2)",
+                    params![genre, format!("genre:{}", genre)],
                     |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
                 )
                 .ok();
@@ -260,6 +261,85 @@ impl PlaylistManager {
                     conn.execute(
                         "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?1, ?2, ?2)",
                         params![genre, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            for (position, song) in songs.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Regenerates each decade "auto-playlist" — a system-managed `playlists` row
+    /// with `dynamic_enabled = 1` and `dynamic_spec` set to `decade:<decade>` (e.g. `decade:1980s`) — if
+    /// it's missing or its `updated` timestamp is more than 24h old, and prunes
+    /// rows for decades no longer present in the library.
+    pub fn sync_decade_auto_playlists(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let decades = scanner.get_library_decades()?;
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        // Prune decade auto-playlists for decades no longer in the library.
+        let mut stmt =
+            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'decade:%'")?;
+        let existing: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        for (id, spec) in &existing {
+            let decade = spec.strip_prefix("decade:").unwrap_or(spec);
+            if !decades.contains(&decade.to_string()) {
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+            }
+        }
+
+        for decade in &decades {
+            let spec = format!("decade:{}", decade);
+            let existing_row: Option<(i64, i64)> = conn
+                .query_row(
+                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    params![spec],
+                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+                )
+                .ok();
+
+            let needs_generation = match existing_row {
+                None => true,
+                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let songs = scanner.get_songs_by_decade(decade, 50)?;
+
+            let playlist_id = match existing_row {
+                Some((id, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                        params![now, id],
+                    )?;
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        params![decade, spec, now],
                     )?;
                     conn.last_insert_rowid()
                 }
@@ -1212,6 +1292,40 @@ mod tests {
             .map(|t| t.song.as_ref().unwrap().title.as_deref().unwrap())
             .collect();
         assert_eq!(titles_undo, vec!["Song 1", "Song 2", "Song 3", "Song 4"]);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_decade_auto_playlists() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, year, source, unavailable) VALUES ('Track 80s', 1982, 1, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 90s', 1999, 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_decade_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let decade_playlists: Vec<_> = playlists.iter().filter(|p| p.dynamic_enabled && p.dynamic_spec.as_deref().unwrap_or("").starts_with("decade:")).collect();
+        assert_eq!(decade_playlists.len(), 2);
+
+        let pl_80s = decade_playlists.iter().find(|p| p.name == "1980s").unwrap();
+        let tracks = manager.get_playlist_tracks(pl_80s.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].song.as_ref().unwrap().title.as_deref(), Some("Track 80s"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

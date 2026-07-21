@@ -19,6 +19,7 @@
 
   let kind = $derived(view.kind);
   let genre = $derived(view.genre);
+  let decade = $derived(view.decade);
   let playlistId = $derived(view.playlistId);
   let updated = $derived(view.updated);
 
@@ -114,13 +115,14 @@
   let displayName = $derived.by(() => {
     if (kind === "favourites") return i18n.t("playlists.autoFavourites");
     if (kind === "recently_added") return i18n.t("playlists.autoRecentlyAdded");
+    if (kind === "decade") return decade || i18n.t("artistDetail.unknownYear");
     return genre || i18n.t("artistDetail.unknownGenre");
   });
 
   let topCovers = $derived(songsToCoverStack(songs));
 
   let updatedLabel = $derived.by(() => {
-    if (kind !== "genre" || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -132,31 +134,33 @@
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
 
-  async function fetchSongs(k: typeof kind, g: typeof genre, pid: typeof playlistId): Promise<Song[]> {
-    if (k === "genre" && pid !== undefined) {
+  async function fetchSongs(k: typeof kind, g: typeof genre, d: typeof decade, pid: typeof playlistId): Promise<Song[]> {
+    if ((k === "genre" || k === "decade") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
     }
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
+    if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
     return invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
   }
 
   $effect(() => {
     const k = kind;
     const g = genre;
+    const d = decade;
     const pid = playlistId;
     loading = true;
-    fetchSongs(k, g, pid)
+    fetchSongs(k, g, d, pid)
       .then((fetchedSongs) => {
-        if (kind !== k || genre !== g || playlistId !== pid) return;
+        if (kind !== k || genre !== g || decade !== d || playlistId !== pid) return;
         songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);
       })
       .finally(() => {
-        if (kind === k && genre === g && playlistId === pid) loading = false;
+        if (kind === k && genre === g && decade === d && playlistId === pid) loading = false;
       });
   });
 
@@ -216,7 +220,7 @@
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
     loading = true;
-    fetchSongs(kind, genre, playlistId)
+    fetchSongs(kind, genre, decade, playlistId)
       .then((fetchedSongs) => {
         songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
       })
