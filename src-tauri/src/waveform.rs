@@ -128,8 +128,8 @@ pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>
     Ok(data)
 }
 
-/// Scans database for songs that are missing either waveform or moodbar cache and generates them.
-pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
+/// Queries database for songs missing either waveform or moodbar cache.
+pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
     let mut stmt = conn.prepare(
         "SELECT s.id, s.path FROM songs s
@@ -142,19 +142,35 @@ pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
         .filter_map(|r| r.ok())
         .collect();
+    Ok(missing_songs)
+}
 
+/// Scans database for songs missing visualizer cache and generates them, invoking a progress callback for each song.
+pub fn backfill_missing_visualizers_with_progress<F>(
+    db: &Database,
+    mut progress_cb: F,
+) -> Result<usize>
+where
+    F: FnMut(usize, usize, &str),
+{
+    let missing_songs = get_missing_visualizer_songs(db)?;
     if missing_songs.is_empty() {
         return Ok(0);
     }
 
-    log::info!(
-        "Backfilling missing visualizers for {} songs",
-        missing_songs.len()
-    );
+    let total = missing_songs.len();
+    log::info!("Backfilling missing visualizers for {total} songs");
     let mut count = 0;
 
-    for (song_id, path_str) in missing_songs {
+    for (idx, (song_id, path_str)) in missing_songs.into_iter().enumerate() {
         let path = Path::new(&path_str);
+        let file_name = path
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_else(|| path_str.clone());
+
+        progress_cb(idx + 1, total, &file_name);
+
         if !path.exists() {
             continue;
         }
@@ -171,8 +187,13 @@ pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
         }
     }
 
-    log::info!("Completed visualizer backfill for {} songs", count);
+    log::info!("Completed visualizer backfill for {count} songs");
     Ok(count)
+}
+
+/// Scans database for songs that are missing either waveform or moodbar cache and generates them.
+pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
+    backfill_missing_visualizers_with_progress(db, |_, _, _| {})
 }
 
 #[cfg(test)]

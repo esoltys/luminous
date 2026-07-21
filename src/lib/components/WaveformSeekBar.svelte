@@ -5,6 +5,7 @@
   import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
 
+  let containerEl = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
   let moodbarData = $state<number[]>([]);
@@ -16,6 +17,29 @@
   let waveformRequestId = 0;
   let moodbarRequestId = 0;
 
+  let isLoadingWaveform = $state(false);
+  let isLoadingMoodbar = $state(false);
+  let pulseAngle = $state(0);
+  let animFrameId: number | null = null;
+
+  function startLoadingAnimation() {
+    if (animFrameId !== null) return;
+    function step() {
+      if (isLoadingWaveform || isLoadingMoodbar) {
+        pulseAngle = (pulseAngle + 0.08) % (Math.PI * 2);
+        draw();
+        animFrameId = requestAnimationFrame(step);
+      } else {
+        if (animFrameId !== null) {
+          cancelAnimationFrame(animFrameId);
+          animFrameId = null;
+        }
+        draw();
+      }
+    }
+    animFrameId = requestAnimationFrame(step);
+  }
+
   // Fetch waveform when current song changes. get_waveform_data() falls back
   // to a full offline decode of the audio file (decode_all_samples) on a
   // cache miss, which is expensive — rapid-fire skips must not each trigger
@@ -26,12 +50,14 @@
     const requestId = ++waveformRequestId;
     if (songId === undefined) {
       waveformData = [];
+      isLoadingWaveform = false;
+      draw();
       return;
     }
-    // Immediately show neutral fallback waveform while decoding/fetching
-    waveformData = Array(150).fill(40);
+    isLoadingWaveform = true;
+    startLoadingAnimation();
     try {
-      const data = await invoke<number[] | null>("get_waveform_data", { songId });
+      const data = await invoke<number[] | null>("get_waveform_data", { song_id: songId, songId });
       if (requestId !== waveformRequestId) return; // superseded by a newer track
       if (data) {
         waveformData = data;
@@ -39,7 +65,11 @@
     } catch (e) {
       if (requestId !== waveformRequestId) return;
       console.error("Failed to load waveform:", e);
-      waveformData = Array(150).fill(40);
+    } finally {
+      if (requestId === waveformRequestId) {
+        isLoadingWaveform = false;
+        draw();
+      }
     }
   }
 
@@ -49,18 +79,26 @@
     const requestId = ++moodbarRequestId;
     if (songId === undefined) {
       moodbarData = [];
+      isLoadingMoodbar = false;
+      draw();
       return;
     }
-    // Immediately reset moodbar data while decoding/fetching
+    isLoadingMoodbar = true;
     moodbarData = [];
+    startLoadingAnimation();
     try {
-      const data = await invoke<number[] | null>("get_moodbar_data", { songId });
+      const data = await invoke<number[] | null>("get_moodbar_data", { song_id: songId, songId });
       if (requestId !== moodbarRequestId) return;
       moodbarData = data ?? [];
     } catch (e) {
       if (requestId !== moodbarRequestId) return;
       console.error("Failed to load moodbar:", e);
       moodbarData = [];
+    } finally {
+      if (requestId === moodbarRequestId) {
+        isLoadingMoodbar = false;
+        draw();
+      }
     }
   }
 
@@ -94,20 +132,21 @@
 
   // Draw waveform or moodbar, depending on prefs.seekBarMode
   function draw() {
-    if (!canvas) return;
+    if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const width = containerEl.clientWidth || 300;
+    const height = 28;
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
       canvas.height = height * dpr;
-      ctx.scale(dpr, dpr);
     }
 
+    if (ctx.save) ctx.save();
+    ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
     const songLength = playerStore.currentSong?.length_nanosec || 1;
@@ -124,6 +163,7 @@
     } else {
       drawWaveform(ctx, width, height, progressPct, accentColor, hoverColor, borderCol);
     }
+    if (ctx.restore) ctx.restore();
   }
 
   function drawWaveform(
@@ -135,34 +175,53 @@
     hoverColor: string,
     borderCol: string,
   ) {
-    const data = waveformData.length > 0 ? waveformData : Array(150).fill(40);
+    const isPlaceholder = isLoadingWaveform || waveformData.length === 0;
+    const data = isPlaceholder ? Array(150).fill(0) : waveformData;
     const numBars = data.length;
-    const barGap = 1.5;
-    const barWidth = (width - (numBars - 1) * barGap) / numBars;
+    const barGap = width < 450 ? 0.5 : 1.0;
+    const barWidth = Math.max(1, (width - (numBars - 1) * barGap) / numBars);
 
     // Premium gradients for played part
     const gradPlayed = ctx.createLinearGradient(0, height, 0, 0);
     gradPlayed.addColorStop(0, accentColor);
     gradPlayed.addColorStop(1, hoverColor);
 
+    const textSecCol = themeStore.resolvedColors["color-text-secondary"] || '#9ca3af';
+
     for (let i = 0; i < numBars; i++) {
-      const val = data[i] / 255.0;
+      let val: number;
+      if (isPlaceholder) {
+        // Animated wave pattern indicating waveform scanning/decoding in progress
+        const sine = Math.sin(pulseAngle + (i / numBars) * Math.PI * 4);
+        val = 0.25 + 0.2 * sine;
+        ctx.fillStyle = accentColor;
+        ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (i / numBars) * Math.PI * 3);
+      } else {
+        val = data[i] / 255.0;
+        const barPct = i / numBars;
+        if (barPct <= progressPct) {
+          ctx.globalAlpha = 1.0;
+          ctx.fillStyle = gradPlayed;
+        } else {
+          ctx.globalAlpha = 0.45;
+          ctx.fillStyle = textSecCol;
+        }
+      }
+
       // Center the bars vertically
       const barHeight = Math.max(2, val * height * 0.85);
       const x = i * (barWidth + barGap);
       const y = (height - barHeight) / 2;
 
-      const barPct = i / numBars;
-      if (barPct <= progressPct) {
-        ctx.fillStyle = gradPlayed;
+      if (barWidth >= 2 && ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, 1);
+        ctx.fill();
       } else {
-        ctx.fillStyle = borderCol;
+        ctx.fillRect(x, y, barWidth, barHeight);
       }
-
-      ctx.beginPath();
-      ctx.roundRect(x, y, barWidth, barHeight, 1);
-      ctx.fill();
     }
+    ctx.globalAlpha = 1.0;
   }
 
   function drawMoodbar(
@@ -242,7 +301,7 @@
     if (mode === "moodbar") {
       moodbarData = [];
     } else {
-      waveformData = songId ? Array(150).fill(40) : [];
+      waveformData = [];
     }
     const timer = setTimeout(() => {
       if (mode === "moodbar") {
@@ -250,7 +309,7 @@
       } else {
         loadWaveform(songId);
       }
-    }, 150);
+    }, 50);
     return () => clearTimeout(timer);
   });
 
@@ -297,11 +356,12 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+  bind:this={containerEl}
   onmousedown={handleMouseDown}
-  class="relative flex-1 h-8 cursor-pointer flex items-center group select-none"
+  class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
   title={prefs.seekBarMode === 'moodbar'
     ? i18n.t('playerBar.moodbarLegend', {}, 'Moodbar — color reflects the track\'s frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band')
     : undefined}
 >
-  <canvas bind:this={canvas} class="w-full h-7 opacity-100"></canvas>
+  <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
 </div>

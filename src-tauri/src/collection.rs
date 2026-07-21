@@ -226,21 +226,11 @@ impl CollectionScanner {
 
         // Mark songs from these directories that no longer exist as unavailable
         // (soft-delete: set lastseen to 0 rather than deleting)
-        let _ = app.emit(
-            "scan-progress",
-            ScanProgress {
-                phase: ScanPhase::Updating,
-                scanned: total,
-                total,
-                current_path: None,
-            },
-        );
-
         if let Err(e) = self.prune_missing_songs() {
             log::error!("Failed to prune missing songs during scan: {e}");
         }
 
-        // Phase 3: Resolve missing album artwork (local & remote)
+        // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
         log::info!("Starting artwork resolution for missing albums...");
         let mut albums_to_resolve = Vec::new();
         if let Ok(conn) = self.db.pool.get() {
@@ -285,8 +275,46 @@ impl CollectionScanner {
             }
         }
 
+        let total_updating_items = albums_to_resolve.len() as u64;
+
+        if total_updating_items == 0 {
+            let _ = app.emit(
+                "scan-progress",
+                ScanProgress {
+                    phase: ScanPhase::Updating,
+                    scanned: total,
+                    total,
+                    current_path: None,
+                },
+            );
+        }
+
+        let mut updating_scanned = 0u64;
         let mut remote_fetch_count = 0;
         for (song_id, path_str, effective_artist, album, art_embedded) in albums_to_resolve {
+            updating_scanned += 1;
+            let display_desc = if !effective_artist.trim().is_empty() && !album.trim().is_empty() {
+                format!("Cover art: {effective_artist} - {album}")
+            } else if !album.trim().is_empty() {
+                format!("Cover art: {album}")
+            } else {
+                let file_name = Path::new(&path_str)
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path_str.clone());
+                format!("Cover art: {file_name}")
+            };
+
+            let _ = app.emit(
+                "scan-progress",
+                ScanProgress {
+                    phase: ScanPhase::Updating,
+                    scanned: updating_scanned,
+                    total: total_updating_items,
+                    current_path: Some(display_desc),
+                },
+            );
+
             let path = Path::new(&path_str);
             let mut resolved = false;
 
@@ -334,10 +362,6 @@ impl CollectionScanner {
                     }
                 }
             }
-        }
-
-        if let Err(e) = crate::waveform::backfill_missing_visualizers(&self.db) {
-            log::error!("Failed to backfill missing visualizers during scan: {e}");
         }
 
         // Done
