@@ -35,13 +35,29 @@
   }
 
   onMount(async () => {
+    let ver = "";
     try {
       const { getVersion } = await import("@tauri-apps/api/app");
-      const ver = await getVersion();
-      if (ver) appVersion = ver;
+      ver = await getVersion();
     } catch {
-      // Not in Tauri context — version stays empty
+      // Not in Tauri context
     }
+
+    let hash = "";
+    try {
+      hash = await invoke<string>("get_commit_hash");
+    } catch {
+      hash = (import.meta as any).env?.VITE_COMMIT_HASH || "";
+    }
+
+    if (ver && hash) {
+      appVersion = `${ver}#${hash}`;
+    } else if (ver) {
+      appVersion = ver;
+    } else if (hash) {
+      appVersion = `#${hash}`;
+    }
+
 
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");

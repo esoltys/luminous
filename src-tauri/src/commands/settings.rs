@@ -37,3 +37,8 @@ pub async fn get_all_app_settings(
     }
     Ok(settings)
 }
+
+#[tauri::command]
+pub fn get_commit_hash() -> String {
+    option_env!("BUILD_COMMIT_HASH").unwrap_or("").to_string()
+}

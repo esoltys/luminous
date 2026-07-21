@@ -4,11 +4,23 @@ import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin";
 
+import { execSync } from "child_process";
+
 const host = process.env.TAURI_DEV_HOST;
+let commitHash = "";
+try {
+  commitHash = execSync("git rev-parse --short HEAD").toString().trim();
+} catch {
+  commitHash = "";
+}
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  define: {
+    "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
+  },
   plugins: [tailwindcss(), sveltekit(), svelteTesting(), tauriIpcMockPlugin()],
+
   test: {
     globals: true,
     include: ["src/**/*.{test,spec}.{js,ts}"],
