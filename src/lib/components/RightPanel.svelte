@@ -90,7 +90,7 @@
         {#if currentSong.bitrate}
           <div class="flex items-start justify-between gap-3 text-xs">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
-            <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps{currentSong.is_vbr ? ` (${i18n.t('playerBar.bitrateVbrSuffix', {}, 'avg')})` : ''}</span>
           </div>
         {/if}
         {#if currentSong.samplerate}

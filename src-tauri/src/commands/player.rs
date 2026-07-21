@@ -23,7 +23,7 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
                 rating, playcount, skipcount, lastplayed, lastseen,
                 art_embedded, art_automatic, art_manual, art_unset,
                 cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
-                replaygain_track_gain, replaygain_album_gain
+                replaygain_track_gain, replaygain_album_gain, is_vbr
          FROM songs WHERE id = ?1",
             params![song_id],
             |row| {
@@ -81,6 +81,7 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
                     ebur128_loudness_range_lu: row.get(50)?,
                     replaygain_track_gain: row.get(51)?,
                     replaygain_album_gain: row.get(52)?,
+                    is_vbr: row.get(53)?,
                     ..Default::default()
                 })
             },
@@ -119,7 +120,7 @@ pub async fn play_songs(
                     rating, playcount, skipcount, lastplayed, lastseen,
                     art_embedded, art_automatic, art_manual, art_unset,
                     cue_path, ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
-                    replaygain_track_gain, replaygain_album_gain
+                    replaygain_track_gain, replaygain_album_gain, is_vbr
              FROM songs WHERE id = ?1",
             params![id],
             |row| {
@@ -177,6 +178,7 @@ pub async fn play_songs(
                     ebur128_loudness_range_lu: row.get(50)?,
                     replaygain_track_gain: row.get(51)?,
                     replaygain_album_gain: row.get(52)?,
+                    is_vbr: row.get(53)?,
                     ..Default::default()
                 })
             },

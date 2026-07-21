@@ -60,4 +60,18 @@ describe("RightPanel.svelte", () => {
     expect(getByText("Test Album")).toBeInTheDocument();
     expect(getByText("FLAC")).toBeInTheDocument();
   });
+
+  it("renders a plain bitrate for CBR files", () => {
+    playerStore.currentSong = { ...mockSong, bitrate: 320, is_vbr: false };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("320 kbps")).toBeInTheDocument();
+  });
+
+  it("labels the bitrate as an average for VBR files", () => {
+    playerStore.currentSong = { ...mockSong, bitrate: 245, is_vbr: true };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("245 kbps (avg)")).toBeInTheDocument();
+  });
 });

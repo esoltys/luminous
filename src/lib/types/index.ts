@@ -79,6 +79,7 @@ export interface Song {
   beginning_nanosec: number;
   end_nanosec: number;
   bitrate?: number;
+  is_vbr?: boolean;
   samplerate?: number;
   bitdepth?: number;
   channels?: number;

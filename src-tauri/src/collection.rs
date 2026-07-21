@@ -697,7 +697,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(54)?;
+                let count: i64 = row.get(55)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -722,7 +722,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(54)?;
+                let count: i64 = row.get(55)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -747,7 +747,7 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(54)?;
+                let count: i64 = row.get(55)?;
                 Ok((song, count))
             })?
             .filter_map(|r| r.ok())
@@ -879,6 +879,15 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let channels = properties.channels().map(|c| c as i32);
     let bitdepth = properties.bit_depth().map(|b| b as i32);
 
+    // Lofty's public API reports only the average bitrate for VBR MP3s, with no way to
+    // tell VBR and CBR apart. Sniff the Xing/Info/VBRI header ourselves so the UI can
+    // label an average as an average instead of implying a constant rate.
+    let is_vbr = if filetype == FileType::Mp3 {
+        detect_mp3_vbr(path)
+    } else {
+        None
+    };
+
     // Use the primary tag (ID3v2, VorbisComment, etc.)
     let tag: Option<&Tag> = tagged_file.primary_tag();
 
@@ -893,6 +902,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         bitdepth,
         filesize,
         mtime,
+        is_vbr,
         ..Default::default()
     };
 
@@ -928,6 +938,40 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     Ok(song)
 }
 
+/// Detect whether an MP3 file is VBR-encoded by looking for a Xing/Info/VBRI header
+/// in the first audio frame. "Xing" and "VBRI" mark true VBR; "Info" is the Xing
+/// encoder's own marker for CBR (see http://gabriel.mp3-tech.org/mp3infotag.html).
+/// A plain CBR file has no such header at all, so `Some(false)` covers both cases.
+/// Returns `None` only if the file couldn't be read.
+fn detect_mp3_vbr(path: &Path) -> Option<bool> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut buf = vec![0u8; 8 * 1024];
+    let n = file.read(&mut buf).ok()?;
+    buf.truncate(n);
+
+    // Skip a leading ID3v2 tag so its (rare) text content can't be mistaken for a
+    // VBR marker — the real header lives in the first MPEG frame, right after it.
+    let mut offset = 0;
+    if buf.len() >= 10 && &buf[0..3] == b"ID3" {
+        let size = ((buf[6] as u32 & 0x7f) << 21)
+            | ((buf[7] as u32 & 0x7f) << 14)
+            | ((buf[8] as u32 & 0x7f) << 7)
+            | (buf[9] as u32 & 0x7f);
+        offset = (10 + size as usize).min(buf.len());
+    }
+
+    let audio = &buf[offset..];
+    let has_marker = |needle: &[u8]| audio.windows(needle.len()).any(|w| w == needle);
+
+    if has_marker(b"Xing") || has_marker(b"VBRI") {
+        Some(true)
+    } else {
+        Some(false)
+    }
+}
+
 /// Parse a ReplayGain gain tag value (e.g. "-6.2 dB", "-6.2") into a f64.
 fn parse_replaygain_db(s: &str) -> Option<f64> {
     s.trim()
@@ -961,6 +1005,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     filetype=excluded.filetype, source=excluded.source,
                     replaygain_track_gain=excluded.replaygain_track_gain,
                     replaygain_album_gain=excluded.replaygain_album_gain,
+                    is_vbr=excluded.is_vbr,
                     unavailable=0",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
         ),
@@ -992,6 +1037,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.art_unset,
             song.replaygain_track_gain,
             song.replaygain_album_gain,
+            song.is_vbr,
         ],
     )?;
     Ok(())
@@ -1016,7 +1062,8 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     cue_path,
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
-    replaygain_track_gain, replaygain_album_gain
+    replaygain_track_gain, replaygain_album_gain,
+    is_vbr
 ";
 
 /// Song columns qualified with the `s` alias, plus a correlated `album_track_count`
@@ -1036,6 +1083,7 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
+    s.is_vbr,
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
     ) AS album_track_count";
@@ -1045,11 +1093,11 @@ const SONG_INSERT_COLS: &str = "
     composer, lyrics, comment, track, disc, year, originalyear, genre,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
-    replaygain_track_gain, replaygain_album_gain
+    replaygain_track_gain, replaygain_album_gain, is_vbr
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -1107,6 +1155,7 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         unavailable: row.get::<_, Option<bool>>(51)?.unwrap_or(false),
         replaygain_track_gain: row.get(52)?,
         replaygain_album_gain: row.get(53)?,
+        is_vbr: row.get(54)?,
         ..Default::default()
     })
 }
@@ -1248,6 +1297,58 @@ mod tests {
     use super::*;
     use crate::models::{FileType, Song, SongSource};
     use std::sync::Arc;
+
+    #[test]
+    fn test_detect_mp3_vbr_finds_xing_header() {
+        let path = write_temp_file("vbr_xing", &[b"\xFF\xFB\x90\x00", b"Xing", &[0u8; 100]]);
+        assert_eq!(detect_mp3_vbr(&path), Some(true));
+    }
+
+    #[test]
+    fn test_detect_mp3_vbr_finds_vbri_header() {
+        let path = write_temp_file("vbr_vbri", &[b"\xFF\xFB\x90\x00", b"VBRI", &[0u8; 100]]);
+        assert_eq!(detect_mp3_vbr(&path), Some(true));
+    }
+
+    #[test]
+    fn test_detect_mp3_vbr_no_header_is_cbr() {
+        let path = write_temp_file("cbr_plain", &[b"\xFF\xFB\x90\x00", &[0u8; 200]]);
+        assert_eq!(detect_mp3_vbr(&path), Some(false));
+    }
+
+    #[test]
+    fn test_detect_mp3_vbr_info_marker_is_cbr() {
+        let path = write_temp_file("cbr_info", &[b"\xFF\xFB\x90\x00", b"Info", &[0u8; 100]]);
+        assert_eq!(detect_mp3_vbr(&path), Some(false));
+    }
+
+    #[test]
+    fn test_detect_mp3_vbr_skips_id3v2_tag_content() {
+        // A synchsafe ID3v2 header claiming a 4-byte tag whose body is "Xing" —
+        // detection must skip past it and not mistake tag text for the real header.
+        let id3_header: &[u8] = &[b'I', b'D', b'3', 3, 0, 0, 0, 0, 0, 4];
+        let path = write_temp_file(
+            "cbr_id3_xing_text",
+            &[id3_header, b"Xing", b"\xFF\xFB\x90\x00", &[0u8; 100]],
+        );
+        assert_eq!(detect_mp3_vbr(&path), Some(false));
+    }
+
+    fn write_temp_file(name: &str, chunks: &[&[u8]]) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "luminous_vbr_test_{name}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut data = Vec::new();
+        for chunk in chunks {
+            data.extend_from_slice(chunk);
+        }
+        std::fs::write(&path, data).unwrap();
+        path
+    }
 
     #[test]
     fn test_get_albums_artist_resolution() {

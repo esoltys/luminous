@@ -161,6 +161,7 @@ pub struct Song {
     pub beginning_nanosec: i64, // CUE sheet start (0 for normal files)
     pub end_nanosec: i64,       // CUE sheet end (0 for normal files)
     pub bitrate: Option<i32>,
+    pub is_vbr: Option<bool>,
     pub samplerate: Option<i32>,
     pub bitdepth: Option<i32>,
     pub channels: Option<i32>,

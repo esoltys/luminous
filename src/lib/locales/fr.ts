@@ -360,6 +360,7 @@ export const fr = {
     artistLabel: "Artiste",
     albumLabel: "Album",
     bitrateLabel: "Débit",
+    bitrateVbrSuffix: "moy.",
     sampleRateLabel: "Taux d'échantillonnage",
     releasedLabel: "Sortie",
     genreLabel: "Genre",
