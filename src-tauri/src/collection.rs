@@ -993,6 +993,7 @@ fn home_item_for_context(
         },
     }
 }
+
 fn get_playlists_by_ids(
     conn: &rusqlite::Connection,
     ids: &[i64],
@@ -1048,6 +1049,8 @@ fn get_songs_by_ids(
         .collect();
     Ok(map)
 }
+
+
 // ---------------------------------------------------------------------------
 // Audio file detection
 // ---------------------------------------------------------------------------
