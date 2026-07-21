@@ -22,6 +22,16 @@ export class PlayerStore {
   loudnessGainDb = $state<number | undefined>(undefined);
   /** Tracks remaining after the current one; populated from PlaybackState (#26). */
   remainingPlaylistItems = $state<number>(0);
+  /** Set of playlist IDs whose library auto-refill pool has been exhausted. */
+  exhaustedPlaylistIds = $state<number[]>([]);
+
+  isAutoPlayExhausted(playlistId: number): boolean {
+    return this.exhaustedPlaylistIds.includes(playlistId);
+  }
+
+  clearExhausted(playlistId: number) {
+    this.exhaustedPlaylistIds = this.exhaustedPlaylistIds.filter((id) => id !== playlistId);
+  }
 
   /** Prevents concurrent refill invocations for the same playlist. */
   private _refillInFlight = false;
@@ -121,6 +131,11 @@ export class PlayerStore {
           await playlistsStore.selectPlaylist(pid);
         }
         await playlistsStore.refreshPlaylists();
+      } else {
+        // No new songs returned: all matching tracks in library have been added
+        if (!this.exhaustedPlaylistIds.includes(pid)) {
+          this.exhaustedPlaylistIds = [...this.exhaustedPlaylistIds, pid];
+        }
       }
     } catch (err) {
       console.error("[PlayerStore] Auto-Play refill failed:", err);

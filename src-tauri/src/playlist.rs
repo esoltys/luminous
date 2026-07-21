@@ -262,7 +262,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?1, ?2, ?2)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated, auto_play) VALUES (?1, 1, ?1, ?2, ?2, 1)",
                         params![genre, now],
                     )?;
                     conn.last_insert_rowid()
@@ -341,7 +341,7 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated, auto_play) VALUES (?1, 1, ?2, ?3, ?3, 1)",
                         params![decade, spec, now],
                     )?;
                     conn.last_insert_rowid()

@@ -407,7 +407,8 @@ ALTER TABLE songs ADD COLUMN is_instrumental BOOLEAN NOT NULL DEFAULT 0;
 // ---------------------------------------------------------------------------
 
 const MIGRATION_9: &str = "
-ALTER TABLE playlists ADD COLUMN auto_play BOOLEAN NOT NULL DEFAULT 0;
+ALTER TABLE playlists ADD COLUMN auto_play BOOLEAN NOT NULL DEFAULT 1;
+UPDATE playlists SET auto_play = 1 WHERE dynamic_enabled = 1;
 ";
 
 #[cfg(test)]

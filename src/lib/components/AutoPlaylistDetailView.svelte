@@ -11,7 +11,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw } from "lucide-svelte";
+  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -219,9 +219,9 @@
    * always show the toggle but store the preference in app_settings.
    */
   let autoPlay = $derived.by(() => {
-    if (playlistId === undefined) return false;
+    if (playlistId === undefined) return true;
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-    return pl?.auto_play ?? false;
+    return pl?.auto_play ?? true;
   });
 
   async function handleToggleAutoPlay() {
@@ -234,6 +234,7 @@
   async function handleRefreshAutoPlaylist() {
     if (playlistId === undefined || isRefreshing) return;
     isRefreshing = true;
+    playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
       const fetchedSongs = await fetchSongs(kind, genre, decade, playlistId);
@@ -363,18 +364,18 @@
         </div>
 
         <!-- Control Buttons -->
-        <div class="flex items-center gap-3 mt-3 select-none">
+        <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <button
             onclick={handlePlayAll}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
+            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20 shrink-0"
           >
             <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
           </button>
           <button
             onclick={handleShufflePlay}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
           </button>
@@ -382,7 +383,7 @@
             onclick={handleAddAllToPlaylist}
             disabled={loading || songs.length === 0}
             title={i18n.t('albumDetail.addAllToPlaylistTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
           >
             <Plus class="w-4 h-4" />
           </button>
@@ -390,7 +391,7 @@
             onclick={handleSaveAsCustomPlaylist}
             disabled={loading || songs.length === 0}
             title={i18n.t('playlists.saveAsCustomTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
           >
             <FolderPlus class="w-4 h-4" />
           </button>
@@ -401,7 +402,7 @@
               onclick={handleRefreshAutoPlaylist}
               disabled={loading || isRefreshing}
               title="Refresh auto-playlist with a new selection of tracks from your library"
-              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
             >
               <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
             </button>
@@ -415,20 +416,21 @@
               title={autoPlay
                 ? "Auto-Play ON — keeps appending next batch as you reach the end. Click to disable."
                 : "Auto-Play OFF — stops at end of current batch. Click to enable continuous playback."}
-              class="ml-2 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all duration-200 cursor-pointer select-none
+              class="ml-1 flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-200 cursor-pointer select-none
                 {autoPlay
                   ? 'bg-brand-accent/15 border-brand-accent text-brand-accent shadow-[0_0_12px_2px] shadow-brand-accent/25 hover:bg-brand-accent/25'
                   : 'border-brand-border text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
             >
-              <RefreshCw class="w-3.5 h-3.5 {autoPlay ? 'animate-spin [animation-duration:3s]' : ''}" />
-              Auto-Play
+              <RefreshCw class="w-3.5 h-3.5 shrink-0 {autoPlay ? 'animate-spin [animation-duration:3s]' : ''}" />
+              <span class="whitespace-nowrap">Auto-Play</span>
               <!-- Toggle pill -->
-              <span class="relative inline-flex items-center w-8 h-4 rounded-full transition-colors duration-200 {autoPlay ? 'bg-brand-accent' : 'bg-brand-border'}">
+              <span class="relative inline-flex items-center w-8 h-4 rounded-full shrink-0 transition-colors duration-200 {autoPlay ? 'bg-brand-accent' : 'bg-brand-border'}">
                 <span class="absolute w-3 h-3 bg-white rounded-full shadow transition-transform duration-200 {autoPlay ? 'translate-x-4' : 'translate-x-0.5'}"></span>
               </span>
             </button>
           {/if}
         </div>
+
 
       </div>
 
@@ -592,6 +594,13 @@
         </tbody>
       </table>
     </div>
+
+    {#if autoPlay && (kind === "genre" || kind === "decade") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
+      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-secondary/80 flex items-center justify-center gap-2 select-none">
+        <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
+        <span>All matching tracks from your library have been added to this auto-playlist.</span>
+      </div>
+    {/if}
   </div>
 </div>
 
