@@ -145,11 +145,19 @@
     return invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
   }
 
+  // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI
+  let backingTrackCount = $derived.by(() => {
+    if (playlistId === undefined) return 0;
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    return pl?.track_count ?? 0;
+  });
+
   $effect(() => {
     const k = kind;
     const g = genre;
     const d = decade;
     const pid = playlistId;
+    const count = backingTrackCount;
     loading = true;
     fetchSongs(k, g, d, pid)
       .then((fetchedSongs) => {

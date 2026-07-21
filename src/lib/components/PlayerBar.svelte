@@ -108,21 +108,69 @@
       default: return mode;
     }
   }
+
+  let coverTitle = $derived.by(() => {
+    if (!playerStore.currentSong) return "";
+    const pid = playerStore.playlistId;
+    if (pid && pid > 0) {
+      const pl = playlistsStore.playlists.find((p) => p.id === pid);
+      if (pl) {
+        return `Go to playlist "${pl.name}"`;
+      }
+    }
+    return playerStore.currentSong.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : "";
+  });
+
+  function handleCoverClick(e: MouseEvent) {
+    if (!playerStore.currentSong) return;
+    e.stopPropagation();
+
+    const pid = playerStore.playlistId;
+    if (pid && pid > 0) {
+      const pl = playlistsStore.playlists.find((p) => p.id === pid);
+      if (pl) {
+        if (pl.dynamic_enabled) {
+          const spec = pl.dynamic_spec ?? "";
+          if (spec.startsWith("decade:")) {
+            const decade = spec.replace(/^decade:/, "");
+            collectionStore.viewAutoPlaylist({
+              kind: "decade",
+              decade,
+              playlistId: pl.id,
+              updated: pl.updated,
+            });
+          } else {
+            const genre = spec.replace(/^genre:/, "") || pl.name;
+            collectionStore.viewAutoPlaylist({
+              kind: "genre",
+              genre,
+              playlistId: pl.id,
+              updated: pl.updated,
+            });
+          }
+          return;
+        } else {
+          playlistsStore.selectPlaylist(pl.id);
+          collectionStore.viewPlaylist(pl.id);
+          return;
+        }
+      }
+    }
+
+    if (playerStore.currentSong.album) {
+      collectionStore.viewAlbum(playerStore.currentSong.album);
+    }
+  }
 </script>
 
 <footer class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <button
-      onclick={(e) => {
-        if (playerStore.currentSong) {
-          e.stopPropagation();
-          collectionStore.viewAlbum(playerStore.currentSong.album || "");
-        }
-      }}
+      onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
       class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 cursor-pointer disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
-      title={playerStore.currentSong?.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : ""}
+      title={coverTitle}
     >
       <CoverArt
         songId={playerStore.currentSong?.id}
