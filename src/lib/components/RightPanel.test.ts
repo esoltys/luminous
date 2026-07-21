@@ -74,4 +74,28 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("245 kbps (avg)")).toBeInTheDocument();
   });
+
+  it("renders Mono channel info when channels is 1", () => {
+    playerStore.currentSong = { ...mockSong, channels: 1 };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("Channels")).toBeInTheDocument();
+    expect(getByText("Mono")).toBeInTheDocument();
+  });
+
+  it("renders Stereo channel info when channels is 2", () => {
+    playerStore.currentSong = { ...mockSong, channels: 2 };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("Channels")).toBeInTheDocument();
+    expect(getByText("Stereo")).toBeInTheDocument();
+  });
+
+  it("renders 5.1 Surround channel info when channels is 6", () => {
+    playerStore.currentSong = { ...mockSong, channels: 6 };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("Channels")).toBeInTheDocument();
+    expect(getByText("5.1 Surround")).toBeInTheDocument();
+  });
 });

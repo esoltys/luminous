@@ -41,6 +41,15 @@
       default: return i18n.t('playerBar.lyricsNone', {}, 'Not downloaded');
     }
   }
+
+  function formatChannels(channels?: number): string {
+    if (!channels) return "";
+    if (channels === 1) return i18n.t('playerBar.channelsMono', {}, 'Mono');
+    if (channels === 2) return i18n.t('playerBar.channelsStereo', {}, 'Stereo');
+    if (channels === 6) return i18n.t('playerBar.channels51', {}, '5.1 Surround');
+    if (channels === 8) return i18n.t('playerBar.channels71', {}, '7.1 Surround');
+    return i18n.t('playerBar.channelsCount', { count: channels }, `${channels} channels`);
+  }
 </script>
 
 <aside
@@ -97,6 +106,12 @@
           <div class="flex items-start justify-between gap-3 text-xs">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
             <span class="text-brand-text-primary text-right break-words min-w-0">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
+          </div>
+        {/if}
+        {#if currentSong.channels}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.channelsLabel', {}, 'Channels')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{formatChannels(currentSong.channels)}</span>
           </div>
         {/if}
         {#if playerStore.loudnessSource !== "disabled"}
