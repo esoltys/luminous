@@ -251,8 +251,7 @@
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
     <div class="px-8 pt-10" class:pb-24={!!playerStore.currentSong}>
-      <h2 class="text-xl font-semibold text-brand-text-primary mb-4">{i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}</h2>
-      <HorizontalScrollRow>
+      <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
           <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist.id)} />
         {/each}

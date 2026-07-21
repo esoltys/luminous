@@ -3,7 +3,13 @@
   import type { Snippet } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
 
-  let { children }: { children: Snippet } = $props();
+  interface Props {
+    title?: string;
+    headerExtra?: Snippet;
+    children: Snippet;
+  }
+
+  let { title, headerExtra, children }: Props = $props();
 
   let scrollContainer = $state<HTMLDivElement | undefined>(undefined);
   let canScrollLeft = $state(false);
@@ -42,30 +48,44 @@
   });
 </script>
 
-<div class="relative">
-  {#if canScrollLeft}
-    <button
-      onclick={() => scroll("left")}
-      class="absolute left-0 top-1/2 -translate-y-1/2 z-10 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 cursor-pointer"
-      title={i18n.t('common.scrollLeft')}
-    >
-      <ChevronLeft class="w-6 h-6 text-white" />
-    </button>
+<div class="space-y-4">
+  {#if title || headerExtra || canScrollLeft || canScrollRight}
+    <div class="flex items-center justify-between min-h-[32px]">
+      <div class="flex items-center gap-4">
+        {#if title}
+          <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+        {/if}
+        {#if headerExtra}
+          {@render headerExtra()}
+        {/if}
+      </div>
+
+      <div class="flex items-center gap-1.5 ml-auto">
+        <button
+          onclick={() => scroll("left")}
+          disabled={!canScrollLeft}
+          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          title={i18n.t('common.scrollLeft')}
+          aria-label={i18n.t('common.scrollLeft')}
+        >
+          <ChevronLeft class="w-5 h-5" />
+        </button>
+        <button
+          onclick={() => scroll("right")}
+          disabled={!canScrollRight}
+          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          title={i18n.t('common.scrollRight')}
+          aria-label={i18n.t('common.scrollRight')}
+        >
+          <ChevronRight class="w-5 h-5" />
+        </button>
+      </div>
+    </div>
   {/if}
 
   <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth pb-2 carousel-scroll">
     {@render children()}
   </div>
-
-  {#if canScrollRight}
-    <button
-      onclick={() => scroll("right")}
-      class="absolute right-0 top-1/2 -translate-y-1/2 z-10 transition-colors bg-black/50 hover:bg-black/70 rounded-full p-2 cursor-pointer"
-      title={i18n.t('common.scrollRight')}
-    >
-      <ChevronRight class="w-6 h-6 text-white" />
-    </button>
-  {/if}
 </div>
 
 <style>

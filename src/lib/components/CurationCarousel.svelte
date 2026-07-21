@@ -4,13 +4,14 @@
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
 
   interface Props {
+    title?: string;
     items: HomeItem[];
   }
 
-  let { items }: Props = $props();
+  let { title, items }: Props = $props();
 </script>
 
-<HorizontalScrollRow>
+<HorizontalScrollRow {title}>
   {#each items as item (item.type === 'song' ? 's_' + item.song.id : 'a_' + (item.album.album || '') + '_' + (item.album.artist || ''))}
     <CarouselCard {item} />
   {/each}

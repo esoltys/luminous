@@ -66,32 +66,17 @@
     {:else}
       <!-- Recently Played Section -->
       {#if recentlyPlayed.length > 0}
-        <div>
-          <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            {i18n.t('home.recentlyPlayed')}
-          </h2>
-          <CurationCarousel items={recentlyPlayed} />
-        </div>
+        <CurationCarousel title={i18n.t('home.recentlyPlayed')} items={recentlyPlayed} />
       {/if}
 
       <!-- Most Frequently Played Section -->
       {#if frequentlyPlayed.length > 0}
-        <div>
-          <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            {i18n.t('home.mostPlayed')}
-          </h2>
-          <CurationCarousel items={frequentlyPlayed} />
-        </div>
+        <CurationCarousel title={i18n.t('home.mostPlayed')} items={frequentlyPlayed} />
       {/if}
 
       <!-- Recently Added Section -->
       {#if recentlyAdded.length > 0}
-        <div>
-          <h2 class="text-xl font-semibold text-brand-text-primary mb-4">
-            {i18n.t('home.recentlyAdded')}
-          </h2>
-          <CurationCarousel items={recentlyAdded} />
-        </div>
+        <CurationCarousel title={i18n.t('home.recentlyAdded')} items={recentlyAdded} />
       {/if}
 
       <!-- Empty State -->
