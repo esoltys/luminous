@@ -4,7 +4,7 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.67.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Release](https://img.shields.io/badge/Release-0.75.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-72%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 [![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](ROADMAP.md)
 
@@ -88,13 +88,36 @@ You can download the latest installers and portable binaries directly from the G
 *   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
 *   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
 *   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view.
-*   **Powerful Playlist Editor**: Drag to reorder, rename inline, undo/redo changes, and import or export M3U, M3U8, PLS, and XSPF files.
+*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, and import/export M3U, M3U8, PLS, and XSPF files.
+*   **Decades & Smart Auto-Playlists**: Automatic playlist categorization by decade (60s through 2020s) with custom category color badges.
 *   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with local caching and plain-text fallback.
 *   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, then write tags back to your files.
-*   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with an online fallback and duplicate cleanup.
+*   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with multi-layered stack previews and duplicate cleanup.
 *   **Dynamic Theme Engine**: Curated color themes, or design your own live with the Custom Theme Builder.
 *   **Bilingual Interface**: Made in Canada 🍁 — fully translated between English and French, switchable instantly.
-*   **Seamless State Preservation**: Restores your sidebar, playlist selection, volume, queue, and equalizer settings on reopen.
+*   **Seamless State Preservation**: Restores your active queue, playback position, sidebar navigation, playlist selection, volume, and equalizer settings on reopen.
+
+---
+
+## Release Notes
+
+### v0.75.0
+
+#### 🌟 Features & Enhancements
+* **Decades Auto-Playlists**: Automatic categorization by release decade (60s through 2020s) with distinct category color badges (#16).
+* **Enhanced Playlist Editor**: Added multi-selection, batch drag-and-drop reordering, duplicate track detection, inline search, and multi-layer cover art stacks (#86).
+* **Seamless State Restoration**: Full persistence of playback position, active queue context, view selection, and detail panes across app restarts (#72, #91).
+* **Artist & Genre Discovery**: Displays primary genres on artist cards with expanded sorting options and optimized query performance.
+* **Unified Cover Stack Component**: Integrated multi-layered cover art stacks across `AlbumCard`s, Artist views, and Playlist hubs.
+* **Integrated Library Maintenance**: Configurable auto-scanning, directory watch settings, and database indexing from Settings (#19).
+* **UI Polish & Alignment**: Unified grid margin alignment, inline carousel controls (#94), clamped floating context menus, and improved table header sorting.
+
+#### 🐛 Bug Fixes & Stability
+* Resolved dual waveform peak generation and normalization for seekbar visualizers (#93).
+* Fixed modal and context menu z-index rendering behind the acrylic PlayerBar.
+* Corrected artist album count calculations and singular/plural formatting.
+* Fixed theme color resolution for seekbar waveform canvas elements.
+* Ensured screenshot lyrics automation matches featured tracks (#96).
 
 ---
 
