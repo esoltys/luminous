@@ -54,16 +54,16 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group relative"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center rounded-lg overflow-hidden">
-    {#if topAlbums.length > 0 && autoKind}
+    {#if isQueue}
+      <div class="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <Layers class="w-10 h-10 text-white/90" />
+      </div>
+    {:else if topAlbums.length > 0 && autoKind}
       <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-36 h-36" />
-    {:else if isQueue}
-      <div class="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
-        <Layers class="w-10 h-10 text-white/90" />
-      </div>
     {:else if autoKind}
       <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         {#if autoKind === "decade"}
