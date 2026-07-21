@@ -33,7 +33,7 @@
     e.stopPropagation();
     const songIds = tracks.filter((t) => t.song && !t.song.unavailable).map((t) => t.song!.id);
     if (songIds.length > 0) {
-      playerStore.playSongs(songIds, 0);
+      playerStore.playSongs(songIds, 0, playlist.id);
     }
     onClick();
   }

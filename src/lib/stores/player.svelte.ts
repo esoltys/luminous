@@ -138,8 +138,8 @@ export class PlayerStore {
     await invoke("open_and_play", { paths });
   }
 
-  async playSongs(songIds: number[], startIndex: number) {
-    await invoke("play_songs", { songIds, startIndex });
+  async playSongs(songIds: number[], startIndex: number, playlistId?: number) {
+    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null });
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number) {

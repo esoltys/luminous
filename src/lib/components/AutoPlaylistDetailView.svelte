@@ -167,13 +167,13 @@
   function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    playerStore.playSongs(songIds, index >= 0 ? index : 0);
+    playerStore.playSongs(songIds, index >= 0 ? index : 0, playlistId);
   }
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0);
+    await playerStore.playSongs(songs.map((s) => s.id), 0, playlistId);
   }
 
   async function handleShufflePlay() {
@@ -181,7 +181,7 @@
     const ids = songs.map((s) => s.id);
     const randomIndex = Math.floor(Math.random() * ids.length);
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(ids, randomIndex);
+    await playerStore.playSongs(ids, randomIndex, playlistId);
   }
 
   async function handleAddSongToPlaylist(songId: number) {

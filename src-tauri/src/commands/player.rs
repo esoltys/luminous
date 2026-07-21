@@ -29,6 +29,7 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
 pub async fn play_songs(
     song_ids: Vec<i64>,
     start_index: usize,
+    playlist_id: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     use rusqlite::params;
@@ -117,15 +118,16 @@ pub async fn play_songs(
         }
     }
 
+    let pid = playlist_id.unwrap_or(0);
     let items = songs
         .into_iter()
         .enumerate()
-        .map(|(i, s)| PlaylistItem::new_song(0, i as i32, s))
+        .map(|(i, s)| PlaylistItem::new_song(pid, i as i32, s))
         .collect::<Vec<_>>();
 
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, start_index, 0)
+        .play_playlist(items, start_index, pid)
         .await
         .map_err(|e| e.to_string())
 }
