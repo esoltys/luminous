@@ -12,6 +12,7 @@
   import DesignTools from "./DesignTools.svelte";
 
   let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats" | "about">("general");
+  let appVersion = $state("");
 
   async function openExternalUrl(url: string) {
     try {
@@ -34,6 +35,14 @@
   }
 
   onMount(async () => {
+    try {
+      const { getVersion } = await import("@tauri-apps/api/app");
+      const ver = await getVersion();
+      if (ver) appVersion = ver;
+    } catch {
+      // Not in Tauri context — version stays empty
+    }
+
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
@@ -732,7 +741,7 @@
             <div class="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
               <h3 class="text-2xl font-bold text-brand-text-primary">Luminous Music Player</h3>
               <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30">
-                v0.67.0
+                v{appVersion}
               </span>
               <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 {i18n.t('settings.aboutLicense')}
