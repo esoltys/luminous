@@ -408,8 +408,42 @@ impl Player {
         self.persist_position(start_ns);
 
         self.apply_loudness_gain(&song).await;
+        self.preload_upcoming_waveforms();
         let audio = self.audio.lock().await;
         audio.play(Box::new(song), start_ns)
+    }
+
+    /// Proactively pre-generates waveform visualizer data for the current song
+    /// and the upcoming next track in the queue/playlist on a background thread.
+    pub fn preload_upcoming_waveforms(&self) {
+        let db = Arc::clone(&self._db);
+        let mut songs_to_preload = Vec::new();
+
+        if let Some(ref song) = self.current_song {
+            if let Some(ref path_str) = song.path {
+                songs_to_preload.push((song.id, std::path::PathBuf::from(path_str)));
+            }
+        }
+
+        if let Some(target) = self.peek_next_natural() {
+            if let Some(ref path_str) = target.song.path {
+                songs_to_preload.push((target.song.id, std::path::PathBuf::from(path_str)));
+            }
+        }
+
+        if songs_to_preload.is_empty() {
+            return;
+        }
+
+        tauri::async_runtime::spawn_blocking(move || {
+            for (song_id, path) in songs_to_preload {
+                if let Err(e) = crate::waveform::generate_visualizer_data(&db, song_id, &path) {
+                    log::debug!(
+                        "Proactive waveform pre-generation skipped for song {song_id}: {e}"
+                    );
+                }
+            }
+        });
     }
 
     /// Persist the ordered song-id list for ad-hoc queues (`playlist_id ==
@@ -578,6 +612,7 @@ impl Player {
             self.scrobble_point_nanosec = song.length_nanosec.map(|ns| (ns as u64) / 2);
             self.scrobbled = false;
             self.apply_loudness_gain(&song).await;
+            self.preload_upcoming_waveforms();
             let audio = self.audio.lock().await;
             return audio.play(Box::new(song), start_ns);
         }
@@ -741,6 +776,7 @@ impl Player {
     /// for a gapless handover. Does nothing when playback will naturally
     /// stop after the current track.
     pub async fn prepare_gapless_next(&mut self) -> Result<()> {
+        self.preload_upcoming_waveforms();
         let Some(target) = self.peek_next_natural() else {
             return Ok(());
         };

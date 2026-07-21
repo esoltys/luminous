@@ -185,6 +185,22 @@
       newThemeName = "";
     }
   }
+
+  function getPhaseDisplayName(phase: string | undefined): string {
+    if (!phase) return i18n.t('sidebar.scanning');
+    switch (phase) {
+      case "discovering":
+        return i18n.t('settings.phaseDiscovering');
+      case "reading_tags":
+        return i18n.t('settings.phaseReadingTags');
+      case "updating":
+        return i18n.t('settings.phaseUpdating');
+      case "done":
+        return i18n.t('settings.phaseDone');
+      default:
+        return phase;
+    }
+  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
@@ -335,7 +351,7 @@
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="border-b border-brand-border pb-3">
           <div class="flex items-start gap-3">
-            <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0 {collectionStore.isScanning ? 'animate-spin' : ''}" />
+            <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0" />
             <div class="space-y-1 min-w-0">
               <h4 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h4>
               <p class="text-xs text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
@@ -347,9 +363,9 @@
         {#if collectionStore.isScanning}
           <div class="bg-brand-main/60 border border-brand-accent/30 rounded-xl p-4 space-y-2">
             <div class="flex justify-between items-center text-xs font-semibold text-brand-text-primary">
-              <span class="capitalize flex items-center gap-2">
+              <span class="flex items-center gap-2">
                 <RefreshCw class="w-4 h-4 animate-spin text-brand-accent-text" />
-                {i18n.t('settings.scanningPhase', { phase: collectionStore.scanProgress?.phase || i18n.t('sidebar.scanning') })}
+                {i18n.t('settings.scanningPhase', { phase: getPhaseDisplayName(collectionStore.scanProgress?.phase) })}
               </span>
               <span>{collectionStore.scanProgress?.scanned || 0} / {collectionStore.scanProgress?.total || 0}</span>
             </div>
@@ -370,7 +386,7 @@
             disabled={collectionStore.isScanning}
             class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-brand-accent/10 cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw class="w-4 h-4 {collectionStore.isScanning ? 'animate-spin' : ''}" />
+            <RefreshCw class="w-4 h-4" />
             {i18n.t('settings.incrementalRescanBtn')}
           </button>
 
