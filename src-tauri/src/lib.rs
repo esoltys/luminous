@@ -389,6 +389,14 @@ pub fn run() {
             // Start background EBU R128 loudness analyzer (#77)
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
+            // Start background visualizer backfill
+            let db_clone = Arc::clone(&state.db);
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(e) = crate::waveform::backfill_missing_visualizers(&db_clone) {
+                    log::error!("Failed visualizer backfill on startup: {e}");
+                }
+            });
+
             app.manage(state);
 
             let media_shortcuts = [

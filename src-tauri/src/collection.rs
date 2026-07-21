@@ -336,6 +336,10 @@ impl CollectionScanner {
             }
         }
 
+        if let Err(e) = crate::waveform::backfill_missing_visualizers(&self.db) {
+            log::error!("Failed to backfill missing visualizers during scan: {e}");
+        }
+
         // Done
         let _ = app.emit(
             "scan-progress",

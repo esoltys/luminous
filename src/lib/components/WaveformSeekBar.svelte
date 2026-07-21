@@ -28,14 +28,13 @@
       waveformData = [];
       return;
     }
+    // Immediately show neutral fallback waveform while decoding/fetching
+    waveformData = Array(150).fill(40);
     try {
       const data = await invoke<number[] | null>("get_waveform_data", { songId });
       if (requestId !== waveformRequestId) return; // superseded by a newer track
       if (data) {
         waveformData = data;
-      } else {
-        // Fallback flat peaks if no waveform exists yet
-        waveformData = Array(150).fill(40);
       }
     } catch (e) {
       if (requestId !== waveformRequestId) return;
@@ -52,6 +51,8 @@
       moodbarData = [];
       return;
     }
+    // Immediately reset moodbar data while decoding/fetching
+    moodbarData = [];
     try {
       const data = await invoke<number[] | null>("get_moodbar_data", { songId });
       if (requestId !== moodbarRequestId) return;
@@ -237,13 +238,19 @@
   $effect(() => {
     const songId = playerStore.currentSong?.id;
     const mode = prefs.seekBarMode;
+    // Immediately clear current display to neutral so old track's waveform is not shown
+    if (mode === "moodbar") {
+      moodbarData = [];
+    } else {
+      waveformData = songId ? Array(150).fill(40) : [];
+    }
     const timer = setTimeout(() => {
       if (mode === "moodbar") {
         loadMoodbar(songId);
       } else {
         loadWaveform(songId);
       }
-    }, 300);
+    }, 150);
     return () => clearTimeout(timer);
   });
 
