@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource } from "../types";
+import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 
@@ -153,8 +153,8 @@ export class PlayerStore {
     await invoke("open_and_play", { paths });
   }
 
-  async playSongs(songIds: number[], startIndex: number, playlistId?: number) {
-    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null });
+  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext) {
+    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number) {

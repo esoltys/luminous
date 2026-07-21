@@ -10,7 +10,7 @@
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
-  import type { Song, AlbumItem } from "../types";
+  import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
   let { albumName }: { albumName: string } = $props();
@@ -96,11 +96,15 @@
     }
   }
 
+  function albumPlayContext(): PlayContext {
+    return { type: "album", album: albumName, albumArtist: artistName || undefined };
+  }
+
   function handlePlaySelected() {
     if (selectedSongIds.size === 0) return;
     const selectedList = songs.filter((s) => selectedSongIds.has(s.id));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0);
+      playerStore.playSongs(selectedList.map((s) => s.id), 0, undefined, albumPlayContext());
     }
   }
 
@@ -232,13 +236,13 @@
   function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    playerStore.playSongs(songIds, index >= 0 ? index : 0);
+    playerStore.playSongs(songIds, index >= 0 ? index : 0, undefined, albumPlayContext());
   }
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0);
+    await playerStore.playSongs(songs.map((s) => s.id), 0, undefined, albumPlayContext());
   }
 
   async function handleShufflePlay() {
@@ -246,7 +250,7 @@
     const ids = songs.map((s) => s.id);
     const randomIndex = Math.floor(Math.random() * ids.length);
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(ids, randomIndex);
+    await playerStore.playSongs(ids, randomIndex, undefined, albumPlayContext());
   }
 
   async function handleAddSongToPlaylist(songId: number) {

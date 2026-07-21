@@ -1,12 +1,33 @@
 <script lang="ts">
   import type { HomeItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import CoverArt from "./CoverArt.svelte";
   import AlbumCard from "./AlbumCard.svelte";
+  import PlaylistCard from "./PlaylistCard.svelte";
   import { Play } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   let { item }: { item: HomeItem } = $props();
+
+  // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
+  // in AutoPlaylistDetailView, custom playlists open in the regular PlaylistView.
+  function openPlaylist() {
+    if (item.type !== "playlist") return;
+    const playlist = item.playlist;
+    if (playlist.dynamic_enabled) {
+      const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
+      collectionStore.viewAutoPlaylist(
+        isDecade
+          ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^genre:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+      );
+      return;
+    }
+    playlistsStore.selectPlaylist(playlist.id);
+    collectionStore.viewPlaylist(playlist.id);
+  }
 
   function formatDuration(ns: number | undefined): string {
     if (!ns) return "0:00";
@@ -26,6 +47,8 @@
 
 {#if item.type === "album"}
   <AlbumCard album={item.album} widthClass="w-48 shrink-0" />
+{:else if item.type === "playlist"}
+  <PlaylistCard playlist={item.playlist} widthClass="w-48 shrink-0" onClick={openPlaylist} />
 {:else}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->

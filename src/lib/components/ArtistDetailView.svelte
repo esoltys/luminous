@@ -10,7 +10,7 @@
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import { Play, Shuffle } from "lucide-svelte";
-  import type { Song, Playlist, AlbumItem } from "../types";
+  import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
   import { getArtistAlbums } from "../utils/artist";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -285,7 +285,8 @@
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
       if (songs.length > 0) {
-        playerStore.playSongs(songs.map(s => s.id), 0);
+        const context: PlayContext = { type: "album", album: album.album || "", albumArtist: album.artist || undefined };
+        playerStore.playSongs(songs.map(s => s.id), 0, undefined, context);
       }
     }}
     onAddToPlaylist={async () => {
