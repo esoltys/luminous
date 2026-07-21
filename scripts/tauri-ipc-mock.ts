@@ -405,6 +405,9 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       }));
     },
 
+    get_waveform_data: () => makeWaveform(),
+    get_moodbar_data: () => makeMoodbar(),
+
     get_lyrics: (args) => {
       const songId = args?.songId as number | undefined;
       const song = (songId !== undefined ? library.songs.find((s) => s.id === songId) : undefined) ?? featuredSong;
