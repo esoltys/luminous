@@ -117,10 +117,17 @@ class PlaylistsStore {
   }
 
   async deletePlaylist(id: number) {
+    if (Array.isArray(this.playlists)) {
+      const target = this.playlists.find((p) => p && p.id === id);
+      if (target && !target.dynamic_enabled && target.name && target.name.toLowerCase() === "queue") {
+        console.warn("Cannot delete special Queue playlist");
+        return;
+      }
+    }
     await invoke("delete_playlist", { id });
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
-      if (this.playlists.length > 0) {
+      if (Array.isArray(this.playlists) && this.playlists.length > 0) {
         await this.selectPlaylist(this.playlists[0].id);
       } else {
         this.activePlaylistId = null;

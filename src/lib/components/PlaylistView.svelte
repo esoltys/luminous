@@ -139,6 +139,10 @@
     activePlaylist !== undefined && playlistsStore.activePlaylistId === activePlaylist.id
   );
 
+  let isQueue = $derived(
+    activePlaylist !== undefined && !activePlaylist.dynamic_enabled && activePlaylist.name.toLowerCase() === "queue"
+  );
+
   type PlaylistSortField = "position" | "title" | "artist" | "album" | "rating" | "duration";
   let sortField = $state<PlaylistSortField>("position");
   let sortAsc = $state(true);
@@ -285,7 +289,7 @@
   let showDeleteConfirm = $state(false);
 
   async function handleDeletePlaylist() {
-    if (!activePlaylist) return;
+    if (!activePlaylist || isQueue) return;
     showDeleteConfirm = false;
     await playlistsStore.deletePlaylist(activePlaylist.id);
     collectionStore.selectedPlaylistId = null;
@@ -682,29 +686,64 @@
     </div>
 
     <!-- Toolbar: Search filter, actions, import/export, undo/redo -->
-    <div class="h-14 px-6 border-b border-brand-border/60 flex items-center justify-between relative z-10 bg-brand-main/40 backdrop-blur-md gap-4">
-      <!-- Search Filter Bar -->
-      <div class="relative flex-1 max-w-xs">
-        <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-        <input
-          type="text"
-          bind:value={filterQuery}
-          placeholder={i18n.t("playlists.filterPlaceholder")}
-          class="w-full pl-8 pr-7 py-1 text-xs bg-brand-sidebar/60 border border-brand-border/60 rounded-md text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent transition-colors"
-        />
-        {#if filterQuery}
+    <div class="px-6 py-2.5 border-b border-brand-border/60 flex flex-col gap-2 relative z-10 bg-brand-main/40 backdrop-blur-md">
+      <!-- Line 1: Filter songs input, Undo & Redo (with labels), Remove duplicates -->
+      <div class="flex items-center justify-between gap-3 w-full">
+        <!-- Search Filter Bar -->
+        <div class="relative flex-1 max-w-xs">
+          <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
+          <input
+            type="text"
+            bind:value={filterQuery}
+            placeholder={i18n.t("playlists.filterPlaceholder")}
+            class="w-full pl-8 pr-7 py-1 text-xs bg-brand-sidebar/60 border border-brand-border/60 rounded-md text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent transition-colors"
+          />
+          {#if filterQuery}
+            <button
+              onclick={() => { filterQuery = ""; }}
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+              title={i18n.t("playlists.clearFilter")}
+            >
+              <X class="w-3 h-3" />
+            </button>
+          {/if}
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Undo/Redo controls with labels -->
           <button
-            onclick={() => { filterQuery = ""; }}
-            class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
-            title={i18n.t("playlists.clearFilter")}
+            onclick={() => playlistsStore.undo()}
+            class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+            title={i18n.t("playlists.undoTooltip")}
           >
-            <X class="w-3 h-3" />
+            <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
+            <span>{i18n.t("playlists.undoBtn")}</span>
           </button>
-        {/if}
+          <button
+            onclick={() => playlistsStore.redo()}
+            class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+            title={i18n.t("playlists.redoTooltip")}
+          >
+            <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
+            <span>{i18n.t("playlists.redoBtn")}</span>
+          </button>
+
+          <!-- Deduplicate Button -->
+          {#if duplicateCount > 0}
+            <button
+              onclick={removeDuplicates}
+              class="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+              title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
+            >
+              <CopyPlus class="w-3.5 h-3.5" />
+              <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
+            </button>
+          {/if}
+        </div>
       </div>
 
-      <!-- Action buttons -->
-      <div class="flex items-center gap-2">
+      <!-- Line 2: Import, Export, Remove Unavailable, Clear Playlist, Delete -->
+      <div class="flex items-center justify-end gap-2 w-full">
         <!-- Import / Export buttons -->
         <button
           onclick={handleImportPlaylist}
@@ -723,34 +762,6 @@
           <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
           <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
         </button>
-
-        <!-- Undo/Redo controls -->
-        <button
-          onclick={() => playlistsStore.undo()}
-          class="p-1.5 rounded-md hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-          title={i18n.t("playlists.undoTooltip")}
-        >
-          <RotateCcw class="w-4 h-4" />
-        </button>
-        <button
-          onclick={() => playlistsStore.redo()}
-          class="p-1.5 rounded-md hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-          title={i18n.t("playlists.redoTooltip")}
-        >
-          <RotateCw class="w-4 h-4" />
-        </button>
-
-        <!-- Deduplicate Button (matches Remove Unavailable button style) -->
-        {#if duplicateCount > 0}
-          <button
-            onclick={removeDuplicates}
-            class="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
-            title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
-          >
-            <CopyPlus class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
-          </button>
-        {/if}
 
         <!-- Remove Unavailable Button -->
         {#if unavailableCount > 0}
@@ -772,14 +783,16 @@
           {i18n.t("playlists.clearPlaylistBtn")}
         </button>
 
-        <button
-          onclick={() => { showDeleteConfirm = true; }}
-          class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
-          title={i18n.t("playlists.deletePlaylistTooltip")}
-        >
-          <Trash2 class="w-3.5 h-3.5" />
-          <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
-        </button>
+        {#if !isQueue}
+          <button
+            onclick={() => { showDeleteConfirm = true; }}
+            class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+            title={i18n.t("playlists.deletePlaylistTooltip")}
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
+          </button>
+        {/if}
       </div>
     </div>
 
