@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 9;
+const CURRENT_SCHEMA_VERSION: i32 = 10;
 
 #[derive(Debug)]
 pub struct Database {
@@ -142,6 +142,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![9],
+            )?;
+        }
+
+        if version < 10 {
+            log::info!("Running migration 10: play_history for context-aware Recently Played");
+            conn.execute_batch(MIGRATION_10)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![10],
             )?;
         }
 
@@ -409,6 +418,21 @@ ALTER TABLE songs ADD COLUMN is_instrumental BOOLEAN NOT NULL DEFAULT 0;
 const MIGRATION_9: &str = "
 ALTER TABLE playlists ADD COLUMN auto_play BOOLEAN NOT NULL DEFAULT 1;
 UPDATE playlists SET auto_play = 1 WHERE dynamic_enabled = 1;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 10: play_history for context-aware Recently Played
+// ---------------------------------------------------------------------------
+
+const MIGRATION_10: &str = "
+CREATE TABLE IF NOT EXISTS play_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    context_type TEXT NOT NULL,
+    song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    playlist_id INTEGER REFERENCES playlists(id) ON DELETE CASCADE,
+    played_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at DESC);
 ";
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 //! Play statistics & ratings — write paths for playcount, skipcount,
 //! lastplayed, and the user rating stored on `songs`.
 
+use crate::models::PlayContext;
 use anyhow::Result;
 use rusqlite::{params, Connection};
 
@@ -15,6 +16,23 @@ pub fn record_play(conn: &Connection, song_id: i64) -> Result<()> {
              lastplayed = strftime('%s', 'now')
          WHERE id = ?1",
         params![song_id],
+    )?;
+    Ok(())
+}
+
+/// Record what the user was inside (album/playlist/standalone song) when a
+/// listen completed, so "Recently Played" can reflect that context instead
+/// of a post-hoc heuristic.
+pub fn record_play_context(conn: &Connection, context: &PlayContext, song_id: i64) -> Result<()> {
+    let (context_type, playlist_id) = match context {
+        PlayContext::Song => ("song", None),
+        PlayContext::Album { .. } => ("album", None),
+        PlayContext::Playlist { playlist_id } => ("playlist", Some(*playlist_id)),
+    };
+    conn.execute(
+        "INSERT INTO play_history (context_type, song_id, playlist_id, played_at)
+         VALUES (?1, ?2, ?3, strftime('%s','now'))",
+        params![context_type, song_id, playlist_id],
     )?;
     Ok(())
 }
@@ -122,6 +140,52 @@ mod tests {
         assert_eq!(playcount, 2);
         assert_eq!(skipcount, 0);
         assert!(lastplayed.is_some());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_record_play_context_persists_by_type() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let id = insert_song(&conn, "/tmp/context.flac");
+        conn.execute(
+            "INSERT INTO playlists (name) VALUES ('Test Playlist')",
+            params![],
+        )
+        .unwrap();
+        let playlist_id = conn.last_insert_rowid();
+
+        record_play_context(&conn, &PlayContext::Song, id).unwrap();
+        record_play_context(
+            &conn,
+            &PlayContext::Album {
+                album: "Test Album".into(),
+                album_artist: Some("Test Artist".into()),
+            },
+            id,
+        )
+        .unwrap();
+        record_play_context(&conn, &PlayContext::Playlist { playlist_id }, id).unwrap();
+
+        let rows: Vec<(String, Option<i64>)> = conn
+            .prepare(
+                "SELECT context_type, playlist_id FROM play_history WHERE song_id = ?1 ORDER BY id",
+            )
+            .unwrap()
+            .query_map(params![id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
+        assert_eq!(
+            rows,
+            vec![
+                ("song".to_string(), None),
+                ("album".to_string(), None),
+                ("playlist".to_string(), Some(playlist_id)),
+            ]
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }

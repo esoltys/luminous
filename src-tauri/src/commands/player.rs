@@ -1,5 +1,5 @@
 use crate::{
-    models::{PlaybackState, PlaylistItem, RepeatMode, ShuffleMode},
+    models::{PlayContext, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode},
     AppState,
 };
 use tauri::State;
@@ -20,7 +20,7 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
     let item = PlaylistItem::new_song(0, 0, song);
     let mut player = state.player.lock().await;
     player
-        .play_playlist(vec![item], 0, 0)
+        .play_playlist(vec![item], 0, 0, Some(PlayContext::Song))
         .await
         .map_err(|e| e.to_string())
 }
@@ -30,6 +30,7 @@ pub async fn play_songs(
     song_ids: Vec<i64>,
     start_index: usize,
     playlist_id: Option<i64>,
+    context: Option<PlayContext>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     use rusqlite::params;
@@ -127,7 +128,7 @@ pub async fn play_songs(
 
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, start_index, pid)
+        .play_playlist(items, start_index, pid, context)
         .await
         .map_err(|e| e.to_string())
 }
@@ -146,7 +147,7 @@ pub async fn play_playlist_item(
     };
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, item_index, playlist_id)
+        .play_playlist(items, item_index, playlist_id, None)
         .await
         .map_err(|e| e.to_string())
 }
@@ -415,7 +416,7 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
 
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, 0, 0)
+        .play_playlist(items, 0, 0, Some(PlayContext::Song))
         .await
         .map_err(|e| e.to_string())
 }

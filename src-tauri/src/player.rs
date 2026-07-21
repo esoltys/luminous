@@ -6,7 +6,9 @@
 use crate::{
     audio::AudioEngine,
     db::Database,
-    models::{LoudnessGainSource, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song},
+    models::{
+        LoudnessGainSource, PlayContext, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode, Song,
+    },
     stats,
 };
 use anyhow::{anyhow, Result};
@@ -39,6 +41,10 @@ pub struct Player {
     pub current_song: Option<Song>,
     pub current_playlist_id: Option<i64>,
     pub current_item_uuid: Option<String>,
+    /// What the user was inside (album/playlist/standalone) when this
+    /// playback queue was started — recorded at the scrobble point for
+    /// context-aware "Recently Played".
+    current_play_context: Option<PlayContext>,
 
     // Playback mode
     pub shuffle_mode: ShuffleMode,
@@ -264,6 +270,7 @@ impl Player {
             current_song: restored_song.clone(),
             current_playlist_id: restored_playlist_id,
             current_item_uuid: restored_item_uuid,
+            current_play_context: None,
             shuffle_mode,
             repeat_mode,
             stop_after_current: false,
@@ -296,9 +303,12 @@ impl Player {
         items: Vec<PlaylistItem>,
         start_index: usize,
         playlist_id: i64,
+        context: Option<PlayContext>,
     ) -> Result<()> {
         self.playlist_items = items;
         self.current_playlist_id = Some(playlist_id);
+        self.current_play_context =
+            context.or_else(|| (playlist_id > 0).then_some(PlayContext::Playlist { playlist_id }));
         self.played_indices.clear();
         self.queue.clear();
         self.scrobbled = false;
@@ -1043,7 +1053,16 @@ impl Player {
         let song_id = self.current_song.as_ref()?.id;
         match self._db.pool.get() {
             Ok(conn) => match stats::record_play(&conn, song_id) {
-                Ok(()) => Some(stats::stats_payload(&conn, song_id)),
+                Ok(()) => {
+                    let context = self
+                        .current_play_context
+                        .clone()
+                        .unwrap_or(PlayContext::Song);
+                    if let Err(e) = stats::record_play_context(&conn, &context, song_id) {
+                        log::warn!("Failed to record play context for song {song_id}: {e}");
+                    }
+                    Some(stats::stats_payload(&conn, song_id))
+                }
                 Err(e) => {
                     log::warn!("Failed to record play for song {song_id}: {e}");
                     None
@@ -1190,7 +1209,7 @@ mod tests {
 
         // Simulate an ad-hoc selection (album/artist/search — playlist_id 0)
         // starting on the middle track, then "quitting" mid-playback.
-        player.play_playlist(items, 1, 0).await.unwrap();
+        player.play_playlist(items, 1, 0, None).await.unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 2);
 
         // Reopening the app re-runs Player::new against the same DB.

@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, ScanPhase, ScanProgress, Song,
-        SongSource,
+        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, ScanPhase,
+        ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -707,28 +707,50 @@ impl CollectionScanner {
         Ok(stats)
     }
 
+    /// Recently played, grouped by what the user actually played from —
+    /// an Album card if they were browsing an album, a Playlist card if
+    /// they played from a playlist, or a Song card for a standalone pick.
+    /// See `play_history` (migration 10) and `PlayContext`.
     pub fn get_recently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
         let query_limit = limit * 20;
         let sql = format!(
-            "SELECT {HOME_ITEM_SELECT_COLS}
-             FROM songs s
+            "SELECT {HOME_ITEM_SELECT_COLS}, ph.context_type, ph.playlist_id
+             FROM play_history ph
+             JOIN songs s ON s.id = ph.song_id
              WHERE s.source IN (1, 2) AND s.unavailable = 0
-             ORDER BY s.lastplayed DESC NULLS LAST, s.mtime DESC
+             ORDER BY ph.played_at DESC
              LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs_with_counts: Vec<(Song, i64)> = stmt
+        let rows: Vec<(Song, i64, String, Option<i64>)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(55)?;
-                Ok((song, count))
+                let album_track_count: i64 = row.get(55)?;
+                let context_type: String = row.get(56)?;
+                let playlist_id: Option<i64> = row.get(57)?;
+                Ok((song, album_track_count, context_type, playlist_id))
             })?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(group_songs_into_home_items(
-            songs_with_counts,
+
+        let playlist_ids: Vec<i64> = {
+            use std::collections::HashSet;
+            rows.iter()
+                .filter(|(_, _, context_type, playlist_id)| {
+                    context_type == "playlist" && playlist_id.is_some()
+                })
+                .filter_map(|(_, _, _, playlist_id)| *playlist_id)
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect()
+        };
+        let playlists_by_id = get_playlists_by_ids(&conn, &playlist_ids)?;
+
+        Ok(group_by_play_context(
+            rows,
             limit as usize,
+            &playlists_by_id,
         ))
     }
 
@@ -826,6 +848,115 @@ fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64)>, limit: usize
     }
 
     items
+}
+
+/// Dedup key for context-aware Recently Played — one entry per album,
+/// playlist, or standalone song, keeping only the most recent occurrence.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum PlayContextKey {
+    Playlist(i64),
+    Album(String, String),
+    Song(i64),
+}
+
+fn group_by_play_context(
+    rows: Vec<(Song, i64, String, Option<i64>)>,
+    limit: usize,
+    playlists_by_id: &std::collections::HashMap<i64, Playlist>,
+) -> Vec<HomeItem> {
+    use std::collections::HashSet;
+    let mut items = Vec::new();
+    let mut seen = HashSet::new();
+
+    for (song, album_track_count, context_type, playlist_id) in rows {
+        if items.len() >= limit {
+            break;
+        }
+
+        let key = match context_type.as_str() {
+            "playlist" if playlist_id.is_some() => PlayContextKey::Playlist(playlist_id.unwrap()),
+            "album" if song.album.as_deref().is_some_and(|a| !a.trim().is_empty()) => {
+                let artist_name = song
+                    .album_artist
+                    .clone()
+                    .or_else(|| song.artist.clone())
+                    .unwrap_or_default();
+                PlayContextKey::Album(song.album.clone().unwrap(), artist_name)
+            }
+            _ => PlayContextKey::Song(song.id),
+        };
+
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.insert(key.clone());
+
+        match key {
+            PlayContextKey::Playlist(id) => match playlists_by_id.get(&id) {
+                Some(playlist) => items.push(HomeItem::Playlist {
+                    playlist: playlist.clone(),
+                }),
+                None => items.push(HomeItem::Song {
+                    song: Box::new(song),
+                }),
+            },
+            PlayContextKey::Album(album_name, artist_name) => {
+                items.push(HomeItem::Album {
+                    album: AlbumItem {
+                        artist: Some(artist_name),
+                        album: Some(album_name),
+                        year: song.year,
+                        track_count: album_track_count as i32,
+                        art_embedded: song.art_embedded,
+                        art_automatic: song.art_automatic.clone(),
+                        art_manual: song.art_manual.clone(),
+                    },
+                });
+            }
+            PlayContextKey::Song(_) => {
+                items.push(HomeItem::Song {
+                    song: Box::new(song),
+                });
+            }
+        }
+    }
+
+    items
+}
+
+fn get_playlists_by_ids(
+    conn: &rusqlite::Connection,
+    ids: &[i64],
+) -> Result<std::collections::HashMap<i64, Playlist>> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
+                p.last_played_row, p.created, p.updated,
+                (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
+         FROM playlists p WHERE p.id IN ({placeholders})"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let map = stmt
+        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+            let playlist = Playlist {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                dynamic_enabled: row.get(2)?,
+                dynamic_spec: row.get(3)?,
+                auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
+                last_played_row: row.get(5)?,
+                created: row.get(6)?,
+                updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+                track_count: row.get(8)?,
+            };
+            Ok((playlist.id, playlist))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(map)
 }
 
 // ---------------------------------------------------------------------------
