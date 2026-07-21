@@ -315,6 +315,22 @@ impl PlaylistItem {
     }
 }
 
+/// Where a play was initiated from, recorded alongside each scrobble so
+/// "Recently Played" can reflect what the user actually clicked into
+/// (an album, a playlist, or an individual song) rather than a heuristic.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PlayContext {
+    Song,
+    Album {
+        album: String,
+        album_artist: Option<String>,
+    },
+    Playlist {
+        playlist_id: i64,
+    },
+}
+
 /// A named playlist.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
@@ -521,10 +537,11 @@ pub struct AlbumItem {
     pub art_manual: Option<String>,
 }
 
-/// Represents a dynamic item in the Home curation carousels (either a Song or an Album).
+/// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum HomeItem {
     Song { song: Box<Song> },
     Album { album: AlbumItem },
+    Playlist { playlist: Playlist },
 }

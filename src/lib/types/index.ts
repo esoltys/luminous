@@ -261,4 +261,12 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
 
 export type HomeItem =
   | { type: "song"; song: Song }
-  | { type: "album"; album: AlbumItem };
+  | { type: "album"; album: AlbumItem }
+  | { type: "playlist"; playlist: Playlist };
+
+// What the user was inside when a play started — lets "Recently Played"
+// show an Album/Playlist card instead of always collapsing to a Song.
+export type PlayContext =
+  | { type: "song" }
+  | { type: "album"; album: string; albumArtist?: string }
+  | { type: "playlist"; playlistId: number };

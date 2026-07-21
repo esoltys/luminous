@@ -40,7 +40,11 @@
       songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
       if (songs.length > 0) {
         const songIds = songs.map((s) => s.id);
-        playerStore.playSongs(songIds, 0);
+        playerStore.playSongs(songIds, 0, undefined, {
+          type: "album",
+          album: album.album || "",
+          albumArtist: album.artist ?? undefined,
+        });
       }
     } catch (err) {
       console.error("Failed to play album:", err);

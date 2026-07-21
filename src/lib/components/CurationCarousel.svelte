@@ -9,10 +9,16 @@
   }
 
   let { title, items }: Props = $props();
+
+  function keyFor(item: HomeItem): string {
+    if (item.type === "song") return "s_" + item.song.id;
+    if (item.type === "playlist") return "p_" + item.playlist.id;
+    return "a_" + (item.album.album || "") + "_" + (item.album.artist || "");
+  }
 </script>
 
 <HorizontalScrollRow {title}>
-  {#each items as item (item.type === 'song' ? 's_' + item.song.id : 'a_' + (item.album.album || '') + '_' + (item.album.artist || ''))}
+  {#each items as item (keyFor(item))}
     <CarouselCard {item} />
   {/each}
 </HorizontalScrollRow>
