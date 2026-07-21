@@ -20,7 +20,8 @@
     CopyPlus,
     Music,
     Shuffle,
-    Search
+    Search,
+    Radio
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -132,6 +133,10 @@
   // Selected playlist from the store
   let activePlaylist = $derived(
     playlistsStore.playlists.find((p) => p.id === playlistsStore.activePlaylistId)
+  );
+
+  let isActive = $derived(
+    activePlaylist !== undefined && playlistsStore.activePlaylistId === activePlaylist.id
   );
 
   type PlaylistSortField = "position" | "title" | "artist" | "album" | "rating" | "duration";
@@ -600,6 +605,15 @@
               >
                 <Pencil class="w-4 h-4" />
               </button>
+              {#if isActive}
+                <div
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-accent text-brand-accent-contrast text-xs font-bold shadow-md select-none shrink-0 ml-1"
+                  title={i18n.t("playlists.activeBadgeTooltip")}
+                >
+                  <Radio class="w-3.5 h-3.5 animate-pulse" />
+                  <span>{i18n.t("playlists.activeBadgeLabel")}</span>
+                </div>
+              {/if}
             </div>
           {/if}
 
@@ -632,6 +646,16 @@
             >
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </button>
+            {#if !isActive && activePlaylist}
+              <button
+                onclick={() => playlistsStore.selectPlaylist(activePlaylist.id)}
+                class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast font-semibold text-sm transition-all cursor-pointer shadow-sm"
+                title={i18n.t("playlists.makeActiveBtn")}
+              >
+                <Radio class="w-4 h-4" />
+                <span>{i18n.t("playlists.makeActiveBtn")}</span>
+              </button>
+            {/if}
           </div>
         </div>
 

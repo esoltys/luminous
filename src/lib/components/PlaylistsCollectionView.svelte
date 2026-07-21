@@ -40,7 +40,12 @@
 
   let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:")));
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
-  let customPlaylists = $derived(playlistsStore.playlists.filter((p) => !p.dynamic_enabled));
+  let customPlaylists = $derived.by(() => {
+    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled);
+    const queue = list.find((p) => p.name.toLowerCase() === "queue");
+    const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
+    return queue ? [queue, ...rest] : rest;
+  });
 
   // Auto-playlists that currently resolve to 0 songs are hidden entirely
   // (e.g. a genre's tags got edited away, or no songs are rated 5 stars).
@@ -145,14 +150,18 @@
   let sortedPlaylists = $derived.by(() => {
     const field = customSortField;
     const asc = customSortAsc;
-    return [...customPlaylists].sort((a, b) => {
-      if (field === "name") {
-        return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      }
-      const valA = field === "track_count" ? a.track_count : a.updated;
-      const valB = field === "track_count" ? b.track_count : b.updated;
-      return asc ? valA - valB : valB - valA;
-    });
+    const queue = customPlaylists.find((p) => p.name.toLowerCase() === "queue");
+    const rest = customPlaylists
+      .filter((p) => p.name.toLowerCase() !== "queue")
+      .sort((a, b) => {
+        if (field === "name") {
+          return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        }
+        const valA = field === "track_count" ? a.track_count : a.updated;
+        const valB = field === "track_count" ? b.track_count : b.updated;
+        return asc ? valA - valB : valB - valA;
+      });
+    return queue ? [queue, ...rest] : rest;
   });
 
   function openAuto(def: AutoDef) {

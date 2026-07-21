@@ -30,6 +30,20 @@ class PlaylistsStore {
     this.init();
   }
 
+  async ensureQueuePlaylist(): Promise<Playlist | null> {
+    let queuePl = this.playlists.find((p) => !p.dynamic_enabled && p.name.toLowerCase() === "queue");
+    if (!queuePl) {
+      try {
+        const created: Playlist = await invoke("create_playlist", { name: "Queue" });
+        await this.refreshPlaylists();
+        queuePl = this.playlists.find((p) => p.id === created.id) || created;
+      } catch (err) {
+        console.error("Failed to auto-create Queue playlist:", err);
+      }
+    }
+    return queuePl || null;
+  }
+
   private async init() {
     try {
       // Keep loaded playlist tracks in sync with rating/playcount changes
@@ -45,6 +59,8 @@ class PlaylistsStore {
 
       await this.refreshPlaylists();
       this.refreshAutoPlaylistCounts();
+      const queuePl = await this.ensureQueuePlaylist();
+
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_playlist_id) {
         const plId = parseInt(settings.active_playlist_id, 10);
@@ -53,7 +69,9 @@ class PlaylistsStore {
           return;
         }
       }
-      if (this.playlists.length > 0) {
+      if (queuePl) {
+        await this.selectPlaylist(queuePl.id);
+      } else if (this.playlists.length > 0) {
         await this.selectPlaylist(this.playlists[0].id);
       }
     } catch (err) {
