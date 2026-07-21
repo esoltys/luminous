@@ -99,28 +99,6 @@ You can download the latest installers and portable binaries directly from the G
 
 ---
 
-## Release Notes
-
-### v0.75.0
-
-#### 🌟 Features & Enhancements
-* **Decades Auto-Playlists**: Automatic categorization by release decade (60s through 2020s) with distinct category color badges (#16).
-* **Enhanced Playlist Editor**: Added multi-selection, batch drag-and-drop reordering, duplicate track detection, inline search, and multi-layer cover art stacks (#86).
-* **Seamless State Restoration**: Full persistence of playback position, active queue context, view selection, and detail panes across app restarts (#72, #91).
-* **Artist & Genre Discovery**: Displays primary genres on artist cards with expanded sorting options and optimized query performance.
-* **Unified Cover Stack Component**: Integrated multi-layered cover art stacks across `AlbumCard`s, Artist views, and Playlist hubs.
-* **Integrated Library Maintenance**: Configurable auto-scanning, directory watch settings, and database indexing from Settings (#19).
-* **UI Polish & Alignment**: Unified grid margin alignment, inline carousel controls (#94), clamped floating context menus, and improved table header sorting.
-
-#### 🐛 Bug Fixes & Stability
-* Resolved dual waveform peak generation and normalization for seekbar visualizers (#93).
-* Fixed modal and context menu z-index rendering behind the acrylic PlayerBar.
-* Corrected artist album count calculations and singular/plural formatting.
-* Fixed theme color resolution for seekbar waveform canvas elements.
-* Ensured screenshot lyrics automation matches featured tracks (#96).
-
----
-
 ## Architecture
 
 ```
