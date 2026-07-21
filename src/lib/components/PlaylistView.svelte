@@ -134,15 +134,64 @@
     playlistsStore.playlists.find((p) => p.id === playlistsStore.activePlaylistId)
   );
 
-  // Derived filtered tracks based on filterQuery
+  type PlaylistSortField = "position" | "title" | "artist" | "album" | "rating" | "duration";
+  let sortField = $state<PlaylistSortField>("position");
+  let sortAsc = $state(true);
+
+  function toggleSort(field: PlaylistSortField) {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
+
+  // Derived filtered tracks based on filterQuery and sort selection
   let filteredTracks = $derived.by(() => {
     const q = filterQuery.trim().toLowerCase();
-    if (!q) return playlistsStore.activePlaylistTracks;
-    return playlistsStore.activePlaylistTracks.filter((item) => {
-      const title = item.song?.title?.toLowerCase() ?? "";
-      const artist = item.song?.artist?.toLowerCase() ?? "";
-      const album = item.song?.album?.toLowerCase() ?? "";
-      return title.includes(q) || artist.includes(q) || album.includes(q);
+    let result = playlistsStore.activePlaylistTracks;
+    if (q) {
+      result = result.filter((item) => {
+        const title = item.song?.title?.toLowerCase() ?? "";
+        const artist = item.song?.artist?.toLowerCase() ?? "";
+        const album = item.song?.album?.toLowerCase() ?? "";
+        return title.includes(q) || artist.includes(q) || album.includes(q);
+      });
+    }
+
+    if (sortField === "position") {
+      return sortAsc ? result : [...result].reverse();
+    }
+
+    return [...result].sort((a, b) => {
+      let valA: string | number = "";
+      let valB: string | number = "";
+
+      if (sortField === "title") {
+        valA = a.song?.title?.toLowerCase() ?? "";
+        valB = b.song?.title?.toLowerCase() ?? "";
+      } else if (sortField === "artist") {
+        valA = a.song?.artist?.toLowerCase() ?? "";
+        valB = b.song?.artist?.toLowerCase() ?? "";
+      } else if (sortField === "album") {
+        valA = a.song?.album?.toLowerCase() ?? "";
+        valB = b.song?.album?.toLowerCase() ?? "";
+      } else if (sortField === "rating") {
+        valA = a.song?.rating ?? 0;
+        valB = b.song?.rating ?? 0;
+      } else if (sortField === "duration") {
+        valA = a.song?.length_nanosec ?? 0;
+        valB = b.song?.length_nanosec ?? 0;
+      }
+
+      if (typeof valA === "string" && typeof valB === "string") {
+        const cmp = valA.localeCompare(valB);
+        return sortAsc ? cmp : -cmp;
+      } else {
+        const cmp = (valA as number) - (valB as number);
+        return sortAsc ? cmp : -cmp;
+      }
     });
   });
 
@@ -716,12 +765,36 @@
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">{i18n.t("playlists.tableHeaderTrack")}</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t("playlists.tableHeaderTitle")}</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t("playlists.tableHeaderArtist")}</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t("collection.tableHeaderAlbum")}</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">{i18n.t("collection.tableHeaderRating")}</th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">{i18n.t("playlists.tableHeaderDuration")}</th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">
+                <button onclick={() => toggleSort("position")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("playlists.tableHeaderTrack")} {sortField === "position" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+                <button onclick={() => toggleSort("title")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("playlists.tableHeaderTitle")} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+                <button onclick={() => toggleSort("artist")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("playlists.tableHeaderArtist")} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+                <button onclick={() => toggleSort("album")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("collection.tableHeaderAlbum")} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">
+                <button onclick={() => toggleSort("rating")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("collection.tableHeaderRating")} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
+              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">
+                <button onclick={() => toggleSort("duration")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                  {i18n.t("playlists.tableHeaderDuration")} {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
+              </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t("collection.tableHeaderActions")}</th>
             </tr>
           </thead>

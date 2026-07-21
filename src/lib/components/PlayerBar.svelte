@@ -36,6 +36,12 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
+  // Volume slider gradient style
+  let volumePercent = $derived(playerStore.volume * 100);
+  let volumeSliderStyle = $derived(
+    `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
+  );
+
   // Handle seek progress bar click
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -261,7 +267,7 @@
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
       class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
-      style="background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) {playerStore.volume * 100}%, var(--color-border) {playerStore.volume * 100}%, var(--color-border) 100%)"
+      style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volume')}
     />

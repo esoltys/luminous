@@ -157,6 +157,53 @@
       });
   });
 
+  type AlbumSortField = "track" | "title" | "rating" | "playcount" | "duration";
+  let sortField = $state<AlbumSortField>("track");
+  let sortAsc = $state(true);
+
+  function toggleSort(field: AlbumSortField) {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
+
+  let sortedSongs = $derived.by(() => {
+    if (sortField === "track") {
+      if (sortAsc) return songs;
+      return [...songs].reverse();
+    }
+
+    return [...songs].sort((a, b) => {
+      let valA: string | number = "";
+      let valB: string | number = "";
+
+      if (sortField === "title") {
+        valA = a.title?.toLowerCase() ?? "";
+        valB = b.title?.toLowerCase() ?? "";
+      } else if (sortField === "rating") {
+        valA = a.rating ?? 0;
+        valB = b.rating ?? 0;
+      } else if (sortField === "playcount") {
+        valA = a.playcount ?? 0;
+        valB = b.playcount ?? 0;
+      } else if (sortField === "duration") {
+        valA = a.length_nanosec ?? 0;
+        valB = b.length_nanosec ?? 0;
+      }
+
+      if (typeof valA === "string" && typeof valB === "string") {
+        const cmp = valA.localeCompare(valB);
+        return sortAsc ? cmp : -cmp;
+      } else {
+        const cmp = (valA as number) - (valB as number);
+        return sortAsc ? cmp : -cmp;
+      }
+    });
+  });
+
   function goBack() {
     collectionStore.selectedAlbumName = null;
     collectionStore.activeSubTab = "albums";
@@ -350,13 +397,21 @@
       <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
         <div class="grid grid-cols-[36px_40px_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
           <div class="text-center w-9"></div>
-          <div class="text-left">{i18n.t('collection.tableHeaderTrack')}</div>
-          <div class="text-left">{i18n.t('collection.tableHeaderTitle')}</div>
-          <div class="text-center">{i18n.t('collection.tableHeaderRating')}</div>
-          <div class="text-center">{i18n.t('collection.tableHeaderPlays')}</div>
-          <div class="text-center">
-            <Clock class="w-3.5 h-3.5 mx-auto" />
-          </div>
+          <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+            {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
+          </button>
+          <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+            {i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
+          </button>
+          <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+            {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
+          </button>
+          <button onclick={() => toggleSort("playcount")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+            {i18n.t('collection.tableHeaderPlays')} {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}
+          </button>
+          <button onclick={() => toggleSort("duration")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+            <Clock class="w-3.5 h-3.5 mx-auto" /> {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
+          </button>
           <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
         </div>
       </div>
@@ -367,13 +422,13 @@
           <div class="flex items-center justify-center py-16">
             <div class="text-brand-text-secondary text-sm">{i18n.t('home.loading')}</div>
           </div>
-        {:else if songs.length === 0}
+        {:else if sortedSongs.length === 0}
           <div class="py-16 text-center select-none">
             <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
             <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
           </div>
         {:else}
-          {#each songs as song, index (song.id)}
+          {#each sortedSongs as song, index (song.id)}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div

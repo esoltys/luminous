@@ -239,4 +239,40 @@ describe("PlaylistView.svelte", () => {
     expect(getAllByText("Play Selected").length).toBeGreaterThan(0);
     expect(getByText("Remove from Playlist")).toBeInTheDocument();
   });
+
+  it("sorts tracks by column header clicks and toggles direction", async () => {
+    const { getByText, getAllByRole } = render(PlaylistView);
+
+    // Initial order: Track One, Track Two, Track Three
+    let rows = getAllByRole("row").slice(1); // Exclude header row
+    expect(rows[0]).toHaveTextContent("Track One");
+    expect(rows[1]).toHaveTextContent("Track Two");
+    expect(rows[2]).toHaveTextContent("Track Three");
+
+    // Click "Title" column header to sort alphabetically by title
+    const titleHeaderBtn = getByText("Title").closest("button")!;
+    await fireEvent.click(titleHeaderBtn);
+
+    rows = getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Track One");
+    expect(rows[1]).toHaveTextContent("Track Three");
+    expect(rows[2]).toHaveTextContent("Track Two");
+
+    // Click "Title" header again to toggle to descending order
+    await fireEvent.click(titleHeaderBtn);
+
+    rows = getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Track Two");
+    expect(rows[1]).toHaveTextContent("Track Three");
+    expect(rows[2]).toHaveTextContent("Track One");
+
+    // Click "Artist" header to sort by artist
+    const artistHeaderBtn = getByText("Artist").closest("button")!;
+    await fireEvent.click(artistHeaderBtn);
+
+    rows = getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("Artist A");
+    expect(rows[1]).toHaveTextContent("Artist B");
+    expect(rows[2]).toHaveTextContent("Artist C");
+  });
 });

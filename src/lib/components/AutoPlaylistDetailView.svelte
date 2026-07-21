@@ -253,6 +253,57 @@
       unlisten?.();
     };
   });
+
+  type AutoPlaylistSortField = "default" | "track" | "title" | "artist" | "album" | "rating" | "duration";
+  let sortField = $state<AutoPlaylistSortField>("default");
+  let sortAsc = $state(true);
+
+  function toggleSort(field: AutoPlaylistSortField) {
+    if (sortField === field) {
+      sortAsc = !sortAsc;
+    } else {
+      sortField = field;
+      sortAsc = true;
+    }
+  }
+
+  let sortedSongs = $derived.by(() => {
+    if (sortField === "default") {
+      return sortAsc ? songs : [...songs].reverse();
+    }
+    return [...songs].sort((a, b) => {
+      let valA: string | number = "";
+      let valB: string | number = "";
+
+      if (sortField === "track") {
+        valA = a.track ?? 0;
+        valB = b.track ?? 0;
+      } else if (sortField === "title") {
+        valA = a.title?.toLowerCase() ?? "";
+        valB = b.title?.toLowerCase() ?? "";
+      } else if (sortField === "artist") {
+        valA = a.artist?.toLowerCase() ?? "";
+        valB = b.artist?.toLowerCase() ?? "";
+      } else if (sortField === "album") {
+        valA = a.album?.toLowerCase() ?? "";
+        valB = b.album?.toLowerCase() ?? "";
+      } else if (sortField === "rating") {
+        valA = a.rating ?? 0;
+        valB = b.rating ?? 0;
+      } else if (sortField === "duration") {
+        valA = a.length_nanosec ?? 0;
+        valB = b.length_nanosec ?? 0;
+      }
+
+      if (typeof valA === "string" && typeof valB === "string") {
+        const cmp = valA.localeCompare(valB);
+        return sortAsc ? cmp : -cmp;
+      } else {
+        const cmp = (valA as number) - (valB as number);
+        return sortAsc ? cmp : -cmp;
+      }
+    });
+  });
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full">
@@ -323,18 +374,41 @@
     </div>
   </div>
 
-  <!-- Songs Table Section -->
   <div class="px-6 md:px-8 py-6" class:pb-24={!!playerStore.currentSong}>
     <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
       <table class="w-full text-left text-sm border-collapse min-w-[800px]">
         <thead>
           <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">{i18n.t('playlists.tableHeaderTrack')}</th>
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderTitle')}</th>
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('playlists.tableHeaderArtist')}</th>
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">{i18n.t('collection.tableHeaderAlbum')}</th>
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">{i18n.t('collection.tableHeaderRating')}</th>
-            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">{i18n.t('playlists.tableHeaderDuration')}</th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">
+              <button onclick={() => toggleSort("track")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('playlists.tableHeaderTrack')} {sortField === "track" || sortField === "default" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+              <button onclick={() => toggleSort("title")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('playlists.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+              <button onclick={() => toggleSort("artist")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('playlists.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
+              <button onclick={() => toggleSort("album")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">
+              <button onclick={() => toggleSort("rating")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
+            <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">
+              <button onclick={() => toggleSort("duration")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
+                {i18n.t('playlists.tableHeaderDuration')} {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t('collection.tableHeaderActions')}</th>
           </tr>
         </thead>
@@ -343,13 +417,13 @@
             <tr><td colspan="7" class="py-16 text-center">
               <div class="text-brand-text-secondary text-sm">{i18n.t('home.loading')}</div>
             </td></tr>
-          {:else if songs.length === 0}
+          {:else if sortedSongs.length === 0}
             <tr><td colspan="7" class="py-16 text-center select-none">
               <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
               <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
             </td></tr>
           {:else}
-            {#each songs as song, index (song.id)}
+            {#each sortedSongs as song, index (song.id)}
               <tr
                 data-song-row="true"
                 onclick={(e) => handleSongClick(e, song)}
