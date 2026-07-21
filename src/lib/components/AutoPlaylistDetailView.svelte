@@ -424,7 +424,7 @@
               title={autoPlay
                 ? "Auto-Play ON — keeps appending next batch as you reach the end. Click to disable."
                 : "Auto-Play OFF — stops at end of current batch. Click to enable continuous playback."}
-              class="ml-1 flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-200 cursor-pointer select-none
+              class="flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-200 cursor-pointer select-none
                 {autoPlay
                   ? 'bg-brand-accent/15 border-brand-accent text-brand-accent shadow-[0_0_12px_2px] shadow-brand-accent/25 hover:bg-brand-accent/25'
                   : 'border-brand-border text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
