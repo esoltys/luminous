@@ -181,7 +181,7 @@ describe("PlaylistView.svelte", () => {
 
   it("filters tracks by title or artist using the filter search input", async () => {
     const { getByPlaceholderText, getByText, queryByText } = render(PlaylistView);
-    const input = getByPlaceholderText("Filter tracks...");
+    const input = getByPlaceholderText("Filter songs...");
 
     await fireEvent.input(input, { target: { value: "Track One" } });
     expect(getByText("Track One")).toBeInTheDocument();
