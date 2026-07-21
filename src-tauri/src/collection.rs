@@ -1533,4 +1533,3 @@ pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
     let end = start + 9;
     Some((start, end))
 }
-

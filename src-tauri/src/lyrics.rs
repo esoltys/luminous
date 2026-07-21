@@ -81,6 +81,30 @@ impl LyricsManager {
             }
         }
 
+        // 3. Clean title of featured artist annotations (e.g., "(feat. ...)") and retry online search
+        let cleaned_title = clean_featured_title(title);
+        if cleaned_title != title {
+            if let Ok(lyrics) = self
+                .fetch_lrclib(artist, &cleaned_title, None, duration_sec)
+                .await
+            {
+                if is_synced_lrc(&lyrics) {
+                    return Ok(lyrics);
+                }
+                if best_lyrics.is_none() {
+                    best_lyrics = Some(lyrics);
+                }
+            }
+            if let Ok(lyrics) = self.fetch_lyrics_ovh(artist, &cleaned_title).await {
+                if is_synced_lrc(&lyrics) {
+                    return Ok(lyrics);
+                }
+                if best_lyrics.is_none() {
+                    best_lyrics = Some(lyrics);
+                }
+            }
+        }
+
         if let Some(lyrics) = best_lyrics {
             return Ok(lyrics);
         }
@@ -148,6 +172,18 @@ impl LyricsManager {
     }
 }
 
+pub fn clean_featured_title(title: &str) -> String {
+    let mut cleaned = title.to_string();
+    let lower = cleaned.to_lowercase();
+    for marker in &[" (feat.", " [feat.", " (ft.", " [ft.", " feat.", " ft."] {
+        if let Some(pos) = lower.find(marker) {
+            cleaned.truncate(pos);
+            break;
+        }
+    }
+    cleaned.trim().to_string()
+}
+
 pub fn is_synced_lrc(text: &str) -> bool {
     let bytes = text.as_bytes();
     if bytes.len() < 6 {
@@ -165,4 +201,29 @@ pub fn is_synced_lrc(text: &str) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_featured_title() {
+        assert_eq!(
+            clean_featured_title("Song Title (feat. Artist)"),
+            "Song Title"
+        );
+        assert_eq!(
+            clean_featured_title("Song Title [feat. Artist]"),
+            "Song Title"
+        );
+        assert_eq!(clean_featured_title("Song Title ft. Artist"), "Song Title");
+        assert_eq!(clean_featured_title("Plain Song Title"), "Plain Song Title");
+    }
+
+    #[test]
+    fn test_is_synced_lrc() {
+        assert!(is_synced_lrc("[00:12.00] Line of lyrics"));
+        assert!(!is_synced_lrc("Plain lyrics line without LRC timestamp"));
+    }
 }

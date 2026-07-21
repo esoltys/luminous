@@ -189,15 +189,17 @@ mod tests {
     #[test]
     fn test_compute_waveform_peaks_peak_normalization() {
         // Quiet signal with max amplitude 0.05
-        let samples: Vec<f32> = (0..1000)
-            .map(|i| (i as f32 / 1000.0) * 0.05)
-            .collect();
+        let samples: Vec<f32> = (0..1000).map(|i| (i as f32 / 1000.0) * 0.05).collect();
 
         let peaks = compute_waveform_peaks(&samples, 10);
         assert_eq!(peaks.len(), 10);
         // The last chunk should reach peak normalized to ~255 despite max sample being 0.05
         let max_peak = *peaks.iter().max().unwrap();
-        assert!(max_peak >= 250, "Max peak should be normalized near 255, got {}", max_peak);
+        assert!(
+            max_peak >= 250,
+            "Max peak should be normalized near 255, got {}",
+            max_peak
+        );
         // First chunk should be near 0
         assert!(peaks[0] < 50);
     }

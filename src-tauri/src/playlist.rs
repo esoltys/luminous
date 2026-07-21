@@ -1319,13 +1319,25 @@ mod tests {
         manager.sync_decade_auto_playlists().unwrap();
 
         let playlists = manager.get_playlists().unwrap();
-        let decade_playlists: Vec<_> = playlists.iter().filter(|p| p.dynamic_enabled && p.dynamic_spec.as_deref().unwrap_or("").starts_with("decade:")).collect();
+        let decade_playlists: Vec<_> = playlists
+            .iter()
+            .filter(|p| {
+                p.dynamic_enabled
+                    && p.dynamic_spec
+                        .as_deref()
+                        .unwrap_or("")
+                        .starts_with("decade:")
+            })
+            .collect();
         assert_eq!(decade_playlists.len(), 2);
 
         let pl_80s = decade_playlists.iter().find(|p| p.name == "1980s").unwrap();
         let tracks = manager.get_playlist_tracks(pl_80s.id).unwrap();
         assert_eq!(tracks.len(), 1);
-        assert_eq!(tracks[0].song.as_ref().unwrap().title.as_deref(), Some("Track 80s"));
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Track 80s")
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
