@@ -321,6 +321,37 @@ impl Player {
         self.play_at_index(play_index).await
     }
 
+    /// Append songs directly to the in-memory `playlist_items` so the player
+    /// can continue playing them seamlessly.  Called by the Auto-Play refill
+    /// path after the backend has already persisted the new items to the DB.
+    pub fn append_songs_to_playlist_items(&mut self, items: Vec<PlaylistItem>) {
+        self.playlist_items.extend(items);
+        // Keep the shuffle order in sync (append new indices at the end
+        // in sequential order; they'll be reached naturally)
+        let new_start = if self.shuffle_mode != ShuffleMode::Off {
+            self.shuffle_order.len()
+        } else {
+            0 // irrelevant in non-shuffle, order == position
+        };
+        let new_len = self.playlist_items.len();
+        let existing_ordered: std::collections::HashSet<usize> =
+            self.shuffle_order.iter().copied().collect();
+        for i in new_start..new_len {
+            if !existing_ordered.contains(&i) {
+                self.shuffle_order.push(i);
+            }
+        }
+    }
+
+    /// Number of playlist items that have not yet been played (ahead of current index).
+    pub fn remaining_playlist_items(&self) -> usize {
+        let total = self.playlist_items.len();
+        match self.current_index {
+            Some(idx) => total.saturating_sub(idx + 1),
+            None => total,
+        }
+    }
+
     /// Returns true if the playlist item has a playable (present + available) song.
     fn is_item_playable(item: &PlaylistItem) -> bool {
         match &item.song {
@@ -993,6 +1024,7 @@ impl Player {
             stop_after_current: self.stop_after_current,
             loudness_source: self.current_loudness_source,
             loudness_gain_db: self.current_loudness_gain_db,
+            remaining_playlist_items: self.remaining_playlist_items(),
         }
     }
 

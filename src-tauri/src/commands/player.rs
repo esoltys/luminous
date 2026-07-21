@@ -423,3 +423,34 @@ pub async fn get_startup_file(state: State<'_, AppState>) -> Result<Option<Strin
     let mut lock = state.startup_file.lock().await;
     Ok(lock.take())
 }
+
+/// Append songs to the live in-memory player playlist without interrupting
+/// playback.  Called by the frontend Auto-Play refill logic (#26) after
+/// `refill_auto_playlist` has persisted the new items to the DB.
+#[tauri::command]
+pub async fn append_songs_to_player_playlist(
+    song_ids: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use rusqlite::params;
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+
+    let mut items = Vec::with_capacity(song_ids.len());
+    for &id in &song_ids {
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
+            crate::collection::SONG_SELECT_COLS
+        );
+        if let Ok(song) = conn.query_row(&sql, params![id], crate::collection::row_to_song) {
+            let item = crate::models::PlaylistItem::new_song(0, 0, song);
+            items.push(item);
+        }
+    }
+
+    if !items.is_empty() {
+        let mut player = state.player.lock().await;
+        player.append_songs_to_playlist_items(items);
+    }
+
+    Ok(())
+}

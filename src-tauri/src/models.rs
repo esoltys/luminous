@@ -322,6 +322,8 @@ pub struct Playlist {
     pub name: String,
     pub dynamic_enabled: bool,
     pub dynamic_spec: Option<String>, // JSON-serialized smart playlist spec
+    #[serde(default)]
+    pub auto_play: bool, // Auto-Play: keep appending next batch when approaching end (#26)
     pub last_played_row: Option<i32>,
     pub created: i64,
     pub updated: i64,
@@ -374,6 +376,10 @@ pub struct PlaybackState {
     pub loudness_source: LoudnessGainSource,
     /// The applied gain in dB, when normalization is active for this track.
     pub loudness_gain_db: Option<f32>,
+    /// How many playlist items remain after the current track.
+    /// Used by the frontend Auto-Play refill logic (#26).
+    #[serde(default)]
+    pub remaining_playlist_items: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

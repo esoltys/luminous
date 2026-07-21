@@ -11,7 +11,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic } from "lucide-svelte";
+  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -213,6 +213,22 @@
     }
   }
 
+  /**
+   * Derive current auto_play state from the backing playlist row (genre/decade only).
+   * For virtual playlists (favourites, recently_added) there is no row — so we
+   * always show the toggle but store the preference in app_settings.
+   */
+  let autoPlay = $derived.by(() => {
+    if (playlistId === undefined) return false;
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    return pl?.auto_play ?? false;
+  });
+
+  async function handleToggleAutoPlay() {
+    if (playlistId === undefined) return;
+    await playlistsStore.setPlaylistAutoPlay(playlistId, !autoPlay);
+  }
+
   function openTagEditor(songId: number) {
     editingSongId = songId;
   }
@@ -362,7 +378,30 @@
           >
             <FolderPlus class="w-4 h-4" />
           </button>
+
+          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+            <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
+            <button
+              id="auto-play-toggle-{playlistId}"
+              onclick={handleToggleAutoPlay}
+              title={autoPlay
+                ? "Auto-Play ON — keeps appending next batch as you reach the end. Click to disable."
+                : "Auto-Play OFF — stops at end of current batch. Click to enable continuous playback."}
+              class="ml-2 flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all duration-200 cursor-pointer select-none
+                {autoPlay
+                  ? 'bg-brand-accent/15 border-brand-accent text-brand-accent shadow-[0_0_12px_2px] shadow-brand-accent/25 hover:bg-brand-accent/25'
+                  : 'border-brand-border text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+            >
+              <RefreshCw class="w-3.5 h-3.5 {autoPlay ? 'animate-spin [animation-duration:3s]' : ''}" />
+              Auto-Play
+              <!-- Toggle pill -->
+              <span class="relative inline-flex items-center w-8 h-4 rounded-full transition-colors duration-200 {autoPlay ? 'bg-brand-accent' : 'bg-brand-border'}">
+                <span class="absolute w-3 h-3 bg-white rounded-full shadow transition-transform duration-200 {autoPlay ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+              </span>
+            </button>
+          {/if}
         </div>
+
       </div>
 
       <!-- Right: Cover Stack -->

@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { PlaybackState, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource } from "../types";
+import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
+
+/** Minimum remaining tracks before the auto-refill is triggered (#26). */
+const AUTO_PLAY_REFILL_THRESHOLD = 3;
 
 export class PlayerStore {
   // Reactive state using Svelte 5 Runes
@@ -17,6 +20,11 @@ export class PlayerStore {
   stopAfterCurrent = $state<boolean>(false);
   loudnessSource = $state<LoudnessGainSource>("disabled");
   loudnessGainDb = $state<number | undefined>(undefined);
+  /** Tracks remaining after the current one; populated from PlaybackState (#26). */
+  remainingPlaylistItems = $state<number>(0);
+
+  /** Prevents concurrent refill invocations for the same playlist. */
+  private _refillInFlight = false;
 
   constructor() {
     this.init();
@@ -35,12 +43,15 @@ export class PlayerStore {
       });
 
       // Listen for playback state changes
-      await listen<PlaybackState>("playback-state", (event) => {
+      await listen<PlaybackState>("playback-state", async (event) => {
         const oldSongId = this.currentSong?.id;
         this.updateState(event.payload);
         if (this.currentSong?.id !== oldSongId) {
           themeStore.updateArtworkColors(this.currentSong);
         }
+        // Auto-Play refill: checked on every state change so we react when
+        // remaining drops below threshold after each track advance (#26).
+        await this.maybeRefillAutoPlaylist();
       });
 
       // Listen for track changes
@@ -79,6 +90,37 @@ export class PlayerStore {
     this.stopAfterCurrent = state.stop_after_current;
     this.loudnessSource = state.loudness_source;
     this.loudnessGainDb = state.loudness_gain_db;
+    this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
+  }
+
+  /**
+   * Auto-Play refill (#26): when a dynamic playlist has auto_play enabled and
+   * the remaining track count drops below the threshold, fetch the next batch
+   * and append it to both the DB playlist and the live player queue.
+   */
+  private async maybeRefillAutoPlaylist() {
+    const pid = this.playlistId;
+    if (!pid || pid === 0) return;
+    if (this.remainingPlaylistItems >= AUTO_PLAY_REFILL_THRESHOLD) return;
+    if (this._refillInFlight) return;
+
+    // Look up this playlist to check dynamic_enabled + auto_play
+    try {
+      const playlists = await invoke<Playlist[]>("get_playlists");
+      const pl = playlists.find((p) => p.id === pid);
+      if (!pl?.dynamic_enabled || !pl?.auto_play) return;
+
+      this._refillInFlight = true;
+      const newSongs = await invoke<Song[]>("refill_auto_playlist", { playlistId: pid });
+      if (newSongs.length > 0) {
+        const songIds = newSongs.map((s) => s.id);
+        await invoke("append_songs_to_player_playlist", { songIds });
+      }
+    } catch (err) {
+      console.error("[PlayerStore] Auto-Play refill failed:", err);
+    } finally {
+      this._refillInFlight = false;
+    }
   }
 
   // Playback Control Actions

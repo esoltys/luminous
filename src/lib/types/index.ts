@@ -158,6 +158,7 @@ export interface Playlist {
   name: string;
   dynamic_enabled: boolean;
   dynamic_spec?: string;
+  auto_play?: boolean;
   last_played_row?: number;
   created: number;
   updated: number;
@@ -181,6 +182,7 @@ export interface PlaybackState {
   stop_after_current: boolean;
   loudness_source: LoudnessGainSource;
   loudness_gain_db?: number;
+  remaining_playlist_items?: number;
 }
 
 export interface MusicDirectory {

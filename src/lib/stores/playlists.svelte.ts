@@ -211,6 +211,16 @@ class PlaylistsStore {
   async exportPlaylist(playlistId: number, exportPath: string, relative: boolean = true) {
     await invoke("export_playlist", { playlistId, exportPath, relative });
   }
+
+  /**
+   * Toggle the Auto-Play flag on a dynamic/auto playlist.
+   * When enabled, playback will keep appending the next batch of matching
+   * songs as the queue approaches the end of the current batch (#26).
+   */
+  async setPlaylistAutoPlay(playlistId: number, autoPlay: boolean) {
+    await invoke("set_playlist_auto_play", { playlistId, autoPlay });
+    await this.refreshPlaylists();
+  }
 }
 
 export const playlistsStore = new PlaylistsStore();

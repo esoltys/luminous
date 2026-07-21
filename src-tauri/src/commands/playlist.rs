@@ -221,3 +221,65 @@ pub async fn export_playlist(
         .export_playlist(playlist_id, &export_path, relative)
         .map_err(|e| e.to_string())
 }
+
+/// Toggle the Auto-Play flag on a dynamic playlist.  When enabled, the player
+/// will automatically append the next batch of matching songs as playback
+/// approaches the end of the current batch.
+#[tauri::command]
+pub async fn set_playlist_auto_play(
+    playlist_id: i64,
+    auto_play: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .set_playlist_auto_play(playlist_id, auto_play)
+        .map_err(|e| e.to_string())
+}
+
+/// Fetch the next batch of songs for an auto-playlist's refill pass and append
+/// them both to the DB playlist and to the live player queue.  Called by the
+/// player when `remaining < threshold` and `auto_play` is true.
+#[tauri::command]
+pub async fn refill_auto_playlist(
+    playlist_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::models::Song>, String> {
+    // Read the playlist's dynamic_spec
+    let (dynamic_spec, _auto_play) = {
+        let pm = state.playlists.lock().await;
+        let playlists = pm.get_playlists().map_err(|e| e.to_string())?;
+        let pl = playlists
+            .iter()
+            .find(|p| p.id == playlist_id)
+            .ok_or_else(|| format!("Playlist {} not found", playlist_id))?;
+        (pl.dynamic_spec.clone().unwrap_or_default(), pl.auto_play)
+    };
+
+    if dynamic_spec.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Get refill songs (excludes already-present tracks)
+    let new_songs = {
+        let pm = state.playlists.lock().await;
+        pm.get_auto_playlist_refill_songs(playlist_id, &dynamic_spec, 25)
+            .map_err(|e| e.to_string())?
+    };
+
+    if new_songs.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Append new songs to the playlist_items table
+    {
+        let mut pm = state.playlists.lock().await;
+        let ids: Vec<i64> = new_songs.iter().map(|s| s.id).collect();
+        pm.add_songs_to_playlist(playlist_id, &ids)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(new_songs)
+}

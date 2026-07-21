@@ -501,6 +501,7 @@ pub fn run() {
             commands::player::play_playlist_item,
             commands::player::open_and_play,
             commands::player::get_startup_file,
+            commands::player::append_songs_to_player_playlist,
             commands::player::pause,
             commands::player::resume,
             commands::player::stop,
@@ -530,6 +531,8 @@ pub fn run() {
             commands::playlist::redo_playlist,
             commands::playlist::import_playlist,
             commands::playlist::export_playlist,
+            commands::playlist::set_playlist_auto_play,
+            commands::playlist::refill_auto_playlist,
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,

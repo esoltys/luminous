@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Heart, Clock, Calendar, Music } from "lucide-svelte";
+  import { ListMusic, Play, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
@@ -17,11 +17,12 @@
     /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
     updated?: number;
     trackCount: number;
+    autoPlay?: boolean;
     onClick: () => void;
     widthClass?: string;
   }
 
-  let { label, kind, genre, decade, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
+  let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
 
   let songs = $state<Song[]>([]);
 
@@ -116,6 +117,16 @@
         <Play class="w-5 h-5 fill-current ml-0.5" />
       </button>
     </div>
+    {#if autoPlay}
+      <!-- Auto-Play badge (#26) -->
+      <div
+        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand-accent/90 text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg"
+        title="Auto-Play enabled — keeps appending next batch"
+      >
+        <RefreshCw class="w-2.5 h-2.5 animate-spin [animation-duration:3s]" />
+        Auto
+      </div>
+    {/if}
   </div>
 
   <button

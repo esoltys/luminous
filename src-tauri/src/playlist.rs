@@ -112,6 +112,7 @@ impl PlaylistManager {
             name: name.to_string(),
             dynamic_enabled: false,
             dynamic_spec: None,
+            auto_play: false,
             last_played_row: None,
             created: now,
             updated: now,
@@ -138,7 +139,7 @@ impl PlaylistManager {
     pub fn get_playlists(&self) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec,
+            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
                     p.last_played_row, p.created, p.updated,
                     COUNT(pi.id) as track_count
              FROM playlists p
@@ -153,10 +154,11 @@ impl PlaylistManager {
                     name: row.get(1)?,
                     dynamic_enabled: row.get(2)?,
                     dynamic_spec: row.get(3)?,
-                    last_played_row: row.get(4)?,
-                    created: row.get(5)?,
-                    updated: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
-                    track_count: row.get(7)?,
+                    auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
+                    last_played_row: row.get(5)?,
+                    created: row.get(6)?,
+                    updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+                    track_count: row.get(8)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -167,7 +169,7 @@ impl PlaylistManager {
     pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec,
+            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
                     p.last_played_row, p.created, p.updated,
                     (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
              FROM playlists p
@@ -187,10 +189,11 @@ impl PlaylistManager {
                     name: row.get(1)?,
                     dynamic_enabled: row.get(2)?,
                     dynamic_spec: row.get(3)?,
-                    last_played_row: row.get(4)?,
-                    created: row.get(5)?,
-                    updated: row.get::<_, Option<i64>>(6)?.unwrap_or(0),
-                    track_count: row.get(7)?,
+                    auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
+                    last_played_row: row.get(5)?,
+                    created: row.get(6)?,
+                    updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+                    track_count: row.get(8)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -354,6 +357,59 @@ impl PlaylistManager {
         }
 
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Auto-Play (dynamic refill) — #26
+    // -----------------------------------------------------------------------
+
+    /// Persist the `auto_play` flag for a playlist row.
+    pub fn set_playlist_auto_play(&self, id: i64, auto_play: bool) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE playlists SET auto_play = ?1 WHERE id = ?2",
+            params![auto_play, id],
+        )?;
+        Ok(())
+    }
+
+    /// Returns songs that match the dynamic spec of playlist `id` but are NOT
+    /// yet present in its `playlist_items`.  Used for the Auto-Play refill
+    /// path — up to `limit` new songs are returned in random order so each
+    /// batch feels fresh.
+    pub fn get_auto_playlist_refill_songs(
+        &self,
+        playlist_id: i64,
+        dynamic_spec: &str,
+        limit: usize,
+    ) -> Result<Vec<Song>> {
+        let scanner = CollectionScanner::new(self.db.clone());
+
+        // Parse spec prefix to determine filter type
+        let songs: Vec<Song> = if let Some(decade) = dynamic_spec.strip_prefix("decade:") {
+            scanner.get_songs_by_decade(decade, (limit * 4) as i64)? // fetch extra; we'll filter
+        } else {
+            let genre = dynamic_spec.strip_prefix("genre:").unwrap_or(dynamic_spec);
+            scanner.get_songs_by_genre(genre, (limit * 4) as i64)?
+        };
+
+        // Collect song IDs already in the playlist so we can exclude them
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT song_id FROM playlist_items WHERE playlist_id = ?1 AND song_id IS NOT NULL",
+        )?;
+        let existing_ids: std::collections::HashSet<i64> = stmt
+            .query_map(params![playlist_id], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let new_songs: Vec<Song> = songs
+            .into_iter()
+            .filter(|s| !existing_ids.contains(&s.id))
+            .take(limit)
+            .collect();
+
+        Ok(new_songs)
     }
 
     // -----------------------------------------------------------------------
