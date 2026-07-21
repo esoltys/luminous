@@ -22,6 +22,27 @@
       e.preventDefault();
       searchInput?.focus();
     }
+
+    // Dedicated keyboard "Browser Back"/"Browser Forward" keys, same action as
+    // the history navigation buttons.
+    if (e.key === "BrowserBack") {
+      e.preventDefault();
+      collectionStore.goBack();
+    } else if (e.key === "BrowserForward") {
+      e.preventDefault();
+      collectionStore.goForward();
+    }
+  }
+
+  // Mouse side (thumb) buttons — button 3 is Back, button 4 is Forward.
+  function handleMouseUp(e: MouseEvent) {
+    if (e.button === 3) {
+      e.preventDefault();
+      collectionStore.goBack();
+    } else if (e.button === 4) {
+      e.preventDefault();
+      collectionStore.goForward();
+    }
   }
 
   // Search handler (prevent reload)
@@ -72,7 +93,7 @@
 
 </script>
 
-<svelte:window on:keydown={handleKeyDown} />
+<svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} />
 
 <header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-40 overflow-hidden" class:glass-surface={themeStore.isGlassTheme}>
   <!-- History Navigation Controls -->
