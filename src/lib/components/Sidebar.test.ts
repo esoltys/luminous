@@ -56,4 +56,12 @@ describe("Sidebar.svelte", () => {
     expect(queryByRole("button", { name: /artists/i })).toBeNull();
     expect(queryByRole("button", { name: /albums/i })).toBeNull();
   });
+
+  it("centers Collection and Playlists wrapper containers when collapsed (width < 180)", () => {
+    const { getByTitle } = render(Sidebar, { props: { width: 64 } });
+    const collectionBtn = getByTitle("Collection");
+    const playlistsBtn = getByTitle("Playlists");
+    expect(collectionBtn.parentElement).toHaveClass("items-center");
+    expect(playlistsBtn.parentElement).toHaveClass("items-center");
+  });
 });
