@@ -411,7 +411,7 @@
     );
     const songIds = selectedTracks.map((t) => t.song!.id);
     if (songIds.length > 0) {
-      playerStore.playSongs(songIds, 0);
+      playerStore.playSongs(songIds, 0, activePlaylist.id);
     }
   }
 

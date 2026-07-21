@@ -108,7 +108,7 @@
     if (selectedSongIds.size === 0) return;
     const selectedList = songs.filter((s) => selectedSongIds.has(s.id));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0);
+      playerStore.playSongs(selectedList.map((s) => s.id), 0, playlistId);
     }
   }
 
