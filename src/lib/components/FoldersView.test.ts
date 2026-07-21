@@ -8,6 +8,9 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "get_all_app_settings") {
       return Promise.resolve({ active_settings_tab: "about" });
     }
+    if (cmd === "get_commit_hash") {
+      return Promise.resolve("048f421");
+    }
     return Promise.resolve([]);
   }),
 }));
@@ -25,8 +28,9 @@ describe("FoldersView.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the version number from getVersion in the About view", async () => {
+  it("renders the version number and build commit hash in the About view", async () => {
     const { findByText } = render(FoldersView);
-    expect(await findByText("v0.75.0")).toBeInTheDocument();
+    expect(await findByText("v0.75.0#048f421")).toBeInTheDocument();
   });
 });
+

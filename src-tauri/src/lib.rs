@@ -559,6 +559,7 @@ pub fn run() {
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
+            commands::settings::get_commit_hash,
             // Stats commands
             commands::stats::set_song_rating,
         ])

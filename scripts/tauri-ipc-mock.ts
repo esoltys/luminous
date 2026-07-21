@@ -315,6 +315,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
+    get_commit_hash: () => "048f421",
+
 
     get_playback_state: () => {
       const posSec = window.mockPlaybackPositionSec ?? 122;
