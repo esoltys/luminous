@@ -183,4 +183,19 @@ describe("PlaylistsStore", () => {
     await playlistsStore.deduplicatePlaylist(101);
     expect(invoke).toHaveBeenCalledWith("remove_from_playlist", { playlistId: 101, uuids: ["item-dup"] });
   });
+
+  it("returns activeCustomPlaylist when active playlist is a custom playlist", async () => {
+    playlistsStore.playlists = [
+      { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false },
+      { id: 102, name: "80s Rock", track_count: 10, created: 1700000001, updated: 1700000001, dynamic_enabled: true },
+    ];
+    playlistsStore.activePlaylistId = 101;
+    expect(playlistsStore.activeCustomPlaylist?.name).toBe("Favorites");
+
+    playlistsStore.activePlaylistId = 102; // auto playlist
+    expect(playlistsStore.activeCustomPlaylist).toBeNull();
+
+    playlistsStore.activePlaylistId = null;
+    expect(playlistsStore.activeCustomPlaylist).toBeNull();
+  });
 });

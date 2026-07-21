@@ -19,6 +19,13 @@ class PlaylistsStore {
     return genreCount + (this.favouritesCount > 0 ? 1 : 0) + (this.recentlyAddedCount > 0 ? 1 : 0);
   }
 
+  /** The currently active playlist ONLY if it is a custom playlist (not an auto/dynamic playlist). */
+  get activeCustomPlaylist(): Playlist | null {
+    if (this.activePlaylistId === null) return null;
+    const pl = this.playlists.find((p) => p.id === this.activePlaylistId);
+    return pl && !pl.dynamic_enabled ? pl : null;
+  }
+
   constructor() {
     this.init();
   }

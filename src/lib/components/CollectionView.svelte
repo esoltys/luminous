@@ -100,8 +100,8 @@
 
   async function handleBulkAddToPlaylist() {
     if (selectedSongIds.size === 0) return;
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, Array.from(selectedSongIds));
+    if (playlistsStore.activeCustomPlaylist) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
       alert(i18n.t("collection.selectPlaylistFirstAlert"));
     }
@@ -280,8 +280,8 @@
   }
 
   async function handleAddSongToPlaylist(songId: number) {
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, [songId]);
+    if (playlistsStore.activeCustomPlaylist) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
       alert(i18n.t('collection.selectPlaylistFirstAlert'));
     }
@@ -461,7 +461,9 @@
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
                     class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                    title={i18n.t('collection.addPlaylistTooltip')}
+                    title={playlistsStore.activeCustomPlaylist
+                      ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
+                      : i18n.t('collection.addPlaylistTooltipDefault')}
                   >
                     <Plus class="w-4 h-4" />
                   </button>
@@ -638,8 +640,10 @@
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
-      if (songs.length > 0 && playlistsStore.activePlaylistId !== null) {
-        await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map(s => s.id));
+      if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
+        await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
+      } else if (songs.length > 0) {
+        alert(i18n.t("collection.selectPlaylistFirstAlert"));
       }
     }}
     onGoToArtist={album.artist ? () => collectionStore.viewArtist(album.artist || "") : undefined}
@@ -665,7 +669,11 @@
       class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
     >
       <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
-      <span>{i18n.t('playlists.contextMenuAddToPlaylist')}</span>
+      <span>
+        {playlistsStore.activeCustomPlaylist
+          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: playlistsStore.activeCustomPlaylist.name })
+          : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
+      </span>
     </button>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button

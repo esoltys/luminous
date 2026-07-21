@@ -83,10 +83,10 @@
 
         if (songs.length > 0) {
           const songIds = songs.map((s) => s.id);
-          if (playlistsStore.activePlaylistId !== null) {
-            await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songIds);
+          if (playlistsStore.activeCustomPlaylist) {
+            await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
             collectionStore.activeTab = "playlists";
-            await playerStore.playPlaylistItem(playlistsStore.activePlaylistId, 0);
+            await playerStore.playPlaylistItem(playlistsStore.activeCustomPlaylist.id, 0);
           }
         }
       } catch (err) {

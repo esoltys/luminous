@@ -292,8 +292,10 @@
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
-      if (songs.length > 0 && playlistsStore.activePlaylistId !== null) {
-        await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map(s => s.id));
+      if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
+        await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
+      } else if (songs.length > 0) {
+        alert(i18n.t("collection.selectPlaylistFirstAlert"));
       }
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}

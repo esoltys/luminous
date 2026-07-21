@@ -3,6 +3,7 @@
   import { Play, Plus, User } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
   import { portal } from "../utils/portal";
 
   let {
@@ -93,7 +94,11 @@
       role="menuitem"
     >
       <Plus class="w-3.5 h-3.5 text-brand-text-secondary shrink-0" />
-      <span>{i18n.t("playlists.contextMenuAddToPlaylist")}</span>
+      <span>
+        {playlistsStore.activeCustomPlaylist
+          ? i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })
+          : i18n.t("playlists.contextMenuAddToPlaylistDefault")}
+      </span>
     </button>
   {/if}
 

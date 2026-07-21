@@ -89,8 +89,8 @@
 
   async function handleBulkAddToPlaylist() {
     if (selectedSongIds.size === 0) return;
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, Array.from(selectedSongIds));
+    if (playlistsStore.activeCustomPlaylist) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
       alert(i18n.t("collection.selectPlaylistFirstAlert"));
     }
@@ -254,8 +254,8 @@
   }
 
   async function handleAddSongToPlaylist(songId: number) {
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, [songId]);
+    if (playlistsStore.activeCustomPlaylist) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
       alert(i18n.t('collection.selectPlaylistFirstAlert'));
     }
@@ -263,8 +263,8 @@
 
   async function handleAddAlbumToPlaylist() {
     if (songs.length === 0) return;
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map((s) => s.id));
+    if (playlistsStore.activeCustomPlaylist) {
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
     } else {
       alert(i18n.t('collection.selectPlaylistFirstAlert'));
     }
@@ -393,7 +393,9 @@
           <button
             onclick={handleAddAlbumToPlaylist}
             disabled={loading || songs.length === 0}
-            title={i18n.t('albumDetail.addAllToPlaylistTooltip')}
+            title={playlistsStore.activeCustomPlaylist
+              ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
+              : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
             class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
             <Plus class="w-4 h-4" />
@@ -516,7 +518,9 @@
                 <button
                   onclick={() => handleAddSongToPlaylist(song.id)}
                   class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
-                  title={i18n.t('collection.addPlaylistTooltip')}
+                  title={playlistsStore.activeCustomPlaylist
+                    ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
+                    : i18n.t('collection.addPlaylistTooltipDefault')}
                 >
                   <Plus class="w-4 h-4" />
                 </button>
@@ -592,7 +596,11 @@
       class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
     >
       <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
-      <span>{i18n.t('playlists.contextMenuAddToPlaylist')}</span>
+      <span>
+        {playlistsStore.activeCustomPlaylist
+          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: playlistsStore.activeCustomPlaylist.name })
+          : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
+      </span>
     </button>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button
