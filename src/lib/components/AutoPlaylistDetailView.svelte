@@ -409,7 +409,7 @@
             <button
               onclick={handleRefreshAutoPlaylist}
               disabled={loading || isRefreshing}
-              title="Refresh auto-playlist with a new selection of tracks from your library"
+              title={i18n.t('playlists.refreshAutoPlaylistTooltip')}
               class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
             >
               <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
@@ -422,15 +422,15 @@
               id="auto-play-toggle-{playlistId}"
               onclick={handleToggleAutoPlay}
               title={autoPlay
-                ? "Auto-Play ON — keeps appending next batch as you reach the end. Click to disable."
-                : "Auto-Play OFF — stops at end of current batch. Click to enable continuous playback."}
+                ? i18n.t('playlists.autoPlayTooltipOn')
+                : i18n.t('playlists.autoPlayTooltipOff')}
               class="flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-200 cursor-pointer select-none
                 {autoPlay
                   ? 'bg-brand-accent/15 border-brand-accent text-brand-accent shadow-[0_0_12px_2px] shadow-brand-accent/25 hover:bg-brand-accent/25'
                   : 'border-brand-border text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
             >
               <RefreshCw class="w-3.5 h-3.5 shrink-0 {autoPlay ? 'animate-spin [animation-duration:3s]' : ''}" />
-              <span class="whitespace-nowrap">Auto-Play</span>
+              <span class="whitespace-nowrap">{i18n.t('playlists.autoPlayLabel')}</span>
               <!-- Toggle pill -->
               <span class="relative inline-flex items-center w-8 h-4 rounded-full shrink-0 transition-colors duration-200 {autoPlay ? 'bg-brand-accent' : 'bg-brand-border'}">
                 <span class="absolute w-3 h-3 bg-white rounded-full shadow transition-transform duration-200 {autoPlay ? 'translate-x-4' : 'translate-x-0.5'}"></span>
@@ -606,7 +606,7 @@
     {#if autoPlay && (kind === "genre" || kind === "decade") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
       <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-secondary/80 flex items-center justify-center gap-2 select-none">
         <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
-        <span>All matching tracks from your library have been added to this auto-playlist.</span>
+        <span>{i18n.t('playlists.allMatchingTracksAdded')}</span>
       </div>
     {/if}
   </div>
