@@ -1,99 +1,94 @@
-# Walkthrough — Moodbar Visualizer & Moodmoji (#25)
+# Walkthrough — Functional Back/Forward Navigation (#67)
 
-Branch: `feature/25-moodbar-improvements` (worktree `.claude/worktrees/goal-feature-77-1883a5`)
+Branch: `feature/67-back-forward-navigation`
 
 ## What this delivers
 
-Issue #25 asked for a more useful moodbar (distinct, contrasting mood
-profiles per track) plus a "moodmoji" emoji hash next to the track. A
-gap-analysis comment on the issue found the moodbar component was fully
-built but **commented out of the UI**, and proposed re-introducing it as an
-alternate mode of the existing waveform seek bar rather than a separate
-strip. This lands both the original ask and that redesign:
+Issue #67 asked for the Back/Forward chevrons in `TopNavigation.svelte` to
+actually navigate, browser-style, instead of just moving a dead index
+counter. This wires them to a real navigation history stack:
 
-- **Contrast-boosted moodbar** — `generate_moodbar` now applies a per-track,
-  per-channel min-max histogram stretch across all 150 points instead of a
-  fixed `*150.0` scale, so quiet/uniform masters still use the full 0–255
-  color range instead of clustering near black.
-- **Toggle mode on the seek bar** — the moodbar is no longer a separate
-  strip. A small toggle button next to the scrubber switches
-  `WaveformSeekBar` between waveform and moodbar rendering, same geometry
-  and seek interaction. The choice persists via `app_state`
-  (`seekbar_mode`), same pattern as rating style/language.
-- **Downsampled, region-based rendering** — the raw 150 points are averaged
-  into ~40 wider contiguous blocks so the strip reads as color *regions*
-  rather than a 150-bar "barcode." Unplayed segments blend toward a
-  **grayscale** version of the theme's border color (not its raw hue) — the
-  album-art-adaptive theme derives border color from the current track's
-  cover art, and blending toward that raw color fought with the moodbar's
-  own bass/mid/treble color coding. Played segments show full mood color
-  with a thin accent-colored cap, keeping accent as the only
-  interactive-emphasis hue per DESIGN.md.
-- **Color legend tooltip** — hovering the moodbar explains the mapping:
-  red = bass, green = mids, blue = treble, brighter = more energy in that
-  band (issue asked for "tooltips clarifying what the colors indicate").
-- **Moodmoji** — a 2-emoji hash derived from the moodbar data, shown next
-  to the now-playing track title (not in dense list rows, per the
-  gap-analysis comment). First emoji = dominant frequency band
-  (🥁 bass / 🎸 mid / 🔔 treble), second = overall spectral energy
-  (❄️ calm / 🍃 balanced / 🔥 intense — deliberately not faces, since
-  spectral energy isn't emotional valence: a sad, dense track can score
-  "intense" just as easily as a happy one). It clears immediately on track
-  change instead of showing the previous track's moodmoji until the fetch
-  debounce fires.
-- **Show moodmoji setting** — General Settings gained a toggle (default on)
-  to hide the moodmoji, with a description of what it is. Settings rows
-  were restyled to a standard label+description-left, control-right
-  pattern (title/description stacked on the left, control vertically
-  centered on the right, thin dividers between rows), replacing the
-  original footnote-style hint text.
+- **History stack lives on `collectionStore`** (`collection.svelte.ts`),
+  since that's already the source of truth for "where the user is":
+  `activeTab`, `activeSubTab`, `playlistsSubTab`, `selectedArtistName`,
+  `selectedAlbumName`, `selectedPlaylistId`, `selectedAutoPlaylist`.
+- **Snapshots are recorded from the existing property setters**, not a new
+  `$effect` — every one of those fields already has a getter/setter (used
+  for `localStorage` persistence), so each setter now also calls
+  `scheduleRecordHistory()`. Every navigation call site in the app already
+  goes through these setters (`viewArtist`, `viewAlbum`, `viewPlaylist`,
+  `viewAutoPlaylist`, `Sidebar.svelte`'s tab clicks, the detail views' own
+  "back" links), so no other component needed to change.
+- **Multi-field navigations collapse into one history entry.** A single
+  action like `viewArtist()` writes several fields in sequence
+  (`activeTab`, `activeSubTab`, `selectedArtistName`, clears search). Each
+  setter call schedules a microtask-coalesced snapshot; since a synchronous
+  function body runs to completion before any microtask fires, all those
+  writes land in the *same* tick and produce exactly one history entry —
+  not one per field.
+- **Replaying history doesn't re-record itself.** `goBack()`/`goForward()`
+  set an `isNavigatingHistory` guard while writing the snapshot back onto
+  the store's setters, so applying a history entry doesn't push a new one.
+  A `JSON.stringify` equality check in `recordHistory()` is a second,
+  independent safety net against duplicate/stray entries.
+- **New navigation truncates stale forward history** — going back and then
+  navigating somewhere new drops the old "forward" branch, same as a web
+  browser.
+- **Capped at 50 entries** to avoid unbounded growth over a long session.
+- **Seeded on boot** — `init()` now calls `recordHistory()` once after
+  restoring the persisted `activeTab`/`activeSubTab`/etc. from
+  `localStorage`, so Back/Forward have a starting point immediately after
+  a relaunch instead of an empty stack.
+- **Playlist detail views reload their tracks on replay** — `selectedPlaylistId`
+  gates which view shows, but the actual track list comes from
+  `playlistsStore.activePlaylistId`/`activePlaylistTracks`. Replaying a
+  snapshot with a non-null `selectedPlaylistId` also calls
+  `playlistsStore.selectPlaylist(id)` so Back/Forward into a playlist shows
+  its real tracks, not stale ones.
 
 ## Files changed
 
-- [src-tauri/src/moodbar.rs](src-tauri/src/moodbar.rs) — per-track/per-channel
-  contrast stretch; minor clippy cleanup to the existing FFT loop.
-- [src/lib/components/WaveformSeekBar.svelte](src/lib/components/WaveformSeekBar.svelte) —
-  moodbar fetch/draw path, mode toggle wiring, downsampling, grayscale
-  theme-blend anchor, color legend tooltip.
-- [src/lib/components/PlayerBar.svelte](src/lib/components/PlayerBar.svelte) —
-  toggle button, moodmoji fetch/derive/display.
-- [src/lib/components/FoldersView.svelte](src/lib/components/FoldersView.svelte) —
-  General Settings toggle for moodmoji visibility; restyled rating-style and
-  language rows to match.
-- [src/lib/components/MoodBar.svelte](src/lib/components/MoodBar.svelte) —
-  deleted (superseded by the toggle mode).
-- [src/lib/utils/moodmoji.ts](src/lib/utils/moodmoji.ts) — new, the emoji
-  derivation.
-- [src/lib/stores/prefs.svelte.ts](src/lib/stores/prefs.svelte.ts) —
-  `seekBarMode` and `showMoodmoji` prefs, persisted via `set_app_setting`.
-- [src/lib/locales/en.ts](src/lib/locales/en.ts) /
-  [fr.ts](src/lib/locales/fr.ts) — new tooltip/settings strings.
-- [scripts/tauri-ipc-mock.ts](scripts/tauri-ipc-mock.ts) /
-  [take-screenshots.ts](scripts/take-screenshots.ts) /
-  [mock-config.example.json](scripts/mock-config.example.json) — mocked
-  `get_moodbar_data` and a `click-moodbar-toggle` screenshot action for the
-  docs-screenshot harness.
+- [src/lib/stores/collection.svelte.ts](src/lib/stores/collection.svelte.ts) —
+  `NavigationView` snapshot type, `history`/`historyIndex` state,
+  `canGoBack`/`canGoForward` getters, `goBack()`/`goForward()`, and the
+  `scheduleRecordHistory()` hook added to each navigation-relevant setter.
+- [src/lib/components/TopNavigation.svelte](src/lib/components/TopNavigation.svelte) —
+  removed the dead local `historyStack`/`historyIndex` state and the
+  "Would navigate to..." placeholder handlers; buttons now call
+  `collectionStore.goBack()` / `goForward()` and disable based on
+  `canGoBack` / `canGoForward`.
+- [src/lib/stores/collection.test.ts](src/lib/stores/collection.test.ts) —
+  two new tests: Back/Forward round-tripping through `viewArtist`/`viewAlbum`,
+  and forward-history truncation after navigating anew from a Back'd-into
+  state.
+
+## What's intentionally out of scope
+
+- The history *stack itself* isn't persisted across app restarts — only a
+  single seed entry from the already-persisted view. Issue #67 called this
+  optional ("at minimum... seed the stack with a single initial entry");
+  full stack persistence felt like scope creep for what's fundamentally a
+  same-session convenience feature.
+- `playlistsStore.activePlaylistId` (which playlist's tracks are loaded,
+  separate from `collectionStore.selectedPlaylistId` which gates the view)
+  isn't itself part of the history snapshot — it's re-derived by calling
+  `selectPlaylist()` on replay instead, so it can't drift from whichever
+  playlist `selectedPlaylistId` says should be showing.
 
 ## Testing / Verification
 
 - `bun run check` (svelte-check) — clean, no new errors.
-- `cargo check` / `cargo clippy -- -D warnings` — clean; fixed the two new
-  clippy lints introduced by this change plus one pre-existing lint in the
-  touched FFT loop.
-- `bun run test` — full suite (188 tests) passes, including `PlayerBar.test.ts`.
-- Visual verification was done live in `bun run tauri dev` — iterated
-  interactively on the emoji sets, downsampling, tooltip wording, settings
-  layout, and the theme-interference fix, with each change confirmed
-  against your running app.
-
-## What's intentionally out of scope
-
-- No real mood/valence classification (tempo, key/mode, onset density) —
-  moodmoji is explicitly a spectral-energy hash, not an emotion detector.
-- No change to the underlying `waveforms`/`moodbars` SQLite schema.
+- `bun run test` — full suite (219 tests) passes, including the 2 new
+  history tests in `collection.test.ts`.
+- Not visually verified in the running app — Luminous's `invoke()` calls
+  need real Tauri IPC, so per your stated preference I'm leaving live
+  verification to you in `bun run tauri dev` rather than using a browser
+  preview or the screenshot harness. Worth clicking through: Home →
+  Collection → an artist → an album → Playlists → a playlist, then Back
+  through each step and Forward back to the playlist, and confirm a
+  relaunch still has a working (if single-entry) history.
 
 ## Next steps for your approval
 
-You've already reviewed each piece live as it landed. Once you confirm
-you're happy with the whole thing together, I'll merge this branch, clean
-up the worktree, and comment on + close issue #25.
+Once you've clicked through Back/Forward in your dev server and you're
+happy with it, let me know and I'll merge this branch and close issue #67.
