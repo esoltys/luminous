@@ -533,6 +533,7 @@ pub fn run() {
             commands::playlist::export_playlist,
             commands::playlist::set_playlist_auto_play,
             commands::playlist::refill_auto_playlist,
+            commands::playlist::refresh_auto_playlist,
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,

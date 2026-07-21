@@ -412,6 +412,45 @@ impl PlaylistManager {
         Ok(new_songs)
     }
 
+    /// Force-regenerates a dynamic/auto playlist's tracks (e.g. when user clicks
+    /// the "Refresh" button in the auto-playlist header), replacing its contents
+    /// with a fresh selection of matching songs from the library.
+    pub fn refresh_auto_playlist(&mut self, playlist_id: i64) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let spec: String = conn.query_row(
+            "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
+            params![playlist_id],
+            |row| row.get(0),
+        )?;
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let songs = if let Some(decade) = spec.strip_prefix("decade:") {
+            scanner.get_songs_by_decade(decade, 50)?
+        } else {
+            let genre = spec.strip_prefix("genre:").unwrap_or(&spec);
+            scanner.get_songs_by_genre(genre, 50)?
+        };
+
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+            params![now, playlist_id],
+        )?;
+        conn.execute(
+            "DELETE FROM playlist_items WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Import & Export
     // -----------------------------------------------------------------------

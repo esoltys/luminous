@@ -11,7 +11,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw } from "lucide-svelte";
+  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -229,6 +229,22 @@
     await playlistsStore.setPlaylistAutoPlay(playlistId, !autoPlay);
   }
 
+  let isRefreshing = $state(false);
+
+  async function handleRefreshAutoPlaylist() {
+    if (playlistId === undefined || isRefreshing) return;
+    isRefreshing = true;
+    try {
+      await playlistsStore.refreshAutoPlaylist(playlistId);
+      const fetchedSongs = await fetchSongs(kind, genre, decade, playlistId);
+      songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+    } catch (err) {
+      console.error("Failed to refresh auto-playlist:", err);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
   function openTagEditor(songId: number) {
     editingSongId = songId;
   }
@@ -378,6 +394,18 @@
           >
             <FolderPlus class="w-4 h-4" />
           </button>
+
+          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+            <!-- Refresh button: force-regenerate playlist with fresh songs from library -->
+            <button
+              onclick={handleRefreshAutoPlaylist}
+              disabled={loading || isRefreshing}
+              title="Refresh auto-playlist with a new selection of tracks from your library"
+              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            >
+              <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
+            </button>
+          {/if}
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->

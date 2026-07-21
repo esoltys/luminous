@@ -283,3 +283,18 @@ pub async fn refill_auto_playlist(
 
     Ok(new_songs)
 }
+
+/// Force-regenerates an auto-playlist's tracks from the library (e.g. when
+/// the user clicks the "Refresh" button in the auto-playlist header).
+#[tauri::command]
+pub async fn refresh_auto_playlist(
+    playlist_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .refresh_auto_playlist(playlist_id)
+        .map_err(|e| e.to_string())
+}

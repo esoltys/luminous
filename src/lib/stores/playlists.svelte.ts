@@ -221,6 +221,17 @@ class PlaylistsStore {
     await invoke("set_playlist_auto_play", { playlistId, autoPlay });
     await this.refreshPlaylists();
   }
+
+  /**
+   * Force-refresh an auto-playlist with a fresh set of matching songs from the library.
+   */
+  async refreshAutoPlaylist(playlistId: number) {
+    await invoke("refresh_auto_playlist", { playlistId });
+    await this.refreshPlaylists();
+    if (this.activePlaylistId === playlistId) {
+      await this.selectPlaylist(playlistId);
+    }
+  }
 }
 
 export const playlistsStore = new PlaylistsStore();
