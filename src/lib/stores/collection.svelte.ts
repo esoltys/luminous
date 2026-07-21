@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
+import { playlistsStore } from "./playlists.svelte";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics";
 export type ActiveSubTab = "songs" | "albums" | "artists";
@@ -19,6 +20,19 @@ export interface AutoPlaylistRef {
   /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
   updated?: number;
 }
+
+/** A snapshot of "where the user is" for Back/Forward navigation history. */
+interface NavigationView {
+  activeTab: ActiveTab;
+  activeSubTab: ActiveSubTab;
+  playlistsSubTab: PlaylistsSubTab;
+  selectedArtistName: string | null;
+  selectedAlbumName: string | null;
+  selectedPlaylistId: number | null;
+  selectedAutoPlaylist: AutoPlaylistRef | null;
+}
+
+const MAX_HISTORY = 50;
 
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
@@ -50,6 +64,7 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("navigation_activeTab", val);
     }
+    this.scheduleRecordHistory();
   }
 
   get activeSubTab() { return this._activeSubTab; }
@@ -58,6 +73,7 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("navigation_activeSubTab", val);
     }
+    this.scheduleRecordHistory();
   }
 
   get playlistsSubTab() { return this._playlistsSubTab; }
@@ -66,6 +82,7 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("navigation_playlistsSubTab", val);
     }
+    this.scheduleRecordHistory();
   }
 
   private _selectedArtistName = $state<string | null>(null);
@@ -81,6 +98,7 @@ class CollectionStore {
       if (val !== null) localStorage.setItem("navigation_selectedPlaylistId", String(val));
       else localStorage.removeItem("navigation_selectedPlaylistId");
     }
+    this.scheduleRecordHistory();
   }
 
   /** Selected auto-playlist for the read-only Auto-Playlist Detail view. */
@@ -91,6 +109,7 @@ class CollectionStore {
       if (val) localStorage.setItem("navigation_selectedAutoPlaylist", JSON.stringify(val));
       else localStorage.removeItem("navigation_selectedAutoPlaylist");
     }
+    this.scheduleRecordHistory();
   }
 
   /** Selected artist for the Artist Detail view (rendered inside CollectionView). */
@@ -101,6 +120,7 @@ class CollectionStore {
       if (val) localStorage.setItem("navigation_selectedArtistName", val);
       else localStorage.removeItem("navigation_selectedArtistName");
     }
+    this.scheduleRecordHistory();
   }
 
   /** Selected album for the Album Detail view (rendered inside CollectionView). */
@@ -111,6 +131,79 @@ class CollectionStore {
       if (val) localStorage.setItem("navigation_selectedAlbumName", val);
       else localStorage.removeItem("navigation_selectedAlbumName");
     }
+    this.scheduleRecordHistory();
+  }
+
+  // Back/Forward navigation history. Snapshots are coalesced via a microtask
+  // so that a single user action touching several fields in sequence (e.g.
+  // viewArtist() setting activeTab/activeSubTab/selectedArtistName) records
+  // one history entry instead of one per field write.
+  private history = $state<NavigationView[]>([]);
+  private historyIndex = $state(-1);
+  private isNavigatingHistory = false;
+  private historyRecordScheduled = false;
+
+  get canGoBack(): boolean { return this.historyIndex > 0; }
+  get canGoForward(): boolean { return this.historyIndex < this.history.length - 1; }
+
+  private snapshotView(): NavigationView {
+    return {
+      activeTab: this._activeTab,
+      activeSubTab: this._activeSubTab,
+      playlistsSubTab: this._playlistsSubTab,
+      selectedArtistName: this._selectedArtistName,
+      selectedAlbumName: this._selectedAlbumName,
+      selectedPlaylistId: this._selectedPlaylistId,
+      selectedAutoPlaylist: this._selectedAutoPlaylist,
+    };
+  }
+
+  private scheduleRecordHistory() {
+    if (this.isNavigatingHistory || this.historyRecordScheduled) return;
+    this.historyRecordScheduled = true;
+    queueMicrotask(() => {
+      this.historyRecordScheduled = false;
+      this.recordHistory();
+    });
+  }
+
+  private recordHistory() {
+    const snap = this.snapshotView();
+    const current = this.historyIndex >= 0 ? this.history[this.historyIndex] : undefined;
+    if (current && JSON.stringify(current) === JSON.stringify(snap)) return;
+
+    const truncated = this.history.slice(0, this.historyIndex + 1);
+    truncated.push(snap);
+    if (truncated.length > MAX_HISTORY) truncated.shift();
+    this.history = truncated;
+    this.historyIndex = truncated.length - 1;
+  }
+
+  private applyHistorySnapshot(snap: NavigationView) {
+    this.isNavigatingHistory = true;
+    this.activeTab = snap.activeTab;
+    this.activeSubTab = snap.activeSubTab;
+    this.playlistsSubTab = snap.playlistsSubTab;
+    this.selectedArtistName = snap.selectedArtistName;
+    this.selectedAlbumName = snap.selectedAlbumName;
+    this.selectedPlaylistId = snap.selectedPlaylistId;
+    this.selectedAutoPlaylist = snap.selectedAutoPlaylist;
+    if (snap.selectedPlaylistId !== null) {
+      playlistsStore.selectPlaylist(snap.selectedPlaylistId);
+    }
+    this.isNavigatingHistory = false;
+  }
+
+  goBack() {
+    if (!this.canGoBack) return;
+    this.historyIndex--;
+    this.applyHistorySnapshot(this.history[this.historyIndex]);
+  }
+
+  goForward() {
+    if (!this.canGoForward) return;
+    this.historyIndex++;
+    this.applyHistorySnapshot(this.history[this.historyIndex]);
   }
 
   // Layout panel states
@@ -178,6 +271,10 @@ class CollectionStore {
           }
         }
       }
+
+      // Seed history with the restored (or default) view so Back/Forward
+      // have a starting point instead of an empty stack on boot.
+      this.recordHistory();
 
       await this.refreshDirectories();
       await this.refreshStats();

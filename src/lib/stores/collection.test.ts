@@ -211,6 +211,55 @@ describe("CollectionStore", () => {
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
   });
 
+  it("supports Back/Forward navigation through viewArtist/viewAlbum history", async () => {
+    // Flush the microtask-coalesced history record from any earlier test's navigation
+    // before establishing our own baseline entry (history is a shared singleton across tests).
+    await Promise.resolve();
+    collectionStore.selectedArtistName = null;
+    collectionStore.selectedAlbumName = null;
+    await Promise.resolve();
+
+    collectionStore.viewArtist("History Test Artist");
+    await Promise.resolve();
+
+    collectionStore.viewAlbum("History Test Album");
+    await Promise.resolve();
+
+    expect(collectionStore.selectedAlbumName).toBe("History Test Album");
+    expect(collectionStore.canGoBack).toBe(true);
+
+    collectionStore.goBack();
+    expect(collectionStore.selectedArtistName).toBe("History Test Artist");
+    expect(collectionStore.selectedAlbumName).toBeNull();
+    expect(collectionStore.canGoForward).toBe(true);
+
+    collectionStore.goForward();
+    expect(collectionStore.selectedAlbumName).toBe("History Test Album");
+    expect(collectionStore.canGoForward).toBe(false);
+  });
+
+  it("truncates forward history when navigating anew from a Back'd-into state", async () => {
+    await Promise.resolve();
+
+    collectionStore.viewArtist("Artist A");
+    await Promise.resolve();
+    collectionStore.viewArtist("Artist B");
+    await Promise.resolve();
+
+    collectionStore.goBack();
+    expect(collectionStore.selectedArtistName).toBe("Artist A");
+    expect(collectionStore.canGoForward).toBe(true);
+
+    collectionStore.viewArtist("Artist C");
+    await Promise.resolve();
+
+    expect(collectionStore.selectedArtistName).toBe("Artist C");
+    expect(collectionStore.canGoForward).toBe(false);
+
+    collectionStore.goBack();
+    expect(collectionStore.selectedArtistName).toBe("Artist A");
+  });
+
   it("toggles and persists layout states (sidebar, right panel, immersive mode)", () => {
     const initialSidebar = collectionStore.sidebarOpen;
     collectionStore.toggleSidebar();

@@ -16,10 +16,6 @@
     invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
   }
 
-  // Navigation history stack
-  let historyStack = $state<string[]>([]);
-  let historyIndex = $state(-1);
-
   // Handle Ctrl+L to focus search
   function handleKeyDown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key === "l") {
@@ -74,20 +70,6 @@
 
 
 
-  // Navigation history handlers
-  function goBack() {
-    if (historyIndex > 0) {
-      historyIndex--;
-      // Would navigate to historyStack[historyIndex]
-    }
-  }
-
-  function goForward() {
-    if (historyIndex < historyStack.length - 1) {
-      historyIndex++;
-      // Would navigate to historyStack[historyIndex]
-    }
-  }
 </script>
 
 <svelte:window on:keydown={handleKeyDown} />
@@ -96,16 +78,16 @@
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
-      onclick={goBack}
-      disabled={historyIndex <= 0}
+      onclick={() => collectionStore.goBack()}
+      disabled={!collectionStore.canGoBack}
       class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       title={i18n.t('topNav.goBack')}
     >
       <ChevronLeft class="w-5 h-5" />
     </button>
     <button
-      onclick={goForward}
-      disabled={historyIndex >= historyStack.length - 1}
+      onclick={() => collectionStore.goForward()}
+      disabled={!collectionStore.canGoForward}
       class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       title={i18n.t('topNav.goForward')}
     >
