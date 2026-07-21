@@ -6,16 +6,22 @@ use tauri::State;
 pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
     eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}");
 
-    // 1. Check database cache
+    // 1. Check database cache and instrumental flag
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let cached_lyrics: Option<String> = conn
+    let (cached_lyrics, is_instrumental): (Option<String>, bool) = conn
         .query_row(
-            "SELECT lyrics FROM songs WHERE id = ?1",
+            "SELECT lyrics, COALESCE(is_instrumental, 0) FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .ok()
-        .flatten();
+        .unwrap_or((None, false));
+
+    if is_instrumental {
+        eprintln!(
+            "[Luminous Backend] Track is marked instrumental. Skipping online lyrics search."
+        );
+        return Err("Song is marked as instrumental".to_string());
+    }
 
     if let Some(ref lyrics) = cached_lyrics {
         if !lyrics.trim().is_empty() {
@@ -132,6 +138,21 @@ pub async fn save_lyrics(
     conn.execute(
         "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
         rusqlite::params![lyrics, song_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_instrumental(
+    state: State<'_, AppState>,
+    song_id: i64,
+    is_instrumental: bool,
+) -> Result<(), String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE songs SET is_instrumental = ?1 WHERE id = ?2",
+        rusqlite::params![is_instrumental, song_id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())

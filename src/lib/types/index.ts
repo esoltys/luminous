@@ -135,6 +135,8 @@ export interface Song {
 
   /** True when the file is missing from disk (soft-deleted). Playlist items retain metadata. */
   unavailable: boolean;
+  /** True when track is marked instrumental (online lyrics fetch bypassed). */
+  is_instrumental?: boolean;
 }
 
 export type PlaylistItemType = "song" | "stream" | "streaming_service";

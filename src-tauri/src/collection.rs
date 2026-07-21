@@ -1087,7 +1087,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
     replaygain_track_gain, replaygain_album_gain,
-    is_vbr
+    is_vbr, is_instrumental
 ";
 
 /// Song columns qualified with the `s` alias, plus a correlated `album_track_count`
@@ -1107,7 +1107,7 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr,
+    s.is_vbr, s.is_instrumental,
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
     ) AS album_track_count";
@@ -1180,6 +1180,7 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         replaygain_track_gain: row.get(52)?,
         replaygain_album_gain: row.get(53)?,
         is_vbr: row.get(54)?,
+        is_instrumental: row.get::<_, Option<bool>>(55)?.unwrap_or(false),
         ..Default::default()
     })
 }
