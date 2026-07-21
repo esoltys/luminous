@@ -201,6 +201,9 @@ async function main() {
         window.localStorage.setItem("sort_album_field", "year");
         window.localStorage.setItem("sort_album_asc", "false");
       }
+      if ("${subTab}" === "auto" || "${subTab}" === "custom") {
+        window.localStorage.setItem("navigation_playlistsSubTab", "${subTab}");
+      }
     `);
 
     await page.goto("http://localhost:1420");
@@ -314,7 +317,10 @@ async function main() {
       await page.waitForTimeout(400);
     },
     "click-playlist": async (page) => {
-      await page.locator(".playlists-scroll-container li button").first().click();
+      await page.evaluate(() => {
+        const card = document.querySelector(".grid > div, .playlists-scroll-container li button");
+        if (card) (card as HTMLElement).click();
+      });
       await page.waitForTimeout(400);
     }
   };

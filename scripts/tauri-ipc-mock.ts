@@ -328,6 +328,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_playlists_by_artist: () => [],
     get_playlists: () => library.playlists,
+    sync_genre_auto_playlists: () => null,
+    get_favourite_songs: () => library.songs.slice(0, 5),
+    get_recently_added_songs: () => library.songs.slice(0, 5),
+    get_songs_by_genre: (args) => library.songs.filter((s) => s.genre === args.genre),
 
     get_playlist_tracks: (args) => {
       const playlistId = args.playlistId as number;
