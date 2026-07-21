@@ -31,12 +31,15 @@ class PlaylistsStore {
   }
 
   async ensureQueuePlaylist(): Promise<Playlist | null> {
-    let queuePl = this.playlists.find((p) => !p.dynamic_enabled && p.name.toLowerCase() === "queue");
+    if (!Array.isArray(this.playlists)) return null;
+    let queuePl = this.playlists.find((p) => p && !p.dynamic_enabled && p.name && p.name.toLowerCase() === "queue");
     if (!queuePl) {
       try {
         const created: Playlist = await invoke("create_playlist", { name: "Queue" });
         await this.refreshPlaylists();
-        queuePl = this.playlists.find((p) => p.id === created.id) || created;
+        if (Array.isArray(this.playlists)) {
+          queuePl = this.playlists.find((p) => p && p.id === created?.id) || created;
+        }
       } catch (err) {
         console.error("Failed to auto-create Queue playlist:", err);
       }
