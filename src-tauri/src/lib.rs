@@ -341,6 +341,10 @@ pub fn run() {
                                         "[Luminous Backend] ERROR from audio engine: {}",
                                         message
                                     );
+                                    let mut p = player.lock().await;
+                                    let _ = p.next_track().await;
+                                    let state = p.get_state().await;
+                                    let _ = app.emit("playback-state", state);
                                 }
                                 _ => {}
                             }

@@ -131,7 +131,15 @@
       editText = cleanEditText;
     } catch (e: any) {
       console.error("[LyricsView] Failed to load lyrics:", e);
-      errorMsg = e.toString();
+      const errStr = e.toString();
+      if (errStr.toLowerCase().includes("instrumental")) {
+        if (playerStore.currentSong && playerStore.currentSong.id === songId) {
+          playerStore.currentSong.is_instrumental = true;
+        }
+        errorMsg = "";
+      } else {
+        errorMsg = errStr;
+      }
       lyricsText = "";
       editText = "";
     } finally {

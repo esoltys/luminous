@@ -581,7 +581,8 @@ impl PlaylistManager {
                          s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
                          s.lastplayed, s.lastseen, s.art_embedded,
                          s.art_automatic, s.art_manual, s.art_unset,
-                         s.unavailable
+                         s.unavailable, s.replaygain_track_gain,
+                         s.replaygain_album_gain, s.is_vbr, s.is_instrumental
                   FROM playlist_items pi
                   LEFT JOIN songs s ON s.id = pi.song_id
                   WHERE pi.playlist_id = ?1
@@ -643,6 +644,10 @@ impl PlaylistManager {
                         art_manual: row.get(55)?,
                         art_unset: row.get(56)?,
                         unavailable: row.get::<_, Option<bool>>(57)?.unwrap_or(false),
+                        replaygain_track_gain: row.get(58)?,
+                        replaygain_album_gain: row.get(59)?,
+                        is_vbr: row.get(60)?,
+                        is_instrumental: row.get::<_, Option<bool>>(61)?.unwrap_or(false),
                         ..Default::default()
                     })
                 } else if let Some(ref meta_json) = additional_meta_str {

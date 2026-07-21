@@ -155,5 +155,8 @@ pub async fn set_instrumental(
         rusqlite::params![is_instrumental, song_id],
     )
     .map_err(|e| e.to_string())?;
+
+    let mut player = state.player.lock().await;
+    player.update_song_instrumental(song_id, is_instrumental);
     Ok(())
 }

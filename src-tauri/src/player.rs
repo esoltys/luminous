@@ -553,6 +553,28 @@ impl Player {
         }
     }
 
+    pub fn update_song_instrumental(&mut self, song_id: i64, is_instrumental: bool) {
+        if let Some(ref mut song) = self.current_song {
+            if song.id == song_id {
+                song.is_instrumental = is_instrumental;
+            }
+        }
+        for item in &mut self.playlist_items {
+            if let Some(ref mut song) = item.song {
+                if song.id == song_id {
+                    song.is_instrumental = is_instrumental;
+                }
+            }
+        }
+        for item in &mut self.queue {
+            if let Some(ref mut song) = item.song {
+                if song.id == song_id {
+                    song.is_instrumental = is_instrumental;
+                }
+            }
+        }
+    }
+
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
         self.persist_position(pos);
