@@ -114,10 +114,30 @@
     return "";
   });
 
-  let genreLabel = $derived.by(() => {
-    if (songs.length > 0 && songs[0].genre) return songs[0].genre;
-    return i18n.t('albumDetail.unknownGenre');
+  let rawGenre = $derived.by(() => (songs.length > 0 ? songs[0].genre : undefined));
+
+  let genreLabel = $derived(rawGenre || i18n.t('albumDetail.unknownGenre'));
+
+  // The materialized genre auto-playlist row backing this genre, if it's been
+  // generated yet (see PlaylistsCollectionView's identical genre/decade split).
+  let genrePlaylist = $derived.by(() => {
+    if (!rawGenre) return null;
+    return (
+      playlistsStore.playlists.find(
+        (p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:") && p.dynamic_spec === rawGenre
+      ) ?? null
+    );
   });
+
+  function openGenrePlaylist() {
+    if (!rawGenre) return;
+    collectionStore.viewAutoPlaylist({
+      kind: "genre",
+      genre: rawGenre,
+      playlistId: genrePlaylist?.id,
+      updated: genrePlaylist?.updated,
+    });
+  }
 
   let yearLabel = $derived.by(() => {
     if (albumItem?.year) return albumItem.year;
@@ -329,7 +349,17 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary/85 mt-1 font-medium">
-          <span>{genreLabel}</span>
+          {#if rawGenre}
+            <button
+              onclick={openGenrePlaylist}
+              class="hover:underline hover:text-brand-accent-text transition-colors cursor-pointer"
+              title={i18n.t('albumDetail.goToGenrePlaylistTooltip', { genre: rawGenre })}
+            >
+              {genreLabel}
+            </button>
+          {:else}
+            <span>{genreLabel}</span>
+          {/if}
           <span>•</span>
           {#if yearLabel}
             <span>{yearLabel}</span>

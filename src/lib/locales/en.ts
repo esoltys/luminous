@@ -486,7 +486,8 @@ export const en = {
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {year} · {duration}",
     addAllToPlaylistTooltip: "Add all songs to active playlist",
-    editInfoTooltip: "Edit album info"
+    editInfoTooltip: "Edit album info",
+    goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."

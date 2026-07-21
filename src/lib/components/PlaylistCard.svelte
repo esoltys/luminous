@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play } from "lucide-svelte";
+  import { ListMusic, Play, Calendar, Music } from "lucide-svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
@@ -27,6 +27,12 @@
 
   let topAlbums = $derived(songsToCoverStack(tracks.filter((t) => !!t.song).map((t) => t.song!)));
 
+  // Mirrors PlaylistsCollectionView's genre/decade detection so genre and decade
+  // auto-playlists keep their identifying background color outside the Auto-Playlists tab too.
+  let autoKind = $derived<"genre" | "decade" | null>(
+    !playlist.dynamic_enabled ? null : playlist.dynamic_spec?.startsWith("decade:") ? "decade" : "genre"
+  );
+
   let updatedLabel = $derived(new Date(playlist.updated * 1000).toLocaleDateString());
 
   function handlePlayButtonClick(e: MouseEvent) {
@@ -46,8 +52,20 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
-    {#if topAlbums.length > 0}
+    {#if topAlbums.length > 0 && autoKind}
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
+      </div>
+    {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-36 h-36" />
+    {:else if autoKind}
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+        {#if autoKind === "decade"}
+          <Calendar class="w-10 h-10 text-white/90" />
+        {:else}
+          <Music class="w-10 h-10 text-white/90" />
+        {/if}
+      </div>
     {:else}
       <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/80" />

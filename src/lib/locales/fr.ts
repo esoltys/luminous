@@ -486,7 +486,8 @@ export const fr = {
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
     addAllToPlaylistTooltip: "Ajouter toutes les chansons à la playlist active",
-    editInfoTooltip: "Modifier les infos de l'album"
+    editInfoTooltip: "Modifier les infos de l'album",
+    goToGenrePlaylistTooltip: "Aller à la playlist automatique {genre}"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."

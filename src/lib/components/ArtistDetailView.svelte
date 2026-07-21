@@ -135,9 +135,21 @@
     collectionStore.viewAlbum(album.album || "");
   }
 
-  function openPlaylist(id: number) {
-    playlistsStore.selectPlaylist(id);
-    collectionStore.viewPlaylist(id);
+  // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so genre/decade
+  // auto-playlists open in AutoPlaylistDetailView (Auto-Play toggle, etc.) here too,
+  // instead of always falling through to the custom-playlist detail view.
+  function openPlaylist(playlist: Playlist) {
+    if (playlist.dynamic_enabled) {
+      const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
+      collectionStore.viewAutoPlaylist(
+        isDecade
+          ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^genre:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+      );
+      return;
+    }
+    playlistsStore.selectPlaylist(playlist.id);
+    collectionStore.viewPlaylist(playlist.id);
   }
 
   async function handlePlayAll() {
@@ -253,7 +265,7 @@
     <div class="px-8 pt-10" class:pb-24={!!playerStore.currentSong}>
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
-          <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist.id)} />
+          <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist)} />
         {/each}
       </HorizontalScrollRow>
     </div>
