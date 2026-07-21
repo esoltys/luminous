@@ -79,6 +79,7 @@ export class PlayerStore {
   }
 
   private updateState(state: PlaybackState) {
+    if (!state) return;
     this.state = state.state;
     this.currentSong = state.current_song;
     this.playlistId = state.playlist_id;
@@ -115,6 +116,11 @@ export class PlayerStore {
       if (newSongs.length > 0) {
         const songIds = newSongs.map((s) => s.id);
         await invoke("append_songs_to_player_playlist", { songIds });
+        const { playlistsStore } = await import("./playlists.svelte");
+        if (playlistsStore.activePlaylistId === pid) {
+          await playlistsStore.selectPlaylist(pid);
+        }
+        await playlistsStore.refreshPlaylists();
       }
     } catch (err) {
       console.error("[PlayerStore] Auto-Play refill failed:", err);

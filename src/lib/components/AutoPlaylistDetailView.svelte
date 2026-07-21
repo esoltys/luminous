@@ -407,7 +407,9 @@
       <!-- Right: Cover Stack -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         {#if topCovers.length > 0}
-          <CoverStack covers={topCovers} sizeClass="w-40 h-40" />
+          <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg relative shadow-2xl">
+            <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
+          </div>
         {:else}
           <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl bg-gradient-to-br {getArtistGradient(displayName)} flex items-center justify-center">
             <ListMusic class="w-16 h-16 text-white/80" />

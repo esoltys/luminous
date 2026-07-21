@@ -85,7 +85,7 @@
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
       <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg relative">
-        <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-36 h-36" />
+        <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
       <div class="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
