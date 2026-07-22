@@ -16,9 +16,32 @@
     const activeRules = ruleList.filter((r) => r.value.trim() !== "");
     if (activeRules.length === 0) return "Smart Playlist";
 
+    // Detect a decade range: year >= X and year <= Y where Y - X === 9
+    const yearGte = activeRules.find((r) => r.field === "year" && (r.op === ">=" || r.op === ">"));
+    const yearLte = activeRules.find((r) => r.field === "year" && (r.op === "<=" || r.op === "<"));
+    let decadeToken: string | null = null;
+    const decadeRuleIds = new Set<string>();
+
+    if (yearGte && yearLte) {
+      const lo = parseInt(yearGte.value.trim(), 10);
+      const hi = parseInt(yearLte.value.trim(), 10);
+      // Adjust for strict operators
+      const loAdj = yearGte.op === ">" ? lo + 1 : lo;
+      const hiAdj = yearLte.op === "<" ? hi - 1 : hi;
+      if (!isNaN(loAdj) && !isNaN(hiAdj) && hiAdj - loAdj === 9 && loAdj % 10 === 0) {
+        decadeToken = `${loAdj}s`;
+        // Mark both rules as consumed
+        (yearGte as any).__decadeConsumed = true;
+        (yearLte as any).__decadeConsumed = true;
+      }
+    }
+
     const parts: string[] = [];
 
+    if (decadeToken) parts.push(decadeToken);
+
     for (const r of activeRules) {
+      if ((r as any).__decadeConsumed) continue;
       const val = r.value.trim().replace(/^["']|["']$/g, "");
       if (!val) continue;
 
@@ -48,14 +71,29 @@
       }
     }
 
+    // Clean up the mutation (rules are passed by ref so we need to tidy up)
+    if (yearGte) delete (yearGte as any).__decadeConsumed;
+    if (yearLte) delete (yearLte as any).__decadeConsumed;
+
     if (parts.length === 0) return "Smart Playlist";
+
+    // Single-token shortcuts
     if (parts.length === 1) {
       const single = parts[0];
-      const firstField = activeRules[0].field;
+      const onlyNonDecadeRule = activeRules.find((r) => r.field !== "year");
+      const firstField = onlyNonDecadeRule?.field ?? activeRules[0].field;
+      if (decadeToken && parts[0] === decadeToken) return `${decadeToken} Mix`;
       if (firstField === "genre") return `${single} Mix`;
       if (firstField === "artist") return `${single} Selection`;
       if (firstField === "rating") return `${single} Songs`;
       return `${single} Playlist`;
+    }
+
+    // Re-order: decade first, then genre, then rest for natural-sounding names
+    // e.g. "1980s Rock Mix" instead of "Rock · 1980s Mix"
+    if (decadeToken) {
+      const withoutDecade = parts.filter((p) => p !== decadeToken);
+      return `${decadeToken} ${withoutDecade.join(" · ")} Mix`;
     }
 
     return `${parts.join(" · ")} Mix`;
