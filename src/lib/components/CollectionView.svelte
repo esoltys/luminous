@@ -408,36 +408,36 @@
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
           <div class="grid items-center py-3 px-4" style={gridColsStyle}>
             <div class="text-center w-9"></div>
-            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
-              <span class="truncate">{i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}</span>
+            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
-              <span class="truncate">{i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}</span>
+            <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
-              <span class="truncate">{i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}</span>
+            <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
-              <span class="truncate">{i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}</span>
+            <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
             {#if collectionStore.visibleColumns.format}
-              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
-                <span class="truncate">Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
+              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate max-w-[calc(100%-0.5rem)]">Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.year}
-              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
-                <span class="truncate">Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
+              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate max-w-[calc(100%-0.5rem)]">Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.genre}
-              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
-                <span class="truncate">Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
+              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate max-w-[calc(100%-0.5rem)]">Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
-              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
-                <span class="truncate">Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
+              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate max-w-[calc(100%-0.5rem)]">Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.rating}
