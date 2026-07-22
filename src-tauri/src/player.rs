@@ -1220,4 +1220,59 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+
+    #[tokio::test]
+    async fn test_previous_track_walks_back_through_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // Start on the last track (index 2, song id 3).
+        player.play_playlist(items, 2, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+        assert_eq!(player.current_index, Some(2));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "previous should move to the prior track, not replay the current one"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+        assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
