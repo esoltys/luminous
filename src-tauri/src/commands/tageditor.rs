@@ -164,3 +164,95 @@ pub async fn save_song_tags(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn save_album_tags(
+    state: State<'_, AppState>,
+    song_ids: Vec<i64>,
+    album: String,
+    album_artist: String,
+    genre: String,
+    year: Option<u32>,
+) -> Result<u32, String> {
+    if song_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+
+    struct SongMetadata {
+        path: String,
+        title: String,
+        artist: String,
+        composer: String,
+        track: Option<u32>,
+        disc: Option<u32>,
+    }
+
+    let mut songs_data = Vec::with_capacity(song_ids.len());
+    for &song_id in &song_ids {
+        let res = conn.query_row(
+            "SELECT path, title, artist, composer, track, disc FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| {
+                Ok(SongMetadata {
+                    path: row.get(0)?,
+                    title: row.get(1).unwrap_or_default(),
+                    artist: row.get(2).unwrap_or_default(),
+                    composer: row.get(3).unwrap_or_default(),
+                    track: row.get(4).ok(),
+                    disc: row.get(5).ok(),
+                })
+            },
+        );
+        if let Ok(meta) = res {
+            songs_data.push(meta);
+        }
+    }
+
+    let album_c = album.clone();
+    let album_artist_c = album_artist.clone();
+    let genre_c = genre.clone();
+
+    let updated_count = tauri::async_runtime::spawn_blocking(move || {
+        let mut count = 0u32;
+        for item in songs_data {
+            let path = std::path::PathBuf::from(&item.path);
+            let write_res = crate::tageditor::write_tags(
+                &path,
+                &item.title,
+                &item.artist,
+                &album_c,
+                &album_artist_c,
+                &item.composer,
+                &genre_c,
+                item.track,
+                item.disc,
+                year,
+            );
+            if write_res.is_ok() {
+                count += 1;
+            }
+        }
+        count
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for &song_id in &song_ids {
+        tx.execute(
+            "UPDATE songs SET
+                album = ?1,
+                album_artist = ?2,
+                genre = ?3,
+                year = ?4
+             WHERE id = ?5",
+            rusqlite::params![album, album_artist, genre, year, song_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(updated_count)
+}

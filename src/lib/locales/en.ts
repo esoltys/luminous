@@ -451,6 +451,19 @@ export const en = {
     acoustidApiKeyError: "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.",
     saveFailedPrefix: "Failed to save tags: "
   },
+  albumTagEditor: {
+    title: "Edit Album Tags",
+    albumField: "Album Title",
+    albumArtistField: "Album Artist",
+    genreField: "Genre",
+    yearField: "Release Year",
+    tracksAffected: "Applies to {count} tracks",
+    cancelBtn: "Cancel",
+    saveBtn: "Save Tags",
+    saving: "Saving album tags...",
+    saveSuccess: "Updated album tags for {count} tracks",
+    saveFailedPrefix: "Failed to save album tags: "
+  },
   equalizer: {
     title: "10-Band Graphic Equalizer",
     resetBtn: "Reset Flat",

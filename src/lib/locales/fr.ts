@@ -451,6 +451,19 @@ export const fr = {
     acoustidApiKeyError: "La clé API AcoustID est invalide ou a expiré. Veuillez obtenir une clé API client gratuite sur https://acoustid.org/ et exécuter Luminous avec la variable d'environnement « ACOUSTID_API_KEY » définie.",
     saveFailedPrefix: "Échec de l'enregistrement des tags : "
   },
+  albumTagEditor: {
+    title: "Modifier les tags de l'album",
+    albumField: "Titre de l'album",
+    albumArtistField: "Artiste de l'album",
+    genreField: "Genre",
+    yearField: "Année de sortie",
+    tracksAffected: "S'applique à {count} pistes",
+    cancelBtn: "Annuler",
+    saveBtn: "Enregistrer",
+    saving: "Enregistrement des tags de l'album...",
+    saveSuccess: "Tags d'album mis à jour pour {count} pistes",
+    saveFailedPrefix: "Échec de l'enregistrement des tags d'album : "
+  },
   equalizer: {
     title: "Égaliseur graphique à 10 bandes",
     resetBtn: "Réinitialiser",

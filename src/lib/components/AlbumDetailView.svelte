@@ -8,6 +8,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
@@ -18,6 +19,7 @@
   let songs = $state<Song[]>([]);
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
+  let showAlbumTagEditor = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
   let selectedSongIds = $state<Set<number>>(new Set());
@@ -276,7 +278,7 @@
 
   function openAlbumTagEditor() {
     if (songs.length === 0) return;
-    openTagEditor(songs[0].id);
+    showAlbumTagEditor = true;
   }
 
   function handleTagEditorSaved() {
@@ -544,6 +546,18 @@
   <TagEditor
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if showAlbumTagEditor && songs.length > 0}
+  <AlbumTagEditor
+    songIds={songs.map((s) => s.id)}
+    initialAlbum={songs[0].album}
+    initialAlbumArtist={songs[0].album_artist || songs[0].artist}
+    initialGenre={songs[0].genre}
+    initialYear={songs[0].year}
+    onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />
 {/if}

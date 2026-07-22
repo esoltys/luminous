@@ -13,6 +13,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
+if (typeof Element !== "undefined" && !Element.prototype.animate) {
+  Element.prototype.animate = vi.fn().mockReturnValue({
+    finished: Promise.resolve(),
+    cancel: () => {},
+  }) as any;
+}
+
 describe("PlayerBar.svelte", () => {
   const mockSong: Song = {
     id: 42,
