@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Play, Plus, User, Disc, Edit3 } from "lucide-svelte";
+  import { Play, Plus, User, Disc, Edit3, Folder } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -17,6 +17,7 @@
     onGoToArtist,
     onGoToAlbum,
     onEditTags,
+    onOrganizeFiles,
     onClose,
   }: {
     x: number;
@@ -28,6 +29,7 @@
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
+    onOrganizeFiles?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -42,10 +44,7 @@
 
   let adjustedY = $derived.by(() => {
     if (typeof window === "undefined") return y;
-    const menuHeight = 220;
-    // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top
-    // of page content whenever a song is loaded — clamp above it so the
-    // menu's lower items aren't hidden underneath it.
+    const menuHeight = 250;
     const dockClearance = playerStore.currentSong ? 96 : 0;
     return Math.min(y, window.innerHeight - menuHeight - dockClearance - 10);
   });
@@ -140,17 +139,29 @@
         <span>{i18n.t("playlists.contextMenuGoAlbum")}</span>
       </button>
     {/if}
+  {/if}
 
-    {#if onEditTags}
-      <div class="my-1 border-t border-brand-border/40"></div>
-      <button
-        onclick={() => { onEditTags?.(); onClose(); }}
-        class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 hover:bg-brand-sidebar/80 hover:text-brand-text-primary transition-colors cursor-pointer"
-        role="menuitem"
-      >
-        <Edit3 class="w-3.5 h-3.5 text-brand-text-secondary shrink-0" />
-        <span>{i18n.t("collection.editTagsTooltip")}</span>
-      </button>
-    {/if}
+  <div class="my-1 border-t border-brand-border/40"></div>
+
+  {#if onOrganizeFiles}
+    <button
+      onclick={() => { onOrganizeFiles?.(); onClose(); }}
+      class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 hover:bg-brand-sidebar/80 hover:text-brand-text-primary transition-colors cursor-pointer"
+      role="menuitem"
+    >
+      <Folder class="w-3.5 h-3.5 text-brand-text-secondary shrink-0" />
+      <span>{i18n.t("organizer.title")}</span>
+    </button>
+  {/if}
+
+  {#if selectedCount === 1 && onEditTags}
+    <button
+      onclick={() => { onEditTags?.(); onClose(); }}
+      class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 hover:bg-brand-sidebar/80 hover:text-brand-text-primary transition-colors cursor-pointer"
+      role="menuitem"
+    >
+      <Edit3 class="w-3.5 h-3.5 text-brand-text-secondary shrink-0" />
+      <span>{i18n.t("collection.editTagsTooltip")}</span>
+    </button>
   {/if}
 </div>

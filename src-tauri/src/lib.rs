@@ -22,6 +22,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod moodbar;
+pub mod organizer;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
@@ -49,6 +50,7 @@ pub struct AppState {
     pub playlists: Arc<Mutex<PlaylistManager>>,
     pub cover_manager: Arc<CoverManager>,
     pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
+    pub watcher_paused: Arc<std::sync::atomic::AtomicBool>,
     pub startup_file: Mutex<Option<String>>,
     /// OS "Now Playing" integration handle (#80) — `None` when the platform
     /// integration failed to initialize (unsupported desktop, no session
@@ -417,6 +419,8 @@ pub fn run() {
                 );
             }
 
+            let watcher_paused = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
             let state = AppState {
                 db,
                 audio,
@@ -425,6 +429,7 @@ pub fn run() {
                 playlists,
                 cover_manager,
                 watcher,
+                watcher_paused,
                 startup_file: Mutex::new(startup_path),
                 media_session,
             };
@@ -619,6 +624,9 @@ pub fn run() {
             commands::settings::set_fade_settings,
             // Stats commands
             commands::stats::set_song_rating,
+            // Organizer commands
+            commands::organizer::preview_organize,
+            commands::organizer::apply_organize,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

@@ -759,7 +759,13 @@ impl CollectionScanner {
                 let album_disc_count: i64 = row.get(57)?;
                 let context_type: String = row.get(58)?;
                 let playlist_id: Option<i64> = row.get(59)?;
-                Ok((song, album_track_count, album_disc_count, context_type, playlist_id))
+                Ok((
+                    song,
+                    album_track_count,
+                    album_disc_count,
+                    context_type,
+                    playlist_id,
+                ))
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -885,7 +891,10 @@ impl CollectionScanner {
     }
 }
 
-fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64, i64)>, limit: usize) -> Vec<HomeItem> {
+fn group_songs_into_home_items(
+    songs_with_counts: Vec<(Song, i64, i64)>,
+    limit: usize,
+) -> Vec<HomeItem> {
     use std::collections::HashSet;
     let mut items = Vec::new();
     let mut seen_albums = HashSet::new();
@@ -1520,10 +1529,15 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
 
     // Spawn the background thread to handle watcher events
     let db_for_thread = Arc::clone(&db);
+    let watcher_paused = Arc::clone(&state.watcher_paused);
     std::thread::Builder::new()
         .name("luminous-watcher".to_string())
         .spawn(move || {
             for event in rx {
+                if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
+                    continue;
+                }
+
                 // Check if real-time folder watching is disabled in app settings
                 let realtime_enabled = if let Ok(conn) = db_for_thread.pool.get() {
                     conn.query_row(

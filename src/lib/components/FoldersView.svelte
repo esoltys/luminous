@@ -10,9 +10,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
   import DesignTools from "./DesignTools.svelte";
+  import OrganizeFiles from "./OrganizeFiles.svelte";
 
   let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats" | "about">("general");
   let appVersion = $state("");
+  let showOrganizeModal = $state(false);
 
   async function openExternalUrl(url: string) {
     try {
@@ -426,10 +428,27 @@
             {i18n.t('settings.pruneMissingBtn')}
           </button>
 
+          <button
+            onclick={() => { showOrganizeModal = true; }}
+            disabled={collectionStore.isScanning}
+            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            title={i18n.t('organizer.subtitle')}
+          >
+            <Folder class="w-4 h-4 text-brand-accent-text" />
+            {i18n.t('organizer.organizeEntireLibrary')}
+          </button>
+
           {#if pruneMsg}
             <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
           {/if}
         </div>
+
+        <OrganizeFiles
+          isOpen={showOrganizeModal}
+          songIds={[]}
+          initialScope="library"
+          onClose={() => { showOrganizeModal = false; }}
+        />
 
         <!-- Configuration Toggles -->
         <div class="pt-3 border-t border-brand-border/50 space-y-4">
