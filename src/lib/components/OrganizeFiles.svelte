@@ -51,13 +51,13 @@
     const regex = /(%[a-z]+)|([/\\])|([{}])/gi;
     return escaped.replace(regex, (match, pVar, pSep, pBracket) => {
       if (pVar) {
-        return `<span class="text-cyan-300 font-semibold bg-cyan-500/20 px-1 py-0.5 rounded border border-cyan-500/40">${pVar}</span>`;
+        return `<span class="text-cyan-300 font-bold bg-cyan-500/25">${pVar}</span>`;
       }
       if (pSep) {
-        return `<span class="text-amber-400 font-bold px-1 py-0.5 bg-amber-500/20 rounded border border-amber-500/40">${pSep}</span>`;
+        return `<span class="text-amber-400 font-bold bg-amber-500/30">${pSep}</span>`;
       }
       if (pBracket) {
-        return `<span class="text-purple-300 font-bold px-1 py-0.5 bg-purple-500/20 rounded border border-purple-500/40">${pBracket}</span>`;
+        return `<span class="text-purple-300 font-bold bg-purple-500/30">${pBracket}</span>`;
       }
       return match;
     });
@@ -307,14 +307,14 @@
 
           <!-- Highlighted input box -->
           <div class="relative w-full rounded-xl bg-brand-sidebar/90 border border-brand-border/90 focus-within:border-brand-accent transition-colors font-mono text-xs overflow-hidden min-h-[40px] flex items-center shadow-inner">
-            <div class="absolute inset-0 px-3.5 py-2.5 text-brand-text-primary whitespace-pre overflow-hidden flex items-center pointer-events-none font-mono text-xs select-none z-0">
+            <div class="absolute inset-0 px-3.5 py-2.5 text-brand-text-primary whitespace-pre overflow-hidden flex items-center pointer-events-none font-mono text-xs leading-normal tracking-normal select-none z-0">
               {@html highlightTemplateHtml(template)}
             </div>
             <input
               id="template-input"
               type="text"
               bind:value={template}
-              class="relative w-full px-3.5 py-2.5 bg-transparent text-transparent caret-brand-accent font-mono text-xs focus:outline-none z-10"
+              class="relative w-full px-3.5 py-2.5 bg-transparent text-transparent caret-brand-accent font-mono text-xs leading-normal tracking-normal focus:outline-none z-10"
               spellcheck="false"
             />
           </div>
