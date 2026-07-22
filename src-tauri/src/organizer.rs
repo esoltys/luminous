@@ -177,16 +177,26 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         .map(|d| d.to_string())
         .unwrap_or_else(|| "1".to_string());
 
-    let track_str = match song.track {
+    let track_2digit = match song.track {
         Some(t) if t > 0 => format!("{:02}", t),
         _ => "00".to_string(),
+    };
+    let track_unpadded = match song.track {
+        Some(t) if t > 0 => t.to_string(),
+        _ => "0".to_string(),
+    };
+    let track_3digit = match song.track {
+        Some(t) if t > 0 => format!("{:03}", t),
+        _ => "000".to_string(),
     };
 
     expanded = expanded.replace("%albumartist", album_artist_str);
     expanded = expanded.replace("%artist", artist_str);
     expanded = expanded.replace("%album", album_str);
     expanded = expanded.replace("%disc", &disc_str);
-    expanded = expanded.replace("%track", &track_str);
+    expanded = expanded.replace("%track3", &track_3digit);
+    expanded = expanded.replace("%rawtrack", &track_unpadded);
+    expanded = expanded.replace("%track", &track_2digit);
     expanded = expanded.replace("%title", title_str);
     expanded = expanded.replace("%year", &year_str);
     expanded = expanded.replace("%genre", genre_str);
