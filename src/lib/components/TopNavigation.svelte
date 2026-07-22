@@ -1,7 +1,8 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight, Search, FolderOpen, RefreshCw, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { collectionStore } from "../stores/collection.svelte";
+  import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -14,6 +15,79 @@
   let searchInput: HTMLInputElement | undefined;
   let searchContainerRef: HTMLDivElement | undefined;
   let isSearchFocused = $state(false);
+
+  let matchingPlaylists = $derived.by(() => {
+    const query = collectionStore.searchQuery.trim().toLowerCase();
+    if (!query) return [];
+
+    const results: Array<
+      | { type: "auto"; id: string; label: string; subtitle: string; ref: AutoPlaylistRef }
+      | { type: "custom"; id: number; label: string; subtitle: string }
+    > = [];
+
+    // Favourites auto-playlist
+    const favLabel = i18n.t("playlists.autoFavourites", {}, "Favourites");
+    if (favLabel.toLowerCase().includes(query) || "favourites".includes(query) || "favorites".includes(query)) {
+      results.push({
+        type: "auto",
+        id: "auto:favourites",
+        label: favLabel,
+        subtitle: i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist"),
+        ref: { kind: "favourites" }
+      });
+    }
+
+    // Recently Added auto-playlist
+    const recLabel = i18n.t("playlists.autoRecentlyAdded", {}, "Recently Added");
+    if (recLabel.toLowerCase().includes(query) || "recently added".includes(query) || "recent".includes(query)) {
+      results.push({
+        type: "auto",
+        id: "auto:recently_added",
+        label: recLabel,
+        subtitle: i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist"),
+        ref: { kind: "recently_added" }
+      });
+    }
+
+    // Materialized playlists (genre, decade, custom)
+    for (const p of playlistsStore.playlists) {
+      if (!p || !p.name) continue;
+      const nameLower = p.name.toLowerCase();
+      const specLower = (p.dynamic_spec || "").toLowerCase();
+      if (nameLower.includes(query) || specLower.includes(query)) {
+        if (p.dynamic_enabled) {
+          if (p.dynamic_spec?.startsWith("decade:")) {
+            const decade = p.dynamic_spec.replace(/^decade:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:decade:${p.id}`,
+              label: p.name,
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Decade`,
+              ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
+            });
+          } else {
+            const genre = (p.dynamic_spec || "").replace(/^genre:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:genre:${p.id}`,
+              label: p.name,
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Genre`,
+              ref: { kind: "genre", genre, playlistId: p.id, updated: p.updated }
+            });
+          }
+        } else {
+          results.push({
+            type: "custom",
+            id: p.id,
+            label: p.name,
+            subtitle: i18n.t("playlists.playlistLabel", {}, "Playlist")
+          });
+        }
+      }
+    }
+
+    return results;
+  });
 
   function navigateToFoldersSettings() {
     collectionStore.activeTab = "settings";
@@ -243,7 +317,7 @@
               {/if}
             </div>
 
-            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && collectionStore.searchResults.length === 0 && !collectionStore.searchLoading}
+            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && matchingPlaylists.length === 0 && collectionStore.searchResults.length === 0 && !collectionStore.searchLoading}
               <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
                 {i18n.t('topNav.noSuggestions', {}, 'No matching suggestions')}
               </div>
@@ -320,6 +394,57 @@
                         </span>
                         <span class="text-xs text-brand-text-secondary/70 truncate">
                           {i18n.t('collection.albumLabel', {}, 'Album')} • {album.artist || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+
+                <!-- Matching Playlists & Auto-playlists (Top 3) -->
+                {#each matchingPlaylists.slice(0, 3) as item (item.id)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => {
+                      if (item.type === 'auto') {
+                        collectionStore.viewAutoPlaylist(item.ref);
+                        collectionStore.addRecentSearch({
+                          kind: "playlist",
+                          title: item.label,
+                          subtitle: item.subtitle,
+                          query: item.label
+                        });
+                      } else {
+                        collectionStore.viewPlaylist(item.id);
+                        collectionStore.addRecentSearch({
+                          kind: "playlist",
+                          title: item.label,
+                          subtitle: item.subtitle,
+                          query: item.label,
+                          entityId: item.id
+                        });
+                      }
+                      isSearchFocused = false;
+                    }}
+                    onkeydown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (item.type === 'auto') collectionStore.viewAutoPlaylist(item.ref);
+                        else collectionStore.viewPlaylist(item.id);
+                        isSearchFocused = false;
+                      }
+                    }}
+                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                  >
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                        <ListMusic class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                      <div class="flex flex-col min-w-0 flex-1">
+                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
+                          {item.label}
+                        </span>
+                        <span class="text-xs text-brand-text-secondary/70 truncate">
+                          {item.subtitle}
                         </span>
                       </div>
                     </div>
