@@ -246,7 +246,11 @@ impl PlaylistManager {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_genre(genre, 50)?;
+            let songs = scanner.get_songs_by_genre(genre, 25)?;
+            // Skip genres with fewer than 25 songs — not enough to form a meaningful playlist.
+            if songs.len() < 25 {
+                continue;
+            }
 
             let playlist_id = match existing_row {
                 Some((id, _)) => {
@@ -325,7 +329,11 @@ impl PlaylistManager {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_decade(decade, 50)?;
+            let songs = scanner.get_songs_by_decade(decade, 25)?;
+            // Skip decades with fewer than 25 songs — not enough to form a meaningful playlist.
+            if songs.len() < 25 {
+                continue;
+            }
 
             let playlist_id = match existing_row {
                 Some((id, _)) => {
@@ -1434,16 +1442,25 @@ mod tests {
 
         {
             let conn = db_arc.pool.get().unwrap();
+
+            // Insert 1 song in the 80s — below the 25-song threshold, should be skipped.
             conn.execute(
                 "INSERT INTO songs (title, year, source, unavailable) VALUES ('Track 80s', 1982, 1, 0)",
                 [],
             )
             .unwrap();
-            conn.execute(
-                "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 90s', 1999, 1, 0)",
-                [],
-            )
-            .unwrap();
+
+            // Insert 25 songs in the 90s — meets the threshold, should create a playlist.
+            for i in 0..25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 90s {}', 1995, 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
         }
 
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
@@ -1460,15 +1477,19 @@ mod tests {
                         .starts_with("decade:")
             })
             .collect();
-        assert_eq!(decade_playlists.len(), 2);
 
-        let pl_80s = decade_playlists.iter().find(|p| p.name == "1980s").unwrap();
-        let tracks = manager.get_playlist_tracks(pl_80s.id).unwrap();
-        assert_eq!(tracks.len(), 1);
-        assert_eq!(
-            tracks[0].song.as_ref().unwrap().title.as_deref(),
-            Some("Track 80s")
+        // 80s had only 1 song — below minimum, so no playlist created.
+        assert!(
+            !decade_playlists.iter().any(|p| p.name == "1980s"),
+            "expected 80s playlist to be skipped (< 25 songs)"
         );
+
+        // 90s had 25 songs — should have a playlist.
+        assert_eq!(decade_playlists.len(), 1);
+        assert_eq!(decade_playlists[0].name, "1990s");
+
+        let tracks = manager.get_playlist_tracks(decade_playlists[0].id).unwrap();
+        assert_eq!(tracks.len(), 25);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

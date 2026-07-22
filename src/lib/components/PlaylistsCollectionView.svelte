@@ -39,10 +39,22 @@
     await playlistsStore.refreshAutoPlaylistCounts();
   });
 
-  let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("genre:")));
+  // System genre auto-playlists are stored with a raw genre name as dynamic_spec (e.g. "Rock", "Jazz").
+  // Smart playlists built via the Smart Playlist builder use a "genre:" prefix (e.g. "genre:jazz rating:>=4").
+  let genreAutoPlaylists = $derived(
+    playlistsStore.playlists.filter(
+      (p) =>
+        p.dynamic_enabled &&
+        !p.dynamic_spec?.startsWith("decade:") &&
+        !p.dynamic_spec?.startsWith("genre:")
+    )
+  );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let customPlaylists = $derived.by(() => {
-    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || (!p.dynamic_spec?.startsWith("decade:") && !p.dynamic_spec?.startsWith("genre:")));
+    // Include non-dynamic playlists + user-created Smart playlists (dynamic_spec with "genre:" prefix or other field rules)
+    const list = playlistsStore.playlists.filter(
+      (p) => !p.dynamic_enabled || p.dynamic_spec?.startsWith("genre:") || (!p.dynamic_spec?.startsWith("decade:") && p.dynamic_spec?.includes(":"))
+    );
     const queue = list.find((p) => p.name.toLowerCase() === "queue");
     const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
     return queue ? [queue, ...rest] : rest;
