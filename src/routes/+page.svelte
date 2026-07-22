@@ -111,6 +111,7 @@
       });
     }
   });
+  import SmartPlaylistBuilderModal from "../lib/components/SmartPlaylistBuilderModal.svelte";
 </script>
 
 <div class="flex flex-col h-full overflow-hidden bg-brand-main font-sans">
@@ -129,3 +130,10 @@
     {/if}
   </div>
 </div>
+
+{#if collectionStore.isSmartBuilderOpen}
+  <SmartPlaylistBuilderModal
+    initialRules={collectionStore.smartBuilderRules}
+    onClose={() => collectionStore.closeSmartBuilder()}
+  />
+{/if}

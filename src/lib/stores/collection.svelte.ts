@@ -105,9 +105,11 @@ class CollectionStore {
   isSmartBuilderOpen = $state<boolean>(false);
   smartBuilderRules = $state<Array<{ field: string; op: string; value: string }>>([]);
 
-  openSmartBuilder(initialRules?: Array<{ field: string; op: string; value: string }>) {
-    this.smartBuilderRules = initialRules || [];
+  openSmartBuilder(rules?: Array<{ field: string; op: string; value: string }>) {
+    this.smartBuilderRules = rules || [];
     this.isSmartBuilderOpen = true;
+    this.activeTab = "playlists";
+    this.playlistsSubTab = "custom";
   }
 
   closeSmartBuilder() {

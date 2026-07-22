@@ -352,10 +352,3 @@
     </div>
   </div>
 {/if}
-
-{#if collectionStore.isSmartBuilderOpen}
-  <SmartPlaylistBuilderModal
-    initialRules={collectionStore.smartBuilderRules}
-    onClose={() => collectionStore.closeSmartBuilder()}
-  />
-{/if}
