@@ -26,10 +26,23 @@ class PlaylistsStore {
     return genreCount + (this.favouritesCount > 0 ? 1 : 0) + (this.recentlyAddedCount > 0 ? 1 : 0);
   }
 
+  /** The special pinned Queue playlist, always present and never deletable. */
+  private get queuePlaylist(): Playlist | null {
+    return (
+      this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
+    );
+  }
+
+  /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
+   * falling back to the Queue playlist when nothing has been pinned yet. */
+  get effectivePinnedPlaylistId(): number | null {
+    return this.pinnedPlaylistId ?? this.queuePlaylist?.id ?? null;
+  }
+
   /** The pinned/"Active" playlist ONLY if it is a custom playlist (not an auto/dynamic playlist). */
   get activeCustomPlaylist(): Playlist | null {
-    if (this.pinnedPlaylistId === null) return null;
-    const pl = this.playlists.find((p) => p.id === this.pinnedPlaylistId);
+    if (this.effectivePinnedPlaylistId === null) return null;
+    const pl = this.playlists.find((p) => p.id === this.effectivePinnedPlaylistId);
     return pl && !pl.dynamic_enabled ? pl : null;
   }
 

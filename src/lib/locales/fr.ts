@@ -336,7 +336,7 @@ export const fr = {
     autoPlaylistInfoTitle: "Comment fonctionnent les listes de lecture automatiques ?",
     autoPlaylistInfoText: "Les listes automatiques sont générées depuis votre bibliothèque et actualisées quotidiennement avec jusqu'à 25 titres. Les listes par genre regroupent les chansons selon leur étiquette de genre ; les listes par décennie selon l'année de sortie. Une liste n'est créée que si un genre ou une décennie compte au moins 25 chansons correspondantes. Cliquez sur une liste pour parcourir ses titres, ou sur Actualiser pour obtenir une nouvelle sélection.",
     activePlaylistInfoTitle: "Que signifie « Active » ?",
-    activePlaylistInfoText: "Une seule liste personnalisée peut être marquée Active à la fois — c'est la cible rapide pour « Ajouter à la liste active » dans toute l'application. Ouvrir une liste pour la parcourir ne change jamais laquelle est Active ; cliquez sur « Définir comme active » sur une liste pour le faire.",
+    activePlaylistInfoText: "Une seule liste personnalisée peut être marquée Active à la fois — c'est la cible rapide pour « Ajouter à la liste active » dans toute l'application. La file d'attente est Active par défaut jusqu'à ce que vous en choisissiez une autre. Ouvrir une liste pour la parcourir ne change jamais laquelle est Active ; cliquez sur « Définir comme active » sur une liste pour le faire.",
     editSmartPlaylistBtn: "Modifier les règles",
   },
   lyrics: {

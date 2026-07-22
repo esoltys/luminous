@@ -12,6 +12,7 @@
   import { Play, Shuffle } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
   import { getArtistAlbums } from "../utils/artist";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
 
   let { artistName }: { artistName: string } = $props();
@@ -137,14 +138,16 @@
 
   // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so genre/decade
   // auto-playlists open in AutoPlaylistDetailView (Auto-Play toggle, etc.) here too,
-  // instead of always falling through to the custom-playlist detail view.
+  // instead of always falling through to the custom-playlist detail view. Smart
+  // Playlists are also dynamic_enabled but are user-authored rule playlists, not
+  // system auto-playlists, so they must go through the normal viewPlaylist path.
   function openPlaylist(playlist: Playlist) {
-    if (playlist.dynamic_enabled) {
+    if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
       collectionStore.viewAutoPlaylist(
         isDecade
           ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
-          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^genre:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          : { kind: "genre", genre: playlist.dynamic_spec ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
       );
       return;
     }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ChevronLeft, ChevronRight, Search, FolderOpen, RefreshCw, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
-  import { parseSearchRules, hasAdvancedSearchTerms } from "../utils/filterParser";
+  import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -56,7 +56,7 @@
       const nameLower = p.name.toLowerCase();
       const specLower = (p.dynamic_spec || "").toLowerCase();
       if (nameLower.includes(query) || specLower.includes(query)) {
-        if (p.dynamic_enabled) {
+        if (p.dynamic_enabled && !isSmartPlaylistSpec(p.dynamic_spec)) {
           if (p.dynamic_spec?.startsWith("decade:")) {
             const decade = p.dynamic_spec.replace(/^decade:/, "");
             results.push({
@@ -67,7 +67,7 @@
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
             });
           } else {
-            const genre = (p.dynamic_spec || "").replace(/^genre:/, "");
+            const genre = p.dynamic_spec || p.name;
             results.push({
               type: "auto",
               id: `auto:genre:${p.id}`,

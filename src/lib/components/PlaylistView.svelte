@@ -138,7 +138,7 @@
   );
 
   let isActive = $derived(
-    activePlaylist !== undefined && playlistsStore.pinnedPlaylistId === activePlaylist.id
+    activePlaylist !== undefined && playlistsStore.effectivePinnedPlaylistId === activePlaylist.id
   );
 
   let isQueue = $derived(

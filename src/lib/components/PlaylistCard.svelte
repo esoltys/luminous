@@ -50,7 +50,7 @@
   });
 
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
-  let isActive = $derived(playlistsStore.pinnedPlaylistId === playlist.id);
+  let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);
 
   let updatedLabel = $derived(formatRelativeDate(playlist.updated));
 

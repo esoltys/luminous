@@ -8,20 +8,22 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import { Play } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
 
   let { item }: { item: HomeItem } = $props();
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
-  // in AutoPlaylistDetailView, custom playlists open in the regular PlaylistView.
+  // in AutoPlaylistDetailView, custom playlists (including Smart Playlists,
+  // which are also dynamic_enabled) open in the regular PlaylistView.
   function openPlaylist() {
     if (item.type !== "playlist") return;
     const playlist = item.playlist;
-    if (playlist.dynamic_enabled) {
+    if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
       collectionStore.viewAutoPlaylist(
         isDecade
           ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
-          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^genre:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          : { kind: "genre", genre: playlist.dynamic_spec ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
       );
       return;
     }

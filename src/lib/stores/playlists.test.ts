@@ -199,6 +199,20 @@ describe("PlaylistsStore", () => {
     expect(playlistsStore.activeCustomPlaylist).toBeNull();
   });
 
+  it("falls back to the Queue playlist as the default Active playlist when nothing is pinned", async () => {
+    playlistsStore.playlists = [
+      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false },
+      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+    expect(playlistsStore.effectivePinnedPlaylistId).toBe(101);
+    expect(playlistsStore.activeCustomPlaylist?.name).toBe("Queue");
+
+    await playlistsStore.pinPlaylist(102);
+    expect(playlistsStore.effectivePinnedPlaylistId).toBe(102);
+    expect(playlistsStore.activeCustomPlaylist?.name).toBe("Favorites");
+  });
+
   it("does not change pinnedPlaylistId merely from selectPlaylist (viewing)", async () => {
     playlistsStore.playlists = [
       { id: 101, name: "Favorites", track_count: 3, created: 1700000000, updated: 1700000000, dynamic_enabled: false },
