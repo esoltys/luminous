@@ -49,8 +49,8 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    const regex = /(%[a-z]+)|([/\\])|([{}])/gi;
-    return escaped.replace(regex, (match, pVar, pSep, pBracket) => {
+    const regex = /(%[a-z]+)|([/\\])|([{}])|(\s)/gi;
+    return escaped.replace(regex, (match, pVar, pSep, pBracket, pSpace) => {
       if (pVar) {
         return `<span class="text-cyan-300 font-bold bg-cyan-500/25">${pVar}</span>`;
       }
@@ -59,6 +59,9 @@
       }
       if (pBracket) {
         return `<span class="text-purple-300 font-bold bg-purple-500/30">${pBracket}</span>`;
+      }
+      if (pSpace) {
+        return `<span class="bg-white/10 rounded-xs" title="Space">&nbsp;</span>`;
       }
       return match;
     });
