@@ -115,7 +115,7 @@
     {playlist.name}
   </button>
   {#if subtitleLabel}
-    <div class="text-xs text-brand-text-secondary/60 truncate w-full mt-0.5 font-medium">
+    <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
       {subtitleLabel}
     </div>
   {/if}

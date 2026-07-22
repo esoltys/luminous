@@ -167,6 +167,10 @@
         bind:this={searchInput}
         bind:value={collectionStore.searchQuery}
         onfocus={() => { isSearchFocused = true; }}
+        oninput={(e) => {
+          isSearchFocused = true;
+          collectionStore.search((e.target as HTMLInputElement).value);
+        }}
         type="text"
         placeholder={i18n.t('topNav.searchPlaceholder')}
         class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
@@ -217,11 +221,154 @@
       {/if}
     </form>
 
-    <!-- Recent Searches Dropdown -->
+    <!-- Search Dropdown Popover -->
     {#if isSearchFocused}
       <div
         class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar/95 backdrop-blur-md rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
       >
+        <!-- Auto-suggestions (Shown when typing a non-empty search query) -->
+        {#if collectionStore.searchQuery.trim() !== ""}
+          <div class="mb-3">
+            <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none">
+              <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+                {i18n.t('topNav.searchSuggestions', {}, 'Suggestions')}
+              </span>
+              {#if collectionStore.searchLoading}
+                <span class="text-[10px] text-brand-accent-text font-mono">
+                  {i18n.t('topNav.searching', {}, 'Searching...')}
+                </span>
+              {/if}
+            </div>
+
+            {#if collectionStore.filteredArtists.length === 0 && collectionStore.filteredAlbums.length === 0 && collectionStore.searchResults.length === 0 && !collectionStore.searchLoading}
+              <div class="p-3 text-center text-xs text-brand-text-secondary/60 select-none">
+                {i18n.t('topNav.noSuggestions', {}, 'No matching suggestions')}
+              </div>
+            {:else}
+              <div class="flex flex-col gap-1">
+                <!-- Matching Artists (Top 3) -->
+                {#each collectionStore.filteredArtists.slice(0, 3) as artist (artist.name)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => {
+                      if (artist.name) {
+                        collectionStore.viewArtist(artist.name);
+                        collectionStore.addRecentSearch({
+                          kind: "artist",
+                          title: artist.name,
+                          subtitle: i18n.t('artistDetail.artistLabel', {}, 'Artist'),
+                          query: artist.name
+                        });
+                        isSearchFocused = false;
+                      }
+                    }}
+                    onkeydown={(e) => e.key === 'Enter' && artist.name && collectionStore.viewArtist(artist.name)}
+                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                  >
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                      <div class="flex flex-col min-w-0 flex-1">
+                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
+                          {artist.name}
+                        </span>
+                        <span class="text-xs text-brand-text-secondary/70 truncate">
+                          {i18n.t('artistDetail.artistLabel', {}, 'Artist')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+
+                <!-- Matching Albums (Top 3) -->
+                {#each collectionStore.filteredAlbums.slice(0, 3) as album (album.album)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => {
+                      if (album.album) {
+                        collectionStore.viewAlbum(album.album);
+                        collectionStore.addRecentSearch({
+                          kind: "album",
+                          title: album.album,
+                          subtitle: `${i18n.t('collection.albumLabel', {}, 'Album')} • ${album.artist || 'Unknown'}`,
+                          query: album.album,
+                          artUrl: album.art_manual || album.art_automatic
+                        });
+                        isSearchFocused = false;
+                      }
+                    }}
+                    onkeydown={(e) => e.key === 'Enter' && album.album && collectionStore.viewAlbum(album.album)}
+                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                  >
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                        {#if album.art_manual || album.art_automatic}
+                          <img src={getCoverArtUrl(album.art_manual || album.art_automatic)} alt="" class="w-full h-full object-cover" />
+                        {:else}
+                          <Disc class="w-4 h-4 text-brand-text-secondary" />
+                        {/if}
+                      </div>
+                      <div class="flex flex-col min-w-0 flex-1">
+                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
+                          {album.album}
+                        </span>
+                        <span class="text-xs text-brand-text-secondary/70 truncate">
+                          {i18n.t('collection.albumLabel', {}, 'Album')} • {album.artist || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+
+                <!-- Matching Songs (Top 3) -->
+                {#each collectionStore.searchResults.slice(0, 3) as song (song.id)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    onclick={() => {
+                      const songTitle = song.title || "Unknown";
+                      collectionStore.searchQuery = songTitle;
+                      collectionStore.search(songTitle);
+                      collectionStore.addRecentSearch({
+                        kind: "song",
+                        title: songTitle,
+                        subtitle: `${i18n.t('collection.songLabel', {}, 'Song')} • ${song.artist || 'Unknown'}`,
+                        query: songTitle,
+                        artUrl: song.art_manual || song.art_automatic
+                      });
+                      isSearchFocused = false;
+                    }}
+                    onkeydown={(e) => e.key === 'Enter' && collectionStore.search(song.title || "")}
+                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                  >
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                        {#if song.art_manual || song.art_automatic}
+                          <img src={getCoverArtUrl(song.art_manual || song.art_automatic)} alt="" class="w-full h-full object-cover" />
+                        {:else}
+                          <Music class="w-4 h-4 text-brand-text-secondary" />
+                        {/if}
+                      </div>
+                      <div class="flex flex-col min-w-0 flex-1">
+                        <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
+                          {song.title || 'Unknown'}
+                        </span>
+                        <span class="text-xs text-brand-text-secondary/70 truncate">
+                          {i18n.t('collection.songLabel', {}, 'Song')} • {song.artist || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- Recent Searches Section (Below Auto-suggestions) -->
         <div class="flex items-center justify-between px-2 py-1 mb-2 border-b border-brand-border/40 select-none">
           <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
             {i18n.t('topNav.recentSearches', {}, 'Recent searches')}

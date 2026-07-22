@@ -30,6 +30,8 @@ export const en = {
     recentSearches: "Recent searches",
     clearRecentSearches: "Clear recent searches",
     noRecentSearches: "No recent searches",
+    searchSuggestions: "Suggestions",
+    noSuggestions: "No matching suggestions",
     toggleSidebar: "Toggle Menu Sidebar",
     toggleImmersive: "Toggle Immersive Album Art Screen",
     toggleRightPanel: "Toggle Detail Panel",

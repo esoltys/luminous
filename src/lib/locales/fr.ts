@@ -30,6 +30,8 @@ export const fr = {
     recentSearches: "Recherches récentes",
     clearRecentSearches: "Effacer les recherches récentes",
     noRecentSearches: "Aucune recherche récente",
+    searchSuggestions: "Suggestions",
+    noSuggestions: "Aucune suggestion correspondante",
     toggleSidebar: "Basculer le menu latéral",
     toggleImmersive: "Basculer l'écran de pochette immersif",
     toggleRightPanel: "Basculer le panneau de détails",

@@ -157,7 +157,7 @@
   >
     {label}
   </button>
-  <div class="text-xs text-brand-text-secondary/60 truncate w-full mt-0.5 font-medium">
+  <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
     {subtitleLabel}
   </div>
   <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
