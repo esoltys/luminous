@@ -4,8 +4,8 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.75.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
-[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-88%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
+[![Release](https://img.shields.io/badge/Release-0.90.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-91%25-green?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 [![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](ROADMAP.md)
 
 Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. Made in Canada 🍁 and available in both English and French.
@@ -97,16 +97,21 @@ You can download the latest installers and portable binaries directly from the G
 ## Product Highlights
 
 *   **Personalized Home Hub**: A tailored dashboard with Recently Played, Most Played, and Recently Added rows, plus cover art carousels for browsing.
-*   **Instant Search and Navigation**: Find any track, album, or artist instantly with split-second, database-level search.
+*   **Instant Search & Auto-Suggestions**: Find any track, album, artist, or playlist instantly with database-level search, live auto-suggestions (#100), and recent search history.
+*   **Native OS Media Integration**: Full integration with OS system media transport controls (Windows SMTC, Linux MPRIS2, macOS Now Playing) for lock screen controls, system media keys, and live track metadata (#101).
+*   **Smart Playlist Builder & Advanced Filtering**: Create dynamic rule-based playlists with live track matching, decade range auto-naming (*1980s Rock Mix*), and target field search filters (`artist:`, `album:`, `year:`, `rating:`, etc.) (#13).
+*   **Customizable Library Columns**: Reorder and toggle table columns including dedicated audio format and channel indicators (#13).
+*   **Seamless History Navigation**: Dedicated back and forward navigation supporting top-bar controls, keyboard shortcuts, and mouse side buttons (#67).
+*   **Context-Aware Play History**: Track playback retains originating context (album or playlist) under Recently Played and Most Frequently Played views (#99).
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
 *   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
 *   **Gapless Playback**: Tracks flow into one another with no silence or clicks — ideal for live albums, concept records, and DJ mixes.
 *   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
 *   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
 *   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view.
-*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, and import/export M3U, M3U8, PLS, and XSPF files.
+*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, Auto-Refill toggle (#26), and import/export M3U, M3U8, PLS, and XSPF files.
 *   **Decades & Smart Auto-Playlists**: Automatic playlist categorization by decade (60s through 2020s) with custom category color badges.
-*   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with local caching and plain-text fallback.
+*   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with instrumental track flags (#12), local caching, and plain-text fallback.
 *   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, then write tags back to your files.
 *   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with multi-layered stack previews and duplicate cleanup.
 *   **Dynamic Theme Engine**: Curated color themes, or design your own live with the Custom Theme Builder.
