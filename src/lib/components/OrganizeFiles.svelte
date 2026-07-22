@@ -481,15 +481,6 @@
           <label class="flex items-center gap-2 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer">
             <input
               type="checkbox"
-              bind:checked={cleanEmptyDirs}
-              class="w-3.5 h-3.5 rounded border-brand-border accent-brand-accent cursor-pointer"
-            />
-            <span>{i18n.t("organizer.cleanEmptyDirs")}</span>
-          </label>
-
-          <label class="flex items-center gap-2 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer">
-            <input
-              type="checkbox"
               bind:checked={moveExtraFiles}
               class="w-3.5 h-3.5 rounded border-brand-border accent-brand-accent cursor-pointer"
             />
