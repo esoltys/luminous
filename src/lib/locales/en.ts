@@ -607,6 +607,8 @@ export const en = {
     summaryErrors: "{count} errors",
     summaryMissingTags: "{count} missing tags",
     onlyChanging: "Only show changing files",
+    commonBasePath: "Common Base Path:",
+    cancel: "Cancel",
     applyButton: "Apply Changes",
     applySuccess: "Successfully reorganized {count} file(s)",
     organizeFilesTooltip: "Organize files by tag template",

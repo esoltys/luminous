@@ -29,7 +29,7 @@
     onSuccess?: () => void;
   } = $props();
 
-  const DEFAULT_TEMPLATE = "%albumartist/%album/%disc-%track %title";
+  const DEFAULT_TEMPLATE = "%albumartist/%album/{%disc-}%track %title";
   const VARIABLE_CHIPS = [
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
@@ -579,7 +579,7 @@
               <!-- Common Base Path Bar -->
               {#if commonPrefix}
                 <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
-                  <span class="font-semibold text-brand-accent-text shrink-0">Common Base Path:</span>
+                  <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
                   <span class="truncate text-brand-text-primary">{commonPrefix}</span>
                 </div>
               {/if}
@@ -714,7 +714,7 @@
             onclick={onClose}
             class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
           >
-            Cancel
+            {i18n.t("organizer.cancel")}
           </button>
 
           <button
