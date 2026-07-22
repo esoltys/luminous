@@ -296,7 +296,7 @@ export const en = {
     autoPlayTooltipOn: "Auto-Play ON — keeps appending next batch as you reach the end. Click to disable.",
     autoPlayTooltipOff: "Auto-Play OFF — stops at end of current batch. Click to enable continuous playback.",
     autoPlayBadgeTooltip: "Auto-Play enabled — keeps appending next batch",
-    genreAutoPlaylist: "Genre Auto-Playlist",
+    genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Decade",
     favouritesAutoPlaylist: "Auto-Playlist",
     recentlyAddedAutoPlaylist: "Auto-Playlist",

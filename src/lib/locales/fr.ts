@@ -296,7 +296,7 @@ export const fr = {
     autoPlayTooltipOn: "Lecture automatique ACTIVÉE — ajoute automatiquement le lot suivant vers la fin. Cliquer pour désactiver.",
     autoPlayTooltipOff: "Lecture automatique DÉSACTIVÉE — s'arrête à la fin du lot actuel. Cliquer pour activer la lecture continue.",
     autoPlayBadgeTooltip: "Lecture auto activée — continue à ajouter le lot suivant",
-    genreAutoPlaylist: "Liste auto par genre",
+    genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Décennie",
     favouritesAutoPlaylist: "Liste auto",
     recentlyAddedAutoPlaylist: "Liste auto",
