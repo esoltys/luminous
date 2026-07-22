@@ -40,13 +40,13 @@
 </script>
 
 {#if item.type === "album"}
-  <AlbumCard album={item.album} widthClass="w-48 shrink-0" />
+  <AlbumCard album={item.album} widthClass="w-48 shrink-0 snap-start" />
 {:else if item.type === "playlist"}
-  <PlaylistCard playlist={item.playlist} widthClass="w-48 shrink-0" onClick={openPlaylist} />
+  <PlaylistCard playlist={item.playlist} widthClass="w-48 shrink-0 snap-start" onClick={openPlaylist} />
 {:else}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="flex-shrink-0 w-48 group relative">
+  <div class="flex-shrink-0 w-48 group relative snap-start">
     <!-- Card Container -->
     <div class="relative overflow-hidden rounded-xl bg-brand-sidebar border border-brand-border/60 transition-all duration-200 hover:border-brand-accent/40 flex flex-col h-full">
       <!-- Cover Art -->
