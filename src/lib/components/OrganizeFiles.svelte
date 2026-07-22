@@ -62,11 +62,20 @@
 
   let activeSongIds = $derived(scope === "library" ? [] : songIds);
 
-  let collisionCount = $derived(items.filter((i) => i.status === "collision").length);
-  let errorCount = $derived(items.filter((i) => i.status === "error").length);
-  let missingTagCount = $derived(items.filter((i) => i.status === "missing_tag").length);
-  let readyCount = $derived(items.filter((i) => i.status === "ok" || i.status === "missing_tag").length);
-  let unchangedCount = $derived(items.filter((i) => i.status === "unchanged").length);
+  function getItemStatus(item: OrganizePreviewItem): "ok" | "unchanged" | "collision" | "missing_tag" | "error" {
+    const s = String(item?.status || "").toLowerCase();
+    if (s === "ok") return "ok";
+    if (s === "unchanged") return "unchanged";
+    if (s === "collision") return "collision";
+    if (s === "missing_tag" || s === "missingtag") return "missing_tag";
+    return "error";
+  }
+
+  let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "collision").length);
+  let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
+  let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
+  let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok" || getItemStatus(i) === "missing_tag").length);
+  let unchangedCount = $derived(items.filter((i) => getItemStatus(i) === "unchanged").length);
   let canApply = $derived(readyCount > 0 && collisionCount === 0 && !isLoading && !isApplying);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -390,23 +399,24 @@
             {:else}
               <VirtualList items={items} height="100%" itemHeight={36}>
                 {#snippet children(item: OrganizePreviewItem)}
+                  {@const st = getItemStatus(item)}
                   <div
                     class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors"
                   >
-                    <div class="w-24 shrink-0">
-                      {#if item.status === "ok"}
+                    <div class="w-28 shrink-0">
+                      {#if st === "ok"}
                         <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           {i18n.t("organizer.statusOk")}
                         </span>
-                      {:else if item.status === "unchanged"}
+                      {:else if st === "unchanged"}
                         <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
                           {i18n.t("organizer.statusUnchanged")}
                         </span>
-                      {:else if item.status === "collision"}
+                      {:else if st === "collision"}
                         <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
                           {i18n.t("organizer.statusCollision")}
                         </span>
-                      {:else if item.status === "missing_tag"}
+                      {:else if st === "missing_tag"}
                         <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
                           {i18n.t("organizer.statusMissingTag")}
                         </span>
@@ -417,17 +427,17 @@
                       {/if}
                     </div>
 
-                    <div class="flex-1 truncate px-2 text-brand-text-secondary" title={item.from_path}>
-                      {item.from_path}
+                    <div class="flex-1 truncate px-2 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}" title={item.from_path}>
+                      {item.from_path || "(No path recorded)"}
                     </div>
                     <div class="text-brand-text-secondary px-1">→</div>
                     <div
-                      class="flex-1 truncate px-2 {item.status === 'ok' ? 'text-emerald-400 font-semibold' : item.status === 'collision' || item.status === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
-                      title={item.status === 'error' && item.error_message ? item.error_message : item.to_path}
+                      class="flex-1 truncate px-2 {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                      title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
                     >
-                      {#if item.status === 'error'}
-                        <span class="text-rose-400 font-medium">
-                          {item.error_message ? `Error: ${item.error_message}` : item.to_path || 'Unknown error'}
+                      {#if st === 'error' || st === 'collision' || item.error_message}
+                        <span class="{st === 'missing_tag' ? 'text-amber-400' : 'text-rose-400'} font-medium">
+                          {item.error_message ? item.error_message : (item.to_path || 'Unknown error')}
                         </span>
                       {:else}
                         {item.to_path}

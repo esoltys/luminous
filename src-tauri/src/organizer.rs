@@ -244,7 +244,7 @@ pub fn compute_preview(
     let songs: Vec<Song> = if song_ids.is_empty() {
         let mut stmt = conn.prepare(
             "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-             FROM songs WHERE path IS NOT NULL AND source IN (1, 2)",
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2)",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(Song {
@@ -269,7 +269,7 @@ pub fn compute_preview(
             let placeholders = vec!["?"; chunk.len()].join(",");
             let sql = format!(
                 "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-                 FROM songs WHERE id IN ({}) AND path IS NOT NULL",
+                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != ''",
                 placeholders
             );
             let mut stmt = conn.prepare(&sql)?;
