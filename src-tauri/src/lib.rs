@@ -19,6 +19,7 @@ pub mod equalizer;
 pub mod filter_parser;
 pub mod loudness;
 pub mod lyrics;
+pub mod media_session;
 pub mod models;
 pub mod moodbar;
 pub mod player;
@@ -49,6 +50,10 @@ pub struct AppState {
     pub cover_manager: Arc<CoverManager>,
     pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
     pub startup_file: Mutex<Option<String>>,
+    /// OS "Now Playing" integration handle (#80) — `None` when the platform
+    /// integration failed to initialize (unsupported desktop, no session
+    /// bus, etc), in which case Luminous simply runs without it.
+    pub media_session: Option<media_session::MediaSessionHandle>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -232,6 +237,19 @@ pub fn run() {
                         tick_counter = tick_counter.wrapping_add(1);
                         if tick_counter.is_multiple_of(4) {
                             p.persist_position(pos);
+                            // MPRIS2's Position property isn't push-updated by
+                            // souvlaki's D-Bus backend — it just returns
+                            // whatever we last set, so without this the OS
+                            // media session's seek bar freezes at the
+                            // position from the last state transition (#80).
+                            // SMTC interpolates its own timeline, so this is
+                            // a no-op cost there beyond the periodic refresh.
+                            let playback_snapshot = p.get_state().await;
+                            crate::media_session::mirror_state(
+                                &app_handle_ticks,
+                                &playback_snapshot,
+                            )
+                            .await;
                         }
                         let _ = app_handle_ticks.emit(
                             "playback-position",
@@ -304,19 +322,23 @@ pub fn run() {
                                         }),
                                     );
                                     let state = p.get_state().await;
+                                    crate::media_session::mirror_state(&app, &state).await;
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::Paused => {
                                     let state = p.get_state().await;
+                                    crate::media_session::mirror_state(&app, &state).await;
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::Stopped => {
                                     let state = p.get_state().await;
+                                    crate::media_session::mirror_state(&app, &state).await;
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::TrackFinished { .. } => {
                                     let _ = p.on_track_finished().await;
                                     let state = p.get_state().await;
+                                    crate::media_session::mirror_state(&app, &state).await;
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::AboutToFinish { .. } => {
@@ -335,6 +357,7 @@ pub fn run() {
                                         }),
                                     );
                                     let state = p.get_state().await;
+                                    crate::media_session::mirror_state(&app, &state).await;
                                     let _ = app.emit("playback-state", state);
                                 }
                                 crate::audio::AudioEvent::Error { message } => {
@@ -377,6 +400,23 @@ pub fn run() {
             };
 
             let watcher = Arc::new(parking_lot::Mutex::new(None));
+
+            // souvlaki needs an HWND on Windows to register SMTC for our window.
+            #[cfg(target_os = "windows")]
+            let media_hwnd: Option<*mut std::ffi::c_void> = app
+                .get_webview_window("main")
+                .and_then(|w| w.hwnd().ok())
+                .map(|h| h.0 as *mut std::ffi::c_void);
+            #[cfg(not(target_os = "windows"))]
+            let media_hwnd: Option<*mut std::ffi::c_void> = None;
+
+            let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
+            if media_session.is_none() {
+                eprintln!(
+                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2/Now Playing) unavailable; continuing without it."
+                );
+            }
+
             let state = AppState {
                 db,
                 audio,
@@ -386,6 +426,7 @@ pub fn run() {
                 cover_manager,
                 watcher,
                 startup_file: Mutex::new(startup_path),
+                media_session,
             };
 
             // Start background directory watcher
@@ -463,6 +504,8 @@ pub fn run() {
                                 );
                             } else {
                                 let playback_state = player.get_state().await;
+                                crate::media_session::mirror_state(&app_handle, &playback_state)
+                                    .await;
                                 let _ = app_handle.emit("playback-state", playback_state);
                             }
                         });

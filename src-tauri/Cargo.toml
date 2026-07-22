@@ -60,6 +60,12 @@ bs1770 = "1"
 # --- File watching ---
 notify = { version = "6", features = ["serde"] }
 
+# --- OS "Now Playing" integration: SMTC (Windows), MPRIS2 (Linux), ---
+# --- MPNowPlayingInfoCenter (macOS) (#80) ---
+# `use_zbus` gives a pure-Rust D-Bus client on Linux, avoiding a build-time
+# dependency on libdbus-1-dev (the default `use_dbus` feature links libdbus).
+souvlaki = { version = "0.8", default-features = false, features = ["use_zbus"] }
+
 # --- HTTP client ---
 # Use rustls to avoid requiring libssl-dev system package
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
