@@ -334,7 +334,10 @@ export const en = {
     contextMenuEditTags: "Edit Tags",
     noFilterResults: "No tracks match \"{query}\"",
     autoPlaylistInfoTitle: "How do Auto Playlists work?",
-    autoPlaylistInfoText: "Auto Playlists are curated automatically from your library — refreshed daily with up to 25 tracks. Genre playlists group songs by their genre tag; Decade playlists group by release year. A playlist is only created when a genre or decade has at least 25 matching songs. You can click any playlist to browse its tracks, or click Refresh to pick a fresh selection instantly."
+    autoPlaylistInfoText: "Auto Playlists are curated automatically from your library — refreshed daily with up to 25 tracks. Genre playlists group songs by their genre tag; Decade playlists group by release year. A playlist is only created when a genre or decade has at least 25 matching songs. You can click any playlist to browse its tracks, or click Refresh to pick a fresh selection instantly.",
+    activePlaylistInfoTitle: "What does \"Active\" mean?",
+    activePlaylistInfoText: "One custom playlist can be marked Active at a time — it's the quick-add target for \"Add to Active Playlist\" throughout Luminous. Opening a playlist to browse it never changes which one is Active; click \"Make Active\" on a playlist to set it.",
+    editSmartPlaylistBtn: "Edit Rules",
   },
   lyrics: {
     title: "Lyrics",

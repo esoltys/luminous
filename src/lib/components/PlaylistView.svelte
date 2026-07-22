@@ -27,6 +27,7 @@
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem } from "../types";
+  import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import SongRating from "./SongRating.svelte";
@@ -137,12 +138,28 @@
   );
 
   let isActive = $derived(
-    activePlaylist !== undefined && playlistsStore.activePlaylistId === activePlaylist.id
+    activePlaylist !== undefined && playlistsStore.pinnedPlaylistId === activePlaylist.id
   );
 
   let isQueue = $derived(
     activePlaylist !== undefined && !activePlaylist.dynamic_enabled && activePlaylist.name.toLowerCase() === "queue"
   );
+
+  let isSmartPlaylist = $derived(
+    activePlaylist !== undefined &&
+      activePlaylist.dynamic_enabled &&
+      isSmartPlaylistSpec(activePlaylist.dynamic_spec)
+  );
+
+  function handleEditSmartPlaylist() {
+    if (!activePlaylist) return;
+    const rules = parseSearchRules((activePlaylist.dynamic_spec ?? "").replace(/;/g, " "));
+    collectionStore.openSmartBuilder(rules, {
+      id: activePlaylist.id,
+      name: activePlaylist.name,
+      autoPlay: activePlaylist.auto_play ?? true,
+    });
+  }
 
   type PlaylistSortField = "position" | "title" | "artist" | "album" | "rating" | "duration";
   let sortField = $state<PlaylistSortField>("position");
@@ -651,9 +668,19 @@
             >
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </button>
-            {#if !isActive && activePlaylist}
+            {#if isSmartPlaylist}
               <button
-                onclick={() => playlistsStore.selectPlaylist(activePlaylist.id)}
+                onclick={handleEditSmartPlaylist}
+                class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer"
+                title={i18n.t("playlists.editSmartPlaylistBtn")}
+              >
+                <Pencil class="w-4 h-4" />
+                <span>{i18n.t("playlists.editSmartPlaylistBtn")}</span>
+              </button>
+            {/if}
+            {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
+              <button
+                onclick={() => playlistsStore.pinPlaylist(activePlaylist.id)}
                 class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast font-semibold text-sm transition-all cursor-pointer shadow-sm"
                 title={i18n.t("playlists.makeActiveBtn")}
               >

@@ -6,6 +6,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
 
   import { invoke } from "@tauri-apps/api/core";
 
@@ -151,7 +152,7 @@
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.playlists.filter((p) => !p.dynamic_enabled).length})
+              ({playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)).length})
             </span>
           </button>
         </div>

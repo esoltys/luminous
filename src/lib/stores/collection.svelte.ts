@@ -104,9 +104,14 @@ class CollectionStore {
 
   isSmartBuilderOpen = $state<boolean>(false);
   smartBuilderRules = $state<Array<{ field: string; op: string; value: string }>>([]);
+  smartBuilderEditing = $state<{ id: number; name: string; autoPlay: boolean } | null>(null);
 
-  openSmartBuilder(rules?: Array<{ field: string; op: string; value: string }>) {
+  openSmartBuilder(
+    rules?: Array<{ field: string; op: string; value: string }>,
+    editing?: { id: number; name: string; autoPlay: boolean }
+  ) {
     this.smartBuilderRules = rules || [];
+    this.smartBuilderEditing = editing ?? null;
     this.isSmartBuilderOpen = true;
     this.activeTab = "playlists";
     this.playlistsSubTab = "custom";
@@ -115,6 +120,7 @@ class CollectionStore {
   closeSmartBuilder() {
     this.isSmartBuilderOpen = false;
     this.smartBuilderRules = [];
+    this.smartBuilderEditing = null;
   }
 
   private _activeTab = $state<ActiveTab>("collection");

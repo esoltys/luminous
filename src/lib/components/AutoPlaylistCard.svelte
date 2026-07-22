@@ -26,7 +26,7 @@
 
   let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
 
-  let isActive = $derived(playlistId !== undefined && playlistsStore.activePlaylistId === playlistId);
+  let isActive = $derived(playlistId !== undefined && playlistsStore.pinnedPlaylistId === playlistId);
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");

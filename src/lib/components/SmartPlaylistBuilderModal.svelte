@@ -7,10 +7,11 @@
 
   interface Props {
     initialRules?: Rule[];
+    editing?: { id: number; name: string; autoPlay: boolean } | null;
     onClose: () => void;
   }
 
-  let { initialRules = [], onClose }: Props = $props();
+  let { initialRules = [], editing = null, onClose }: Props = $props();
 
   function generateSuggestedName(ruleList: Array<{ field: string; op: string; value: string }>): string {
     const activeRules = ruleList.filter((r) => r.value.trim() !== "");
@@ -97,9 +98,12 @@
   }
 
   let rules = $state<RuleItem[]>(createInitialRules());
-  let userHasEditedName = $state(false);
-  let playlistName = $state(generateSuggestedName(rules));
-  let autoPlay = $state(true);
+  // When editing an existing playlist, its name was already chosen
+  // deliberately (possibly by hand) — don't clobber it with a re-generated
+  // suggestion as the user tweaks rules.
+  let userHasEditedName = $state(editing !== null);
+  let playlistName = $state(editing?.name ?? generateSuggestedName(rules));
+  let autoPlay = $state(editing?.autoPlay ?? true);
 
   $effect(() => {
     if (!userHasEditedName) {
@@ -171,6 +175,16 @@
       .join("; ");
 
     try {
+      if (editing) {
+        if (name !== editing.name) {
+          await playlistsStore.renamePlaylist(editing.id, name);
+        }
+        await playlistsStore.updatePlaylistSpec(editing.id, specString, autoPlay);
+        collectionStore.closeSmartBuilder();
+        collectionStore.viewPlaylist(editing.id);
+        return;
+      }
+
       const playlist = await playlistsStore.createPlaylist(name);
       if (playlist && specString) {
         await playlistsStore.updatePlaylistSpec(playlist.id, specString, autoPlay);
@@ -180,7 +194,7 @@
         collectionStore.viewPlaylist(playlist.id);
       }
     } catch (err) {
-      console.error("Failed to create smart playlist:", err);
+      console.error("Failed to save smart playlist:", err);
     }
   }
 
@@ -204,7 +218,7 @@
           <Sparkles class="w-5 h-5" />
         </div>
         <div>
-          <h2 class="text-base font-bold text-brand-text-primary">Create Smart Playlist</h2>
+          <h2 class="text-base font-bold text-brand-text-primary">{editing ? "Edit Smart Playlist" : "Create Smart Playlist"}</h2>
           <p class="text-xs text-brand-text-secondary/70">Build a dynamic playlist based on custom metadata rules</p>
         </div>
       </div>

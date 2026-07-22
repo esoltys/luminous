@@ -134,6 +134,7 @@
 {#if collectionStore.isSmartBuilderOpen}
   <SmartPlaylistBuilderModal
     initialRules={collectionStore.smartBuilderRules}
+    editing={collectionStore.smartBuilderEditing}
     onClose={() => collectionStore.closeSmartBuilder()}
   />
 {/if}

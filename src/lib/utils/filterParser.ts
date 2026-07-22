@@ -76,3 +76,15 @@ export function parseSearchRules(query: string): Rule[] {
 export function hasAdvancedSearchTerms(query: string): boolean {
   return parseSearchRules(query).length > 0;
 }
+
+/**
+ * True if a playlist's `dynamic_spec` is a user-authored Smart Playlist rule
+ * spec (e.g. "genre:rock", "artist:Miles Davis; rating:>=4"), as opposed to a
+ * system genre/decade auto-playlist. Smart Playlist specs always contain a
+ * "field:value" rule; system genre auto-playlists store a bare genre name
+ * (no ':'), and decade auto-playlists use a "decade:" prefix. Mirrors the
+ * categorization in playlist.rs.
+ */
+export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
+  return !!spec && spec.includes(":") && !spec.startsWith("decade:");
+}

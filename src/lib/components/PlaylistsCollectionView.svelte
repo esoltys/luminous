@@ -13,6 +13,7 @@
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles, HelpCircle } from "lucide-svelte";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
 
   interface AutoDef {
     id: string;
@@ -40,21 +41,16 @@
   });
 
   // System genre auto-playlists are stored with a raw genre name as dynamic_spec (e.g. "Rock", "Jazz").
-  // Smart playlists built via the Smart Playlist builder use a "genre:" prefix (e.g. "genre:jazz rating:>=4").
+  // Smart playlists built via the Smart Playlist builder always contain a "field:value" rule (e.g. "genre:jazz rating:>=4").
   let genreAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) =>
-        p.dynamic_enabled &&
-        !p.dynamic_spec?.startsWith("decade:") &&
-        !p.dynamic_spec?.startsWith("genre:")
+      (p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:") && !isSmartPlaylistSpec(p.dynamic_spec)
     )
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let customPlaylists = $derived.by(() => {
-    // Include non-dynamic playlists + user-created Smart playlists (dynamic_spec with "genre:" prefix or other field rules)
-    const list = playlistsStore.playlists.filter(
-      (p) => !p.dynamic_enabled || p.dynamic_spec?.startsWith("genre:") || (!p.dynamic_spec?.startsWith("decade:") && p.dynamic_spec?.includes(":"))
-    );
+    // Include non-dynamic playlists + user-created Smart playlists
+    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
     const queue = list.find((p) => p.name.toLowerCase() === "queue");
     const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
     return queue ? [queue, ...rest] : rest;
@@ -356,20 +352,33 @@
               />
             {/each}
           </div>
-        {:else if sortedPlaylists.length === 0}
-          <div class="col-span-full py-16 text-center">
-            <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-              <ListMusic class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-              <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('playlists.noPlaylistsTitle')}</h3>
-              <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('playlists.noPlaylistsText')}</p>
+        {:else}
+          <!-- Active Playlist Info Banner -->
+          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
+            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
+            <div class="space-y-1">
+              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.activePlaylistInfoTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+                {i18n.t('playlists.activePlaylistInfoText')}
+              </p>
             </div>
           </div>
-        {:else}
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-            {#each sortedPlaylists as pl (pl.id)}
-              <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
-            {/each}
-          </div>
+
+          {#if sortedPlaylists.length === 0}
+            <div class="col-span-full py-16 text-center">
+              <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
+                <ListMusic class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('playlists.noPlaylistsTitle')}</h3>
+                <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('playlists.noPlaylistsText')}</p>
+              </div>
+            </div>
+          {:else}
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+              {#each sortedPlaylists as pl (pl.id)}
+                <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
+              {/each}
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
