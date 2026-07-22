@@ -248,20 +248,20 @@
         <div class="flex items-center gap-2">
           {#if collectionStore.playlistsSubTab === "custom"}
             <button
-              onclick={handleImportPlaylist}
-              class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              title={i18n.t('playlists.importPlaylistTooltip')}
-            >
-              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
-              <span>{i18n.t('playlists.importPlaylistBtn')}</span>
-            </button>
-            <button
               onclick={() => { showCreateForm = !showCreateForm; }}
               class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
               title={i18n.t('playlists.newPlaylistBtn')}
             >
               <Plus class="w-3.5 h-3.5" />
               <span>{i18n.t('playlists.newPlaylistBtn')}</span>
+            </button>
+            <button
+              onclick={handleImportPlaylist}
+              class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              title={i18n.t('playlists.importPlaylistTooltip')}
+            >
+              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t('playlists.importPlaylistBtn')}</span>
             </button>
           {/if}
 
