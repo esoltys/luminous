@@ -393,8 +393,8 @@
         {/if}
 
         <!-- Template Pattern Input -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
             <label for="template-input" class="font-semibold text-brand-text-primary">
               {i18n.t("organizer.templateLabel")}
             </label>
@@ -439,8 +439,8 @@
         <!-- Options row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
           <!-- Destination folder -->
-          <div class="space-y-1.5 md:col-span-2">
-            <label for="dest-dir-input" class="font-semibold text-brand-text-primary">
+          <div class="md:col-span-2">
+            <label for="dest-dir-input" class="block font-semibold text-brand-text-primary mb-1.5">
               {i18n.t("organizer.destinationDirLabel")}
             </label>
             <div class="flex items-center gap-2">
