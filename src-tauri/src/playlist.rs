@@ -230,30 +230,39 @@ impl PlaylistManager {
         }
 
         for genre in &genres {
-            let existing_row: Option<(i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64)> = conn
                 .query_row(
-                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND (dynamic_spec = ?1 OR dynamic_spec = ?2)",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND (p.dynamic_spec = ?1 OR p.dynamic_spec = ?2) GROUP BY p.id",
                     params![genre, format!("genre:{}", genre)],
-                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .ok();
 
+            // Always check song count first — prune the playlist if it falls below threshold.
+            let songs = scanner.get_songs_by_genre(genre, 25)?;
+            if songs.len() < 25 {
+                if let Some((id, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
+                Some((_, updated, track_count)) => {
+                    now - updated > STALE_AFTER_SECS || track_count != 25
+                }
             };
             if !needs_generation {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_genre(genre, 25)?;
-            // Skip genres with fewer than 25 songs — not enough to form a meaningful playlist.
-            if songs.len() < 25 {
-                continue;
-            }
-
             let playlist_id = match existing_row {
-                Some((id, _)) => {
+                Some((id, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
@@ -313,30 +322,39 @@ impl PlaylistManager {
 
         for decade in &decades {
             let spec = format!("decade:{}", decade);
-            let existing_row: Option<(i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64)> = conn
                 .query_row(
-                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
-                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .ok();
 
+            // Always check song count first — prune the playlist if it falls below threshold.
+            let songs = scanner.get_songs_by_decade(decade, 25)?;
+            if songs.len() < 25 {
+                if let Some((id, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
+                Some((_, updated, track_count)) => {
+                    now - updated > STALE_AFTER_SECS || track_count != 25
+                }
             };
             if !needs_generation {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_decade(decade, 25)?;
-            // Skip decades with fewer than 25 songs — not enough to form a meaningful playlist.
-            if songs.len() < 25 {
-                continue;
-            }
-
             let playlist_id = match existing_row {
-                Some((id, _)) => {
+                Some((id, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
