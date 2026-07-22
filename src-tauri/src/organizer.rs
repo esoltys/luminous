@@ -190,16 +190,22 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         _ => "000".to_string(),
     };
 
-    expanded = expanded.replace("%albumartist", album_artist_str);
-    expanded = expanded.replace("%artist", artist_str);
-    expanded = expanded.replace("%album", album_str);
+    let artist_clean = sanitize_component(artist_str, false, false);
+    let album_artist_clean = sanitize_component(album_artist_str, false, false);
+    let album_clean = sanitize_component(album_str, false, false);
+    let title_clean = sanitize_component(title_str, false, false);
+    let genre_clean = sanitize_component(genre_str, false, false);
+
+    expanded = expanded.replace("%albumartist", &album_artist_clean);
+    expanded = expanded.replace("%artist", &artist_clean);
+    expanded = expanded.replace("%album", &album_clean);
     expanded = expanded.replace("%disc", &disc_str);
     expanded = expanded.replace("%track3", &track_3digit);
     expanded = expanded.replace("%rawtrack", &track_unpadded);
     expanded = expanded.replace("%track", &track_2digit);
-    expanded = expanded.replace("%title", title_str);
+    expanded = expanded.replace("%title", &title_clean);
     expanded = expanded.replace("%year", &year_str);
-    expanded = expanded.replace("%genre", genre_str);
+    expanded = expanded.replace("%genre", &genre_clean);
     expanded = expanded.replace("%extension", ext);
 
     expanded
