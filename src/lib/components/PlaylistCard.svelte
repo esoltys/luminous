@@ -143,14 +143,21 @@
     <span class="shrink-0">{playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}</span>
   </div>
 
-  {#if !playlist.dynamic_enabled && !isActive}
-    <button
-      onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
-      class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-      title={i18n.t('playlists.makeActiveBtn')}
-    >
-      <Radio class="w-3.5 h-3.5 text-brand-accent-text group-hover:text-current" />
-      <span>{i18n.t('playlists.makeActiveBtn')}</span>
-    </button>
+  {#if !playlist.dynamic_enabled}
+    {#if !isActive}
+      <button
+        onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
+        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+        title={i18n.t('playlists.makeActiveBtn')}
+      >
+        <Radio class="w-3.5 h-3.5 text-brand-accent-text group-hover:text-current" />
+        <span>{i18n.t('playlists.makeActiveBtn')}</span>
+      </button>
+    {:else}
+      <div class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center gap-1.5 select-none">
+        <Radio class="w-3.5 h-3.5 text-brand-accent-text animate-pulse" />
+        <span>{i18n.t('playlists.activeBadgeLabel')}</span>
+      </div>
+    {/if}
   {/if}
 </div>

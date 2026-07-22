@@ -315,6 +315,7 @@ export const fr = {
     relativeOneYearAgo: "Il y a 1 an",
     relativeYearsAgo: "Il y a {count} ans",
     makeActiveBtn: "Définir comme active",
+    activeBadgeLabel: "Active",
     refreshAutoPlaylistTooltip: "Rafraîchir la playlist automatique avec une nouvelle sélection de titres de votre bibliothèque",
     allMatchingTracksAdded: "Tous les titres correspondants de votre bibliothèque ont été ajoutés à cette liste automatique.",
     playSelected: "Lire la sélection",
