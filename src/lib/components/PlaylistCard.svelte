@@ -7,6 +7,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { formatRelativeDate } from "../utils/date";
   import CoverStack from "./CoverStack.svelte";
 
   let { playlist, onClick, widthClass = "w-full" }: { playlist: Playlist; onClick: () => void; widthClass?: string } = $props();
@@ -42,7 +43,7 @@
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
   let isActive = $derived(playlistsStore.activePlaylistId === playlist.id);
 
-  let updatedLabel = $derived(new Date(playlist.updated * 1000).toLocaleDateString());
+  let updatedLabel = $derived(formatRelativeDate(playlist.updated));
 
   function handlePlayButtonClick(e: MouseEvent) {
     e.stopPropagation();

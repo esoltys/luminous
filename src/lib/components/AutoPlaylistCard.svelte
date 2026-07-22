@@ -6,6 +6,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { formatRelativeDate } from "../utils/date";
   import CoverStack from "./CoverStack.svelte";
 
   interface Props {
@@ -75,7 +76,7 @@
 
   let updatedLabel = $derived.by(() => {
     if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
-    return new Date(updated * 1000).toLocaleDateString();
+    return formatRelativeDate(updated);
   });
 
   function handlePlayButtonClick(e: MouseEvent) {
