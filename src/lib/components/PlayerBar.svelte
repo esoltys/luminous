@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -163,7 +165,7 @@
   }
 </script>
 
-<footer class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none" class:glass-surface={themeStore.isGlassTheme}>
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <button
@@ -336,21 +338,13 @@
      extends the shared --glass-shadow (elevation + highlight, app.css)
      with --glass-glow (theme.svelte.ts) rather than baking the glow into
      the shared variable itself. */
-  footer.glass-surface {
+  :global(footer.glass-surface) {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background-color: var(--glass-bg-playerbar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
-    /* Unlike the other glass panels (Sidebar, TopNavigation, RightPanel),
-       the PlayDock floats as a *sibling* of +layout.svelte's
-       .flip-perspective 3D-transform container rather than living inside
-       it, sampling that container's content from outside for its blur.
-       Chromium-family engines (confirmed on Windows WebView2; already
-       worked around for Linux/WebKitGTK via .no-3d) can fail to composite
-       backdrop-filter correctly for an element outside a 3D-transformed
-       subtree it needs to sample — the tint renders but the blur silently
-       drops. Forcing this element onto its own explicit GPU layer
-       sidesteps the buggy automatic layer assignment. */
-    isolation: isolate;
-    will-change: backdrop-filter;
-    transform: translateZ(0);
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the
@@ -358,7 +352,7 @@
      inset highlight from https://codepen.io/lassiterda/pen/vEOpqMa. Plain
      box-shadow — no backdrop-filter/SVG-filter interaction, so it renders
      the same regardless of whether the blur itself composites. */
-  footer.glass-surface::after {
+  :global(footer.glass-surface::after) {
     content: "";
     position: absolute;
     inset: 0;

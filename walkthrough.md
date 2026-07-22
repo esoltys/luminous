@@ -1,180 +1,52 @@
-# Walkthrough — Advanced Filtering, Customizable Columns & Smart Playlist Integration (#13)
+# Walkthrough — Fix Playbar Backdrop Blur Loss in Production Builds (#102)
 
-Branch: `feature-advanced-filter-and-columns`
+Branch: `fix-playbar-blur`  
+Issue: [#102: Bug: Playbar loses backdrop blur effect in production builds](https://github.com/esoltys/luminous/issues/102)
 
-## What this delivers
+## Problem Summary
 
-Issue #13 asked for customizable track table columns, a power-user filter
-grammar in the search bar, and Smart/Advanced Playlist creation with a
-distinct badge. All three landed, plus several rounds of bug fixes once
-manual testing surfaced problems.
+In production builds (`bun run build` / `bun run tauri build`), the floating `PlayerBar` lost its frosted glass `backdrop-filter: blur(20px)` effect. While the translucent background tint rendered, the content scrolling underneath the playbar remained sharp instead of blurred.
 
-### 1. Advanced filter grammar (backend)
+## Root Cause Analysis
 
-- **[filter_parser.rs](src-tauri/src/filter_parser.rs)** — new tokenizing lexer/parser for
-  search queries: bare terms plus `field:value` / `field:<op>value` with
-  `= != > >= < <=`. Text fields (`artist`, `album`, `title`, `genre`,
-  `composer`), numeric fields (`year`, `bitrate`, `track`, `disc`, `rating`,
-  `playcount`, `skipcount`), and `duration` (`MM:SS` or seconds).
-- **[collection.rs:382](src-tauri/src/collection.rs#L382)** — `search_songs` compiles parsed
-  field terms into parameterized SQL `WHERE` clauses, `AND`ed with the
-  existing FTS5 full-text match for bare terms. Invalid syntax degrades to
-  plain FTS5 rather than erroring.
+1. **Tree-Shaking of Utility & Scoped Styles**:
+   - In Svelte 5 + Tailwind CSS v4, `.glass-surface` was applied dynamically via `{themeStore.isGlassTheme ? 'glass-surface' : ''}`.
+   - Svelte 5's template analyzer saw no static `class="glass-surface"` string literal in HTML and marked `footer.glass-surface` in component `<style>` blocks as an unused selector (`css_unused_selector`), purging it.
+   - Tailwind CSS v4's candidate extractor also tree-shaked `@utility glass-surface` from the production CSS bundle because it didn't recognize dynamic JS ternary strings.
+   - Result: `.glass-surface` and `backdrop-filter` were missing completely from `build/_app/immutable/assets/0.*.css` in release builds.
 
-### 2. Smart playlists: creation, population, naming, categorization
+2. **Compositing Layer Isolation**:
+   - In `+layout.svelte`, `PlayerBar` was wrapped inside `<div class="absolute inset-x-4 bottom-4 z-40" transition:fly={{ y: 40, duration: 300, easing: cubicOut }}>`.
+   - Svelte's `transition:fly` applied persistent inline `transform` compositing properties to the parent `div`. In Chromium WebView2, parent compositing layers isolate `backdrop-filter` from sampling elements outside their layer subtree (such as the main scrolling content area).
 
-- **[playlist.rs:376](src-tauri/src/playlist.rs#L376)** — `populate_dynamic_playlist` runs the
-  rule query immediately on creation/update and inserts matches into
-  `playlist_items`, so a new smart playlist isn't empty until some later
-  sync.
-- **Fixed a real bug found in manual testing**: the `contains` operator was
-  being serialized literally into the spec string instead of being
-  translated to the parser's actual grammar, so every smart playlist came
-  back empty. Fixed in `SmartPlaylistBuilderModal.svelte`.
-- **[SmartPlaylistBuilderModal.svelte](src/lib/components/SmartPlaylistBuilderModal.svelte)** —
-  suggests a descriptive name from the current rules (`genre:jazz` → "Jazz
-  Mix", `artist:"Miles Davis"` → "Miles Davis Selection",
-  `rating:>=4 genre:rock` → "4★+ · Rock Mix", decade ranges → "1980s Rock
-  Mix"), while preserving manual edits to the name field. Also fixed an
-  infinite render loop caused by mutating the reactive `rules` array
-  in-place while computing the suggestion.
-- **Categorization fix**: system genre/decade auto-playlists and
-  user-created Smart playlists both use `dynamic_enabled` rows, so they
-  need to be told apart correctly. System auto-playlists store the raw
-  genre/decade as `dynamic_spec` (e.g. `"Rock"`, `"decade:1980s"`); Smart
-  playlists always contain a `field:` rule (e.g. `"genre:jazz"`). Smart
-  playlists render in the **Custom Playlists** tab; system auto-playlists
-  stay in **Auto Playlists**.
+## Changes Made
 
-### 3. Auto-playlist correctness (found during manual testing, not in original scope but blocking it)
+### 1. Style Preservation (`src/app.css` & Component Style Blocks)
+- **`src/app.css`**: Defined `:global(.glass-surface)` using explicit `:global()` wrappers and `!important` flags for `backdrop-filter` and `background-color: var(--glass-bg-playerbar) !important`. This prevents both Svelte 5 and Tailwind CSS v4 from purging glassmorphism rules during production bundling.
+- **`src/lib/components/PlayerBar.svelte`**: Added `:global(footer.glass-surface)` rules directly to the component `<style>` block to ensure `backdrop-filter: blur(20px) saturate(180%) !important;` and `background-color: var(--glass-bg-playerbar) !important;` are bundled directly into the component asset output.
+- **`src/lib/components/Sidebar.svelte`**, **`TopNavigation.svelte`**, **`RightPanel.svelte`**: Added `:global()` glass-surface rules for `aside` and `header` elements to preserve glassmorphism across all UI panels in production.
 
-- Auto-playlists (genre/decade) are now forced to regenerate when their
-  track count drifts from the fixed 25-song target, and existing
-  under-threshold playlists are pruned rather than left stale.
-  [playlist.rs]
-- Genre/decade auto-playlists with fewer than 25 qualifying songs are
-  skipped instead of created half-full.
-- Added an info banner at the top of the Auto Playlists view explaining
-  how auto-playlists are generated and refreshed.
-- **Auto-Play → Auto-Refill rename**: renamed throughout the UI and both
-  locale files (`en.ts`, `fr.ts`) for clarity — the setting controls
-  whether an auto-playlist's contents refresh automatically, not playback.
-- The "Auto" badge on `AutoPlaylistCard` and `PlaylistCard` (carousel) now
-  only shows when Auto-Refill is actually enabled for that playlist,
-  instead of unconditionally on every auto-playlist.
+### 2. Parent Compositing Context Cleanup (`src/routes/+layout.svelte` & `PlayerBar.svelte`)
+- **`src/routes/+layout.svelte`**: Removed `transition:fly` from the outer PlayDock `<div>` wrapper so it does not establish a GPU compositing isolation root over the playbar.
+- **`src/lib/components/PlayerBar.svelte`**: Applied `transition:fly` directly to `<footer class="glass-surface">`. Once the mounting fly transition completes, Svelte clears the `transform` style from the DOM element, restoring full `backdrop-filter` sampling across underlying content layers.
+- Removed `isolation: isolate` from `footer.glass-surface` in `PlayerBar.svelte`.
 
-### 4. Custom columns & layout (frontend)
+## Visual Verification
 
-- **[CollectionView.svelte](src/lib/components/CollectionView.svelte)** — Columns popover to
-  toggle `Format`, `Year`, `Genre`, `Bitrate`, `Rating`, `Play Count`,
-  `Duration`, persisted to `localStorage` via `collectionStore`. Dedicated
-  **Format** column (uppercase codec/extension). Clean "All results
-  filtered out" empty state with a one-click "Reset Search & Filters"
-  button.
+Production build verified running natively via `luminous.exe` (`C:\Users\ericj\source\luminous\.worktrees\fix-playbar-blur\src-tauri\target\release\luminous.exe`):
 
-### 5. Badges & card styling
+![Playbar Blur Fixed](file:///C:/Users/ericj/.gemini/antigravity/brain/925e94d8-8ff9-4d2b-9553-15a3d103098f/.user_uploaded/media__1784740994774.png)
 
-- **[PlaylistCard.svelte](src/lib/components/PlaylistCard.svelte)** /
-  **[AutoPlaylistCard.svelte](src/lib/components/AutoPlaylistCard.svelte)** — `Auto`/`Smart`
-  badges moved to top-right, using theme accent tokens
-  (`bg-brand-accent text-brand-accent-contrast`) instead of hardcoded
-  colors. Smart playlists get a distinct purple-to-indigo gradient
-  background.
+## Verification & Test Results
 
-## Files changed
+- **Type Check**: `bun run check` passed with 0 errors, 0 warnings.
+- **Unit Tests**: `bun run test:run` passed 20/20 test files (226/226 tests passed).
+- **CSS Bundle Verification**: Confirmed via grep that `.glass-surface` and `backdrop-filter: blur(20px) saturate(180%)` are present in `build/_app/immutable/assets/0.*.css`.
+- **Production Build**: Built and verified release executable `luminous.exe` (`bun run tauri build`).
 
-18 files, +1215/-140 vs `main`. Backend: `filter_parser.rs` (new),
-`collection.rs`, `playlist.rs`, `commands/playlist.rs`, `lib.rs`. Frontend:
-`SmartPlaylistBuilderModal.svelte` (new), `CollectionView.svelte`,
-`TopNavigation.svelte`, `PlaylistsCollectionView.svelte`, `PlaylistCard.svelte`,
-`AutoPlaylistCard.svelte`, `collection.svelte.ts`, `playlists.svelte.ts`,
-`filterParser.ts` (new), `+page.svelte`, `en.ts`, `fr.ts`,
-`CollectionView.test.ts`.
+## Next Steps
 
-## What's intentionally out of scope
-
-- Grouping tracks by Album/Artist and the full sort-selector matrix
-  described in the issue's design doc weren't built — this branch focused
-  on filtering, columns, and the Smart Playlist pipeline. Worth a
-  follow-up issue if still wanted.
-- The `:` hint popover in `TopNavigation.svelte` for field-suggestion
-  autocomplete wasn't added; the filter grammar works today by typing the
-  full `field:value` syntax without inline help.
-- Exclusive/bit-perfect audio routing is unrelated to this issue — not
-  applicable here.
-
-## Round 2 — the "smart playlist is empty" bug
-
-You reported that clicking **Create Smart Playlist** produced an empty
-playlist. Root cause: **two** backend bugs, both in `playlist.rs`, both
-triggered specifically by genre-field rules (the modal's default field is
-`genre`, so this hit almost every smart playlist):
-
-1. `populate_dynamic_playlist` / `get_auto_playlist_refill_songs` treated
-   *any* spec starting with `"genre:"` as a system genre auto-playlist and
-   ran an **exact-match** `get_songs_by_genre()` lookup — but a Smart
-   Playlist rule on the genre field serialises to that exact same
-   `"genre:<value>"` prefix. `genre:rock` searched for a song whose genre
-   column was literally `"rock"`, not "contains rock", so real genres like
-   `"Classic Rock"` never matched. Fixed by routing on "spec contains a
-   `:`" instead of the `"genre:"` prefix specifically — system auto-playlist
-   specs are always bare names (no colon) since the earlier categorization
-   fix, so Smart Playlist specs now correctly fall through to the real
-   filter-parser path (`search_songs`, `LIKE`-based).
-2. `sync_genre_auto_playlists` — which runs every time the Playlists view
-   mounts — pruned *any* dynamic-enabled, non-decade playlist whose spec
-   didn't exactly equal a current library genre. Since Smart Playlists are
-   also dynamic-enabled and their specs (e.g. `"artist:Miles Davis"`) never
-   equal a genre name, they were being silently **deleted** on the next
-   view mount after creation. Scoped the prune query to bare-name specs
-   only.
-
-Added two regression tests in `playlist.rs`:
-`test_smart_playlist_genre_rule_populates_via_filter_not_exact_genre_match`
-and `test_sync_genre_auto_playlists_does_not_prune_smart_playlists`.
-
-## Round 2 — toolbar order
-
-Reordered the Playlists view toolbar so **New Playlist** comes before
-**Import Playlist** (was Import, then New).
-
-## Testing / Verification
-
-- `cargo test` (backend, incl. BDD scenarios) — passes, 0 failures.
-- `bun run check` (svelte-check) — 0 errors, 1 pre-existing warning
-  (`SmartPlaylistBuilderModal.svelte:101`, a `state_referenced_locally`
-  lint on an intentional one-time initial value — the subsequent
-  `$effect` keeps it in sync reactively).
-- `bun run test:run` — 224/224 passing. One test
-  (`PlaylistsCollectionView.test.ts`) had stale mock data left over from
-  before the categorization fix (used the old `"genre:Rock"` dynamic_spec
-  convention for a *system* auto-playlist, which the new logic correctly
-  reclassifies as a Smart playlist); updated the mock to the current
-  `"Rock"` convention to match `playlist.rs`'s actual output.
-- Not visually verified by me — per your stated preference, live
-  verification is yours in `bun run tauri dev` rather than a browser
-  preview or the screenshot harness. Your dev server for this worktree
-  (`luminous.exe`) already appears to be running.
-
-Worth clicking through:
-- Search bar: try `genre:jazz`, `rating:>=4 year:<2000`, and a bare-word
-  search — confirm all return sensible results and bad syntax doesn't
-  error.
-- Collection view: toggle columns in the Columns menu, confirm the Format
-  column shows codec, and confirm the "all filtered out" empty state and
-  its reset button.
-- Playlists: build a Smart Playlist with a genre rule (e.g. `genre` contains
-  `rock`), confirm it's **non-empty** immediately, shows the suggested name,
-  appears under **Custom Playlists** with the purple gradient + top-right
-  Smart badge — then switch to Auto Playlists and back to Custom (remounting
-  the view, which re-runs the genre-playlist sync) and confirm it's still
-  there with tracks, not deleted.
-- Toolbar: confirm **New Playlist** now appears before **Import Playlist**.
-- Auto Playlists tab: confirm the new info banner, and that Auto badges
-  only appear when Auto-Refill is toggled on for that playlist.
-
-## Next steps for your approval
-
-Once you've clicked through the above in your dev server and you're happy
-with it, let me know and I'll merge this branch into `main` and close issue
-#13.
+1. Commit changes to `fix-playbar-blur` branch.
+2. Merge `fix-playbar-blur` into `main`.
+3. Comment on and close GitHub Issue [#102](https://github.com/esoltys/luminous/issues/102).
+4. Remove temporary worktree directory `.worktrees/fix-playbar-blur`.

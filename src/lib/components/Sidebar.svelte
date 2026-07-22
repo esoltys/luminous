@@ -46,7 +46,7 @@
   }
 </script>
 
-<aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden" class:glass-surface={themeStore.isGlassTheme}>
+<aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <!-- Navigation -->
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button
@@ -187,3 +187,14 @@
   <!-- Bottom spacer for player bar -->
   <div class:mb-24={!!playerStore.currentSong}></div>
 </aside>
+
+<style>
+  aside.glass-surface {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background-color: var(--glass-bg-sidebar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
+    box-shadow: var(--glass-shadow, none);
+  }
+</style>

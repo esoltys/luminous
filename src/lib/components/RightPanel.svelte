@@ -54,8 +54,7 @@
 
 <aside
   style="width: {width}px;"
-  class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden"
-  class:glass-surface={themeStore.isGlassTheme}
+  class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
   <!-- Content -->
   <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
@@ -170,6 +169,15 @@
 
   aside ::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  aside.glass-surface {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background-color: var(--glass-bg-sidebar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
+    box-shadow: var(--glass-shadow, none);
   }
 
   aside ::-webkit-scrollbar-thumb {

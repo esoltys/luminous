@@ -76,15 +76,15 @@
 /* Glassmorphism utility classes */
 .glass {
   background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .glass-premium {
   background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(11, 15, 25, 0.9));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -104,18 +104,26 @@
  * (specular edge, as if light is catching the glass) + a soft elevation
  * shadow + a low-opacity accent-colored glow around the panel.
  */
-.glass-surface {
+:global(.glass-surface) {
   position: relative;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-color: var(--glass-border-color, var(--color-border));
   box-shadow: var(--glass-shadow, none);
 }
 
-.bg-brand-sidebar.glass-surface {
-  background-color: var(--glass-bg-sidebar);
+:global(.bg-brand-sidebar.glass-surface),
+:global(aside.glass-surface),
+:global(header.glass-surface) {
+  background-color: var(--glass-bg-sidebar) !important;
 }
 
-.bg-brand-playerbar.glass-surface {
-  background-color: var(--glass-bg-playerbar);
+:global(.bg-brand-playerbar.glass-surface),
+:global(footer.glass-surface) {
+  background-color: var(--glass-bg-playerbar) !important;
 }
+
+
+
+
+

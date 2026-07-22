@@ -216,7 +216,7 @@
 
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible" class:glass-surface={themeStore.isGlassTheme}>
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
@@ -663,4 +663,15 @@
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>
+
+<style>
+  header.glass-surface {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background-color: var(--glass-bg-sidebar) !important;
+    border-color: var(--glass-border-color, var(--color-border)) !important;
+    box-shadow: var(--glass-shadow, none);
+  }
+</style>
 

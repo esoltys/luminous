@@ -259,7 +259,7 @@
        whenever there's no current song, so it doesn't linger showing
        "Nothing playing" after the queue ends. -->
   {#if playerStore.currentSong}
-    <div class="absolute inset-x-4 bottom-4 z-40" transition:fly={{ y: 40, duration: 300, easing: cubicOut }}>
+    <div class="absolute inset-x-4 bottom-4 z-40">
       <PlayerBar />
     </div>
   {/if}
@@ -267,7 +267,7 @@
 
 <style>
   .flip-perspective {
-    perspective: 1500px;
+    perspective: none;
   }
 
   .flip-card {
