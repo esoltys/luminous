@@ -130,16 +130,45 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         }
     }
 
-    // 2. Perform variable replacement
-    let artist_str = song.artist.as_deref().unwrap_or("Unknown Artist");
+    // 2. Perform variable replacement with fallbacks for empty/whitespace string metadata
+    let file_stem_fallback = song
+        .path
+        .as_ref()
+        .map(PathBuf::from)
+        .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "Unknown Title".to_string());
+
+    let artist_str = song
+        .artist
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("Unknown Artist");
+
     let album_artist_str = song
         .album_artist
         .as_deref()
-        .or(song.artist.as_deref())
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| song.artist.as_deref().filter(|s| !s.trim().is_empty()))
         .unwrap_or("Unknown Artist");
-    let album_str = song.album.as_deref().unwrap_or("Unknown Album");
-    let title_str = song.title.as_deref().unwrap_or("Unknown Title");
-    let genre_str = song.genre.as_deref().unwrap_or("Unknown Genre");
+
+    let album_str = song
+        .album
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("Unknown Album");
+
+    let title_str = song
+        .title
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(&file_stem_fallback);
+
+    let genre_str = song
+        .genre
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("Unknown Genre");
+
     let year_str = song.year.map(|y| y.to_string()).unwrap_or_default();
     let disc_str = song
         .disc
@@ -372,13 +401,18 @@ pub fn compute_preview(
         }
     }
 
-    for (_path, indices) in target_paths_map {
-        if indices.len() > 1 {
+    for (target_path, indices) in target_paths_map {
+        if indices.len() > 1 && !target_path.trim().is_empty() {
             for idx in indices {
-                if preview_items[idx].status != OrganizePreviewStatus::Unchanged {
+                let status = preview_items[idx].status.clone();
+                if status != OrganizePreviewStatus::Unchanged
+                    && status != OrganizePreviewStatus::Error
+                {
                     preview_items[idx].status = OrganizePreviewStatus::Collision;
-                    preview_items[idx].error_message =
-                        Some("Multiple files map to this target path".to_string());
+                    preview_items[idx].error_message = Some(format!(
+                        "Multiple files map to target path: {}",
+                        target_path
+                    ));
                 }
             }
         }
