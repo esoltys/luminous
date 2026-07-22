@@ -237,6 +237,19 @@ pub fn run() {
                         tick_counter = tick_counter.wrapping_add(1);
                         if tick_counter.is_multiple_of(4) {
                             p.persist_position(pos);
+                            // MPRIS2's Position property isn't push-updated by
+                            // souvlaki's D-Bus backend — it just returns
+                            // whatever we last set, so without this the OS
+                            // media session's seek bar freezes at the
+                            // position from the last state transition (#80).
+                            // SMTC interpolates its own timeline, so this is
+                            // a no-op cost there beyond the periodic refresh.
+                            let playback_snapshot = p.get_state().await;
+                            crate::media_session::mirror_state(
+                                &app_handle_ticks,
+                                &playback_snapshot,
+                            )
+                            .await;
                         }
                         let _ = app_handle_ticks.emit(
                             "playback-position",
