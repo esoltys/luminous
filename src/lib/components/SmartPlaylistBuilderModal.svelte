@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -101,10 +102,11 @@
   let rules = $state<RuleItem[]>(createInitialRules());
   // When editing an existing playlist, its name was already chosen
   // deliberately (possibly by hand) — don't clobber it with a re-generated
-  // suggestion as the user tweaks rules.
-  let userHasEditedName = $state(editing !== null);
-  let playlistName = $state(editing?.name ?? generateSuggestedName(rules));
-  let autoPlay = $state(editing?.autoPlay ?? true);
+  // suggestion as the user tweaks rules. untrack() signals to Svelte that
+  // capturing the initial value only is intentional here.
+  let userHasEditedName = $state(untrack(() => editing !== null));
+  let playlistName = $state(untrack(() => editing?.name ?? generateSuggestedName(rules)));
+  let autoPlay = $state(untrack(() => editing?.autoPlay ?? true));
 
   $effect(() => {
     if (!userHasEditedName) {

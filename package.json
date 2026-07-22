@@ -19,7 +19,6 @@
     "test:run": "vitest run",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
-    "postbuild": "bunx tsx scripts/take-screenshots.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts"
   },
