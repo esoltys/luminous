@@ -29,15 +29,21 @@
 
   let topAlbums = $derived(songsToCoverStack(tracks.filter((t) => !!t.song).map((t) => t.song!)));
 
-  let autoKind = $derived<"genre" | "decade" | null>(
-    !playlist.dynamic_enabled ? null : playlist.dynamic_spec?.startsWith("decade:") ? "decade" : "genre"
+  let autoKind = $derived<"genre" | "decade" | "smart" | null>(
+    !playlist.dynamic_enabled
+      ? null
+      : playlist.dynamic_spec?.startsWith("decade:")
+      ? "decade"
+      : playlist.dynamic_spec?.startsWith("genre:")
+      ? "genre"
+      : "smart"
   );
 
   let subtitleLabel = $derived.by(() => {
     if (!playlist.dynamic_enabled) return null;
     if (autoKind === "decade") return i18n.t("playlists.decadeAutoPlaylist");
     if (autoKind === "genre") return i18n.t("playlists.genreAutoPlaylist");
-    return i18n.t("playlists.genreAutoPlaylist");
+    return "Smart Rule Playlist";
   });
 
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
@@ -67,17 +73,19 @@
         <Layers class="w-10 h-10 text-white/90" />
       </div>
     {:else if topAlbums.length > 0 && autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-purple-600 via-violet-600 to-indigo-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
     {:else if autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-purple-600 via-violet-600 to-indigo-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         {#if autoKind === "decade"}
           <Calendar class="w-10 h-10 text-white/90" />
-        {:else}
+        {:else if autoKind === "genre"}
           <Music class="w-10 h-10 text-white/90" />
+        {:else}
+          <Sparkles class="w-10 h-10 text-white/90" />
         {/if}
       </div>
     {:else}
@@ -86,9 +94,17 @@
       </div>
     {/if}
 
-    {#if playlist.dynamic_enabled}
+    {#if autoKind === "decade" || autoKind === "genre"}
       <div
-        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
+        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
+        title="Auto Playlist"
+      >
+        <Radio class="w-2.5 h-2.5" />
+        Auto
+      </div>
+    {:else if autoKind === "smart"}
+      <div
+        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
         title="Smart Rule-Based Playlist"
       >
         <Sparkles class="w-2.5 h-2.5" />
