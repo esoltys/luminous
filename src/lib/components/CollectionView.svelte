@@ -6,7 +6,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3 } from "lucide-svelte";
+  import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3, Columns, FilterX } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
@@ -21,6 +21,7 @@
   // activeSubTab and activeTab are managed globally via collectionStore
 
   let editingSongId = $state<number | null>(null);
+  let showColumnsMenu = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
 
@@ -244,6 +245,22 @@
     });
   });
 
+  let gridColsStyle = $derived.by(() => {
+    const cols: string[] = ["36px", "40px", "2fr", "1.5fr", "1.5fr"];
+    const vc = collectionStore.visibleColumns;
+
+    if (vc.format) cols.push("64px");
+    if (vc.year) cols.push("60px");
+    if (vc.genre) cols.push("1.2fr");
+    if (vc.bitrate) cols.push("70px");
+    if (vc.rating) cols.push("96px");
+    if (vc.playcount) cols.push("70px");
+    if (vc.duration) cols.push("80px");
+
+    cols.push("80px");
+    return `grid-template-columns: ${cols.join(" ")}`;
+  });
+
   function toggleSort(field: keyof Song) {
     if (sortField === field) {
       sortAsc = !sortAsc;
@@ -308,8 +325,56 @@
         {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
       </div>
 
-      <!-- Sort Dropdown (Right) -->
-      <div class="flex items-center gap-4">
+      <!-- Sort Dropdown & Column Controls (Right) -->
+      <div class="flex items-center gap-3">
+        <!-- Columns Toggle Popover -->
+        <div class="relative">
+          <button
+            onclick={() => { showColumnsMenu = !showColumnsMenu; }}
+            class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none transition-all cursor-pointer font-medium"
+            title="Custom Visible Columns"
+          >
+            <Columns class="w-3.5 h-3.5 text-brand-accent-text" />
+            <span>Columns</span>
+          </button>
+
+          {#if showColumnsMenu}
+            <div class="absolute right-0 top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-52 flex flex-col gap-1.5 select-none">
+              <div class="text-[11px] font-bold text-brand-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-brand-border/40">
+                Visible Columns
+              </div>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.format} onchange={() => collectionStore.toggleColumn("format")} class="rounded accent-brand-accent" />
+                Format
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.year} onchange={() => collectionStore.toggleColumn("year")} class="rounded accent-brand-accent" />
+                Year
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.genre} onchange={() => collectionStore.toggleColumn("genre")} class="rounded accent-brand-accent" />
+                Genre
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.bitrate} onchange={() => collectionStore.toggleColumn("bitrate")} class="rounded accent-brand-accent" />
+                Bitrate
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.rating} onchange={() => collectionStore.toggleColumn("rating")} class="rounded accent-brand-accent" />
+                Rating
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.playcount} onchange={() => collectionStore.toggleColumn("playcount")} class="rounded accent-brand-accent" />
+                Play Count
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.duration} onchange={() => collectionStore.toggleColumn("duration")} class="rounded accent-brand-accent" />
+                Duration
+              </label>
+            </div>
+          {/if}
+        </div>
+
         <div class="relative">
           <select
             value={`${sortField}-${sortAsc}`}
@@ -341,7 +406,7 @@
       <!-- Songs Table View -->
       <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-          <div class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center py-3 px-4">
+          <div class="grid items-center py-3 px-4" style={gridColsStyle}>
             <div class="text-center w-9"></div>
             <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
               {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
@@ -355,12 +420,41 @@
             <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
               {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
             </button>
-            <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-              {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
-            </button>
-            <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-              <Clock class="w-4 h-4" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
-            </button>
+            {#if collectionStore.visibleColumns.format}
+              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+                Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.year}
+              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+                Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.genre}
+              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+                Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.bitrate}
+              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+                Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.rating}
+              <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+                {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.playcount}
+              <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
+                Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.duration}
+              <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
+                <Clock class="w-4 h-4" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
+              </button>
+            {/if}
             <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
           </div>
         </div>
@@ -369,11 +463,11 @@
           {#if filteredSongs.length === 0}
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
-                <p class="text-xs text-brand-text-secondary/60">
+                <FilterX class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1">All results filtered out</h3>
+                <p class="text-xs text-brand-text-secondary/60 mb-4">
                   {#if collectionStore.searchQuery}
-                    {i18n.t('collection.noSongsSearchEmpty', { query: collectionStore.searchQuery })}
+                    No tracks match your query: <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
                   {:else}
                     {i18n.t('collection.noSongsLibraryEmpty')}
                   {/if}
@@ -381,9 +475,10 @@
                 {#if collectionStore.searchQuery}
                   <button
                     onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-                    class="mt-4 px-3 py-1.5 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-lg transition-colors font-medium cursor-pointer"
+                    class="px-3.5 py-2 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-xl shadow transition-all font-semibold cursor-pointer flex items-center gap-1.5"
                   >
-                    {i18n.t('collection.clearSearchFilter')}
+                    <FilterX class="w-3.5 h-3.5" />
+                    Reset Search & Filters
                   </button>
                 {/if}
               </div>
@@ -397,7 +492,8 @@
                 onclick={(e) => handleSongClick(e, song)}
                 ondblclick={() => handlePlaySong(song)}
                 oncontextmenu={(e) => handleContextMenu(e, song)}
-                class="grid grid-cols-[36px_40px_2fr_1.5fr_1.5fr_96px_96px_80px] items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm cursor-pointer
+                style={gridColsStyle}
+                class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm cursor-pointer
                   {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -453,10 +549,39 @@
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
-                <div class="flex justify-center">
-                  <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
-                </div>
-                <div class="text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</div>
+                {#if collectionStore.visibleColumns.format}
+                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+                    {song.filetype ? song.filetype.toUpperCase() : "—"}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.year}
+                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-medium">
+                    {song.year || "—"}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.genre}
+                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-medium">
+                    {song.genre || "—"}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.bitrate}
+                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-mono">
+                    {song.bitrate ? `${song.bitrate}k` : "—"}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.rating}
+                  <div class="flex justify-center">
+                    <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.playcount}
+                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">
+                    {song.playcount ?? 0}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.duration}
+                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">{formatDuration(song.length_nanosec)}</div>
+                {/if}
                 <div class="flex items-center justify-center gap-2.5">
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}

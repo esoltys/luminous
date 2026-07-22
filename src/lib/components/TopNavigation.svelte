@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, FolderOpen, RefreshCw, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, Search, FolderOpen, RefreshCw, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
+  import { parseSearchRules, hasAdvancedSearchTerms } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -303,6 +304,46 @@
       <div
         class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
       >
+        {#if hasAdvancedSearchTerms(collectionStore.searchQuery)}
+          <button
+            type="button"
+            onclick={() => {
+              const rules = parseSearchRules(collectionStore.searchQuery);
+              collectionStore.openSmartBuilder(rules);
+              isSearchFocused = false;
+            }}
+            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 transition-all cursor-pointer text-left group"
+          >
+            <div class="flex items-center gap-2.5">
+              <div class="p-1.5 rounded-lg bg-indigo-600 text-white">
+                <Sparkles class="w-4 h-4" />
+              </div>
+              <div>
+                <div class="text-xs font-bold text-brand-text-primary group-hover:text-indigo-300 transition-colors">
+                  Create Smart Playlist from Search
+                </div>
+                <div class="text-[11px] text-brand-text-secondary/80">
+                  Pre-fill builder with rules from active search query
+                </div>
+              </div>
+            </div>
+            <span class="text-xs font-semibold text-indigo-400 group-hover:underline">Open Builder →</span>
+          </button>
+        {/if}
+
+        {#if collectionStore.searchQuery.includes(":")}
+          <div class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90">
+            <div class="font-semibold text-brand-text-primary mb-1 flex items-center gap-1">
+              <span>💡 Filter Syntax Hint</span>
+            </div>
+            <div class="space-y-0.5 text-[11px]">
+              <div><span class="font-medium text-brand-text-primary">Fields:</span> <code class="bg-brand-sidebar px-1 rounded">artist</code>, <code class="bg-brand-sidebar px-1 rounded">album</code>, <code class="bg-brand-sidebar px-1 rounded">title</code>, <code class="bg-brand-sidebar px-1 rounded">genre</code>, <code class="bg-brand-sidebar px-1 rounded">year</code>, <code class="bg-brand-sidebar px-1 rounded">rating</code>, <code class="bg-brand-sidebar px-1 rounded">duration</code>, <code class="bg-brand-sidebar px-1 rounded">playcount</code></div>
+              <div><span class="font-medium text-brand-text-primary">Operators:</span> <code class="bg-brand-sidebar px-1 rounded">=</code> <code class="bg-brand-sidebar px-1 rounded">!=</code> <code class="bg-brand-sidebar px-1 rounded">&gt;</code> <code class="bg-brand-sidebar px-1 rounded">&gt;=</code> <code class="bg-brand-sidebar px-1 rounded">&lt;</code> <code class="bg-brand-sidebar px-1 rounded">&lt;=</code></div>
+              <div class="text-brand-text-secondary/60 italic pt-0.5">e.g. rating:&gt;=4 year:&lt;2000 genre:jazz "miles davis"</div>
+            </div>
+          </div>
+        {/if}
+
         <!-- Auto-suggestions (Shown when typing a non-empty search query) -->
         {#if collectionStore.searchQuery.trim() !== ""}
           <div class="mb-3">

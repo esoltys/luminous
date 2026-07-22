@@ -16,6 +16,7 @@ pub mod commands;
 pub mod covermanager;
 pub mod db;
 pub mod equalizer;
+pub mod filter_parser;
 pub mod loudness;
 pub mod lyrics;
 pub mod models;

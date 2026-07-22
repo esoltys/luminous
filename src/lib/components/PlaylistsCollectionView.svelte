@@ -11,7 +11,8 @@
   import AutoPlaylistCard from "./AutoPlaylistCard.svelte";
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
-  import { FolderInput, Plus, ListMusic } from "lucide-svelte";
+  import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
+  import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
 
   interface AutoDef {
     id: string;
@@ -304,6 +305,14 @@
           <button type="submit" class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer">
             {i18n.t('sidebar.create')}
           </button>
+          <button
+            type="button"
+            onclick={() => collectionStore.openSmartBuilder()}
+            class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors"
+          >
+            <Sparkles class="w-3.5 h-3.5" />
+            <span>Advanced...</span>
+          </button>
         </form>
       {/if}
 
@@ -342,4 +351,11 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if collectionStore.isSmartBuilderOpen}
+  <SmartPlaylistBuilderModal
+    initialRules={collectionStore.smartBuilderRules}
+    onClose={() => collectionStore.closeSmartBuilder()}
+  />
 {/if}

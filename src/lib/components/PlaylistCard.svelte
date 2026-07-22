@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Calendar, Music, Radio, Layers } from "lucide-svelte";
+  import { ListMusic, Play, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
@@ -83,6 +83,16 @@
     {:else}
       <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/80" />
+      </div>
+    {/if}
+
+    {#if playlist.dynamic_enabled}
+      <div
+        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
+        title="Smart Rule-Based Playlist"
+      >
+        <Sparkles class="w-2.5 h-2.5" />
+        Smart
       </div>
     {/if}
 
