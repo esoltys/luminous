@@ -49,16 +49,17 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    const regex = /(%[a-z]+)|([/\\])|([{}])|(\s)/gi;
-    return escaped.replace(regex, (match, pVar, pSep, pBracket, pSpace) => {
+    const regex = /({[^{}]*})|(%[a-z]+)|([/\\])|(\s)/gi;
+    return escaped.replace(regex, (match, pBlock, pVar, pSep, pSpace) => {
+      if (pBlock) {
+        const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-cyan-300 font-bold bg-cyan-500/30 rounded-xs">${v}</span>`);
+        return `<span class="text-purple-300 font-bold bg-purple-500/25 rounded-xs">${inner}</span>`;
+      }
       if (pVar) {
-        return `<span class="text-cyan-300 font-bold bg-cyan-500/25">${pVar}</span>`;
+        return `<span class="text-cyan-300 font-bold bg-cyan-500/25 rounded-xs">${pVar}</span>`;
       }
       if (pSep) {
-        return `<span class="text-amber-400 font-bold bg-amber-500/30">${pSep}</span>`;
-      }
-      if (pBracket) {
-        return `<span class="text-purple-300 font-bold bg-purple-500/30">${pBracket}</span>`;
+        return `<span class="text-amber-400 font-bold bg-amber-500/30 rounded-xs">${pSep}</span>`;
       }
       if (pSpace) {
         return `<span class="bg-white/10 rounded-xs" title="Space">&nbsp;</span>`;
@@ -255,7 +256,18 @@
   }
 
   $effect(() => {
-    if (isOpen) {
+    // Read reactive variables synchronously so Svelte 5 tracks dependencies
+    const _t = template;
+    const _d = destinationDir;
+    const _r = replaceSpaces;
+    const _a = asciiOnly;
+    const _c = cleanEmptyDirs;
+    const _m = moveExtraFiles;
+    const _s = scope;
+    const _ids = activeSongIds;
+    const _open = isOpen;
+
+    if (_open) {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         fetchPreview();
@@ -482,9 +494,14 @@
           <div class="flex items-center justify-between">
             <h3 class="font-bold text-brand-text-primary flex items-center gap-2">
               <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
-              {#if isLoading}
-                <RefreshCw class="w-3 h-3 text-brand-accent-text animate-spin" />
-              {/if}
+              <button
+                type="button"
+                onclick={fetchPreview}
+                class="p-1 rounded-md text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar cursor-pointer transition-colors"
+                title="Refresh Preview"
+              >
+                <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
+              </button>
             </h3>
 
             <!-- Summary badges -->
