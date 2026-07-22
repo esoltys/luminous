@@ -591,6 +591,7 @@ export const en = {
     replaceSpaces: "Replace spaces with underscores",
     asciiOnly: "ASCII-only filenames (strip non-ASCII)",
     cleanEmptyDirs: "Clean up empty source folders",
+    moveExtraFiles: "Move companion files (artwork, lyrics, logs, cue sheets)",
     previewTitle: "Dry-Run Preview ({count} items)",
     colSource: "Original Path",
     colDestination: "Target Path",

@@ -591,6 +591,7 @@ export const fr = {
     replaceSpaces: "Remplacer les espaces par des tirets bas (_)",
     asciiOnly: "Noms de fichiers ASCII uniquement",
     cleanEmptyDirs: "Nettoyer les dossiers source vides",
+    moveExtraFiles: "Déplacer les fichiers connexes (pochettes, paroles, logs, fiches CUE)",
     previewTitle: "Aperçu avant application ({count} éléments)",
     colSource: "Chemin d'origine",
     colDestination: "Chemin cible",

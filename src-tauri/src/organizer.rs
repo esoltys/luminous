@@ -19,6 +19,8 @@ pub struct OrganizeOptions {
     pub replace_spaces_with_underscores: bool,
     pub ascii_only: bool,
     pub clean_empty_dirs: bool,
+    #[serde(default)]
+    pub move_extra_files: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -421,12 +423,68 @@ pub fn compute_preview(
     Ok(preview_items)
 }
 
+const AUDIO_EXTENSIONS: &[&str] = &[
+    "mp3", "flac", "m4a", "aac", "ogg", "opus", "wav", "aiff", "aif", "wma", "alac", "dsf", "dff",
+];
+
+fn is_audio_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+fn move_companion_files(src_dir: &Path, dst_dir: &Path) -> Vec<String> {
+    let mut errors = Vec::new();
+    if !src_dir.exists() || !src_dir.is_dir() || src_dir == dst_dir {
+        return errors;
+    }
+
+    let entries = match fs::read_dir(src_dir) {
+        Ok(e) => e,
+        Err(_) => return errors,
+    };
+
+    let remaining_entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+    let has_audio_left = remaining_entries
+        .iter()
+        .any(|entry| is_audio_file(&entry.path()));
+
+    if !has_audio_left {
+        if let Err(e) = fs::create_dir_all(dst_dir) {
+            errors.push(format!(
+                "Failed to create directory {}: {}",
+                dst_dir.display(),
+                e
+            ));
+            return errors;
+        }
+
+        for entry in remaining_entries {
+            let path = entry.path();
+            if path.is_file() && !is_audio_file(&path) {
+                if let Some(file_name) = path.file_name() {
+                    let dst_file = dst_dir.join(file_name);
+                    if !dst_file.exists() {
+                        let _ = fs::rename(&path, &dst_file).or_else(|_| {
+                            fs::copy(&path, &dst_file).and_then(|_| fs::remove_file(&path))
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    errors
+}
+
 /// Execute batch file relocation and SQLite path updates.
 pub fn execute_apply(
     db: &Database,
     watcher_paused: &AtomicBool,
     items: &[OrganizeApplyItem],
     clean_empty_dirs: bool,
+    move_extra_files: bool,
 ) -> Result<OrganizeResult> {
     watcher_paused.store(true, Ordering::Relaxed);
 
@@ -434,6 +492,7 @@ pub fn execute_apply(
     let mut skipped_count = 0;
     let mut errors = Vec::new();
     let mut source_parents_to_clean: HashSet<PathBuf> = HashSet::new();
+    let mut moved_dir_pairs: HashMap<PathBuf, PathBuf> = HashMap::new();
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;
@@ -453,8 +512,9 @@ pub fn execute_apply(
             continue;
         }
 
-        if let Some(parent) = src.parent() {
-            source_parents_to_clean.insert(parent.to_path_buf());
+        if let (Some(src_parent), Some(dst_parent)) = (src.parent(), dst.parent()) {
+            source_parents_to_clean.insert(src_parent.to_path_buf());
+            moved_dir_pairs.insert(src_parent.to_path_buf(), dst_parent.to_path_buf());
         }
 
         if let Some(dst_parent) = dst.parent() {
@@ -498,6 +558,13 @@ pub fn execute_apply(
 
     if let Err(e) = tx.commit() {
         errors.push(format!("Transaction commit error: {}", e));
+    }
+
+    if move_extra_files {
+        for (src_dir, dst_dir) in moved_dir_pairs {
+            let companion_errors = move_companion_files(&src_dir, &dst_dir);
+            errors.extend(companion_errors);
+        }
     }
 
     if clean_empty_dirs {
