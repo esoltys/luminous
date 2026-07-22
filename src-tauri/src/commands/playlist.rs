@@ -239,6 +239,20 @@ pub async fn set_playlist_auto_play(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn set_playlist_dynamic_spec(
+    playlist_id: i64,
+    spec: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .set_playlist_dynamic_spec(playlist_id, &spec)
+        .map_err(|e| e.to_string())
+}
+
 /// Fetch the next batch of songs for an auto-playlist's refill pass and append
 /// them both to the DB playlist and to the live player queue.  Called by the
 /// player when `remaining < threshold` and `auto_play` is true.

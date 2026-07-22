@@ -373,6 +373,17 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Update the `dynamic_spec` and `dynamic_enabled` fields for a playlist row.
+    pub fn set_playlist_dynamic_spec(&self, id: i64, spec: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let enabled = !spec.trim().is_empty();
+        conn.execute(
+            "UPDATE playlists SET dynamic_spec = ?1, dynamic_enabled = ?2 WHERE id = ?3",
+            params![spec, enabled, id],
+        )?;
+        Ok(())
+    }
+
     /// Returns songs that match the dynamic spec of playlist `id` but are NOT
     /// yet present in its `playlist_items`.  Used for the Auto-Play refill
     /// path — up to `limit` new songs are returned in random order so each

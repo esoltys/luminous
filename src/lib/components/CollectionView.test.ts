@@ -165,7 +165,7 @@ describe("CollectionView.svelte", () => {
     collectionStore.searchQuery = "NonexistentTrack";
 
     const { getByText } = render(CollectionView);
-    expect(getByText(/no songs found/i)).toBeInTheDocument();
+    expect(getByText(/all results filtered out|no songs found/i)).toBeInTheDocument();
   });
 
   it("opens context menu on right-click of a song row", async () => {

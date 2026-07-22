@@ -22,11 +22,14 @@
     value: string;
   }
 
-  let rules = $state<RuleItem[]>(
-    initialRules.length > 0
-      ? initialRules.map((r, i) => ({ id: `rule_${i}_${Date.now()}`, ...r }))
-      : [{ id: `rule_0_${Date.now()}`, field: "genre", op: "contains", value: "" }]
-  );
+  function createInitialRules(): RuleItem[] {
+    if (initialRules && initialRules.length > 0) {
+      return initialRules.map((r, i) => ({ id: `rule_${i}_${Date.now()}`, ...r }));
+    }
+    return [{ id: `rule_0_${Date.now()}`, field: "genre", op: "contains", value: "" }];
+  }
+
+  let rules = $state<RuleItem[]>(createInitialRules());
 
   const availableFields = [
     { key: "artist", label: "Artist", type: "text" },

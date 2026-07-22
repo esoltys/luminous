@@ -110,10 +110,20 @@ class PlaylistsStore {
     }
   }
 
-  async createPlaylist(name: string) {
+  async createPlaylist(name: string): Promise<Playlist> {
     const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
+    return playlist;
+  }
+
+  async updatePlaylistSpec(id: number, spec: string, autoPlay: boolean = false) {
+    await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
+    await invoke("set_playlist_auto_play", { playlistId: id, autoPlay });
+    await this.refreshPlaylists();
+    if (this.activePlaylistId === id) {
+      await this.selectPlaylist(id);
+    }
   }
 
   async deletePlaylist(id: number) {
