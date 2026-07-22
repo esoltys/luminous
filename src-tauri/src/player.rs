@@ -619,11 +619,29 @@ impl Player {
     pub async fn pause(&self) -> Result<()> {
         let pos = self.audio.lock().await.current_position_nanosec();
         self.persist_position(pos);
-        self.audio.lock().await.pause()
+        let settings =
+            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
+            self.audio
+                .lock()
+                .await
+                .pause_with_fade(settings.fade_pause_duration_ms)
+        } else {
+            self.audio.lock().await.pause()
+        }
     }
 
     pub async fn resume(&self) -> Result<()> {
-        self.audio.lock().await.resume()
+        let settings =
+            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
+            self.audio
+                .lock()
+                .await
+                .resume_with_fade(settings.fade_pause_duration_ms)
+        } else {
+            self.audio.lock().await.resume()
+        }
     }
 
     pub async fn stop(&mut self) -> Result<()> {
@@ -632,7 +650,16 @@ impl Player {
         self.current_playlist_id = None;
         self.persist_current_song();
         self.persist_position(0);
-        self.audio.lock().await.stop()
+        let settings =
+            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+        if settings.fade_pause_enabled && settings.fade_pause_duration_ms > 0 {
+            self.audio
+                .lock()
+                .await
+                .stop_with_fade(settings.fade_pause_duration_ms)
+        } else {
+            self.audio.lock().await.stop()
+        }
     }
 
     pub async fn seek_to(&self, position_nanosec: u64) -> Result<()> {
@@ -836,18 +863,42 @@ impl Player {
     }
 
     /// Respond to the engine's `AboutToFinish` signal: prime the next track
-    /// for a gapless handover. Does nothing when playback will naturally
-    /// stop after the current track.
+    /// for a gapless or crossfade handover (#79). Does nothing when playback will
+    /// naturally stop after the current track.
     pub async fn prepare_gapless_next(&mut self) -> Result<()> {
         self.preload_upcoming_waveforms();
         let Some(target) = self.peek_next_natural() else {
             return Ok(());
         };
         let start_ns = target.song.beginning_nanosec.max(0) as u64;
-        self.audio
-            .lock()
-            .await
-            .preload_next(Box::new(target.song), start_ns)
+
+        let fade_settings =
+            crate::commands::settings::get_fade_settings_from_db(&self._db).unwrap_or_default();
+
+        let is_same_album = if let Some(current) = &self.current_song {
+            current.is_same_album_or_cue_sibling(&target.song)
+        } else {
+            false
+        };
+
+        if fade_settings.crossfade_auto_enabled
+            && (!fade_settings.crossfade_suppress_same_album || !is_same_album)
+        {
+            log::info!(
+                "Auto-crossfade armed for track transition to song {}",
+                target.song.id
+            );
+            self.audio.lock().await.preload_next_with_crossfade(
+                Box::new(target.song),
+                start_ns,
+                fade_settings.crossfade_auto_duration_secs,
+            )
+        } else {
+            self.audio
+                .lock()
+                .await
+                .preload_next(Box::new(target.song), start_ns)
+        }
     }
 
     /// Commit a completed gapless handover reported by the engine. Advances

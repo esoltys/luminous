@@ -292,25 +292,25 @@
   // $effect. Debounced: the cleanup callback cancels the pending timer
   // whenever songId/mode changes again before it fires, so a burst of rapid
   // skips only ever loads data for whichever track the user actually
-  // settles on. Only the active mode's data is fetched — switching modes
-  // lazily loads the other strip rather than always fetching both.
+  let loadedSongId: number | undefined = undefined;
+  let loadedMode: string | undefined = undefined;
+
+  // Fetch waveform or moodbar when song or mode actually changes.
   $effect(() => {
     const songId = playerStore.currentSong?.id;
     const mode = prefs.seekBarMode;
-    // Immediately clear current display to neutral so old track's waveform is not shown
-    if (mode === "moodbar") {
-      moodbarData = [];
-    } else {
-      waveformData = [];
-    }
-    const timer = setTimeout(() => {
+
+    if (songId !== loadedSongId || mode !== loadedMode) {
+      loadedSongId = songId;
+      loadedMode = mode;
       if (mode === "moodbar") {
+        moodbarData = [];
         loadMoodbar(songId);
       } else {
+        waveformData = [];
         loadWaveform(songId);
       }
-    }, 50);
-    return () => clearTimeout(timer);
+    }
   });
 
   $effect(() => {

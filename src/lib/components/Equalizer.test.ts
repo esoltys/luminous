@@ -31,11 +31,22 @@ describe("Equalizer.svelte", () => {
     fallback_gain_db: -6.0,
   };
 
+  const defaultFadeSettings = {
+    fade_pause_enabled: true,
+    fade_pause_duration_ms: 300,
+    crossfade_manual_enabled: true,
+    crossfade_manual_duration_ms: 1000,
+    crossfade_auto_enabled: false,
+    crossfade_auto_duration_secs: 3.0,
+    crossfade_suppress_same_album: true,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_equalizer_state") return defaultEqConfig;
       if (cmd === "get_loudness_settings") return defaultLoudness;
+      if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_loudness_analysis_remaining") return 0;
       if (cmd === "load_equalizer_preset") return { gains: [4, 3, 2, -1, -2, -1, 1, 2, 3, 4], parametric: [] };
       return null;

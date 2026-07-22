@@ -257,9 +257,62 @@
     await invoke("set_loudness_fallback_gain", { fallbackGainDb });
   }
 
+  // --- Playback Fades & Crossfade (#79) ---
+  interface FadeSettings {
+    fade_pause_enabled: boolean;
+    fade_pause_duration_ms: number;
+    crossfade_manual_enabled: boolean;
+    crossfade_manual_duration_ms: number;
+    crossfade_auto_enabled: boolean;
+    crossfade_auto_duration_secs: number;
+    crossfade_suppress_same_album: boolean;
+  }
+
+  let fadePauseEnabled = $state(true);
+  let fadePauseDurationMs = $state(300);
+  let crossfadeManualEnabled = $state(true);
+  let crossfadeManualDurationMs = $state(1000);
+  let crossfadeAutoEnabled = $state(false);
+  let crossfadeAutoDurationSecs = $state(3.0);
+  let crossfadeSuppressSameAlbum = $state(true);
+
+  async function loadFadeSettings() {
+    try {
+      const settings = await invoke<FadeSettings>("get_fade_settings");
+      fadePauseEnabled = settings.fade_pause_enabled;
+      fadePauseDurationMs = settings.fade_pause_duration_ms;
+      crossfadeManualEnabled = settings.crossfade_manual_enabled;
+      crossfadeManualDurationMs = settings.crossfade_manual_duration_ms;
+      crossfadeAutoEnabled = settings.crossfade_auto_enabled;
+      crossfadeAutoDurationSecs = settings.crossfade_auto_duration_secs;
+      crossfadeSuppressSameAlbum = settings.crossfade_suppress_same_album;
+    } catch (e) {
+      console.error("Failed to load fade settings:", e);
+    }
+  }
+
+  async function saveFadeSettings() {
+    try {
+      await invoke("set_fade_settings", {
+        settings: {
+          fade_pause_enabled: fadePauseEnabled,
+          fade_pause_duration_ms: fadePauseDurationMs,
+          crossfade_manual_enabled: crossfadeManualEnabled,
+          crossfade_manual_duration_ms: crossfadeManualDurationMs,
+          crossfade_auto_enabled: crossfadeAutoEnabled,
+          crossfade_auto_duration_secs: crossfadeAutoDurationSecs,
+          crossfade_suppress_same_album: crossfadeSuppressSameAlbum,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to save fade settings:", e);
+    }
+  }
+
   onMount(async () => {
     loadConfig();
     loadLoudnessSettings();
+    loadFadeSettings();
     loadAnalysisRemaining();
     unlistenAnalysis = await listen<{ remaining: number }>(
       "loudness-analysis-progress",
@@ -449,6 +502,79 @@
           ? i18n.t('loudness.analyzing', { remaining: analysisRemaining })
           : i18n.t('loudness.analyzed')}
       </p>
+    </div>
+
+    <!-- Playback Fades & Crossfade (#79) -->
+    <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 flex flex-col gap-3">
+      <div>
+        <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('fades.title')}</h4>
+        <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('fades.subtitle')}</p>
+      </div>
+
+      <!-- Fade on Pause/Stop -->
+      <div class="flex flex-col gap-1.5 pt-1">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.fadePause')}</span>
+          <input
+            type="checkbox"
+            bind:checked={fadePauseEnabled}
+            onchange={saveFadeSettings}
+            class="toggle-checkbox accent-brand-accent cursor-pointer"
+          />
+        </div>
+        {#if fadePauseEnabled}
+          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
+            <span>{i18n.t('fades.fadeDuration')}</span>
+            <span class="font-mono text-brand-accent-text">{fadePauseDurationMs}ms</span>
+          </div>
+          <input
+            type="range"
+            min="100"
+            max="1000"
+            step="50"
+            bind:value={fadePauseDurationMs}
+            onchange={saveFadeSettings}
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+          />
+        {/if}
+      </div>
+
+      <!-- Automatic Crossfade -->
+      <div class="flex flex-col gap-1.5 border-t border-brand-border/40 pt-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.crossfadeAuto')}</span>
+          <input
+            type="checkbox"
+            bind:checked={crossfadeAutoEnabled}
+            onchange={saveFadeSettings}
+            class="toggle-checkbox accent-brand-accent cursor-pointer"
+          />
+        </div>
+        {#if crossfadeAutoEnabled}
+          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
+            <span>{i18n.t('fades.crossfadeDuration')}</span>
+            <span class="font-mono text-brand-accent-text">{crossfadeAutoDurationSecs.toFixed(1)}s</span>
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="10.0"
+            step="0.5"
+            bind:value={crossfadeAutoDurationSecs}
+            onchange={saveFadeSettings}
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+          />
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-[11px] text-brand-text-secondary/80">{i18n.t('fades.suppressSameAlbum')}</span>
+            <input
+              type="checkbox"
+              bind:checked={crossfadeSuppressSameAlbum}
+              onchange={saveFadeSettings}
+              class="accent-brand-accent cursor-pointer"
+            />
+          </div>
+        {/if}
+      </div>
     </div>
 
     {#if mode === "parametric20"}
