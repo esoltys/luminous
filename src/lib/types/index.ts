@@ -270,3 +270,17 @@ export type PlayContext =
   | { type: "song" }
   | { type: "album"; album: string; albumArtist?: string }
   | { type: "playlist"; playlistId: number };
+
+export type RecentSearchKind = "query" | "artist" | "album" | "song" | "playlist";
+
+export interface RecentSearchItem {
+  id: string;
+  kind: RecentSearchKind;
+  title: string;
+  subtitle?: string;
+  query?: string;
+  artUrl?: string | null;
+  entityId?: string | number;
+  timestamp: number;
+}
+

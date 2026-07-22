@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem } from "../types";
+import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem, RecentSearchItem } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 
@@ -54,6 +54,8 @@ class CollectionStore {
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
+  recentSearches = $state<RecentSearchItem[]>([]);
+
   private _activeTab = $state<ActiveTab>("collection");
   private _activeSubTab = $state<ActiveSubTab>("songs");
   private _playlistsSubTab = $state<PlaylistsSubTab>("custom");
@@ -270,6 +272,15 @@ class CollectionStore {
             console.error("Failed to parse saved selectedAutoPlaylist:", e);
           }
         }
+
+        const savedRecent = localStorage.getItem("luminous_recent_searches");
+        if (savedRecent) {
+          try {
+            this.recentSearches = JSON.parse(savedRecent);
+          } catch (e) {
+            console.error("Failed to parse saved recentSearches:", e);
+          }
+        }
       }
 
       // Seed history with the restored (or default) view so Back/Forward
@@ -415,6 +426,48 @@ class CollectionStore {
     } finally {
       this.searchLoading = false;
     }
+  }
+
+  saveRecentSearches() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("luminous_recent_searches", JSON.stringify(this.recentSearches));
+    }
+  }
+
+  addRecentSearch(item: Omit<RecentSearchItem, "id" | "timestamp">) {
+    const cleanTitle = (item.title || "").trim();
+    if (!cleanTitle) return;
+
+    // Deduplicate by title + kind
+    const existingIndex = this.recentSearches.findIndex(
+      (r) => r.kind === item.kind && r.title.toLowerCase() === cleanTitle.toLowerCase()
+    );
+    if (existingIndex !== -1) {
+      this.recentSearches.splice(existingIndex, 1);
+    }
+
+    const newItem: RecentSearchItem = {
+      ...item,
+      id: `rs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: cleanTitle,
+      timestamp: Date.now(),
+    };
+
+    this.recentSearches.unshift(newItem);
+    if (this.recentSearches.length > 10) {
+      this.recentSearches = this.recentSearches.slice(0, 10);
+    }
+    this.saveRecentSearches();
+  }
+
+  removeRecentSearch(id: string) {
+    this.recentSearches = this.recentSearches.filter((r) => r.id !== id);
+    this.saveRecentSearches();
+  }
+
+  clearRecentSearches() {
+    this.recentSearches = [];
+    this.saveRecentSearches();
   }
 
   viewArtist(name: string) {
