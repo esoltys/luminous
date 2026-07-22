@@ -34,12 +34,44 @@
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
     { label: "%album", desc: "Album" },
-    { label: "%disc", desc: "Disc #" },
+    { label: "{Disc %disc/}", desc: "Conditional Disc #" },
     { label: "%track", desc: "Track #" },
     { label: "%title", desc: "Title" },
     { label: "%year", desc: "Year" },
     { label: "%genre", desc: "Genre" },
   ];
+
+  function highlightTemplateHtml(str: string): string {
+    if (!str) return "";
+    let escaped = str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    const regex = /(%[a-z]+)|([/\\])|([{}])/gi;
+    return escaped.replace(regex, (match, pVar, pSep, pBracket) => {
+      if (pVar) {
+        return `<span class="text-cyan-300 font-semibold bg-cyan-500/20 px-1 py-0.5 rounded border border-cyan-500/40">${pVar}</span>`;
+      }
+      if (pSep) {
+        return `<span class="text-amber-400 font-bold px-1 py-0.5 bg-amber-500/20 rounded border border-amber-500/40">${pSep}</span>`;
+      }
+      if (pBracket) {
+        return `<span class="text-purple-300 font-bold px-1 py-0.5 bg-purple-500/20 rounded border border-purple-500/40">${pBracket}</span>`;
+      }
+      return match;
+    });
+  }
+
+  function highlightPathHtml(path: string): string {
+    if (!path) return "";
+    const escaped = path
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    return escaped.replace(/([/\\])/g, '<span class="text-amber-400 font-bold px-0.5 bg-amber-500/15 rounded">$1</span>');
+  }
 
   let template = $state(DEFAULT_TEMPLATE);
   let scope = $state<"selection" | "library">("library");
@@ -261,12 +293,20 @@
               {i18n.t("organizer.defaultPattern")}
             </button>
           </div>
-          <input
-            id="template-input"
-            type="text"
-            bind:value={template}
-            class="w-full px-3.5 py-2 bg-brand-sidebar/80 border border-brand-border/80 rounded-xl text-brand-text-primary text-xs font-mono focus:outline-none focus:border-brand-accent transition-colors"
-          />
+
+          <!-- Highlighted input box -->
+          <div class="relative w-full rounded-xl bg-brand-sidebar/90 border border-brand-border/90 focus-within:border-brand-accent transition-colors font-mono text-xs overflow-hidden min-h-[40px] flex items-center shadow-inner">
+            <div class="absolute inset-0 px-3.5 py-2.5 text-brand-text-primary whitespace-pre overflow-hidden flex items-center pointer-events-none font-mono text-xs select-none z-0">
+              {@html highlightTemplateHtml(template)}
+            </div>
+            <input
+              id="template-input"
+              type="text"
+              bind:value={template}
+              class="relative w-full px-3.5 py-2.5 bg-transparent text-transparent caret-brand-accent font-mono text-xs focus:outline-none z-10"
+              spellcheck="false"
+            />
+          </div>
 
           <!-- Variable chips -->
           <div class="flex flex-wrap items-center gap-1.5 pt-1">
@@ -275,7 +315,7 @@
               <button
                 type="button"
                 onclick={() => insertChip(chip.label)}
-                class="px-2 py-0.5 rounded-lg bg-brand-sidebar border border-brand-border/60 text-[11px] font-mono text-brand-accent-text hover:bg-brand-accent/20 transition-colors cursor-pointer"
+                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border {chip.label.startsWith('{') ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 hover:bg-purple-500/30' : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30'}"
                 title={chip.desc}
               >
                 {chip.label}
@@ -428,7 +468,7 @@
                     </div>
 
                     <div class="flex-1 truncate px-2 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}" title={item.from_path}>
-                      {item.from_path || "(No path recorded)"}
+                      {@html highlightPathHtml(item.from_path || "(No path recorded)")}
                     </div>
                     <div class="text-brand-text-secondary px-1">→</div>
                     <div
@@ -440,7 +480,7 @@
                           {item.error_message ? item.error_message : (item.to_path || 'Unknown error')}
                         </span>
                       {:else}
-                        {item.to_path}
+                        {@html highlightPathHtml(item.to_path)}
                       {/if}
                     </div>
                   </div>
