@@ -279,4 +279,53 @@ describe("CollectionStore", () => {
     collectionStore.exitImmersiveMode();
     expect(collectionStore.immersiveMode).toBe(false);
   });
+
+  it("manages recent searches state, deduplication, and persistence", () => {
+    collectionStore.clearRecentSearches();
+    expect(collectionStore.recentSearches).toHaveLength(0);
+
+    collectionStore.addRecentSearch({
+      kind: "query",
+      title: "Pink Floyd",
+      query: "Pink Floyd"
+    });
+    expect(collectionStore.recentSearches).toHaveLength(1);
+    expect(collectionStore.recentSearches[0].title).toBe("Pink Floyd");
+
+    // Deduplication test
+    collectionStore.addRecentSearch({
+      kind: "artist",
+      title: "The Beatles",
+      subtitle: "Artist"
+    });
+    collectionStore.addRecentSearch({
+      kind: "query",
+      title: "Pink Floyd",
+      query: "Pink Floyd"
+    });
+    expect(collectionStore.recentSearches).toHaveLength(2);
+    expect(collectionStore.recentSearches[0].title).toBe("Pink Floyd");
+
+    // Capacity cap (max 10) test
+    for (let i = 1; i <= 12; i++) {
+      collectionStore.addRecentSearch({
+        kind: "query",
+        title: `Search ${i}`,
+        query: `Search ${i}`
+      });
+    }
+    expect(collectionStore.recentSearches).toHaveLength(10);
+    expect(collectionStore.recentSearches[0].title).toBe("Search 12");
+
+    // Remove single item
+    const itemToRemove = collectionStore.recentSearches[0];
+    collectionStore.removeRecentSearch(itemToRemove.id);
+    expect(collectionStore.recentSearches).toHaveLength(9);
+    expect(collectionStore.recentSearches.some(r => r.id === itemToRemove.id)).toBe(false);
+
+    // Clear all
+    collectionStore.clearRecentSearches();
+    expect(collectionStore.recentSearches).toHaveLength(0);
+    expect(localStorage.getItem("luminous_recent_searches")).toBe("[]");
+  });
 });

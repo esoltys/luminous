@@ -128,7 +128,7 @@
       <!-- FRONT FACE: Normal App Layout -->
       <div class="flip-face flip-front flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
         <!-- Top Navigation Ribbon -->
-        <div class="flex-shrink-0 z-40 overflow-hidden">
+        <div class="flex-shrink-0 z-50 overflow-visible">
           <TopNavigation />
         </div>
 
