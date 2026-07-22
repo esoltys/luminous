@@ -150,6 +150,49 @@
     return fullPath;
   }
 
+  let fromColWidth = $state(340);
+  let toColWidth = $state(380);
+  let isResizing = $state<"from" | "to" | null>(null);
+  let resizeStartX = 0;
+  let resizeStartWidth = 0;
+
+  function startResize(col: "from" | "to", e: MouseEvent) {
+    e.preventDefault();
+    isResizing = col;
+    resizeStartX = e.clientX;
+    resizeStartWidth = col === "from" ? fromColWidth : toColWidth;
+    window.addEventListener("mousemove", handleResizeMove);
+    window.addEventListener("mouseup", handleResizeUp);
+  }
+
+  function handleResizeMove(e: MouseEvent) {
+    if (!isResizing) return;
+    const diff = e.clientX - resizeStartX;
+    if (isResizing === "from") {
+      fromColWidth = Math.max(150, resizeStartWidth + diff);
+    } else {
+      toColWidth = Math.max(150, resizeStartWidth + diff);
+    }
+  }
+
+  function handleResizeUp() {
+    isResizing = null;
+    window.removeEventListener("mousemove", handleResizeMove);
+    window.removeEventListener("mouseup", handleResizeUp);
+  }
+
+  function autoFitColumns() {
+    let maxFrom = 250;
+    let maxTo = 300;
+    for (const raw of items) {
+      const i = getItemObj(raw);
+      if (i.from_path) maxFrom = Math.max(maxFrom, i.from_path.length * 7.5);
+      if (i.to_path) maxTo = Math.max(maxTo, i.to_path.length * 7.5);
+    }
+    fromColWidth = Math.min(1000, Math.max(250, maxFrom));
+    toColWidth = Math.min(1000, Math.max(300, maxTo));
+  }
+
   let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "collision").length);
   let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
@@ -485,7 +528,7 @@
           {/if}
 
           <!-- Virtualized table -->
-          <div class="h-64 border border-brand-border/60 rounded-xl overflow-x-auto overflow-y-hidden bg-brand-sidebar/40">
+          <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
             {#if items.length === 0}
               <div class="h-full flex items-center justify-center text-brand-text-secondary">
                 {#if isLoading}
@@ -495,66 +538,120 @@
                 {/if}
               </div>
             {:else}
-              <div class="min-w-[720px] h-full flex flex-col">
-                {#if commonPrefix}
-                  <div class="px-3 py-1 bg-brand-sidebar/70 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
-                    <span class="font-semibold text-brand-accent-text shrink-0">Common Base Path:</span>
-                    <span class="truncate text-brand-text-primary">{commonPrefix}</span>
-                  </div>
-                {/if}
-                <div class="flex-1 min-h-0">
-                  <VirtualList items={items} height="100%" itemHeight={36}>
-                    {#snippet children(rawRow: any)}
-                      {@const item = getItemObj(rawRow)}
-                      {@const st = getItemStatus(item)}
-                      {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
-                      {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
-                      <div
-                        class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
-                      >
-                        <div class="w-24 shrink-0">
-                          {#if st === "ok"}
-                            <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              {i18n.t("organizer.statusOk")}
-                            </span>
-                          {:else if st === "unchanged"}
-                            <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
-                              {i18n.t("organizer.statusUnchanged")}
-                            </span>
-                          {:else if st === "collision"}
-                            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
-                              {i18n.t("organizer.statusCollision")}
-                            </span>
-                          {:else if st === "missing_tag"}
-                            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
-                              {i18n.t("organizer.statusMissingTag")}
-                            </span>
-                          {:else}
-                            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
-                              {i18n.t("organizer.statusError")}
-                            </span>
-                          {/if}
-                        </div>
+              <!-- Common Base Path Bar -->
+              {#if commonPrefix}
+                <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
+                  <span class="font-semibold text-brand-accent-text shrink-0">Common Base Path:</span>
+                  <span class="truncate text-brand-text-primary">{commonPrefix}</span>
+                </div>
+              {/if}
 
-                        <div class="flex-1 truncate px-2 min-w-[200px] {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}" title={item.from_path}>
-                          {@html highlightPathHtml(displayFrom || "(No path recorded)")}
-                        </div>
-                        <div class="text-brand-text-secondary px-1.5 shrink-0">→</div>
+              <!-- Horizontally scrollable viewport wrapper -->
+              <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+                <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
+                  <!-- Table Column Header with Draggable Splitters -->
+                  <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
+                    <div class="w-24 shrink-0">Status</div>
+
+                    <!-- Original Path Header -->
+                    <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
+                      <span class="truncate flex-1">Original Path</span>
+                      <button
+                        type="button"
+                        aria-label="Resize Original Path Column"
+                        onmousedown={(e) => startResize("from", e)}
+                        ondblclick={autoFitColumns}
+                        class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
+                        title="Drag to resize column, double-click to auto-fit"
+                      >
+                        <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
+                      </button>
+                    </div>
+
+                    <div class="w-6 text-center shrink-0 text-brand-text-secondary">→</div>
+
+                    <!-- Target Path Header -->
+                    <div class="flex items-center shrink-0 pl-1" style="width: {toColWidth}px;">
+                      <span class="truncate flex-1">Target Path</span>
+                      <button
+                        type="button"
+                        aria-label="Resize Target Path Column"
+                        onmousedown={(e) => startResize("to", e)}
+                        ondblclick={autoFitColumns}
+                        class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
+                        title="Drag to resize column, double-click to auto-fit"
+                      >
+                        <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Virtualized rows -->
+                  <div class="flex-1 min-h-0">
+                    <VirtualList items={items} height="100%" itemHeight={36}>
+                      {#snippet children(rawRow: any)}
+                        {@const item = getItemObj(rawRow)}
+                        {@const st = getItemStatus(item)}
+                        {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
+                        {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
                         <div
-                          class="flex-1 truncate px-2 min-w-[200px] {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
-                          title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
+                          class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
                         >
-                          {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
-                            <span class="text-rose-400 font-medium">
-                              {item.error_message ? item.error_message : (displayTo || 'Unknown error')}
-                            </span>
-                          {:else}
-                            {@html highlightPathHtml(displayTo)}
-                          {/if}
+                          <!-- Status badge -->
+                          <div class="w-24 shrink-0">
+                            {#if st === "ok"}
+                              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                {i18n.t("organizer.statusOk")}
+                              </span>
+                            {:else if st === "unchanged"}
+                              <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
+                                {i18n.t("organizer.statusUnchanged")}
+                              </span>
+                            {:else if st === "collision"}
+                              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                                {i18n.t("organizer.statusCollision")}
+                              </span>
+                            {:else if st === "missing_tag"}
+                              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                                {i18n.t("organizer.statusMissingTag")}
+                              </span>
+                            {:else}
+                              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                                {i18n.t("organizer.statusError")}
+                              </span>
+                            {/if}
+                          </div>
+
+                          <!-- Original path cell -->
+                          <div
+                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}"
+                            style="width: {fromColWidth}px;"
+                            title={item.from_path}
+                          >
+                            {@html highlightPathHtml(displayFrom || "(No path recorded)")}
+                          </div>
+
+                          <!-- Arrow separator -->
+                          <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
+
+                          <!-- Target path cell -->
+                          <div
+                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                            style="width: {toColWidth}px;"
+                            title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
+                          >
+                            {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
+                              <span class="text-rose-400 font-medium">
+                                {item.error_message ? item.error_message : (displayTo || 'Unknown error')}
+                              </span>
+                            {:else}
+                              {@html highlightPathHtml(displayTo)}
+                            {/if}
+                          </div>
                         </div>
-                      </div>
-                    {/snippet}
-                  </VirtualList>
+                      {/snippet}
+                    </VirtualList>
+                  </div>
                 </div>
               </div>
             {/if}
