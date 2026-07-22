@@ -251,6 +251,25 @@ impl Song {
             .map(|ns| ns as f64 / 1_000_000_000.0)
             .unwrap_or(0.0)
     }
+
+    /// Returns true if this song and `other` belong to the same album or are CUE sheet siblings (#79).
+    pub fn is_same_album_or_cue_sibling(&self, other: &Song) -> bool {
+        if let (Some(c1), Some(c2)) = (&self.cue_path, &other.cue_path) {
+            if !c1.is_empty() && c1 == c2 {
+                return true;
+            }
+        }
+        if let (Some(a1), Some(a2)) = (&self.album, &other.album) {
+            if !a1.is_empty() && a1.eq_ignore_ascii_case(a2) {
+                let artist1 = self.effective_album_artist();
+                let artist2 = other.effective_album_artist();
+                if !artist1.is_empty() && artist1.eq_ignore_ascii_case(artist2) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +505,35 @@ pub enum LoudnessGainSource {
 }
 
 // ---------------------------------------------------------------------------
+// Playback Fades & Crossfade models (#79)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FadeSettings {
+    pub fade_pause_enabled: bool,
+    pub fade_pause_duration_ms: u32,
+    pub crossfade_manual_enabled: bool,
+    pub crossfade_manual_duration_ms: u32,
+    pub crossfade_auto_enabled: bool,
+    pub crossfade_auto_duration_secs: f32,
+    pub crossfade_suppress_same_album: bool,
+}
+
+impl Default for FadeSettings {
+    fn default() -> Self {
+        Self {
+            fade_pause_enabled: true,
+            fade_pause_duration_ms: 300,
+            crossfade_manual_enabled: true,
+            crossfade_manual_duration_ms: 1000,
+            crossfade_auto_enabled: false,
+            crossfade_auto_duration_secs: 3.0,
+            crossfade_suppress_same_album: true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Collection / library models
 // ---------------------------------------------------------------------------
 
@@ -544,4 +592,39 @@ pub enum HomeItem {
     Song { song: Box<Song> },
     Album { album: AlbumItem },
     Playlist { playlist: Playlist },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_same_album_or_cue_sibling() {
+        let mut s1 = Song::default();
+        s1.album = Some("The Dark Side of the Moon".to_string());
+        s1.artist = Some("Pink Floyd".to_string());
+
+        let mut s2 = Song::default();
+        s2.album = Some("The Dark Side of the Moon".to_string());
+        s2.artist = Some("Pink Floyd".to_string());
+
+        assert!(s1.is_same_album_or_cue_sibling(&s2));
+
+        let mut s3 = Song::default();
+        s3.album = Some("Abbey Road".to_string());
+        s3.artist = Some("The Beatles".to_string());
+
+        assert!(!s1.is_same_album_or_cue_sibling(&s3));
+    }
+
+    #[test]
+    fn test_cue_sibling_match() {
+        let mut s1 = Song::default();
+        s1.cue_path = Some("/music/album.cue".to_string());
+
+        let mut s2 = Song::default();
+        s2.cue_path = Some("/music/album.cue".to_string());
+
+        assert!(s1.is_same_album_or_cue_sibling(&s2));
+    }
 }

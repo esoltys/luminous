@@ -506,6 +506,20 @@ export const en = {
     analyzing: "Analyzing library: {remaining} track(s) remaining",
     analyzed: "All tracks analyzed"
   },
+  fades: {
+    title: "Playback Fades & Crossfade",
+    subtitle: "Fade volume on pause/stop and crossfade between queued tracks",
+    fadePause: "Fade on Pause/Stop",
+    fadePauseHint: "Smoothly ramp down volume when pausing or stopping playback",
+    fadeDuration: "Fade Duration",
+    crossfadeManual: "Manual Track Crossfade",
+    crossfadeManualHint: "Crossfade when manually skipping or changing tracks",
+    crossfadeAuto: "Automatic Track Crossfade",
+    crossfadeAutoHint: "Crossfade automatically as a track reaches its end",
+    crossfadeDuration: "Crossfade Duration",
+    suppressSameAlbum: "Preserve Gapless for Same Album",
+    suppressSameAlbumHint: "Skip auto-crossfade between consecutive tracks from the same album"
+  },
   themes: {
     system: "System",
     "ruby-red": "Ruby Red",

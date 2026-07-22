@@ -615,6 +615,8 @@ pub fn run() {
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
             commands::settings::get_commit_hash,
+            commands::settings::get_fade_settings,
+            commands::settings::set_fade_settings,
             // Stats commands
             commands::stats::set_song_rating,
         ])

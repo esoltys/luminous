@@ -504,7 +504,21 @@ export const fr = {
     fallbackGain: "Gain de secours",
     fallbackGainHint: "Appliqué lorsqu'une piste n'a ni analyse R128 ni tag ReplayGain",
     analyzing: "Analyse de la bibliothèque : {remaining} piste(s) restante(s)",
-    analyzed: "Toutes les pistes ont été analysées"
+    analyzed: "Toutes les pistes sont analysées"
+  },
+  fades: {
+    title: "Fondu & Fondu enchaîné",
+    subtitle: "Fondu du volume à la pause et fondu enchaîné entre les pistes",
+    fadePause: "Fondu à la pause/arrêt",
+    fadePauseHint: "Diminue progressivement le volume lors de la mise en pause ou de l'arrêt",
+    fadeDuration: "Durée du fondu",
+    crossfadeManual: "Fondu enchaîné manuel",
+    crossfadeManualHint: "Fondu enchaîné lors d'un changement manuel de piste",
+    crossfadeAuto: "Fondu enchaîné automatique",
+    crossfadeAutoHint: "Fondu enchaîné automatique à la fin d'un morceau",
+    crossfadeDuration: "Durée du fondu enchaîné",
+    suppressSameAlbum: "Préserver l'enchaînement sans blanc (Même album)",
+    suppressSameAlbumHint: "Ignorer le fondu enchaîné entre les pistes d'un même album"
   },
   themes: {
     system: "Système",

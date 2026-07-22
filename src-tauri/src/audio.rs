@@ -43,6 +43,21 @@ use symphonia::core::{
 /// sibling-track continuation (#78).
 pub const PRELOAD_LEAD_NS: u64 = 8_000_000_000;
 
+fn apply_fade_ramp(fade_gain: &Arc<AtomicU32>, start_gain: f32, end_gain: f32, duration_ms: u32) {
+    if duration_ms == 0 {
+        fade_gain.store(end_gain.to_bits(), Ordering::Relaxed);
+        return;
+    }
+    let steps = (duration_ms / 10).max(1);
+    let step_dur = std::time::Duration::from_millis((duration_ms / steps) as u64);
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        let g = start_gain + (end_gain - start_gain) * t;
+        fade_gain.store(g.to_bits(), Ordering::Relaxed);
+        std::thread::sleep(step_dur);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Control messages sent to the decode thread
 // ---------------------------------------------------------------------------
@@ -51,12 +66,17 @@ pub enum AudioCommand {
     Play(PlayRequest),
     Cue(PlayRequest),
     Pause,
+    PauseWithFade(u32),
     Resume,
+    ResumeWithFade(u32),
     Stop,
+    StopWithFade(u32),
     SeekTo(u64),    // target position in nanoseconds
     SetVolume(f32), // 0.0–1.0
     /// Prime the next track for a gapless transition after the current one.
     PreloadNext(PlayRequest),
+    /// Prime the next track for an auto-crossfade transition (#79).
+    PreloadNextCrossfade(PlayRequest, f32),
     /// Drop a primed next track (playback context changed) and re-arm the
     /// `AboutToFinish` signal so a fresh preload can be requested.
     ClearPreload,
@@ -204,6 +224,23 @@ impl AudioEngine {
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
+    pub fn preload_next_with_crossfade(
+        &self,
+        song: Box<Song>,
+        start_nanosec: u64,
+        crossfade_secs: f32,
+    ) -> Result<()> {
+        self.cmd_tx
+            .send(AudioCommand::PreloadNextCrossfade(
+                PlayRequest {
+                    song,
+                    start_nanosec,
+                },
+                crossfade_secs,
+            ))
+            .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
     pub fn clear_preload(&self) -> Result<()> {
         self.cmd_tx
             .send(AudioCommand::ClearPreload)
@@ -216,15 +253,33 @@ impl AudioEngine {
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
+    pub fn pause_with_fade(&self, fade_ms: u32) -> Result<()> {
+        self.cmd_tx
+            .send(AudioCommand::PauseWithFade(fade_ms))
+            .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
     pub fn resume(&self) -> Result<()> {
         self.cmd_tx
             .send(AudioCommand::Resume)
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
+    pub fn resume_with_fade(&self, fade_ms: u32) -> Result<()> {
+        self.cmd_tx
+            .send(AudioCommand::ResumeWithFade(fade_ms))
+            .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
     pub fn stop(&self) -> Result<()> {
         self.cmd_tx
             .send(AudioCommand::Stop)
+            .map_err(|_| anyhow!("audio thread shut down"))
+    }
+
+    pub fn stop_with_fade(&self, fade_ms: u32) -> Result<()> {
+        self.cmd_tx
+            .send(AudioCommand::StopWithFade(fade_ms))
             .map_err(|_| anyhow!("audio thread shut down"))
     }
 
@@ -665,7 +720,7 @@ fn decode_thread(
                         }
                         continue;
                     }
-                    Ok(AudioCommand::Resume) => {
+                    Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {
                         if let Some(r) = paused_req.take() {
                             let cur_pos = position.load(Ordering::Relaxed);
                             PlayRequest {
@@ -676,7 +731,7 @@ fn decode_thread(
                             continue;
                         }
                     }
-                    Ok(AudioCommand::Stop) => {
+                    Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
                         if let Some(out) = output.as_ref() {
                             let _ = out.stream.pause();
                         }
@@ -711,7 +766,7 @@ fn decode_thread(
                         *vol = v.clamp(0.0, 1.0);
                     }
                 }
-                Ok(AudioCommand::Stop) => {
+                Ok(AudioCommand::Stop) | Ok(AudioCommand::StopWithFade(_)) => {
                     if let Some(out) = output.as_ref() {
                         let _ = out.stream.pause();
                     }
@@ -820,8 +875,36 @@ fn decode_thread(
                     });
                     break 'decode;
                 }
+                Ok(AudioCommand::PauseWithFade(dur_ms)) => {
+                    apply_fade_ramp(&fade_gain, 1.0, 0.0, dur_ms);
+                    let _ = out.stream.pause();
+                    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
+                    if let Ok(mut s) = play_state.lock() {
+                        *s = PlayState::Paused;
+                    }
+                    let _ = event_tx.send(AudioEvent::Paused);
+                    let song_for_resume = match transition.as_ref() {
+                        Some(t) => t.finished_song.clone(),
+                        None => current.song.clone(),
+                    };
+                    paused_req = Some(PlayRequest {
+                        song: song_for_resume,
+                        start_nanosec: position.load(Ordering::Relaxed),
+                    });
+                    break 'decode;
+                }
                 Ok(AudioCommand::Stop) => {
                     let _ = out.stream.pause();
+                    if let Ok(mut s) = play_state.lock() {
+                        *s = PlayState::Stopped;
+                    }
+                    let _ = event_tx.send(AudioEvent::Stopped);
+                    break 'decode;
+                }
+                Ok(AudioCommand::StopWithFade(dur_ms)) => {
+                    apply_fade_ramp(&fade_gain, 1.0, 0.0, dur_ms);
+                    let _ = out.stream.pause();
+                    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
                     if let Ok(mut s) = play_state.lock() {
                         *s = PlayState::Stopped;
                     }
@@ -917,6 +1000,23 @@ fn decode_thread(
                         }
                     }
                 }
+                Ok(AudioCommand::PreloadNextCrossfade(preq, _secs)) => {
+                    match ActiveTrack::open(
+                        preq.song,
+                        preq.start_nanosec,
+                        target_sample_rate,
+                        target_channels as usize,
+                    ) {
+                        Ok(t) => {
+                            log::debug!("Preloaded next track {} for crossfade", t.song.id);
+                            next = Some(t);
+                        }
+                        Err(e) => {
+                            log::warn!("Crossfade preload failed: {e}");
+                            next = None;
+                        }
+                    }
+                }
                 Ok(AudioCommand::ClearPreload) => {
                     if transition.is_none() {
                         next = None;
@@ -925,7 +1025,7 @@ fn decode_thread(
                 }
                 Err(mpsc::TryRecvError::Empty) => {} // no pending command
                 Err(mpsc::TryRecvError::Disconnected) => break 'decode,
-                Ok(AudioCommand::Resume) => {} // already playing
+                Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {} // already playing
                 Ok(AudioCommand::Cue(_)) => {} // already playing
             }
 
