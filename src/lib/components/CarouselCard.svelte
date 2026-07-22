@@ -54,9 +54,9 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="flex-shrink-0 w-48 group relative">
     <!-- Card Container -->
-    <div class="relative overflow-hidden bg-brand-sidebar border border-brand-border/50 transition-all duration-200 hover:border-brand-accent hover:shadow-lg hover:shadow-brand-accent/10">
+    <div class="relative overflow-hidden rounded-xl bg-brand-sidebar border border-brand-border/60 transition-all duration-200 hover:border-brand-accent/40 flex flex-col h-full">
       <!-- Cover Art -->
-      <div class="relative aspect-square overflow-hidden bg-brand-sidebar">
+      <div class="relative aspect-square overflow-hidden bg-brand-sidebar w-full">
         <CoverArt
           songId={item.song.id}
           artEmbedded={item.song.art_embedded}
@@ -66,33 +66,33 @@
         />
 
         <!-- Play Button Overlay -->
-        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
           <button
             onclick={handlePlay}
-            class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-brand-accent hover:bg-brand-accent-hover rounded-full p-3 text-brand-accent-contrast shadow-lg cursor-pointer"
+            class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
             title={i18n.t('playerBar.play')}
           >
-            <Play class="w-6 h-6 fill-current" />
+            <Play class="w-5 h-5 fill-current ml-0.5" />
           </button>
         </div>
       </div>
 
       <!-- Metadata -->
-      <div class="p-3 space-y-2">
+      <div class="p-3.5 flex flex-col flex-1">
         <!-- Song Title -->
-        <h3 class="text-sm font-semibold text-brand-text-primary truncate" title={item.song.title}>
+        <h3 class="font-semibold text-sm text-brand-text-primary truncate" title={item.song.title}>
           {item.song.title || i18n.t('collection.unknownSong')}
         </h3>
 
         <!-- Song Artist -->
-        <p class="text-xs text-brand-text-secondary truncate" title={item.song.artist}>
+        <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium" title={item.song.artist}>
           {item.song.artist || i18n.t('collection.unknownArtist')}
         </p>
 
         <!-- Song Duration -->
-        <p class="text-xs text-brand-text-secondary/60">
+        <div class="mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
           {formatDuration(item.song.length_nanosec)}
-        </p>
+        </div>
       </div>
     </div>
   </div>

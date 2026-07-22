@@ -32,6 +32,13 @@
     !playlist.dynamic_enabled ? null : playlist.dynamic_spec?.startsWith("decade:") ? "decade" : "genre"
   );
 
+  let subtitleLabel = $derived.by(() => {
+    if (!playlist.dynamic_enabled) return null;
+    if (autoKind === "decade") return i18n.t("playlists.decadeAutoPlaylist");
+    if (autoKind === "genre") return i18n.t("playlists.genreAutoPlaylist");
+    return i18n.t("playlists.genreAutoPlaylist");
+  });
+
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
   let isActive = $derived(playlistsStore.activePlaylistId === playlist.id);
 
@@ -106,7 +113,12 @@
   >
     {playlist.name}
   </button>
-  <div class="flex items-center justify-between mt-0.5 text-[10px] text-brand-text-secondary/50">
+  {#if subtitleLabel}
+    <div class="text-xs text-brand-text-secondary/60 truncate w-full mt-0.5 font-medium">
+      {subtitleLabel}
+    </div>
+  {/if}
+  <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
     <span class="truncate">{i18n.t('playlists.updatedOn', { date: updatedLabel })}</span>
     <span class="shrink-0">{playlist.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: playlist.track_count })}</span>
   </div>

@@ -27,6 +27,14 @@
 
   let isActive = $derived(playlistId !== undefined && playlistsStore.activePlaylistId === playlistId);
 
+  let subtitleLabel = $derived.by(() => {
+    if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
+    if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
+    if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
+    if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    return i18n.t("playlists.genreAutoPlaylist");
+  });
+
   let songs = $state<Song[]>([]);
 
   $effect(() => {
@@ -148,7 +156,10 @@
   >
     {label}
   </button>
-  <div class="flex items-center justify-between mt-0.5 text-[10px] text-brand-text-secondary/50">
+  <div class="text-xs text-brand-text-secondary/60 truncate w-full mt-0.5 font-medium">
+    {subtitleLabel}
+  </div>
+  <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
     <span class="truncate">{updatedLabel ? i18n.t('playlists.updatedOn', { date: updatedLabel }) : ""}</span>
     <span class="shrink-0">{trackCount === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: trackCount })}</span>
   </div>

@@ -110,10 +110,10 @@
   onclick={handleCardClick}
   ondblclick={handleCardDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl overflow-hidden flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
 >
   <div
-    class="aspect-square bg-brand-main mb-3 flex items-center justify-center text-brand-accent-text relative"
+    class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"
   >
     <CoverStack
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
@@ -131,28 +131,30 @@
       </button>
     </div>
   </div>
-  <button
-    onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
-    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
-    title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
-  >
-    {album.album || i18n.t('collection.unknownAlbum')}
-  </button>
-  {#if showArtist}
-    {#if album.artist}
-      <button
-        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
-        class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5"
-        title={i18n.t('collection.filterByArtist', { artist: album.artist })}
-      >
-        {album.artist}
-      </button>
-    {:else}
-      <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate">{i18n.t('collection.variousArtists')}</span>
+  <div class="p-3.5 flex flex-col flex-1">
+    <button
+      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
+      class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+      title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
+    >
+      {album.album || i18n.t('collection.unknownAlbum')}
+    </button>
+    {#if showArtist}
+      {#if album.artist}
+        <button
+          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
+          class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5 font-medium"
+          title={i18n.t('collection.filterByArtist', { artist: album.artist })}
+        >
+          {album.artist}
+        </button>
+      {:else}
+        <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate font-medium">{i18n.t('collection.variousArtists')}</span>
+      {/if}
     {/if}
-  {/if}
-  <div class="flex items-center justify-between mt-2 text-[10px] text-brand-text-secondary/50">
-    <span>{album.year || ""}</span>
-    <span>{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : (album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count }))}</span>
+    <div class="flex items-center justify-between mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
+      <span>{album.year || ""}</span>
+      <span>{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : (album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count }))}</span>
+    </div>
   </div>
 </div>

@@ -309,7 +309,7 @@
 
       <div class="pt-2 pb-8">
         {#if collectionStore.playlistsSubTab === "auto"}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {#each sortedAutoDefs as def (def.id)}
               <AutoPlaylistCard
                 label={def.label}
@@ -333,7 +333,7 @@
             </div>
           </div>
         {:else}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {#each sortedPlaylists as pl (pl.id)}
               <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
             {/each}
