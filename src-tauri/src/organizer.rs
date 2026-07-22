@@ -124,9 +124,18 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
             let has_artist = block_content.contains("%artist")
                 && !block_content.contains("%albumartist")
                 && song.artist.as_deref().is_some_and(|a| !a.trim().is_empty());
+            let has_track = (block_content.contains("%track")
+                || block_content.contains("%track3")
+                || block_content.contains("%rawtrack"))
+                && song.track.is_some_and(|t| t > 0);
 
-            let should_render =
-                has_disc || has_year || has_genre || has_album_artist || has_album || has_artist;
+            let should_render = has_disc
+                || has_year
+                || has_genre
+                || has_album_artist
+                || has_album
+                || has_artist
+                || has_track;
             let replacement = if should_render {
                 block_content.to_string()
             } else {
@@ -704,6 +713,35 @@ mod tests {
         assert_eq!(
             expand_template(template, &song_no_album, "flac"),
             "Artist/01 Single Track"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_optional_track() {
+        let song_with_track = Song {
+            id: 1,
+            title: Some("Single Track".to_string()),
+            artist: Some("Artist".to_string()),
+            track: Some(3),
+            ..Default::default()
+        };
+
+        let song_no_track = Song {
+            id: 2,
+            title: Some("Single Track".to_string()),
+            artist: Some("Artist".to_string()),
+            track: None,
+            ..Default::default()
+        };
+
+        let template = "%albumartist/{%album/}{%disc-}{%track }%title";
+        assert_eq!(
+            expand_template(template, &song_with_track, "flac"),
+            "Artist/03 Single Track"
+        );
+        assert_eq!(
+            expand_template(template, &song_no_track, "flac"),
+            "Artist/Single Track"
         );
     }
 
