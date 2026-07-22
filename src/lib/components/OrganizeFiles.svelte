@@ -95,8 +95,16 @@
 
   let activeSongIds = $derived(scope === "library" ? [] : songIds);
 
+  function getItemObj(raw: any): OrganizePreviewItem {
+    if (raw && typeof raw === "object" && "item" in raw && raw.item) {
+      return raw.item as OrganizePreviewItem;
+    }
+    return raw as OrganizePreviewItem;
+  }
+
   function getItemStatus(item: OrganizePreviewItem): "ok" | "unchanged" | "collision" | "missing_tag" | "error" {
-    const s = String(item?.status || "").toLowerCase();
+    const target = getItemObj(item);
+    const s = String(target?.status || "").toLowerCase();
     if (s === "ok") return "ok";
     if (s === "unchanged") return "unchanged";
     if (s === "collision") return "collision";
@@ -450,7 +458,8 @@
               </div>
             {:else}
               <VirtualList items={items} height="100%" itemHeight={36}>
-                {#snippet children(item: OrganizePreviewItem)}
+                {#snippet children(rawRow: any)}
+                  {@const item = getItemObj(rawRow)}
                   {@const st = getItemStatus(item)}
                   <div
                     class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors"
@@ -487,8 +496,8 @@
                       class="flex-1 truncate px-2 {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
                       title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
                     >
-                      {#if st === 'error' || st === 'collision' || item.error_message}
-                        <span class="{st === 'missing_tag' ? 'text-amber-400' : 'text-rose-400'} font-medium">
+                      {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
+                        <span class="text-rose-400 font-medium">
                           {item.error_message ? item.error_message : (item.to_path || 'Unknown error')}
                         </span>
                       {:else}
