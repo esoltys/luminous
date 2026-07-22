@@ -342,7 +342,7 @@
           class="px-4 py-2 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast text-xs font-semibold rounded-xl shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
         >
           <Sparkles class="w-3.5 h-3.5" />
-          Create Smart Playlist
+          {editing ? "Update Smart Playlist" : "Create Smart Playlist"}
         </button>
       </div>
     </form>

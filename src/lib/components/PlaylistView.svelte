@@ -627,15 +627,6 @@
               >
                 <Pencil class="w-4 h-4" />
               </button>
-              {#if isActive}
-                <div
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-accent text-brand-accent-contrast text-xs font-bold shadow-md select-none shrink-0 ml-1"
-                  title={i18n.t("playlists.activeBadgeTooltip")}
-                >
-                  <Radio class="w-3.5 h-3.5 animate-pulse" />
-                  <span>{i18n.t("playlists.activeBadgeLabel")}</span>
-                </div>
-              {/if}
             </div>
           {/if}
 

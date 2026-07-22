@@ -315,8 +315,6 @@ export const en = {
     relativeOneYearAgo: "1 year ago",
     relativeYearsAgo: "{count} years ago",
     makeActiveBtn: "Make Active",
-    activeBadgeLabel: "Active",
-    activeBadgeTooltip: "Currently active playlist for adding songs",
     refreshAutoPlaylistTooltip: "Refresh auto-playlist with a new selection of tracks from your library",
     allMatchingTracksAdded: "All matching tracks from your library have been added to this auto-playlist.",
     playSelected: "Play Selected",
