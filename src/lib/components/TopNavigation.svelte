@@ -7,6 +7,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
+  import CoverArt from "./CoverArt.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
 
@@ -224,7 +225,7 @@
     <!-- Search Dropdown Popover -->
     {#if isSearchFocused}
       <div
-        class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar/95 backdrop-blur-md rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
+        class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
       >
         <!-- Auto-suggestions (Shown when typing a non-empty search query) -->
         {#if collectionStore.searchQuery.trim() !== ""}
@@ -304,13 +305,13 @@
                     class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                        {#if album.art_manual || album.art_automatic}
-                          <img src={getCoverArtUrl(album.art_manual || album.art_automatic)} alt="" class="w-full h-full object-cover" />
-                        {:else}
-                          <Disc class="w-4 h-4 text-brand-text-secondary" />
-                        {/if}
-                      </div>
+                      <CoverArt
+                        songId={undefined}
+                        artManual={album.art_manual}
+                        artAutomatic={album.art_automatic}
+                        artEmbedded={album.art_embedded}
+                        sizeClass="w-8 h-8 rounded-md"
+                      />
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
                           {album.album}
@@ -345,13 +346,13 @@
                     class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                        {#if song.art_manual || song.art_automatic}
-                          <img src={getCoverArtUrl(song.art_manual || song.art_automatic)} alt="" class="w-full h-full object-cover" />
-                        {:else}
-                          <Music class="w-4 h-4 text-brand-text-secondary" />
-                        {/if}
-                      </div>
+                      <CoverArt
+                        songId={song.id}
+                        artManual={song.art_manual}
+                        artAutomatic={song.art_automatic}
+                        artEmbedded={song.art_embedded}
+                        sizeClass="w-8 h-8 rounded-md"
+                      />
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
                           {song.title || 'Unknown'}
@@ -400,21 +401,28 @@
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                   <!-- Avatar / Artwork / Icon -->
-                  <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : 'rounded-md'}">
-                    {#if item.artUrl}
-                      <img src={getCoverArtUrl(item.artUrl)} alt="" class="w-full h-full object-cover" />
-                    {:else if item.kind === 'artist'}
-                      <User class="w-4 h-4 text-brand-text-secondary" />
-                    {:else if item.kind === 'album'}
-                      <Disc class="w-4 h-4 text-brand-text-secondary" />
-                    {:else if item.kind === 'playlist'}
-                      <ListMusic class="w-4 h-4 text-brand-text-secondary" />
-                    {:else if item.kind === 'song'}
-                      <Music class="w-4 h-4 text-brand-text-secondary" />
-                    {:else}
-                      <History class="w-4 h-4 text-brand-text-secondary" />
-                    {/if}
-                  </div>
+                  {#if item.artUrl}
+                    <CoverArt
+                      songId={typeof item.entityId === 'number' ? item.entityId : undefined}
+                      artManual={item.artUrl}
+                      artAutomatic={item.artUrl}
+                      sizeClass="w-9 h-9 {item.kind === 'artist' ? 'rounded-full' : 'rounded-md'}"
+                    />
+                  {:else}
+                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : 'rounded-md'}">
+                      {#if item.kind === 'artist'}
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      {:else if item.kind === 'album'}
+                        <Disc class="w-4 h-4 text-brand-text-secondary" />
+                      {:else if item.kind === 'playlist'}
+                        <ListMusic class="w-4 h-4 text-brand-text-secondary" />
+                      {:else if item.kind === 'song'}
+                        <Music class="w-4 h-4 text-brand-text-secondary" />
+                      {:else}
+                        <History class="w-4 h-4 text-brand-text-secondary" />
+                      {/if}
+                    </div>
+                  {/if}
 
                   <!-- Title & Subtitle -->
                   <div class="flex flex-col min-w-0 flex-1">
