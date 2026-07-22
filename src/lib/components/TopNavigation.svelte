@@ -138,7 +138,7 @@
 
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-40 overflow-visible" class:glass-surface={themeStore.isGlassTheme}>
+<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible" class:glass-surface={themeStore.isGlassTheme}>
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
