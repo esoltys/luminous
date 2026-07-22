@@ -174,7 +174,18 @@
     if (!name) return;
 
     const validRules = rules.filter((r) => r.value.trim() !== "");
-    const specString = validRules.map((r) => `${r.field}:${r.op}${r.value.trim()}`).join("; ");
+    // Serialise rules into the filter_parser format:
+    //   text contains  → "field:value"      (parser defaults to LIKE for text)
+    //   text =         → "field:=value"
+    //   text !=        → "field:!=value"
+    //   numeric op     → "field:>=value" etc.
+    const specString = validRules
+      .map((r) => {
+        const val = r.value.trim();
+        const opPrefix = r.op === "contains" ? "" : r.op;
+        return `${r.field}:${opPrefix}${val}`;
+      })
+      .join("; ");
 
     try {
       const playlist = await playlistsStore.createPlaylist(name);
