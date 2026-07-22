@@ -116,6 +116,40 @@
     return "error";
   }
 
+  let commonPrefix = $derived.by(() => {
+    const allPaths: string[] = [];
+    for (const raw of items) {
+      const i = getItemObj(raw);
+      if (i.from_path) allPaths.push(i.from_path);
+      if (i.to_path) allPaths.push(i.to_path);
+    }
+    if (allPaths.length < 2) return "";
+    let prefix = allPaths[0];
+    const lastSep = Math.max(prefix.lastIndexOf("/"), prefix.lastIndexOf("\\"));
+    if (lastSep > 0) prefix = prefix.slice(0, lastSep + 1);
+
+    for (const p of allPaths) {
+      while (prefix.length > 0 && !p.startsWith(prefix)) {
+        const sep = Math.max(prefix.slice(0, -1).lastIndexOf("/"), prefix.slice(0, -1).lastIndexOf("\\"));
+        if (sep >= 0) {
+          prefix = prefix.slice(0, sep + 1);
+        } else {
+          prefix = "";
+          break;
+        }
+      }
+    }
+    return prefix;
+  });
+
+  function getDisplayPath(fullPath: string, prefix: string): string {
+    if (!fullPath) return "";
+    if (prefix && prefix.length > 3 && fullPath.startsWith(prefix)) {
+      return "…" + fullPath.slice(prefix.length - 1);
+    }
+    return fullPath;
+  }
+
   let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "collision").length);
   let errorCount = $derived(items.filter((i) => getItemStatus(i) === "error").length);
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
@@ -451,7 +485,7 @@
           {/if}
 
           <!-- Virtualized table -->
-          <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40">
+          <div class="h-64 border border-brand-border/60 rounded-xl overflow-x-auto overflow-y-hidden bg-brand-sidebar/40">
             {#if items.length === 0}
               <div class="h-full flex items-center justify-center text-brand-text-secondary">
                 {#if isLoading}
@@ -461,56 +495,68 @@
                 {/if}
               </div>
             {:else}
-              <VirtualList items={items} height="100%" itemHeight={36}>
-                {#snippet children(rawRow: any)}
-                  {@const item = getItemObj(rawRow)}
-                  {@const st = getItemStatus(item)}
-                  <div
-                    class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors"
-                  >
-                    <div class="w-28 shrink-0">
-                      {#if st === "ok"}
-                        <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          {i18n.t("organizer.statusOk")}
-                        </span>
-                      {:else if st === "unchanged"}
-                        <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
-                          {i18n.t("organizer.statusUnchanged")}
-                        </span>
-                      {:else if st === "collision"}
-                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
-                          {i18n.t("organizer.statusCollision")}
-                        </span>
-                      {:else if st === "missing_tag"}
-                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
-                          {i18n.t("organizer.statusMissingTag")}
-                        </span>
-                      {:else}
-                        <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
-                          {i18n.t("organizer.statusError")}
-                        </span>
-                      {/if}
-                    </div>
-
-                    <div class="flex-1 truncate px-2 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}" title={item.from_path}>
-                      {@html highlightPathHtml(item.from_path || "(No path recorded)")}
-                    </div>
-                    <div class="text-brand-text-secondary px-1">→</div>
-                    <div
-                      class="flex-1 truncate px-2 {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
-                      title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
-                    >
-                      {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
-                        <span class="text-rose-400 font-medium">
-                          {item.error_message ? item.error_message : (item.to_path || 'Unknown error')}
-                        </span>
-                      {:else}
-                        {@html highlightPathHtml(item.to_path)}
-                      {/if}
-                    </div>
+              <div class="min-w-[720px] h-full flex flex-col">
+                {#if commonPrefix}
+                  <div class="px-3 py-1 bg-brand-sidebar/70 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
+                    <span class="font-semibold text-brand-accent-text shrink-0">Common Base Path:</span>
+                    <span class="truncate text-brand-text-primary">{commonPrefix}</span>
                   </div>
-                {/snippet}
-              </VirtualList>
+                {/if}
+                <div class="flex-1 min-h-0">
+                  <VirtualList items={items} height="100%" itemHeight={36}>
+                    {#snippet children(rawRow: any)}
+                      {@const item = getItemObj(rawRow)}
+                      {@const st = getItemStatus(item)}
+                      {@const displayFrom = getDisplayPath(item.from_path, commonPrefix)}
+                      {@const displayTo = getDisplayPath(item.to_path, commonPrefix)}
+                      <div
+                        class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
+                      >
+                        <div class="w-24 shrink-0">
+                          {#if st === "ok"}
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              {i18n.t("organizer.statusOk")}
+                            </span>
+                          {:else if st === "unchanged"}
+                            <span class="px-2 py-0.5 rounded bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
+                              {i18n.t("organizer.statusUnchanged")}
+                            </span>
+                          {:else if st === "collision"}
+                            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusCollision")}>
+                              {i18n.t("organizer.statusCollision")}
+                            </span>
+                          {:else if st === "missing_tag"}
+                            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40" title={item.error_message || i18n.t("organizer.statusMissingTag")}>
+                              {i18n.t("organizer.statusMissingTag")}
+                            </span>
+                          {:else}
+                            <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40" title={item.error_message || i18n.t("organizer.statusError")}>
+                              {i18n.t("organizer.statusError")}
+                            </span>
+                          {/if}
+                        </div>
+
+                        <div class="flex-1 truncate px-2 min-w-[200px] {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}" title={item.from_path}>
+                          {@html highlightPathHtml(displayFrom || "(No path recorded)")}
+                        </div>
+                        <div class="text-brand-text-secondary px-1.5 shrink-0">→</div>
+                        <div
+                          class="flex-1 truncate px-2 min-w-[200px] {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                          title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
+                        >
+                          {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
+                            <span class="text-rose-400 font-medium">
+                              {item.error_message ? item.error_message : (displayTo || 'Unknown error')}
+                            </span>
+                          {:else}
+                            {@html highlightPathHtml(displayTo)}
+                          {/if}
+                        </div>
+                      </div>
+                    {/snippet}
+                  </VirtualList>
+                </div>
+              </div>
             {/if}
           </div>
         </div>
