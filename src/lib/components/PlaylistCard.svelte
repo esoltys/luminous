@@ -96,7 +96,7 @@
 
     {#if autoKind === "decade" || autoKind === "genre"}
       <div
-        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
+        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
         title="Auto Playlist"
       >
         <Radio class="w-2.5 h-2.5" />
@@ -104,7 +104,7 @@
       </div>
     {:else if autoKind === "smart"}
       <div
-        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-600/90 text-white text-[9px] font-bold tracking-wide shadow-lg select-none"
+        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
         title="Smart Rule-Based Playlist"
       >
         <Sparkles class="w-2.5 h-2.5" />
@@ -114,7 +114,7 @@
 
     {#if isActive}
       <div
-        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
+        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
         title={i18n.t('playlists.activeBadgeTooltip')}
       >
         <Radio class="w-2.5 h-2.5 animate-pulse" />
