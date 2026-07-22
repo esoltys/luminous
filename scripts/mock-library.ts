@@ -172,6 +172,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
     const existing = byKey.get(key);
     if (existing) {
       existing.track_count += 1;
+      existing.disc_count = Math.max(existing.disc_count, song.disc ?? 1);
       existing.year = existing.year ?? song.year ?? null;
       existing.art_embedded = existing.art_embedded || song.art_embedded;
       existing.art_automatic = existing.art_automatic ?? song.art_automatic ?? null;
@@ -182,6 +183,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
         artist,
         year: song.year ?? null,
         track_count: 1,
+        disc_count: song.disc ?? 1,
         art_embedded: song.art_embedded,
         art_automatic: song.art_automatic ?? null,
         art_manual: song.art_manual ?? null,

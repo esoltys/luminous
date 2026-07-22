@@ -27,6 +27,7 @@ vi.mock("@tauri-apps/api/core", () => {
     artist: `Artist ${i * 2}`,
     year: 2020 + (i % 5),
     track_count: 200,
+    disc_count: 1,
     art_embedded: false,
     art_automatic: null,
     art_manual: null,

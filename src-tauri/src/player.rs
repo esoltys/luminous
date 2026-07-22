@@ -718,9 +718,18 @@ impl Player {
     }
 
     pub async fn previous_track(&mut self) -> Result<()> {
-        // In shuffle mode, walk back through history (skip unavailable)
+        // In shuffle mode, walk back through history (skip unavailable).
+        // `play_at_index` pushes every track it plays onto `played_indices`,
+        // including the current one — so the entry on top of the stack right
+        // now is the current track's own history entry, not the prior track.
+        // Discard it (and any other stale entries matching current_index)
+        // before treating a popped entry as the destination, or Previous
+        // just replays the current song instead of moving back (#105).
         if self.shuffle_mode != ShuffleMode::Off {
             while let Some(prev_index) = self.played_indices.pop() {
+                if Some(prev_index) == self.current_index {
+                    continue;
+                }
                 let item_index = self
                     .shuffle_order
                     .get(prev_index)
@@ -1268,6 +1277,184 @@ mod tests {
         assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
         assert_eq!(restarted.playlist_items.len(), 3);
         assert_eq!(restarted.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_previous_track_walks_back_through_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // Start on the last track (index 2, song id 3).
+        player.play_playlist(items, 2, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+        assert_eq!(player.current_index, Some(2));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "previous should move to the prior track, not replay the current one"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+        assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Same scenario as `test_previous_track_walks_back_through_playlist`,
+    /// but exercises the real saved-playlist path (`PlaylistManager` +
+    /// `get_playlist_tracks`) instead of the ad-hoc `PlaylistItem::new_song`
+    /// helper, to check for divergence between Album and Playlist playback
+    /// reported in #105 ("Previous song works on albums, but not playlists").
+    #[tokio::test]
+    async fn test_previous_track_walks_back_through_saved_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut manager = crate::playlist::PlaylistManager::new(db_arc.clone()).unwrap();
+        let playlist = manager.create_playlist("Test Playlist").unwrap();
+        manager
+            .add_songs_to_playlist(playlist.id, &[1, 2, 3])
+            .unwrap();
+
+        let items = manager.get_playlist_tracks(playlist.id).unwrap();
+        assert_eq!(items.len(), 3);
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        // Start on the last track (index 2).
+        player
+            .play_playlist(items, 2, playlist.id, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+        assert_eq!(player.current_index, Some(2));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "previous should move to the prior playlist track, not replay the current one"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Root-caused #105's "Previous restarts the current song instead of
+    /// moving to the prior one" report: it only reproduces with Shuffle on.
+    /// `play_at_index` pushes every played (virtual) index onto
+    /// `played_indices`, including the current track's own entry, so the
+    /// naive top-of-stack pop in `previous_track` just replayed it.
+    #[tokio::test]
+    async fn test_previous_track_in_shuffle_mode_does_not_replay_current() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=4i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=4i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_shuffle_mode(ShuffleMode::All);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        let first_song_id = player.current_song.as_ref().unwrap().id;
+
+        // Advance forward twice so there's real history to walk back through.
+        player.next_track().await.unwrap();
+        let second_song_id = player.current_song.as_ref().unwrap().id;
+        player.next_track().await.unwrap();
+        let third_song_id = player.current_song.as_ref().unwrap().id;
+        assert_ne!(second_song_id, first_song_id);
+        assert_ne!(third_song_id, second_song_id);
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            second_song_id,
+            "previous should move to the prior shuffled track, not replay the current one"
+        );
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            first_song_id,
+            "a second previous press should keep walking back, not stay put"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

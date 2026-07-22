@@ -580,6 +580,7 @@ pub struct AlbumItem {
     pub album: Option<String>,
     pub year: Option<i32>,
     pub track_count: i32,
+    pub disc_count: i32,
     pub art_embedded: bool,
     pub art_automatic: Option<String>,
     pub art_manual: Option<String>,

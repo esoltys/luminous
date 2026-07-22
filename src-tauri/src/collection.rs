@@ -643,6 +643,7 @@ impl CollectionScanner {
                 album,
                 MIN(year) AS year,
                 COUNT(*) AS track_count,
+                MAX(COALESCE(disc, 1)) AS disc_count,
                 MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
                 MAX(art_automatic) AS art_automatic,
                 MAX(art_manual) AS art_manual
@@ -658,9 +659,10 @@ impl CollectionScanner {
                     "album": row.get::<_, Option<String>>(1)?,
                     "year": row.get::<_, Option<i32>>(2)?,
                     "track_count": row.get::<_, i32>(3)?,
-                    "art_embedded": row.get::<_, bool>(4)?,
-                    "art_automatic": row.get::<_, Option<String>>(5)?,
-                    "art_manual": row.get::<_, Option<String>>(6)?,
+                    "disc_count": row.get::<_, i32>(4)?,
+                    "art_embedded": row.get::<_, bool>(5)?,
+                    "art_automatic": row.get::<_, Option<String>>(6)?,
+                    "art_manual": row.get::<_, Option<String>>(7)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -750,13 +752,14 @@ impl CollectionScanner {
              LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let rows: Vec<(Song, i64, String, Option<i64>)> = stmt
+        let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
                 let album_track_count: i64 = row.get(56)?;
-                let context_type: String = row.get(57)?;
-                let playlist_id: Option<i64> = row.get(58)?;
-                Ok((song, album_track_count, context_type, playlist_id))
+                let album_disc_count: i64 = row.get(57)?;
+                let context_type: String = row.get(58)?;
+                let playlist_id: Option<i64> = row.get(59)?;
+                Ok((song, album_track_count, album_disc_count, context_type, playlist_id))
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -764,10 +767,10 @@ impl CollectionScanner {
         let playlist_ids: Vec<i64> = {
             use std::collections::HashSet;
             rows.iter()
-                .filter(|(_, _, context_type, playlist_id)| {
+                .filter(|(_, _, _, context_type, playlist_id)| {
                     context_type == "playlist" && playlist_id.is_some()
                 })
-                .filter_map(|(_, _, _, playlist_id)| *playlist_id)
+                .filter_map(|(_, _, _, _, playlist_id)| *playlist_id)
                 .collect::<HashSet<_>>()
                 .into_iter()
                 .collect()
@@ -840,13 +843,14 @@ impl CollectionScanner {
         let items = agg_rows
             .into_iter()
             .filter_map(|row| {
-                let (song, album_track_count) =
+                let (song, album_track_count, album_disc_count) =
                     songs_by_id.get(&row.representative_song_id)?.clone();
                 Some(home_item_for_context(
                     &row.context_type,
                     row.playlist_id,
                     song,
                     album_track_count,
+                    album_disc_count,
                     &playlists_by_id,
                 ))
             })
@@ -865,11 +869,12 @@ impl CollectionScanner {
              LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs_with_counts: Vec<(Song, i64)> = stmt
+        let songs_with_counts: Vec<(Song, i64, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
                 let count: i64 = row.get(56)?;
-                Ok((song, count))
+                let disc_count: i64 = row.get(57)?;
+                Ok((song, count, disc_count))
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -880,12 +885,12 @@ impl CollectionScanner {
     }
 }
 
-fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64)>, limit: usize) -> Vec<HomeItem> {
+fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64, i64)>, limit: usize) -> Vec<HomeItem> {
     use std::collections::HashSet;
     let mut items = Vec::new();
     let mut seen_albums = HashSet::new();
 
-    for (song, album_track_count) in songs_with_counts {
+    for (song, album_track_count, album_disc_count) in songs_with_counts {
         if items.len() >= limit {
             break;
         }
@@ -907,6 +912,7 @@ fn group_songs_into_home_items(songs_with_counts: Vec<(Song, i64)>, limit: usize
                             album: Some(album_name.clone()),
                             year: song.year,
                             track_count: album_track_count as i32,
+                            disc_count: album_disc_count as i32,
                             art_embedded: song.art_embedded,
                             art_automatic: song.art_automatic.clone(),
                             art_manual: song.art_manual.clone(),
@@ -935,7 +941,7 @@ enum PlayContextKey {
 }
 
 fn group_by_play_context(
-    rows: Vec<(Song, i64, String, Option<i64>)>,
+    rows: Vec<(Song, i64, i64, String, Option<i64>)>,
     limit: usize,
     playlists_by_id: &std::collections::HashMap<i64, Playlist>,
 ) -> Vec<HomeItem> {
@@ -943,7 +949,7 @@ fn group_by_play_context(
     let mut items = Vec::new();
     let mut seen = HashSet::new();
 
-    for (song, album_track_count, context_type, playlist_id) in rows {
+    for (song, album_track_count, album_disc_count, context_type, playlist_id) in rows {
         if items.len() >= limit {
             break;
         }
@@ -971,6 +977,7 @@ fn group_by_play_context(
             playlist_id,
             song,
             album_track_count,
+            album_disc_count,
             playlists_by_id,
         ));
     }
@@ -986,6 +993,7 @@ fn home_item_for_context(
     playlist_id: Option<i64>,
     song: Song,
     album_track_count: i64,
+    album_disc_count: i64,
     playlists_by_id: &std::collections::HashMap<i64, Playlist>,
 ) -> HomeItem {
     match context_type {
@@ -1009,6 +1017,7 @@ fn home_item_for_context(
                     album: song.album.clone(),
                     year: song.year,
                     track_count: album_track_count as i32,
+                    disc_count: album_disc_count as i32,
                     art_embedded: song.art_embedded,
                     art_automatic: song.art_automatic.clone(),
                     art_manual: song.art_manual.clone(),
@@ -1059,7 +1068,7 @@ fn get_playlists_by_ids(
 fn get_songs_by_ids(
     conn: &rusqlite::Connection,
     ids: &[i64],
-) -> Result<std::collections::HashMap<i64, (Song, i64)>> {
+) -> Result<std::collections::HashMap<i64, (Song, i64, i64)>> {
     if ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
@@ -1070,7 +1079,8 @@ fn get_songs_by_ids(
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
             let song = row_to_song(row)?;
             let album_track_count: i64 = row.get(56)?;
-            Ok((song.id, (song, album_track_count)))
+            let album_disc_count: i64 = row.get(57)?;
+            Ok((song.id, (song, album_track_count, album_disc_count)))
         })?
         .filter_map(|r| r.ok())
         .collect();
@@ -1339,8 +1349,8 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     is_vbr, is_instrumental
 ";
 
-/// Song columns qualified with the `s` alias, plus a correlated `album_track_count`
-/// subquery. Shared by the home-screen queries (`get_recently_played`,
+/// Song columns qualified with the `s` alias, plus correlated `album_track_count`
+/// and `album_disc_count` subqueries. Shared by the home-screen queries (`get_recently_played`,
 /// `get_most_frequently_played`, `get_recently_added`), which all join on `songs s`.
 const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
     s.title, s.titlesort, s.artist, s.artistsort,
@@ -1359,7 +1369,10 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.is_vbr, s.is_instrumental,
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
-    ) AS album_track_count";
+    ) AS album_track_count,
+    (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
+     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+    ) AS album_disc_count";
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,

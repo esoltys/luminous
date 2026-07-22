@@ -207,18 +207,25 @@
   <!-- Player controls / Playback engine controller -->
   <div class="flex flex-col items-center gap-1.5 w-1/3 max-w-[600px]">
     <div class="flex items-center gap-5">
-      <button
-        onclick={cycleShuffle}
-        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)}`}
-      >
-        <Shuffle class="w-4 h-4" />
-        {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
-            {playerStore.shuffleMode === 'inside_album' ? 'IA' : playerStore.shuffleMode === 'albums' ? 'AL' : 'AR'}
+      <div class="relative">
+        {#if playerStore.shuffleMode !== 'off'}
+          <span class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text uppercase tracking-wide whitespace-nowrap pointer-events-none">
+            {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
           </span>
         {/if}
-      </button>
+        <button
+          onclick={cycleShuffle}
+          class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
+          title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)}`}
+        >
+          <Shuffle class="w-4 h-4" />
+          {#if playerStore.shuffleMode !== 'off' && playerStore.shuffleMode !== 'all'}
+            <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
+              {playerStore.shuffleMode === 'inside_album' ? 'IA' : playerStore.shuffleMode === 'albums' ? 'AL' : 'AR'}
+            </span>
+          {/if}
+        </button>
+      </div>
 
       <button onclick={() => playerStore.previous()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
@@ -319,7 +326,7 @@
       class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
       style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
-      title={i18n.t('playerBar.volume')}
+      title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     {#if collectionStore.immersiveMode}
       <button 

@@ -83,7 +83,7 @@
     </div>
   {/if}
 
-  <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth pb-2 carousel-scroll">
+  <div bind:this={scrollContainer} class="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 carousel-scroll">
     {@render children()}
   </div>
 </div>

@@ -7,6 +7,7 @@
   import { Play } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
+  import { getAlbumCategoryLabel } from "../utils/artist";
 
   interface Props {
     album: AlbumItem;
@@ -154,7 +155,7 @@
     {/if}
     <div class="flex items-center justify-between mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
       <span>{album.year || ""}</span>
-      <span>{album.track_count <= 7 ? i18n.t('artistDetail.singleEp') : (album.track_count === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: album.track_count }))}</span>
+      <span>{getAlbumCategoryLabel(album.track_count, album.disc_count)}</span>
     </div>
   </div>
 </div>

@@ -213,6 +213,7 @@ export interface AlbumItem {
   album: string | null;
   year: number | null;
   track_count: number;
+  disc_count: number;
   art_embedded: boolean;
   art_automatic: string | null;
   art_manual: string | null;

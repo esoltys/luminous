@@ -80,6 +80,7 @@ describe("CollectionView.svelte", () => {
       artist: "Band A",
       year: 2021,
       track_count: 1,
+      disc_count: 1,
       art_embedded: false,
       art_automatic: null,
       art_manual: null,

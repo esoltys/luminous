@@ -31,14 +31,6 @@
     collectionStore.viewPlaylist(playlist.id);
   }
 
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const seconds = Math.floor(ns / 1_000_000_000);
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
-
   async function handlePlay(e: MouseEvent) {
     e.stopPropagation();
     if (item.type === "song") {
@@ -48,13 +40,13 @@
 </script>
 
 {#if item.type === "album"}
-  <AlbumCard album={item.album} widthClass="w-48 shrink-0" />
+  <AlbumCard album={item.album} widthClass="w-48 shrink-0 snap-start" />
 {:else if item.type === "playlist"}
-  <PlaylistCard playlist={item.playlist} widthClass="w-48 shrink-0" onClick={openPlaylist} />
+  <PlaylistCard playlist={item.playlist} widthClass="w-48 shrink-0 snap-start" onClick={openPlaylist} />
 {:else}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="flex-shrink-0 w-48 group relative">
+  <div class="flex-shrink-0 w-48 group relative snap-start">
     <!-- Card Container -->
     <div class="relative overflow-hidden rounded-xl bg-brand-sidebar border border-brand-border/60 transition-all duration-200 hover:border-brand-accent/40 flex flex-col h-full">
       <!-- Cover Art -->
@@ -90,11 +82,6 @@
         <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium" title={item.song.artist}>
           {item.song.artist || i18n.t('collection.unknownArtist')}
         </p>
-
-        <!-- Song Duration -->
-        <div class="mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
-          {formatDuration(item.song.length_nanosec)}
-        </div>
       </div>
     </div>
   </div>
