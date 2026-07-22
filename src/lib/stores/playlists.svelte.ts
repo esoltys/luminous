@@ -8,6 +8,13 @@ class PlaylistsStore {
   activePlaylistId = $state<number | null>(null);
   activePlaylistTracks = $state<PlaylistItem[]>([]);
 
+  /** The playlist explicitly pinned via "Make Active" as the quick-add target
+   * used across the app ("Add to {name}"). Distinct from `activePlaylistId`
+   * (which just tracks whichever playlist is currently loaded/viewed) so
+   * that merely opening a playlist to look at it never changes this. Only
+   * `pinPlaylist()` (wired to the "Make Active" button) mutates it. */
+  pinnedPlaylistId = $state<number | null>(null);
+
   /** Live song counts for the virtual (non-materialized) auto-playlists. */
   favouritesCount = $state(0);
   recentlyAddedCount = $state(0);
@@ -19,10 +26,23 @@ class PlaylistsStore {
     return genreCount + (this.favouritesCount > 0 ? 1 : 0) + (this.recentlyAddedCount > 0 ? 1 : 0);
   }
 
-  /** The currently active playlist ONLY if it is a custom playlist (not an auto/dynamic playlist). */
+  /** The special pinned Queue playlist, always present and never deletable. */
+  private get queuePlaylist(): Playlist | null {
+    return (
+      this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
+    );
+  }
+
+  /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
+   * falling back to the Queue playlist when nothing has been pinned yet. */
+  get effectivePinnedPlaylistId(): number | null {
+    return this.pinnedPlaylistId ?? this.queuePlaylist?.id ?? null;
+  }
+
+  /** The pinned/"Active" playlist ONLY if it is a custom playlist (not an auto/dynamic playlist). */
   get activeCustomPlaylist(): Playlist | null {
-    if (this.activePlaylistId === null) return null;
-    const pl = this.playlists.find((p) => p.id === this.activePlaylistId);
+    if (this.effectivePinnedPlaylistId === null) return null;
+    const pl = this.playlists.find((p) => p.id === this.effectivePinnedPlaylistId);
     return pl && !pl.dynamic_enabled ? pl : null;
   }
 
@@ -65,6 +85,13 @@ class PlaylistsStore {
       const queuePl = await this.ensureQueuePlaylist();
 
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
+      if (settings && settings.pinned_playlist_id) {
+        const pinnedId = parseInt(settings.pinned_playlist_id, 10);
+        if (!isNaN(pinnedId) && this.playlists.some((p) => p.id === pinnedId)) {
+          this.pinnedPlaylistId = pinnedId;
+        }
+      }
+
       if (settings && settings.active_playlist_id) {
         const plId = parseInt(settings.active_playlist_id, 10);
         if (!isNaN(plId) && this.playlists.some((p) => p.id === plId)) {
@@ -110,10 +137,32 @@ class PlaylistsStore {
     }
   }
 
-  async createPlaylist(name: string) {
+  /** Explicitly pins `id` as the "Active" quick-add target — only called from
+   * the "Make Active" button. Never call this as a side effect of merely
+   * viewing/opening a playlist. */
+  async pinPlaylist(id: number) {
+    this.pinnedPlaylistId = id;
+    try {
+      await invoke("set_app_setting", { key: "pinned_playlist_id", value: id.toString() });
+    } catch (err) {
+      console.error("Failed to save pinned playlist setting:", err);
+    }
+  }
+
+  async createPlaylist(name: string): Promise<Playlist> {
     const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
+    return playlist;
+  }
+
+  async updatePlaylistSpec(id: number, spec: string, autoPlay: boolean = false) {
+    await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
+    await invoke("set_playlist_auto_play", { playlistId: id, autoPlay });
+    await this.refreshPlaylists();
+    if (this.activePlaylistId === id) {
+      await this.selectPlaylist(id);
+    }
   }
 
   async deletePlaylist(id: number) {
@@ -132,6 +181,14 @@ class PlaylistsStore {
       } else {
         this.activePlaylistId = null;
         this.activePlaylistTracks = [];
+      }
+    }
+    if (this.pinnedPlaylistId === id) {
+      this.pinnedPlaylistId = null;
+      try {
+        await invoke("set_app_setting", { key: "pinned_playlist_id", value: "" });
+      } catch (err) {
+        console.error("Failed to clear pinned playlist setting:", err);
       }
     }
   }

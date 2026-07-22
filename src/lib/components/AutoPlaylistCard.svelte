@@ -1,10 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Heart, Clock, Calendar, Music, RefreshCw, Radio } from "lucide-svelte";
+  import { ListMusic, Play, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
-  import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import CoverStack from "./CoverStack.svelte";
@@ -25,8 +24,6 @@
   }
 
   let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
-
-  let isActive = $derived(playlistId !== undefined && playlistsStore.activePlaylistId === playlistId);
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
@@ -129,15 +126,7 @@
         <Play class="w-5 h-5 fill-current ml-0.5" />
       </button>
     </div>
-    {#if isActive}
-      <div
-        class="absolute top-2 left-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title={i18n.t('playlists.activeBadgeTooltip')}
-      >
-        <Radio class="w-2.5 h-2.5 animate-pulse" />
-        {i18n.t('playlists.activeBadgeLabel')}
-      </div>
-    {/if}
+
     {#if autoPlay}
       <!-- Auto-Play badge (#26) -->
       <div

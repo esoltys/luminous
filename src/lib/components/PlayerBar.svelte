@@ -3,6 +3,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -129,7 +130,7 @@
     if (pid && pid > 0) {
       const pl = playlistsStore.playlists.find((p) => p.id === pid);
       if (pl) {
-        if (pl.dynamic_enabled) {
+        if (pl.dynamic_enabled && !isSmartPlaylistSpec(pl.dynamic_spec)) {
           const spec = pl.dynamic_spec ?? "";
           if (spec.startsWith("decade:")) {
             const decade = spec.replace(/^decade:/, "");
@@ -140,10 +141,9 @@
               updated: pl.updated,
             });
           } else {
-            const genre = spec.replace(/^genre:/, "") || pl.name;
             collectionStore.viewAutoPlaylist({
               kind: "genre",
-              genre,
+              genre: spec || pl.name,
               playlistId: pl.id,
               updated: pl.updated,
             });

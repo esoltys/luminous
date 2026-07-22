@@ -6,7 +6,7 @@ use crate::{
     models::{Playlist, PlaylistItem, PlaylistItemType, Song},
 };
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -214,42 +214,58 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        // Prune genre auto-playlists for genres no longer in the library.
+        // Prune genre auto-playlists for genres no longer in the library. Only
+        // touch rows using the bare-genre-name convention (e.g. "Rock") —
+        // anything containing ':' is either a decade auto-playlist (excluded
+        // above) or a user-created Smart Playlist rule spec (e.g. "genre:rock"),
+        // and must not be swept up here.
         let mut stmt =
-            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND (dynamic_spec NOT LIKE 'decade:%')")?;
+            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec NOT LIKE '%:%'")?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt);
         for (id, spec) in &existing {
-            let genre_name = spec.strip_prefix("genre:").unwrap_or(spec);
-            if !genres.contains(&genre_name.to_string()) {
+            if !genres.contains(spec) {
                 conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
             }
         }
 
         for genre in &genres {
-            let existing_row: Option<(i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64)> = conn
                 .query_row(
-                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND (dynamic_spec = ?1 OR dynamic_spec = ?2)",
-                    params![genre, format!("genre:{}", genre)],
-                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    params![genre],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .ok();
 
+            // Always check song count first — prune the playlist if it falls below threshold.
+            let songs = scanner.get_songs_by_genre(genre, 25)?;
+            if songs.len() < 25 {
+                if let Some((id, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
+                Some((_, updated, track_count)) => {
+                    now - updated > STALE_AFTER_SECS || track_count != 25
+                }
             };
             if !needs_generation {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_genre(genre, 50)?;
-
             let playlist_id = match existing_row {
-                Some((id, _)) => {
+                Some((id, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
@@ -309,26 +325,39 @@ impl PlaylistManager {
 
         for decade in &decades {
             let spec = format!("decade:{}", decade);
-            let existing_row: Option<(i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64)> = conn
                 .query_row(
-                    "SELECT id, updated FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
-                    |row| Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0))),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .ok();
 
+            // Always check song count first — prune the playlist if it falls below threshold.
+            let songs = scanner.get_songs_by_decade(decade, 25)?;
+            if songs.len() < 25 {
+                if let Some((id, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated)) => now - updated > STALE_AFTER_SECS,
+                Some((_, updated, track_count)) => {
+                    now - updated > STALE_AFTER_SECS || track_count != 25
+                }
             };
             if !needs_generation {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_decade(decade, 50)?;
-
             let playlist_id = match existing_row {
-                Some((id, _)) => {
+                Some((id, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
@@ -373,6 +402,69 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`.
+    pub fn populate_dynamic_playlist(&mut self, playlist_id: i64) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let spec: Option<String> = conn
+            .query_row(
+                "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
+                params![playlist_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let spec = match spec {
+            Some(s) if !s.trim().is_empty() => s,
+            _ => return Ok(()),
+        };
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let songs = if let Some(decade) = spec.strip_prefix("decade:") {
+            scanner.get_songs_by_decade(decade, 100)?
+        } else if !spec.contains(':') {
+            // Bare-name convention: a system genre auto-playlist, not a Smart
+            // Playlist rule spec (which always contains a "field:" rule).
+            scanner.get_songs_by_genre(&spec, 100)?
+        } else {
+            let query = spec.replace(';', " ");
+            scanner.search_songs(&query, 100)?
+        };
+
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+            params![now, playlist_id],
+        )?;
+
+        conn.execute(
+            "DELETE FROM playlist_items WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Update the `dynamic_spec` and `dynamic_enabled` fields for a playlist row, and populate its matching songs.
+    pub fn set_playlist_dynamic_spec(&mut self, id: i64, spec: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let enabled = !spec.trim().is_empty();
+        conn.execute(
+            "UPDATE playlists SET dynamic_spec = ?1, dynamic_enabled = ?2 WHERE id = ?3",
+            params![spec, enabled, id],
+        )?;
+        if enabled {
+            self.populate_dynamic_playlist(id)?;
+        }
+        Ok(())
+    }
+
     /// Returns songs that match the dynamic spec of playlist `id` but are NOT
     /// yet present in its `playlist_items`.  Used for the Auto-Play refill
     /// path — up to `limit` new songs are returned in random order so each
@@ -387,10 +479,14 @@ impl PlaylistManager {
 
         // Parse spec prefix to determine filter type
         let songs: Vec<Song> = if let Some(decade) = dynamic_spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, (limit * 4) as i64)? // fetch extra; we'll filter
+            scanner.get_songs_by_decade(decade, (limit * 4) as i64)?
+        } else if !dynamic_spec.contains(':') {
+            // Bare-name convention: a system genre auto-playlist, not a Smart
+            // Playlist rule spec (which always contains a "field:" rule).
+            scanner.get_songs_by_genre(dynamic_spec, (limit * 4) as i64)?
         } else {
-            let genre = dynamic_spec.strip_prefix("genre:").unwrap_or(dynamic_spec);
-            scanner.get_songs_by_genre(genre, (limit * 4) as i64)?
+            let query = dynamic_spec.replace(';', " ");
+            scanner.search_songs(&query, 100)?
         };
 
         // Collect song IDs already in the playlist so we can exclude them
@@ -416,39 +512,7 @@ impl PlaylistManager {
     /// the "Refresh" button in the auto-playlist header), replacing its contents
     /// with a fresh selection of matching songs from the library.
     pub fn refresh_auto_playlist(&mut self, playlist_id: i64) -> Result<()> {
-        let conn = self.db.pool.get()?;
-        let spec: String = conn.query_row(
-            "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
-            params![playlist_id],
-            |row| row.get(0),
-        )?;
-
-        let scanner = CollectionScanner::new(self.db.clone());
-        let songs = if let Some(decade) = spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, 50)?
-        } else {
-            let genre = spec.strip_prefix("genre:").unwrap_or(&spec);
-            scanner.get_songs_by_genre(genre, 50)?
-        };
-
-        let now = chrono::Utc::now().timestamp();
-        conn.execute(
-            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-            params![now, playlist_id],
-        )?;
-        conn.execute(
-            "DELETE FROM playlist_items WHERE playlist_id = ?1",
-            params![playlist_id],
-        )?;
-
-        for (position, song) in songs.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-            )?;
-        }
-
-        Ok(())
+        self.populate_dynamic_playlist(playlist_id)
     }
 
     // -----------------------------------------------------------------------
@@ -1403,16 +1467,25 @@ mod tests {
 
         {
             let conn = db_arc.pool.get().unwrap();
+
+            // Insert 1 song in the 80s — below the 25-song threshold, should be skipped.
             conn.execute(
                 "INSERT INTO songs (title, year, source, unavailable) VALUES ('Track 80s', 1982, 1, 0)",
                 [],
             )
             .unwrap();
-            conn.execute(
-                "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 90s', 1999, 1, 0)",
-                [],
-            )
-            .unwrap();
+
+            // Insert 25 songs in the 90s — meets the threshold, should create a playlist.
+            for i in 0..25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 90s {}', 1995, 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
         }
 
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
@@ -1429,14 +1502,96 @@ mod tests {
                         .starts_with("decade:")
             })
             .collect();
-        assert_eq!(decade_playlists.len(), 2);
 
-        let pl_80s = decade_playlists.iter().find(|p| p.name == "1980s").unwrap();
-        let tracks = manager.get_playlist_tracks(pl_80s.id).unwrap();
-        assert_eq!(tracks.len(), 1);
+        // 80s had only 1 song — below minimum, so no playlist created.
+        assert!(
+            !decade_playlists.iter().any(|p| p.name == "1980s"),
+            "expected 80s playlist to be skipped (< 25 songs)"
+        );
+
+        // 90s had 25 songs — should have a playlist.
+        assert_eq!(decade_playlists.len(), 1);
+        assert_eq!(decade_playlists[0].name, "1990s");
+
+        let tracks = manager.get_playlist_tracks(decade_playlists[0].id).unwrap();
+        assert_eq!(tracks.len(), 25);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_smart_playlist_genre_rule_populates_via_filter_not_exact_genre_match() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song', 'Classic Rock', 1, 0)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Jazz Song', 'Jazz', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Rock Mix").unwrap();
+
+        // Mirrors the spec the Smart Playlist builder serialises for a single
+        // "genre contains rock" rule — must NOT be routed to the exact-match
+        // get_songs_by_genre() path, which would never match "Classic Rock".
+        manager
+            .set_playlist_dynamic_spec(pl.id, "genre:rock")
+            .unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(
+            tracks.len(),
+            1,
+            "expected the contains-style genre rule to match 'Classic Rock' via LIKE, not require an exact 'rock' genre"
+        );
         assert_eq!(
             tracks[0].song.as_ref().unwrap().title.as_deref(),
-            Some("Track 80s")
+            Some("Rock Song")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_genre_auto_playlists_does_not_prune_smart_playlists() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, genre, artist, source, unavailable) VALUES ('Song A', 'Jazz', 'Miles Davis', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        // A user-created Smart Playlist whose spec has nothing to do with any
+        // real library genre — the genre-auto-playlist sync/prune pass must
+        // leave it alone since its spec contains a "field:" rule.
+        let pl = manager.create_playlist("Miles Mix").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "artist:Miles Davis")
+            .unwrap();
+
+        manager.sync_genre_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        assert!(
+            playlists.iter().any(|p| p.id == pl.id),
+            "Smart Playlist should survive sync_genre_auto_playlists, but it was deleted"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

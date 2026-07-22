@@ -16,6 +16,7 @@ pub mod commands;
 pub mod covermanager;
 pub mod db;
 pub mod equalizer;
+pub mod filter_parser;
 pub mod loudness;
 pub mod lyrics;
 pub mod models;
@@ -532,6 +533,7 @@ pub fn run() {
             commands::playlist::import_playlist,
             commands::playlist::export_playlist,
             commands::playlist::set_playlist_auto_play,
+            commands::playlist::set_playlist_dynamic_spec,
             commands::playlist::refill_auto_playlist,
             commands::playlist::refresh_auto_playlist,
             // Cover Art commands

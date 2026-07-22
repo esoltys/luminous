@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Calendar, Music, Radio, Layers } from "lucide-svelte";
+  import { ListMusic, Play, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
@@ -8,6 +8,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
+  import { isSmartPlaylistSpec } from "../utils/filterParser";
   import CoverStack from "./CoverStack.svelte";
 
   let { playlist, onClick, widthClass = "w-full" }: { playlist: Playlist; onClick: () => void; widthClass?: string } = $props();
@@ -29,19 +30,27 @@
 
   let topAlbums = $derived(songsToCoverStack(tracks.filter((t) => !!t.song).map((t) => t.song!)));
 
-  let autoKind = $derived<"genre" | "decade" | null>(
-    !playlist.dynamic_enabled ? null : playlist.dynamic_spec?.startsWith("decade:") ? "decade" : "genre"
+  // System genre auto-playlists store a bare genre name (no ':') and never
+  // reach this component (they render via AutoPlaylistCard instead).
+  let autoKind = $derived<"genre" | "decade" | "smart" | null>(
+    !playlist.dynamic_enabled
+      ? null
+      : playlist.dynamic_spec?.startsWith("decade:")
+      ? "decade"
+      : isSmartPlaylistSpec(playlist.dynamic_spec)
+      ? "smart"
+      : "genre"
   );
 
   let subtitleLabel = $derived.by(() => {
     if (!playlist.dynamic_enabled) return null;
     if (autoKind === "decade") return i18n.t("playlists.decadeAutoPlaylist");
     if (autoKind === "genre") return i18n.t("playlists.genreAutoPlaylist");
-    return i18n.t("playlists.genreAutoPlaylist");
+    return "Smart Rule Playlist";
   });
 
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
-  let isActive = $derived(playlistsStore.activePlaylistId === playlist.id);
+  let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);
 
   let updatedLabel = $derived(formatRelativeDate(playlist.updated));
 
@@ -67,17 +76,19 @@
         <Layers class="w-10 h-10 text-white/90" />
       </div>
     {:else if topAlbums.length > 0 && autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-amber-500 via-orange-500 to-orange-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
     {:else if autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-amber-500 via-orange-500 to-orange-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
         {#if autoKind === "decade"}
           <Calendar class="w-10 h-10 text-white/90" />
-        {:else}
+        {:else if autoKind === "genre"}
           <Music class="w-10 h-10 text-white/90" />
+        {:else}
+          <Sparkles class="w-10 h-10 text-white/90" />
         {/if}
       </div>
     {:else}
@@ -86,13 +97,21 @@
       </div>
     {/if}
 
-    {#if isActive}
+    {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}
       <div
         class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title={i18n.t('playlists.activeBadgeTooltip')}
+        title={i18n.t('playlists.autoPlayBadgeTooltip')}
       >
-        <Radio class="w-2.5 h-2.5 animate-pulse" />
-        {i18n.t('playlists.activeBadgeLabel')}
+        <Radio class="w-2.5 h-2.5" />
+        {i18n.t('playlists.autoPlayBadgeLabel')}
+      </div>
+    {:else if autoKind === "smart"}
+      <div
+        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
+        title="Smart Rule-Based Playlist"
+      >
+        <Sparkles class="w-2.5 h-2.5" />
+        Smart
       </div>
     {/if}
 
@@ -127,7 +146,7 @@
   {#if !playlist.dynamic_enabled}
     {#if !isActive}
       <button
-        onclick={(e) => { e.stopPropagation(); playlistsStore.selectPlaylist(playlist.id); }}
+        onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
         class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
         title={i18n.t('playlists.makeActiveBtn')}
       >

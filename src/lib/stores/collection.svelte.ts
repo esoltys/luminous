@@ -10,6 +10,18 @@ export type ActiveSubTab = "songs" | "albums" | "artists";
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 export type PlaylistsSubTab = "auto" | "custom";
 
+export interface VisibleColumns {
+  format: boolean;
+  bitrate: boolean;
+  year: boolean;
+  path: boolean;
+  genre: boolean;
+  rating: boolean;
+  playcount: boolean;
+  lastplayed: boolean;
+  duration: boolean;
+}
+
 /** An auto-playlist reference (Favourites, Recently Added, genre, or decade), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
   kind: "favourites" | "recently_added" | "genre" | "decade";
@@ -55,6 +67,61 @@ class CollectionStore {
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
   recentSearches = $state<RecentSearchItem[]>([]);
+
+  visibleColumns = $state<VisibleColumns>(
+    (() => {
+      const defaultCols: VisibleColumns = {
+        format: true,
+        year: true,
+        rating: true,
+        duration: true,
+        bitrate: false,
+        path: false,
+        genre: false,
+        playcount: false,
+        lastplayed: false,
+      };
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("luminous_visible_columns");
+        if (saved) {
+          try {
+            return { ...defaultCols, ...JSON.parse(saved) };
+          } catch (e) {
+            console.error("Failed to parse visible columns:", e);
+          }
+        }
+      }
+      return defaultCols;
+    })()
+  );
+
+  toggleColumn(column: keyof VisibleColumns) {
+    this.visibleColumns[column] = !this.visibleColumns[column];
+    if (typeof window !== "undefined") {
+      localStorage.setItem("luminous_visible_columns", JSON.stringify(this.visibleColumns));
+    }
+  }
+
+  isSmartBuilderOpen = $state<boolean>(false);
+  smartBuilderRules = $state<Array<{ field: string; op: string; value: string }>>([]);
+  smartBuilderEditing = $state<{ id: number; name: string; autoPlay: boolean } | null>(null);
+
+  openSmartBuilder(
+    rules?: Array<{ field: string; op: string; value: string }>,
+    editing?: { id: number; name: string; autoPlay: boolean }
+  ) {
+    this.smartBuilderRules = rules || [];
+    this.smartBuilderEditing = editing ?? null;
+    this.isSmartBuilderOpen = true;
+    this.activeTab = "playlists";
+    this.playlistsSubTab = "custom";
+  }
+
+  closeSmartBuilder() {
+    this.isSmartBuilderOpen = false;
+    this.smartBuilderRules = [];
+    this.smartBuilderEditing = null;
+  }
 
   private _activeTab = $state<ActiveTab>("collection");
   private _activeSubTab = $state<ActiveSubTab>("songs");

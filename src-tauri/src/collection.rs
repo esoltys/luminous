@@ -16,7 +16,7 @@ use lofty::{
     tag::{Accessor, ItemKey, Tag},
 };
 use notify::Watcher;
-use rusqlite::params;
+use rusqlite::{params, ToSql};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -381,40 +381,67 @@ impl CollectionScanner {
     /// Full-text + field search across the library.
     pub fn search_songs(&self, query: &str, limit: i64) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
-        // Use FTS5 for queries with non-trivial content
-        let sql = if query.trim().is_empty() {
-            format!(
-                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY album_artist, album, disc, track LIMIT ?2",
+        let query_trimmed = query.trim();
+        if query_trimmed.is_empty() {
+            let sql = format!(
+                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY album_artist, album, disc, track LIMIT ?1",
                 SONG_SELECT_COLS
-            )
-        } else {
-            format!(
-                "SELECT {} FROM songs WHERE unavailable = 0 AND id IN (
-                    SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?1
-                 )
-                 UNION
-                 SELECT {} FROM songs WHERE unavailable = 0 AND (
-                    title LIKE ?3 OR artist LIKE ?3 OR album LIKE ?3
-                 )
-                 ORDER BY album_artist, album, disc, track
-                 LIMIT ?2",
-                SONG_SELECT_COLS, SONG_SELECT_COLS
-            )
-        };
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let songs = stmt
+                .query_map(params![limit], row_to_song)?
+                .filter_map(|r| r.ok())
+                .collect();
+            return Ok(songs);
+        }
 
-        let like_query = format!("%{query}%");
-        let fts_query = format!("{query}*");
+        let parsed = crate::filter_parser::parse_query(query_trimmed);
+
+        let mut where_clauses = vec!["unavailable = 0".to_string()];
+        let mut query_params: Vec<Box<dyn ToSql>> = Vec::new();
+
+        // If bare terms exist, match against FTS5 or LIKE
+        if !parsed.bare_terms.is_empty() {
+            let bare_str = parsed.bare_terms.join(" ");
+            let fts_query = format!("{bare_str}*");
+            let like_query = format!("%{bare_str}%");
+
+            query_params.push(Box::new(fts_query));
+            let fts_param_idx = query_params.len();
+            query_params.push(Box::new(like_query));
+            let like_param_idx = query_params.len();
+
+            let bare_sql = format!(
+                "(id IN (SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?{fts_param_idx}) OR (title LIKE ?{like_param_idx} OR artist LIKE ?{like_param_idx} OR album LIKE ?{like_param_idx}))"
+            );
+            where_clauses.push(bare_sql);
+        }
+
+        // Add qualified field filter clauses
+        for filter in parsed.field_filters {
+            query_params.push(Box::new(filter.value));
+            let param_idx = query_params.len();
+            let op_str = filter.op.to_sql();
+            let clause = format!("{} {} ?{}", filter.sql_column, op_str, param_idx);
+            where_clauses.push(clause);
+        }
+
+        query_params.push(Box::new(limit));
+        let limit_param_idx = query_params.len();
+
+        let where_str = where_clauses.join(" AND ");
+        let sql = format!(
+            "SELECT {} FROM songs WHERE {} ORDER BY album_artist, album, disc, track LIMIT ?{}",
+            SONG_SELECT_COLS, where_str, limit_param_idx
+        );
+
+        let params_refs: Vec<&dyn ToSql> = query_params.iter().map(|p| p.as_ref()).collect();
 
         let mut stmt = conn.prepare(&sql)?;
-        let songs = if query.trim().is_empty() {
-            stmt.query_map(params![query, limit], row_to_song)?
-                .filter_map(|r| r.ok())
-                .collect()
-        } else {
-            stmt.query_map(params![fts_query, limit, like_query], row_to_song)?
-                .filter_map(|r| r.ok())
-                .collect()
-        };
+        let songs = stmt
+            .query_map(params_refs.as_slice(), row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
 
         Ok(songs)
     }
@@ -1049,7 +1076,6 @@ fn get_songs_by_ids(
         .collect();
     Ok(map)
 }
-
 
 // ---------------------------------------------------------------------------
 // Audio file detection
