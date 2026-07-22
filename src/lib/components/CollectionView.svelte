@@ -408,51 +408,51 @@
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
           <div class="grid items-center py-3 px-4" style={gridColsStyle}>
             <div class="text-center w-9"></div>
-            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
+            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
+              <span class="truncate">{i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              {i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
+            <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
+              <span class="truncate">{i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              {i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
+            <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
+              <span class="truncate">{i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
-            <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-              {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
+            <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-4">
+              <span class="truncate">{i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}</span>
             </button>
             {#if collectionStore.visibleColumns.format}
-              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-                Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
+                <span class="truncate">Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.year}
-              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-                Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
+                <span class="truncate">Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.genre}
-              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-                Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
+                <span class="truncate">Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
-              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-                Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 pr-2">
+                <span class="truncate">Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.rating}
-              <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-                {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate">{i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.playcount}
-              <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-                Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate">Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.duration}
-              <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-                <Clock class="w-4 h-4" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
+              <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <Clock class="w-4 h-4 shrink-0" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
               </button>
             {/if}
             <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
