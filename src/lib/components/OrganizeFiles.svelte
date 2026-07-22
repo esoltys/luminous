@@ -29,13 +29,14 @@
     onSuccess?: () => void;
   } = $props();
 
-  const DEFAULT_TEMPLATE = "%albumartist/%album/{%disc-}%track %title";
+  const DEFAULT_TEMPLATE = "%albumartist/{%album/}{%disc-}%track %title";
   const VARIABLE_CHIPS = [
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
     { label: "%album", desc: "Album" },
+    { label: "{%album/}", desc: "Optional Album Folder" },
     { label: "/", desc: "Folder Separator" },
-    { label: "{Disc %disc/}", desc: "Conditional Disc Folder" },
+    { label: "{%disc-}", desc: "Conditional Disc Prefix" },
     { label: "%track", desc: "Track #" },
     { label: "%title", desc: "Title" },
     { label: "%year", desc: "Year" },

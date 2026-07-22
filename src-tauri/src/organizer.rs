@@ -118,8 +118,15 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
                     .album_artist
                     .as_deref()
                     .is_some_and(|a| !a.trim().is_empty());
+            let has_album = block_content.contains("%album")
+                && !block_content.contains("%albumartist")
+                && song.album.as_deref().is_some_and(|a| !a.trim().is_empty());
+            let has_artist = block_content.contains("%artist")
+                && !block_content.contains("%albumartist")
+                && song.artist.as_deref().is_some_and(|a| !a.trim().is_empty());
 
-            let should_render = has_disc || has_year || has_genre || has_album_artist;
+            let should_render =
+                has_disc || has_year || has_genre || has_album_artist || has_album || has_artist;
             let replacement = if should_render {
                 block_content.to_string()
             } else {
@@ -666,6 +673,37 @@ mod tests {
         assert_eq!(
             expand_template(template, &song_no_disc, "flac"),
             "Artist/Album/01 Track 1"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_optional_album() {
+        let song_with_album = Song {
+            id: 1,
+            title: Some("Single Track".to_string()),
+            artist: Some("Artist".to_string()),
+            album: Some("Greatest Hits".to_string()),
+            track: Some(1),
+            ..Default::default()
+        };
+
+        let song_no_album = Song {
+            id: 2,
+            title: Some("Single Track".to_string()),
+            artist: Some("Artist".to_string()),
+            album: None,
+            track: Some(1),
+            ..Default::default()
+        };
+
+        let template = "%albumartist/{%album/}{%disc-}%track %title";
+        assert_eq!(
+            expand_template(template, &song_with_album, "flac"),
+            "Artist/Greatest Hits/01 Single Track"
+        );
+        assert_eq!(
+            expand_template(template, &song_no_album, "flac"),
+            "Artist/01 Single Track"
         );
     }
 
