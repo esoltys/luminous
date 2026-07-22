@@ -49,8 +49,8 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    const regex = /({[^{}]*})|(%[a-z]+)|([/\\])/gi;
-    return escaped.replace(regex, (match, pBlock, pVar, pSep) => {
+    const regex = /({[^{}]*})|(%[a-z]+)|([/\\])|(\s)/gi;
+    return escaped.replace(regex, (match, pBlock, pVar, pSep, pSpace) => {
       if (pBlock) {
         const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-cyan-300 font-bold bg-cyan-500/30 rounded-xs">${v}</span>`);
         return `<span class="text-purple-300 font-bold bg-purple-500/25 rounded-xs">${inner}</span>`;
@@ -60,6 +60,9 @@
       }
       if (pSep) {
         return `<span class="text-amber-400 font-bold bg-amber-500/30 rounded-xs">${pSep}</span>`;
+      }
+      if (pSpace) {
+        return `<span class="bg-white/15 rounded-xs select-none" title="Space">&nbsp;</span>`;
       }
       return match;
     });
@@ -114,9 +117,17 @@
     return "error";
   }
 
+  let showOnlyChanging = $state(false);
+
+  let displayedItems = $derived(
+    showOnlyChanging
+      ? items.filter((i) => getItemStatus(i) !== "unchanged")
+      : items
+  );
+
   let commonPrefix = $derived.by(() => {
     const allPaths: string[] = [];
-    for (const raw of items) {
+    for (const raw of displayedItems) {
       const i = getItemObj(raw);
       if (i.from_path) allPaths.push(i.from_path);
       if (i.to_path) allPaths.push(i.to_path);
@@ -501,8 +512,17 @@
               </button>
             </h3>
 
-            <!-- Summary badges -->
+            <!-- Summary badges & filter toggle -->
             <div class="flex items-center gap-2 text-[11px]">
+              <label class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  bind:checked={showOnlyChanging}
+                  class="w-3 h-3 rounded border-brand-border accent-brand-accent cursor-pointer"
+                />
+                <span>{i18n.t("organizer.onlyChanging")}</span>
+              </label>
+
               <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
                 {i18n.t("organizer.summaryReady", { count: readyCount })}
               </span>
@@ -550,6 +570,10 @@
                 {:else}
                   <span>No tracks to organize.</span>
                 {/if}
+              </div>
+            {:else if displayedItems.length === 0}
+              <div class="h-full flex items-center justify-center text-brand-text-secondary">
+                <span>No changing files match filter.</span>
               </div>
             {:else}
               <!-- Common Base Path Bar -->
@@ -602,7 +626,7 @@
 
                   <!-- Virtualized rows -->
                   <div class="flex-1 min-h-0">
-                    <VirtualList items={items} height="100%" itemHeight={36}>
+                    <VirtualList items={displayedItems} height="100%" itemHeight={36}>
                       {#snippet children(rawRow: any)}
                         {@const item = getItemObj(rawRow)}
                         {@const st = getItemStatus(item)}

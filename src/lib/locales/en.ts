@@ -606,6 +606,7 @@ export const en = {
     summaryCollisions: "{count} collisions",
     summaryErrors: "{count} errors",
     summaryMissingTags: "{count} missing tags",
+    onlyChanging: "Only show changing files",
     applyButton: "Apply Changes",
     applySuccess: "Successfully reorganized {count} file(s)",
     organizeFilesTooltip: "Organize files by tag template",
