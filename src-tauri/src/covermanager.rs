@@ -189,6 +189,43 @@ impl CoverManager {
         Ok(None)
     }
 
+    /// Resolve the on-disk filesystem path (not a `luminous-art://` URI) for
+    /// a song's cover art. For consumers that need a real file rather than a
+    /// webview-protocol URL — e.g. the OS "Now Playing" media session (#80),
+    /// which loads artwork directly.
+    pub fn get_cover_art_path(&self, song_id: i64) -> Result<Option<PathBuf>> {
+        let conn = self.db.pool.get()?;
+        let (art_automatic, art_manual, art_unset) = conn.query_row(
+            "SELECT art_automatic, art_manual, art_unset FROM songs WHERE id = ?1",
+            params![song_id],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
+            },
+        )?;
+
+        if art_unset {
+            return Ok(None);
+        }
+
+        if let Some(manual) = art_manual {
+            return Ok(Some(self.covers_dir.join(manual)));
+        }
+
+        if let Some(auto) = art_automatic {
+            return Ok(Some(if auto.starts_with("album-") {
+                self.covers_dir.join(auto)
+            } else {
+                PathBuf::from(auto)
+            }));
+        }
+
+        Ok(None)
+    }
+
     /// Resolve URI string (luminous-art://...) for a given song ID
     pub fn get_cover_art_uri(&self, song_id: i64) -> Result<Option<String>> {
         let conn = self.db.pool.get()?;

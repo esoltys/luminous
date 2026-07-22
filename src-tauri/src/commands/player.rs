@@ -207,14 +207,19 @@ pub async fn previous_track(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn seek_to(position_nanosec: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .player
-        .lock()
-        .await
+pub async fn seek_to(
+    position_nanosec: i64,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().await;
+    player
         .seek_to(position_nanosec as u64)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let playback_state = player.get_state().await;
+    crate::media_session::mirror_state(&app, &playback_state).await;
+    Ok(())
 }
 
 #[tauri::command]
