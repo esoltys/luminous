@@ -1275,4 +1275,58 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+
+    /// Same scenario as `test_previous_track_walks_back_through_playlist`,
+    /// but exercises the real saved-playlist path (`PlaylistManager` +
+    /// `get_playlist_tracks`) instead of the ad-hoc `PlaylistItem::new_song`
+    /// helper, to check for divergence between Album and Playlist playback
+    /// reported in #105 ("Previous song works on albums, but not playlists").
+    #[tokio::test]
+    async fn test_previous_track_walks_back_through_saved_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut manager = crate::playlist::PlaylistManager::new(db_arc.clone()).unwrap();
+        let playlist = manager.create_playlist("Test Playlist").unwrap();
+        manager
+            .add_songs_to_playlist(playlist.id, &[1, 2, 3])
+            .unwrap();
+
+        let items = manager.get_playlist_tracks(playlist.id).unwrap();
+        assert_eq!(items.len(), 3);
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        // Start on the last track (index 2).
+        player
+            .play_playlist(items, 2, playlist.id, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+        assert_eq!(player.current_index, Some(2));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            2,
+            "previous should move to the prior playlist track, not replay the current one"
+        );
+        assert_eq!(player.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
 }
