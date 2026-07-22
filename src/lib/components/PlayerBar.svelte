@@ -317,7 +317,7 @@
       class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
       style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
-      title={i18n.t('playerBar.volume')}
+      title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     {#if collectionStore.immersiveMode}
       <button 

@@ -282,9 +282,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const albumName = song.album?.trim();
       if (albumName) {
         const artistName = song.album_artist || song.artist || "";
-        const albumTrackCount = library.songs.filter(
+        const albumSongs = library.songs.filter(
           (s) => s.album === song.album && (s.album_artist || s.artist || "") === artistName
-        ).length;
+        );
+        const albumTrackCount = albumSongs.length;
 
         if (albumTrackCount > 1) {
           const albumKey = `${song.album}::${artistName}`;
@@ -297,6 +298,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
                 album: song.album,
                 year: song.year ?? null,
                 track_count: albumTrackCount,
+                disc_count: Math.max(1, ...albumSongs.map((s) => s.disc ?? 1)),
                 art_embedded: song.art_embedded,
                 art_automatic: song.art_automatic ?? null,
                 art_manual: song.art_manual ?? null,

@@ -1,4 +1,5 @@
 import type { AlbumItem } from "../types";
+import { i18n } from "../stores/i18n.svelte";
 
 /** An artist's albums, newest first. */
 export function getArtistAlbums(albums: AlbumItem[], name: string | null): AlbumItem[] {
@@ -6,6 +7,20 @@ export function getArtistAlbums(albums: AlbumItem[], name: string | null): Album
   return albums
     .filter((a) => a.artist === name)
     .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+}
+
+/**
+ * Single card-facing category label for an album: "Single" (1 track), "EP"
+ * (2-6 tracks), "Album" (7+ tracks) — overridden by "{n}-Disc Set" whenever
+ * the release spans more than one disc, so a card never shows two labels.
+ */
+export function getAlbumCategoryLabel(trackCount: number, discCount: number | null | undefined): string {
+  if ((discCount ?? 1) > 1) {
+    return i18n.t("artistDetail.discSet", { count: discCount ?? 1 });
+  }
+  if (trackCount === 1) return i18n.t("artistDetail.single");
+  if (trackCount <= 6) return i18n.t("artistDetail.ep");
+  return i18n.t("artistDetail.album");
 }
 
 const GRADIENTS = [

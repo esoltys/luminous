@@ -386,6 +386,7 @@ export const fr = {
     repeatOneByOne: "Une à la fois",
     volume: "Volume",
     volumeSlider: "Curseur de volume",
+    volumeWithValue: "Volume : {value}%",
     queueTitle: "File d'attente",
     historyTitle: "Historique d'écoute",
     queueTab: "File ({count})",
@@ -513,6 +514,10 @@ export const fr = {
     albumsFilter: "Albums ({count})",
     singlesAndEps: "Singles et EPs ({count})",
     singleEp: "Single/EP",
+    single: "Single",
+    ep: "EP",
+    album: "Album",
+    discSet: "Coffret {count} disques",
     noReleasesFound: "Aucune sortie trouvée.",
     playlistsFeaturing: "Listes de lecture avec {artist}"
   },

@@ -212,7 +212,7 @@
   </div>
 
   <!-- Discography -->
-  <div class="px-8 pt-8">
+  <div class="px-6 pt-8">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.discography')}</h2>
       {#if discographySource.length > POPULAR_CAP}
@@ -265,7 +265,7 @@
 
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
-    <div class="px-8 pt-10" class:pb-24={!!playerStore.currentSong}>
+    <div class="px-6 pt-10" class:pb-24={!!playerStore.currentSong}>
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
           <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist)} />

@@ -386,6 +386,7 @@ export const en = {
     repeatOneByOne: "One by One",
     volume: "Volume",
     volumeSlider: "Volume Slider",
+    volumeWithValue: "Volume: {value}%",
     queueTitle: "Play Queue",
     historyTitle: "Play History",
     queueTab: "Queue ({count})",
@@ -513,6 +514,10 @@ export const en = {
     albumsFilter: "Albums ({count})",
     singlesAndEps: "Singles and EPs ({count})",
     singleEp: "Single/EP",
+    single: "Single",
+    ep: "EP",
+    album: "Album",
+    discSet: "{count}-Disc Set",
     noReleasesFound: "No releases found.",
     playlistsFeaturing: "Playlists featuring {artist}"
   },

@@ -523,11 +523,11 @@
                     {song.title || i18n.t('collection.unknownSong')}
                   </span>
                 </div>
-                <div class="text-brand-text-secondary/90 truncate pr-4 min-w-0">
+                <div class="text-brand-text-secondary/90 truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90 text-left"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
@@ -536,11 +536,11 @@
                     <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
-                <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0">
+                <div class="text-brand-text-secondary/70 truncate pr-4 flex items-center min-w-0">
                   {#if song.album}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70 text-left"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
