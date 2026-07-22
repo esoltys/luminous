@@ -302,7 +302,7 @@
         </div>
       </div>
 
-      <!-- Auto-Play Toggle -->
+      <!-- Auto-Refill Toggle -->
       <div class="flex items-center gap-3 pt-2">
         <label class="relative inline-flex items-center cursor-pointer">
           <input type="checkbox" bind:checked={autoPlay} class="sr-only peer" />
