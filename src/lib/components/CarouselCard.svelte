@@ -31,14 +31,6 @@
     collectionStore.viewPlaylist(playlist.id);
   }
 
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const seconds = Math.floor(ns / 1_000_000_000);
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
-
   async function handlePlay(e: MouseEvent) {
     e.stopPropagation();
     if (item.type === "song") {
@@ -90,11 +82,6 @@
         <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium" title={item.song.artist}>
           {item.song.artist || i18n.t('collection.unknownArtist')}
         </p>
-
-        <!-- Song Duration -->
-        <div class="mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
-          {formatDuration(item.song.length_nanosec)}
-        </div>
       </div>
     </div>
   </div>
