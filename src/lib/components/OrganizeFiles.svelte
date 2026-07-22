@@ -34,7 +34,8 @@
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
     { label: "%album", desc: "Album" },
-    { label: "{Disc %disc/}", desc: "Conditional Disc #" },
+    { label: "/", desc: "Folder Separator" },
+    { label: "{Disc %disc/}", desc: "Conditional Disc Folder" },
     { label: "%track", desc: "Track #" },
     { label: "%title", desc: "Title" },
     { label: "%year", desc: "Year" },
@@ -326,10 +327,10 @@
               <button
                 type="button"
                 onclick={() => insertChip(chip.label)}
-                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border {chip.label.startsWith('{') ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 hover:bg-purple-500/30' : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30'}"
+                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border {chip.label === '/' ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold' : chip.label.startsWith('{') ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 hover:bg-purple-500/30' : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30'}"
                 title={chip.desc}
               >
-                {chip.label}
+                {chip.label === '/' ? '/ (Folder)' : chip.label}
               </button>
             {/each}
           </div>
