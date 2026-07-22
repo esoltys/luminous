@@ -76,7 +76,11 @@ You can download the latest installers and portable binaries directly from the G
         </td>
     </tr>
     <tr>
-        <td colspan="2">
+    	<td width="50%">
+            <h4 align="center">Organize Files</h4>
+            <img src="docs/screenshots/organize-files.png" alt="Organize Files" />
+        </td>
+        <td width="50%">
             <h4 align="center">Smart Playlist Editor</h4>
             <img src="docs/screenshots/playlist-smart-edit.png" alt="Smart Playlist Editor" />
         </td>
