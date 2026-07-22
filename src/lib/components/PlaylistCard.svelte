@@ -94,13 +94,13 @@
       </div>
     {/if}
 
-    {#if autoKind === "decade" || autoKind === "genre"}
+    {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}
       <div
         class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title="Auto Playlist"
+        title={i18n.t('playlists.autoPlayBadgeTooltip')}
       >
         <Radio class="w-2.5 h-2.5" />
-        Auto
+        {i18n.t('playlists.autoPlayBadgeLabel')}
       </div>
     {:else if autoKind === "smart"}
       <div
