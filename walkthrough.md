@@ -103,6 +103,41 @@ manual testing surfaced problems.
 - Exclusive/bit-perfect audio routing is unrelated to this issue — not
   applicable here.
 
+## Round 2 — the "smart playlist is empty" bug
+
+You reported that clicking **Create Smart Playlist** produced an empty
+playlist. Root cause: **two** backend bugs, both in `playlist.rs`, both
+triggered specifically by genre-field rules (the modal's default field is
+`genre`, so this hit almost every smart playlist):
+
+1. `populate_dynamic_playlist` / `get_auto_playlist_refill_songs` treated
+   *any* spec starting with `"genre:"` as a system genre auto-playlist and
+   ran an **exact-match** `get_songs_by_genre()` lookup — but a Smart
+   Playlist rule on the genre field serialises to that exact same
+   `"genre:<value>"` prefix. `genre:rock` searched for a song whose genre
+   column was literally `"rock"`, not "contains rock", so real genres like
+   `"Classic Rock"` never matched. Fixed by routing on "spec contains a
+   `:`" instead of the `"genre:"` prefix specifically — system auto-playlist
+   specs are always bare names (no colon) since the earlier categorization
+   fix, so Smart Playlist specs now correctly fall through to the real
+   filter-parser path (`search_songs`, `LIKE`-based).
+2. `sync_genre_auto_playlists` — which runs every time the Playlists view
+   mounts — pruned *any* dynamic-enabled, non-decade playlist whose spec
+   didn't exactly equal a current library genre. Since Smart Playlists are
+   also dynamic-enabled and their specs (e.g. `"artist:Miles Davis"`) never
+   equal a genre name, they were being silently **deleted** on the next
+   view mount after creation. Scoped the prune query to bare-name specs
+   only.
+
+Added two regression tests in `playlist.rs`:
+`test_smart_playlist_genre_rule_populates_via_filter_not_exact_genre_match`
+and `test_sync_genre_auto_playlists_does_not_prune_smart_playlists`.
+
+## Round 2 — toolbar order
+
+Reordered the Playlists view toolbar so **New Playlist** comes before
+**Import Playlist** (was Import, then New).
+
 ## Testing / Verification
 
 - `cargo test` (backend, incl. BDD scenarios) — passes, 0 failures.
@@ -128,9 +163,13 @@ Worth clicking through:
 - Collection view: toggle columns in the Columns menu, confirm the Format
   column shows codec, and confirm the "all filtered out" empty state and
   its reset button.
-- Playlists: build a Smart Playlist (e.g. `genre:rock`), confirm it's
-  non-empty immediately, shows the suggested name, appears under **Custom
-  Playlists** with the purple gradient + top-right Smart badge.
+- Playlists: build a Smart Playlist with a genre rule (e.g. `genre` contains
+  `rock`), confirm it's **non-empty** immediately, shows the suggested name,
+  appears under **Custom Playlists** with the purple gradient + top-right
+  Smart badge — then switch to Auto Playlists and back to Custom (remounting
+  the view, which re-runs the genre-playlist sync) and confirm it's still
+  there with tracks, not deleted.
+- Toolbar: confirm **New Playlist** now appears before **Import Playlist**.
 - Auto Playlists tab: confirm the new info banner, and that Auto badges
   only appear when Auto-Refill is toggled on for that playlist.
 
