@@ -6,7 +6,7 @@ use crate::{
     models::{Playlist, PlaylistItem, PlaylistItemType, Song},
 };
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -373,14 +373,64 @@ impl PlaylistManager {
         Ok(())
     }
 
-    /// Update the `dynamic_spec` and `dynamic_enabled` fields for a playlist row.
-    pub fn set_playlist_dynamic_spec(&self, id: i64, spec: &str) -> Result<()> {
+    /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`.
+    pub fn populate_dynamic_playlist(&mut self, playlist_id: i64) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let spec: Option<String> = conn
+            .query_row(
+                "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
+                params![playlist_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let spec = match spec {
+            Some(s) if !s.trim().is_empty() => s,
+            _ => return Ok(()),
+        };
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let songs = if let Some(decade) = spec.strip_prefix("decade:") {
+            scanner.get_songs_by_decade(decade, 100)?
+        } else if let Some(genre) = spec.strip_prefix("genre:") {
+            scanner.get_songs_by_genre(genre, 100)?
+        } else {
+            let query = spec.replace(';', " ");
+            scanner.search_songs(&query, 100)?
+        };
+
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+            params![now, playlist_id],
+        )?;
+
+        conn.execute(
+            "DELETE FROM playlist_items WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Update the `dynamic_spec` and `dynamic_enabled` fields for a playlist row, and populate its matching songs.
+    pub fn set_playlist_dynamic_spec(&mut self, id: i64, spec: &str) -> Result<()> {
         let conn = self.db.pool.get()?;
         let enabled = !spec.trim().is_empty();
         conn.execute(
             "UPDATE playlists SET dynamic_spec = ?1, dynamic_enabled = ?2 WHERE id = ?3",
             params![spec, enabled, id],
         )?;
+        if enabled {
+            self.populate_dynamic_playlist(id)?;
+        }
         Ok(())
     }
 
@@ -398,10 +448,12 @@ impl PlaylistManager {
 
         // Parse spec prefix to determine filter type
         let songs: Vec<Song> = if let Some(decade) = dynamic_spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, (limit * 4) as i64)? // fetch extra; we'll filter
-        } else {
-            let genre = dynamic_spec.strip_prefix("genre:").unwrap_or(dynamic_spec);
+            scanner.get_songs_by_decade(decade, (limit * 4) as i64)?
+        } else if let Some(genre) = dynamic_spec.strip_prefix("genre:") {
             scanner.get_songs_by_genre(genre, (limit * 4) as i64)?
+        } else {
+            let query = dynamic_spec.replace(';', " ");
+            scanner.search_songs(&query, 100)?
         };
 
         // Collect song IDs already in the playlist so we can exclude them
@@ -427,39 +479,7 @@ impl PlaylistManager {
     /// the "Refresh" button in the auto-playlist header), replacing its contents
     /// with a fresh selection of matching songs from the library.
     pub fn refresh_auto_playlist(&mut self, playlist_id: i64) -> Result<()> {
-        let conn = self.db.pool.get()?;
-        let spec: String = conn.query_row(
-            "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
-            params![playlist_id],
-            |row| row.get(0),
-        )?;
-
-        let scanner = CollectionScanner::new(self.db.clone());
-        let songs = if let Some(decade) = spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, 50)?
-        } else {
-            let genre = spec.strip_prefix("genre:").unwrap_or(&spec);
-            scanner.get_songs_by_genre(genre, 50)?
-        };
-
-        let now = chrono::Utc::now().timestamp();
-        conn.execute(
-            "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-            params![now, playlist_id],
-        )?;
-        conn.execute(
-            "DELETE FROM playlist_items WHERE playlist_id = ?1",
-            params![playlist_id],
-        )?;
-
-        for (position, song) in songs.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
-                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
-            )?;
-        }
-
-        Ok(())
+        self.populate_dynamic_playlist(playlist_id)
     }
 
     // -----------------------------------------------------------------------

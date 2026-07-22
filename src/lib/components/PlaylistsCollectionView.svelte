@@ -39,10 +39,10 @@
     await playlistsStore.refreshAutoPlaylistCounts();
   });
 
-  let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:")));
+  let genreAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("genre:")));
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let customPlaylists = $derived.by(() => {
-    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled);
+    const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || (!p.dynamic_spec?.startsWith("decade:") && !p.dynamic_spec?.startsWith("genre:")));
     const queue = list.find((p) => p.name.toLowerCase() === "queue");
     const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
     return queue ? [queue, ...rest] : rest;

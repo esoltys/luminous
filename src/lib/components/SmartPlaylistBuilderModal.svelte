@@ -12,8 +12,54 @@
 
   let { initialRules = [], onClose }: Props = $props();
 
-  let playlistName = $state("Smart Playlist");
-  let autoPlay = $state(true);
+  function generateSuggestedName(ruleList: Array<{ field: string; op: string; value: string }>): string {
+    const activeRules = ruleList.filter((r) => r.value.trim() !== "");
+    if (activeRules.length === 0) return "Smart Playlist";
+
+    const parts: string[] = [];
+
+    for (const r of activeRules) {
+      const val = r.value.trim().replace(/^["']|["']$/g, "");
+      if (!val) continue;
+
+      if (r.field === "genre") {
+        const capitalized = val.charAt(0).toUpperCase() + val.slice(1);
+        parts.push(capitalized);
+      } else if (r.field === "artist") {
+        parts.push(val);
+      } else if (r.field === "album") {
+        parts.push(`Album: ${val}`);
+      } else if (r.field === "year") {
+        if (r.op === ">=" || r.op === ">") {
+          parts.push(`${val}+`);
+        } else if (r.op === "<=" || r.op === "<") {
+          parts.push(`Pre-${val}`);
+        } else {
+          parts.push(val);
+        }
+      } else if (r.field === "rating") {
+        if (r.op === ">=" || r.op === ">") {
+          parts.push(`${val}★+`);
+        } else {
+          parts.push(`${val}★`);
+        }
+      } else {
+        parts.push(val);
+      }
+    }
+
+    if (parts.length === 0) return "Smart Playlist";
+    if (parts.length === 1) {
+      const single = parts[0];
+      const firstField = activeRules[0].field;
+      if (firstField === "genre") return `${single} Mix`;
+      if (firstField === "artist") return `${single} Selection`;
+      if (firstField === "rating") return `${single} Songs`;
+      return `${single} Playlist`;
+    }
+
+    return `${parts.join(" · ")} Mix`;
+  }
 
   interface RuleItem {
     id: string;
@@ -30,6 +76,15 @@
   }
 
   let rules = $state<RuleItem[]>(createInitialRules());
+  let userHasEditedName = $state(false);
+  let playlistName = $state(generateSuggestedName(rules));
+  let autoPlay = $state(true);
+
+  $effect(() => {
+    if (!userHasEditedName) {
+      playlistName = generateSuggestedName(rules);
+    }
+  });
 
   const availableFields = [
     { key: "artist", label: "Artist", type: "text" },
@@ -140,6 +195,7 @@
           id="smart-playlist-name-input"
           type="text"
           bind:value={playlistName}
+          oninput={() => { userHasEditedName = true; }}
           placeholder="My Smart Playlist"
           class="w-full bg-brand-main border border-brand-border rounded-xl px-3.5 py-2 text-sm text-brand-text-primary focus:outline-none focus:border-brand-accent font-medium"
           required
