@@ -81,6 +81,8 @@
       collectionStore.viewAlbum(item.title);
     } else if (item.kind === "playlist" && item.entityId) {
       collectionStore.viewPlaylist(Number(item.entityId));
+    } else if (item.kind === "song" && item.query) {
+      collectionStore.viewAlbum(item.query);
     } else {
       collectionStore.searchQuery = item.query || item.title;
       collectionStore.search(item.query || item.title);
@@ -331,18 +333,28 @@
                     tabindex="0"
                     onclick={() => {
                       const songTitle = song.title || "Unknown";
-                      collectionStore.searchQuery = songTitle;
-                      collectionStore.search(songTitle);
+                      if (song.album) {
+                        collectionStore.viewAlbum(song.album);
+                      } else {
+                        collectionStore.searchQuery = songTitle;
+                        collectionStore.search(songTitle);
+                      }
                       collectionStore.addRecentSearch({
                         kind: "song",
                         title: songTitle,
                         subtitle: `${i18n.t('collection.songLabel', {}, 'Song')} • ${song.artist || 'Unknown'}`,
-                        query: songTitle,
+                        query: song.album || songTitle,
                         artUrl: song.art_manual || song.art_automatic
                       });
                       isSearchFocused = false;
                     }}
-                    onkeydown={(e) => e.key === 'Enter' && collectionStore.search(song.title || "")}
+                    onkeydown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (song.album) collectionStore.viewAlbum(song.album);
+                        else collectionStore.search(song.title || "");
+                        isSearchFocused = false;
+                      }
+                    }}
                     class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
