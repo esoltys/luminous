@@ -76,13 +76,13 @@ You can download the latest installers and portable binaries directly from the G
         </td>
     </tr>
     <tr>
-        <td <td colspan="2">>
+        <td colspan="2">
             <h4 align="center">Smart Playlist Editor</h4>
             <img src="docs/screenshots/playlist-smart-edit.png" alt="Smart Playlist Editor" />
         </td>
     </tr>
     <tr>
-        <td <td colspan="2">>
+        <td colspan="2">
             <h4 align="center">Immersive Now Playing</h4>
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
         </td>
