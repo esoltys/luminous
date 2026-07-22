@@ -1,6 +1,7 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { X, Plus, Sparkles, SlidersHorizontal } from "lucide-svelte";
   import type { Rule } from "../utils/filterParser";
@@ -203,13 +204,22 @@
       onClose();
     }
   }
+
+  // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top of
+  // page content whenever a song is loaded — reserve room for it so the modal
+  // shrinks and its form scrolls internally instead of sliding underneath it.
+  let dockClearance = $derived(playerStore.currentSong ? 96 : 0);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+  style="padding-bottom: {dockClearance + 16}px"
+>
   <div
-    class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+    class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+    style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">
