@@ -332,7 +332,9 @@ export const en = {
     contextMenuGoArtist: "Go to Artist",
     contextMenuGoAlbum: "Go to Album",
     contextMenuEditTags: "Edit Tags",
-    noFilterResults: "No tracks match \"{query}\""
+    noFilterResults: "No tracks match \"{query}\"",
+    autoPlaylistInfoTitle: "How do Auto Playlists work?",
+    autoPlaylistInfoText: "Auto Playlists are curated automatically from your library — refreshed daily with up to 25 tracks. Genre playlists group songs by their genre tag; Decade playlists group by release year. A playlist is only created when a genre or decade has at least 25 matching songs. You can click any playlist to browse its tracks, or click Refresh to pick a fresh selection instantly."
   },
   lyrics: {
     title: "Lyrics",

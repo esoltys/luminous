@@ -12,7 +12,7 @@
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
-  import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
+  import { FolderInput, Plus, ListMusic, Sparkles, HelpCircle } from "lucide-svelte";
 
   interface AutoDef {
     id: string;
@@ -344,6 +344,17 @@
                 onClick={() => openAuto(def)}
               />
             {/each}
+          </div>
+
+          <!-- Auto-Playlist Info Banner -->
+          <div class="mt-6 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
+            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
+            <div class="space-y-1">
+              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.autoPlaylistInfoTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+                {i18n.t('playlists.autoPlaylistInfoText')}
+              </p>
+            </div>
           </div>
         {:else if sortedPlaylists.length === 0}
           <div class="col-span-full py-16 text-center">

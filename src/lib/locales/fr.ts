@@ -332,7 +332,9 @@ export const fr = {
     contextMenuGoArtist: "Aller à l'artiste",
     contextMenuGoAlbum: "Aller à l'album",
     contextMenuEditTags: "Éditer les étiquettes",
-    noFilterResults: "Aucune piste ne correspond à \"{query}\""
+    noFilterResults: "Aucune piste ne correspond à \"{query}\"",
+    autoPlaylistInfoTitle: "Comment fonctionnent les listes de lecture automatiques ?",
+    autoPlaylistInfoText: "Les listes automatiques sont générées depuis votre bibliothèque et actualisées quotidiennement avec jusqu'à 25 titres. Les listes par genre regroupent les chansons selon leur étiquette de genre ; les listes par décennie selon l'année de sortie. Une liste n'est créée que si un genre ou une décennie compte au moins 25 chansons correspondantes. Cliquez sur une liste pour parcourir ses titres, ou sur Actualiser pour obtenir une nouvelle sélection."
   },
   lyrics: {
     title: "Paroles",
