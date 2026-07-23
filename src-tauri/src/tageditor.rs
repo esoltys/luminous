@@ -100,6 +100,11 @@ pub fn write_tags(
         }
     };
 
+    // Guard against embedded cover art being dropped by the text-field edits
+    // below (#106) — nothing here is meant to touch pictures, so restore
+    // them if they come back empty after editing.
+    let original_pictures = tag.pictures().to_vec();
+
     tag.set_title(title.to_string());
     tag.set_artist(artist.to_string());
     tag.set_album(album.to_string());
@@ -124,6 +129,12 @@ pub fn write_tags(
         tag.set_year(y);
     } else {
         tag.remove_key(&lofty::tag::ItemKey::Year);
+    }
+
+    if tag.pictures().is_empty() && !original_pictures.is_empty() {
+        for picture in original_pictures {
+            tag.push_picture(picture);
+        }
     }
 
     let mut attempts = 0;
