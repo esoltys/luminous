@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Clock, Activity, HardDrive, ExternalLink, Globe, Info, Shield } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Globe, Info, Shield } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -271,7 +271,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-24={!!playerStore.currentSong}>
+  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
@@ -424,7 +424,7 @@
             class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
             title={i18n.t('settings.pruneMissingHint')}
           >
-            <Sparkles class="w-4 h-4" />
+            <Eraser class="w-4 h-4" />
             {i18n.t('settings.pruneMissingBtn')}
           </button>
 

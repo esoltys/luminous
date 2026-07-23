@@ -426,7 +426,7 @@
     </div>
 
     <!-- Main View Songs Container -->
-    <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col" class:pb-24={!!playerStore.currentSong}>
+    <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col" class:pb-28={!!playerStore.currentSong}>
       <!-- Songs Table View -->
       <div bind:this={songsTableContainer} class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
@@ -633,7 +633,7 @@
 
   {:else}
     <!-- Scrollable Container for Albums / Artists Views -->
-    <div class="flex-1 px-6 overflow-y-auto" class:pb-24={!!playerStore.currentSong}>
+    <div class="flex-1 px-6 overflow-y-auto" class:pb-28={!!playerStore.currentSong}>
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
         <!-- Showing Count (Left) -->

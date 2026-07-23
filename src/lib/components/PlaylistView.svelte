@@ -820,7 +820,7 @@
     </div>
 
     <!-- Tracks List Container -->
-    <div class="p-6" class:pb-24={!!playerStore.currentSong}>
+    <div class="p-6" class:pb-28={!!playerStore.currentSong}>
       <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
