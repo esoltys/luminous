@@ -654,7 +654,10 @@
   </div>
 
   <!-- Reactive Logo Brand -->
-  <div class="flex items-center justify-center flex-shrink-0">
+  <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
+       which needs overflow-visible for the search dropdown popover) so the
+       logo's SVG glow filter can never bleed into the sidebar/header layers -->
+  <div class="flex items-center justify-center flex-shrink-0 overflow-hidden isolate">
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>
