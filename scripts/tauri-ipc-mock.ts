@@ -670,6 +670,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
+    "enter_miniplayer_mode", "exit_miniplayer_mode", "resize_miniplayer", "start_window_drag", "start_window_resize",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;
 
@@ -683,36 +684,52 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     return handler(args);
   }
 
-  window.__TAURI_INTERNALS__ = {
-    transformCallback(callback, once = false) {
+  const internals = {
+    transformCallback(callback: IpcCallback, once = false) {
       const id = nextCallbackId++;
       callbacks[id] = (data) => {
         if (once) delete callbacks[id];
         callback(data);
       };
+      (window as unknown as Record<string, unknown>)[`_${id}`] = callbacks[id];
       return id;
     },
 
-    unregisterCallback(id) {
+    unregisterCallback(id: number) {
       delete callbacks[id];
+      delete (window as unknown as Record<string, unknown>)[`_${id}`];
+    },
+
+    unregisterListener(event: string, eventId: number) {
+      delete callbacks[eventId];
+      delete (window as unknown as Record<string, unknown>)[`_${eventId}`];
+      if (eventListeners[event]) {
+        eventListeners[event] = eventListeners[event].filter((h) => h !== eventId);
+      }
     },
 
     invoke,
 
-    ipc(message) {
+    ipc(message: { cmd?: string; params?: Record<string, unknown>; callback?: number; error?: number }) {
       console.log("[Tauri Mock IPC] message:", message);
-      if (message?.cmd === "plugin:event|listen") {
-        invoke(message.cmd, message.params ?? {});
-        getIpcCallback(message.callback)?.();
-        return;
-      }
-
       if (message?.cmd) {
         invoke(message.cmd, message.params ?? {})
           .then((res) => getIpcCallback(message.callback)?.(res))
           .catch((err) => getIpcCallback(message.error)?.(err));
       }
     },
+  };
+
+  (internals as any).metadata = {
+    unregisterListener: (event: string, eventId: number) => internals.unregisterListener(event, eventId),
+  };
+  (internals as any).listeners = {
+    unregisterListener: (event: string, eventId: number) => internals.unregisterListener(event, eventId),
+  };
+
+  window.__TAURI_INTERNALS__ = internals;
+  (window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+    unregisterListener: (event: string, eventId: number) => internals.unregisterListener(event, eventId),
   };
 
   // Simulate spectral FFT visualizer events periodically.

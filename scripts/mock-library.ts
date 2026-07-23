@@ -83,6 +83,8 @@ export interface ScreenshotConfig extends MockConfigDefaults {
   filename: string;
   action?: string;
   isImmersive?: boolean;
+  viewportWidth?: number;
+  viewportHeight?: number;
 }
 
 export interface MockConfig {

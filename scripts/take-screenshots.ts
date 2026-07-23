@@ -136,6 +136,8 @@ async function main() {
     rightPanelOpen?: boolean;
     sidebarWidth?: number;
     positionSeconds?: number;
+    viewportWidth?: number;
+    viewportHeight?: number;
   }
 
   async function capture({
@@ -151,10 +153,12 @@ async function main() {
     rightPanelOpen = false,
     sidebarWidth = 64,
     positionSeconds = 122,
+    viewportWidth = 1280,
+    viewportHeight = 800,
   }: CaptureOptions) {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Language: ${language}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
-    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
         const text = msg.text();
@@ -340,6 +344,41 @@ async function main() {
       await page.getByRole("button", { name: "Advanced...", exact: true }).click();
       await page.waitForTimeout(400);
     },
+    "click-smart-playlist-edit": async (page) => {
+      await page.getByRole("button", { name: "New Playlist", exact: true }).click();
+      await page.waitForTimeout(300);
+      await page.getByRole("button", { name: "Advanced...", exact: true }).click();
+      await page.waitForTimeout(400);
+      const nameInput = page.locator("#smart-playlist-name-input");
+      await nameInput.fill("1980s Rock Mix");
+      await page.waitForTimeout(200);
+
+      const valInputs = page.locator('input[placeholder="Value..."]');
+      await valInputs.nth(0).fill("Rock");
+
+      await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+      await page.waitForTimeout(200);
+      const selects = page.locator("form select");
+      await selects.nth(2).selectOption("year");
+      await page.waitForTimeout(100);
+      await selects.nth(3).selectOption(">=");
+      await page.waitForTimeout(100);
+      await valInputs.nth(1).fill("1980");
+
+      await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+      await page.waitForTimeout(200);
+      await selects.nth(4).selectOption("year");
+      await page.waitForTimeout(100);
+      await selects.nth(5).selectOption("<=");
+      await page.waitForTimeout(100);
+      await valInputs.nth(2).fill("1989");
+
+      const toggle = page.locator('form input[type="checkbox"]');
+      if (!(await toggle.isChecked())) {
+        await toggle.check();
+      }
+      await page.waitForTimeout(400);
+    },
     "type-search": async (page) => {
       const searchInput = page.locator('input[placeholder*="Search"]');
       await searchInput.focus();
@@ -348,6 +387,13 @@ async function main() {
     },
     "toggle-miniplayer": async (page) => {
       await page.keyboard.press("Control+m");
+      await page.waitForTimeout(400);
+    },
+    "toggle-miniplayer-hover": async (page) => {
+      await page.keyboard.press("Control+m");
+      await page.waitForTimeout(400);
+      const miniRegion = page.locator('[role="region"][aria-label="Miniplayer"]');
+      await miniRegion.hover();
       await page.waitForTimeout(400);
     }
   };
@@ -382,6 +428,8 @@ async function main() {
           rightPanelOpen: settings.rightPanelOpen,
           sidebarWidth: settings.sidebarWidth,
           positionSeconds: settings.positionSeconds,
+          viewportWidth: s.viewportWidth,
+          viewportHeight: s.viewportHeight,
         });
       }
     } else {
