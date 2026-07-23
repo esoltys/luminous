@@ -18,6 +18,7 @@ export interface VisibleColumns {
   genre: boolean;
   rating: boolean;
   playcount: boolean;
+  skipcount: boolean;
   lastplayed: boolean;
   duration: boolean;
 }
@@ -79,6 +80,7 @@ class CollectionStore {
         path: false,
         genre: false,
         playcount: false,
+        skipcount: false,
         lastplayed: false,
       };
       if (typeof window !== "undefined") {

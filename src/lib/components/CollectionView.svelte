@@ -255,6 +255,7 @@
     if (vc.bitrate) cols.push("70px");
     if (vc.rating) cols.push("96px");
     if (vc.playcount) cols.push("70px");
+    if (vc.skipcount) cols.push("70px");
     if (vc.duration) cols.push("80px");
 
     cols.push("80px");
@@ -392,6 +393,10 @@
                 Play Count
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+                <input type="checkbox" checked={collectionStore.visibleColumns.skipcount} onchange={() => collectionStore.toggleColumn("skipcount")} class="rounded accent-brand-accent" />
+                Skip Count
+              </label>
+              <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.duration} onchange={() => collectionStore.toggleColumn("duration")} class="rounded accent-brand-accent" />
                 Duration
               </label>
@@ -472,6 +477,11 @@
             {#if collectionStore.visibleColumns.playcount}
               <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
                 <span class="truncate">Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
+              </button>
+            {/if}
+            {#if collectionStore.visibleColumns.skipcount}
+              <button onclick={() => toggleSort("skipcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
+                <span class="truncate">Skips {sortField === "skipcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.duration}
@@ -601,6 +611,11 @@
                 {#if collectionStore.visibleColumns.playcount}
                   <div class="text-center text-brand-text-secondary/80 font-mono text-xs">
                     {song.playcount ?? 0}
+                  </div>
+                {/if}
+                {#if collectionStore.visibleColumns.skipcount}
+                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">
+                    {song.skipcount ?? 0}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.duration}
