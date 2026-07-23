@@ -18,6 +18,13 @@
     parametric: ParametricBand[];
   }
 
+  // Matches PlayerBar's volume-slider gradient recipe so every horizontal
+  // range input in the app shows the same accent-filled "active range" look.
+  function rangeFillStyle(value: number, min: number, max: number): string {
+    const pct = ((value - min) / (max - min)) * 100;
+    return `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${pct}%, var(--color-border) ${pct}%, var(--color-border) 100%)`;
+  }
+
   let enabled = $state(false);
   let mode = $state<EqMode>("graphic10");
   let preamp = $state(0.0);
@@ -416,7 +423,8 @@
         step="0.5"
         bind:value={preamp}
         oninput={handlePreampChange}
-        class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+        class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+        style={rangeFillStyle(preamp, -12.0, 12.0)}
       />
     </div>
 
@@ -452,7 +460,8 @@
             bind:value={targetLufs}
             oninput={handleTargetLufsChange}
             disabled={!loudnessEnabled}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            style={rangeFillStyle(targetLufs, -24.0, -14.0)}
           />
         </div>
 
@@ -491,7 +500,8 @@
             bind:value={fallbackGainDb}
             oninput={handleFallbackGainChange}
             disabled={!loudnessEnabled}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            style={rangeFillStyle(fallbackGainDb, -24.0, 0.0)}
           />
           <span class="text-[10px] text-brand-text-secondary/60">{i18n.t('loudness.fallbackGainHint')}</span>
         </div>
@@ -534,7 +544,8 @@
             step="50"
             bind:value={fadePauseDurationMs}
             onchange={saveFadeSettings}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            style={rangeFillStyle(fadePauseDurationMs, 100, 1000)}
           />
         {/if}
       </div>
@@ -562,7 +573,8 @@
             step="0.5"
             bind:value={crossfadeAutoDurationSecs}
             onchange={saveFadeSettings}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            style={rangeFillStyle(crossfadeAutoDurationSecs, 0.5, 10.0)}
           />
           <div class="flex items-center justify-between pt-1">
             <span class="text-[11px] text-brand-text-secondary/80">{i18n.t('fades.suppressSameAlbum')}</span>
