@@ -247,6 +247,28 @@ describe("CollectionStore", () => {
     expect(collectionStore.immersiveMode).toBe(false);
   });
 
+  it("remembers a manually resized miniplayer size across enter/exit", async () => {
+    collectionStore.setMiniplayerSize(420, 480);
+    expect(collectionStore.miniplayerWidth).toBe(420);
+    expect(collectionStore.miniplayerHeight).toBe(480);
+    expect(localStorage.getItem("layout_miniplayerWidth")).toBe("420");
+    expect(localStorage.getItem("layout_miniplayerHeight")).toBe("480");
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
+      if (cmd === "enter_miniplayer_mode") {
+        expect(args).toEqual({ width: 420, height: 480 });
+        return { saved_width: 1280, saved_height: 800 };
+      }
+      return null;
+    });
+
+    await collectionStore.enterMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(true);
+
+    await collectionStore.exitMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(false);
+  });
+
   it("manages recent searches state, deduplication, and persistence", () => {
     collectionStore.clearRecentSearches();
     expect(collectionStore.recentSearches).toHaveLength(0);

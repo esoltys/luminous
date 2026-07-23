@@ -285,6 +285,8 @@ class CollectionStore {
   isMiniplayer = $state<boolean>(false);
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
+  miniplayerWidth = $state<number>(300);
+  miniplayerHeight = $state<number>(360);
 
 
   watchFoldersRealtime = $state<boolean>(true);
@@ -313,6 +315,12 @@ class CollectionStore {
 
         const savedImmersive = localStorage.getItem("layout_immersiveMode");
         if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
+
+        const savedMiniplayerWidth = localStorage.getItem("layout_miniplayerWidth");
+        if (savedMiniplayerWidth) this.miniplayerWidth = parseInt(savedMiniplayerWidth, 10);
+
+        const savedMiniplayerHeight = localStorage.getItem("layout_miniplayerHeight");
+        if (savedMiniplayerHeight) this.miniplayerHeight = parseInt(savedMiniplayerHeight, 10);
 
         const savedTab = localStorage.getItem("navigation_activeTab");
         if (savedTab) this._activeTab = savedTab as ActiveTab;
@@ -606,7 +614,7 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode(width = 300, height = 360) {
+  async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight) {
     if (this.isMiniplayer) return;
     this.isMiniplayer = true;
     try {
@@ -617,6 +625,15 @@ class CollectionStore {
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
+    }
+  }
+
+  setMiniplayerSize(width: number, height: number) {
+    this.miniplayerWidth = width;
+    this.miniplayerHeight = height;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_miniplayerWidth", width.toString());
+      localStorage.setItem("layout_miniplayerHeight", height.toString());
     }
   }
 

@@ -55,18 +55,21 @@
     const startY = e.clientY;
     const startWidth = window.innerWidth;
     const startHeight = window.innerHeight;
+    let lastWidth = startWidth;
+    let lastHeight = startHeight;
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
-      const newWidth = Math.max(220, Math.min(650, startWidth + deltaX));
-      const newHeight = Math.max(220, Math.min(650, startHeight + deltaY));
-      invoke("resize_miniplayer", { width: newWidth, height: newHeight }).catch(() => {});
+      lastWidth = Math.max(220, Math.min(650, startWidth + deltaX));
+      lastHeight = Math.max(220, Math.min(650, startHeight + deltaY));
+      invoke("resize_miniplayer", { width: lastWidth, height: lastHeight }).catch(() => {});
     }
 
     function onPointerUp() {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      collectionStore.setMiniplayerSize(lastWidth, lastHeight);
     }
 
     window.addEventListener("pointermove", onPointerMove);
