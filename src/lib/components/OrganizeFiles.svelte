@@ -315,10 +315,10 @@
         errorMessage = result.errors.join("; ");
       } else {
         successMessage = i18n.t("organizer.applySuccess", { count: result.moved_count });
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-        }, 1200);
+        onSuccess?.();
+        // Leave the modal open so the user can see the result — refresh the
+        // preview to reflect the just-applied moves instead of auto-closing.
+        await fetchPreview();
       }
     } catch (err: any) {
       console.error("Failed to apply organize:", err);
