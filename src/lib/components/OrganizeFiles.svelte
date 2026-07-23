@@ -214,8 +214,15 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape" && isOpen) {
+    if (!isOpen) return;
+    if (e.key === "Escape") {
       onClose();
+    } else if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+      if (!canApply) return;
+      e.preventDefault();
+      handleApply();
     }
   }
 

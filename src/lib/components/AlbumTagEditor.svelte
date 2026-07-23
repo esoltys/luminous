@@ -47,7 +47,21 @@
       isSaving = false;
     }
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      props.onClose();
+    } else if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+      if (isSaving) return;
+      e.preventDefault();
+      handleSave();
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div use:portal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col text-brand-text-primary">
