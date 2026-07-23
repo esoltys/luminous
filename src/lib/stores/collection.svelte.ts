@@ -606,7 +606,7 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode(width = 300, height = 300) {
+  async enterMiniplayerMode(width = 300, height = 360) {
     if (this.isMiniplayer) return;
     this.isMiniplayer = true;
     try {

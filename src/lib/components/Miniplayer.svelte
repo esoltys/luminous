@@ -114,7 +114,7 @@
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
     <!-- Centered Sharp Active Album Art Card -->
     <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
-      <div class="relative w-full aspect-square max-h-full max-w-[240px] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center group-hover:scale-[0.98] transition-transform duration-300">
+      <div class="relative aspect-square max-h-full max-w-[240px] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center group-hover:scale-[0.98] transition-transform duration-300">
         <CoverArt
           songId={playerStore.currentSong?.id}
           artEmbedded={playerStore.currentSong?.art_embedded}

@@ -14,7 +14,7 @@ pub async fn enter_miniplayer_mode(
     let logical_height = current_size.height as f64 / scale_factor;
 
     let target_width = width.unwrap_or(300.0);
-    let target_height = height.unwrap_or(300.0);
+    let target_height = height.unwrap_or(360.0);
 
     let _ = window.set_always_on_top(true);
     let _ = window.set_decorations(false);
@@ -90,9 +90,9 @@ mod tests {
         let width = None;
         let height = None;
         let target_width = width.unwrap_or(300.0);
-        let target_height = height.unwrap_or(300.0);
+        let target_height = height.unwrap_or(360.0);
         assert_eq!(target_width, 300.0);
-        assert_eq!(target_height, 300.0);
+        assert_eq!(target_height, 360.0);
     }
 
     #[test]
