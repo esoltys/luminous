@@ -187,6 +187,13 @@
         <span class="text-sm font-semibold text-brand-text-primary truncate" title={playerStore.currentSong?.title}>
           {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
         </span>
+        {#if playerStore.currentSong}
+          <SongRating
+            rating={playerStore.currentSong.rating}
+            onRate={(r) => playerStore.rateCurrent(r)}
+            size="sm"
+          />
+        {/if}
       </div>
       {#if playerStore.currentSong?.artist}
         <button
@@ -277,12 +284,6 @@
         {/if}
       </div>
 
-      {#if playerStore.currentSong}
-        <SongRating
-          rating={playerStore.currentSong.rating}
-          onRate={(r) => playerStore.rateCurrent(r)}
-        />
-      {/if}
     </div>
 
     <!-- Scrubber -->
