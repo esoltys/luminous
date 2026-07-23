@@ -10,19 +10,22 @@ export function getArtistAlbums(albums: AlbumItem[], name: string | null): Album
 }
 
 /**
- * Track number for a song row: "{disc}-{track}" (e.g. "2-1") once a release
- * spans more than one disc, since a plain track number is ambiguous across
- * discs — otherwise just the track number, falling back to the row's
- * 1-based list position when the track tag itself is missing.
+ * Track number for a song row: "{disc}-{track}" (e.g. "1-1", "2-1") once the
+ * *release* spans more than one disc — including its disc-1 tracks, so
+ * numbering reads consistently across the whole release — otherwise just
+ * the track number, falling back to the row's 1-based list position when
+ * the track tag itself is missing. `discCount` is the release's total disc
+ * count (not this song's own disc field), e.g. AlbumItem.disc_count.
  */
 export function formatTrackNumber(
   track: number | null | undefined,
   disc: number | null | undefined,
+  discCount: number,
   fallbackIndex: number
 ): string {
   const trackNum = track !== undefined && track !== null ? track : fallbackIndex + 1;
-  if (disc !== undefined && disc !== null && disc > 1) {
-    return `${disc}-${trackNum}`;
+  if (discCount > 1) {
+    return `${disc ?? 1}-${trackNum}`;
   }
   return String(trackNum);
 }

@@ -121,6 +121,11 @@
     return "";
   });
 
+  // Whether *any* track carries a disc > 1 decides whether every row
+  // (including disc-1 tracks) gets the "{disc}-{track}" prefix — a plain
+  // song.disc_count read wouldn't reflect songs still loading/missing tags.
+  let discCount = $derived(songs.reduce((max, s) => Math.max(max, s.disc ?? 1), 1));
+
   let rawGenre = $derived.by(() => (songs.length > 0 ? songs[0].genre : undefined));
 
   let genreLabel = $derived(rawGenre || i18n.t('albumDetail.unknownGenre'));
@@ -434,7 +439,7 @@
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/30">
       <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-        <div class="grid grid-cols-[36px_40px_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
+        <div class="grid grid-cols-[36px_56px_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
           <div class="text-center w-9"></div>
           <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
             {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
@@ -475,7 +480,7 @@
               onclick={(e) => handleSongClick(e, song)}
               ondblclick={() => handlePlaySong(song)}
               oncontextmenu={(e) => handleContextMenu(e, song)}
-              class="grid grid-cols-[36px_40px_1fr_96px_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm cursor-pointer
+              class="grid grid-cols-[36px_56px_1fr_96px_60px_60px_80px] items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm cursor-pointer
                 {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
             >
               <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -496,7 +501,7 @@
               </div>
 
               <div class="text-brand-text-secondary/70 truncate pr-4 font-medium">
-                {formatTrackNumber(song.track, song.disc, index)}
+                {formatTrackNumber(song.track, song.disc, discCount, index)}
               </div>
 
               <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
