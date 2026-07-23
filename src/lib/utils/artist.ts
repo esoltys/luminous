@@ -10,6 +10,24 @@ export function getArtistAlbums(albums: AlbumItem[], name: string | null): Album
 }
 
 /**
+ * Track number for a song row: "{disc}-{track}" (e.g. "2-1") once a release
+ * spans more than one disc, since a plain track number is ambiguous across
+ * discs — otherwise just the track number, falling back to the row's
+ * 1-based list position when the track tag itself is missing.
+ */
+export function formatTrackNumber(
+  track: number | null | undefined,
+  disc: number | null | undefined,
+  fallbackIndex: number
+): string {
+  const trackNum = track !== undefined && track !== null ? track : fallbackIndex + 1;
+  if (disc !== undefined && disc !== null && disc > 1) {
+    return `${disc}-${trackNum}`;
+  }
+  return String(trackNum);
+}
+
+/**
  * Single card-facing category label for an album: "Single" (1 track), "EP"
  * (2-6 tracks), "Album" (7+ tracks) — overridden by "{n}-Disc Set" whenever
  * the release spans more than one disc, so a card never shows two labels.

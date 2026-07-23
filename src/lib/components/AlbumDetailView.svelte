@@ -13,6 +13,7 @@
   import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { formatTrackNumber } from "../utils/artist";
 
   let { albumName }: { albumName: string } = $props();
 
@@ -429,7 +430,7 @@
   </div>
 
   <!-- Songs Table Section -->
-  <div class="px-6 py-6" class:pb-24={!!playerStore.currentSong}>
+  <div class="px-6 py-6" class:pb-28={!!playerStore.currentSong}>
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/30">
       <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
@@ -495,7 +496,7 @@
               </div>
 
               <div class="text-brand-text-secondary/70 truncate pr-4 font-medium">
-                {song.track !== undefined && song.track !== null ? song.track : index + 1}
+                {formatTrackNumber(song.track, song.disc, index)}
               </div>
 
               <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
