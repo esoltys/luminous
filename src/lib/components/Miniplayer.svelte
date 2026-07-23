@@ -42,13 +42,19 @@
     e.preventDefault();
     e.stopPropagation();
 
+    // Native OS resize and the manual pointer-drag fallback below must be
+    // mutually exclusive: if both run, they fight over the window size
+    // (the fallback computes deltas from a stale start size while the OS
+    // resizes live), producing an unpredictable final size that doesn't
+    // match what the user actually dragged to.
     try {
       const appWindow = getCurrentWindow() as any;
       if (appWindow && typeof appWindow.startResizing === "function") {
-        appWindow.startResizing("south-east");
+        appWindow.startResizing("south-east").catch(() => {});
+        return;
       }
     } catch {
-      // Fallback to manual pointer drag resize
+      // Fall through to manual pointer drag resize
     }
 
     const startX = e.clientX;
