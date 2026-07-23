@@ -285,12 +285,8 @@ class CollectionStore {
   isMiniplayer = $state<boolean>(false);
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
-  savedWindowX = $state<number | null>(null);
-  savedWindowY = $state<number | null>(null);
   miniplayerWidth = $state<number>(300);
   miniplayerHeight = $state<number>(360);
-  miniplayerX = $state<number | null>(null);
-  miniplayerY = $state<number | null>(null);
 
 
   watchFoldersRealtime = $state<boolean>(true);
@@ -325,12 +321,6 @@ class CollectionStore {
 
         const savedMiniplayerHeight = localStorage.getItem("layout_miniplayerHeight");
         if (savedMiniplayerHeight) this.miniplayerHeight = parseInt(savedMiniplayerHeight, 10);
-
-        const savedMiniplayerX = localStorage.getItem("layout_miniplayerX");
-        if (savedMiniplayerX) this.miniplayerX = parseInt(savedMiniplayerX, 10);
-
-        const savedMiniplayerY = localStorage.getItem("layout_miniplayerY");
-        if (savedMiniplayerY) this.miniplayerY = parseInt(savedMiniplayerY, 10);
 
         const savedTab = localStorage.getItem("navigation_activeTab");
         if (savedTab) this._activeTab = savedTab as ActiveTab;
@@ -624,21 +614,14 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight, x = this.miniplayerX, y = this.miniplayerY) {
+  async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight) {
     if (this.isMiniplayer) return;
     this.isMiniplayer = true;
     try {
-      const res = await invoke<{ saved_width: number; saved_height: number; saved_x: number; saved_y: number }>(
-        "enter_miniplayer_mode",
-        { width, height, x, y }
-      );
+      const res = await invoke<{ saved_width: number; saved_height: number }>("enter_miniplayer_mode", { width, height });
       if (res && res.saved_width && res.saved_height) {
         this.savedWindowWidth = res.saved_width;
         this.savedWindowHeight = res.saved_height;
-      }
-      if (res && res.saved_x !== undefined && res.saved_y !== undefined) {
-        this.savedWindowX = res.saved_x;
-        this.savedWindowY = res.saved_y;
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
@@ -654,33 +637,16 @@ class CollectionStore {
     }
   }
 
-  setMiniplayerPosition(x: number, y: number) {
-    this.miniplayerX = x;
-    this.miniplayerY = y;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("layout_miniplayerX", x.toString());
-      localStorage.setItem("layout_miniplayerY", y.toString());
-    }
-  }
-
   async exitMiniplayerMode() {
     if (!this.isMiniplayer) return;
     this.isMiniplayer = false;
     try {
-      const res = await invoke<{ mini_width: number; mini_height: number; mini_x: number; mini_y: number }>(
-        "exit_miniplayer_mode",
-        {
-          savedWidth: this.savedWindowWidth,
-          savedHeight: this.savedWindowHeight,
-          savedX: this.savedWindowX,
-          savedY: this.savedWindowY
-        }
-      );
+      const res = await invoke<{ mini_width: number; mini_height: number }>("exit_miniplayer_mode", {
+        savedWidth: this.savedWindowWidth,
+        savedHeight: this.savedWindowHeight
+      });
       if (res && res.mini_width && res.mini_height) {
         this.setMiniplayerSize(res.mini_width, res.mini_height);
-      }
-      if (res && res.mini_x !== undefined && res.mini_y !== undefined) {
-        this.setMiniplayerPosition(res.mini_x, res.mini_y);
       }
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);

@@ -247,13 +247,13 @@ describe("CollectionStore", () => {
     expect(collectionStore.immersiveMode).toBe(false);
   });
 
-  it("captures the miniplayer's actual resized/repositioned bounds on exit and reuses them on next enter", async () => {
-    // Simulates a resize/drag done via native OS window-manager gestures,
-    // which the frontend can't observe through pointer events —
-    // exit_miniplayer_mode reports the real window bounds instead.
+  it("captures the miniplayer's actual resized size on exit and reuses it on next enter", async () => {
+    // Simulates a resize done via the native OS resize handle, which the
+    // frontend can't observe through pointer events — exit_miniplayer_mode
+    // reports the real window size instead.
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "enter_miniplayer_mode") return { saved_width: 1280, saved_height: 800, saved_x: 40, saved_y: 60 };
-      if (cmd === "exit_miniplayer_mode") return { mini_width: 500, mini_height: 540, mini_x: 900, mini_y: 620 };
+      if (cmd === "enter_miniplayer_mode") return { saved_width: 1280, saved_height: 800 };
+      if (cmd === "exit_miniplayer_mode") return { mini_width: 500, mini_height: 540 };
       return null;
     });
 
@@ -264,33 +264,19 @@ describe("CollectionStore", () => {
     expect(collectionStore.isMiniplayer).toBe(false);
     expect(collectionStore.miniplayerWidth).toBe(500);
     expect(collectionStore.miniplayerHeight).toBe(540);
-    expect(collectionStore.miniplayerX).toBe(900);
-    expect(collectionStore.miniplayerY).toBe(620);
     expect(localStorage.getItem("layout_miniplayerWidth")).toBe("500");
     expect(localStorage.getItem("layout_miniplayerHeight")).toBe("540");
-    expect(localStorage.getItem("layout_miniplayerX")).toBe("900");
-    expect(localStorage.getItem("layout_miniplayerY")).toBe("620");
 
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "enter_miniplayer_mode") {
-        expect(args).toEqual({ width: 500, height: 540, x: 900, y: 620 });
-        return { saved_width: 1280, saved_height: 800, saved_x: 40, saved_y: 60 };
+        expect(args).toEqual({ width: 500, height: 540 });
+        return { saved_width: 1280, saved_height: 800 };
       }
       return null;
     });
 
     await collectionStore.enterMiniplayerMode();
     expect(collectionStore.isMiniplayer).toBe(true);
-    expect(collectionStore.savedWindowX).toBe(40);
-    expect(collectionStore.savedWindowY).toBe(60);
-
-    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
-      if (cmd === "exit_miniplayer_mode") {
-        expect(args).toMatchObject({ savedX: 40, savedY: 60 });
-        return { mini_width: 500, mini_height: 540, mini_x: 900, mini_y: 620 };
-      }
-      return null;
-    });
 
     await collectionStore.exitMiniplayerMode();
   });
