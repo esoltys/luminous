@@ -540,6 +540,7 @@ pub fn run() {
             commands::collection::get_songs_by_artist,
             commands::collection::get_albums,
             commands::collection::get_artists,
+            commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,
             commands::collection::get_songs_by_genre,
