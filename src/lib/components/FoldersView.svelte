@@ -137,6 +137,9 @@
     if (theme.id === "system") {
       return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
+    if (theme.id === "dynamic-artwork") {
+      return themeStore.resolvedColors;
+    }
     return theme.colors;
   }
 
@@ -148,10 +151,9 @@
   // updates — skipped while editing an existing custom theme, since that
   // case is seeded from the theme being edited instead (below).
   $effect(() => {
-    const _themeId = themeStore.activeThemeId;
-    const _songId = playerStore.currentSong?.id;
+    const colors = themeStore.resolvedColors;
     if (!editingThemeId) {
-      loadActiveThemeColors();
+      customColors = { ...colors };
     }
   });
 

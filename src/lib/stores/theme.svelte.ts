@@ -489,17 +489,8 @@ export class ThemeStore {
   }
 
   async updateArtworkColors(song: Song | undefined) {
-    // Extracted artwork colors only drive rendering (--logo-stop-*,
-    // --color-artwork-*) when the Dynamic Artwork theme is actually
-    // active — otherwise every track change would stomp whatever
-    // applyActiveTheme() correctly set for the current theme. The
-    // extraction itself still runs so artworkColors is ready the moment
-    // the user switches to Dynamic Artwork.
-    const isDynamicArtwork = this.currentTheme.id === "dynamic-artwork";
-
     if (!song) {
-      if (isDynamicArtwork) this.resetArtworkColors();
-      else this.artworkColors = null;
+      this.resetArtworkColors();
       return;
     }
 
@@ -530,19 +521,16 @@ export class ThemeStore {
     }
 
     if (!url) {
-      if (isDynamicArtwork) this.resetArtworkColors();
-      else this.artworkColors = null;
+      this.resetArtworkColors();
       return;
     }
 
     try {
       const colors = await extractColorsFromImage(url);
-      if (isDynamicArtwork) this.applyArtworkColors(colors);
-      else this.artworkColors = colors;
+      this.applyArtworkColors(colors);
     } catch (e) {
       console.error("Failed to extract artwork colors:", e);
-      if (isDynamicArtwork) this.resetArtworkColors();
-      else this.artworkColors = null;
+      this.resetArtworkColors();
     }
   }
 

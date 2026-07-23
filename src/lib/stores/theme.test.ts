@@ -264,6 +264,23 @@ describe("Custom Theme Builder & ThemeStore", () => {
     expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#123456");
     expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#456789");
   });
+
+  it("updateArtworkColors updates CSS custom properties unconditionally even when another theme is active", async () => {
+    themeStore.activeThemeId = "nordic-blue";
+    const colors = {
+      primary: "#112233",
+      sidebar: "#223344",
+      playerbar: "#334455",
+      accent: "#445566",
+      accentHover: "#556677",
+      border: "#667788"
+    };
+
+    themeStore.applyArtworkColors(colors);
+
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#112233");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#445566");
+  });
 });
 
 describe("Image Extraction Fallbacks", () => {
