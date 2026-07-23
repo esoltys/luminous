@@ -4,7 +4,7 @@ Luminous v0.90.0 contains exciting new features, design enhancements, and stabil
 
 ### 🌟 New Features
 - **Smart Playlist Builder & Advanced Filter Engine**: Rule-driven dynamic playlists (`artist`, `album`, `genre`, `year`, `rating`, etc.) with live track matching preview, decade range auto-naming (*1980s Rock Mix*), customizable table columns, and dedicated purple gradient styling (#13).
-- **Native OS Now Playing Integration**: System Media Transport Controls via Souvlaki (Windows SMTC, Linux MPRIS2, macOS Now Playing) enabling system media keys, lock screen track metadata, play/pause, seek, and track skipping (#101).
+- **Native OS Now Playing Integration**: System Media Transport Controls via Souvlaki (Windows SMTC, Linux MPRIS2) enabling system media keys, lock screen track metadata, play/pause, seek, and track skipping (#101).
 - **Live Search Auto-Suggestions & History**: Top search bar live auto-suggestions for tracks, albums, artists, custom playlists, and auto-playlists with direct view navigation and recent search history dropdown (#100).
 - **Seamless History Navigation**: Top-bar navigation arrows, keyboard shortcuts, and mouse thumb button support for navigating backwards/forwards through app history (#67).
 - **Context-Aware Recently & Frequently Played**: Retains album/playlist playback context under Recently Played and Most Frequently Played views with interactive PlayerBar album art click navigation (#99).
@@ -24,4 +24,4 @@ Luminous v0.90.0 contains exciting new features, design enhancements, and stabil
 - **Active Playlist Decoupling**: Viewing a playlist no longer automatically marks it as the "Active" playback queue target.
 
 ### ⚠️ Important Notice
-- **Bundle Identifier Update (`org.luminous.app` ➔ `org.luminous.music`)**: Updated bundle identifier to resolve macOS application bundle extension conflicts. Upgrading users should note that local app data/settings will not automatically migrate from previous versions (`v0.75.0` or earlier).
+- **Bundle Identifier Update (`org.luminous.app` ➔ `org.luminous.music`)**: Updated bundle identifier to resolve application bundle extension conflicts. Upgrading users should note that local app data/settings will not automatically migrate from previous versions (`v0.75.0` or earlier).
