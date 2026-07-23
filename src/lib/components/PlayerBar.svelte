@@ -253,22 +253,29 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      <button
-        onclick={cycleRepeat}
-        class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
-        title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)}`}
-      >
-        {#if playerStore.repeatMode === 'track'}
-          <Repeat1 class="w-4 h-4" />
-        {:else}
-          <Repeat class="w-4 h-4" />
-        {/if}
-        {#if playerStore.repeatMode !== 'off' && playerStore.repeatMode !== 'track' && playerStore.repeatMode !== 'playlist'}
-          <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
-            {playerStore.repeatMode === 'album' ? 'AL' : '1x'}
+      <div class="relative">
+        <button
+          onclick={cycleRepeat}
+          class="text-xs transition-colors hover:text-brand-text-primary relative p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
+          title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)}`}
+        >
+          {#if playerStore.repeatMode === 'track'}
+            <Repeat1 class="w-4 h-4" />
+          {:else}
+            <Repeat class="w-4 h-4" />
+          {/if}
+          {#if playerStore.repeatMode !== 'off' && playerStore.repeatMode !== 'track' && playerStore.repeatMode !== 'playlist'}
+            <span class="absolute -bottom-1 -right-1 text-[8px] bg-brand-accent text-brand-accent-contrast rounded-full px-0.5 scale-75">
+              {playerStore.repeatMode === 'album' ? 'AL' : '1x'}
+            </span>
+          {/if}
+        </button>
+        {#if playerStore.repeatMode !== 'off'}
+          <span class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text uppercase tracking-wide whitespace-nowrap pointer-events-none">
+            {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
           </span>
         {/if}
-      </button>
+      </div>
 
       {#if playerStore.currentSong}
         <SongRating
