@@ -10,7 +10,7 @@
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
-  import { getArtistAlbums, getArtistGradient } from "../utils/artist";
+  import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -129,13 +129,7 @@
   }
 
   function getArtistSongsFor(name: string | null): Song[] {
-    if (!name) return [];
-    const trimmed = name.trim();
-    return collectionStore.songs.filter(
-      (s) =>
-        (s.album_artist && s.album_artist.trim() === trimmed) ||
-        (s.artist && s.artist.trim() === trimmed)
-    );
+    return getArtistSongs(collectionStore.songs, name);
   }
 
   let sortField = $state<keyof Song>(

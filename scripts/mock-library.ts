@@ -177,6 +177,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
       existing.art_embedded = existing.art_embedded || song.art_embedded;
       existing.art_automatic = existing.art_automatic ?? song.art_automatic ?? null;
       existing.art_manual = existing.art_manual ?? song.art_manual ?? null;
+      existing.genre = existing.genre ?? song.genre ?? null;
     } else {
       byKey.set(key, {
         album: song.album,
@@ -187,6 +188,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
         art_embedded: song.art_embedded,
         art_automatic: song.art_automatic ?? null,
         art_manual: song.art_manual ?? null,
+        genre: song.genre ?? null,
       });
     }
   }

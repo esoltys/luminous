@@ -1,4 +1,4 @@
-import type { AlbumItem } from "../types";
+import type { AlbumItem, Song } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 
 /** An artist's albums, newest first. */
@@ -7,6 +7,17 @@ export function getArtistAlbums(albums: AlbumItem[], name: string | null): Album
   return albums
     .filter((a) => a.artist === name)
     .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+}
+
+/** An artist's songs, matched by either album_artist or (per-track) artist. */
+export function getArtistSongs(songs: Song[], name: string | null): Song[] {
+  if (!name) return [];
+  const trimmed = name.trim();
+  return songs.filter(
+    (s) =>
+      (s.album_artist && s.album_artist.trim() === trimmed) ||
+      (s.artist && s.artist.trim() === trimmed)
+  );
 }
 
 /**

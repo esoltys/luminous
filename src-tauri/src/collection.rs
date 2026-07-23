@@ -632,7 +632,16 @@ impl CollectionScanner {
                 MAX(COALESCE(disc, 1)) AS disc_count,
                 MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
                 MAX(art_automatic) AS art_automatic,
-                MAX(art_manual) AS art_manual
+                MAX(art_manual) AS art_manual,
+                (
+                    SELECT genre
+                    FROM songs g
+                    WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
+                      AND g.genre IS NOT NULL AND g.genre != ''
+                    GROUP BY genre
+                    ORDER BY COUNT(*) DESC, genre ASC
+                    LIMIT 1
+                ) AS genre
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
@@ -649,6 +658,7 @@ impl CollectionScanner {
                     "art_embedded": row.get::<_, bool>(5)?,
                     "art_automatic": row.get::<_, Option<String>>(6)?,
                     "art_manual": row.get::<_, Option<String>>(7)?,
+                    "genre": row.get::<_, Option<String>>(8)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -691,6 +701,55 @@ impl CollectionScanner {
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
                     "genre": row.get::<_, Option<String>>(3)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(artists)
+    }
+
+    /// Artists ranked by total play count across their songs (ties broken
+    /// alphabetically). Artists with zero plays are excluded entirely —
+    /// this powers the Home "Top Artists" carousel, not a full artist
+    /// directory (see `get_artists` for that).
+    pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "WITH album_counts AS (
+                SELECT album, COUNT(*) AS track_count
+                FROM songs
+                WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
+                GROUP BY album
+             )
+             SELECT
+                COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist,
+                COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN s.album END) AS album_count,
+                COUNT(*) AS song_count,
+                SUM(COALESCE(s.playcount, 0)) AS total_playcount,
+                (
+                    SELECT genre
+                    FROM songs g
+                    WHERE COALESCE(NULLIF(g.album_artist, ''), g.artist) = COALESCE(NULLIF(s.album_artist, ''), s.artist)
+                      AND g.source IN (1, 2) AND g.unavailable = 0 AND g.genre IS NOT NULL AND g.genre != ''
+                    GROUP BY g.genre
+                    ORDER BY COUNT(*) DESC, g.genre ASC
+                    LIMIT 1
+                ) AS genre
+             FROM songs s
+             LEFT JOIN album_counts ac ON s.album = ac.album
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             GROUP BY effective_artist
+             HAVING SUM(COALESCE(s.playcount, 0)) > 0
+             ORDER BY total_playcount DESC, effective_artist ASC
+             LIMIT ?1",
+        )?;
+        let artists: Vec<serde_json::Value> = stmt
+            .query_map(params![limit], |row| {
+                Ok(serde_json::json!({
+                    "name": row.get::<_, Option<String>>(0)?,
+                    "album_count": row.get::<_, i32>(1)?,
+                    "song_count": row.get::<_, i32>(2)?,
+                    "genre": row.get::<_, Option<String>>(4)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -911,6 +970,7 @@ fn group_songs_into_home_items(
                             art_embedded: song.art_embedded,
                             art_automatic: song.art_automatic.clone(),
                             art_manual: song.art_manual.clone(),
+                            genre: song.genre.clone(),
                         },
                     });
                 }
@@ -1016,6 +1076,7 @@ fn home_item_for_context(
                     art_embedded: song.art_embedded,
                     art_automatic: song.art_automatic.clone(),
                     art_manual: song.art_manual.clone(),
+                    genre: song.genre.clone(),
                 },
             }
         }
@@ -1913,6 +1974,75 @@ mod tests {
             .unwrap();
         assert_eq!(full_artist["album_count"].as_i64(), Some(1));
         assert_eq!(full_artist["song_count"].as_i64(), Some(8));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_top_artists_ranks_by_playcount_and_excludes_zero_plays() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_artists_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Artist Low: one song, played twice.
+        let song_low = Song {
+            artist: Some("Artist Low".to_string()),
+            title: Some("Low Track".to_string()),
+            playcount: 2,
+            source: SongSource::LocalFile,
+            path: Some(r"C:\Music\Artist Low\low.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_low).unwrap();
+
+        // Artist High: two songs, playcounts sum to 10.
+        let song_high_a = Song {
+            artist: Some("Artist High".to_string()),
+            title: Some("High Track A".to_string()),
+            playcount: 6,
+            source: SongSource::LocalFile,
+            path: Some(r"C:\Music\Artist High\a.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_high_a).unwrap();
+        let song_high_b = Song {
+            artist: Some("Artist High".to_string()),
+            title: Some("High Track B".to_string()),
+            playcount: 4,
+            source: SongSource::LocalFile,
+            path: Some(r"C:\Music\Artist High\b.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_high_b).unwrap();
+
+        // Artist Unplayed: never played, must be excluded entirely.
+        let song_unplayed = Song {
+            artist: Some("Artist Unplayed".to_string()),
+            title: Some("Unplayed Track".to_string()),
+            playcount: 0,
+            source: SongSource::LocalFile,
+            path: Some(r"C:\Music\Artist Unplayed\track.mp3".to_string()),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_unplayed).unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let top_artists = scanner.get_top_artists(10).unwrap();
+
+        let names: Vec<&str> = top_artists
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, vec!["Artist High", "Artist Low"]);
+
+        let high = &top_artists[0];
+        assert_eq!(high["song_count"].as_i64(), Some(2));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

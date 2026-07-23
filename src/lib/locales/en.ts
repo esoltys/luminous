@@ -45,8 +45,8 @@ export const en = {
     greetingNight: "Good Night",
     exploreSub: "Explore your music collection",
     loading: "Loading your collection...",
-    recentlyPlayed: "Recently Played",
-    mostPlayed: "Most Played",
+    topArtists: "Top Artists",
+    mostPlayed: "Top 5 Most Played",
     recentlyAdded: "Recently Added",
     emptyState: "Start adding music to see your personalized collections"
   },

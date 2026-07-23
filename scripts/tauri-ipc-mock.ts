@@ -300,6 +300,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
                 art_embedded: song.art_embedded,
                 art_automatic: song.art_automatic ?? null,
                 art_manual: song.art_manual ?? null,
+                genre: song.genre ?? null,
               },
             });
           }
@@ -478,6 +479,18 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_albums: () => library.albums,
     get_artists: () => library.artists,
+    get_top_artists: (args) => {
+      const playcountByArtist = new Map<string, number>();
+      for (const song of library.songs) {
+        const artist = song.album_artist || song.artist;
+        if (!artist) continue;
+        playcountByArtist.set(artist, (playcountByArtist.get(artist) ?? 0) + (song.playcount || 0));
+      }
+      return [...library.artists]
+        .filter((a) => a.name && (playcountByArtist.get(a.name) ?? 0) > 0)
+        .sort((a, b) => (playcountByArtist.get(b.name!) ?? 0) - (playcountByArtist.get(a.name!) ?? 0))
+        .slice(0, (args.limit as number) || 10);
+    },
 
     get_songs_by_album: (args) => library.songs.filter((s) => s.album === args.album),
     get_songs_by_artist: (args) =>

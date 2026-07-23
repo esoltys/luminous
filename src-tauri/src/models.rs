@@ -584,6 +584,7 @@ pub struct AlbumItem {
     pub art_embedded: bool,
     pub art_automatic: Option<String>,
     pub art_manual: Option<String>,
+    pub genre: Option<String>,
 }
 
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).

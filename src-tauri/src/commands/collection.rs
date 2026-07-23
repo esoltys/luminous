@@ -148,6 +148,17 @@ pub async fn get_artists(state: State<'_, AppState>) -> Result<Vec<serde_json::V
 }
 
 #[tauri::command]
+pub async fn get_top_artists(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_top_artists(limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_recently_played(
     limit: Option<i64>,
     state: State<'_, AppState>,
