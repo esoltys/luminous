@@ -152,6 +152,8 @@ export const fr = {
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
     predefinedThemes: "Thèmes prédéfinis",
     customThemes: "Thèmes personnalisés",
+    systemThemeLight: "Suit actuellement le mode clair de votre système",
+    systemThemeDark: "Suit actuellement le mode sombre de votre système",
     editTheme: "Modifier le thème",
     deleteTheme: "Supprimer le thème",
     customThemeBuilderTitle: "Créateur de thème personnalisé",

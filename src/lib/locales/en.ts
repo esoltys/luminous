@@ -152,6 +152,8 @@ export const en = {
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
     predefinedThemes: "Predefined Themes",
     customThemes: "Custom Themes",
+    systemThemeLight: "Currently following your OS's Light mode",
+    systemThemeDark: "Currently following your OS's Dark mode",
     editTheme: "Edit Theme",
     deleteTheme: "Delete Theme",
     customThemeBuilderTitle: "Custom Theme Builder",

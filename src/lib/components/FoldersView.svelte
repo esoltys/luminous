@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Globe, Info, Shield } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Globe, Info, Shield, Sun, Moon } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -543,7 +543,18 @@
                 class="bg-brand-sidebar/40 border rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-all duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-2 border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
               >
                 <div class="flex items-center justify-between w-full">
-                  <span class="font-semibold text-sm text-brand-text-primary">{theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}</span>
+                  <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
+                    {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
+                    {#if theme.id === 'system'}
+                      <span title={themeStore.systemColorScheme === 'dark' ? i18n.t('settings.systemThemeDark') : i18n.t('settings.systemThemeLight')}>
+                        {#if themeStore.systemColorScheme === 'dark'}
+                          <Moon class="w-3.5 h-3.5 text-brand-text-secondary" />
+                        {:else}
+                          <Sun class="w-3.5 h-3.5 text-brand-text-secondary" />
+                        {/if}
+                      </span>
+                    {/if}
+                  </span>
                 </div>
                 <!-- Miniature colors preview -->
                 <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
