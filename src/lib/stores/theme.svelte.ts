@@ -619,6 +619,12 @@ export class ThemeStore {
     const resolvedBgMain = theme.id === "dynamic-artwork"
       ? (this.artworkColors || getFallbackColors()).primary
       : colors["bg-main"];
+    const resolvedBgSidebar = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).sidebar
+      : colors["bg-sidebar"];
+    const resolvedBgPlayerbar = theme.id === "dynamic-artwork"
+      ? (this.artworkColors || getFallbackColors()).playerbar
+      : colors["bg-playerbar"];
     const resolvedAccentHover = theme.id === "dynamic-artwork"
       ? (this.artworkColors || getFallbackColors()).accentHover
       : colors["color-accent-hover"];
@@ -658,9 +664,9 @@ export class ThemeStore {
     // tracks the OS scheme — every other theme has fixed colors.
     // Rendering-only, separate from the opaque `colors` above — alpha
     // never reaches a color picker, see hexToRgbaString().
-    const isDark = !isLightColor(colors["bg-main"]);
-    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(colors["bg-sidebar"], isDark ? 0.5 : 0.6));
-    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(colors["bg-playerbar"], isDark ? 0.5 : 0.6));
+    const isDark = !isLightColor(resolvedBgMain);
+    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(resolvedBgSidebar, isDark ? 0.5 : 0.6));
+    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(resolvedBgPlayerbar, isDark ? 0.5 : 0.6));
     root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
 
     const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
