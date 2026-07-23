@@ -587,6 +587,17 @@ export class ThemeStore {
   applyActiveTheme() {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
+
+    // updateArtworkColors() only re-extracts/applies colors on a song
+    // change (see player.svelte.ts), so switching *to* Dynamic Artwork
+    // while a song is already playing would otherwise leave the
+    // --color-artwork-* CSS vars stale (or unset) until the next track —
+    // sync them from whatever's already cached (or the fallback palette)
+    // right away instead of waiting for that next update.
+    if (theme.id === "dynamic-artwork") {
+      this.applyArtworkColors(this.artworkColors || getFallbackColors());
+    }
+
     const isLuminous = theme.id === "system";
     // The System theme's live colors come from whichever OS-scheme palette
     // is active, not the static preview colors on the theme entry.
