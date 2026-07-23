@@ -159,11 +159,15 @@ export interface Playlist {
   dynamic_enabled: boolean;
   dynamic_spec?: string;
   auto_play?: boolean;
+  population_mode?: QueuePopulationMode;
   last_played_row?: number;
   created: number;
   updated: number;
   track_count: number;
 }
+
+/** Queue population bias — see #120. Tab order: All, Favourites, Familiar, Discover, Deep Cuts. */
+export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover" | "deep_cuts";
 
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "one_by_one" | "intro";

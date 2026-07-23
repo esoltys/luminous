@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Playlist, PlaylistItem, Song } from "../types";
+import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 
 class PlaylistsStore {
@@ -156,7 +156,15 @@ class PlaylistsStore {
     return playlist;
   }
 
-  async updatePlaylistSpec(id: number, spec: string, autoPlay: boolean = false) {
+  async updatePlaylistSpec(
+    id: number,
+    spec: string,
+    autoPlay: boolean = false,
+    populationMode: QueuePopulationMode = "all"
+  ) {
+    // Mode is persisted before the spec so that the spec-triggered
+    // (re)population below already uses it.
+    await invoke("set_playlist_population_mode", { playlistId: id, mode: populationMode });
     await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
     await invoke("set_playlist_auto_play", { playlistId: id, autoPlay });
     await this.refreshPlaylists();
@@ -312,6 +320,20 @@ class PlaylistsStore {
   async setPlaylistAutoPlay(playlistId: number, autoPlay: boolean) {
     await invoke("set_playlist_auto_play", { playlistId, autoPlay });
     await this.refreshPlaylists();
+  }
+
+  /**
+   * Change a playlist's queue population bias (All/Favourites/Familiar/
+   * Discover/Deep Cuts — #120). The backend persists the mode and
+   * immediately regenerates the playlist's tracks, so the change takes
+   * effect right away rather than waiting for the next refresh.
+   */
+  async setPlaylistPopulationMode(playlistId: number, mode: QueuePopulationMode) {
+    await invoke("set_playlist_population_mode", { playlistId, mode });
+    await this.refreshPlaylists();
+    if (this.activePlaylistId === playlistId) {
+      await this.selectPlaylist(playlistId);
+    }
   }
 
   /**

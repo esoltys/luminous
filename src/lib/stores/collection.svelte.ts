@@ -1,6 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Song, MusicDirectory, LibraryStats, ScanProgress, AlbumItem, ArtistItem, RecentSearchItem } from "../types";
+import type {
+  Song,
+  MusicDirectory,
+  LibraryStats,
+  ScanProgress,
+  AlbumItem,
+  ArtistItem,
+  RecentSearchItem,
+  QueuePopulationMode,
+} from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 
@@ -105,11 +114,16 @@ class CollectionStore {
 
   isSmartBuilderOpen = $state<boolean>(false);
   smartBuilderRules = $state<Array<{ field: string; op: string; value: string }>>([]);
-  smartBuilderEditing = $state<{ id: number; name: string; autoPlay: boolean } | null>(null);
+  smartBuilderEditing = $state<{
+    id: number;
+    name: string;
+    autoPlay: boolean;
+    populationMode?: QueuePopulationMode;
+  } | null>(null);
 
   openSmartBuilder(
     rules?: Array<{ field: string; op: string; value: string }>,
-    editing?: { id: number; name: string; autoPlay: boolean }
+    editing?: { id: number; name: string; autoPlay: boolean; populationMode?: QueuePopulationMode }
   ) {
     this.smartBuilderRules = rules || [];
     this.smartBuilderEditing = editing ?? null;

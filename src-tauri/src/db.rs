@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 11;
+const CURRENT_SCHEMA_VERSION: i32 = 12;
 
 #[derive(Debug)]
 pub struct Database {
@@ -160,6 +160,17 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![11],
+            )?;
+        }
+
+        if version < 12 {
+            log::info!(
+                "Running migration 12: queue population mode for auto/dynamic playlists (#120)"
+            );
+            conn.execute_batch(MIGRATION_12)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![12],
             )?;
         }
 
@@ -452,6 +463,15 @@ CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at 
 
 const MIGRATION_11: &str = "
 DELETE FROM app_state WHERE key = 'excluded_formats';
+";
+
+// ---------------------------------------------------------------------------
+// Migration 12: queue population mode (All/Favourites/Familiar/Discover/Deep
+// Cuts) for auto- and smart-playlists (#120)
+// ---------------------------------------------------------------------------
+
+const MIGRATION_12: &str = "
+ALTER TABLE playlists ADD COLUMN population_mode TEXT NOT NULL DEFAULT 'all';
 ";
 
 #[cfg(test)]

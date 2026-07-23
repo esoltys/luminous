@@ -3,7 +3,7 @@
 use crate::{
     collection::CollectionScanner,
     db::Database,
-    models::{Playlist, PlaylistItem, PlaylistItemType, Song},
+    models::{Playlist, PlaylistItem, PlaylistItemType, QueuePopulationMode, Song},
 };
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
@@ -113,6 +113,7 @@ impl PlaylistManager {
             dynamic_enabled: false,
             dynamic_spec: None,
             auto_play: false,
+            population_mode: QueuePopulationMode::default(),
             last_played_row: None,
             created: now,
             updated: now,
@@ -139,7 +140,7 @@ impl PlaylistManager {
     pub fn get_playlists(&self) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
+            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play, p.population_mode,
                     p.last_played_row, p.created, p.updated,
                     COUNT(pi.id) as track_count
              FROM playlists p
@@ -155,10 +156,15 @@ impl PlaylistManager {
                     dynamic_enabled: row.get(2)?,
                     dynamic_spec: row.get(3)?,
                     auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                    last_played_row: row.get(5)?,
-                    created: row.get(6)?,
-                    updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
-                    track_count: row.get(8)?,
+                    population_mode: QueuePopulationMode::from(
+                        row.get::<_, Option<String>>(5)?
+                            .unwrap_or_default()
+                            .as_str(),
+                    ),
+                    last_played_row: row.get(6)?,
+                    created: row.get(7)?,
+                    updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
+                    track_count: row.get(9)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -169,7 +175,7 @@ impl PlaylistManager {
     pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
+            "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play, p.population_mode,
                     p.last_played_row, p.created, p.updated,
                     (SELECT COUNT(*) FROM playlist_items pi2 WHERE pi2.playlist_id = p.id) as track_count
              FROM playlists p
@@ -190,10 +196,15 @@ impl PlaylistManager {
                     dynamic_enabled: row.get(2)?,
                     dynamic_spec: row.get(3)?,
                     auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                    last_played_row: row.get(5)?,
-                    created: row.get(6)?,
-                    updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
-                    track_count: row.get(8)?,
+                    population_mode: QueuePopulationMode::from(
+                        row.get::<_, Option<String>>(5)?
+                            .unwrap_or_default()
+                            .as_str(),
+                    ),
+                    last_played_row: row.get(6)?,
+                    created: row.get(7)?,
+                    updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
+                    track_count: row.get(9)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -233,18 +244,22 @@ impl PlaylistManager {
         }
 
         for genre in &genres {
-            let existing_row: Option<(i64, i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![genre],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
                 .ok();
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
 
             // Always check song count first — prune the playlist if it falls below threshold.
-            let songs = scanner.get_songs_by_genre(genre, 25)?;
+            let songs = scanner.get_songs_by_genre(genre, 25, mode)?;
             if songs.len() < 25 {
-                if let Some((id, _, _)) = existing_row {
+                if let Some((id, _, _, _)) = existing_row {
                     conn.execute(
                         "DELETE FROM playlist_items WHERE playlist_id = ?1",
                         params![id],
@@ -256,7 +271,7 @@ impl PlaylistManager {
 
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated, track_count)) => {
+                Some((_, updated, track_count, _)) => {
                     now - updated > STALE_AFTER_SECS || track_count != 25
                 }
             };
@@ -265,7 +280,7 @@ impl PlaylistManager {
             }
 
             let playlist_id = match existing_row {
-                Some((id, _, _)) => {
+                Some((id, _, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
@@ -325,18 +340,22 @@ impl PlaylistManager {
 
         for decade in &decades {
             let spec = format!("decade:{}", decade);
-            let existing_row: Option<(i64, i64, i64)> = conn
+            let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
-                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id) FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
                     params![spec],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
                 .ok();
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
 
             // Always check song count first — prune the playlist if it falls below threshold.
-            let songs = scanner.get_songs_by_decade(decade, 25)?;
+            let songs = scanner.get_songs_by_decade(decade, 25, mode)?;
             if songs.len() < 25 {
-                if let Some((id, _, _)) = existing_row {
+                if let Some((id, _, _, _)) = existing_row {
                     conn.execute(
                         "DELETE FROM playlist_items WHERE playlist_id = ?1",
                         params![id],
@@ -348,7 +367,7 @@ impl PlaylistManager {
 
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated, track_count)) => {
+                Some((_, updated, track_count, _)) => {
                     now - updated > STALE_AFTER_SECS || track_count != 25
                 }
             };
@@ -357,7 +376,7 @@ impl PlaylistManager {
             }
 
             let playlist_id = match existing_row {
-                Some((id, _, _)) => {
+                Some((id, _, _, _)) => {
                     conn.execute(
                         "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                         params![now, id],
@@ -402,32 +421,45 @@ impl PlaylistManager {
         Ok(())
     }
 
-    /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`.
+    /// Persist the `population_mode` bias for a playlist row (see #120).
+    pub fn set_playlist_population_mode(&self, id: i64, mode: QueuePopulationMode) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE playlists SET population_mode = ?1 WHERE id = ?2",
+            params![mode.as_str(), id],
+        )?;
+        Ok(())
+    }
+
+    /// Populate/refresh tracks for any dynamic playlist based on its `dynamic_spec`,
+    /// selected per its own `population_mode` bias (see #120).
     pub fn populate_dynamic_playlist(&mut self, playlist_id: i64) -> Result<()> {
         let conn = self.db.pool.get()?;
-        let spec: Option<String> = conn
+        let row: Option<(Option<String>, String)> = conn
             .query_row(
-                "SELECT dynamic_spec FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
+                "SELECT dynamic_spec, COALESCE(population_mode, 'all') FROM playlists WHERE id = ?1 AND dynamic_enabled = 1",
                 params![playlist_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
 
-        let spec = match spec {
-            Some(s) if !s.trim().is_empty() => s,
+        let (spec, mode) = match row {
+            Some((Some(s), mode)) if !s.trim().is_empty() => {
+                (s, QueuePopulationMode::from(mode.as_str()))
+            }
             _ => return Ok(()),
         };
 
         let scanner = CollectionScanner::new(self.db.clone());
         let songs = if let Some(decade) = spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, 100)?
+            scanner.get_songs_by_decade(decade, 100, mode)?
         } else if !spec.contains(':') {
             // Bare-name convention: a system genre auto-playlist, not a Smart
             // Playlist rule spec (which always contains a "field:" rule).
-            scanner.get_songs_by_genre(&spec, 100)?
+            scanner.get_songs_by_genre(&spec, 100, mode)?
         } else {
             let query = spec.replace(';', " ");
-            scanner.search_songs(&query, 100)?
+            scanner.search_songs_by_mode(&query, 100, mode)?
         };
 
         let now = chrono::Utc::now().timestamp();
@@ -473,20 +505,21 @@ impl PlaylistManager {
         &self,
         playlist_id: i64,
         dynamic_spec: &str,
+        mode: QueuePopulationMode,
         limit: usize,
     ) -> Result<Vec<Song>> {
         let scanner = CollectionScanner::new(self.db.clone());
 
         // Parse spec prefix to determine filter type
         let songs: Vec<Song> = if let Some(decade) = dynamic_spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, (limit * 4) as i64)?
+            scanner.get_songs_by_decade(decade, (limit * 4) as i64, mode)?
         } else if !dynamic_spec.contains(':') {
             // Bare-name convention: a system genre auto-playlist, not a Smart
             // Playlist rule spec (which always contains a "field:" rule).
-            scanner.get_songs_by_genre(dynamic_spec, (limit * 4) as i64)?
+            scanner.get_songs_by_genre(dynamic_spec, (limit * 4) as i64, mode)?
         } else {
             let query = dynamic_spec.replace(';', " ");
-            scanner.search_songs(&query, 100)?
+            scanner.search_songs_by_mode(&query, 100, mode)?
         };
 
         // Collect song IDs already in the playlist so we can exclude them
@@ -1592,6 +1625,61 @@ mod tests {
         assert!(
             playlists.iter().any(|p| p.id == pl.id),
             "Smart Playlist should survive sync_genre_auto_playlists, but it was deleted"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Changing a Smart Playlist's `population_mode` must be picked up the
+    /// next time its tracks are (re)populated — see #120.
+    #[test]
+    fn test_set_playlist_population_mode_changes_populated_tracks() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable, rating, playcount, lastplayed) VALUES ('Old Favourite', 'Miles Davis', 1, 0, 5, 40, 1700000000)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable, rating, playcount, lastplayed) VALUES ('Unheard Cut', 'Miles Davis', 1, 0, 0, 0, NULL)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Miles Mix").unwrap();
+        assert_eq!(pl.population_mode, QueuePopulationMode::All);
+
+        manager
+            .set_playlist_dynamic_spec(pl.id, "artist:Miles Davis")
+            .unwrap();
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(
+            tracks.len(),
+            2,
+            "both songs should populate under the default All mode"
+        );
+
+        // Switch to Deep Cuts — only the never-played song should remain.
+        manager
+            .set_playlist_population_mode(pl.id, QueuePopulationMode::DeepCuts)
+            .unwrap();
+        manager.refresh_auto_playlist(pl.id).unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let updated = playlists.iter().find(|p| p.id == pl.id).unwrap();
+        assert_eq!(updated.population_mode, QueuePopulationMode::DeepCuts);
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Unheard Cut")
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
