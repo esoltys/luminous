@@ -15,12 +15,24 @@
     onSave?: () => void;
   }
 
-  let props: Props = $props();
+  let {
+    songIds,
+    initialAlbum = "",
+    initialAlbumArtist = "",
+    initialGenre = "",
+    initialYear = null,
+    onClose,
+    onSave
+  }: Props = $props();
 
-  let album = $state(props.initialAlbum ?? "");
-  let albumArtist = $state(props.initialAlbumArtist ?? "");
-  let genre = $state(props.initialGenre ?? "");
-  let year = $state<number | null>(props.initialYear ?? null);
+  // svelte-ignore state_referenced_locally
+  let album = $state(initialAlbum);
+  // svelte-ignore state_referenced_locally
+  let albumArtist = $state(initialAlbumArtist);
+  // svelte-ignore state_referenced_locally
+  let genre = $state(initialGenre);
+  // svelte-ignore state_referenced_locally
+  let year = $state<number | null>(initialYear);
 
   let isSaving = $state(false);
 
@@ -28,7 +40,7 @@
     isSaving = true;
     try {
       await invoke("save_album_tags", {
-        songIds: props.songIds,
+        songIds,
         album,
         albumArtist,
         genre,
@@ -38,8 +50,8 @@
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
 
-      if (props.onSave) props.onSave();
-      props.onClose();
+      if (onSave) onSave();
+      onClose();
     } catch (e: any) {
       console.error("Failed to save album tags:", e);
       alert(i18n.t("albumTagEditor.saveFailedPrefix") + e.toString());
@@ -50,7 +62,7 @@
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
-      props.onClose();
+      onClose();
     } else if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
@@ -71,7 +83,7 @@
         <Sliders class="w-4 h-4 text-brand-accent-text" />
         <h3 class="text-sm font-bold">{i18n.t('albumTagEditor.title')}</h3>
       </div>
-      <button onclick={props.onClose} disabled={isSaving} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50">
+      <button onclick={onClose} disabled={isSaving} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50">
         <X class="w-4 h-4" />
       </button>
     </div>
@@ -82,7 +94,7 @@
         <!-- Tracks badge -->
         <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-lg px-3 py-2.5 text-xs font-medium text-brand-text-secondary">
           <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-          <span>{i18n.t('albumTagEditor.tracksAffected', { count: props.songIds.length })}</span>
+          <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
         </div>
 
         <!-- Form fields -->
@@ -146,7 +158,7 @@
     <!-- Footer -->
     <div class="h-16 flex items-center justify-end px-6 border-t border-brand-border gap-3 bg-brand-main shrink-0">
       <button
-        onclick={props.onClose}
+        onclick={onClose}
         disabled={isSaving}
         class="px-4 py-2 text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50"
       >
