@@ -378,7 +378,7 @@
           {displayName}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary/85 mt-1 font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary mt-1 font-medium">
           <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
@@ -534,7 +534,7 @@
                 class="border-b border-brand-border/40 group transition-all duration-150 select-none cursor-pointer
                   {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-14 relative">
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary font-medium w-14 relative">
                   <div class="relative w-9 h-4 mx-auto flex items-center justify-center">
                     {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                       <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
@@ -559,36 +559,36 @@
                 <td class="py-2.5 px-4 font-medium truncate max-w-xs {selectedSongIds.has(song.id) || (playerStore.currentSong && playerStore.currentSong.id === song.id) ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
                   <span class="truncate" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
+                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.artist}
                     <span
                       role="button"
                       tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
                       onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
                     </span>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
+                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.album}
                     <span
                       role="button"
                       tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
                       onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
                     </span>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-center">
@@ -596,12 +596,12 @@
                     <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
                   </div>
                 </td>
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(song.length_nanosec)}</td>
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary">{formatDuration(song.length_nanosec)}</td>
                 <td class="py-2.5 px-4 text-center">
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
-                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                       title={playlistsStore.activeCustomPlaylist
                         ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                         : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -610,7 +610,7 @@
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
-                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                       title={i18n.t('collection.editTagsTooltip')}
                     >
                       <Edit3 class="w-4 h-4" />
@@ -625,7 +625,7 @@
     </div>
 
     {#if autoPlay && (kind === "genre" || kind === "decade") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
-      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-secondary/80 flex items-center justify-center gap-2 select-none">
+      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-secondary flex items-center justify-center gap-2 select-none">
         <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
         <span>{i18n.t('playlists.allMatchingTracksAdded')}</span>
       </div>

@@ -10,7 +10,6 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
-  import DesignTools from "./DesignTools.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
 
   let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "about">("general");
@@ -184,27 +183,10 @@
     }
   });
 
-  function handleLivePreview() {
-    // Inject the colors live to the document head for instant feedback
-    if (typeof document === "undefined") return;
-    let styleEl = document.getElementById("luminous-theme-style");
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "luminous-theme-style";
-      document.head.appendChild(styleEl);
+  function applyCustomTheme() {
+    if (customColors) {
+      themeStore.applyThemeColorsPreview(customColors);
     }
-    styleEl.innerHTML = `
-      :root {
-        --bg-main: ${customColors["bg-main"]};
-        --bg-sidebar: ${customColors["bg-sidebar"]};
-        --bg-playerbar: ${customColors["bg-playerbar"]};
-        --color-accent: ${customColors["color-accent"]};
-        --color-accent-hover: ${customColors["color-accent-hover"]};
-        --color-text-primary: ${customColors["color-text-primary"]};
-        --color-text-secondary: ${customColors["color-text-secondary"]};
-        --color-border: ${customColors["color-border"]};
-      }
-    `;
   }
 
   async function saveCustomTheme() {
@@ -374,7 +356,7 @@
               <p class="text-xs font-medium text-brand-text-secondary">{i18n.t('settings.installFormatLabel')}</p>
               <p class="text-sm font-bold text-brand-text-primary">{getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name)}</p>
             </div>
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {updaterStore.installFormat.supports_self_update ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-brand-border/60 text-brand-text-secondary'}">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {updaterStore.installFormat.supports_self_update ? 'bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30' : 'bg-brand-border/60 text-brand-text-secondary'}">
               {updaterStore.installFormat.supports_self_update ? i18n.t('settings.autoUpdateReady', {}, 'Auto-Update Ready') : i18n.t('settings.notifyOnly', {}, 'Notify Only')}
             </span>
           </div>
@@ -382,9 +364,9 @@
 
         <!-- Update Available Alert Banner (if available) -->
         {#if updaterStore.updateAvailable}
-          <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div class="bg-brand-accent/10 border border-brand-accent/30 rounded-xl p-4 flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <div class="w-9 h-9 rounded-lg bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center shrink-0">
                 <ArrowUp class="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
@@ -400,19 +382,19 @@
             </div>
             <button
               onclick={() => openExternalUrl(updaterStore.downloadUrl || updaterStore.releaseUrl)}
-              class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20 shrink-0"
+              class="px-4 py-2 rounded-lg bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shrink-0"
             >
               <Download class="w-4 h-4" />
               {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateDownloadBtn') : i18n.t('settings.updateDownloadGithubBtn')}
             </button>
           </div>
         {:else if updaterStore.checkStatus === 'up-to-date'}
-          <div class="text-xs text-emerald-400 font-medium flex items-center gap-1.5 pt-1">
-            <Check class="w-4 h-4 text-emerald-400" />
+          <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5 pt-1">
+            <Check class="w-4 h-4 text-brand-accent" />
             {i18n.t('settings.updateUpToDate')}
           </div>
         {:else if updaterStore.checkStatus === 'error'}
-          <div class="text-xs text-amber-400 font-medium flex items-center gap-1.5 pt-1">
+          <div class="text-xs text-brand-text-secondary font-medium flex items-center gap-1.5 pt-1">
             {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
           </div>
         {/if}
@@ -466,7 +448,7 @@
         <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
         <div class="space-y-1">
           <h4 class="font-semibold text-brand-text-primary">{i18n.t('settings.folderHelpTitle')}</h4>
-          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t('settings.folderHelpText')}
           </p>
         </div>
@@ -482,7 +464,7 @@
               </div>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                <p class="text-[10px] text-brand-text-secondary/50 mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
+                <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
               </div>
             </div>
             <button
@@ -496,10 +478,10 @@
         {/each}
 
         {#if collectionStore.directories.length === 0}
-          <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary/60">
-            <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
+          <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
+            <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
             <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
-            <p class="text-xs text-brand-text-secondary/60 mb-4">{i18n.t('settings.noFoldersText')}</p>
+            <p class="text-xs text-brand-text-secondary mb-4">{i18n.t('settings.noFoldersText')}</p>
           </div>
         {/if}
       </div>
@@ -511,7 +493,7 @@
             <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0" />
             <div class="space-y-1 min-w-0">
               <h4 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
             </div>
           </div>
         </div>
@@ -532,7 +514,7 @@
                 style="width: {collectionStore.scanProgress?.total ? (collectionStore.scanProgress.scanned / collectionStore.scanProgress.total) * 100 : 0}%"
               ></div>
             </div>
-            <p class="text-[10px] text-brand-text-secondary/60 truncate">{collectionStore.scanProgress?.current_path || ""}</p>
+            <p class="text-xs text-brand-text-secondary truncate">{collectionStore.scanProgress?.current_path || ""}</p>
           </div>
         {/if}
 
@@ -596,7 +578,7 @@
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
-              <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.watchRealtimeHint')}</p>
+              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.watchRealtimeHint')}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
@@ -619,7 +601,7 @@
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
-              <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.scanOnStartupHint')}</p>
+              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.scanOnStartupHint')}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
@@ -642,7 +624,7 @@
         <!-- Library Stats & Last Scan Summary -->
         <div class="pt-3 border-t border-brand-border/50 space-y-3">
           {#if collectionStore.lastScanTime}
-            <div class="text-xs text-brand-text-secondary/70 flex items-center justify-between font-medium">
+            <div class="text-xs text-brand-text-secondary flex items-center justify-between font-medium">
               <span class="flex items-center gap-1.5">
                 <Clock class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
                 {i18n.t('settings.lastScanned', { time: collectionStore.lastScanTime })}
@@ -652,19 +634,19 @@
 
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
           <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
+            <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSongs')}</span>
             <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_songs.toLocaleString()}</p>
           </div>
           <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsAlbums')}</span>
+            <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsAlbums')}</span>
             <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_albums.toLocaleString()}</p>
           </div>
           <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
+            <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsArtists')}</span>
             <p class="text-base font-bold text-brand-text-primary mt-0.5">{collectionStore.stats.total_artists.toLocaleString()}</p>
           </div>
           <div class="bg-brand-main/40 border border-brand-border rounded-lg p-3">
-            <span class="text-[10px] text-brand-text-secondary/60 uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
+            <span class="text-xs text-brand-text-secondary uppercase font-semibold">{i18n.t('settings.statsSize')}</span>
             <p class="text-base font-bold text-brand-text-primary mt-0.5">{(collectionStore.stats.total_filesize_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB</p>
           </div>
         </div>
@@ -696,12 +678,14 @@
                     {/if}
                   </span>
                 </div>
-                <!-- Miniature colors preview -->
-                <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-                  <div class="w-[30%]" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
-                  <div class="w-[50%]" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
-                  <div class="w-[10%]" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
-                  <div class="w-[10%]" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
+                <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+                  <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
                 </div>
               </button>
             {/each}
@@ -724,11 +708,14 @@
                   <div class="flex items-center justify-between w-full">
                     <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
                   </div>
-                  <div class="flex gap-1 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-                    <div class="w-[30%]" style="background-color: {theme.colors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
-                    <div class="w-[50%]" style="background-color: {theme.colors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
-                    <div class="w-[10%]" style="background-color: {theme.colors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
-                    <div class="w-[10%]" style="background-color: {theme.colors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                  <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
+                  <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+                    <div class="flex-1" style="background-color: {theme.colors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                    <div class="flex-1" style="background-color: {theme.colors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                    <div class="flex-1" style="background-color: {theme.colors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                    <div class="flex-1" style="background-color: {theme.colors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                    <div class="flex-1" style="background-color: {theme.colors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
+                    <div class="flex-1" style="background-color: {theme.colors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
                   </div>
                   <div class="flex gap-2">
                     <button
@@ -761,37 +748,17 @@
                 {editingTheme ? i18n.t('settings.editingThemeTitle', { name: editingTheme.name }) : i18n.t('settings.customThemeBuilderTitle')}
               </h4>
             </div>
-            <div class="flex items-center gap-2">
-              {#if editingThemeId}
-                <button
-                  onclick={() => { editingThemeId = null; }}
-                  class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
-                >
-                  {i18n.t('settings.cancel')}
-                </button>
-              {/if}
-              <!-- Simple/Advanced Toggle -->
-              <div class="flex items-center gap-2 bg-brand-main rounded-full p-0.5 border border-brand-border">
-                <button
-                  onclick={() => { useAdvancedBuilder = false; }}
-                  class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {!useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                >
-                  {i18n.t('settings.simple')}
-                </button>
-                <button
-                  onclick={() => { useAdvancedBuilder = true; }}
-                  class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all {useAdvancedBuilder ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-                >
-                  {i18n.t('settings.advanced')}
-                </button>
-              </div>
-            </div>
+            {#if editingThemeId}
+              <button
+                onclick={() => { editingThemeId = null; }}
+                class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
+              >
+                {i18n.t('settings.cancel')}
+              </button>
+            {/if}
           </div>
 
-          {#if useAdvancedBuilder}
-            <DesignTools {customColors} {newThemeName} themeId={editingThemeId} onSaved={() => { editingThemeId = null; }} />
-          {:else}
-            <div class="space-y-5">
+          <div class="space-y-5">
               <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
                 <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
                   <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
@@ -807,95 +774,81 @@
                   onclick={loadActiveThemeColors}
                   class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
                 >
-                  <Palette class="w-4 h-4 text-brand-accent-text" /> {i18n.t('settings.importColors')}
+                  <RotateCcw class="w-4 h-4 text-brand-accent-text" /> {i18n.t('settings.importColors')}
                 </button>
               </div>
 
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-2">
-                <!-- Main Background -->
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-6 pt-2">
+                <!-- Dark Muted (Main Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-main']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">bg-main</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">darkMuted (bg-main)</span>
                   </div>
                 </div>
 
-                <!-- Sidebar Background -->
+                <!-- Dark Vibrant (Sidebar Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-sidebar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">bg-sidebar</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">darkVibrant (bg-sidebar)</span>
                   </div>
                 </div>
 
-                <!-- Player Bar Background -->
+                <!-- Light Muted (Player Bar Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-playerbar']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">bg-playerbar</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">lightMuted (bg-playerbar)</span>
                   </div>
                 </div>
 
-                <!-- Accent Color -->
+                <!-- Vibrant (Accent Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-accent']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">color-accent</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">vibrant (color-accent)</span>
                   </div>
                 </div>
 
-                <!-- Accent Hover Color -->
+                <!-- Light Vibrant (Accent Hover Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-accent-hover']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">accent-hover</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">lightVibrant (accent-hover)</span>
                   </div>
                 </div>
 
-                <!-- Primary Text -->
+                <!-- Muted (Border Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-text-primary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.primaryTextLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">text-primary</span>
-                  </div>
-                </div>
-
-                <!-- Secondary Text -->
-                <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-text-secondary']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
-                    <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.secondaryTextLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">text-secondary</span>
-                  </div>
-                </div>
-
-                <!-- Border Color -->
-                <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-border']} oninput={handleLivePreview} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
+                  <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary/50">color-border</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">muted (color-border)</span>
                   </div>
                 </div>
               </div>
 
-              <div class="flex items-center gap-3 pt-3 border-t border-brand-border">
+              <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-brand-border">
                 <button
                   onclick={saveCustomTheme}
                   class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
                 >
                   {editingThemeId ? i18n.t('settings.saveChanges') : i18n.t('settings.saveCustom')}
                 </button>
-                <span class="text-[10px] text-brand-text-secondary/50">{i18n.t('settings.livePreviewInfo')}</span>
+                <button
+                  onclick={applyCustomTheme}
+                  class="bg-brand-main hover:bg-brand-sidebar border border-brand-accent/60 text-brand-accent-text hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                >
+                  {i18n.t('settings.applyTheme')}
+                </button>
               </div>
             </div>
-          {/if}
         </div>
       </div>
     {:else if settingsTab === "equalizer"}
@@ -914,7 +867,7 @@
               <h3 class="text-2xl font-bold text-brand-text-primary">{i18n.t('settings.aboutAppName', {}, 'Luminous Music Player')}</h3>
             </div>
             <p class="text-sm text-brand-text-secondary">{i18n.t('settings.aboutTagline')}</p>
-            <p class="text-xs text-brand-text-secondary/70">
+            <p class="text-xs text-brand-text-secondary">
               {i18n.t('settings.aboutCreatedByPrefix', {}, 'Created by ')}<button onclick={() => openExternalUrl("https://esoltys.github.io/")} class="text-brand-accent-text hover:underline font-semibold cursor-pointer">Eric Soltys 🍁</button>{i18n.t('settings.aboutCreatedBySuffix', {}, ' in the BC Kootenays, Canada')}
             </p>
           </div>
@@ -934,10 +887,10 @@
               </div>
               <div>
                 <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutGitHubRepo')}</p>
-                <p class="text-[10px] text-brand-text-secondary/60">github.com/esoltys/luminous</p>
+                <p class="text-xs text-brand-text-secondary">github.com/esoltys/luminous</p>
               </div>
             </div>
-            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary group-hover:text-brand-accent-text transition-colors" />
           </button>
 
           <button
@@ -950,10 +903,10 @@
               </div>
               <div>
                 <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutViewCredits')}</p>
-                <p class="text-[10px] text-brand-text-secondary/60">CREDITS.md</p>
+                <p class="text-xs text-brand-text-secondary">CREDITS.md</p>
               </div>
             </div>
-            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary group-hover:text-brand-accent-text transition-colors" />
           </button>
 
           <button
@@ -966,10 +919,10 @@
               </div>
               <div>
                 <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutViewLicense')}</p>
-                <p class="text-[10px] text-brand-text-secondary/60">{i18n.t('settings.aboutLicenseSubtitle', {}, 'MIT License')}</p>
+                <p class="text-xs text-brand-text-secondary">{i18n.t('settings.aboutLicenseSubtitle', {}, 'MIT License')}</p>
               </div>
             </div>
-            <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
+            <ExternalLink class="w-4 h-4 text-brand-text-secondary group-hover:text-brand-accent-text transition-colors" />
           </button>
         </div>
 
@@ -982,12 +935,12 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
               <p class="font-bold text-brand-text-primary">Rust & Tauri v2</p>
-              <p class="text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.aboutTechRust')}</p>
+              <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechRust')}</p>
             </div>
 
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
               <p class="font-bold text-brand-text-primary">Svelte 5 & TypeScript</p>
-              <p class="text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.aboutTechSvelte')}</p>
+              <p class="text-brand-text-secondary leading-relaxed">{i18n.t('settings.aboutTechSvelte')}</p>
             </div>
           </div>
 
@@ -998,15 +951,15 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">Symphonia & CPAL</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechSymphonia')}</p>
+              <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechSymphonia')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">rubato & bs1770</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechRubato')}</p>
+              <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechRubato')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">rustfft & Lofty</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechRustfft')}</p>
+              <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechRustfft')}</p>
             </div>
           </div>
 
@@ -1014,10 +967,10 @@
             {i18n.t('settings.aboutInfluences')}
           </h4>
 
-          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t('settings.aboutInfluencesText')}
           </p>
-          <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
             {i18n.t('settings.aboutDedication')}
           </p>
         </div>

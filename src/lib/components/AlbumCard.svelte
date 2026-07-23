@@ -147,10 +147,10 @@
           {album.artist}
         </button>
       {:else}
-        <span class="text-xs text-brand-text-secondary/60 text-left w-full mt-0.5 truncate font-medium">{i18n.t('collection.variousArtists')}</span>
+        <span class="text-xs text-brand-text-secondary text-left w-full mt-0.5 truncate font-medium">{i18n.t('collection.variousArtists')}</span>
       {/if}
     {/if}
-    <div class="flex items-center justify-between mt-auto pt-2 text-[10px] text-brand-text-secondary/50">
+    <div class="flex items-center justify-between mt-auto pt-2 text-xs text-brand-text-secondary font-medium">
       <span>{album.year || ""}</span>
       <span>{getAlbumCategoryLabel(album.track_count, album.disc_count)}</span>
     </div>

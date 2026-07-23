@@ -507,7 +507,7 @@
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <FilterX class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
                 <h3 class="text-base font-semibold text-brand-text-primary mb-1">All results filtered out</h3>
-                <p class="text-xs text-brand-text-secondary/60 mb-4">
+                <p class="text-xs text-brand-text-secondary mb-4">
                   {#if collectionStore.searchQuery}
                     No tracks match your query: <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
                   {:else}
@@ -554,7 +554,7 @@
                     <Play class="w-4 h-4 fill-current" />
                   </button>
                 </div>
-                <div class="text-brand-text-secondary/70 truncate pr-4 min-w-0 font-medium">
+                <div class="text-brand-text-secondary truncate pr-4 min-w-0 font-medium">
                   {song.track !== undefined && song.track !== null ? song.track : "—"}
                 </div>
                 <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
@@ -565,49 +565,49 @@
                     {song.title || i18n.t('collection.unknownSong')}
                   </span>
                 </div>
-                <div class="text-brand-text-secondary/90 truncate pr-4 flex items-center min-w-0">
+                <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
-                <div class="text-brand-text-secondary/70 truncate pr-4 flex items-center min-w-0">
+                <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
                   {#if song.album}
                     <button
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
                     </button>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
                 {#if collectionStore.visibleColumns.format}
-                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
                     {song.filetype ? song.filetype.toUpperCase() : "—"}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.year}
-                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-medium">
+                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
                     {song.year || "—"}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.genre}
-                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-medium">
+                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
                     {song.genre || "—"}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.bitrate}
-                  <div class="text-brand-text-secondary/70 truncate pr-2 min-w-0 text-xs font-mono">
+                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
                     {song.bitrate ? `${song.bitrate}k` : "—"}
                   </div>
                 {/if}
@@ -617,22 +617,22 @@
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.playcount}
-                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">
+                  <div class="text-center text-brand-text-secondary font-mono text-xs">
                     {song.playcount ?? 0}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.skipcount}
-                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">
+                  <div class="text-center text-brand-text-secondary font-mono text-xs">
                     {song.skipcount ?? 0}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.duration}
-                  <div class="text-center text-brand-text-secondary/80 font-mono text-xs">{formatDuration(song.length_nanosec)}</div>
+                  <div class="text-center text-brand-text-secondary font-mono text-xs">{formatDuration(song.length_nanosec)}</div>
                 {/if}
                 <div class="flex items-center justify-center gap-2.5">
                   <button
                     onclick={() => handleAddSongToPlaylist(song.id)}
-                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                    class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                     title={playlistsStore.activeCustomPlaylist
                       ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                       : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -641,7 +641,7 @@
                   </button>
                   <button
                     onclick={() => openTagEditor(song.id)}
-                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                    class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                     title={i18n.t('collection.editTagsTooltip')}
                   >
                     <Edit3 class="w-4 h-4" />

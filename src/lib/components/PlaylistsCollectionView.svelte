@@ -331,7 +331,7 @@
             <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
             <div class="space-y-1">
               <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.autoPlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+              <p class="text-xs text-brand-text-secondary leading-relaxed">
                 {i18n.t('playlists.autoPlaylistInfoText')}
               </p>
             </div>
@@ -358,7 +358,7 @@
             <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
             <div class="space-y-1">
               <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.activePlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary/70 leading-relaxed">
+              <p class="text-xs text-brand-text-secondary leading-relaxed">
                 {i18n.t('playlists.activePlaylistInfoText')}
               </p>
             </div>
@@ -369,7 +369,7 @@
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <ListMusic class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
                 <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('playlists.noPlaylistsTitle')}</h3>
-                <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('playlists.noPlaylistsText')}</p>
+                <p class="text-xs text-brand-text-secondary font-medium">{i18n.t('playlists.noPlaylistsText')}</p>
               </div>
             </div>
           {:else}

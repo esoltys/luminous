@@ -35,6 +35,13 @@ export interface Theme {
 }
 
 export interface ExtractedColors {
+  vibrant?: string;
+  lightVibrant?: string;
+  darkVibrant?: string;
+  muted?: string;
+  lightMuted?: string;
+  darkMuted?: string;
+  isLight?: boolean;
   primary: string;
   sidebar: string;
   playerbar: string;
@@ -177,11 +184,10 @@ export const PREDEFINED_THEMES: Theme[] = [
   }
 ];
 
-// The Dynamic Artwork theme (PREDEFINED_THEMES below) hardcodes these as its
-// text colors regardless of the extracted background, so every background
-// surface buildExtractedColors() produces must stay readable against both.
-const ARTWORK_TEXT_PRIMARY = "#ffffff";
-const ARTWORK_TEXT_SECONDARY = "#e2e8f0";
+const ARTWORK_TEXT_PRIMARY_DARK = "#ffffff";
+const ARTWORK_TEXT_SECONDARY_DARK = "#e2e8f0";
+const ARTWORK_TEXT_PRIMARY_LIGHT = "#16181d";
+const ARTWORK_TEXT_SECONDARY_LIGHT = "#5a6072";
 
 type Rgb = { r: number; g: number; b: number };
 
@@ -197,14 +203,14 @@ function clampLightness(rgb: Rgb, minL: number, maxL: number): Rgb {
   return withLightness(rgb, Math.min(Math.max(hsl.l, minL), maxL));
 }
 
-/** Steps lightness down in HSL space until both fixed artwork text colors clear WCAG AA, or L bottoms out. */
+/** Steps lightness down in HSL space until both fixed dark-theme text colors clear WCAG AA, or L bottoms out. */
 function darkenUntilReadable(rgb: Rgb): Rgb {
   let candidate = rgb;
   let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   for (let i = 0; i < 30; i++) {
     const hex = rgbToHex(candidate.r, candidate.g, candidate.b);
-    const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY, hex).wcagAA;
-    const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY, hex).wcagAA;
+    const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY_DARK, hex).wcagAA;
+    const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY_DARK, hex).wcagAA;
     if (primaryOk && secondaryOk) return candidate;
     if (hsl.l <= 0) return candidate;
     hsl = { ...hsl, l: Math.max(0, hsl.l - 0.02) };
@@ -213,39 +219,71 @@ function darkenUntilReadable(rgb: Rgb): Rgb {
   return candidate;
 }
 
-/**
- * Derives the full artwork palette from a weighted color histogram using
- * Median Cut quantization + Android Palette-style archetype scoring (#61),
- * replacing flat population-dominance picking. That approach loses small,
- * vibrant accent clusters on covers dominated by a huge neutral background
- * (e.g. a mostly-black album with a tiny neon accent) because population
- * alone decides the winner; scoring candidates by role (vibrant vs. muted,
- * light vs. dark) instead keeps the accent regardless of how few pixels it
- * covers. Every derived background surface is then validated with
- * checkWcagCompliance() against the fixed Dynamic Artwork text colors,
- * mirroring the pickAccessibleOnColor() pattern already used for text-on-accent.
- */
+/** Steps lightness up in HSL space until both fixed light-theme text colors clear WCAG AA, or L tops out. */
+function lightenUntilReadable(rgb: Rgb): Rgb {
+  let candidate = rgb;
+  let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  for (let i = 0; i < 30; i++) {
+    const hex = rgbToHex(candidate.r, candidate.g, candidate.b);
+    const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY_LIGHT, hex).wcagAA;
+    const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY_LIGHT, hex).wcagAA;
+    if (primaryOk && secondaryOk) return candidate;
+    if (hsl.l >= 1) return candidate;
+    hsl = { ...hsl, l: Math.min(1, hsl.l + 0.02) };
+    candidate = hslToRgb(hsl.h, hsl.s, hsl.l);
+  }
+  return candidate;
+}
+
 export function buildExtractedColors(colorCounts: ColorCount[]): ExtractedColors {
   const swatches = quantizeMedianCut(colorCounts, 24);
   const archetypes = extractArchetypes(swatches);
   const dominant = swatches.reduce((max, s) => (s.population > max.population ? s : max), swatches[0]);
 
-  const primaryBase = archetypes.darkVibrant || archetypes.darkMuted || dominant;
-  const primaryRgb = darkenUntilReadable(clampLightness(primaryBase, 0, 0.35));
-  const primaryHsl = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+  // Derive all 6 Android Palette archetypes with fallbacks
+  const vibrant = archetypes.vibrant || dominant;
+  const lightVibrant = archetypes.lightVibrant || clampLightness(vibrant, 0.55, 0.85);
+  const darkVibrant = archetypes.darkVibrant || clampLightness(vibrant, 0.15, 0.35);
+  const muted = archetypes.muted || dominant;
+  const lightMuted = archetypes.lightMuted || clampLightness(muted, 0.55, 0.85);
+  const darkMuted = archetypes.darkMuted || clampLightness(muted, 0.15, 0.35);
 
-  // extractArchetypes() always backfills vibrant with the dominant swatch
-  // when nothing clears its guard rails, so this is never null here.
-  const accentBase = archetypes.vibrant as (typeof swatches)[number];
-  const accentRgb = clampLightness(accentBase, 0.35, 0.75);
-  const accentHsl = rgbToHsl(accentRgb.r, accentRgb.g, accentRgb.b);
+  // Determine if cover art is light ($L > 0.40$)
+  const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
+  const isLight = dominantHsl.l > 0.40;
 
-  const sidebarRgb = withLightness(primaryRgb, primaryHsl.l - 0.025);
-  const playerbarRgb = withLightness(primaryRgb, primaryHsl.l - 0.012);
-  const borderRgb = withLightness(primaryRgb, primaryHsl.l + 0.14);
-  const accentHoverRgb = withLightness(accentRgb, Math.min(0.85, accentHsl.l + 0.1));
+  // Map 6 archetypes to UI panel surfaces based on Light vs Dark Glass Mode
+  let primaryRgb: Rgb;
+  let sidebarRgb: Rgb;
+  let playerbarRgb: Rgb;
+  let accentRgb: Rgb;
+  let accentHoverRgb: Rgb;
+  let borderRgb: Rgb;
+
+  if (isLight) {
+    primaryRgb = lightenUntilReadable(clampLightness(lightMuted, 0.70, 0.95));
+    sidebarRgb = lightenUntilReadable(clampLightness(lightVibrant, 0.65, 0.90));
+    playerbarRgb = lightenUntilReadable(clampLightness(lightMuted, 0.68, 0.92));
+    accentRgb = clampLightness(vibrant, 0.35, 0.65);
+    accentHoverRgb = clampLightness(darkVibrant, 0.25, 0.55);
+    borderRgb = clampLightness(muted, 0.50, 0.80);
+  } else {
+    primaryRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.35));
+    sidebarRgb = darkenUntilReadable(clampLightness(darkVibrant, 0.0, 0.30));
+    playerbarRgb = darkenUntilReadable(clampLightness(darkMuted, 0.0, 0.32));
+    accentRgb = clampLightness(vibrant, 0.35, 0.75);
+    accentHoverRgb = clampLightness(lightVibrant, 0.45, 0.85);
+    borderRgb = clampLightness(muted, 0.20, 0.50);
+  }
 
   return {
+    vibrant: rgbToHex(vibrant.r, vibrant.g, vibrant.b),
+    lightVibrant: rgbToHex(lightVibrant.r, lightVibrant.g, lightVibrant.b),
+    darkVibrant: rgbToHex(darkVibrant.r, darkVibrant.g, darkVibrant.b),
+    muted: rgbToHex(muted.r, muted.g, muted.b),
+    lightMuted: rgbToHex(lightMuted.r, lightMuted.g, lightMuted.b),
+    darkMuted: rgbToHex(darkMuted.r, darkMuted.g, darkMuted.b),
+    isLight,
     primary: rgbToHex(primaryRgb.r, primaryRgb.g, primaryRgb.b),
     sidebar: rgbToHex(sidebarRgb.r, sidebarRgb.g, sidebarRgb.b),
     playerbar: rgbToHex(playerbarRgb.r, playerbarRgb.g, playerbarRgb.b),
@@ -325,6 +363,13 @@ export function extractColorsFromImage(imgUrl: string): Promise<ExtractedColors>
 
 function getFallbackColors(): ExtractedColors {
   return {
+    vibrant: "#88c0d0",
+    lightVibrant: "#8fbcbb",
+    darkVibrant: "#5e81ac",
+    muted: "#4c566a",
+    lightMuted: "#d8dee9",
+    darkMuted: "#2e3440",
+    isLight: false,
     primary: "#2e3440",
     sidebar: "#242933",
     playerbar: "#2b303c",
@@ -534,7 +579,7 @@ export class ThemeStore {
     }
   }
 
-  applyArtworkColors(colors: ExtractedColors) {
+  applyArtworkColors(colors: ExtractedColors, skipApplyActiveTheme = false) {
     this.artworkColors = colors;
     if (typeof document === "undefined") return;
     const root = document.documentElement;
@@ -551,9 +596,13 @@ export class ThemeStore {
     root.style.setProperty("--logo-stop-2", stops.stop2);
     root.style.setProperty("--logo-stop-3", stops.stop3);
     root.style.setProperty("--logo-stop-4", stops.stop4);
+
+    if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
+      this.applyActiveTheme(true);
+    }
   }
 
-  resetArtworkColors() {
+  resetArtworkColors(skipApplyActiveTheme = false) {
     this.artworkColors = null;
     if (typeof document === "undefined") return;
     const root = document.documentElement;
@@ -570,9 +619,66 @@ export class ThemeStore {
     root.style.setProperty("--logo-stop-2", stops.stop2);
     root.style.setProperty("--logo-stop-3", stops.stop3);
     root.style.setProperty("--logo-stop-4", stops.stop4);
+
+    if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
+      this.applyActiveTheme(true);
+    }
   }
 
-  applyActiveTheme() {
+  applyThemeColorsPreview(colors: ThemeColors) {
+    if (typeof document === "undefined") return;
+
+    const resolvedAccent = colors["color-accent"];
+    const resolvedAccentHover = colors["color-accent-hover"];
+    const resolvedBgMain = colors["bg-main"];
+    const resolvedBgSidebar = colors["bg-sidebar"];
+    const resolvedBgPlayerbar = colors["bg-playerbar"];
+
+    const accentContrastText = pickAccessibleOnColor(resolvedAccent);
+    const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
+    const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
+
+    let styleEl = document.getElementById("luminous-theme-style");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "luminous-theme-style";
+      document.head.appendChild(styleEl);
+    }
+
+    styleEl.innerHTML = `
+      :root {
+        --bg-main: ${colors["bg-main"]};
+        --bg-sidebar: ${colors["bg-sidebar"]};
+        --bg-playerbar: ${colors["bg-playerbar"]};
+        --color-accent: ${colors["color-accent"]};
+        --color-accent-hover: ${colors["color-accent-hover"]};
+        --color-text-primary: ${colors["color-text-primary"]};
+        --color-text-secondary: ${colors["color-text-secondary"]};
+        --color-border: ${colors["color-border"]};
+        --color-accent-contrast: ${accentContrastText};
+        --color-accent-text: ${accentText};
+        --color-accent-text-hover: ${accentTextHover};
+      }
+    `;
+
+    const root = document.documentElement;
+    root.classList.toggle("theme-glass", true);
+
+    const isDark = !isLightColor(resolvedBgMain);
+    root.style.setProperty("--glass-bg-sidebar", hexToRgbaString(resolvedBgSidebar, isDark ? 0.5 : 0.6));
+    root.style.setProperty("--glass-bg-playerbar", hexToRgbaString(resolvedBgPlayerbar, isDark ? 0.5 : 0.6));
+    root.style.setProperty("--glass-border-color", isDark ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 15, 20, 0.08)");
+
+    const elevation = isDark ? "0 8px 32px rgba(0, 0, 0, 0.45)" : "0 8px 32px rgba(15, 15, 20, 0.10)";
+    const highlight = isDark ? "inset 0 1px 0 rgba(255, 255, 255, 0.14)" : "inset 0 1px 0 rgba(255, 255, 255, 0.9)";
+    root.style.setProperty("--glass-shadow", `${elevation}, ${highlight}`);
+
+    const glowNear = `0 0 24px 2px ${hexToRgbaString(resolvedAccent, isDark ? 0.45 : 0.28)}`;
+    const glowFar = `0 0 90px 10px ${hexToRgbaString(resolvedAccent, isDark ? 0.28 : 0.16)}`;
+    root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
+  }
+
+  applyActiveTheme(skipApplyArtworkColors = false) {
     if (typeof document === "undefined") return;
     const theme = this.currentTheme;
 
@@ -582,8 +688,8 @@ export class ThemeStore {
     // --color-artwork-* CSS vars stale (or unset) until the next track —
     // sync them from whatever's already cached (or the fallback palette)
     // right away instead of waiting for that next update.
-    if (theme.id === "dynamic-artwork") {
-      this.applyArtworkColors(this.artworkColors || getFallbackColors());
+    if (!skipApplyArtworkColors && theme.id === "dynamic-artwork") {
+      this.applyArtworkColors(this.artworkColors || getFallbackColors(), true);
     }
 
     const isLuminous = theme.id === "system";
@@ -631,6 +737,14 @@ export class ThemeStore {
     const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
     const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
 
+    const textPrimary = theme.id === "dynamic-artwork"
+      ? ((this.artworkColors || getFallbackColors()).isLight ? ARTWORK_TEXT_PRIMARY_LIGHT : ARTWORK_TEXT_PRIMARY_DARK)
+      : colors["color-text-primary"];
+
+    const textSecondary = theme.id === "dynamic-artwork"
+      ? ((this.artworkColors || getFallbackColors()).isLight ? ARTWORK_TEXT_SECONDARY_LIGHT : ARTWORK_TEXT_SECONDARY_DARK)
+      : colors["color-text-secondary"];
+
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
       styleEl = document.createElement("style");
@@ -645,8 +759,8 @@ export class ThemeStore {
         --bg-playerbar: ${colors["bg-playerbar"]};
         --color-accent: ${colors["color-accent"]};
         --color-accent-hover: ${colors["color-accent-hover"]};
-        --color-text-primary: ${colors["color-text-primary"]};
-        --color-text-secondary: ${colors["color-text-secondary"]};
+        --color-text-primary: ${textPrimary};
+        --color-text-secondary: ${textSecondary};
         --color-border: ${colors["color-border"]};
         --color-accent-contrast: ${accentContrastText};
         --color-accent-text: ${accentText};

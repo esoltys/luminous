@@ -54,17 +54,17 @@
     const regex = /({[^{}]*})|(%[a-z]+)|([/\\])|(\s)/gi;
     return escaped.replace(regex, (match, pBlock, pVar, pSep, pSpace) => {
       if (pBlock) {
-        const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-cyan-300 font-bold bg-cyan-500/30 rounded-xs">${v}</span>`);
-        return `<span class="text-purple-300 font-bold bg-purple-500/25 rounded-xs">${inner}</span>`;
+        const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${v}</span>`);
+        return `<span class="text-brand-text-primary font-bold bg-brand-sidebar border border-brand-border rounded-xs px-0.5">${inner}</span>`;
       }
       if (pVar) {
-        return `<span class="text-cyan-300 font-bold bg-cyan-500/25 rounded-xs">${pVar}</span>`;
+        return `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${pVar}</span>`;
       }
       if (pSep) {
-        return `<span class="text-amber-400 font-bold bg-amber-500/30 rounded-xs">${pSep}</span>`;
+        return `<span class="text-brand-text-secondary font-bold px-0.5">${pSep}</span>`;
       }
       if (pSpace) {
-        return `<span class="bg-white/15 rounded-xs select-none" title="Space">&nbsp;</span>`;
+        return `<span class="bg-brand-border/40 rounded-xs select-none" title="Space">&nbsp;</span>`;
       }
       return match;
     });
@@ -77,7 +77,7 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    return escaped.replace(/([/\\])/g, '<span class="text-amber-400 font-bold px-0.5 bg-amber-500/15 rounded">$1</span>');
+    return escaped.replace(/([/\\])/g, '<span class="text-brand-text-secondary font-bold px-0.5">$1</span>');
   }
 
   let template = $state(DEFAULT_TEMPLATE);
@@ -436,7 +436,7 @@
               <button
                 type="button"
                 onclick={() => insertChip(chip.label)}
-                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border {chip.label === '/' ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold' : chip.label.startsWith('{') ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 hover:bg-purple-500/30' : 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30'}"
+                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
                 title={chip.desc}
               >
                 {chip.label === '/' ? '/ (Folder)' : chip.label}
@@ -523,7 +523,7 @@
                 <span>{i18n.t("organizer.onlyChanging")}</span>
               </label>
 
-              <span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
+              <span class="px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold border border-brand-accent/30">
                 {i18n.t("organizer.summaryReady", { count: readyCount })}
               </span>
               <span class="px-2 py-0.5 rounded-full bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
@@ -555,7 +555,7 @@
           {/if}
 
           {#if successMessage}
-            <div class="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-2">
+            <div class="p-3 rounded-xl bg-brand-accent/15 border border-brand-accent/30 text-brand-accent-text flex items-center gap-2">
               <Check class="w-4 h-4 shrink-0" />
               <span>{successMessage}</span>
             </div>
@@ -638,7 +638,7 @@
                           <!-- Status badge -->
                           <div class="w-24 shrink-0">
                             {#if st === "ok"}
-                              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <span class="px-2 py-0.5 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30">
                                 {i18n.t("organizer.statusOk")}
                               </span>
                             {:else if st === "unchanged"}
@@ -674,7 +674,7 @@
 
                           <!-- Target path cell -->
                           <div
-                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-emerald-400 font-semibold' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
+                            class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
                             style="width: {toColWidth}px;"
                             title={item.error_message ? `${item.to_path ? item.to_path + ' — ' : ''}${item.error_message}` : item.to_path}
                           >

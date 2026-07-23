@@ -348,7 +348,7 @@
             {/if}
           </button>
           {#if lookupSucceeded}
-            <div in:fade class="flex items-center gap-1.5 text-emerald-500 text-xs font-semibold">
+            <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
               <Check class="w-3.5 h-3.5 font-bold animate-bounce" />
               <span>{i18n.t('tagEditor.matched')}</span>
             </div>

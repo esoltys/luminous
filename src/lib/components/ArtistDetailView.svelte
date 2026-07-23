@@ -251,7 +251,7 @@
         {#if sets.length > 0}
           <button
             onclick={() => setDiscographyFilter("sets")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'sets' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'sets' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
           >
             {i18n.t('artistDetail.setsFilter', { count: sets.length })}
           </button>
@@ -259,7 +259,7 @@
         {#if fullAlbums.length > 0}
           <button
             onclick={() => setDiscographyFilter("albums")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
           >
             {i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
           </button>
@@ -267,7 +267,7 @@
         {#if eps.length > 0}
           <button
             onclick={() => setDiscographyFilter("eps")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'eps' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'eps' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
           >
             {i18n.t('artistDetail.epsFilter', { count: eps.length })}
           </button>
@@ -275,7 +275,7 @@
         {#if singlesCount > 0}
           <button
             onclick={() => setDiscographyFilter("singles")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
           >
             {i18n.t('artistDetail.singlesFilter', { count: singlesCount })}
           </button>
@@ -302,7 +302,7 @@
         {/each}
       </HorizontalScrollRow>
     {:else if !loading}
-      <p class="text-xs text-brand-text-secondary/60 py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
+      <p class="text-xs text-brand-text-secondary py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
     {/if}
   </div>
 

@@ -604,7 +604,7 @@
                 class="bg-brand-sidebar border border-brand-accent text-brand-text-primary px-3 py-1 text-2xl font-bold rounded-lg focus:outline-none"
                 use:focusAndSelect
               />
-              <button onclick={saveRename} class="p-1.5 text-emerald-400 hover:text-emerald-300 cursor-pointer" title="Save">
+              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent cursor-pointer" title="Save">
                 <Check class="w-5 h-5" />
               </button>
               <button onclick={cancelRename} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer" title="Cancel">
@@ -887,7 +887,7 @@
                     : ''
                   }"
               >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative cursor-grab active:cursor-grabbing">
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary font-medium w-12 relative cursor-grab active:cursor-grabbing">
                   <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
                     <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
                     {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
@@ -911,7 +911,7 @@
                     </button>
                   </div>
                 </td>
-                <td class="py-2.5 px-4 font-medium truncate max-w-xs {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary/50' : 'text-brand-text-primary'}">
+                <td class="py-2.5 px-4 font-medium truncate max-w-xs {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary' : 'text-brand-text-primary'}">
                   <div class="flex items-center gap-2 max-w-full">
                     {#if unavailable}
                       <span title={i18n.t("playlists.fileNotFoundTooltip")}>
@@ -940,40 +940,40 @@
                     {/if}
                   </div>
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/90 truncate max-w-xs">
+                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if unavailable}
-                    <span class="text-brand-text-secondary/40 italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
+                    <span class="text-brand-text-secondary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
                   {:else if item.song?.artist}
                     <span
                       role="button"
                       tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
                       onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/90"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
                     >
                       {item.song.artist}
                     </span>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t("collection.unknownArtist")}</span>
+                    <span class="text-brand-text-secondary">{i18n.t("collection.unknownArtist")}</span>
                   {/if}
                 </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary/70 truncate max-w-xs">
+                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if unavailable}
-                    <span class="text-brand-text-secondary/40 italic text-xs">{item.song?.album ?? ""}</span>
+                    <span class="text-brand-text-secondary italic text-xs">{item.song?.album ?? ""}</span>
                   {:else if item.song?.album}
                     <span
                       role="button"
                       tabindex="0"
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
                       onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary/70"
+                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
                       title={i18n.t("collection.filterByAlbum", { album: item.song.album })}
                     >
                       {item.song.album}
                     </span>
                   {:else}
-                    <span class="text-brand-text-secondary/50">{i18n.t("collection.unknownAlbum")}</span>
+                    <span class="text-brand-text-secondary">{i18n.t("collection.unknownAlbum")}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-center">

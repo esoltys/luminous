@@ -131,6 +131,23 @@ describe("buildExtractedColors (archetype-based artwork color extraction, #61)",
     const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
     expect(hsl.l).toBeGreaterThanOrEqual(0.3);
   });
+
+  it("extracts all 6 Android Palette archetype names on buildExtractedColors", () => {
+    const colors = buildExtractedColors([{ r: 200, g: 200, b: 200, count: 1000 }]);
+    expect(colors.vibrant).toBeTruthy();
+    expect(colors.lightVibrant).toBeTruthy();
+    expect(colors.darkVibrant).toBeTruthy();
+    expect(colors.muted).toBeTruthy();
+    expect(colors.lightMuted).toBeTruthy();
+    expect(colors.darkMuted).toBeTruthy();
+    expect(typeof colors.isLight).toBe("boolean");
+  });
+
+  it("detects light album covers and enables Light Glass Mode (isLight = true)", () => {
+    const lightColors = buildExtractedColors([{ r: 240, g: 240, b: 245, count: 1000 }]);
+    expect(lightColors.isLight).toBe(true);
+    expect(checkWcagCompliance("#16181d", lightColors.primary).wcagAA).toBe(true);
+  });
 });
 
 describe("HSL & Color Utilities", () => {
@@ -280,6 +297,22 @@ describe("Custom Theme Builder & ThemeStore", () => {
 
     expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#112233");
     expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#445566");
+  });
+
+  it("applyArtworkColors triggers applyActiveTheme to update glass panel and contrast variables immediately", () => {
+    themeStore.activeThemeId = "dynamic-artwork";
+    const spy = vi.spyOn(themeStore, "applyActiveTheme");
+
+    themeStore.applyArtworkColors({
+      primary: "#112233",
+      sidebar: "#223344",
+      playerbar: "#334455",
+      accent: "#445566",
+      accentHover: "#556677",
+      border: "#667788"
+    });
+
+    expect(spy).toHaveBeenCalled();
   });
 });
 

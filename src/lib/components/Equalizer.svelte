@@ -354,7 +354,7 @@
       <h3 class="text-sm font-bold text-brand-text-primary">
         {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
       </h3>
-      <p class="text-xs text-brand-text-secondary/70 mt-0.5">
+      <p class="text-xs text-brand-text-secondary mt-0.5">
         {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
       </p>
     </div>
@@ -426,7 +426,7 @@
     <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
       <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
         <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
-        <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary/50"}>
+        <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary"}>
           {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
         </span>
       </div>
@@ -447,7 +447,7 @@
       <div class="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h4>
-          <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('loudness.subtitle')}</p>
+          <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('loudness.subtitle')}</p>
         </div>
         <label class="flex items-center gap-2 shrink-0">
           <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('loudness.enable')}</span>
@@ -517,11 +517,11 @@
             class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={rangeFillStyle(fallbackGainDb, -24.0, 0.0)}
           />
-          <span class="text-[10px] text-brand-text-secondary/60">{i18n.t('loudness.fallbackGainHint')}</span>
+          <span class="text-xs text-brand-text-secondary">{i18n.t('loudness.fallbackGainHint')}</span>
         </div>
       </div>
 
-      <p class="text-[11px] text-brand-text-secondary/70 border-t border-brand-border/60 pt-2">
+      <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
         {analysisRemaining > 0
           ? i18n.t('loudness.analyzing', { remaining: analysisRemaining })
           : i18n.t('loudness.analyzed')}
@@ -532,7 +532,7 @@
     <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 flex flex-col gap-3">
       <div>
         <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('fades.title')}</h4>
-        <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('fades.subtitle')}</p>
+        <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('fades.subtitle')}</p>
       </div>
 
       <!-- Fade on Pause/Stop -->
@@ -591,7 +591,7 @@
             style={rangeFillStyle(crossfadeAutoDurationSecs, 0.5, 10.0)}
           />
           <div class="flex items-center justify-between pt-1">
-            <span class="text-[11px] text-brand-text-secondary/80">{i18n.t('fades.suppressSameAlbum')}</span>
+            <span class="text-xs text-brand-text-secondary">{i18n.t('fades.suppressSameAlbum')}</span>
             <input
               type="checkbox"
               bind:checked={crossfadeSuppressSameAlbum}
@@ -639,7 +639,7 @@
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <!-- Gain display -->
-            <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
+            <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
               {gain > 0 ? "+" : ""}{gain.toFixed(1)}
             </span>
 
@@ -659,7 +659,7 @@
             </div>
 
             <!-- Label -->
-            <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary/70 font-mono text-center tracking-tighter truncate w-full">
+            <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary font-mono text-center tracking-tighter truncate w-full">
               {bandLabels[idx]}
             </span>
           </div>
@@ -678,7 +678,7 @@
             aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
           >
             <!-- Gain display -->
-            <span class="text-[8px] font-mono font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary/50'}">
+            <span class="text-[8px] font-mono font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
               {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
             </span>
 
@@ -698,7 +698,7 @@
             </div>
 
             <!-- Frequency label -->
-            <span class="text-[8px] font-medium font-mono text-center tracking-tighter truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary/70'}">
+            <span class="text-[8px] font-medium font-mono text-center tracking-tighter truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">
               {formatFreq(band.freq)}
             </span>
           </div>
@@ -711,7 +711,7 @@
           <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
             <span>
               {i18n.t('equalizer.bandLabel')} {selectedBand + 1}
-              <span class="text-brand-text-secondary/50 font-mono">· {formatFreq(parametric[selectedBand].freq)}Hz</span>
+              <span class="text-brand-text-secondary font-mono">· {formatFreq(parametric[selectedBand].freq)}Hz</span>
               — {i18n.t('equalizer.qFactor').toUpperCase()}
             </span>
             <span class="text-brand-accent-text font-mono">{parametric[selectedBand].q.toFixed(1)}</span>

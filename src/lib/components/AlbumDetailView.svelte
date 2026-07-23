@@ -356,11 +356,11 @@
               {artistName}
             </button>
           {:else}
-            <span class="text-brand-text-secondary/50">{i18n.t('collection.unknownArtist')}</span>
+            <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
           {/if}
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary/85 mt-1 font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary mt-1 font-medium">
           {#if rawGenre}
             <button
               onclick={openGenrePlaylist}
@@ -500,7 +500,7 @@
                 </button>
               </div>
 
-              <div class="text-brand-text-secondary/70 truncate pr-4 font-medium">
+              <div class="text-brand-text-secondary truncate pr-4 font-medium">
                 {formatTrackNumber(song.track, song.disc, discCount, index)}
               </div>
 
@@ -514,18 +514,18 @@
                 <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
               </div>
 
-              <div class="text-center text-brand-text-secondary/80 font-medium">
+              <div class="text-center text-brand-text-secondary font-medium">
                 {song.playcount ?? 0}
               </div>
 
-              <div class="text-center text-brand-text-secondary/80 font-medium">
+              <div class="text-center text-brand-text-secondary font-medium">
                 {formatDuration(song.length_nanosec)}
               </div>
 
               <div class="flex items-center justify-center gap-2.5">
                 <button
                   onclick={() => handleAddSongToPlaylist(song.id)}
-                  class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                  class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                   title={playlistsStore.activeCustomPlaylist
                     ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                     : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -534,7 +534,7 @@
                 </button>
                 <button
                   onclick={() => openTagEditor(song.id)}
-                  class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors cursor-pointer"
+                  class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
                   title={i18n.t('collection.editTagsTooltip')}
                 >
                   <Edit3 class="w-4 h-4" />

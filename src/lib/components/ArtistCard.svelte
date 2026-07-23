@@ -66,7 +66,7 @@
   >
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
-  <div class="flex gap-2 justify-center mt-2 text-[10px] text-brand-text-secondary/50">
+  <div class="flex gap-2 justify-center mt-2 text-xs text-brand-text-secondary font-medium">
     <span>{genreLabel}</span>
     <span>•</span>
     <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>

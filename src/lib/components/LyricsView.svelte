@@ -258,7 +258,7 @@
           </button>
           <button
             onclick={saveManualLyrics}
-            class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-emerald-950/30 cursor-pointer"
+            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md cursor-pointer"
           >
             <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtn').split(' ')[0]}
           </button>
