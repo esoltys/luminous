@@ -100,7 +100,16 @@ impl CoverManager {
                         if common_names.contains(&stem_lower.as_str()) {
                             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                                 if common_extensions.contains(&ext.to_lowercase().as_str()) {
-                                    return Some(path.canonicalize().unwrap_or(path));
+                                    let canonical = path.canonicalize().unwrap_or(path);
+                                    let s = canonical.to_string_lossy();
+                                    #[cfg(windows)]
+                                    let cleaned_s = match s.strip_prefix(r"\\?\") {
+                                        Some(stripped) => stripped.to_string(),
+                                        None => s.to_string(),
+                                    };
+                                    #[cfg(not(windows))]
+                                    let cleaned_s = s.to_string();
+                                    return Some(PathBuf::from(cleaned_s));
                                 }
                             }
                         }
