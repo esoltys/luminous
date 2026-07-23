@@ -106,7 +106,7 @@
   aria-label="Miniplayer"
   onkeydown={handleKeyDown}
   tabindex="0"
-  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl rounded-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
+  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
