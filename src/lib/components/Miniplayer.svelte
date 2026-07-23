@@ -42,13 +42,19 @@
     e.preventDefault();
     e.stopPropagation();
 
+    // Native OS resize and the manual pointer-drag fallback below must be
+    // mutually exclusive: if both run, they fight over the window size
+    // (the fallback computes deltas from a stale start size while the OS
+    // resizes live), producing an unpredictable final size that doesn't
+    // match what the user actually dragged to.
     try {
       const appWindow = getCurrentWindow() as any;
       if (appWindow && typeof appWindow.startResizing === "function") {
-        appWindow.startResizing("south-east");
+        appWindow.startResizing("south-east").catch(() => {});
+        return;
       }
     } catch {
-      // Fallback to manual pointer drag resize
+      // Fall through to manual pointer drag resize
     }
 
     const startX = e.clientX;
@@ -74,7 +80,12 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m")) {
+    // Ctrl/Cmd+M is handled globally by +layout.svelte's toggleMiniplayerMode
+    // listener. Handling it here too would double-fire on every press (this
+    // handler exits, then the still-bubbling event reaches the global one,
+    // which sees the just-cleared isMiniplayer flag and re-enters) — so only
+    // Escape, which has no global handler, belongs here.
+    if (e.key === "Escape") {
       e.preventDefault();
       collectionStore.exitMiniplayerMode();
     }
@@ -95,7 +106,7 @@
   aria-label="Miniplayer"
   onkeydown={handleKeyDown}
   tabindex="0"
-  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 border border-brand-border/40 shadow-2xl rounded-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
+  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
@@ -114,7 +125,7 @@
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
     <!-- Centered Sharp Active Album Art Card -->
     <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
-      <div class="relative w-full aspect-square max-h-full max-w-[240px] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center group-hover:scale-[0.98] transition-transform duration-300">
+      <div class="relative aspect-square max-h-full max-w-[240px] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center group-hover:scale-[0.98] transition-transform duration-300">
         <CoverArt
           songId={playerStore.currentSong?.id}
           artEmbedded={playerStore.currentSong?.art_embedded}

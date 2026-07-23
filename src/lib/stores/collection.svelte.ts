@@ -283,8 +283,16 @@ class CollectionStore {
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
   isMiniplayer = $state<boolean>(false);
+  // Guards enter/exitMiniplayerMode against overlapping calls: isMiniplayer
+  // flips synchronously, but the window resize/decoration IPC round-trip it
+  // guards is async, so a second toggle fired before that round-trip
+  // resolves would read the window mid-transition and set a wrong "current
+  // size" baseline — compounding into runaway growth on rapid toggling.
+  private miniplayerTransitionInFlight = false;
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
+  miniplayerWidth = $state<number>(300);
+  miniplayerHeight = $state<number>(360);
 
 
   watchFoldersRealtime = $state<boolean>(true);
@@ -313,6 +321,12 @@ class CollectionStore {
 
         const savedImmersive = localStorage.getItem("layout_immersiveMode");
         if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
+
+        const savedMiniplayerWidth = localStorage.getItem("layout_miniplayerWidth");
+        if (savedMiniplayerWidth) this.miniplayerWidth = parseInt(savedMiniplayerWidth, 10);
+
+        const savedMiniplayerHeight = localStorage.getItem("layout_miniplayerHeight");
+        if (savedMiniplayerHeight) this.miniplayerHeight = parseInt(savedMiniplayerHeight, 10);
 
         const savedTab = localStorage.getItem("navigation_activeTab");
         if (savedTab) this._activeTab = savedTab as ActiveTab;
@@ -606,8 +620,9 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode(width = 300, height = 300) {
-    if (this.isMiniplayer) return;
+  async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight) {
+    if (this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+    this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
     try {
       const res = await invoke<{ saved_width: number; saved_height: number }>("enter_miniplayer_mode", { width, height });
@@ -617,19 +632,36 @@ class CollectionStore {
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
+    } finally {
+      this.miniplayerTransitionInFlight = false;
+    }
+  }
+
+  setMiniplayerSize(width: number, height: number) {
+    this.miniplayerWidth = width;
+    this.miniplayerHeight = height;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_miniplayerWidth", width.toString());
+      localStorage.setItem("layout_miniplayerHeight", height.toString());
     }
   }
 
   async exitMiniplayerMode() {
-    if (!this.isMiniplayer) return;
+    if (!this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+    this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = false;
     try {
-      await invoke("exit_miniplayer_mode", {
+      const res = await invoke<{ mini_width: number; mini_height: number }>("exit_miniplayer_mode", {
         savedWidth: this.savedWindowWidth,
         savedHeight: this.savedWindowHeight
       });
+      if (res && res.mini_width && res.mini_height) {
+        this.setMiniplayerSize(res.mini_width, res.mini_height);
+      }
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
+    } finally {
+      this.miniplayerTransitionInFlight = false;
     }
   }
 
