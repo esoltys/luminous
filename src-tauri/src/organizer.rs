@@ -307,7 +307,7 @@ pub fn compute_preview(
     let songs: Vec<Song> = if song_ids.is_empty() {
         let mut stmt = conn.prepare(
             "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2)",
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2) AND unavailable = 0",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(Song {
@@ -332,7 +332,7 @@ pub fn compute_preview(
             let placeholders = vec!["?"; chunk.len()].join(",");
             let sql = format!(
                 "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != ''",
+                 FROM songs WHERE id IN ({}) AND path IS NOT NULL AND TRIM(path) != '' AND unavailable = 0",
                 placeholders
             );
             let mut stmt = conn.prepare(&sql)?;
@@ -466,7 +466,11 @@ fn is_audio_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn move_companion_files(src_dir: &Path, dst_dir: &Path) -> Vec<String> {
+fn move_companion_files(
+    conn: &rusqlite::Connection,
+    src_dir: &Path,
+    dst_dir: &Path,
+) -> Vec<String> {
     let mut errors = Vec::new();
     if !src_dir.exists() || !src_dir.is_dir() || src_dir == dst_dir {
         return errors;
@@ -498,9 +502,22 @@ fn move_companion_files(src_dir: &Path, dst_dir: &Path) -> Vec<String> {
                 if let Some(file_name) = path.file_name() {
                     let dst_file = dst_dir.join(file_name);
                     if !dst_file.exists() {
-                        let _ = fs::rename(&path, &dst_file).or_else(|_| {
+                        let moved = fs::rename(&path, &dst_file).or_else(|_| {
                             fs::copy(&path, &dst_file).and_then(|_| fs::remove_file(&path))
                         });
+                        if moved.is_ok() {
+                            // Folder-level cover art is stored as an absolute
+                            // path in art_automatic (see scan_folder_art()) —
+                            // without this, moved albums would show broken
+                            // art until a future full rescan re-derives it.
+                            let _ = conn.execute(
+                                "UPDATE songs SET art_automatic = ?1 WHERE art_automatic = ?2",
+                                params![
+                                    dst_file.to_string_lossy().to_string(),
+                                    path.to_string_lossy().to_string()
+                                ],
+                            );
+                        }
                     }
                 }
             }
@@ -594,7 +611,7 @@ pub fn execute_apply(
 
     if move_extra_files {
         for (src_dir, dst_dir) in moved_dir_pairs {
-            let companion_errors = move_companion_files(&src_dir, &dst_dir);
+            let companion_errors = move_companion_files(&conn, &src_dir, &dst_dir);
             errors.extend(companion_errors);
         }
     }
@@ -762,5 +779,145 @@ mod tests {
             sanitize_component(unicode_name, false, true),
             "Celine Dion _ Cafe"
         );
+    }
+
+    #[test]
+    fn test_compute_preview_excludes_unavailable_songs() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+        use std::sync::Arc;
+
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_organizer_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let available = Song {
+            path: Some("/music/available.mp3".to_string()),
+            title: Some("Available Track".to_string()),
+            artist: Some("Artist".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            unavailable: false,
+            ..Default::default()
+        };
+        upsert_song(&conn, &available).unwrap();
+
+        // Simulates a song whose file was deleted and then pruned via
+        // "Clean Up Missing Songs" — upsert_song() always writes a fresh
+        // row as available (unavailable=0 on conflict), since it's only
+        // ever called for files the scanner just found on disk. Marking a
+        // song unavailable only ever happens via prune_missing_songs()'s
+        // direct UPDATE, so replicate that here rather than going through
+        // upsert_song(), which has no way to insert one pre-pruned.
+        let pruned = Song {
+            path: Some("/music/deleted-folder/gone.mp3".to_string()),
+            title: Some("Gone Track".to_string()),
+            artist: Some("Artist".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &pruned).unwrap();
+        conn.execute(
+            "UPDATE songs SET unavailable = 1 WHERE path = ?1",
+            rusqlite::params![pruned.path],
+        )
+        .unwrap();
+        drop(conn);
+
+        let options = OrganizeOptions {
+            destination_dir: None,
+            replace_spaces_with_underscores: false,
+            ascii_only: false,
+            clean_empty_dirs: false,
+            move_extra_files: false,
+        };
+
+        let items = compute_preview(&db, &[], "%artist/%title", &options).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].from_path, "/music/available.mp3");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_execute_apply_relocates_folder_art_and_updates_db() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+
+        let base = std::env::temp_dir().join(format!(
+            "luminous_organizer_apply_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let src_dir = base.join("src_album");
+        let dst_dir = base.join("dst_album");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let src_song_path = src_dir.join("track.mp3");
+        let src_cover_path = src_dir.join("cover.jpg");
+        fs::write(&src_song_path, b"fake audio").unwrap();
+        fs::write(&src_cover_path, b"fake cover").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song = Song {
+            path: Some(src_song_path.to_string_lossy().to_string()),
+            title: Some("Track".to_string()),
+            artist: Some("Artist".to_string()),
+            art_automatic: Some(src_cover_path.to_string_lossy().to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let song_id: i64 = conn
+            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .unwrap();
+        drop(conn);
+
+        let dst_song_path = dst_dir.join("track.mp3");
+        let items = vec![OrganizeApplyItem {
+            song_id,
+            from_path: src_song_path.to_string_lossy().to_string(),
+            to_path: dst_song_path.to_string_lossy().to_string(),
+        }];
+
+        let watcher_paused = AtomicBool::new(false);
+        let result = execute_apply(&db, &watcher_paused, &items, true, true).unwrap();
+        assert_eq!(result.moved_count, 1);
+        assert!(result.errors.is_empty());
+
+        // The companion cover file should have followed the track to its new folder...
+        let dst_cover_path = dst_dir.join("cover.jpg");
+        assert!(dst_cover_path.exists());
+        assert!(!src_cover_path.exists());
+
+        // ...and the song's art_automatic reference should point at the new location,
+        // not the now-nonexistent source path.
+        let conn = db.pool.get().unwrap();
+        let art_automatic: Option<String> = conn
+            .query_row(
+                "SELECT art_automatic FROM songs WHERE id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(art_automatic, Some(dst_cover_path.to_string_lossy().to_string()));
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
