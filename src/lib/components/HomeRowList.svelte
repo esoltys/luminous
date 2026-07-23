@@ -6,7 +6,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { formatRelativeDate } from "../utils/date";
+  import { getAlbumCategoryLabel } from "../utils/artist";
   import CoverArt from "./CoverArt.svelte";
+  import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { Play } from "lucide-svelte";
@@ -50,8 +52,15 @@
   }
 
   function trailingLabel(item: HomeItem): string {
-    if (item.type !== "song") return "";
-    return variant === "rank" ? formatDuration(item.song.length_nanosec) : formatRelativeDate(item.song.added);
+    if (item.type === "song") {
+      return variant === "rank" ? formatDuration(item.song.length_nanosec) : formatRelativeDate(item.song.added);
+    }
+    if (item.type === "album") {
+      return getAlbumCategoryLabel(item.album.track_count, item.album.disc_count);
+    }
+    return item.playlist.track_count === 1
+      ? i18n.t("playlists.oneSong")
+      : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
   }
 
   // Mirrors CarouselCard's openPlaylist: genre/decade auto-playlists open in
@@ -152,7 +161,7 @@
               sizeClass="w-11 h-11"
             />
           {:else}
-            <CoverArt songId={undefined} sizeClass="w-11 h-11" />
+            <PlaylistCoverThumb playlist={item.playlist} sizeClass="w-11 h-11" />
           {/if}
           <button
             onclick={(e) => { e.stopPropagation(); playItem(item); }}
@@ -172,7 +181,7 @@
           <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
         {/if}
 
-        <span class="shrink-0 w-14 text-right text-xs text-brand-text-secondary font-medium tabular-nums">
+        <span class="shrink-0 max-w-24 text-right text-xs text-brand-text-secondary font-medium tabular-nums truncate">
           {trailingLabel(item)}
         </span>
       </div>

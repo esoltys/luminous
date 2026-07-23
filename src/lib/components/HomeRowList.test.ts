@@ -70,22 +70,25 @@ describe("HomeRowList.svelte", () => {
     expect(queryByText("01")).not.toBeInTheDocument();
   });
 
-  it("renders album rows using the album title and artist, without a per-song rating", () => {
+  it("renders album rows using the album title, artist, and a category label, without a per-song rating", () => {
     const items: HomeItem[] = [{ type: "album", album: makeAlbum() }];
     const { getByText, container } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("Full Moon Fever")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
+    // 12 tracks, 1 disc -> "Album" category label fills the trailing slot.
+    expect(getByText("Album")).toBeInTheDocument();
     // No song rating control (heart/star) for album-grouped rows.
     expect(container.querySelector('[aria-pressed]')).not.toBeInTheDocument();
     expect(container.querySelector('[aria-label="Rating"]')).not.toBeInTheDocument();
   });
 
-  it("renders playlist rows using the playlist name", () => {
+  it("renders playlist rows using the playlist name and track count", () => {
     const items: HomeItem[] = [{ type: "playlist", playlist: makePlaylist() }];
     const { getByText } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("Road Trip")).toBeInTheDocument();
+    expect(getByText("5 songs")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no items", () => {
