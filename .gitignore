@@ -14,3 +14,8 @@ vite.config.ts.timestamp-*
 # Local overrides for the Tauri IPC mock (see scripts/mock-config.example.json)
 scripts/mock-config.local.json
 scripts/mock-config.json
+
+# Local Cargo configuration
+.cargo/
+*.cargo/config.toml
+
