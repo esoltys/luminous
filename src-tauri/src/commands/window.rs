@@ -8,7 +8,13 @@ pub async fn enter_miniplayer_mode(
     width: Option<f64>,
     height: Option<f64>,
 ) -> Result<serde_json::Value, String> {
-    let current_size = window.outer_size().map_err(|e| e.to_string())?;
+    // set_size() (below, and in resize_miniplayer) sets the window's *inner*
+    // (client area) size — it maps to winit's set_inner_size(). Capturing
+    // via outer_size() here (which includes the title bar/borders) and later
+    // restoring it via set_size() would grow the window by the decoration
+    // thickness on every enter/exit round-trip, so read inner_size() to stay
+    // consistent with what we write.
+    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let logical_width = current_size.width as f64 / scale_factor;
     let logical_height = current_size.height as f64 / scale_factor;
@@ -41,8 +47,11 @@ pub async fn exit_miniplayer_mode(
 ) -> Result<serde_json::Value, String> {
     // Capture the miniplayer's actual current size before restoring the full
     // window — this reflects whatever the user resized it to, whether via
-    // the native OS resize handle or the manual pointer-drag fallback.
-    let current_size = window.outer_size().map_err(|e| e.to_string())?;
+    // the native OS resize handle or the manual pointer-drag fallback. Use
+    // inner_size() (client area) to match what set_size() below writes —
+    // see the comment in enter_miniplayer_mode for why outer_size() here
+    // would compound growth across enter/exit cycles.
+    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let mini_width = current_size.width as f64 / scale_factor;
     let mini_height = current_size.height as f64 / scale_factor;
