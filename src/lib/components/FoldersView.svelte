@@ -868,7 +868,16 @@
             </div>
             <p class="text-sm text-brand-text-secondary">{i18n.t('settings.aboutTagline')}</p>
             <p class="text-xs text-brand-text-secondary">
-              {i18n.t('settings.aboutCreatedByPrefix', {}, 'Created by ')}<button onclick={() => openExternalUrl("https://esoltys.github.io/")} class="text-brand-accent-text hover:underline font-semibold cursor-pointer">Eric Soltys 🍁</button>{i18n.t('settings.aboutCreatedBySuffix', {}, ' in the BC Kootenays, Canada')}
+              {i18n.t('settings.aboutCreatedByPrefix', {}, 'Created by ')}
+              <button
+                onclick={() => openExternalUrl("https://esoltys.github.io/")}
+                class="inline-flex items-center gap-1 text-brand-accent-text hover:text-brand-accent-text-hover font-bold hover:underline cursor-pointer transition-colors"
+                title="Eric Soltys — esoltys.github.io"
+              >
+                Eric Soltys 🍁
+                <ExternalLink class="w-3 h-3 shrink-0" />
+              </button>
+              {i18n.t('settings.aboutCreatedBySuffix', {}, ' in the BC Kootenays, Canada')}
             </p>
           </div>
         </div>
