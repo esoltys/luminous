@@ -263,3 +263,33 @@ impl CoverManager {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_album_hash_distinguishes_same_artist_by_second_key() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_covermanager_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let manager = CoverManager::new(db, temp_dir.clone());
+
+        // Loose singles (no album tag) key their cover cache on title instead
+        // of an empty album string (#106) — two singles by the same artist
+        // must not collide onto the same cached filename.
+        let hash_a = manager.get_album_hash("Eric Soltys", "You Wreck Me");
+        let hash_b = manager.get_album_hash("Eric Soltys", "Wildflowers");
+        assert_ne!(hash_a, hash_b);
+
+        // Same inputs are still stable/idempotent across scans.
+        assert_eq!(hash_a, manager.get_album_hash("Eric Soltys", "You Wreck Me"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+}

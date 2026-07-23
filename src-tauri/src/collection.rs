@@ -1227,7 +1227,17 @@ pub(crate) fn read_and_upsert_song(
             .album_artist
             .as_deref()
             .unwrap_or(song.artist.as_deref().unwrap_or(""));
-        let album = song.album.as_deref().unwrap_or("");
+        // A loose single (no album tag) has no release name to key the cache
+        // on — falling back to "" would hash every such single by the same
+        // artist to the identical cache filename, so the last one scanned
+        // silently overwrites the rest's cached art (#106). The title is the
+        // closest thing a single has to its own "release name".
+        let album = song
+            .album
+            .as_deref()
+            .filter(|a| !a.trim().is_empty())
+            .or(song.title.as_deref())
+            .unwrap_or("");
         if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album)
         {
             song.art_automatic = Some(cached_filename);
