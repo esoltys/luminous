@@ -43,6 +43,20 @@
     "Bass Boost", "Vocal Boost"
   ];
 
+  function getPresetTranslationKey(presetName: string): string {
+    const keyMap: Record<string, string> = {
+      "Flat": "flatPreset",
+      "Pop": "popPreset",
+      "Rock": "rockPreset",
+      "Classical": "classicalPreset",
+      "Jazz": "jazzPreset",
+      "Bass Boost": "bassBoostPreset",
+      "Vocal Boost": "vocalBoostPreset",
+      "Treble Boost": "trebleBoostPreset"
+    };
+    return "equalizer." + (keyMap[presetName] || "customPreset");
+  }
+
   async function loadConfig() {
     try {
       const config = await invoke<EqConfig>("get_equalizer_state");
@@ -386,7 +400,7 @@
         >
           {#each presets as preset}
             <option value={preset} class="bg-brand-main text-brand-text-primary">
-              {i18n.t('equalizer.' + preset.toLowerCase().replace(' ', '') + 'Preset', {}, preset)}
+              {i18n.t(getPresetTranslationKey(preset), {}, preset)}
             </option>
           {/each}
           {#if activePreset === "Custom"}

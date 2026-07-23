@@ -6,7 +6,7 @@ import FoldersView from "./FoldersView.svelte";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "get_all_app_settings") {
-      return Promise.resolve({ active_settings_tab: "about" });
+      return Promise.resolve({ active_settings_tab: "general" });
     }
     if (cmd === "get_commit_hash") {
       return Promise.resolve("048f421");
@@ -28,7 +28,7 @@ describe("FoldersView.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the version number and build commit hash in the About view", async () => {
+  it("renders the version number and build commit hash in the General Settings view", async () => {
     const { findByText } = render(FoldersView);
     expect(await findByText("v0.75.0#048f421")).toBeInTheDocument();
   });

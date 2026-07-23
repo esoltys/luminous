@@ -2,10 +2,11 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon } from "lucide-svelte";
+  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
+  import { updaterStore } from "../stores/updater.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
@@ -33,6 +34,19 @@
       await openUrl(url);
     } catch {
       window.open(url, "_blank");
+    }
+  }
+
+  function getFormatName(fmt: string, fallback: string): string {
+    switch (fmt) {
+      case "windows_setup": return i18n.t('settings.formatWindowsSetup', {}, fallback);
+      case "appimage": return i18n.t('settings.formatAppImage', {}, fallback);
+      case "deb": return i18n.t('settings.formatDeb', {}, fallback);
+      case "rpm": return i18n.t('settings.formatRpm', {}, fallback);
+      case "flatpak": return i18n.t('settings.formatFlatpak', {}, fallback);
+      case "snap": return i18n.t('settings.formatSnap', {}, fallback);
+      case "system_pkg": return i18n.t('settings.formatSystemPkg', {}, fallback);
+      default: return fallback;
     }
   }
   let isTabInitialized = $state(false);
@@ -70,6 +84,8 @@
     } else if (hash) {
       appVersion = `#${hash}`;
     }
+
+    updaterStore.init();
 
 
     try {
@@ -317,6 +333,122 @@
           </select>
         </div>
       </div>
+
+      <!-- Application & Updates Section -->
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.appAndUpdatesTitle')}</h3>
+          <button
+            onclick={() => updaterStore.checkForUpdates()}
+            disabled={updaterStore.checkStatus === 'checking'}
+            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-main border border-brand-border hover:bg-brand-sidebar hover:border-brand-accent/50 text-brand-text-primary transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
+            {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
+          </button>
+        </div>
+
+        <!-- Version & Format Info Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div class="bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 flex items-center justify-between">
+            <div class="space-y-0.5">
+              <p class="text-xs font-medium text-brand-text-secondary">{i18n.t('settings.appVersionLabel')}</p>
+              <p class="text-sm font-bold text-brand-text-primary">Luminous</p>
+            </div>
+            <button
+              onclick={copyVersion}
+              class="px-3 py-1 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 hover:bg-brand-accent/30 transition-colors cursor-pointer flex items-center gap-1.5"
+              title={i18n.t('settings.copyVersionHint')}
+            >
+              {#if versionCopied}
+                <Check class="w-3.5 h-3.5" />
+                {i18n.t('settings.copiedLabel')}
+              {:else}
+                v{appVersion}
+              {/if}
+            </button>
+          </div>
+
+          <div class="bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 flex items-center justify-between">
+            <div class="space-y-0.5">
+              <p class="text-xs font-medium text-brand-text-secondary">{i18n.t('settings.installFormatLabel')}</p>
+              <p class="text-sm font-bold text-brand-text-primary">{getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name)}</p>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {updaterStore.installFormat.supports_self_update ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-brand-border/60 text-brand-text-secondary'}">
+              {updaterStore.installFormat.supports_self_update ? i18n.t('settings.autoUpdateReady', {}, 'Auto-Update Ready') : i18n.t('settings.notifyOnly', {}, 'Notify Only')}
+            </span>
+          </div>
+        </div>
+
+        <!-- Update Available Alert Banner (if available) -->
+        {#if updaterStore.updateAvailable}
+          <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <ArrowUp class="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-brand-text-primary">
+                  {i18n.t('settings.updateAvailableTitle', { version: updaterStore.latestVersion })}
+                </p>
+                <p class="text-xs text-brand-text-secondary/80">
+                  {updaterStore.installFormat.supports_self_update
+                    ? i18n.t('settings.updateDirectReady', {}, 'In-app update ready for direct installation.')
+                    : i18n.t('settings.updateGithubLink', {}, 'Download update payload directly from GitHub Releases.')}
+                </p>
+              </div>
+            </div>
+            <button
+              onclick={() => openExternalUrl(updaterStore.downloadUrl || updaterStore.releaseUrl)}
+              class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-emerald-500/20 shrink-0"
+            >
+              <Download class="w-4 h-4" />
+              {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateDownloadBtn') : i18n.t('settings.updateDownloadGithubBtn')}
+            </button>
+          </div>
+        {:else if updaterStore.checkStatus === 'up-to-date'}
+          <div class="text-xs text-emerald-400 font-medium flex items-center gap-1.5 pt-1">
+            <Check class="w-4 h-4 text-emerald-400" />
+            {i18n.t('settings.updateUpToDate')}
+          </div>
+        {:else if updaterStore.checkStatus === 'error'}
+          <div class="text-xs text-amber-400 font-medium flex items-center gap-1.5 pt-1">
+            {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
+          </div>
+        {/if}
+
+        <!-- Toggle Controls -->
+        <div class="space-y-4 pt-2 border-t border-brand-border/50">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <label for="update-check-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateCheckEnabledLabel')}</label>
+              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateCheckEnabledHint')}</p>
+            </div>
+            <input
+              id="update-check-toggle"
+              type="checkbox"
+              checked={updaterStore.updateCheckEnabled}
+              onchange={(e) => updaterStore.setUpdateCheckEnabled(e.currentTarget.checked)}
+              class="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent cursor-pointer accent-brand-accent"
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-4 pl-4 border-l-2 border-brand-border/40" class:opacity-50={!updaterStore.updateCheckEnabled}>
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <label for="update-auto-install-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateAutoInstallLabel')}</label>
+              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateAutoInstallHint')}</p>
+            </div>
+            <input
+              id="update-auto-install-toggle"
+              type="checkbox"
+              disabled={!updaterStore.updateCheckEnabled}
+              checked={updaterStore.updateAutoInstall}
+              onchange={(e) => updaterStore.setUpdateAutoInstall(e.currentTarget.checked)}
+              class="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent cursor-pointer accent-brand-accent disabled:cursor-not-allowed"
+            />
+          </div>
+        </div>
+      </div>
     {:else if settingsTab === "folders"}
       <!-- Watched Folders Section -->
       <div class="flex justify-between items-center">
@@ -467,7 +599,7 @@
               <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.watchRealtimeHint')}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-xs font-medium text-brand-text-secondary w-6">
+              <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
                 {collectionStore.watchFoldersRealtime ? i18n.t('common.on') : i18n.t('common.off')}
               </span>
               <button
@@ -490,7 +622,7 @@
               <p class="text-xs text-brand-text-secondary/70">{i18n.t('settings.scanOnStartupHint')}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-xs font-medium text-brand-text-secondary w-6">
+              <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
                 {collectionStore.scanOnStartup ? i18n.t('common.on') : i18n.t('common.off')}
               </span>
               <button
@@ -779,26 +911,11 @@
           <img src="/app-icon.svg" alt="Luminous Logo" class="w-20 h-20 shrink-0 drop-shadow-md" />
           <div class="space-y-2 text-center md:text-left flex-1 min-w-0">
             <div class="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-              <h3 class="text-2xl font-bold text-brand-text-primary">Luminous Music Player</h3>
-              <button
-                onclick={copyVersion}
-                class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 hover:bg-brand-accent/30 transition-colors cursor-pointer flex items-center gap-1"
-                title={i18n.t('settings.copyVersionHint')}
-              >
-                {#if versionCopied}
-                  <Check class="w-3 h-3" />
-                  {i18n.t('settings.copiedLabel')}
-                {:else}
-                  v{appVersion}
-                {/if}
-              </button>
-              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {i18n.t('settings.aboutLicense')}
-              </span>
+              <h3 class="text-2xl font-bold text-brand-text-primary">{i18n.t('settings.aboutAppName', {}, 'Luminous Music Player')}</h3>
             </div>
             <p class="text-sm text-brand-text-secondary">{i18n.t('settings.aboutTagline')}</p>
             <p class="text-xs text-brand-text-secondary/70">
-              Created by <button onclick={() => openExternalUrl("https://esoltys.github.io/")} class="text-brand-accent-text hover:underline font-semibold cursor-pointer">Eric Soltys 🍁</button> in the BC Kootenays, Canada
+              {i18n.t('settings.aboutCreatedByPrefix', {}, 'Created by ')}<button onclick={() => openExternalUrl("https://esoltys.github.io/")} class="text-brand-accent-text hover:underline font-semibold cursor-pointer">Eric Soltys 🍁</button>{i18n.t('settings.aboutCreatedBySuffix', {}, ' in the BC Kootenays, Canada')}
             </p>
           </div>
         </div>
@@ -849,7 +966,7 @@
               </div>
               <div>
                 <p class="text-sm font-bold text-brand-text-primary">{i18n.t('settings.aboutViewLicense')}</p>
-                <p class="text-[10px] text-brand-text-secondary/60">MIT License</p>
+                <p class="text-[10px] text-brand-text-secondary/60">{i18n.t('settings.aboutLicenseSubtitle', {}, 'MIT License')}</p>
               </div>
             </div>
             <ExternalLink class="w-4 h-4 text-brand-text-secondary/40 group-hover:text-brand-accent-text transition-colors" />
@@ -865,12 +982,12 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
               <p class="font-bold text-brand-text-primary">Rust & Tauri v2</p>
-              <p class="text-brand-text-secondary/70 leading-relaxed">High-performance native core, multi-threaded audio pipeline, SQLite connection pool, and OS integration.</p>
+              <p class="text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.aboutTechRust')}</p>
             </div>
 
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3.5 space-y-1">
               <p class="font-bold text-brand-text-primary">Svelte 5 & TypeScript</p>
-              <p class="text-brand-text-secondary/70 leading-relaxed">Reactive Svelte 5 Runes state management, virtual list rendering, and Tailwind CSS v4 styling.</p>
+              <p class="text-brand-text-secondary/70 leading-relaxed">{i18n.t('settings.aboutTechSvelte')}</p>
             </div>
           </div>
 
@@ -881,15 +998,15 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">Symphonia & CPAL</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Allocation-free audio decoding and low-latency audio output.</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechSymphonia')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">rubato & bs1770</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Audio sample rate converter & EBU R128 loudness normalization.</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechRubato')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">rustfft & Lofty</p>
-              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">Real-time spectrum analysis, moodbars, and audio tag reading/writing.</p>
+              <p class="text-[11px] text-brand-text-secondary/70 mt-0.5">{i18n.t('settings.aboutTechRustfft')}</p>
             </div>
           </div>
 

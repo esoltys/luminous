@@ -4,7 +4,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music } from "lucide-svelte";
+  import { updaterStore } from "../stores/updater.svelte";
+  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -172,12 +173,22 @@
 
     <button
       onclick={() => { collectionStore.activeTab = "settings"; }}
-      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.settings')}
+      class="relative flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      title={updaterStore.updateAvailable ? `${i18n.t('sidebar.settings')} (${i18n.t('settings.updateAvailable', {}, 'Update available')})` : i18n.t('sidebar.settings')}
     >
       <Settings class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+
       {#if !isCollapsed}
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.settings')}</span>
+        <span class="truncate whitespace-nowrap flex-1 text-left">{i18n.t('sidebar.settings')}</span>
+        {#if updaterStore.updateAvailable}
+          <span class="px-1.5 py-0.5 rounded-full bg-current/15 border border-current/25 text-current flex items-center gap-0.5 text-[10px] font-bold">
+            <ArrowUp class="w-3 h-3 stroke-[2.5]" />
+          </span>
+        {/if}
+      {:else if updaterStore.updateAvailable}
+        <span class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-current/20 border border-current/30 text-current flex items-center justify-center">
+          <ArrowUp class="w-2.5 h-2.5 stroke-[2.5]" />
+        </span>
       {/if}
     </button>
   </nav>

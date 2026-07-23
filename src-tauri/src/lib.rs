@@ -17,6 +17,7 @@ pub mod covermanager;
 pub mod db;
 pub mod equalizer;
 pub mod filter_parser;
+pub mod install_format;
 pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
@@ -139,6 +140,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -622,6 +624,7 @@ pub fn run() {
             commands::settings::get_commit_hash,
             commands::settings::get_fade_settings,
             commands::settings::set_fade_settings,
+            install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,
             // Organizer commands

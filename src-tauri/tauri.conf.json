@@ -37,5 +37,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDRDY5QzUxMjJGNjQ5Q0IKUldTWU0vQytnVG1tTXlWVnpPZm5zNkdFTHdCSU9ldGlDNG9ZUXZCVHR0dzVzK3FRTHJ0Vw==",
+      "endpoints": [
+        "https://github.com/esoltys/luminous/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
