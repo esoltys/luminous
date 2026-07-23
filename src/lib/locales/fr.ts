@@ -371,7 +371,7 @@ export const fr = {
     autoPlaylistInfoTitle: "Comment fonctionnent les listes de lecture automatiques ?",
     autoPlaylistInfoText: "Les listes automatiques se construisent seules à partir de votre bibliothèque et s'actualisent chaque jour avec jusqu'à 25 titres. Les listes par genre regroupent les chansons par genre, et les listes par décennie par année de sortie — chacune n'apparaît qu'à partir de 25 chansons correspondantes. Cliquez sur une liste pour parcourir ses titres, ou sur Actualiser pour obtenir une nouvelle sélection à tout moment.",
     activePlaylistInfoTitle: "Que signifie « Active » ?",
-    activePlaylistInfoText: "Vous pouvez marquer une seule liste personnalisée comme Active à la fois. C'est là que vont les chansons quand vous choisissez « Ajouter à la liste active » dans Luminous. La file d'attente est Active par défaut jusqu'à ce que vous choisissiez une autre liste, et le simple fait d'ouvrir une liste pour la parcourir ne change pas laquelle est Active — cliquez sur « Définir comme active » pour en changer.",
+    activePlaylistInfoText: "Vous pouvez marquer une seule liste personnalisée comme Active à la fois. C'est là que vont les chansons quand vous choisissez « Ajouter à la liste active » dans Luminous. La file d'attente est Active par défaut jusqu'à ce que vous choisissiez une autre liste, et le simple fait d'ouvrir une liste pour la parcourir ne change pas laquelle est Active — cliquez sur « Définir comme active » pour en changer. Les listes à règles intelligentes ne peuvent pas être définies comme actives, car elles se génèrent automatiquement plutôt que d'être créées à la main.",
     editSmartPlaylistBtn: "Modifier les règles",
   },
   lyrics: {

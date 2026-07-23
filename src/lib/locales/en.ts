@@ -372,7 +372,7 @@ export const en = {
     autoPlaylistInfoTitle: "How do Auto Playlists work?",
     autoPlaylistInfoText: "Auto Playlists build themselves from your library and refresh daily with up to 25 tracks. Genre playlists group songs by genre, and Decade playlists group them by release year — each one only shows up once it has at least 25 matching songs. Click a playlist to browse its tracks, or hit Refresh anytime for a new selection.",
     activePlaylistInfoTitle: "What does \"Active\" mean?",
-    activePlaylistInfoText: "You can mark one custom playlist as Active at a time. It's where songs go when you choose \"Add to Active Playlist\" anywhere in Luminous. The Queue is Active by default until you pick another playlist, and just opening a playlist to browse it won't change what's Active — click \"Make Active\" to switch.",
+    activePlaylistInfoText: "You can mark one custom playlist as Active at a time. It's where songs go when you choose \"Add to Active Playlist\" anywhere in Luminous. The Queue is Active by default until you pick another playlist, and just opening a playlist to browse it won't change what's Active — click \"Make Active\" to switch. Smart Rule Playlists can't be made Active since they're generated automatically rather than built by hand.",
     editSmartPlaylistBtn: "Edit Rules",
   },
   lyrics: {
