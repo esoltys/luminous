@@ -885,7 +885,11 @@ mod tests {
         };
         upsert_song(&conn, &song).unwrap();
         let song_id: i64 = conn
-            .query_row("SELECT id FROM songs WHERE path = ?1", params![song.path], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song.path],
+                |r| r.get(0),
+            )
             .unwrap();
         drop(conn);
 
@@ -916,7 +920,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(art_automatic, Some(dst_cover_path.to_string_lossy().to_string()));
+        assert_eq!(
+            art_automatic,
+            Some(dst_cover_path.to_string_lossy().to_string())
+        );
 
         let _ = std::fs::remove_dir_all(&base);
     }

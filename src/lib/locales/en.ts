@@ -425,6 +425,7 @@ export const en = {
     composerLabel: "Composer",
     restoreInterface: "Restore Full Interface",
     formatLabel: "Format",
+    miniplayer: "Picture-in-Picture Miniplayer",
     loudnessLabel: "Loudness",
     loudnessSourceAnalyzed: "R128 analysis",
     loudnessSourceReplayGain: "ReplayGain tag",
@@ -434,6 +435,15 @@ export const en = {
     lyricsPlain: "Plain text",
     lyricsNone: "Not downloaded"
   },
+  miniplayer: {
+    title: "Miniplayer",
+    toggleTooltip: "Picture-in-Picture Mode (Ctrl+M)",
+    exit: "Restore Full Window (Esc)",
+
+    dragHint: "Drag window",
+    resizeHint: "Resize window"
+  },
+
   tagEditor: {
     title: "Edit Metadata Tags",
     titleField: "Song Title",

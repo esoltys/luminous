@@ -423,8 +423,8 @@ export const fr = {
     releasedLabel: "Sortie",
     genreLabel: "Genre",
     composerLabel: "Compositeur",
-    restoreInterface: "Restaurer l'interface complète",
     formatLabel: "Format",
+    miniplayer: "Mini-lecteur Picture-in-Picture",
     loudnessLabel: "Volume",
     loudnessSourceAnalyzed: "Analyse R128",
     loudnessSourceReplayGain: "Tag ReplayGain",
@@ -434,6 +434,14 @@ export const fr = {
     lyricsPlain: "Texte brut",
     lyricsNone: "Non téléchargées"
   },
+  miniplayer: {
+    title: "Mini-lecteur",
+    toggleTooltip: "Mini-lecteur Picture-in-Picture (Ctrl+M)",
+    exit: "Restaurer la fenêtre principale (Esc)",
+    dragHint: "Déplacer la fenêtre",
+    resizeHint: "Redimensionner la fenêtre"
+  },
+
   tagEditor: {
     title: "Modifier les métadonnées",
     titleField: "Titre de la chanson",

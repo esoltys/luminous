@@ -283,6 +283,10 @@ class CollectionStore {
   sidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
+  isMiniplayer = $state<boolean>(false);
+  savedWindowWidth = $state<number>(1280);
+  savedWindowHeight = $state<number>(800);
+
 
   watchFoldersRealtime = $state<boolean>(true);
   scanOnStartup = $state<boolean>(false);
@@ -633,6 +637,42 @@ class CollectionStore {
       localStorage.setItem("layout_immersiveMode", "false");
     }
   }
+
+  async enterMiniplayerMode(width = 300, height = 300) {
+    if (this.isMiniplayer) return;
+    this.isMiniplayer = true;
+    try {
+      const res = await invoke<{ saved_width: number; saved_height: number }>("enter_miniplayer_mode", { width, height });
+      if (res && res.saved_width && res.saved_height) {
+        this.savedWindowWidth = res.saved_width;
+        this.savedWindowHeight = res.saved_height;
+      }
+    } catch (e) {
+      console.warn("Failed to enter miniplayer backend window mode:", e);
+    }
+  }
+
+  async exitMiniplayerMode() {
+    if (!this.isMiniplayer) return;
+    this.isMiniplayer = false;
+    try {
+      await invoke("exit_miniplayer_mode", {
+        savedWidth: this.savedWindowWidth,
+        savedHeight: this.savedWindowHeight
+      });
+    } catch (e) {
+      console.warn("Failed to exit miniplayer backend window mode:", e);
+    }
+  }
+
+  async toggleMiniplayerMode() {
+    if (this.isMiniplayer) {
+      await this.exitMiniplayerMode();
+    } else {
+      await this.enterMiniplayerMode();
+    }
+  }
+
 
   toggleRightPanel() {
     this.rightPanelOpen = !this.rightPanelOpen;

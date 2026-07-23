@@ -288,7 +288,10 @@ mod tests {
         assert_ne!(hash_a, hash_b);
 
         // Same inputs are still stable/idempotent across scans.
-        assert_eq!(hash_a, manager.get_album_hash("Eric Soltys", "You Wreck Me"));
+        assert_eq!(
+            hash_a,
+            manager.get_album_hash("Eric Soltys", "You Wreck Me")
+        );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

@@ -10,3 +10,4 @@ pub mod settings;
 pub mod stats;
 pub mod tageditor;
 pub mod visualizer;
+pub mod window;

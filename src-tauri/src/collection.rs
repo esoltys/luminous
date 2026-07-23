@@ -1238,8 +1238,7 @@ pub(crate) fn read_and_upsert_song(
             .filter(|a| !a.trim().is_empty())
             .or(song.title.as_deref())
             .unwrap_or("");
-        if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album)
-        {
+        if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album) {
             song.art_automatic = Some(cached_filename);
             song.art_unset = false;
         }

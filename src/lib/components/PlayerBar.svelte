@@ -27,8 +27,11 @@
     Disc,
     PanelBottomOpen,
     AudioWaveform,
-    Palette
+    Palette,
+    PictureInPicture
   } from "lucide-svelte";
+
+
 
   // Helper to format nanoseconds to M:SS
   function formatTime(nanosec: number | undefined): string {
@@ -336,7 +339,17 @@
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
+    <button
+      onclick={() => collectionStore.toggleMiniplayerMode()}
+      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0 cursor-pointer"
+      title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+    >
+
+      <PictureInPicture class="w-4.5 h-4.5" />
+    </button>
+
     {#if collectionStore.immersiveMode}
+
       <button 
         onclick={() => collectionStore.toggleImmersiveMode()}
         class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"

@@ -627,6 +627,12 @@ pub fn run() {
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
+            // Window & Miniplayer commands
+            commands::window::enter_miniplayer_mode,
+            commands::window::exit_miniplayer_mode,
+            commands::window::start_window_drag,
+            commands::window::start_window_resize,
+            commands::window::resize_miniplayer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");
