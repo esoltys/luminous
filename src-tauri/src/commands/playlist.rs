@@ -1,5 +1,5 @@
 use crate::{
-    models::{Playlist, PlaylistItem},
+    models::{Playlist, PlaylistItem, QueuePopulationMode},
     AppState,
 };
 use tauri::State;
@@ -73,10 +73,11 @@ pub async fn get_songs_by_decade(
     state: State<'_, AppState>,
     decade: String,
     limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
 ) -> Result<Vec<crate::models::Song>, String> {
     let scanner = crate::collection::CollectionScanner::new(state.db.clone());
     scanner
-        .get_songs_by_decade(&decade, limit.unwrap_or(50))
+        .get_songs_by_decade(&decade, limit.unwrap_or(50), mode.unwrap_or_default())
         .map_err(|e| e.to_string())
 }
 
@@ -253,6 +254,23 @@ pub async fn set_playlist_dynamic_spec(
         .map_err(|e| e.to_string())
 }
 
+/// Persist the `population_mode` bias (All/Favourites/Familiar/Discover/Deep
+/// Cuts, see #120) for a playlist, and immediately regenerate its tracks so
+/// the change takes effect right away rather than waiting for the next
+/// scheduled/manual refresh.
+#[tauri::command]
+pub async fn set_playlist_population_mode(
+    playlist_id: i64,
+    mode: QueuePopulationMode,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut pm = state.playlists.lock().await;
+    pm.set_playlist_population_mode(playlist_id, mode)
+        .map_err(|e| e.to_string())?;
+    pm.refresh_auto_playlist(playlist_id)
+        .map_err(|e| e.to_string())
+}
+
 /// Fetch the next batch of songs for an auto-playlist's refill pass and append
 /// them both to the DB playlist and to the live player queue.  Called by the
 /// player when `remaining < threshold` and `auto_play` is true.
@@ -261,15 +279,19 @@ pub async fn refill_auto_playlist(
     playlist_id: i64,
     state: State<'_, AppState>,
 ) -> Result<Vec<crate::models::Song>, String> {
-    // Read the playlist's dynamic_spec
-    let (dynamic_spec, _auto_play) = {
+    // Read the playlist's dynamic_spec + population_mode
+    let (dynamic_spec, _auto_play, mode) = {
         let pm = state.playlists.lock().await;
         let playlists = pm.get_playlists().map_err(|e| e.to_string())?;
         let pl = playlists
             .iter()
             .find(|p| p.id == playlist_id)
             .ok_or_else(|| format!("Playlist {} not found", playlist_id))?;
-        (pl.dynamic_spec.clone().unwrap_or_default(), pl.auto_play)
+        (
+            pl.dynamic_spec.clone().unwrap_or_default(),
+            pl.auto_play,
+            pl.population_mode,
+        )
     };
 
     if dynamic_spec.is_empty() {
@@ -279,7 +301,7 @@ pub async fn refill_auto_playlist(
     // Get refill songs (excludes already-present tracks)
     let new_songs = {
         let pm = state.playlists.lock().await;
-        pm.get_auto_playlist_refill_songs(playlist_id, &dynamic_spec, 25)
+        pm.get_auto_playlist_refill_songs(playlist_id, &dynamic_spec, mode, 25)
             .map_err(|e| e.to_string())?
     };
 

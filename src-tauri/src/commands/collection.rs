@@ -1,6 +1,6 @@
 use crate::{
     collection::CollectionScanner,
-    models::{HomeItem, LibraryStats, MusicDirectory, Song},
+    models::{HomeItem, LibraryStats, MusicDirectory, QueuePopulationMode, Song},
     AppState,
 };
 use tauri::{AppHandle, State};
@@ -127,11 +127,12 @@ pub async fn get_recently_added_songs(
 pub async fn get_songs_by_genre(
     genre: String,
     limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
-        .get_songs_by_genre(&genre, limit.unwrap_or(50))
+        .get_songs_by_genre(&genre, limit.unwrap_or(50), mode.unwrap_or_default())
         .map_err(|e| e.to_string())
 }
 

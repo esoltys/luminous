@@ -76,6 +76,37 @@ describe("PlaylistsStore", () => {
     expect(playlistsStore.activePlaylistId).toBe(103);
   });
 
+  it("persists population mode before spec/auto-play when saving a smart playlist (#120)", async () => {
+    const calls: string[] = [];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      calls.push(cmd);
+      if (cmd === "get_playlists") return mockPlaylists;
+      return null;
+    });
+
+    await playlistsStore.updatePlaylistSpec(101, "genre:rock", true, "discover");
+
+    expect(invoke).toHaveBeenCalledWith("set_playlist_population_mode", {
+      playlistId: 101,
+      mode: "discover",
+    });
+    expect(invoke).toHaveBeenCalledWith("set_playlist_dynamic_spec", { playlistId: 101, spec: "genre:rock" });
+    expect(invoke).toHaveBeenCalledWith("set_playlist_auto_play", { playlistId: 101, autoPlay: true });
+    expect(calls.indexOf("set_playlist_population_mode")).toBeLessThan(calls.indexOf("set_playlist_dynamic_spec"));
+  });
+
+  it("changes a playlist's population mode and re-selects it if active (#120)", async () => {
+    playlistsStore.activePlaylistId = 101;
+
+    await playlistsStore.setPlaylistPopulationMode(101, "favourites");
+
+    expect(invoke).toHaveBeenCalledWith("set_playlist_population_mode", {
+      playlistId: 101,
+      mode: "favourites",
+    });
+    expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
+  });
+
   it("renames a playlist and refreshes playlists list", async () => {
     await playlistsStore.renamePlaylist(101, "Top Favorites");
 

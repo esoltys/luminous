@@ -350,6 +350,49 @@ pub enum PlayContext {
     },
 }
 
+/// The bias used to select tracks when (re)populating a genre/decade
+/// auto-playlist or a dynamic Smart Playlist's tracks — see #120. Tab order
+/// in the UI, left to right: All, Favourites, Familiar, Discover, Deep Cuts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum QueuePopulationMode {
+    /// Full scope, uniformly randomized (not a deterministic top-N block).
+    #[default]
+    All,
+    /// Biased toward the user's own rating (`rating >= 4`).
+    Favourites,
+    /// Biased toward higher playcount / more recent lastplayed.
+    Familiar,
+    /// Biased toward lesser-played (but not never-played) tracks.
+    Discover,
+    /// Never or almost never played tracks (`playcount = 0 OR lastplayed IS NULL`).
+    DeepCuts,
+}
+
+impl QueuePopulationMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            QueuePopulationMode::All => "all",
+            QueuePopulationMode::Favourites => "favourites",
+            QueuePopulationMode::Familiar => "familiar",
+            QueuePopulationMode::Discover => "discover",
+            QueuePopulationMode::DeepCuts => "deep_cuts",
+        }
+    }
+}
+
+impl From<&str> for QueuePopulationMode {
+    fn from(s: &str) -> Self {
+        match s {
+            "favourites" => QueuePopulationMode::Favourites,
+            "familiar" => QueuePopulationMode::Familiar,
+            "discover" => QueuePopulationMode::Discover,
+            "deep_cuts" => QueuePopulationMode::DeepCuts,
+            _ => QueuePopulationMode::All,
+        }
+    }
+}
+
 /// A named playlist.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
@@ -359,6 +402,8 @@ pub struct Playlist {
     pub dynamic_spec: Option<String>, // JSON-serialized smart playlist spec
     #[serde(default)]
     pub auto_play: bool, // Auto-Play: keep appending next batch when approaching end (#26)
+    #[serde(default)]
+    pub population_mode: QueuePopulationMode, // Queue population bias (#120)
     pub last_played_row: Option<i32>,
     pub created: i64,
     pub updated: i64,

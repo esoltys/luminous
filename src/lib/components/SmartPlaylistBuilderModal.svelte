@@ -6,10 +6,12 @@
   import { i18n } from "../stores/i18n.svelte";
   import { X, Plus, Sparkles, SlidersHorizontal } from "lucide-svelte";
   import type { Rule } from "../utils/filterParser";
+  import type { QueuePopulationMode } from "../types";
+  import PopulationModeTabs from "./PopulationModeTabs.svelte";
 
   interface Props {
     initialRules?: Rule[];
-    editing?: { id: number; name: string; autoPlay: boolean } | null;
+    editing?: { id: number; name: string; autoPlay: boolean; populationMode?: QueuePopulationMode } | null;
     onClose: () => void;
   }
 
@@ -107,6 +109,7 @@
   let userHasEditedName = $state(untrack(() => editing !== null));
   let playlistName = $state(untrack(() => editing?.name ?? generateSuggestedName(rules)));
   let autoPlay = $state(untrack(() => editing?.autoPlay ?? true));
+  let populationMode = $state<QueuePopulationMode>(untrack(() => editing?.populationMode ?? "all"));
 
   $effect(() => {
     if (!userHasEditedName) {
@@ -182,7 +185,7 @@
         if (name !== editing.name) {
           await playlistsStore.renamePlaylist(editing.id, name);
         }
-        await playlistsStore.updatePlaylistSpec(editing.id, specString, autoPlay);
+        await playlistsStore.updatePlaylistSpec(editing.id, specString, autoPlay, populationMode);
         collectionStore.closeSmartBuilder();
         collectionStore.viewPlaylist(editing.id);
         return;
@@ -190,7 +193,7 @@
 
       const playlist = await playlistsStore.createPlaylist(name);
       if (playlist && specString) {
-        await playlistsStore.updatePlaylistSpec(playlist.id, specString, autoPlay);
+        await playlistsStore.updatePlaylistSpec(playlist.id, specString, autoPlay, populationMode);
       }
       collectionStore.closeSmartBuilder();
       if (playlist) {
@@ -338,6 +341,12 @@
           <span class="text-xs font-semibold text-brand-text-primary block">Auto-Refill Batch Playback</span>
           <span class="text-[11px] text-brand-text-secondary/70">Automatically queue matching tracks as playback nears the end</span>
         </div>
+      </div>
+
+      <!-- Queue population mode tabs (#120): applied when this playlist (re)populates -->
+      <div class="flex items-center gap-3 pt-1">
+        <span class="text-xs font-semibold text-brand-text-primary shrink-0">{i18n.t("playlists.populationModeLabel")}</span>
+        <PopulationModeTabs mode={populationMode} onChange={(m) => (populationMode = m)} />
       </div>
 
       <!-- Footer Buttons -->

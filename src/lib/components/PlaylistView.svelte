@@ -158,6 +158,7 @@
       id: activePlaylist.id,
       name: activePlaylist.name,
       autoPlay: activePlaylist.auto_play ?? true,
+      populationMode: activePlaylist.population_mode ?? "all",
     });
   }
 

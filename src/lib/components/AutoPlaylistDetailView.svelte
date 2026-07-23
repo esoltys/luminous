@@ -11,8 +11,9 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
-  import type { PlaylistItem, Song } from "../types";
+  import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
   let { view }: { view: AutoPlaylistRef } = $props();
@@ -237,6 +238,29 @@
     await playlistsStore.setPlaylistAutoPlay(playlistId, !autoPlay);
   }
 
+  /** Derive the current queue population mode from the backing playlist row (#120). */
+  let populationMode = $derived.by((): QueuePopulationMode => {
+    if (playlistId === undefined) return "all";
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    return pl?.population_mode ?? "all";
+  });
+
+  let isChangingMode = $state(false);
+
+  async function handleChangePopulationMode(newMode: QueuePopulationMode) {
+    if (playlistId === undefined || newMode === populationMode || isChangingMode) return;
+    isChangingMode = true;
+    playerStore.clearExhausted(playlistId);
+    try {
+      await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
+      songs = await fetchSongs(kind, genre, decade, playlistId);
+    } catch (err) {
+      console.error("Failed to change queue population mode:", err);
+    } finally {
+      isChangingMode = false;
+    }
+  }
+
   let isRefreshing = $state(false);
 
   async function handleRefreshAutoPlaylist() {
@@ -455,6 +479,15 @@
                 <span class="absolute w-3 h-3 bg-white rounded-full shadow transition-transform duration-200 {autoPlay ? 'translate-x-4' : 'translate-x-0.5'}"></span>
               </span>
             </button>
+          {/if}
+
+          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+            <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
+            <PopulationModeTabs
+              mode={populationMode}
+              disabled={loading || isChangingMode}
+              onChange={handleChangePopulationMode}
+            />
           {/if}
         </div>
 

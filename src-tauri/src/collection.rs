@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, ScanPhase,
-        ScanProgress, Song, SongSource,
+        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, QueuePopulationMode,
+        ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -432,6 +432,72 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Same rule-query parsing as `search_songs`, but replaces the default
+    /// alphabetical ordering with `mode`'s weighted-random bias (see #120),
+    /// for populating a Smart Playlist that has a `population_mode` set.
+    /// `query` is expected to be a non-empty filter-rule string (as produced
+    /// from a playlist's `dynamic_spec`), not a blank/browse-all query.
+    pub fn search_songs_by_mode(
+        &self,
+        query: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+
+        let parsed = crate::filter_parser::parse_query(query.trim());
+
+        let mut where_clauses = vec!["unavailable = 0".to_string()];
+        if !extra_where.is_empty() {
+            where_clauses.push(extra_where.trim_start_matches(" AND ").to_string());
+        }
+        let mut query_params: Vec<Box<dyn ToSql>> = Vec::new();
+
+        if !parsed.bare_terms.is_empty() {
+            let bare_str = parsed.bare_terms.join(" ");
+            let fts_query = format!("{bare_str}*");
+            let like_query = format!("%{bare_str}%");
+
+            query_params.push(Box::new(fts_query));
+            let fts_param_idx = query_params.len();
+            query_params.push(Box::new(like_query));
+            let like_param_idx = query_params.len();
+
+            let bare_sql = format!(
+                "(id IN (SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?{fts_param_idx}) OR (title LIKE ?{like_param_idx} OR artist LIKE ?{like_param_idx} OR album LIKE ?{like_param_idx}))"
+            );
+            where_clauses.push(bare_sql);
+        }
+
+        for filter in parsed.field_filters {
+            query_params.push(Box::new(filter.value));
+            let param_idx = query_params.len();
+            let op_str = filter.op.to_sql();
+            let clause = format!("{} {} ?{}", filter.sql_column, op_str, param_idx);
+            where_clauses.push(clause);
+        }
+
+        query_params.push(Box::new(limit));
+        let limit_param_idx = query_params.len();
+
+        let where_str = where_clauses.join(" AND ");
+        let sql = format!(
+            "SELECT {} FROM songs WHERE {} ORDER BY {} LIMIT ?{}",
+            SONG_SELECT_COLS, where_str, order_by, limit_param_idx
+        );
+
+        let params_refs: Vec<&dyn ToSql> = query_params.iter().map(|p| p.as_ref()).collect();
+
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params_refs.as_slice(), row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(songs)
+    }
+
     /// Get all songs, optionally filtered by source.
     pub fn get_songs(&self, limit: i64, offset: i64) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
@@ -525,15 +591,23 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Highest-rated, most-played songs in a genre, for per-genre auto-playlists.
-    pub fn get_songs_by_genre(&self, genre: &str, limit: i64) -> Result<Vec<Song>> {
+    /// Songs in a genre, selected per `mode`'s bias (see #120), for per-genre
+    /// auto-playlists.
+    pub fn get_songs_by_genre(
+        &self,
+        genre: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
              WHERE genre = ?1
                AND source IN (1, 2)
                AND unavailable = 0
-             ORDER BY rating DESC, playcount DESC
+               {extra_where}
+             ORDER BY {order_by}
              LIMIT ?2",
             SONG_SELECT_COLS
         );
@@ -588,20 +662,28 @@ impl CollectionScanner {
         Ok(decades)
     }
 
-    /// Highest-rated, most-played songs in a decade (e.g. "1980s"), for per-decade auto-playlists.
-    pub fn get_songs_by_decade(&self, decade: &str, limit: i64) -> Result<Vec<Song>> {
+    /// Songs in a decade (e.g. "1980s"), selected per `mode`'s bias (see
+    /// #120), for per-decade auto-playlists.
+    pub fn get_songs_by_decade(
+        &self,
+        decade: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
         let (start, end) = match parse_decade_range(decade) {
             Some(range) => range,
             None => return Ok(Vec::new()),
         };
         let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
              WHERE COALESCE(year, originalyear) >= ?1
                AND COALESCE(year, originalyear) <= ?2
                AND source IN (1, 2)
                AND unavailable = 0
-             ORDER BY rating DESC, playcount DESC
+               {extra_where}
+             ORDER BY {order_by}
              LIMIT ?3",
             SONG_SELECT_COLS
         );
@@ -1095,7 +1177,7 @@ fn get_playlists_by_ids(
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play,
+        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play, p.population_mode,
                 p.last_played_row, p.created, p.updated,
                 (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
          FROM playlists p WHERE p.id IN ({placeholders})"
@@ -1109,10 +1191,15 @@ fn get_playlists_by_ids(
                 dynamic_enabled: row.get(2)?,
                 dynamic_spec: row.get(3)?,
                 auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                last_played_row: row.get(5)?,
-                created: row.get(6)?,
-                updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
-                track_count: row.get(8)?,
+                population_mode: QueuePopulationMode::from(
+                    row.get::<_, Option<String>>(5)?
+                        .unwrap_or_default()
+                        .as_str(),
+                ),
+                last_played_row: row.get(6)?,
+                created: row.get(7)?,
+                updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
+                track_count: row.get(9)?,
             };
             Ok((playlist.id, playlist))
         })?
@@ -1422,6 +1509,36 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
         ],
     )?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Queue population mode (#120) — weighted-random selection fragments
+// ---------------------------------------------------------------------------
+
+/// Extra `WHERE`-clause fragment and `ORDER BY` expression implementing a
+/// `QueuePopulationMode`'s bias. Spliced onto a base scope filter (genre,
+/// decade, or a Smart Playlist's own filter query) by `get_songs_by_genre`,
+/// `get_songs_by_decade`, and `search_songs_by_mode`. Binds no parameters of
+/// its own, so it's safe to splice into either positional (`?N`) SQL.
+///
+/// Ordering uses `RANDOM()` (uniform shuffle) for unweighted modes, and an
+/// `RANDOM() * weight` key for `Familiar`/`Discover` — a lightweight, easy-
+/// to-audit approximation of weighted random sampling: good enough to bias
+/// selection without returning the same deterministic block every time.
+fn mode_query_fragments(mode: QueuePopulationMode) -> (&'static str, &'static str) {
+    match mode {
+        QueuePopulationMode::All => ("", "RANDOM()"),
+        QueuePopulationMode::Favourites => (" AND rating >= 4", "RANDOM()"),
+        QueuePopulationMode::DeepCuts => (" AND (playcount = 0 OR lastplayed IS NULL)", "RANDOM()"),
+        QueuePopulationMode::Familiar => (
+            "",
+            "((ABS(RANDOM()) % 1000000) / 1000000.0) * (playcount + 1) DESC",
+        ),
+        QueuePopulationMode::Discover => (
+            " AND playcount > 0",
+            "((ABS(RANDOM()) % 1000000) / 1000000.0) * (1.0 / playcount) DESC",
+        ),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2089,9 +2206,128 @@ mod tests {
         let decades = scanner.get_library_decades().unwrap();
         assert_eq!(decades, vec!["1980s".to_string(), "1990s".to_string()]);
 
-        let songs_80s = scanner.get_songs_by_decade("1980s", 10).unwrap();
+        let songs_80s = scanner
+            .get_songs_by_decade("1980s", 10, QueuePopulationMode::All)
+            .unwrap();
         assert_eq!(songs_80s.len(), 1);
         assert_eq!(songs_80s[0].title.as_deref(), Some("80s Song"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Verifies each `QueuePopulationMode`'s WHERE-clause bias (see #120)
+    /// selects the correct subset of songs. Ordering is randomized by
+    /// design, so this only asserts set membership, not order.
+    #[test]
+    fn test_get_songs_by_genre_population_modes() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_population_mode_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let genre = "Test Genre";
+        let base = Song {
+            genre: Some(genre.to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+
+        // upsert_song() deliberately never touches rating/playcount/lastplayed
+        // (those are owned by the stats.rs write path, preserved across
+        // rescans) — so seed songs via upsert_song(), then set stats directly.
+        let seed =
+            |path: &str, title: &str, rating: f32, playcount: i32, lastplayed: Option<i64>| {
+                upsert_song(
+                    &conn,
+                    &Song {
+                        title: Some(title.to_string()),
+                        path: Some(path.to_string()),
+                        ..base.clone()
+                    },
+                )
+                .unwrap();
+                conn.execute(
+                    "UPDATE songs SET rating = ?1, playcount = ?2, lastplayed = ?3 WHERE path = ?4",
+                    params![rating, playcount, lastplayed, path],
+                )
+                .unwrap();
+            };
+
+        // Rated 5 stars, never played — should surface under Favourites, and
+        // under Deep Cuts (playcount = 0).
+        seed("/music/fav.mp3", "Fav", 5.0, 0, None);
+
+        // Heavily played, unrated — should surface under Discover (playcount > 0)
+        // but not Favourites or Deep Cuts.
+        seed(
+            "/music/familiar.mp3",
+            "Familiar",
+            0.0,
+            50,
+            Some(1_700_000_000),
+        );
+
+        // Lightly played, unrated — should surface under Discover, not
+        // Favourites or Deep Cuts.
+        seed(
+            "/music/discover.mp3",
+            "Discover",
+            0.0,
+            2,
+            Some(1_700_000_000),
+        );
+
+        // Never played, no lastplayed timestamp — should surface under Deep
+        // Cuts, not Favourites or Discover.
+        seed("/music/deepcut.mp3", "DeepCut", 0.0, 0, None);
+
+        // Played once, low rating — excluded from all three biased modes.
+        seed("/music/neutral.mp3", "Neutral", 2.0, 1, Some(1_700_000_000));
+
+        let scanner = CollectionScanner::new(db);
+
+        fn titles(mut songs: Vec<Song>) -> Vec<String> {
+            let mut out: Vec<String> = songs.drain(..).filter_map(|s| s.title).collect();
+            out.sort();
+            out
+        }
+
+        let all = scanner
+            .get_songs_by_genre(genre, 10, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(
+            titles(all),
+            vec!["DeepCut", "Discover", "Familiar", "Fav", "Neutral"]
+        );
+
+        let familiar = scanner
+            .get_songs_by_genre(genre, 10, QueuePopulationMode::Familiar)
+            .unwrap();
+        assert_eq!(
+            titles(familiar),
+            vec!["DeepCut", "Discover", "Familiar", "Fav", "Neutral"],
+            "Familiar biases order via weighting, not filtering"
+        );
+
+        let favourites = scanner
+            .get_songs_by_genre(genre, 10, QueuePopulationMode::Favourites)
+            .unwrap();
+        assert_eq!(titles(favourites), vec!["Fav"]);
+
+        let discover = scanner
+            .get_songs_by_genre(genre, 10, QueuePopulationMode::Discover)
+            .unwrap();
+        assert_eq!(titles(discover), vec!["Discover", "Familiar", "Neutral"]);
+
+        let deep_cuts = scanner
+            .get_songs_by_genre(genre, 10, QueuePopulationMode::DeepCuts)
+            .unwrap();
+        assert_eq!(titles(deep_cuts), vec!["DeepCut", "Fav"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
