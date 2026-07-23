@@ -108,7 +108,7 @@
 <button
   type="button"
   onclick={togglePulsing}
-  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full transition-shadow duration-300"
+  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate transition-shadow duration-300"
   title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
   aria-label={i18n.t('common.toggleLogoPulsing')}
 >
@@ -131,8 +131,9 @@
         <stop offset="100%" stop-color="var(--logo-stop-4, #ffcc00)" />
       </linearGradient>
 
-      <!-- Adaptive glow filter -->
-      <filter id="adaptiveGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <!-- Adaptive glow filter, region clamped to the logo's own bounding box
+           so blurred primitives can't be composited past the viewBox -->
+      <filter id="adaptiveGlow" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur stdDeviation="12" result="blur1" />
         <feGaussianBlur stdDeviation="4" result="blur2" />
         <feMerge>
@@ -193,6 +194,8 @@
 
 <style>
   svg {
+    overflow: hidden;
+    isolation: isolate;
     transition: filter 0.3s ease;
   }
 
