@@ -34,6 +34,7 @@ pub async fn apply_organize(
         &items,
         clean_empty_dirs,
         move_extra_files,
+        Some(&state.cover_manager),
     )
     .map_err(|e| e.to_string())?;
 

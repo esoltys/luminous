@@ -441,7 +441,7 @@ impl Player {
         self.current_item_uuid = Some(item.uuid.clone());
         self.current_index = Some(candidate);
 
-        if candidate > 0 && !self.played_indices.contains(&candidate) {
+        if !self.played_indices.contains(&candidate) {
             self.played_indices.push(candidate);
         }
 
@@ -1431,6 +1431,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         player.set_shuffle_mode(ShuffleMode::All);
+        player.set_repeat_mode(RepeatMode::Playlist);
         player.play_playlist(items, 0, 0, None).await.unwrap();
         let first_song_id = player.current_song.as_ref().unwrap().id;
 
