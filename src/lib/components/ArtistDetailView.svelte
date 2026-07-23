@@ -53,7 +53,7 @@
     ])
       .then(([fetchedSongs, fetchedPlaylists]) => {
         if (requested !== artistName) return;
-        songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+        songs = fetchedSongs;
         playlists = fetchedPlaylists;
       })
       .catch((err) => {
@@ -329,7 +329,6 @@
     artistName={album.artist || artistName}
     onPlay={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
       if (songs.length > 0) {
         const context: PlayContext = { type: "album", album: album.album || "", albumArtist: album.artist || undefined };
         playerStore.playSongs(songs.map(s => s.id), 0, undefined, context);
@@ -337,7 +336,6 @@
     }}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
       if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
         await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
       } else if (songs.length > 0) {

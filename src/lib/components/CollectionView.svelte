@@ -305,8 +305,6 @@
     let songs = await invoke<Song[]>("get_songs_by_album", {
       album: albumName,
     });
-    // Filter out excluded formats
-    songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
     if (songs.length > 0) {
       const songIds = songs.map((s) => s.id);
       playerStore.playSongs(songIds, 0);
@@ -803,7 +801,6 @@
     onPlay={() => handlePlayAlbum(album.album || "")}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      songs = songs.filter(s => !collectionStore.isFormatExcluded(s.filetype));
       if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
         await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
       } else if (songs.length > 0) {

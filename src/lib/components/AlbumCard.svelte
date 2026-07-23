@@ -38,7 +38,6 @@
       let songs = await invoke<Song[]>("get_songs_by_album", {
         album: album.album || "",
       });
-      songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
       if (songs.length > 0) {
         const songIds = songs.map((s) => s.id);
         playerStore.playSongs(songIds, 0, undefined, {
@@ -79,8 +78,6 @@
         let songs = await invoke<Song[]>("get_songs_by_album", {
           album: album.album || "",
         });
-
-        songs = songs.filter(song => !collectionStore.isFormatExcluded(song.filetype));
 
         if (songs.length > 0) {
           const songIds = songs.map((s) => s.id);

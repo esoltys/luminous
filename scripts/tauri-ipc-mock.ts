@@ -24,7 +24,6 @@ interface AppSettings {
   custom_themes: string;
   active_tab: string;
   active_sub_tab: string;
-  excluded_formats: string;
   [key: string]: string;
 }
 
@@ -111,7 +110,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     custom_themes: "[]",
     active_tab: "collection",
     active_sub_tab: "songs",
-    excluded_formats: "[]",
     language: mockDefaults.language || "en",
   };
 
