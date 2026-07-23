@@ -339,6 +339,16 @@ async function main() {
       await page.waitForTimeout(300);
       await page.getByRole("button", { name: "Advanced...", exact: true }).click();
       await page.waitForTimeout(400);
+    },
+    "type-search": async (page) => {
+      const searchInput = page.locator('input[placeholder*="Search"]');
+      await searchInput.focus();
+      await searchInput.fill("evan");
+      await page.waitForTimeout(400);
+    },
+    "toggle-miniplayer": async (page) => {
+      await page.keyboard.press("Control+m");
+      await page.waitForTimeout(400);
     }
   };
 

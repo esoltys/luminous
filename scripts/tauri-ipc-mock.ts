@@ -458,6 +458,18 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_songs: () => library.songs,
 
+    search_songs: (args) => {
+      const q = ((args.query as string) || "").toLowerCase().trim();
+      if (!q) return library.songs;
+      return library.songs.filter(
+        (s) =>
+          (s.title || "").toLowerCase().includes(q) ||
+          (s.artist || "").toLowerCase().includes(q) ||
+          (s.album || "").toLowerCase().includes(q) ||
+          (s.genre || "").toLowerCase().includes(q)
+      );
+    },
+
     get_recently_played: (args) => {
       const sorted = library.songs
         .filter((s) => s.lastplayed)
@@ -615,6 +627,24 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return null;
     },
 
+    get_install_format: () => ({
+      format: "exe",
+      human_name: "Windows Portable / Installer",
+      supports_self_update: true,
+    }),
+
+    get_fade_settings: () => ({
+      fade_pause_enabled: true,
+      fade_pause_duration_ms: 300,
+      crossfade_manual_enabled: true,
+      crossfade_manual_duration_ms: 1000,
+      crossfade_auto_enabled: false,
+      crossfade_auto_duration_secs: 3.0,
+      crossfade_suppress_same_album: true,
+    }),
+
+    "plugin:app|version": () => "0.90.0",
+
     "plugin:event|listen": (args) => {
       const event = args.event as string;
       const handler = args.handler as number;
@@ -636,6 +666,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "set_equalizer_enabled", "set_equalizer_preamp", "set_equalizer_band", "set_spectrum_enabled",
     "set_equalizer_mode", "set_parametric_band",
     "set_loudness_enabled", "set_loudness_target_lufs", "set_loudness_mode", "set_loudness_fallback_gain",
+    "set_fade_settings",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
