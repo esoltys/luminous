@@ -244,6 +244,26 @@ describe("Custom Theme Builder & ThemeStore", () => {
     expect(colors["bg-main"]).toBe("#2e3440");
     expect(colors["color-accent"]).toBe("#88c0d0");
   });
+
+  it("switching to Dynamic Artwork applies already-cached artwork colors immediately, not just on the next track change", async () => {
+    // Simulate a song already playing (and its colors already extracted)
+    // while some other theme is active — updateArtworkColors() caches
+    // artworkColors regardless of the active theme.
+    themeStore.activeThemeId = "nordic-blue";
+    themeStore.artworkColors = {
+      primary: "#123456",
+      sidebar: "#234567",
+      playerbar: "#345678",
+      accent: "#456789",
+      accentHover: "#56789a",
+      border: "#6789ab"
+    };
+
+    await themeStore.setTheme("dynamic-artwork");
+
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-primary")).toBe("#123456");
+    expect(document.documentElement.style.getPropertyValue("--color-artwork-accent")).toBe("#456789");
+  });
 });
 
 describe("Image Extraction Fallbacks", () => {

@@ -214,8 +214,15 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape" && isOpen) {
+    if (!isOpen) return;
+    if (e.key === "Escape") {
       onClose();
+    } else if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+      if (!canApply) return;
+      e.preventDefault();
+      handleApply();
     }
   }
 
@@ -315,10 +322,10 @@
         errorMessage = result.errors.join("; ");
       } else {
         successMessage = i18n.t("organizer.applySuccess", { count: result.moved_count });
-        setTimeout(() => {
-          onSuccess?.();
-          onClose();
-        }, 1200);
+        onSuccess?.();
+        // Leave the modal open so the user can see the result — refresh the
+        // preview to reflect the just-applied moves instead of auto-closing.
+        await fetchPreview();
       }
     } catch (err: any) {
       console.error("Failed to apply organize:", err);

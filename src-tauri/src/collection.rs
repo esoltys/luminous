@@ -180,31 +180,9 @@ impl CollectionScanner {
                     }
                 }
 
-                // Read tags
-                match read_tags(path) {
-                    Ok(mut song) => {
-                        if song.art_embedded {
-                            let artist = song
-                                .album_artist
-                                .as_deref()
-                                .unwrap_or(song.artist.as_deref().unwrap_or(""));
-                            let album = song.album.as_deref().unwrap_or("");
-                            if let Ok(Some(cached_filename)) =
-                                cover_manager.extract_embedded_art(path, artist, album)
-                            {
-                                song.art_automatic = Some(cached_filename);
-                                song.art_unset = false;
-                            }
-                        } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-                            song.art_automatic =
-                                Some(folder_art_path.to_string_lossy().to_string());
-                            song.art_unset = false;
-                        }
-                        upsert_song(&conn, &song)?;
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to read tags for {}: {e}", path.display());
-                    }
+                // Read tags, resolve art, and upsert
+                if let Err(e) = read_and_upsert_song(&conn, &cover_manager, path) {
+                    log::warn!("Failed to read tags for {}: {e}", path.display());
                 }
 
                 scanned += 1;
@@ -1230,6 +1208,49 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     Ok(song)
 }
 
+/// Reads tags for `path`, resolves embedded/folder cover art via `cover_manager`,
+/// and upserts the resulting row. `read_tags()` alone never populates
+/// `art_automatic` (only the `art_embedded` flag) — that cache lookup/write is
+/// a separate step, so any caller that skips it and upserts read_tags()'s
+/// output directly ends up nulling out an already-cached art_automatic via
+/// upsert_song()'s unconditional overwrite. Shared by the initial scan and
+/// the realtime file watcher so both keep it populated correctly.
+pub(crate) fn read_and_upsert_song(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    path: &Path,
+) -> Result<()> {
+    let mut song = read_tags(path)?;
+
+    if song.art_embedded {
+        let artist = song
+            .album_artist
+            .as_deref()
+            .unwrap_or(song.artist.as_deref().unwrap_or(""));
+        // A loose single (no album tag) has no release name to key the cache
+        // on — falling back to "" would hash every such single by the same
+        // artist to the identical cache filename, so the last one scanned
+        // silently overwrites the rest's cached art (#106). The title is the
+        // closest thing a single has to its own "release name".
+        let album = song
+            .album
+            .as_deref()
+            .filter(|a| !a.trim().is_empty())
+            .or(song.title.as_deref())
+            .unwrap_or("");
+        if let Ok(Some(cached_filename)) = cover_manager.extract_embedded_art(path, artist, album)
+        {
+            song.art_automatic = Some(cached_filename);
+            song.art_unset = false;
+        }
+    } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+        song.art_unset = false;
+    }
+
+    upsert_song(conn, &song)
+}
+
 /// Detect whether an MP3 file is VBR-encoded by looking for a Xing/Info/VBRI header
 /// in the first audio frame. "Xing" and "VBRI" mark true VBR; "Info" is the Xing
 /// encoder's own marker for CBR (see http://gabriel.mp3-tech.org/mp3infotag.html).
@@ -1533,6 +1554,12 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     std::thread::Builder::new()
         .name("luminous-watcher".to_string())
         .spawn(move || {
+            let cover_manager = app_clone
+                .path()
+                .app_data_dir()
+                .ok()
+                .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
+
             for event in rx {
                 if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     continue;
@@ -1573,8 +1600,11 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     } else if path.is_file() && is_audio_file(&path) {
                         log::info!("Watcher detected file addition/change: {}", path_str);
                         if let Ok(conn) = db_for_thread.pool.get() {
-                            if let Ok(song) = read_tags(&path) {
-                                let _ = upsert_song(&conn, &song);
+                            let result = match &cover_manager {
+                                Some(cm) => read_and_upsert_song(&conn, cm, &path),
+                                None => read_tags(&path).and_then(|song| upsert_song(&conn, &song)),
+                            };
+                            if result.is_ok() {
                                 let _ = app_clone.emit("library-changed", ());
                             }
                         }

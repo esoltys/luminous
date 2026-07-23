@@ -5,7 +5,7 @@
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getArtistGradient } from "../utils/artist";
+  import { getArtistGradient, formatTrackNumber } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
@@ -349,6 +349,24 @@
       }
     });
   });
+
+  // Best-effort per-release disc count from whatever tracks of that release
+  // are actually present in this auto-playlist — enough to tell whether a
+  // song's own disc-1 tracks should still get the "{disc}-{track}" prefix
+  // (see formatTrackNumber()) without a dedicated per-album lookup.
+  let releaseDiscCounts = $derived.by(() => {
+    const map = new Map<string, number>();
+    for (const s of songs) {
+      const key = `${s.album_artist?.trim() || s.artist?.trim() || ""}::${s.album ?? ""}`;
+      map.set(key, Math.max(map.get(key) ?? 1, s.disc ?? 1));
+    }
+    return map;
+  });
+
+  function discCountFor(song: Song): number {
+    const key = `${song.album_artist?.trim() || song.artist?.trim() || ""}::${song.album ?? ""}`;
+    return releaseDiscCounts.get(key) ?? 1;
+  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full">
@@ -459,7 +477,7 @@
     </div>
   </div>
 
-  <div class="px-6 md:px-8 py-6" class:pb-24={!!playerStore.currentSong}>
+  <div class="px-6 md:px-8 py-6" class:pb-28={!!playerStore.currentSong}>
     <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
       <table class="w-full text-left text-sm border-collapse min-w-[800px]">
         <thead>
@@ -517,8 +535,8 @@
                 class="border-b border-brand-border/40 group transition-all duration-150 select-none cursor-pointer
                   {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-12 relative">
-                  <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
+                <td class="py-2.5 px-4 text-center text-brand-text-secondary/50 font-medium w-14 relative">
+                  <div class="relative w-9 h-4 mx-auto flex items-center justify-center">
                     {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                       <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                         <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
@@ -526,8 +544,8 @@
                         <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
                       </div>
                     {:else}
-                      <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
-                        {song.track !== undefined && song.track !== null ? song.track : index + 1}
+                      <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity whitespace-nowrap">
+                        {formatTrackNumber(song.track, song.disc, discCountFor(song), index)}
                       </span>
                     {/if}
                     <button

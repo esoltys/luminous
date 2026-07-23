@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Sliders, Save, X, LoaderCircle } from "lucide-svelte";
+  import { Sliders, Save, X, LoaderCircle, Layers } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
@@ -47,7 +47,21 @@
       isSaving = false;
     }
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      props.onClose();
+    } else if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
+      if (isSaving) return;
+      e.preventDefault();
+      handleSave();
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div use:portal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col text-brand-text-primary">
@@ -66,10 +80,9 @@
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       <div class="flex flex-col gap-4">
         <!-- Tracks badge -->
-        <div class="flex flex-col gap-1 bg-brand-main border border-brand-border rounded-lg p-2.5">
-          <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono tracking-wide">
-            {i18n.t('albumTagEditor.tracksAffected', { count: props.songIds.length })}
-          </span>
+        <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-lg px-3 py-2.5 text-xs font-medium text-brand-text-secondary">
+          <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+          <span>{i18n.t('albumTagEditor.tracksAffected', { count: props.songIds.length })}</span>
         </div>
 
         <!-- Form fields -->

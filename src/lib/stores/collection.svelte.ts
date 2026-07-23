@@ -18,6 +18,7 @@ export interface VisibleColumns {
   genre: boolean;
   rating: boolean;
   playcount: boolean;
+  skipcount: boolean;
   lastplayed: boolean;
   duration: boolean;
 }
@@ -79,6 +80,7 @@ class CollectionStore {
         path: false,
         genre: false,
         playcount: false,
+        skipcount: false,
         lastplayed: false,
       };
       if (typeof window !== "undefined") {
@@ -391,6 +393,20 @@ class CollectionStore {
           });
           this.refreshStats();
           this.refreshLibrary();
+
+          // Genre/decade auto-playlists otherwise only regenerate on their own
+          // 24h staleness window (or whenever the Playlists tab happens to
+          // mount) — a scan can add new genres/decades or shift which songs
+          // qualify, so rebuild them right away instead of leaving them stale.
+          (async () => {
+            try {
+              await invoke("sync_genre_auto_playlists");
+              await invoke("sync_decade_auto_playlists");
+              await playlistsStore.refreshPlaylists();
+            } catch (err) {
+              console.error("Failed to sync auto-playlists after scan:", err);
+            }
+          })();
         }
       });
 

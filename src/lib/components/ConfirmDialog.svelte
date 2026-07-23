@@ -19,7 +19,20 @@
     onConfirm: () => void;
     onCancel: () => void;
   } = $props();
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      onCancel();
+    } else if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "BUTTON") return;
+      e.preventDefault();
+      onConfirm();
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div use:portal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
   <div class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col text-brand-text-primary">

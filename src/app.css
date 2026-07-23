@@ -123,6 +123,61 @@
   background-color: var(--glass-bg-playerbar) !important;
 }
 
+/*
+ * Themed <input type="range"> track + thumb. `accent-color` alone (via the
+ * accent-brand-accent utility) can't paint a distinctly-colored "filled"
+ * portion once `appearance: none` replaces native track rendering — without
+ * this, the whole track renders as one flat low-contrast color with only the
+ * thumb showing the accent. Pair this class with an inline
+ * `background: linear-gradient(...)` (computed from value/min/max) for the
+ * actual fill; this only supplies the thumb + track shape, matching
+ * PlayerBar's volume slider.
+ */
+.themed-range {
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.15s ease;
+}
+
+.themed-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--color-accent);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s, border-color 0.2s;
+}
+
+.themed-range:not(:disabled)::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  border-color: var(--color-accent-hover);
+}
+
+.themed-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s, border-color 0.2s;
+}
+
+.themed-range:not(:disabled)::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  border-color: var(--color-accent-hover);
+}
+
+.themed-range:disabled::-webkit-slider-thumb,
+.themed-range:disabled::-moz-range-thumb {
+  border-color: var(--color-border);
+}
+
 
 
 
