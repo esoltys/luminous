@@ -1,5 +1,5 @@
 ---
-version: 0.67
+version: 0.90
 name: Luminous
 description: >
   Dark-first desktop music player UI. Tokens below describe the default
@@ -123,7 +123,7 @@ Luminous is a dense, dark-first desktop music player (Tauri v2 + Svelte 5 Runes)
 
 The UI is built almost entirely from panels: a collapsible **Sidebar**, a **TopNavigation** ribbon, the main content canvas, a multi-tab **RightPanel** (Synced Lyrics, Queue Drawer, Liner Notes), and a persistent **PlayerBar** transport dock. All chrome and content surfaces read colors exclusively from CSS custom properties (`--bg-main`, `--color-accent`, etc., wired through `@theme` in `src/app.css`) rather than literal hex values in components — enabling seamless runtime theme switching and dynamic artwork color extraction.
 
-Theming is **not static**: users can switch between several built-in themes (Luminous, Ruby Red, Nordic Blue, Retro Amber, System light/dark), derive themes dynamically from playing cover art, or build a custom theme in the in-app Custom Theme Builder (`DesignTools.svelte`). Every theme is generated or validated against a **WCAG AA 4.5:1 contrast guarantee** between accent and background (`clampForContrast()` / `generatePaletteFromSeed()` in `src/lib/utils/colorUtils.ts`). This document describes the shipped default theme; treat its *structure and rules* (spacing, radii, elevation approach, contrast discipline) as normative for new UI.
+Theming is **not static**: users can switch between several built-in themes (Luminous, Ruby Red, Nordic Blue, Retro Amber, System light/dark, Dynamic Artwork), derive themes dynamically from playing cover art, or build a custom theme in the in-app Custom Theme Builder (Settings → Themes tab, in `FoldersView.svelte`; the previous standalone `DesignTools.svelte` panel was folded into Settings). Every theme is generated or validated against a **WCAG AA 4.5:1 contrast guarantee** between accent and background (`clampForContrast()` / `generatePaletteFromSeed()` in `src/lib/utils/colorUtils.ts`). This document describes the shipped default theme; treat its *structure and rules* (spacing, radii, elevation approach, contrast discipline) as normative for new UI.
 
 ## Colors
 
@@ -181,7 +181,7 @@ Luminous is largely **flat**: hierarchy comes from background tone steps (`bg-ma
 - `shadow-sm`/`shadow-xs` mark subtle resting state on interactive chrome.
 - `shadow-md`/`shadow-lg` mark active/hover elevation, tinted with the accent color (`shadow-brand-accent/20`, `shadow-brand-accent/10`) for a soft accent glow.
 - `shadow-xl`/`shadow-2xl` mark modal-like overlays (`TagEditor`, `SmartPlaylistModal`) and hero album art.
-- **Glassmorphism surface**: Applied via `.glass-surface` (`backdrop-filter: blur(20px) saturate(180%)`) when the System auto-theme is active.
+- **Glassmorphism surface**: Applied via `.glass-surface` (`backdrop-filter: blur(20px) saturate(180%)`) on all chrome panels (Sidebar, TopNavigation, RightPanel, PlayerBar, Miniplayer). This is no longer System-theme-exclusive — every theme now gets the glass treatment (`themeStore.isGlassTheme` is unconditionally `true`), with the `--glass-*` custom properties recomputed per-theme from that theme's own resolved hex colors.
 
 ## Shapes
 
@@ -209,5 +209,6 @@ Rounded corners scale with component visual weight:
 - Do use `accent-text` (contrast-clamped token), not raw `accent`, for text/icons sitting directly on `bg-main`/`bg-sidebar` to guarantee WCAG AA compliance.
 - Do tint elevation shadows with the accent color on interactive elements.
 - Do reserve `rounded-full` for circular controls and pill chips — avoid using it on rectangular cards or panels.
+- Do use full-strength `text-brand-text-secondary` for metadata/captions — never dilute it with opacity modifiers (`/40`–`/90`). An accessibility audit swept these out app-wide because diluted secondary text failed contrast checks; `border` opacity modifiers are unaffected and remain the normal pattern.
 - Don't introduce a second typeface; hierarchy comes strictly from size and weight.
-- Don't add heavy drop shadows to flat chrome panels outside of the System theme's glass treatment.
+- Don't add heavy drop shadows to flat chrome panels beyond the standard glass treatment (now applied to all themes, not just System).
