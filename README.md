@@ -91,8 +91,20 @@ You can download the latest installers and portable binaries directly from the G
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
         </td>
     </tr>
+    <tr>
+    	<td width="50%" align="center">
+            <h4>Miniplayer</h4>
+            <img src="docs/screenshots/miniplayer.png" width="66%" height="66%" alt="Miniplayer" />
+        </td>
+        <td width="50%" align="center">
+            <h4>Miniplayer (Hover)</h4>
+            <img src="docs/screenshots/miniplayer-hover.png" width="66%" height="66%" alt="Miniplayer (Hover)" />
+        </td>
+    </tr>
   </table>
 </div>
+
+
 
 
 
