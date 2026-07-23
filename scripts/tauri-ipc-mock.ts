@@ -300,6 +300,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
                 art_embedded: song.art_embedded,
                 art_automatic: song.art_automatic ?? null,
                 art_manual: song.art_manual ?? null,
+                genre: song.genre ?? null,
               },
             });
           }

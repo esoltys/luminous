@@ -217,6 +217,7 @@ export interface AlbumItem {
   art_embedded: boolean;
   art_automatic: string | null;
   art_manual: string | null;
+  genre?: string | null;
 }
 
 export interface ArtistItem {

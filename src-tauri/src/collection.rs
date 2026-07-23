@@ -632,7 +632,16 @@ impl CollectionScanner {
                 MAX(COALESCE(disc, 1)) AS disc_count,
                 MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
                 MAX(art_automatic) AS art_automatic,
-                MAX(art_manual) AS art_manual
+                MAX(art_manual) AS art_manual,
+                (
+                    SELECT genre
+                    FROM songs g
+                    WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
+                      AND g.genre IS NOT NULL AND g.genre != ''
+                    GROUP BY genre
+                    ORDER BY COUNT(*) DESC, genre ASC
+                    LIMIT 1
+                ) AS genre
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
@@ -649,6 +658,7 @@ impl CollectionScanner {
                     "art_embedded": row.get::<_, bool>(5)?,
                     "art_automatic": row.get::<_, Option<String>>(6)?,
                     "art_manual": row.get::<_, Option<String>>(7)?,
+                    "genre": row.get::<_, Option<String>>(8)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -960,6 +970,7 @@ fn group_songs_into_home_items(
                             art_embedded: song.art_embedded,
                             art_automatic: song.art_automatic.clone(),
                             art_manual: song.art_manual.clone(),
+                            genre: song.genre.clone(),
                         },
                     });
                 }
@@ -1065,6 +1076,7 @@ fn home_item_for_context(
                     art_embedded: song.art_embedded,
                     art_automatic: song.art_automatic.clone(),
                     art_manual: song.art_manual.clone(),
+                    genre: song.genre.clone(),
                 },
             }
         }

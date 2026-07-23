@@ -36,6 +36,7 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
     art_embedded: false,
     art_automatic: null,
     art_manual: null,
+    genre: "Rock",
     ...overrides,
   };
 }
@@ -76,11 +77,21 @@ describe("HomeRowList.svelte", () => {
 
     expect(getByText("Full Moon Fever")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    // 12 tracks, 1 disc -> "Album" category label fills the trailing slot.
+    // 12 tracks, 1 disc -> "Album" category label fills the trailing slot,
+    // with the album's genre shown below it.
     expect(getByText("Album")).toBeInTheDocument();
+    expect(getByText("Rock")).toBeInTheDocument();
     // No song rating control (heart/star) for album-grouped rows.
     expect(container.querySelector('[aria-pressed]')).not.toBeInTheDocument();
     expect(container.querySelector('[aria-label="Rating"]')).not.toBeInTheDocument();
+  });
+
+  it("omits the genre line for albums with no genre", () => {
+    const items: HomeItem[] = [{ type: "album", album: makeAlbum({ genre: null }) }];
+    const { getByText, queryByText } = render(HomeRowList, { props: { items, variant: "rank" } });
+
+    expect(getByText("Album")).toBeInTheDocument();
+    expect(queryByText("Rock")).not.toBeInTheDocument();
   });
 
   it("renders playlist rows using the playlist name and track count", () => {

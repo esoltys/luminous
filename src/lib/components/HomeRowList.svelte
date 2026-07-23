@@ -63,6 +63,11 @@
       : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
   }
 
+  function genreFor(item: HomeItem): string {
+    if (item.type !== "album") return "";
+    return item.album.genre || "";
+  }
+
   // Mirrors CarouselCard's openPlaylist: genre/decade auto-playlists open in
   // AutoPlaylistDetailView, custom playlists (including Smart Playlists) in
   // the regular PlaylistView.
@@ -181,9 +186,12 @@
           <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
         {/if}
 
-        <span class="shrink-0 max-w-24 text-right text-xs text-brand-text-secondary font-medium tabular-nums truncate">
-          {trailingLabel(item)}
-        </span>
+        <div class="shrink-0 max-w-28 text-right">
+          <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
+          {#if genreFor(item)}
+            <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
+          {/if}
+        </div>
       </div>
     {/each}
 
