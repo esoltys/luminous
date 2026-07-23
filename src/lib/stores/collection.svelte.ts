@@ -283,6 +283,12 @@ class CollectionStore {
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
   isMiniplayer = $state<boolean>(false);
+  // Guards enter/exitMiniplayerMode against overlapping calls: isMiniplayer
+  // flips synchronously, but the window resize/decoration IPC round-trip it
+  // guards is async, so a second toggle fired before that round-trip
+  // resolves would read the window mid-transition and set a wrong "current
+  // size" baseline — compounding into runaway growth on rapid toggling.
+  private miniplayerTransitionInFlight = false;
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
   miniplayerWidth = $state<number>(300);
@@ -615,7 +621,8 @@ class CollectionStore {
   }
 
   async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight) {
-    if (this.isMiniplayer) return;
+    if (this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+    this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
     try {
       const res = await invoke<{ saved_width: number; saved_height: number }>("enter_miniplayer_mode", { width, height });
@@ -625,6 +632,8 @@ class CollectionStore {
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
+    } finally {
+      this.miniplayerTransitionInFlight = false;
     }
   }
 
@@ -638,7 +647,8 @@ class CollectionStore {
   }
 
   async exitMiniplayerMode() {
-    if (!this.isMiniplayer) return;
+    if (!this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+    this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = false;
     try {
       const res = await invoke<{ mini_width: number; mini_height: number }>("exit_miniplayer_mode", {
@@ -650,6 +660,8 @@ class CollectionStore {
       }
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
+    } finally {
+      this.miniplayerTransitionInFlight = false;
     }
   }
 

@@ -281,6 +281,41 @@ describe("CollectionStore", () => {
     await collectionStore.exitMiniplayerMode();
   });
 
+  it("blocks exitMiniplayerMode while a prior enterMiniplayerMode call is still in flight", async () => {
+    // Rapid back-and-forth toggling (e.g. holding Ctrl+M) could otherwise let
+    // exit start reading/resizing the window before enter's own resize IPC
+    // call has resolved, corrupting the captured "current size" baseline and
+    // compounding into runaway growth on repeated toggles.
+    let resolveEnter: (value: unknown) => void = () => {};
+    const pendingEnter = new Promise((resolve) => {
+      resolveEnter = resolve;
+    });
+    let exitCallCount = 0;
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "enter_miniplayer_mode") return pendingEnter;
+      if (cmd === "exit_miniplayer_mode") {
+        exitCallCount++;
+        return { mini_width: 300, mini_height: 360 };
+      }
+      return null;
+    });
+
+    const enterCall = collectionStore.enterMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(true);
+
+    await collectionStore.exitMiniplayerMode();
+    expect(exitCallCount).toBe(0);
+    expect(collectionStore.isMiniplayer).toBe(true);
+
+    resolveEnter({ saved_width: 1280, saved_height: 800 });
+    await enterCall;
+
+    await collectionStore.exitMiniplayerMode();
+    expect(exitCallCount).toBe(1);
+    expect(collectionStore.isMiniplayer).toBe(false);
+  });
+
   it("manages recent searches state, deduplication, and persistence", () => {
     collectionStore.clearRecentSearches();
     expect(collectionStore.recentSearches).toHaveLength(0);
