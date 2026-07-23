@@ -403,6 +403,7 @@
             onclick={() => collectionStore.startScan(false)}
             disabled={collectionStore.isScanning}
             class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-brand-accent/10 cursor-pointer disabled:opacity-50"
+            title={i18n.t('settings.incrementalRescanHint')}
           >
             <RefreshCw class="w-4 h-4" />
             {i18n.t('settings.incrementalRescanBtn')}

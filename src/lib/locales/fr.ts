@@ -217,6 +217,7 @@ export const fr = {
     phaseUpdating: "Mise à jour de la bibliothèque",
     phaseDone: "Terminé",
     incrementalRescanBtn: "Réanalyser la bibliothèque",
+    incrementalRescanHint: "Analyse les dossiers surveillés à la recherche de fichiers nouveaux, modifiés ou supprimés, en ignorant ceux dont la date de modification n'a pas changé",
     forceFullScanBtn: "Forcer la réanalyse complète",
     forceFullScanHint: "Relit les métadonnées et pochette de tous les fichiers audio sans tenir compte des dates de modification",
     pruneMissingBtn: "Nettoyer les chansons manquantes",

@@ -217,6 +217,7 @@ export const en = {
     phaseUpdating: "Updating Library",
     phaseDone: "Done",
     incrementalRescanBtn: "Rescan Library",
+    incrementalRescanHint: "Scans watched folders for new, changed, or removed files, skipping anything whose modification time hasn't changed",
     forceFullScanBtn: "Force Full Re-Scan",
     forceFullScanHint: "Re-reads metadata and artwork for all audio files, ignoring file modification times",
     pruneMissingBtn: "Clean Up Missing Songs",
