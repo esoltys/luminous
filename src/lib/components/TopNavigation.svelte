@@ -264,11 +264,6 @@
           : i18n.t('sidebar.manageLibrary')}
       >
         <RefreshCw class="w-4 h-4 {collectionStore.isScanning ? 'animate-spin text-brand-accent-text' : ''}" />
-        {#if collectionStore.isScanning}
-          <span class="text-[10px] text-brand-accent-text font-mono font-medium">
-            {collectionStore.scanProgress?.scanned || 0}/{collectionStore.scanProgress?.total || 0}
-          </span>
-        {/if}
       </button>
 
       <!-- Open Files/Playlists button -->
