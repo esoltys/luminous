@@ -38,7 +38,15 @@ pub async fn exit_miniplayer_mode(
     window: WebviewWindow,
     saved_width: Option<f64>,
     saved_height: Option<f64>,
-) -> Result<(), String> {
+) -> Result<serde_json::Value, String> {
+    // Capture the miniplayer's actual current size before restoring the full
+    // window — this reflects whatever the user resized it to, whether via
+    // the native OS resize handle or the manual pointer-drag fallback.
+    let current_size = window.outer_size().map_err(|e| e.to_string())?;
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let mini_width = current_size.width as f64 / scale_factor;
+    let mini_height = current_size.height as f64 / scale_factor;
+
     let restore_w = saved_width.unwrap_or(1280.0);
     let restore_h = saved_height.unwrap_or(800.0);
 
@@ -53,7 +61,10 @@ pub async fn exit_miniplayer_mode(
         height: restore_h,
     }));
 
-    Ok(())
+    Ok(serde_json::json!({
+        "mini_width": mini_width,
+        "mini_height": mini_height
+    }))
 }
 
 #[tauri::command]

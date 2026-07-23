@@ -247,16 +247,29 @@ describe("CollectionStore", () => {
     expect(collectionStore.immersiveMode).toBe(false);
   });
 
-  it("remembers a manually resized miniplayer size across enter/exit", async () => {
-    collectionStore.setMiniplayerSize(420, 480);
-    expect(collectionStore.miniplayerWidth).toBe(420);
-    expect(collectionStore.miniplayerHeight).toBe(480);
-    expect(localStorage.getItem("layout_miniplayerWidth")).toBe("420");
-    expect(localStorage.getItem("layout_miniplayerHeight")).toBe("480");
+  it("captures the miniplayer's actual resized size on exit and reuses it on next enter", async () => {
+    // Simulates a resize done via the native OS resize handle, which the
+    // frontend can't observe through pointer events — exit_miniplayer_mode
+    // reports the real window size instead.
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "enter_miniplayer_mode") return { saved_width: 1280, saved_height: 800 };
+      if (cmd === "exit_miniplayer_mode") return { mini_width: 500, mini_height: 540 };
+      return null;
+    });
+
+    await collectionStore.enterMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(true);
+
+    await collectionStore.exitMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(false);
+    expect(collectionStore.miniplayerWidth).toBe(500);
+    expect(collectionStore.miniplayerHeight).toBe(540);
+    expect(localStorage.getItem("layout_miniplayerWidth")).toBe("500");
+    expect(localStorage.getItem("layout_miniplayerHeight")).toBe("540");
 
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "enter_miniplayer_mode") {
-        expect(args).toEqual({ width: 420, height: 480 });
+        expect(args).toEqual({ width: 500, height: 540 });
         return { saved_width: 1280, saved_height: 800 };
       }
       return null;
@@ -266,7 +279,6 @@ describe("CollectionStore", () => {
     expect(collectionStore.isMiniplayer).toBe(true);
 
     await collectionStore.exitMiniplayerMode();
-    expect(collectionStore.isMiniplayer).toBe(false);
   });
 
   it("manages recent searches state, deduplication, and persistence", () => {

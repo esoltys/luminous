@@ -641,10 +641,13 @@ class CollectionStore {
     if (!this.isMiniplayer) return;
     this.isMiniplayer = false;
     try {
-      await invoke("exit_miniplayer_mode", {
+      const res = await invoke<{ mini_width: number; mini_height: number }>("exit_miniplayer_mode", {
         savedWidth: this.savedWindowWidth,
         savedHeight: this.savedWindowHeight
       });
+      if (res && res.mini_width && res.mini_height) {
+        this.setMiniplayerSize(res.mini_width, res.mini_height);
+      }
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
     }
