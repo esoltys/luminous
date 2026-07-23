@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 10;
+const CURRENT_SCHEMA_VERSION: i32 = 11;
 
 #[derive(Debug)]
 pub struct Database {
@@ -151,6 +151,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![10],
+            )?;
+        }
+
+        if version < 11 {
+            log::info!("Running migration 11: drop unused excluded_formats setting");
+            conn.execute_batch(MIGRATION_11)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![11],
             )?;
         }
 
@@ -433,6 +442,16 @@ CREATE TABLE IF NOT EXISTS play_history (
     played_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at DESC);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 11: drop the excluded_formats app_state row — the File Formats
+// settings tab that wrote it was removed; all supported formats are always
+// included now (#109).
+// ---------------------------------------------------------------------------
+
+const MIGRATION_11: &str = "
+DELETE FROM app_state WHERE key = 'excluded_formats';
 ";
 
 #[cfg(test)]

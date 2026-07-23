@@ -12,7 +12,7 @@
   import DesignTools from "./DesignTools.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "formats" | "about">("general");
+  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
   let showOrganizeModal = $state(false);
@@ -76,7 +76,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "formats" || savedTab === "about") {
+        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
           settingsTab = savedTab;
         }
       }
@@ -265,12 +265,6 @@
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabEqualizer')}
-      </button>
-      <button
-        onclick={() => { settingsTab = "formats"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'formats' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-      >
-        {i18n.t('settings.tabFormats')}
       </button>
       <button
         onclick={() => { settingsTab = "about"; }}
@@ -774,36 +768,6 @@
       <!-- Equalizer Section -->
       <div class="space-y-6">
         <Equalizer />
-      </div>
-    {:else if settingsTab === "formats"}
-      <!-- File Formats Filter Section -->
-      <div class="space-y-6">
-        <div>
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.formatsTitle')}</h3>
-          <p class="text-xs text-brand-text-secondary/60 mb-4">{i18n.t('settings.formatsSubtitle')}</p>
-          
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {#each ["MP3", "FLAC", "WAV", "AAC", "ALAC", "OGG", "AIFF", "APE"] as format}
-              {@const isChecked = !collectionStore.excludedFormats.includes(format)}
-              <button
-                onclick={() => collectionStore.toggleFormat(format)}
-                class="bg-brand-sidebar/40 border rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:border-brand-accent/40 cursor-pointer w-full text-left {isChecked ? 'border-brand-accent bg-brand-sidebar/60' : 'border-brand-border'}"
-              >
-                <div class="flex flex-col">
-                  <span class="font-semibold text-sm text-brand-text-primary">{format}</span>
-                  <span class="text-[10px] text-brand-text-secondary/50 mt-0.5">
-                    {isChecked ? i18n.t('settings.enabled') : i18n.t('settings.excluded')}
-                  </span>
-                </div>
-                <div class="w-5 h-5 rounded border flex items-center justify-center transition-colors {isChecked ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast' : 'border-brand-border bg-black/10'}">
-                  {#if isChecked}
-                    <Check class="w-3 h-3 stroke-[3]" />
-                  {/if}
-                </div>
-              </button>
-            {/each}
-          </div>
-        </div>
       </div>
     {:else if settingsTab === "about"}
       <!-- About & Credits Section -->

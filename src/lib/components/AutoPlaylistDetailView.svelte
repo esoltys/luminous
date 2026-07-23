@@ -162,7 +162,7 @@
     fetchSongs(k, g, d, pid)
       .then((fetchedSongs) => {
         if (kind !== k || genre !== g || decade !== d || playlistId !== pid) return;
-        songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+        songs = fetchedSongs;
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);
@@ -245,8 +245,7 @@
     playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      const fetchedSongs = await fetchSongs(kind, genre, decade, playlistId);
-      songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+      songs = await fetchSongs(kind, genre, decade, playlistId);
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -263,7 +262,7 @@
     loading = true;
     fetchSongs(kind, genre, decade, playlistId)
       .then((fetchedSongs) => {
-        songs = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+        songs = fetchedSongs;
       })
       .catch((err) => console.error(err))
       .finally(() => (loading = false));

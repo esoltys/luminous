@@ -46,7 +46,7 @@ describe("CollectionStore", () => {
             { name: "Jazz Quartet", album_count: 1, song_count: 5 }
           ];
         case "get_all_app_settings":
-          return { excluded_formats: JSON.stringify(["FLAC"]) };
+          return {};
         case "search_songs":
           if (args?.query === "Rock") {
             return [{ id: 1, title: "Rock Track 1", artist: "Rock Band", album: "Rock Album", filetype: "MP3" }];
@@ -128,39 +128,6 @@ describe("CollectionStore", () => {
 
     await collectionStore.search("");
     expect(collectionStore.searchResults).toHaveLength(0);
-  });
-
-  it("filters songs based on format exclusions", () => {
-    collectionStore.songs = [
-      { id: 1, title: "Song 1", filetype: "MP3" } as Song,
-      { id: 2, title: "Song 2", filetype: "FLAC" } as Song,
-      { id: 3, title: "Song 3", filetype: "OGG_VORBIS" } as Song
-    ];
-
-    collectionStore.excludedFormats = ["FLAC"];
-    expect(collectionStore.isFormatExcluded("FLAC")).toBe(true);
-    expect(collectionStore.isFormatExcluded("MP3")).toBe(false);
-
-    let filtered = collectionStore.filteredSongs;
-    expect(filtered).toHaveLength(2);
-    expect(filtered.some(s => s.filetype === "FLAC")).toBe(false);
-
-    collectionStore.excludedFormats = ["OGG"];
-    expect(collectionStore.isFormatExcluded("OGG_VORBIS")).toBe(true);
-  });
-
-  it("toggles excluded formats and persists setting", async () => {
-    collectionStore.excludedFormats = ["MP3"];
-
-    await collectionStore.toggleFormat("FLAC");
-    expect(collectionStore.excludedFormats).toEqual(["MP3", "FLAC"]);
-    expect(invoke).toHaveBeenCalledWith("set_app_setting", {
-      key: "excluded_formats",
-      value: JSON.stringify(["MP3", "FLAC"])
-    });
-
-    await collectionStore.toggleFormat("MP3");
-    expect(collectionStore.excludedFormats).toEqual(["FLAC"]);
   });
 
   it("filters albums and artists by search query", () => {

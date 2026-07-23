@@ -58,7 +58,6 @@ class CollectionStore {
   });
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
-  excludedFormats = $state<string[]>([]);
 
   // Cached collections
   songs = $state<Song[]>([]);
@@ -364,16 +363,9 @@ class CollectionStore {
       await this.refreshStats();
       await this.refreshLibrary();
 
-      // Load excluded formats and scanning settings from backend settings
+      // Load scanning settings from backend settings
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings) {
-        if (settings.excluded_formats) {
-          try {
-            this.excludedFormats = JSON.parse(settings.excluded_formats);
-          } catch (e) {
-            console.error("Failed to parse excluded_formats:", e);
-          }
-        }
         if (settings.watch_folders_realtime !== undefined) {
           this.watchFoldersRealtime = settings.watch_folders_realtime !== "false";
         }
@@ -589,30 +581,6 @@ class CollectionStore {
     this.selectedAutoPlaylist = ref;
   }
 
-  isFormatExcluded(filetype: string): boolean {
-    const ft = (filetype || "").toUpperCase();
-    for (const excluded of this.excludedFormats) {
-      if (excluded === "OGG" && ft.startsWith("OGG_")) {
-        return true;
-      }
-      if (ft === excluded) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  async toggleFormat(format: string) {
-    if (this.excludedFormats.includes(format)) {
-      this.excludedFormats = this.excludedFormats.filter(f => f !== format);
-    } else {
-      this.excludedFormats.push(format);
-    }
-    await invoke("set_app_setting", { key: "excluded_formats", value: JSON.stringify(this.excludedFormats) }).catch(err => {
-      console.error("Failed to save excluded_formats:", err);
-    });
-  }
-
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
     if (typeof window !== "undefined") {
@@ -696,8 +664,7 @@ class CollectionStore {
   }
 
   get filteredSongs(): Song[] {
-    let result = this.searchQuery.trim() === "" ? this.songs : this.searchResults;
-    return result.filter(song => !this.isFormatExcluded(song.filetype));
+    return this.searchQuery.trim() === "" ? this.songs : this.searchResults;
   }
 
   get filteredAlbums(): AlbumItem[] {

@@ -186,7 +186,6 @@ async function main() {
         custom_themes: "[]",
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
-        excluded_formats: "[]",
         language: "${language}"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};

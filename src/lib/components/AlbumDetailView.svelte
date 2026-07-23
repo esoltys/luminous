@@ -171,7 +171,7 @@
     invoke<Song[]>("get_songs_by_album", { album: requested })
       .then((fetchedSongs) => {
         if (requested !== albumName) return;
-        let filtered = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+        let filtered = [...fetchedSongs];
         // Sort by disc, then by track
         filtered.sort((a, b) => {
           if (a.disc !== b.disc) {
@@ -293,7 +293,7 @@
     loading = true;
     invoke<Song[]>("get_songs_by_album", { album: albumName })
       .then((fetchedSongs) => {
-        let filtered = fetchedSongs.filter((s) => !collectionStore.isFormatExcluded(s.filetype));
+        let filtered = [...fetchedSongs];
         filtered.sort((a, b) => {
           if (a.disc !== b.disc) {
             return (a.disc ?? 1) - (b.disc ?? 1);
