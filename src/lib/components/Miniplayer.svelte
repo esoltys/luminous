@@ -80,7 +80,12 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m")) {
+    // Ctrl/Cmd+M is handled globally by +layout.svelte's toggleMiniplayerMode
+    // listener. Handling it here too would double-fire on every press (this
+    // handler exits, then the still-bubbling event reaches the global one,
+    // which sees the just-cleared isMiniplayer flag and re-enters) — so only
+    // Escape, which has no global handler, belongs here.
+    if (e.key === "Escape") {
       e.preventDefault();
       collectionStore.exitMiniplayerMode();
     }
