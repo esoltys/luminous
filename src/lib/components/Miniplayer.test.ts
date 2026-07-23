@@ -91,6 +91,17 @@ describe("Miniplayer.svelte", () => {
     expect(getByText("AL")).toBeInTheDocument();
   });
 
+  it("renders the song rating widget and rates the current song", async () => {
+    playerStore.currentSong = mockSong; // rating: 5 -> favorited under the default heart style
+    const rateSpy = vi.spyOn(playerStore, "rateCurrent").mockResolvedValue(undefined as any);
+
+    const { getByTitle } = render(Miniplayer);
+    const heartBtn = getByTitle("Remove from favorites");
+    await fireEvent.click(heartBtn);
+
+    expect(rateSpy).toHaveBeenCalledWith(-1);
+  });
+
   it("exits miniplayer mode when restore button is clicked or Escape is pressed", async () => {
     playerStore.currentSong = mockSong;
     const exitSpy = vi.spyOn(collectionStore, "exitMiniplayerMode");

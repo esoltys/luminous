@@ -7,6 +7,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
+  import SongRating from "./SongRating.svelte";
   import {
     Play,
     Pause,
@@ -189,6 +190,15 @@
       <span class="text-xs text-brand-text-secondary/80 truncate w-full" title={playerStore.currentSong?.artist}>
         {playerStore.currentSong?.artist || (playerStore.currentSong ? i18n.t('collection.unknownArtist') : '')}
       </span>
+      {#if playerStore.currentSong}
+        <div class="mt-1.5">
+          <SongRating
+            rating={playerStore.currentSong.rating}
+            onRate={(r) => playerStore.rateCurrent(r)}
+            size="md"
+          />
+        </div>
+      {/if}
     </div>
 
     <!-- CENTER PLAYBACK CONTROLS & WAVEFORM PROGRESS (Grouped together with tight spacing) -->
