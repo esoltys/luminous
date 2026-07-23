@@ -14,6 +14,7 @@
   import { Play, Shuffle } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
   import { getArtistAlbums } from "../utils/artist";
+  import { songsToCoverStack } from "../utils/covers";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
 
@@ -31,12 +32,16 @@
   }
 
   let albums = $derived(getArtistAlbums(collectionStore.albums, artistName));
+  // Artists with no proper album releases (loose singles only) have nothing
+  // in `albums` to draw covers from — fall back to the songs' own art.
   let headerCovers = $derived(
-    albums.map((a) => ({
-      artEmbedded: a.art_embedded,
-      artAutomatic: a.art_automatic,
-      artManual: a.art_manual,
-    }))
+    albums.length > 0
+      ? albums.map((a) => ({
+          artEmbedded: a.art_embedded,
+          artAutomatic: a.art_automatic,
+          artManual: a.art_manual,
+        }))
+      : songsToCoverStack(songs)
   );
 
   $effect(() => {
@@ -114,6 +119,17 @@
     showAll = false;
   }
 
+  // Some artists have no proper album releases at all (every track is a loose
+  // single with no album tag), so getArtistAlbums() returns nothing and the
+  // Albums/Singles/Popular filters all end up empty. Fall back to showing the
+  // artist's individual songs directly rather than an empty "no releases" state.
+  // Mutually exclusive with `singles` (albums.length is 0 whenever this is
+  // populated), so combining the two counts is safe.
+  let looseSongs = $derived(
+    albums.length === 0 ? [...songs].sort((a, b) => (a.title || "").localeCompare(b.title || "")) : []
+  );
+  let singlesCount = $derived(singles.length + looseSongs.length);
+
   // Land on whichever category actually has releases when switching artists,
   // rather than defaulting to a possibly-empty "Albums" tab (e.g. an
   // EP-only or singles-only artist). Keyed on artistName so a manual tab
@@ -124,7 +140,7 @@
       if (fullAlbums.length > 0) return "albums";
       if (sets.length > 0) return "sets";
       if (eps.length > 0) return "eps";
-      if (singles.length > 0) return "singles";
+      if (singlesCount > 0) return "singles";
       return "albums";
     });
     showAll = false;
@@ -135,13 +151,6 @@
   );
   let discographyItems = $derived(showAll ? discographySource : discographySource.slice(0, POPULAR_CAP));
 
-  // Some artists have no proper album releases at all (every track is a loose
-  // single with no album tag), so getArtistAlbums() returns nothing and the
-  // Albums/Singles/Popular filters all end up empty. Fall back to showing the
-  // artist's individual songs directly rather than an empty "no releases" state.
-  let looseSongs = $derived(
-    albums.length === 0 ? [...songs].sort((a, b) => (a.title || "").localeCompare(b.title || "")) : []
-  );
   let displayedLooseSongs = $derived(showAll ? looseSongs : looseSongs.slice(0, POPULAR_CAP));
 
   function openAlbum(album: AlbumItem) {
@@ -215,7 +224,7 @@
       </div>
 
       <!-- Right: 3D Stacked Album Cover Preview Header -->
-      {#if albums.length > 0}
+      {#if headerCovers.length > 0}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
         </div>
@@ -237,32 +246,40 @@
       {/if}
     </div>
 
-    {#if albums.length > 0}
+    {#if albums.length > 0 || looseSongs.length > 0}
       <div class="flex items-center gap-2 mb-4">
-        <button
-          onclick={() => setDiscographyFilter("sets")}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'sets' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-        >
-          {i18n.t('artistDetail.setsFilter', { count: sets.length })}
-        </button>
-        <button
-          onclick={() => setDiscographyFilter("albums")}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-        >
-          {i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
-        </button>
-        <button
-          onclick={() => setDiscographyFilter("eps")}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'eps' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-        >
-          {i18n.t('artistDetail.epsFilter', { count: eps.length })}
-        </button>
-        <button
-          onclick={() => setDiscographyFilter("singles")}
-          class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-        >
-          {i18n.t('artistDetail.singlesFilter', { count: singles.length })}
-        </button>
+        {#if sets.length > 0}
+          <button
+            onclick={() => setDiscographyFilter("sets")}
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'sets' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+          >
+            {i18n.t('artistDetail.setsFilter', { count: sets.length })}
+          </button>
+        {/if}
+        {#if fullAlbums.length > 0}
+          <button
+            onclick={() => setDiscographyFilter("albums")}
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+          >
+            {i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
+          </button>
+        {/if}
+        {#if eps.length > 0}
+          <button
+            onclick={() => setDiscographyFilter("eps")}
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'eps' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+          >
+            {i18n.t('artistDetail.epsFilter', { count: eps.length })}
+          </button>
+        {/if}
+        {#if singlesCount > 0}
+          <button
+            onclick={() => setDiscographyFilter("singles")}
+            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-border border-brand-border text-white font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+          >
+            {i18n.t('artistDetail.singlesFilter', { count: singlesCount })}
+          </button>
+        {/if}
       </div>
     {/if}
 
