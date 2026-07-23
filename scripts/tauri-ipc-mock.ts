@@ -315,9 +315,116 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     return items;
   }
 
+  // Mirrors expand_template()/build_target_path() in src-tauri/src/organizer.rs
+  // closely enough to drive the Organize Files screenshot with a realistic
+  // preview: same variable set, same conditional-block rules, same fallback
+  // to "Unknown X" for missing/blank fields. Not sanitized beyond the block
+  // logic — mock titles/artists never contain path-illegal characters.
+  interface OrganizePreviewItem {
+    song_id: number;
+    from_path: string;
+    to_path: string;
+    status: "ok" | "unchanged" | "collision" | "missing_tag" | "error";
+    error_message: string | null;
+  }
+
+  function expandOrganizeTemplate(template: string, song: Song): string {
+    let expanded = template;
+
+    while (true) {
+      const start = expanded.indexOf("{");
+      if (start === -1) break;
+      const end = expanded.indexOf("}", start);
+      if (end === -1) break;
+      const block = expanded.slice(start + 1, end);
+
+      const hasAlbumArtist = block.includes("%albumartist") && !!song.album_artist?.trim();
+      const hasAlbum = block.includes("%album") && !block.includes("%albumartist") && !!song.album?.trim();
+      const hasArtist = block.includes("%artist") && !block.includes("%albumartist") && !!song.artist?.trim();
+      const hasDisc = block.includes("%disc") && (song.disc ?? 0) > 0;
+      const hasYear = block.includes("%year") && (song.year ?? 0) > 0;
+      const hasGenre = block.includes("%genre") && !!song.genre?.trim();
+      const hasTrack = /%track|%rawtrack/.test(block) && (song.track ?? 0) > 0;
+
+      const replacement = hasAlbumArtist || hasAlbum || hasArtist || hasDisc || hasYear || hasGenre || hasTrack ? block : "";
+      expanded = expanded.slice(0, start) + replacement + expanded.slice(end + 1);
+    }
+
+    const albumArtist = song.album_artist?.trim() || song.artist?.trim() || "Unknown Artist";
+    const artist = song.artist?.trim() || "Unknown Artist";
+    const album = song.album?.trim() || "Unknown Album";
+    const title = song.title?.trim() || "Unknown Title";
+    const genre = song.genre?.trim() || "Unknown Genre";
+    const track2 = String(song.track && song.track > 0 ? song.track : 0).padStart(2, "0");
+    const track3 = String(song.track && song.track > 0 ? song.track : 0).padStart(3, "0");
+    const trackRaw = String(song.track && song.track > 0 ? song.track : 0);
+    const disc = String(song.disc ?? 1);
+    const year = song.year ? String(song.year) : "";
+
+    return expanded
+      .replaceAll("%albumartist", albumArtist)
+      .replaceAll("%artist", artist)
+      .replaceAll("%album", album)
+      .replaceAll("%disc", disc)
+      .replaceAll("%track3", track3)
+      .replaceAll("%rawtrack", trackRaw)
+      .replaceAll("%track", track2)
+      .replaceAll("%title", title)
+      .replaceAll("%year", year)
+      .replaceAll("%genre", genre);
+  }
+
+  function computeOrganizePreview(songs: Song[], template: string): OrganizePreviewItem[] {
+    // All mock song paths live under "/Music/{artist}/{album}/..." (see
+    // mock-data.ts) — reorganize relative to that shared root.
+    const root = "/Music";
+    const targetCounts = new Map<string, number>();
+    const items: OrganizePreviewItem[] = [];
+
+    for (const song of songs) {
+      const fromPath = song.path || "";
+      if (!fromPath.trim()) continue;
+
+      const ext = fromPath.split(".").pop() || "flac";
+      const expanded = expandOrganizeTemplate(template, song);
+      const parts = expanded.split(/[/\\]/).filter((p) => p.trim() !== "");
+      let relative = parts.join("/");
+      if (!relative.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
+        relative = `${relative}.${ext}`;
+      }
+      const toPath = `${root}/${relative}`;
+      targetCounts.set(toPath, (targetCounts.get(toPath) ?? 0) + 1);
+
+      const missingTag = !song.title?.trim() || !song.artist?.trim();
+      items.push({
+        song_id: song.id,
+        from_path: fromPath,
+        to_path: toPath,
+        status: fromPath === toPath ? "unchanged" : missingTag ? "missing_tag" : "ok",
+        error_message: null,
+      });
+    }
+
+    for (const item of items) {
+      if (item.status === "ok" && (targetCounts.get(item.to_path) ?? 0) > 1) {
+        item.status = "collision";
+        item.error_message = "Another track also resolves to this path";
+      }
+    }
+
+    return items;
+  }
+
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
+
+    preview_organize: (args) => {
+      const songIds = (args.songIds as number[] | undefined) ?? [];
+      const template = (args.template as string) || "%albumartist/{%album/}{%disc-}{%track }%title";
+      const songs = songIds.length > 0 ? library.songs.filter((s) => songIds.includes(s.id)) : library.songs;
+      return computeOrganizePreview(songs, template);
+    },
 
 
     get_playback_state: () => {

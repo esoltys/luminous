@@ -69,6 +69,13 @@
       "action": "click-equalizer-parametric"
     },
     {
+      "name": "organize-files",
+      "filename": "organize-files.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-organize-files"
+    },
+    {
       "name": "now-playing",
       "filename": "now-playing.png",
       "tab": "collection",
@@ -94,6 +101,13 @@
       "tab": "playlists",
       "subTab": "auto",
       "sidebarWidth": 260
+    },
+    {
+      "name": "smart-playlist-editor",
+      "filename": "smart-playlist-editor.png",
+      "tab": "playlists",
+      "subTab": "custom",
+      "action": "click-smart-playlist"
     }
   ]
 }

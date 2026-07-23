@@ -322,6 +322,24 @@ async function main() {
         if (card) (card as HTMLElement).click();
       });
       await page.waitForTimeout(400);
+    },
+    "click-organize-files": async (page) => {
+      await page.getByRole("button", { name: "Watched Folders", exact: true }).click();
+      await page.waitForTimeout(300);
+      await page.getByRole("button", { name: "Organize Entire Library...", exact: true }).click();
+      await page.waitForTimeout(400);
+      // Swap in a template that actually changes the mock library's paths
+      // (the default template already matches how the mock data is laid
+      // out, so every row would show "Unchanged" otherwise).
+      const templateInput = page.locator("#template-input");
+      await templateInput.fill("%albumartist/{%album/}{Disc %disc/}{%track }%title");
+      await page.waitForTimeout(600);
+    },
+    "click-smart-playlist": async (page) => {
+      await page.getByRole("button", { name: "New Playlist", exact: true }).click();
+      await page.waitForTimeout(300);
+      await page.getByRole("button", { name: "Advanced...", exact: true }).click();
+      await page.waitForTimeout(400);
     }
   };
 
