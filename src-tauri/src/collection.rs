@@ -73,41 +73,49 @@ impl CollectionScanner {
             .collect();
         Ok(dirs)
     }
-    /// Marks songs as unavailable (soft-delete) when their file no longer exists on disk.
+    /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
     pub fn prune_missing_songs(&self) -> Result<usize> {
         let conn = self.db.pool.get()?;
-        let mut stmt =
-            conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0")?;
+        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
             Ok((id, path))
         })?;
 
-        let mut to_mark_unavailable = Vec::new();
+        let mut to_delete = Vec::new();
         for (id, path) in rows.flatten() {
             let p = Path::new(&path);
             if !p.exists() {
-                to_mark_unavailable.push(id);
+                to_delete.push(id);
             }
         }
 
-        let unavailable_count = to_mark_unavailable.len();
-        if !to_mark_unavailable.is_empty() {
+        let mut stmt_unavail = conn.prepare("SELECT id FROM songs WHERE unavailable = 1")?;
+        let unavail_rows = stmt_unavail.query_map([], |row| row.get::<_, i64>(0))?;
+        for id in unavail_rows.flatten() {
+            if !to_delete.contains(&id) {
+                to_delete.push(id);
+            }
+        }
+
+        let deleted_count = to_delete.len();
+        if !to_delete.is_empty() {
             let tx = conn.unchecked_transaction()?;
             {
-                let mut upd_stmt = tx.prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")?;
-                for id in &to_mark_unavailable {
-                    upd_stmt.execute(params![id])?;
+                let mut del_stmt = tx.prepare("DELETE FROM songs WHERE id = ?1")?;
+                for id in &to_delete {
+                    del_stmt.execute(params![id])?;
                 }
+                tx.execute_batch("DELETE FROM playlist_items WHERE song_id IS NULL;")?;
             }
             tx.commit()?;
             log::info!(
-                "Marked {} song(s) as unavailable (file missing)",
-                unavailable_count
+                "Hard-deleted {} song(s) from database (file missing or unavailable)",
+                deleted_count
             );
         }
-        Ok(unavailable_count)
+        Ok(deleted_count)
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.
@@ -1480,25 +1488,27 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 // File Watcher & Deletion Sync
 // ---------------------------------------------------------------------------
 
-/// Helper to soft-delete a path and its subpaths from the SQLite database.
-/// Sets unavailable = 1 instead of hard-deleting, so playlist items retain metadata.
+/// Helper to hard-delete a path and its subpaths from the SQLite database.
 pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
     let conn = db.pool.get()?;
     let path_fw = path_str.replace('\\', "/");
     let path_bw = path_str.replace('/', "\\");
 
-    let updated = conn.execute(
-        "UPDATE songs SET unavailable = 1
+    let deleted = conn.execute(
+        "DELETE FROM songs
          WHERE (
             path = ?1 OR path = ?2
             OR path LIKE ?1 || '/%'
             OR path LIKE ?1 || '\\%'
             OR path LIKE ?2 || '/%'
             OR path LIKE ?2 || '\\%'
-         ) AND unavailable = 0",
+         )",
         params![path_fw, path_bw],
     )?;
-    Ok(updated)
+    if deleted > 0 {
+        let _ = conn.execute("DELETE FROM playlist_items WHERE song_id IS NULL", []);
+    }
+    Ok(deleted)
 }
 
 /// Start background directory watching using notify.
@@ -2056,6 +2066,54 @@ mod tests {
             HomeItem::Song { song } => assert_eq!(song.id, standalone_id),
             other => panic!("expected most-played standalone Song first, got {other:?}"),
         }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_prune_missing_songs_hard_deletes() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_hard_delete_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let real_file = temp_dir.join("real.mp3");
+        std::fs::write(&real_file, b"audio").unwrap();
+
+        let song_real = Song {
+            path: Some(real_file.to_string_lossy().to_string()),
+            title: Some("Real Track".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_real).unwrap();
+
+        let song_missing = Song {
+            path: Some(temp_dir.join("missing.mp3").to_string_lossy().to_string()),
+            title: Some("Missing Track".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_missing).unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(pruned, 1);
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let remaining_path: String = conn
+            .query_row("SELECT path FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(remaining_path, real_file.to_string_lossy().to_string());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

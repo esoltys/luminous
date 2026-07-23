@@ -73,6 +73,11 @@ impl CoverManager {
 
     /// Scan directory containing the song for common image names (cover.jpg, folder.png, etc.)
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
+        Self::scan_folder_art_static(audio_path)
+    }
+
+    /// Static version of scan_folder_art that does not require a CoverManager instance
+    pub fn scan_folder_art_static(audio_path: &Path) -> Option<PathBuf> {
         let parent_dir = audio_path.parent()?;
         let common_names = [
             "cover",

@@ -3,6 +3,7 @@
 //! Provides template parsing, dry-run path computation, conflict detection,
 //! and batch file relocation with atomic SQLite path updates.
 
+use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::Song;
 use anyhow::{anyhow, Result};
@@ -534,6 +535,7 @@ pub fn execute_apply(
     items: &[OrganizeApplyItem],
     clean_empty_dirs: bool,
     move_extra_files: bool,
+    cover_manager: Option<&CoverManager>,
 ) -> Result<OrganizeResult> {
     watcher_paused.store(true, Ordering::Relaxed);
 
@@ -542,6 +544,7 @@ pub fn execute_apply(
     let mut errors = Vec::new();
     let mut source_parents_to_clean: HashSet<PathBuf> = HashSet::new();
     let mut moved_dir_pairs: HashMap<PathBuf, PathBuf> = HashMap::new();
+    let mut moved_items: Vec<(i64, String)> = Vec::new();
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;
@@ -593,6 +596,7 @@ pub fn execute_apply(
                     ));
                 } else {
                     moved_count += 1;
+                    moved_items.push((item.song_id, item.to_path.clone()));
                 }
             }
             Err(e) => {
@@ -619,6 +623,62 @@ pub fn execute_apply(
     if clean_empty_dirs {
         for parent in source_parents_to_clean {
             let _ = remove_empty_dirs_recursive(&parent);
+        }
+    }
+
+    // Post-relocation cover art refresh for moved tracks
+    for (song_id, to_path_str) in moved_items {
+        let to_path = Path::new(&to_path_str);
+        let mut new_art_auto: Option<String> = None;
+
+        if let Some(folder_art_path) = CoverManager::scan_folder_art_static(to_path) {
+            new_art_auto = Some(folder_art_path.to_string_lossy().to_string());
+        } else if let Some(cm) = cover_manager {
+            if let Ok((artist, album, art_embedded)) = conn.query_row(
+                "SELECT COALESCE(NULLIF(album_artist, ''), artist, ''), album, art_embedded FROM songs WHERE id = ?1",
+                params![song_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                        row.get::<_, bool>(2)?,
+                    ))
+                },
+            ) {
+                if art_embedded {
+                    if let Ok(Some(cached_fn)) = cm.extract_embedded_art(to_path, &artist, &album) {
+                        new_art_auto = Some(cached_fn);
+                    }
+                }
+            }
+        }
+
+        if let Some(art_path) = new_art_auto {
+            let _ = conn.execute(
+                "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE id = ?2",
+                params![art_path, song_id],
+            );
+        } else {
+            // Check if existing art_automatic points to an unaccessible/non-existent old path
+            let current_art: Option<String> = conn
+                .query_row(
+                    "SELECT art_automatic FROM songs WHERE id = ?1",
+                    params![song_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(None);
+
+            if let Some(ref art) = current_art {
+                let art_p = Path::new(art);
+                if (art_p.is_absolute() || art.contains('/') || art.contains('\\'))
+                    && !art_p.exists()
+                {
+                    let _ = conn.execute(
+                        "UPDATE songs SET art_automatic = NULL WHERE id = ?1",
+                        params![song_id],
+                    );
+                }
+            }
         }
     }
 
@@ -901,7 +961,7 @@ mod tests {
         }];
 
         let watcher_paused = AtomicBool::new(false);
-        let result = execute_apply(&db, &watcher_paused, &items, true, true).unwrap();
+        let result = execute_apply(&db, &watcher_paused, &items, true, true, None).unwrap();
         assert_eq!(result.moved_count, 1);
         assert!(result.errors.is_empty());
 
