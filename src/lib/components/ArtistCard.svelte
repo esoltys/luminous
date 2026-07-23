@@ -1,11 +1,13 @@
 <script lang="ts">
-  import type { ArtistItem, AlbumItem } from "../types";
+  import type { ArtistItem, AlbumItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverStack from "./CoverStack.svelte";
+  import { songsToCoverStack } from "../utils/covers";
 
   interface Props {
     artist: ArtistItem;
     artistAlbums: AlbumItem[];
+    artistSongs?: Song[];
     fullAlbumCount?: number;
     onclick?: (e: MouseEvent) => void;
   }
@@ -13,17 +15,30 @@
   let {
     artist,
     artistAlbums,
+    artistSongs = [],
     fullAlbumCount: _fullAlbumCount,
     onclick: customClick,
   }: Props = $props();
 
-  let covers = $derived(
-    artistAlbums.map((album) => ({
-      artEmbedded: album.art_embedded,
-      artAutomatic: album.art_automatic,
-      artManual: album.art_manual,
-    }))
-  );
+  let covers = $derived.by(() => {
+    const albumCovers = artistAlbums
+      .map((album) => ({
+        artEmbedded: album.art_embedded,
+        artAutomatic: album.art_automatic,
+        artManual: album.art_manual,
+      }))
+      .filter((c) => c.artManual || c.artAutomatic || c.artEmbedded);
+
+    if (albumCovers.length > 0) {
+      return albumCovers;
+    }
+
+    if (artistSongs.length > 0) {
+      return songsToCoverStack(artistSongs);
+    }
+
+    return [];
+  });
 
   let genreLabel = $derived(artist.genre?.trim() || i18n.t('artistDetail.unknownGenre'));
 </script>

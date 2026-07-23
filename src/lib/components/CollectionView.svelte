@@ -128,6 +128,16 @@
     return getArtistAlbums(collectionStore.albums, name);
   }
 
+  function getArtistSongsFor(name: string | null): Song[] {
+    if (!name) return [];
+    const trimmed = name.trim();
+    return collectionStore.songs.filter(
+      (s) =>
+        (s.album_artist && s.album_artist.trim() === trimmed) ||
+        (s.artist && s.artist.trim() === trimmed)
+    );
+  }
+
   let sortField = $state<keyof Song>(
     (typeof window !== "undefined" && localStorage.getItem("sort_song_field") as keyof Song) || "title"
   );
@@ -732,9 +742,11 @@
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}
+              {@const artistSongs = getArtistSongsFor(artist.name)}
               <ArtistCard
                 {artist}
                 {artistAlbums}
+                {artistSongs}
                 onclick={() => collectionStore.viewArtist(artist.name || "")}
               />
             {/each}
