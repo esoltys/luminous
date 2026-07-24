@@ -436,18 +436,26 @@ pub fn compute_preview(
         }
     }
 
-    for (target_path, indices) in target_paths_map {
-        if indices.len() > 1 && !target_path.trim().is_empty() {
-            for idx in indices {
+    for (_target_path, indices) in target_paths_map {
+        if indices.len() > 1 {
+            for &idx in &indices {
                 let status = preview_items[idx].status.clone();
                 if status != OrganizePreviewStatus::Unchanged
                     && status != OrganizePreviewStatus::Error
                 {
+                    // Name the other file(s) sharing this target so the user
+                    // can actually act on it (e.g. spot a duplicate and
+                    // delete/retag one side) instead of just being told a
+                    // collision exists somewhere.
+                    let other_paths: Vec<String> = indices
+                        .iter()
+                        .filter(|&&other_idx| other_idx != idx)
+                        .map(|&other_idx| preview_items[other_idx].from_path.clone())
+                        .collect();
+
                     preview_items[idx].status = OrganizePreviewStatus::Collision;
-                    preview_items[idx].error_message = Some(format!(
-                        "Multiple files map to target path: {}",
-                        target_path
-                    ));
+                    preview_items[idx].error_message =
+                        Some(format!("Same target as: {}", other_paths.join(", ")));
                 }
             }
         }
