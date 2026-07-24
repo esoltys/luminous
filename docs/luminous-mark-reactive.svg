@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 -40 280 280">
+  <defs>
+    <filter id="glowBlurOuter" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="22"></feGaussianBlur>
+    </filter>
+    <filter id="ringBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3"></feGaussianBlur>
+    </filter>
+    <filter id="burstBlur" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="10"></feGaussianBlur>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="112" fill="#626FE8" opacity="0.4" filter="url(#glowBlurOuter)"></circle>
+  <circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="16" opacity="0.95" filter="url(#ringBlur)"></circle>
+  <circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="9" opacity="0.85" filter="url(#ringBlur)"></circle>
+  <circle cx="100" cy="100" r="68" fill="#0A0A0D"></circle>
+  <circle cx="152" cy="57" r="26" fill="#FFFFFF" opacity="0.4" filter="url(#burstBlur)"></circle>
+  <circle cx="152" cy="57" r="12" fill="#FFFFFF"></circle>
+</svg>

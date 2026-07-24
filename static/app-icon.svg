@@ -1,19 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <defs>
-    <filter id="glowBlurOuter" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="16"></feGaussianBlur>
-    </filter>
-    <filter id="glowBlurInner" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="1.5"></feGaussianBlur>
-    </filter>
-    <filter id="burstBlur" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="6"></feGaussianBlur>
-    </filter>
-  </defs>
-  <circle cx="100" cy="100" r="104" fill="#626FE8" opacity="0.3" filter="url(#glowBlurOuter)"></circle>
-  <circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="14" opacity="1"></circle>
-  <circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="8" opacity="0.9"></circle>
+  <circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="14"></circle>
+  <circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="8"></circle>
   <circle cx="100" cy="100" r="68" fill="#0A0A0D"></circle>
-  <circle cx="152" cy="57" r="20" fill="#FFFFFF" opacity="0.28" filter="url(#burstBlur)"></circle>
   <circle cx="152" cy="57" r="11" fill="#FFFFFF"></circle>
 </svg>
