@@ -27,25 +27,32 @@ timeline
 
 ## Milestones Detail
 
-### [Milestone 1.0 — Core Desktop Player & Local Collection](https://github.com/esoltys/luminous/milestone/1)
+### ✅ [Milestone 1.0 — Core Desktop Player & Local Collection](https://github.com/esoltys/luminous/milestone/1) — Complete
 
-**Focus**: Establishing a high-performance desktop music player for local audio collections with an audiophile playback engine and modern Svelte 5 user interface.
+**Focus**: A high-performance desktop music player for local audio collections, pairing an audiophile playback engine with a modern Svelte 5 user interface. All planned features have shipped and the milestone is closed (84/84 issues resolved).
 
 *   **Audiophile Audio Pipeline**:
     *   Symphonia decoding + CPAL output thread with allocation-free playback loop.
     *   True gapless playback with double-buffered audio streaming.
-    *   Dual-mode Equalizer: 10-band graphic equalizer & 20-band parametric DSP filters.
+    *   Dual-mode Equalizer: 10-band graphic equalizer & 20-band parametric DSP filters, with custom pre-amp.
     *   EBU R128 loudness normalization and ReplayGain fallback.
+    *   Real-time FFT spectrum analyzer and colorized moodbar/waveform seek bars.
 *   **Modern Desktop Interface**:
-    *   Resizable 3-column layout (sidebar navigation, central core canvas, right context pane).
+    *   Resizable 3-column layout (sidebar navigation, central core canvas, right context pane) with a universal top search & navigation ribbon.
     *   Adaptive Information Density matrix (Compact, Balanced, Expanded).
-    *   Personalized Home Hub, Category Explorer, and instant database search.
+    *   Personalized Home Hub, Category Explorer, album parallax views, artist profiles, and instant database search with auto-suggestions.
     *   Synchronized `.LRC` scrolling lyrics and detached Picture-in-Picture miniplayer.
+    *   Dynamic theme engine with glassmorphism effects, artwork-based accent extraction, and a Custom Theme Builder.
+    *   Bilingual (English/French) interface and full session state preservation on reopen.
 *   **Local Collection & Metadata Engine**:
     *   Incremental filesystem scanner and file watcher powered by `lofty`.
     *   SQLite database with full-text search (FTS5).
     *   AcoustID audio fingerprinting (`fpcalc`) and tag reader/writer.
-    *   Smart Playlists GUI rule builder with type-safe SQL query translation.
+    *   Smart Cover Art engine with multi-layered stack previews and duplicate cleanup.
+    *   Smart Playlists GUI rule builder with type-safe SQL query translation, plus decade-based auto-playlists and 5-star/heart ratings.
+*   **Quality Assurance**:
+    *   Frontend unit & integration tests (Vitest) and backend unit tests (Rust/Cargo).
+    *   BDD feature specifications under [`features/`](features) covering end-to-end behavior.
 
 ---
 
