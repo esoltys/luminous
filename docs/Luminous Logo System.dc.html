@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
+    ::selection { background: #4F5BD5; color: #fff; }
+  </style>
+</helmet>
+
+<div style="background:#08090c; color:#f1f3f8; min-height:100vh; padding-bottom:120px;">
+
+  <!-- HERO -->
+  <div style="max-width:1200px; margin:0 auto; padding:96px 48px 64px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:28px;">
+    <img src="./luminous-mark.svg" alt="Luminous mark" style="width:120px; height:120px;" />
+    <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:56px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
+      <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:#9aa0b4;">Music Player</div>
+    </div>
+    <div style="font-size:15px; color:#9aa0b4; max-width:560px; line-height:1.6;">Logo &amp; identity system — a mark built to sit still as an app icon and social avatar, and to breathe live with the music as a reactive element.</div>
+  </div>
+
+  <!-- ANATOMY -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Anatomy</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">Four layers, back to front. Two are fixed; two are themeable.</div>
+    <div style="display:grid; grid-template-columns:280px 1fr; gap:56px; align-items:center;">
+      <div style="position:relative; width:280px; height:280px; justify-self:center;">
+        <img src="./luminous-mark.svg" style="width:100%; height:100%;" />
+      </div>
+      <div style="display:flex; flex-direction:column; gap:0;">
+        <sc-for list="{{ anatomyRows }}" as="row" hint-placeholder-count="4">
+          <div style="display:flex; align-items:center; gap:20px; padding:18px 0; border-bottom:1px solid #1a1c24;">
+            <div style="width:14px; height:14px; border-radius:50%; flex-shrink:0; background:{{ row.swatch }}; border:{{ row.swatchBorder }};"></div>
+            <div style="width:150px; flex-shrink:0; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px;">{{ row.name }}</div>
+            <div style="flex:1; font-size:13.5px; color:#9aa0b4; line-height:1.6;">{{ row.desc }}</div>
+            <div style="width:110px; flex-shrink:0; text-align:right; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{{ row.tagColor }};">{{ row.tag }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- REACTIVE DEMO -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Reactive behavior</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">In the app, the mark isn't static — it's an audio-reactive element. Each frequency band drives one layer. Try it below.</div>
+
+    <div style="display:grid; grid-template-columns:340px 1fr; gap:64px; align-items:center; background:#101218; border:1px solid #23262f; border-radius:20px; padding:48px;">
+      <div style="width:100%; aspect-ratio:1; display:flex; align-items:center; justify-content:center;">
+        <svg viewBox="0 0 200 200" style="width:100%; height:100%;">
+          <defs>
+            <filter id="demoGlowBlurOuter" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="16"></feGaussianBlur></filter>
+            <filter id="demoGlowBlurInner" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.5"></feGaussianBlur></filter>
+            <filter id="demoBurstBlur" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"></feGaussianBlur></filter>
+          </defs>
+          <circle cx="100" cy="100" r="{{ glowR }}" fill="#626FE8" opacity="{{ glowOpacity }}" filter="url(#demoGlowBlurOuter)"></circle>
+          <circle cx="100" cy="100" r="77" fill="none" stroke="#626FE8" stroke-width="{{ glowInnerWidth }}" opacity="{{ glowInnerOpacity }}"></circle>
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#FFB648" stroke-width="{{ ringWidth }}" opacity="{{ ringOpacity }}"></circle>
+          <circle cx="100" cy="100" r="68" fill="#0A0A0D"></circle>
+          <circle cx="152" cy="57" r="{{ haloR }}" fill="#FFFFFF" opacity="{{ haloOpacity }}" filter="url(#demoBurstBlur)"></circle>
+          <circle cx="152" cy="57" r="{{ burstR }}" fill="#FFFFFF"></circle>
+        </svg>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">Live preview</div>
+          <button onClick="{{ toggleAutoPlay }}" style="background:{{ autoPlayBg }}; color:{{ autoPlayColor }}; border:1px solid #3a3d4a; border-radius:9999px; padding:8px 18px; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; cursor:pointer;">{{ autoPlayLabel }}</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#9aa0b4;"><span>Bass → Coronal burst</span><span style="color:#f1f3f8; font-weight:600;">{{ bassPct }}%</span></div>
+          <input type="range" min="0" max="100" value="{{ state.bass }}" onChange="{{ onBass }}" style="width:100%; accent-color:#FFB648;" />
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#9aa0b4;"><span>Mid → Ambient glow</span><span style="color:#f1f3f8; font-weight:600;">{{ midPct }}%</span></div>
+          <input type="range" min="0" max="100" value="{{ state.mid }}" onChange="{{ onMid }}" style="width:100%; accent-color:#4F5BD5;" />
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#9aa0b4;"><span>Treble → Eclipse ring</span><span style="color:#f1f3f8; font-weight:600;">{{ treblePct }}%</span></div>
+          <input type="range" min="0" max="100" value="{{ state.treble }}" onChange="{{ onTreble }}" style="width:100%; accent-color:#FFB648;" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOCKUPS -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Lockups</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">Four approved combinations. Never rearrange the mark, wordmark, or tagline relative to each other outside of these.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:20px;">
+      <sc-for list="{{ lockups }}" as="lk" hint-placeholder-count="4">
+        <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:36px 24px; display:flex; flex-direction:column; align-items:center; gap:18px;">
+          <div style="{{ lk.wrapStyle }}">
+            <img src="./luminous-mark.svg" style="width:{{ lk.markSize }}px; height:{{ lk.markSize }}px;" />
+            <sc-if value="{{ lk.showText }}" hint-placeholder-val="{{ true }}">
+              <div style="{{ lk.textWrapStyle }}">
+                <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:{{ lk.wordSize }}px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
+                <sc-if value="{{ lk.showTagline }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:#9aa0b4; margin-top:4px;">Music Player</div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+          <div style="font-size:12px; color:#6d7286; font-family:'Inter',sans-serif;">{{ lk.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- CLEARSPACE & SIZE -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Clearspace &amp; minimum size</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">Keep a margin of at least a quarter of the mark's diameter clear on every side. Below 24px, drop the ring and glow — the silhouette and burst alone still read.</div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
+      <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:40px; display:flex; align-items:center; justify-content:center;">
+        <div style="position:relative; width:200px; height:200px; border:1px dashed #3a3d4a; display:flex; align-items:center; justify-content:center;">
+          <img src="./luminous-mark.svg" style="width:120px; height:120px;" />
+        </div>
+      </div>
+      <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:40px; display:flex; align-items:center; justify-content:center; gap:28px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <img src="./luminous-mark.svg" style="width:64px; height:64px;" />
+          <div style="font-size:11px; color:#6d7286;">64px</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <img src="./luminous-mark.svg" style="width:32px; height:32px;" />
+          <div style="font-size:11px; color:#6d7286;">32px</div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <div style="position:relative; width:16px; height:16px; display:flex; align-items:center; justify-content:center;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#0A0A0D; box-shadow: 0 0 0 1.5px #626FE8, 0 0 0 2.5px #08090c, 0 0 0 4px #FFB648;"></div>
+            <div style="position:absolute; top:0; right:0.5px; width:5px; height:5px; border-radius:50%; background:#fff;"></div>
+          </div>
+          <div style="font-size:11px; color:#6d7286;">16px (simplified)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLOR SYSTEM -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Brand color system</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:680px; line-height:1.6;">Two fixed brand colors carry the identity outside the app (marketing, social, app icon at rest). Inside the app, the glow and ring re-target to whichever UI theme is active.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:44px;">
+      <sc-for list="{{ brandSwatches }}" as="sw" hint-placeholder-count="4">
+        <div style="display:flex; flex-direction:column; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <div style="height:88px; background:{{ sw.hex }};"></div>
+          <div style="padding:14px 16px; background:#101218;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px;">{{ sw.name }}</div>
+            <div style="font-size:12px; color:#9aa0b4; margin-top:2px;">{{ sw.hex }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; margin-bottom:16px;">Per-theme mapping (in-app)</div>
+    <div style="border:1px solid #23262f; border-radius:14px; overflow:hidden;">
+      <sc-for list="{{ themeRows }}" as="th" hint-placeholder-count="5">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; align-items:center; padding:16px 20px; border-bottom:1px solid #1a1c24; background:#101218;">
+          <div style="font-size:13.5px; font-weight:600;">{{ th.name }}</div>
+          <div style="display:flex; align-items:center; gap:8px;"><div style="width:12px; height:12px; border-radius:50%; background:{{ th.glow }};"></div><span style="font-size:12.5px; color:#9aa0b4;">glow {{ th.glow }}</span></div>
+          <div style="display:flex; align-items:center; gap:8px;"><div style="width:12px; height:12px; border-radius:50%; background:{{ th.ring }};"></div><span style="font-size:12.5px; color:#9aa0b4;">ring {{ th.ring }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Wordmark type</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:32px; max-width:640px; line-height:1.6;">Space Grotesk carries the wordmark — its circular counters echo the mark. Inter (the app's UI face) sets the tagline and every supporting label, never the word "Luminous" itself.</div>
+    <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:44px; display:flex; flex-direction:column; gap:22px;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:64px; letter-spacing:-0.02em;">Luminous</div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:64px; letter-spacing:-0.02em; color:#6d7286;">Luminous</div>
+      <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:#9aa0b4;">Music Player · Inter 600 · +24em tracking</div>
+    </div>
+  </div>
+
+  <!-- DO / DONT -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px 96px; border-top:1px solid #23262f;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:40px;">Do &amp; don't</div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+      <sc-for list="{{ dontCards }}" as="d" hint-placeholder-count="3">
+        <div style="background:#101218; border:1px solid #23262f; border-radius:14px; padding:28px; display:flex; flex-direction:column; align-items:center; gap:16px;">
+          <img src="./luminous-mark.svg" style="width:72px; height:72px; {{ d.style }}" />
+          <div style="font-size:13px; color:#e0a0a0; text-align:center; line-height:1.5;">{{ d.label }}</div>
+        </div>
+      </sc-for>
+      <sc-for list="{{ doCards }}" as="d" hint-placeholder-count="3">
+        <div style="background:#101218; border:1px solid #23262f; border-radius:14px; padding:28px; display:flex; flex-direction:column; align-items:center; gap:16px;">
+          <img src="./luminous-mark.svg" style="width:72px; height:72px;" />
+          <div style="font-size:13px; color:#8fbf9a; text-align:center; line-height:1.5;">{{ d.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { bass: 35, mid: 40, treble: 40, autoPlay: false, t: 0 };
+
+  componentWillUnmount() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+  }
+
+  startAuto() {
+    const step = () => {
+      const t = this.state.t + 0.035;
+      this.setState({
+        t,
+        bass: 45 + Math.sin(t * 1.7) * 40,
+        mid: 45 + Math.sin(t * 0.9 + 1.2) * 35,
+        treble: 45 + Math.sin(t * 2.3 + 2.1) * 40,
+      });
+      this._raf = requestAnimationFrame(step);
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+
+  renderVals() {
+    const bass = Math.max(0, Math.min(100, this.state.bass)) / 100;
+    const mid = Math.max(0, Math.min(100, this.state.mid)) / 100;
+    const treble = Math.max(0, Math.min(100, this.state.treble)) / 100;
+
+    const anatomyRows = [
+      { name: 'Black silhouette', desc: 'The eclipsing disc. Always pure black — never recolors with theme or artwork.', swatch: '#0A0A0D', swatchBorder: 'none', tag: 'Fixed', tagColor: '#6d7286' },
+      { name: 'Coronal burst', desc: 'The bright flare at the disc\u2019s edge. Always white — the one constant highlight.', swatch: '#FFFFFF', swatchBorder: '1px solid #3a3d4a', tag: 'Bass', tagColor: '#FFB648' },
+      { name: 'Ambient glow', desc: 'Soft halo behind the disc. Recolors to match the active theme or extracted album art.', swatch: '#626FE8', swatchBorder: 'none', tag: 'Mid', tagColor: '#8890e8' },
+      { name: 'Eclipse ring', desc: 'Thin ring at the disc\u2019s edge. Recolors alongside the glow, one step brighter.', swatch: '#FFB648', swatchBorder: 'none', tag: 'Treble', tagColor: '#FFB648' },
+    ];
+
+    const lockups = [
+      { label: 'Icon alone', markSize: 96, showText: false, wrapStyle: 'display:flex; align-items:center; justify-content:center;', textWrapStyle: '', wordSize: 0, showTagline: false },
+      { label: 'Icon + wordmark (horizontal)', markSize: 56, showText: true, wrapStyle: 'display:flex; align-items:center; gap:16px;', textWrapStyle: 'display:flex; flex-direction:column;', wordSize: 32, showTagline: false },
+      { label: 'Icon + wordmark (stacked)', markSize: 64, showText: true, wrapStyle: 'display:flex; flex-direction:column; align-items:center; gap:14px;', textWrapStyle: 'display:flex; flex-direction:column; align-items:center;', wordSize: 30, showTagline: false },
+      { label: 'Icon + wordmark + tagline', markSize: 64, showText: true, wrapStyle: 'display:flex; flex-direction:column; align-items:center; gap:14px;', textWrapStyle: 'display:flex; flex-direction:column; align-items:center;', wordSize: 30, showTagline: true },
+    ];
+
+    const brandSwatches = [
+      { name: 'Ink (silhouette)', hex: '#0A0A0D' },
+      { name: 'Paper (corona)', hex: '#FFFFFF' },
+      { name: 'Primary — Indigo', hex: '#626FE8' },
+      { name: 'Accent — Gold', hex: '#FFB648' },
+    ];
+
+    const themeRows = [
+      { name: 'Luminous (default)', glow: '#6f7ea9', ring: '#8c98ba' },
+      { name: 'Ruby Red', glow: '#b3555f', ring: '#d67b83' },
+      { name: 'Nordic Blue', glow: '#4d7ea8', ring: '#7aa8cc' },
+      { name: 'Retro Amber', glow: '#b3822f', ring: '#d9a855' },
+      { name: 'Dynamic artwork', glow: 'extracted primary', ring: 'extracted accent' },
+    ];
+
+    const dontCards = [
+      { label: "Don't recolor the black silhouette or white burst", style: 'filter:hue-rotate(120deg) saturate(2);' },
+      { label: "Don't stretch or skew the mark", style: 'transform:scaleX(1.6);' },
+      { label: "Don't add drop shadows or outlines", style: 'filter:drop-shadow(0 8px 10px rgba(0,0,0,0.9)); border:3px solid #fff; border-radius:50%;' },
+    ];
+    const doCards = [
+      { label: 'Keep the mark on a clear, low-noise background' },
+      { label: 'Scale uniformly and preserve clearspace' },
+      { label: 'Let glow + ring retarget to the active theme' },
+    ];
+
+    const glowR = 96 + mid * 14;
+    const glowOpacity = (0.22 + mid * 0.24).toFixed(2);
+    const glowInnerWidth = (10 + mid * 8).toFixed(1);
+    const glowInnerOpacity = (0.8 + mid * 0.2).toFixed(2);
+    const ringWidth = (5 + treble * 9).toFixed(1);
+    const ringOpacity = (0.55 + treble * 0.45).toFixed(2);
+    const burstR = (8 + bass * 10).toFixed(1);
+    const burstOpacity = (0.7 + bass * 0.3).toFixed(2);
+    const haloR = (burstR * 1.8).toFixed(1);
+    const haloOpacity = (0.35 * burstOpacity).toFixed(2);
+
+    return {
+      anatomyRows, lockups, brandSwatches, themeRows, dontCards, doCards,
+      state: this.state,
+      bassPct: Math.round(bass * 100), midPct: Math.round(mid * 100), treblePct: Math.round(treble * 100),
+      glowR, glowOpacity, glowInnerWidth, glowInnerOpacity, ringWidth, ringOpacity, burstR, burstOpacity, haloR, haloOpacity,
+      onBass: (e) => this.setState({ bass: Number(e.target.value) }),
+      onMid: (e) => this.setState({ mid: Number(e.target.value) }),
+      onTreble: (e) => this.setState({ treble: Number(e.target.value) }),
+      autoPlayLabel: this.state.autoPlay ? 'Stop demo' : 'Auto-play demo',
+      autoPlayBg: this.state.autoPlay ? '#4F5BD5' : 'transparent',
+      autoPlayColor: this.state.autoPlay ? '#ffffff' : '#f1f3f8',
+      toggleAutoPlay: () => {
+        const next = !this.state.autoPlay;
+        this.setState({ autoPlay: next });
+        if (next) this.startAuto();
+        else if (this._raf) cancelAnimationFrame(this._raf);
+      },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
+    a { color: #8c98ba; }
+    a:hover { color: #a8b3d4; }
+  </style>
+</helmet>
+
+<div style="background:#08090c; color:#f1f3f8; min-height:100vh; padding-bottom:120px;">
+
+  <div style="max-width:1200px; margin:0 auto; padding:88px 48px 56px; display:flex; align-items:center; gap:24px; border-bottom:1px solid #2c2f3c;">
+    <img src="./luminous-mark.svg" style="width:56px; height:56px;" />
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Luminous</div>
+      <div style="font-size:14px; color:#a6adc4; margin-top:2px;">Visual design system — desktop app UI. See also the <a href="./Luminous%20Logo%20System.dc.html">logo system</a>.</div>
+    </div>
+  </div>
+
+  <!-- COLORS -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Color — Luminous theme (default)</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">The shipped default. Users can swap the whole set at runtime (Ruby Red, Nordic Blue, Retro Amber, system light/dark, or colors derived live from album art) — treat structure and contrast rules as normative, not these exact hex values. <b style="color:#f1f3f8;">accent-gold</b> is the one exception — borrowed from the logo's eclipse ring, it's a fixed brand color (not theme-swappable), reserved for rare highlight moments (e.g. a "featured" or premium marker) — never a primary interactive color.</div>
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px;">
+      <sc-for list="{{ colors }}" as="c" hint-placeholder-count="10">
+        <div style="border:1px solid #2c2f3c; border-radius:12px; overflow:hidden;">
+          <div style="height:72px; background:{{ c.hex }}; border-bottom:1px solid #2c2f3c;"></div>
+          <div style="padding:10px 12px; background:#1c1f29;">
+            <div style="font-size:12.5px; font-weight:600;">{{ c.name }}</div>
+            <div style="font-size:11.5px; color:#a6adc4;">{{ c.hex }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Typography</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Inter, single typeface throughout the UI. Hierarchy comes from size and weight, never a second face — that's reserved for the wordmark alone.</div>
+    <div style="display:flex; flex-direction:column;">
+      <sc-for list="{{ type }}" as="ty" hint-placeholder-count="8">
+        <div style="display:grid; grid-template-columns:140px 1fr 160px; align-items:center; gap:20px; padding:18px 0; border-bottom:1px solid #1c1f29;">
+          <div style="font-size:12px; color:#a6adc4; font-weight:600;">{{ ty.label }}</div>
+          <div style="font-weight:{{ ty.weight }}; font-size:{{ ty.size }}px; line-height:{{ ty.lh }};">Now Playing</div>
+          <div style="font-size:11.5px; color:#6d7286; text-align:right;">{{ ty.spec }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- SPACING + RADII -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c; display:grid; grid-template-columns:1fr 1fr; gap:64px;">
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin-bottom:24px;">Spacing</div>
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <sc-for list="{{ spacing }}" as="s" hint-placeholder-count="6">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <div style="width:56px; font-size:12px; color:#a6adc4;">{{ s.name }}</div>
+            <div style="height:14px; width:{{ s.px }}px; background:#6f7ea9; border-radius:3px;"></div>
+            <div style="font-size:12px; color:#6d7286;">{{ s.pxLabel }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin-bottom:24px;">Radii</div>
+      <div style="display:flex; align-items:flex-end; gap:20px;">
+        <sc-for list="{{ radii }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div style="width:52px; height:52px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:{{ r.px }}px;"></div>
+            <div style="font-size:11px; color:#6d7286;">{{ r.name }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ELEVATION -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Elevation</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:32px; max-width:680px; line-height:1.6;">Flat by default. Hierarchy comes from background-tone steps and low-opacity borders, not shadow depth — chrome panels add a glass blur on top of all themes.</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+      <div style="background:#08090c; border:1px solid #2c2f3c; border-radius:12px; padding:22px; font-size:12.5px; color:#a6adc4;">bg-main — base canvas</div>
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:22px; font-size:12.5px; color:#a6adc4;">bg-sidebar — chrome step</div>
+      <div style="background:#191b23; backdrop-filter:blur(20px) saturate(180%); border:1px solid #2c2f3c; border-radius:12px; padding:22px; box-shadow:0 0 24px rgba(111,126,169,0.15); font-size:12.5px; color:#a6adc4;">glass-surface + accent glow</div>
+    </div>
+  </div>
+
+  <!-- COMPONENTS -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Components</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:36px;">Core primitives, styled from the tokens above.</div>
+    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:20px;">
+      <button style="background:#6f7ea9; color:#000; font-weight:600; font-size:13px; border:none; border-radius:8px; padding:12px 20px; cursor:pointer;">Primary button</button>
+      <button style="background:transparent; color:#f1f3f8; font-weight:600; font-size:13px; border:1px solid #2c2f3c; border-radius:9999px; padding:12px 20px; cursor:pointer;">Secondary button</button>
+      <div style="background:transparent; color:#a6adc4; font-size:13px; border:1px solid #2c2f3c; border-radius:9999px; padding:8px 16px;">Chip</div>
+      <div style="background:#2c2f3c; color:#f1f3f8; font-weight:600; font-size:13px; border-radius:9999px; padding:8px 16px;">Chip active</div>
+      <div style="background:#6f7ea9; color:#6f7ea9; background-color:rgba(111,126,169,0.15); font-weight:700; font-size:9px; letter-spacing:0.05em; text-transform:uppercase; border-radius:6px; padding:5px 9px;">FLAC</div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+      <div style="background:#6f7ea9; color:#000; font-weight:600; font-size:13px; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#000;"></div>Nav item active</div>
+      <div style="background:transparent; color:#a6adc4; font-weight:500; font-size:13px; border-radius:8px; padding:10px 16px;">Nav item</div>
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:16px; font-size:12.5px; color:#a6adc4; width:200px;">Card surface</div>
+    </div>
+  </div>
+
+  <!-- DOS DONTS -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
+      <div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8fbf9a; margin-bottom:14px;">Do</div>
+        <sc-for list="{{ dos }}" as="d" hint-placeholder-count="4">
+          <div style="font-size:13.5px; color:#d5d9e6; line-height:1.7; padding-left:18px; position:relative;"><span style="position:absolute; left:0;">—</span>{{ d }}</div>
+        </sc-for>
+      </div>
+      <div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#e0a0a0; margin-bottom:14px;">Don't</div>
+        <sc-for list="{{ donts }}" as="d" hint-placeholder-count="4">
+          <div style="font-size:13.5px; color:#d5d9e6; line-height:1.7; padding-left:18px; position:relative;"><span style="position:absolute; left:0;">—</span>{{ d }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      colors: [
+        { name: 'bg-main', hex: '#08090c' },
+        { name: 'bg-sidebar', hex: '#1c1f29' },
+        { name: 'bg-playerbar', hex: '#191b23' },
+        { name: 'accent', hex: '#6f7ea9' },
+        { name: 'accent-hover', hex: '#8c98ba' },
+        { name: 'accent-contrast', hex: '#000000' },
+        { name: 'text-primary', hex: '#f1f3f8' },
+        { name: 'text-secondary', hex: '#a6adc4' },
+        { name: 'border', hex: '#2c2f3c' },
+        { name: 'accent-text', hex: '#6f7ea9' },
+        { name: 'accent-gold (rare highlight)', hex: '#FFB648' },
+      ],
+      type: [
+        { label: 'Display', weight: 700, size: 36, lh: 1.15, spec: '36 / 700' },
+        { label: 'Headline lg', weight: 700, size: 24, lh: 1.2, spec: '24 / 700' },
+        { label: 'Headline md', weight: 600, size: 20, lh: 1.25, spec: '20 / 600' },
+        { label: 'Title', weight: 600, size: 18, lh: 1.3, spec: '18 / 600' },
+        { label: 'Body md', weight: 400, size: 14, lh: 1.5, spec: '14 / 400' },
+        { label: 'Body sm', weight: 400, size: 12, lh: 1.5, spec: '12 / 400' },
+        { label: 'Label', weight: 600, size: 12, lh: 1.3, spec: '12 / 600' },
+        { label: 'Micro badge', weight: 700, size: 11, lh: 1, spec: '9\u201311 / 700 · tracked' },
+      ],
+      spacing: [
+        { name: 'xs', px: 4, pxLabel: '4px' },
+        { name: 'sm', px: 8, pxLabel: '8px' },
+        { name: 'md', px: 12, pxLabel: '12px' },
+        { name: 'lg', px: 16, pxLabel: '16px' },
+        { name: 'xl', px: 24, pxLabel: '24px' },
+        { name: '2xl', px: 32, pxLabel: '32px' },
+      ],
+      radii: [
+        { name: 'sm 6', px: 6 },
+        { name: 'md 8', px: 8 },
+        { name: 'lg 12', px: 12 },
+        { name: 'xl 16', px: 16 },
+        { name: 'full', px: 26 },
+      ],
+      dos: [
+        'Read colors from theme tokens — never hardcode theme hex values.',
+        'Use accent-text (contrast-clamped) for text/icons on bg-main or bg-sidebar.',
+        'Tint elevation shadows with the accent color on interactive elements.',
+        'Keep secondary text at full opacity — never dilute with opacity modifiers.',
+        'Reserve accent-gold for one-off highlight moments — a "Featured" badge, a premium marker, a milestone toast.',
+      ],
+      donts: [
+        'Introduce a second UI typeface — hierarchy is size and weight only.',
+        'Use rounded-full on rectangular cards or panels.',
+        'Add heavy drop shadows to flat chrome beyond the standard glass treatment.',
+        'Use raw accent for text sitting directly on the main canvas.',
+        'Use accent-gold on buttons, active states, or anything recurring — that stays on the theme accent.',
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -17,6 +17,7 @@ colors:
   text-primary: "#f1f3f8"
   text-secondary: "#a6adc4"
   border: "#2c2f3c"
+  accent-gold: "#FFB648"
 typography:
   display:
     fontFamily: Inter
@@ -134,6 +135,7 @@ Theming is **not static**: users can switch between several built-in themes (Lum
 - **accent-contrast (#000000):** Heuristically derived per-theme text/icon color for content placed *on top of* an accent-colored surface (e.g. the glyph inside a filled play button).
 - **text-primary (#f1f3f8) / text-secondary (#a6adc4):** Primary reads as near-white for titles and active content; secondary is a desaturated blue-gray for metadata, captions, and inactive labels.
 - **border (#2c2f3c):** The sole structural line color, almost always used at reduced opacity (`/40`, `/50`, `/60`) rather than full strength.
+- **accent-gold (#FFB648):** Fixed brand color (not theme-swappable), borrowed from the logo's eclipse ring. Reserved for rare one-off highlight moments — a "Featured" badge, a premium marker, a milestone toast. Never used on buttons, active states, or anything recurring.
 - **artwork-extracted tokens:** `--color-artwork-primary`, `--color-artwork-accent`, etc., dynamically extracted from current album art when Adaptive Dynamic Cover Tinting is enabled.
 
 ## Typography
@@ -212,3 +214,60 @@ Rounded corners scale with component visual weight:
 - Do use full-strength `text-brand-text-secondary` for metadata/captions — never dilute it with opacity modifiers (`/40`–`/90`). An accessibility audit swept these out app-wide because diluted secondary text failed contrast checks; `border` opacity modifiers are unaffected and remain the normal pattern.
 - Don't introduce a second typeface; hierarchy comes strictly from size and weight.
 - Don't add heavy drop shadows to flat chrome panels beyond the standard glass treatment (now applied to all themes, not just System).
+- Do reserve `accent-gold` for rare highlight moments (Featured badge, premium marker, milestone toast) — never on buttons, active states, or anything recurring.
+- Don't put a gradient or colored frame on a custom (user-made) playlist — flat/no-frame is what visually marks a playlist as custom.
+
+## Playlist Card System
+
+Special playlist categories carry a colored gradient identity, distinct from custom (user-made) playlists, which get no color treatment at all. Full reference: `Luminous Playlist Card System.dc.html`.
+
+### Frame color families (playlists with real album art)
+
+- **Blue** (`#2563EB → #38BDF8`) — Decades.
+- **Green** (`#059669 → #34D399`) — Genres.
+- **Orange** (`#C2410C → #F59E0B`) — Smart Rule playlists.
+
+The gradient renders as a thin border framing the stacked album art, plus a matching badge pill ("Auto" for Decades/Genres, "✦ Smart" for Smart Rule playlists). All gradients run 135° (top-left to bottom-right).
+
+### Icon tiles (playlists without stable album art)
+
+Favourites, Recently Added, and Queue have no consistent art to frame, so they get a full-bleed gradient tile with a single glyph instead. Each has its own distinct signature gradient, independent of the frame color families above:
+
+- Favourites (heart): `#DB2777 → #F43F5E` (pink/rose)
+- Recently Added (clock): `#CA8A04 → #FACC15` (gold/amber)
+- Queue (stack): `#4338CA → #7C3AED` (indigo/violet)
+
+### Custom playlists
+
+User-made playlists get no frame and no gradient — plain album art with the standard card border. Gradient is the one visual signal for "the app built this for you"; flat is what marks a playlist as custom.
+
+## Brand & Logo
+
+The mark is an eclipse motif — a black disc with a corona flare, seen edge-on. It exists in two modes: **static** (app icon, social avatar, marketing — a fixed "at rest" pose) and **reactive** (embedded in the running app — an audio-visualizer element driven live by the current track's frequency bands). Full reference: `Luminous Logo System.dc.html`; source: `assets/luminous-mark.svg`.
+
+### Layers (back to front)
+
+1. **Ambient glow** — soft blurred halo. Recolors with the active theme (or extracted album-art color). Driven by **mid** frequencies at runtime (radius/opacity).
+2. **Eclipse ring** — thin ring at the disc's edge. Recolors alongside the glow, one step brighter. Driven by **treble** (stroke-width/opacity).
+3. **Black silhouette** — the disc itself. Always `#0A0A0D`, fixed regardless of theme or artwork. Never recolors.
+4. **Coronal burst** — bright flare at the disc's edge (fixed position, upper-right). Always pure white. Driven by **bass** (radius/opacity).
+
+### Brand colors (fixed, outside the swappable UI theme)
+
+- Ink (silhouette): `#0A0A0D`
+- Paper (corona): `#FFFFFF`
+- Primary — Indigo: `#626FE8`
+- Accent — Gold: `#FFB648`
+
+These are the logo's own identity colors for marketing/social/app-icon-at-rest use — independent from the in-app swappable `accent` token. Inside the running app, glow + ring instead re-target to whichever theme (or extracted artwork palette) is active.
+
+### Wordmark
+
+"Luminous" is set in **Space Grotesk** (600–700 weight) — a geometric sans whose circular counters echo the mark. It is the only place a second typeface appears; the tagline "Music Player" and all other UI text stay in Inter. Approved lockups: icon alone, icon + wordmark (horizontal), icon + wordmark (stacked), icon + wordmark + "Music Player" tagline (larger/marketing use only). Don't rearrange these relative to each other.
+
+### Usage rules
+
+- Icon ships mark-only, no container — add a squircle/rounded-square background per-platform only where the OS requires it (e.g. macOS dock).
+- Minimum clearspace: ¼ of the mark's diameter on every side.
+- Below 24px, drop the glow and ring — render silhouette + burst only.
+- Never recolor the black silhouette or white burst; never stretch, skew, or add drop shadows/outlines to the mark.
