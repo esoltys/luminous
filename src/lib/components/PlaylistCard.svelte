@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ListMusic, Play, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
   import type { Playlist, PlaylistItem } from "../types";
-  import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -70,19 +69,19 @@
   onclick={onClick}
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group relative"
 >
-  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center rounded-lg overflow-hidden">
+  <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
     {#if isQueue}
-      <div class="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-[#4338CA] to-[#7C3AED] flex items-center justify-center overflow-hidden border border-brand-border/60">
         <Layers class="w-10 h-10 text-white/90" />
       </div>
     {:else if topAlbums.length > 0 && autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-amber-500 via-orange-500 to-orange-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : autoKind === 'genre' ? 'from-[#059669] to-[#34D399]' : 'from-[#C2410C] to-[#F59E0B]'} flex items-center justify-center overflow-hidden border border-brand-border/60">
         <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
     {:else if autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-cyan-600 to-blue-600' : autoKind === 'genre' ? 'from-emerald-600 to-teal-600' : 'from-amber-500 via-orange-500 to-orange-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : autoKind === 'genre' ? 'from-[#059669] to-[#34D399]' : 'from-[#C2410C] to-[#F59E0B]'} flex items-center justify-center overflow-hidden border border-brand-border/60">
         {#if autoKind === "decade"}
           <Calendar class="w-10 h-10 text-white/90" />
         {:else if autoKind === "genre"}
@@ -92,9 +91,10 @@
         {/if}
       </div>
     {:else}
-      <div class="w-full h-full bg-gradient-to-br {getArtistGradient(playlist.name)} flex items-center justify-center overflow-hidden border border-brand-border/60">
-        <ListMusic class="w-10 h-10 text-white/80" />
-      </div>
+      <!-- Custom (user-made) playlist with no art yet: flat, no gradient —
+           gradient/frame treatment is reserved for app-generated playlists
+           (see Luminous Playlist Card System). -->
+      <ListMusic class="w-10 h-10 text-brand-text-secondary" />
     {/if}
 
     {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}

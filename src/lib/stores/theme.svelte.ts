@@ -51,26 +51,13 @@ export interface ExtractedColors {
 }
 
 /**
- * Reserved for ReactiveLogoBrand's gradient only (see calculateLogoStops()
- * below) — pulled from app-icon.svg's own sunrise gradient ("Vibrant Zest
- * Orange core" / "golden horizon" stops) so the in-app logo always matches
- * the real icon shown in the OS taskbar/dock, independent of whatever UI
- * accent the active theme uses. Not extracted programmatically from the
- * SVG at build/runtime — overkill for a static, rarely-changing asset, and
- * would still require guessing which of five gradient stops is "the" brand
- * color; using the exact hex the icon's own source comments already label
- * as the core color is simpler and unambiguous.
- */
-const BRAND_ORANGE = "#ff7300";
-const BRAND_GOLD = "#ffcc00";
-
-/**
- * Dusty slate blue, chosen over the original BRAND_ORANGE for the dark
- * theme's UI accent (badges, buttons, sliders, active states) — clears the
- * same strict 4.5:1 WCAG text-contrast threshold against the near-black
- * canvas (~4.96:1) that BRAND_ORANGE cleared. Deliberately independent of
- * BRAND_ORANGE/BRAND_GOLD, which stay logo-only (see above) so this swap
- * doesn't touch the app-icon-matched logo gradient.
+ * Dusty slate blue, the dark theme's UI accent (badges, buttons, sliders,
+ * active states) — clears the strict 4.5:1 WCAG text-contrast threshold
+ * against the near-black canvas (~4.96:1). Per the Luminous Logo System
+ * (docs/Luminous Logo System.dc.html), the in-app reactive logo's glow/ring
+ * re-target to this same active-theme accent/accent-hover pair — the fixed
+ * Indigo/Gold brand colors in app-icon.svg are reserved for the static
+ * "at rest" mark (app icon, marketing) only.
  */
 const LUMINOUS_DARK_ACCENT = "#6f7ea9";
 
@@ -379,26 +366,6 @@ function getFallbackColors(): ExtractedColors {
   };
 }
 
-function calculateLogoStops(accentHex: string, accentHoverHex: string) {
-  const darken = (hex: string, amount: number): string => {
-    if (!hex || !hex.startsWith("#")) return hex || "";
-    const usePound = hex[0] === "#";
-    const col = usePound ? hex.slice(1) : hex;
-    const num = parseInt(col, 16);
-    const r = Math.max(0, Math.floor(((num / 65536) % 256) * (1 - amount)));
-    const g = Math.max(0, Math.floor(((num / 256) % 256) * (1 - amount)));
-    const b = Math.max(0, Math.floor((num % 256) * (1 - amount)));
-    return (usePound ? "#" : "") + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
-  };
-
-  return {
-    stop1: darken(accentHex, 0.6),
-    stop2: darken(accentHex, 0.2),
-    stop3: accentHex,
-    stop4: accentHoverHex
-  };
-}
-
 export class ThemeStore {
   activeThemeId = $state<string>("system");
   customThemes = $state<Theme[]>([]);
@@ -590,13 +557,6 @@ export class ThemeStore {
     root.style.setProperty("--color-artwork-accent-hover", colors.accentHover);
     root.style.setProperty("--color-artwork-border", colors.border);
 
-    // Apply logo stop variables
-    const stops = calculateLogoStops(colors.accent, colors.accentHover);
-    root.style.setProperty("--logo-stop-1", stops.stop1);
-    root.style.setProperty("--logo-stop-2", stops.stop2);
-    root.style.setProperty("--logo-stop-3", stops.stop3);
-    root.style.setProperty("--logo-stop-4", stops.stop4);
-
     if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
       this.applyActiveTheme(true);
     }
@@ -612,13 +572,6 @@ export class ThemeStore {
     root.style.setProperty("--color-artwork-accent", "#88c0d0");
     root.style.setProperty("--color-artwork-accent-hover", "#8fbcbb");
     root.style.setProperty("--color-artwork-border", "#3b4252");
-
-    // Apply logo stop variables
-    const stops = calculateLogoStops("#88c0d0", "#8fbcbb");
-    root.style.setProperty("--logo-stop-1", stops.stop1);
-    root.style.setProperty("--logo-stop-2", stops.stop2);
-    root.style.setProperty("--logo-stop-3", stops.stop3);
-    root.style.setProperty("--logo-stop-4", stops.stop4);
 
     if (!skipApplyActiveTheme && this.activeThemeId === "dynamic-artwork") {
       this.applyActiveTheme(true);
@@ -798,32 +751,6 @@ export class ThemeStore {
     const glowNear = `0 0 24px 2px ${hexToRgbaString(resolvedAccent, isDark ? 0.45 : 0.28)}`;
     const glowFar = `0 0 90px 10px ${hexToRgbaString(resolvedAccent, isDark ? 0.28 : 0.16)}`;
     root.style.setProperty("--glass-glow", `${glowNear}, ${glowFar}`);
-
-    // Apply logo stops based on active theme or dynamic colors. The
-    // System theme always uses the true brand orange/gold here — never
-    // the scheme-adjusted UI accent, which in light mode is deliberately
-    // darkened for text contrast and would make the logo look muddy/wrong
-    // instead of matching the real app icon.
-    if (theme.id === "dynamic-artwork") {
-      const artColors = this.artworkColors || getFallbackColors();
-      const stops = calculateLogoStops(artColors.accent, artColors.accentHover);
-      root.style.setProperty("--logo-stop-1", stops.stop1);
-      root.style.setProperty("--logo-stop-2", stops.stop2);
-      root.style.setProperty("--logo-stop-3", stops.stop3);
-      root.style.setProperty("--logo-stop-4", stops.stop4);
-    } else if (isLuminous) {
-      const stops = calculateLogoStops(BRAND_ORANGE, BRAND_GOLD);
-      root.style.setProperty("--logo-stop-1", stops.stop1);
-      root.style.setProperty("--logo-stop-2", stops.stop2);
-      root.style.setProperty("--logo-stop-3", stops.stop3);
-      root.style.setProperty("--logo-stop-4", stops.stop4);
-    } else {
-      const stops = calculateLogoStops(colors["color-accent"], colors["color-accent-hover"]);
-      root.style.setProperty("--logo-stop-1", stops.stop1);
-      root.style.setProperty("--logo-stop-2", stops.stop2);
-      root.style.setProperty("--logo-stop-3", stops.stop3);
-      root.style.setProperty("--logo-stop-4", stops.stop4);
-    }
   }
 }
 

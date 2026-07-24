@@ -422,7 +422,7 @@
                         artManual={album.art_manual}
                         artAutomatic={album.art_automatic}
                         artEmbedded={album.art_embedded}
-                        sizeClass="w-8 h-8 rounded-md"
+                        sizeClass="w-8 h-8"
                       />
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
@@ -472,7 +472,7 @@
                     class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                      <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
                         <ListMusic class="w-4 h-4 text-brand-text-secondary" />
                       </div>
                       <div class="flex flex-col min-w-0 flex-1">
@@ -524,7 +524,7 @@
                         artManual={song.art_manual}
                         artAutomatic={song.art_automatic}
                         artEmbedded={song.art_embedded}
-                        sizeClass="w-8 h-8 rounded-md"
+                        sizeClass="w-8 h-8"
                       />
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
@@ -579,10 +579,10 @@
                       songId={typeof item.entityId === 'number' ? item.entityId : undefined}
                       artManual={item.artUrl}
                       artAutomatic={item.artUrl}
-                      sizeClass="w-9 h-9 {item.kind === 'artist' ? 'rounded-full' : 'rounded-md'}"
+                      sizeClass="w-9 h-9 {item.kind === 'artist' ? 'rounded-full' : ''}"
                     />
                   {:else}
-                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : 'rounded-md'}">
+                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : ''}">
                       {#if item.kind === 'artist'}
                         <User class="w-4 h-4 text-brand-text-secondary" />
                       {:else if item.kind === 'album'}

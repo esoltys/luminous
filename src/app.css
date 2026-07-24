@@ -15,6 +15,10 @@
   --color-brand-border: var(--color-border);
   /* Heuristically derived (not hand-picked) — see ThemeStore.applyActiveTheme() */
   --color-brand-accent-contrast: var(--color-accent-contrast);
+  /* Fixed brand color, not theme-swappable — borrowed from the logo's
+     eclipse ring. Reserved for rare highlight moments (Featured badge,
+     premium marker, milestone toast); never wired through ThemeStore. */
+  --color-brand-gold: var(--color-accent-gold);
 }
 
 @layer base {
@@ -35,6 +39,8 @@
        further clamping needed for this fallback — see clampForContrast(). */
     --color-accent-text: #6f7ea9;
     --color-accent-text-hover: #8c98ba;
+    /* Fixed brand gold, never overridden per-theme (see @theme block above) */
+    --color-accent-gold: #ffb648;
 
     /* Artwork extracted colors defaults */
     --color-artwork-primary: #2e3440;

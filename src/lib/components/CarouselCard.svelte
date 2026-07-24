@@ -48,7 +48,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="flex-shrink-0 w-48 group relative snap-start">
     <!-- Card Container -->
-    <div class="relative overflow-hidden rounded-xl bg-brand-sidebar border border-brand-border/60 transition-all duration-200 hover:border-brand-accent/40 flex flex-col h-full">
+    <div class="relative overflow-hidden rounded-b-xl bg-brand-sidebar border border-brand-border/60 transition-all duration-200 hover:border-brand-accent/40 flex flex-col h-full">
       <!-- Cover Art -->
       <div class="relative aspect-square overflow-hidden bg-brand-sidebar w-full">
         <CoverArt

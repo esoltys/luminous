@@ -148,7 +148,7 @@
           </span>
         {/if}
 
-        <div class="relative shrink-0 rounded-md overflow-hidden">
+        <div class="relative shrink-0 overflow-hidden">
           {#if item.type === "song"}
             <CoverArt
               songId={item.song.id}

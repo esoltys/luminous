@@ -685,7 +685,7 @@
 
         <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue Banner -->
         {#if isQueue}
-          <div class="w-32 h-32 hidden sm:flex shrink-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 items-center justify-center overflow-hidden border border-brand-border/60 rounded-2xl shadow-xl">
+          <div class="w-32 h-32 hidden sm:flex shrink-0 bg-gradient-to-br from-[#4338CA] to-[#7C3AED] items-center justify-center overflow-hidden border border-brand-border/60 shadow-xl">
             <Layers class="w-14 h-14 text-white/90" />
           </div>
         {:else if topAlbums.length > 0}

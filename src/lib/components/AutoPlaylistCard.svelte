@@ -93,27 +93,27 @@
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
-      <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-cyan-600 to-blue-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg relative">
+      <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : 'from-[#059669] to-[#34D399]'} flex items-center justify-center overflow-hidden border border-brand-border/60 relative">
         <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
-      <div class="w-full h-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-[#DB2777] to-[#F43F5E] flex items-center justify-center overflow-hidden border border-brand-border/60">
         <Heart class="w-10 h-10 text-white/90 fill-current" />
       </div>
     {:else if kind === "recently_added"}
-      <div class="w-full h-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-[#CA8A04] to-[#FACC15] flex items-center justify-center overflow-hidden border border-brand-border/60">
         <Clock class="w-10 h-10 text-white/90" />
       </div>
     {:else if kind === "decade"}
-      <div class="w-full h-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-[#2563EB] to-[#38BDF8] flex items-center justify-center overflow-hidden border border-brand-border/60">
         <Calendar class="w-10 h-10 text-white/90" />
       </div>
     {:else if kind === "genre"}
-      <div class="w-full h-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-[#059669] to-[#34D399] flex items-center justify-center overflow-hidden border border-brand-border/60">
         <Music class="w-10 h-10 text-white/90" />
       </div>
     {:else}
-      <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center overflow-hidden border border-brand-border/60 rounded-lg">
+      <div class="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center overflow-hidden border border-brand-border/60">
         <ListMusic class="w-10 h-10 text-white/90" />
       </div>
     {/if}
