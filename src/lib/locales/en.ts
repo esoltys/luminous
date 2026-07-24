@@ -12,8 +12,6 @@ export const en = {
     playlistsCustom: "Custom",
     create: "Create",
     rescanLibrary: "Rescan Library",
-    manageLibrary: "Manage Library",
-    scanProgressClickHint: "Scan in progress — click to open Watched Folders settings",
     scanning: "Scanning",
     scanningPhaseTooltip: "Scanning Phase: {phase} ({scanned}/{total})",
     scanningPhaseLabel: "Phase: {phase}"
@@ -119,7 +117,7 @@ export const en = {
     title: "Settings",
     tabGeneral: "General",
     tabFolders: "Folders",
-    tabTools: "Tools",
+    tabTools: "Organize",
     tabThemes: "UI Themes",
     tabEqualizer: "Equalizer",
     tabAbout: "About & Credits",
@@ -255,7 +253,7 @@ export const en = {
     incrementalRescanHint: "Scans watched folders for new, changed, or removed files, skipping anything whose modification time hasn't changed",
     forceFullScanBtn: "Force Full Re-Scan",
     forceFullScanHint: "Re-reads metadata and artwork for all audio files, ignoring file modification times",
-    pruneMissingBtn: "Clean Up Missing Songs",
+    pruneMissingBtn: "Clean Up",
     pruneMissingHint: "Removes library entries for audio files that were moved or deleted from disk, and cleans up any folders left empty",
     pruneCompleteMsg: "Cleaned up {count} missing song(s)",
     toolsHelpTitle: "What do these tools do?",
@@ -674,6 +672,6 @@ export const en = {
     applyButton: "Apply Changes",
     applySuccess: "Successfully reorganized {count} file(s)",
     organizeFilesTooltip: "Organize files by tag template",
-    organizeEntireLibrary: "Organize Entire Library..."
+    organizeEntireLibrary: "Organize"
   }
 };

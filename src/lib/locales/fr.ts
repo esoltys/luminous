@@ -12,8 +12,6 @@ export const fr = {
     playlistsCustom: "Personnalisées",
     create: "Créer",
     rescanLibrary: "Analyser la bibliothèque",
-    manageLibrary: "Gérer la bibliothèque",
-    scanProgressClickHint: "Analyse en cours — cliquez pour ouvrir les paramètres des dossiers surveillés",
     scanning: "Analyse",
     scanningPhaseTooltip: "Phase d'analyse : {phase} ({scanned}/{total})",
     scanningPhaseLabel: "Phase : {phase}"
@@ -119,7 +117,7 @@ export const fr = {
     title: "Paramètres",
     tabGeneral: "Général",
     tabFolders: "Dossiers",
-    tabTools: "Outils",
+    tabTools: "Organiser",
     tabThemes: "Thèmes d'interface",
     tabEqualizer: "Égaliseur",
     tabAbout: "À propos",
@@ -254,7 +252,7 @@ export const fr = {
     incrementalRescanHint: "Analyse les dossiers surveillés à la recherche de fichiers nouveaux, modifiés ou supprimés, en ignorant ceux dont la date de modification n'a pas changé",
     forceFullScanBtn: "Forcer la réanalyse complète",
     forceFullScanHint: "Relit les métadonnées et pochette de tous les fichiers audio sans tenir compte des dates de modification",
-    pruneMissingBtn: "Nettoyer les chansons manquantes",
+    pruneMissingBtn: "Nettoyer",
     pruneMissingHint: "Supprime les entrées de la bibliothèque pour les fichiers audio déplacés ou supprimés du disque, et nettoie les dossiers devenus vides",
     pruneCompleteMsg: "{count} chanson(s) manquante(s) nettoyée(s)",
     toolsHelpTitle: "À quoi servent ces outils ?",
@@ -671,6 +669,6 @@ export const fr = {
     applyButton: "Appliquer les modifications",
     applySuccess: "{count} fichier(s) réorganisé(s) avec succès",
     organizeFilesTooltip: "Organiser les fichiers par modèle de tags",
-    organizeEntireLibrary: "Organiser toute la bibliothèque..."
+    organizeEntireLibrary: "Organiser"
   }
 };
