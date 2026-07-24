@@ -184,13 +184,16 @@
         </div>
 
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
+          <div class="flex items-center gap-2">
+            <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
+            {#if item.type === "song"}
+              <span class="shrink-0">
+                <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
+              </span>
+            {/if}
+          </div>
           <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
         </div>
-
-        {#if item.type === "song"}
-          <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
-        {/if}
 
         <div class="shrink-0 max-w-40 text-right">
           <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
