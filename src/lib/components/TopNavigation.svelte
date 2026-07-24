@@ -632,21 +632,21 @@
   <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
     <button
       onclick={() => collectionStore.toggleSidebar()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleSidebar')}
     >
       <PanelLeft class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleImmersiveMode()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {!collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.immersiveMode ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleImmersive')}
     >
       <PanelBottom class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleRightPanel()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-main/50'}"
+      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-border text-brand-accent-text shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleRightPanel')}
     >
       <PanelRight class="w-4 h-4" />
