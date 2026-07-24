@@ -562,6 +562,7 @@ pub fn run() {
             commands::player::seek_to,
             commands::player::set_volume,
             commands::player::get_playback_state,
+            commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
             // Playlist commands

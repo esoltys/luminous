@@ -238,6 +238,17 @@ pub async fn get_playback_state(state: State<'_, AppState>) -> Result<PlaybackSt
     Ok(state.player.lock().await.get_state().await)
 }
 
+/// Re-syncs the active playback queue (and current song) with the database.
+/// Call after a library rescan so a track that was already queued before a
+/// move/deletion picks up its corrected path (or gets marked unavailable)
+/// without requiring the queue to be rebuilt or the app restarted.
+#[tauri::command]
+pub async fn refresh_playback_queue(state: State<'_, AppState>) -> Result<PlaybackState, String> {
+    let mut player = state.player.lock().await;
+    player.resync_queue_with_db().map_err(|e| e.to_string())?;
+    Ok(player.get_state().await)
+}
+
 #[tauri::command]
 pub async fn set_shuffle_mode(mode: ShuffleMode, state: State<'_, AppState>) -> Result<(), String> {
     state.player.lock().await.set_shuffle_mode(mode);

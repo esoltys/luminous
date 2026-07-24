@@ -168,6 +168,17 @@ impl CollectionScanner {
 
         {
             let conn = self.db.pool.get()?;
+
+            // Repoint DB rows for files that moved to a different watched folder
+            // (e.g. a library split/reorganization) before doing anything else,
+            // so the per-file loop below and prune_missing_songs() both see the
+            // corrected path instead of treating the move as delete+new-insert.
+            match reconcile_moved_songs(&conn, &all_paths) {
+                Ok(0) => {}
+                Ok(n) => log::info!("Reconciled {n} moved song(s) to their new path"),
+                Err(e) => log::warn!("Failed to reconcile moved songs during scan: {e}"),
+            }
+
             for path in &all_paths {
                 let path_str = path.to_string_lossy().to_string();
 
@@ -1666,6 +1677,93 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 // File Watcher & Deletion Sync
 // ---------------------------------------------------------------------------
 
+/// Matches DB rows whose file has vanished from its recorded path ("orphans")
+/// against freshly discovered files that have no DB row yet ("candidates"),
+/// using filename + file size as the identity heuristic, and repoints the
+/// orphan's `path`/`mtime` in place instead of leaving it for delete+reinsert.
+///
+/// This is what lets a folder move/split (including across two different
+/// watched roots) survive a rescan without losing the song's id — and with
+/// it, its play count, rating, and playlist membership. A key only
+/// reconciles when exactly one orphan and exactly one candidate share it;
+/// ambiguous matches (e.g. duplicate files) are left alone and fall back to
+/// the normal insert/prune behavior.
+fn reconcile_moved_songs(conn: &rusqlite::Connection, all_paths: &[PathBuf]) -> Result<usize> {
+    let mut existing_paths_stmt = conn.prepare("SELECT path FROM songs WHERE path IS NOT NULL")?;
+    let existing_paths: std::collections::HashSet<String> = existing_paths_stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+    drop(existing_paths_stmt);
+
+    let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
+        std::collections::HashMap::new();
+    for path in all_paths {
+        if existing_paths.contains(&path.to_string_lossy().to_string()) {
+            continue;
+        }
+        let (Some(filename), Ok(metadata)) = (
+            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
+            std::fs::metadata(path),
+        ) else {
+            continue;
+        };
+        candidates
+            .entry((filename, metadata.len() as i64))
+            .or_default()
+            .push(path);
+    }
+
+    if candidates.is_empty() {
+        return Ok(0);
+    }
+
+    let mut stmt = conn.prepare("SELECT id, path, filesize FROM songs WHERE path IS NOT NULL")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, Option<i64>>(2)?,
+        ))
+    })?;
+
+    let mut orphans: std::collections::HashMap<(String, i64), Vec<i64>> =
+        std::collections::HashMap::new();
+    for (id, path, filesize) in rows.flatten() {
+        let Some(filesize) = filesize else { continue };
+        let p = Path::new(&path);
+        if p.exists() {
+            continue;
+        }
+        let Some(filename) = p.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
+            continue;
+        };
+        orphans.entry((filename, filesize)).or_default().push(id);
+    }
+
+    let mut reconciled = 0usize;
+    let mut update_stmt = conn.prepare("UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3")?;
+    for (key, orphan_ids) in orphans {
+        if orphan_ids.len() != 1 {
+            continue; // ambiguous — multiple missing songs share this filename+size
+        }
+        let Some(candidate_paths) = candidates.get(&key) else {
+            continue;
+        };
+        if candidate_paths.len() != 1 {
+            continue; // ambiguous — multiple new files share this filename+size
+        }
+
+        let new_path = candidate_paths[0];
+        let new_path_str = new_path.to_string_lossy().to_string();
+        let mtime = get_mtime(new_path).unwrap_or(0);
+        update_stmt.execute(params![new_path_str, mtime, orphan_ids[0]])?;
+        reconciled += 1;
+    }
+
+    Ok(reconciled)
+}
+
 /// Helper to hard-delete a path and its subpaths from the SQLite database.
 pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
     let conn = db.pool.get()?;
@@ -1689,18 +1787,39 @@ pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> 
     Ok(deleted)
 }
 
+/// Message delivered from the notify callback to the watcher thread. A plain
+/// `notify::Event` channel would silently lose whatever changes happened
+/// during an `Err` (e.g. the OS's change-journal buffer overflowing during a
+/// large bulk move) — `Overflow` makes that loss explicit and recoverable.
+enum WatcherMsg {
+    Event(notify::Event),
+    Overflow,
+}
+
 /// Start background directory watching using notify.
 pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
     let app_clone = app.clone();
 
     // Create a channel to receive events
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel::<WatcherMsg>();
 
     // Create recommended watcher
     let watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-        if let Ok(event) = res {
-            let _ = tx.send(event);
+        match res {
+            Ok(event) => {
+                let _ = tx.send(WatcherMsg::Event(event));
+            }
+            Err(e) => {
+                // The OS-level change buffer (e.g. Windows' ReadDirectoryChangesW)
+                // has a fixed size and can overflow during a large bulk move
+                // (splitting a library across folders). When that happens notify
+                // reports an error instead of the individual events, so we can't
+                // know what changed — fall back to a full rescan instead of
+                // silently going stale.
+                log::warn!("File watcher error (possible missed events): {e}");
+                let _ = tx.send(WatcherMsg::Overflow);
+            }
         }
     });
 
@@ -1747,7 +1866,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 .ok()
                 .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
 
-            for event in rx {
+            for msg in rx {
                 if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     continue;
                 }
@@ -1768,6 +1887,22 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 if !realtime_enabled {
                     continue;
                 }
+
+                let event = match msg {
+                    WatcherMsg::Event(event) => event,
+                    WatcherMsg::Overflow => {
+                        // We don't know what changed — a full rescan (which also
+                        // reconciles moved files) is the only reliable recovery.
+                        log::warn!("Recovering from a watcher error with a full library rescan");
+                        let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
+                        let app_handle_scan = app_clone.clone();
+                        tauri::async_runtime::block_on(async move {
+                            let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                            let _ = app_handle_scan.emit("library-changed", ());
+                        });
+                        continue;
+                    }
+                };
 
                 for path in event.paths {
                     let path_str = path.to_string_lossy().to_string();
@@ -2480,6 +2615,138 @@ mod tests {
             .query_row("SELECT path FROM songs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(remaining_path, real_file.to_string_lossy().to_string());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_repaths_unique_match() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir = temp_dir.join("new");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // The file now lives only at `new_path` — `old_path` is what the DB
+        // still has recorded, simulating a folder moved to a different
+        // watched root between scans.
+        let old_path = old_dir.join("track.mp3");
+        let new_path = new_dir.join("track.mp3");
+        let content = b"pretend audio bytes";
+        std::fs::write(&new_path, content).unwrap();
+
+        let song = Song {
+            path: Some(old_path.to_string_lossy().to_string()),
+            title: Some("Moved Track".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let original_id: i64 = conn
+            .query_row("SELECT id FROM songs", [], |r| r.get(0))
+            .unwrap();
+        // upsert_song() never touches playcount (it's only mutated via
+        // stats::record_play) — set it directly to prove reconciliation's
+        // UPDATE preserves stats tied to the id instead of resetting them.
+        conn.execute(
+            "UPDATE songs SET playcount = 7 WHERE id = ?1",
+            params![original_id],
+        )
+        .unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, &[new_path.clone()]).unwrap();
+        assert_eq!(reconciled, 1);
+
+        let (id, path, playcount): (i64, String, i32) = conn
+            .query_row("SELECT id, path, playcount FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(id, original_id, "repath must preserve the song's id");
+        assert_eq!(path, new_path.to_string_lossy().to_string());
+        assert_eq!(
+            playcount, 7,
+            "repath must not reset stats tied to the song id"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_skips_ambiguous_matches() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_ambiguous_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir_a = temp_dir.join("new_a");
+        let new_dir_b = temp_dir.join("new_b");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir_a).unwrap();
+        std::fs::create_dir_all(&new_dir_b).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // Two missing rows and two newly discovered files all share the same
+        // filename + size — there's no way to know which orphan maps to
+        // which candidate, so reconciliation must leave both alone.
+        let content = b"duplicate track bytes";
+        let new_path_a = new_dir_a.join("track.mp3");
+        let new_path_b = new_dir_b.join("track.mp3");
+        std::fs::write(&new_path_a, content).unwrap();
+        std::fs::write(&new_path_b, content).unwrap();
+
+        for i in 0..2 {
+            let song = Song {
+                path: Some(
+                    old_dir
+                        .join(format!("orphan{i}/track.mp3"))
+                        .to_string_lossy()
+                        .to_string(),
+                ),
+                title: Some(format!("Orphan {i}")),
+                source: SongSource::LocalFile,
+                filesize: Some(content.len() as i64),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        let reconciled =
+            reconcile_moved_songs(&conn, &[new_path_a.clone(), new_path_b.clone()]).unwrap();
+        assert_eq!(
+            reconciled, 0,
+            "ambiguous filename+size matches must not be guessed at"
+        );
+
+        let mut stmt = conn
+            .prepare("SELECT path FROM songs ORDER BY path")
+            .unwrap();
+        let paths: Vec<String> = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(
+            paths
+                .iter()
+                .all(|p| p.starts_with(&old_dir.to_string_lossy().to_string())),
+            "orphan rows must be untouched, got {paths:?}"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
