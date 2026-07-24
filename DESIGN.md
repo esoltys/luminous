@@ -216,6 +216,7 @@ Rounded corners scale with component visual weight:
 - Don't add heavy drop shadows to flat chrome panels beyond the standard glass treatment (now applied to all themes, not just System).
 - Do reserve `accent-gold` for rare highlight moments (Featured badge, premium marker, milestone toast) — never on buttons, active states, or anything recurring.
 - Don't put a gradient or colored frame on a custom (user-made) playlist — flat/no-frame is what visually marks a playlist as custom.
+- Don't round the corners of album artwork or crop it — art is always shown square and in its entirety; only the outer card/frame gets corner radius.
 
 ## Playlist Card System
 
@@ -264,6 +265,12 @@ These are the logo's own identity colors for marketing/social/app-icon-at-rest u
 ### Wordmark
 
 "Luminous" is set in **Space Grotesk** (600–700 weight) — a geometric sans whose circular counters echo the mark. It is the only place a second typeface appears; the tagline "Music Player" and all other UI text stay in Inter. Approved lockups: icon alone, icon + wordmark (horizontal), icon + wordmark (stacked), icon + wordmark + "Music Player" tagline (larger/marketing use only). Don't rearrange these relative to each other.
+
+### Two artifacts
+
+- `luminous-mark.svg` — static, crisp, no blur or glow filters. Use for app icons, avatars, favicons, and anywhere the mark must render sharp at small sizes.
+- `luminous-mark-reactive.svg` — lush, heavier blur/glow baked in (bigger ambient glow, blurred rings, blurred burst halo). Use for hero/marketing placements and as the resting frame of the in-app audio-reactive element.
+- Never blur the static mark or crisp up the reactive one — they're distinct assets for distinct contexts, not one file with a toggle.
 
 ### Usage rules
 

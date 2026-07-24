@@ -1,4 +1,4 @@
-# <img src="app-icon.svg" width="32" height="32" style="vertical-align: middle;" alt="Luminous Logo" /> Luminous Music Player
+![Luminous Music Player](./docs/luminous-wordmark.png)
 
 [![Rust](https://img.shields.io/badge/Rust-ea4335?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)

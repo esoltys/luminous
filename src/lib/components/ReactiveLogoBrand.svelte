@@ -92,30 +92,32 @@
 
   let isPlaying = $derived(playerStore.state === "playing");
 
-  // Geometry and resting values below mirror the static mark
-  // (assets/luminous-mark.svg / app-icon.svg) exactly: centered at (100,100),
-  // disc r=68, indigo inner rim r=77, gold eclipse ring r=92, burst at
-  // (152,57). When paused/pulsing-disabled these derive to that mark's own
+  // Geometry and resting values below mirror docs/luminous-mark-reactive.svg
+  // exactly: centered at (100,100), disc r=68, indigo inner rim r=77, gold
+  // eclipse ring r=92, burst at (152,57). That asset (not app-icon.svg/
+  // luminous-mark.svg, which are the crisp static variant — see DESIGN.md's
+  // "Two artifacts" section) is the lush, pre-blurred baseline for this
+  // in-app element; when paused/pulsing-disabled these derive to its own
   // literal opacity/width values, so the logo is indistinguishable from the
-  // static icon at rest.
+  // reactive mark's resting frame.
 
   // Ambient glow (mid-driven): the blurred halo plus its crisp inner rim —
   // both re-target to the active theme's accent color, per the Luminous
   // Logo System spec.
-  let glowRadius = $derived(!isPlaying || !isPulsingEnabled ? 104 : 92 + midIntensity * 38);
-  let glowOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.3 : 0.15 + midIntensity * 0.75);
-  let innerRimWidth = $derived(!isPlaying || !isPulsingEnabled ? 14 : 10 + midIntensity * 10);
-  let innerRimOpacity = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.6 + midIntensity * 0.4);
+  let glowRadius = $derived(!isPlaying || !isPulsingEnabled ? 112 : 95 + midIntensity * 35);
+  let glowOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.4 : 0.2 + midIntensity * 0.7);
+  let innerRimWidth = $derived(!isPlaying || !isPulsingEnabled ? 16 : 12 + midIntensity * 12);
+  let innerRimOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.95 : 0.7 + midIntensity * 0.3);
 
   // Eclipse ring (treble-driven): re-targets to the active theme's
   // accent-hover, one step brighter than the glow.
-  let ringWidth = $derived(!isPlaying || !isPulsingEnabled ? 8 : 4 + coronalIntensity * 14);
-  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.9 : 0.4 + coronalIntensity * 0.6);
+  let ringWidth = $derived(!isPlaying || !isPulsingEnabled ? 9 : 5 + coronalIntensity * 16);
+  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.85 : 0.5 + coronalIntensity * 0.5);
 
   // Coronal burst (bass-driven): the halo pulses; the small core dot stays
-  // fixed, matching the static mark's always-visible white highlight.
-  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 20 : 14 + bassIntensity * 22);
-  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.28 : 0.1 + bassIntensity * 0.6);
+  // fixed, matching the reactive mark's always-visible white highlight.
+  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 26 : 18 + bassIntensity * 26);
+  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.4 : 0.15 + bassIntensity * 0.7);
 
   let maxIntensity = $derived(Math.max(bassIntensity, midIntensity, coronalIntensity));
   let saturationVal = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.15 + maxIntensity * 2.35);
@@ -130,21 +132,21 @@
 >
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="-50 -50 300 300"
+    viewBox="-40 -40 280 280"
     class="{sizeMap[size]} {className} select-none"
     aria-hidden="true"
   >
     <defs>
-      <!-- Adaptive glow filter, region clamped to the logo's own bounding box
-           so blurred primitives can't be composited past the viewBox -->
-      <filter id="adaptiveGlow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="12" result="blur1" />
-        <feGaussianBlur stdDeviation="4" result="blur2" />
-        <feMerge>
-          <feMergeNode in="blur1" />
-          <feMergeNode in="blur2" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
+      <!-- Filters mirror docs/luminous-mark-reactive.svg's three distinct
+           blur passes — one per layer, not a single shared filter -->
+      <filter id="glowBlurOuter" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="22" />
+      </filter>
+      <filter id="ringBlur" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="3" />
+      </filter>
+      <filter id="burstBlur" x="-120%" y="-120%" width="340%" height="340%">
+        <feGaussianBlur stdDeviation="10" />
       </filter>
     </defs>
 
@@ -159,11 +161,11 @@
         r={glowRadius}
         fill="var(--color-accent)"
         opacity={glowOpacity}
-        filter="url(#adaptiveGlow)"
+        filter="url(#glowBlurOuter)"
         style="transition: r 0.05s ease-out;"
       />
 
-      <!-- Ambient glow inner rim (mid-driven): crisp ring right at the disc's edge -->
+      <!-- Ambient glow inner rim (mid-driven): softly blurred ring right at the disc's edge -->
       <circle
         cx="100"
         cy="100"
@@ -172,6 +174,7 @@
         stroke-width={innerRimWidth}
         fill="none"
         opacity={innerRimOpacity}
+        filter="url(#ringBlur)"
         style="transition: stroke-width 0.05s ease-out;"
       />
 
@@ -185,6 +188,7 @@
         stroke-width={ringWidth}
         fill="none"
         opacity={ringOpacity}
+        filter="url(#ringBlur)"
         style="transition: stroke-width 0.05s ease-out;"
       />
 
@@ -200,13 +204,13 @@
         cy="57"
         r={burstRadius}
         fill="#ffffff"
-        filter="url(#adaptiveGlow)"
+        filter="url(#burstBlur)"
         opacity={burstOpacity}
         style="transition: r 0.05s ease-out;"
       />
 
       <!-- Coronal burst core: fixed, always-visible white highlight -->
-      <circle cx="152" cy="57" r="11" fill="#ffffff" />
+      <circle cx="152" cy="57" r="12" fill="#ffffff" />
     </g>
   </svg>
 </button>
