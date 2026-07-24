@@ -40,7 +40,7 @@ timeline
 *   **Modern Desktop Interface**:
     *   Resizable 3-column layout (sidebar navigation, central core canvas, right context pane) with a universal top search & navigation ribbon.
     *   Adaptive Information Density matrix (Compact, Balanced, Expanded).
-    *   Personalized Home Hub, Category Explorer, album parallax views, artist profiles, and instant database search with auto-suggestions.
+    *   Personalized Home Hub, Category Explorer, album hero detail views, artist profiles, and instant database search with auto-suggestions.
     *   Synchronized `.LRC` scrolling lyrics and detached Picture-in-Picture miniplayer.
     *   Dynamic theme engine with glassmorphism effects, artwork-based accent extraction, and a Custom Theme Builder.
     *   Bilingual (English/French) interface and full session state preservation on reopen.
