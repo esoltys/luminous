@@ -308,7 +308,7 @@
 
   <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
-    <div class="px-6 pt-10" class:pb-28={!!playerStore.currentSong}>
+    <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
           <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist)} />
@@ -316,7 +316,7 @@
       </HorizontalScrollRow>
     </div>
   {:else}
-    <div class:pb-28={!!playerStore.currentSong}></div>
+    <div class="{playerStore.currentSong ? 'pb-28' : 'pb-6'}"></div>
   {/if}
 </div>
 

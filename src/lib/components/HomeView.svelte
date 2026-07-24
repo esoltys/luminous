@@ -49,7 +49,7 @@
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto" class:pb-28={!!playerStore.currentSong}>
+  <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
     <!-- Header -->
     <div class="px-6 pt-8">
       <h1 class="text-3xl font-bold text-brand-text-primary">
