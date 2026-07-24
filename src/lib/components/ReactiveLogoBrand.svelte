@@ -119,14 +119,14 @@
     aria-hidden="true"
   >
     <defs>
-      <!-- Bass Gradient (Ambient Glow): Deep Accent to Accent -->
-      <linearGradient id="bassGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <!-- Mid Gradient (Ambient Glow): Deep Accent to Accent -->
+      <linearGradient id="midGradient" x1="0%" y1="50%" x2="100%" y2="50%">
         <stop offset="0%" stop-color="var(--logo-stop-1, #3a0d00)" />
         <stop offset="100%" stop-color="var(--logo-stop-3, #ff7300)" />
       </linearGradient>
 
-      <!-- Mid Gradient (Eclipse Ring): Deep Accent Hover to Accent Hover -->
-      <linearGradient id="midGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+      <!-- Treble Gradient (Eclipse Ring): Deep Accent Hover to Accent Hover -->
+      <linearGradient id="trebleGradient" x1="0%" y1="50%" x2="100%" y2="50%">
         <stop offset="0%" stop-color="var(--logo-stop-2, #5a1d00)" />
         <stop offset="100%" stop-color="var(--logo-stop-4, #ffcc00)" />
       </linearGradient>
@@ -153,7 +153,7 @@
         cx="280"
         cy="256"
         r={bgRadius}
-        fill="url(#bassGradient)"
+        fill="url(#midGradient)"
         opacity={bgOpacity}
         filter="url(#adaptiveGlow)"
         style="transition: r 0.05s ease-out;"
@@ -164,7 +164,7 @@
         cx="256"
         cy="256"
         r={ringRadius}
-        stroke="url(#midGradient)"
+        stroke="url(#trebleGradient)"
         stroke-width="26"
         fill="none"
         opacity={ringOpacity}
