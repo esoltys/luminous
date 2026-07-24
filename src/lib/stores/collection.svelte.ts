@@ -418,6 +418,14 @@ class CollectionStore {
           this.refreshStats();
           this.refreshLibrary();
 
+          // The active playback queue is a snapshot taken when it was built —
+          // a scan that repoints a moved file's path (or drops a genuinely
+          // missing one) fixes the database but not an already-queued track,
+          // so resync it here rather than requiring a restart.
+          invoke("refresh_playback_queue").catch((err) => {
+            console.error("Failed to refresh playback queue after scan:", err);
+          });
+
           // Genre/decade auto-playlists otherwise only regenerate on their own
           // 24h staleness window (or whenever the Playlists tab happens to
           // mount) — a scan can add new genres/decades or shift which songs
@@ -438,6 +446,9 @@ class CollectionStore {
       await listen("library-changed", () => {
         this.refreshStats();
         this.refreshLibrary();
+        invoke("refresh_playback_queue").catch((err) => {
+          console.error("Failed to refresh playback queue after library change:", err);
+        });
       });
 
       // Keep cached song rows in sync with rating/playcount changes made

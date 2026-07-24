@@ -1079,6 +1079,43 @@ impl Player {
         }
     }
 
+    /// Re-fetch every queued item's `Song` (and the current song) from the DB
+    /// by id. `playlist_items`/`current_song` are snapshots taken when the
+    /// queue was built, so a library rescan that repoints a moved file's path
+    /// (or hard-deletes a genuinely missing one) fixes the database but not
+    /// an already-loaded queue — this brings it back in sync without
+    /// requiring the queue to be rebuilt or the app restarted. A song id that
+    /// no longer exists (hard-deleted) is left untouched; `is_item_playable`
+    /// already treats a stale/unavailable row as unplayable and skips it.
+    pub fn resync_queue_with_db(&mut self) -> Result<()> {
+        let conn = self._db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs WHERE id = ?1",
+            crate::collection::SONG_SELECT_COLS
+        );
+
+        for item in &mut self.playlist_items {
+            let Some(id) = item.song.as_ref().map(|s| s.id) else {
+                continue;
+            };
+            if let Ok(fresh) =
+                conn.query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+            {
+                item.song = Some(fresh);
+            }
+        }
+
+        if let Some(id) = self.current_song.as_ref().map(|s| s.id) {
+            if let Ok(fresh) =
+                conn.query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+            {
+                self.current_song = Some(fresh);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get the current playback state snapshot for the frontend.
     pub async fn get_state(&self) -> PlaybackState {
         let audio = self.audio.lock().await;
