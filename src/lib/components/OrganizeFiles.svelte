@@ -44,32 +44,6 @@
     { label: "%genre", desc: "Genre" },
   ];
 
-  function highlightTemplateHtml(str: string): string {
-    if (!str) return "";
-    let escaped = str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    const regex = /({[^{}]*})|(%[a-z]+)|([/\\])|(\s)/gi;
-    return escaped.replace(regex, (match, pBlock, pVar, pSep, pSpace) => {
-      if (pBlock) {
-        const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${v}</span>`);
-        return `<span class="text-brand-text-primary font-bold bg-brand-sidebar border border-brand-border rounded-xs px-0.5">${inner}</span>`;
-      }
-      if (pVar) {
-        return `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${pVar}</span>`;
-      }
-      if (pSep) {
-        return `<span class="text-brand-text-secondary font-bold px-0.5">${pSep}</span>`;
-      }
-      if (pSpace) {
-        return `<span class="bg-brand-border/40 rounded-xs select-none" title="Space">&nbsp;</span>`;
-      }
-      return match;
-    });
-  }
-
   function highlightPathHtml(path: string): string {
     if (!path) return "";
     const escaped = path
@@ -415,19 +389,14 @@
             </button>
           </div>
 
-          <!-- Plain, directly-editable input (background color only — no overlay layer to drift out of alignment with the caret) -->
+          <!-- Plain, directly-editable input — bordered like the destination folder input below so it reads as editable -->
           <input
             id="template-input"
             type="text"
             bind:value={template}
-            class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/90 focus:bg-brand-sidebar text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal outline-none shadow-inner transition-colors min-h-[40px]"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/80 border border-brand-border/80 focus:outline-none focus:border-brand-accent text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal transition-colors min-h-[40px]"
             spellcheck="false"
           />
-
-          <!-- Read-only tokenized preview of the pattern above -->
-          <div class="mt-1.5 px-3.5 py-2 rounded-lg bg-brand-main/60 font-mono text-xs whitespace-pre overflow-x-auto">
-            {@html highlightTemplateHtml(template)}
-          </div>
 
           <!-- Variable chips -->
           <div class="flex flex-wrap items-center gap-1.5 pt-1">
