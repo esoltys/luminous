@@ -691,7 +691,7 @@ pub fn execute_apply(
     })
 }
 
-fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<()> {
+pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<()> {
     if !dir.exists() || !dir.is_dir() {
         return Ok(());
     }

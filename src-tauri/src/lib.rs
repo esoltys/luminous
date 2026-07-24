@@ -279,9 +279,13 @@ pub fn run() {
                             .load(std::sync::atomic::Ordering::Relaxed);
                         let state = engine.current_state();
                         let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                            let sample_rate = engine
+                                .output_sample_rate
+                                .load(std::sync::atomic::Ordering::Relaxed);
                             Some(crate::analyzer::calculate_spectrum(
                                 &engine.visualizer_buf,
                                 1024,
+                                sample_rate,
                             ))
                         } else {
                             None

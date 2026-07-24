@@ -131,6 +131,10 @@ pub struct AudioEngine {
     pub play_state: Arc<Mutex<PlayState>>,
     pub visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
     pub spectrum_enabled: Arc<std::sync::atomic::AtomicBool>,
+    /// Actual output device sample rate, updated once the CPAL stream is
+    /// built. The spectrum analyzer needs this to convert FFT bin indices
+    /// to real Hz instead of assuming a fixed rate.
+    pub output_sample_rate: Arc<AtomicU32>,
     pub equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     /// Per-track loudness-normalization multiplier (#77). f32 bits in an
     /// atomic so the audio callback reads it without locking. 1.0 = neutral.
@@ -148,6 +152,7 @@ impl AudioEngine {
         let play_state = Arc::new(Mutex::new(PlayState::Stopped));
         let visualizer_buf = Arc::new(crate::analyzer::AudioVisualizerBuffer::new(4096));
         let spectrum_enabled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let output_sample_rate = Arc::new(AtomicU32::new(44100));
         let equalizer = Arc::new(Mutex::new(crate::equalizer::Equalizer::new()));
         let loudness_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let fade_gain = Arc::new(AtomicU32::new(1.0f32.to_bits()));
@@ -156,6 +161,7 @@ impl AudioEngine {
         let vol_clone = Arc::clone(&volume);
         let state_clone = Arc::clone(&play_state);
         let vis_clone = Arc::clone(&visualizer_buf);
+        let sample_rate_clone = Arc::clone(&output_sample_rate);
         let eq_clone = Arc::clone(&equalizer);
         let loudness_clone = Arc::clone(&loudness_gain);
         let fade_clone = Arc::clone(&fade_gain);
@@ -171,6 +177,7 @@ impl AudioEngine {
                     vol_clone,
                     state_clone,
                     vis_clone,
+                    sample_rate_clone,
                     eq_clone,
                     loudness_clone,
                     fade_clone,
@@ -186,6 +193,7 @@ impl AudioEngine {
             play_state,
             visualizer_buf,
             spectrum_enabled,
+            output_sample_rate,
             equalizer,
             loudness_gain,
             fade_gain,
@@ -645,6 +653,7 @@ fn decode_thread(
     volume: Arc<Mutex<f32>>,
     play_state: Arc<Mutex<PlayState>>,
     visualizer_buf: Arc<crate::analyzer::AudioVisualizerBuffer>,
+    output_sample_rate: Arc<AtomicU32>,
     equalizer: Arc<Mutex<crate::equalizer::Equalizer>>,
     loudness_gain: Arc<AtomicU32>,
     fade_gain: Arc<AtomicU32>,
@@ -679,7 +688,10 @@ fn decode_thread(
                                 &loudness_gain,
                                 &fade_gain,
                             ) {
-                                Ok(o) => output = Some(o),
+                                Ok(o) => {
+                                    output_sample_rate.store(o.sample_rate, Ordering::Relaxed);
+                                    output = Some(o);
+                                }
                                 Err(message) => {
                                     let _ = event_tx.send(AudioEvent::Error { message });
                                     continue;
@@ -797,7 +809,10 @@ fn decode_thread(
                 &loudness_gain,
                 &fade_gain,
             ) {
-                Ok(o) => output = Some(o),
+                Ok(o) => {
+                    output_sample_rate.store(o.sample_rate, Ordering::Relaxed);
+                    output = Some(o);
+                }
                 Err(message) => {
                     let _ = event_tx.send(AudioEvent::Error { message });
                     continue;

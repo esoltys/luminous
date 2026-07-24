@@ -53,7 +53,11 @@ impl AudioVisualizerBuffer {
 }
 
 /// Calculate 32 frequency bins from the audio buffer using FFT with Hann windowing and log scaling.
-pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usize) -> Vec<f32> {
+pub fn calculate_spectrum(
+    visualizer_buf: &AudioVisualizerBuffer,
+    fft_size: usize,
+    sample_rate: u32,
+) -> Vec<f32> {
     let samples = visualizer_buf.get_samples(fft_size);
 
     let mut planner = FftPlanner::new();
@@ -83,23 +87,50 @@ pub fn calculate_spectrum(visualizer_buf: &AudioVisualizerBuffer, fft_size: usiz
         spectrum.push(magnitude);
     }
 
-    // Downsample/group the spectrum into 32 bins logarithmically
-    let mut bins = vec![0.0f32; 32];
-    let num_bins = bins.len();
+    // Downsample/group the spectrum into 32 bins, log-spaced by actual
+    // frequency (not raw FFT index) so each output bin corresponds to a
+    // consistent, real Hz range regardless of sample rate. The 62.5 Hz -
+    // 16 kHz window is chosen so bin 8 lands exactly on 250 Hz and bin 20
+    // on 2 kHz — the same bass/mid/treble cutoffs `moodbar.rs` uses — which
+    // is what the frontend's slice(0,8)/slice(8,20)/slice(20,32) split
+    // assumes.
+    const LOW_FREQ: f32 = 62.5;
+    const HIGH_FREQ: f32 = 16_000.0;
+    let num_bins = 32;
+    let mut bins = vec![0.0f32; num_bins];
+    let nyquist = sample_rate as f32 / 2.0;
+    let hz_per_fft_bin = sample_rate as f32 / fft_size as f32;
 
     for (i, bin) in bins.iter_mut().enumerate() {
-        let start_pct = i as f32 / num_bins as f32;
-        let end_pct = (i + 1) as f32 / num_bins as f32;
+        let freq_lo = LOW_FREQ * (HIGH_FREQ / LOW_FREQ).powf(i as f32 / num_bins as f32);
+        let freq_hi =
+            (LOW_FREQ * (HIGH_FREQ / LOW_FREQ).powf((i + 1) as f32 / num_bins as f32)).min(nyquist);
 
-        // Logarithmic scaling maps index bounds to better match human hearing spacing
-        let start_idx = (start_pct.powi(2) * half_size as f32) as usize;
-        let end_idx =
-            ((end_pct.powi(2) * half_size as f32) as usize).clamp(start_idx + 1, half_size);
+        let start_idx = ((freq_lo / hz_per_fft_bin) as usize).min(half_size.saturating_sub(1));
+        let end_idx = ((freq_hi / hz_per_fft_bin) as usize).clamp(start_idx + 1, half_size);
 
         let count = end_idx - start_idx;
         let sum: f32 = spectrum[start_idx..end_idx].iter().sum();
 
         *bin = if count > 0 { sum / count as f32 } else { 0.0 };
+    }
+
+    // Raw FFT magnitude falls off steeply with frequency for typical music,
+    // so treated linearly a wide swath of the loudest (usually low-end)
+    // bins all clip to the same "maxed out" display value while quieter
+    // bins crater to near zero — a flat plateau + cliff instead of a
+    // smooth decreasing shape. Normalizing every bin relative to the
+    // frame's own peak and applying a cube-root curve compresses that
+    // dynamic range: the loudest bin lands at 1.0, and quieter bins are
+    // boosted (more so the quieter they are) instead of being swallowed.
+    // This is self-calibrating — it doesn't depend on absolute FFT
+    // magnitude scale or playback volume — and it means no single band
+    // is structurally destined to stay pinned at maximum.
+    let peak = bins.iter().cloned().fold(0.0f32, f32::max);
+    if peak > 0.0 {
+        for bin in bins.iter_mut() {
+            *bin = (*bin / peak).cbrt();
+        }
     }
 
     bins
