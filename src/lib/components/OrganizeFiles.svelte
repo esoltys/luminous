@@ -29,7 +29,7 @@
     onSuccess?: () => void;
   } = $props();
 
-  const DEFAULT_TEMPLATE = "%albumartist/{%album/}{%disc-}{%track }%title";
+  const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   const VARIABLE_CHIPS = [
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
@@ -415,18 +415,18 @@
             </button>
           </div>
 
-          <!-- Highlighted input box -->
-          <div class="relative w-full rounded-xl bg-brand-sidebar/90 border border-brand-border/90 focus-within:border-brand-accent transition-colors font-mono text-xs overflow-hidden min-h-[40px] flex items-center shadow-inner">
-            <div class="absolute inset-0 px-3.5 py-2.5 text-brand-text-primary whitespace-pre overflow-hidden flex items-center pointer-events-none font-mono text-xs leading-normal tracking-normal select-none z-0">
-              {@html highlightTemplateHtml(template)}
-            </div>
-            <input
-              id="template-input"
-              type="text"
-              bind:value={template}
-              class="relative w-full px-3.5 py-2.5 bg-transparent text-transparent caret-brand-accent font-mono text-xs leading-normal tracking-normal focus:outline-none z-10"
-              spellcheck="false"
-            />
+          <!-- Plain, directly-editable input (background color only — no overlay layer to drift out of alignment with the caret) -->
+          <input
+            id="template-input"
+            type="text"
+            bind:value={template}
+            class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/90 focus:bg-brand-sidebar text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal outline-none shadow-inner transition-colors min-h-[40px]"
+            spellcheck="false"
+          />
+
+          <!-- Read-only tokenized preview of the pattern above -->
+          <div class="mt-1.5 px-3.5 py-2 rounded-lg bg-brand-main/60 font-mono text-xs whitespace-pre overflow-x-auto">
+            {@html highlightTemplateHtml(template)}
           </div>
 
           <!-- Variable chips -->
