@@ -92,14 +92,30 @@
 
   let isPlaying = $derived(playerStore.state === "playing");
 
-  // Derive element opacities, glow radii, and saturation based on play and specific band intensities
-  let bgOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.35 : 0.0 + midIntensity * 0.8);
-  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.8 : 0.05 + coronalIntensity * 0.9);
-  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.65 : 0.05 + bassIntensity * 0.95);
+  // Geometry and resting values below mirror the static mark
+  // (assets/luminous-mark.svg / app-icon.svg) exactly: centered at (100,100),
+  // disc r=68, indigo inner rim r=77, gold eclipse ring r=92, burst at
+  // (152,57). When paused/pulsing-disabled these derive to that mark's own
+  // literal opacity/width values, so the logo is indistinguishable from the
+  // static icon at rest.
 
-  let bgRadius = $derived(!isPlaying || !isPulsingEnabled ? 115 : 105 + midIntensity * 40);
-  let ringRadius = $derived(!isPlaying || !isPulsingEnabled ? 120 : 110 + coronalIntensity * 30);
-  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 32 : 24 + bassIntensity * 16);
+  // Ambient glow (mid-driven): the blurred halo plus its crisp inner rim —
+  // both re-target to the active theme's accent color, per the Luminous
+  // Logo System spec.
+  let glowRadius = $derived(!isPlaying || !isPulsingEnabled ? 104 : 92 + midIntensity * 38);
+  let glowOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.3 : 0.15 + midIntensity * 0.75);
+  let innerRimWidth = $derived(!isPlaying || !isPulsingEnabled ? 14 : 10 + midIntensity * 10);
+  let innerRimOpacity = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.6 + midIntensity * 0.4);
+
+  // Eclipse ring (treble-driven): re-targets to the active theme's
+  // accent-hover, one step brighter than the glow.
+  let ringWidth = $derived(!isPlaying || !isPulsingEnabled ? 8 : 4 + coronalIntensity * 14);
+  let ringOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.9 : 0.4 + coronalIntensity * 0.6);
+
+  // Coronal burst (bass-driven): the halo pulses; the small core dot stays
+  // fixed, matching the static mark's always-visible white highlight.
+  let burstRadius = $derived(!isPlaying || !isPulsingEnabled ? 20 : 14 + bassIntensity * 22);
+  let burstOpacity = $derived(!isPlaying || !isPulsingEnabled ? 0.28 : 0.1 + bassIntensity * 0.6);
 
   let maxIntensity = $derived(Math.max(bassIntensity, midIntensity, coronalIntensity));
   let saturationVal = $derived(!isPlaying || !isPulsingEnabled ? 1.0 : 0.15 + maxIntensity * 2.35);
@@ -114,23 +130,11 @@
 >
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    viewBox="70 66 380 380"
+    viewBox="-50 -50 300 300"
     class="{sizeMap[size]} {className} select-none"
     aria-hidden="true"
   >
     <defs>
-      <!-- Mid Gradient (Ambient Glow): Deep Accent to Accent -->
-      <linearGradient id="midGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-        <stop offset="0%" stop-color="var(--logo-stop-1, #3a0d00)" />
-        <stop offset="100%" stop-color="var(--logo-stop-3, #ff7300)" />
-      </linearGradient>
-
-      <!-- Treble Gradient (Eclipse Ring): Deep Accent Hover to Accent Hover -->
-      <linearGradient id="trebleGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-        <stop offset="0%" stop-color="var(--logo-stop-2, #5a1d00)" />
-        <stop offset="100%" stop-color="var(--logo-stop-4, #ffcc00)" />
-      </linearGradient>
-
       <!-- Adaptive glow filter, region clamped to the logo's own bounding box
            so blurred primitives can't be composited past the viewBox -->
       <filter id="adaptiveGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -148,34 +152,52 @@
     <g
       style="filter: saturate({saturationVal}); transition: filter 0.05s ease-out;"
     >
-      <!-- Ambient backplate glow -->
+      <!-- Ambient glow (mid-driven): soft blurred halo -->
       <circle
-        cx="280"
-        cy="256"
-        r={bgRadius}
-        fill="url(#midGradient)"
-        opacity={bgOpacity}
+        cx="100"
+        cy="100"
+        r={glowRadius}
+        fill="var(--color-accent)"
+        opacity={glowOpacity}
         filter="url(#adaptiveGlow)"
         style="transition: r 0.05s ease-out;"
       />
 
-      <!-- Reactive eclipse ring (thickened) -->
+      <!-- Ambient glow inner rim (mid-driven): crisp ring right at the disc's edge -->
       <circle
-        cx="256"
-        cy="256"
-        r={ringRadius}
-        stroke="url(#trebleGradient)"
-        stroke-width="26"
+        cx="100"
+        cy="100"
+        r="77"
+        stroke="var(--color-accent)"
+        stroke-width={innerRimWidth}
+        fill="none"
+        opacity={innerRimOpacity}
+        style="transition: stroke-width 0.05s ease-out;"
+      />
+
+      <!-- Eclipse ring (treble-driven): re-targets to the active theme's
+           accent-hover, one step brighter than the glow -->
+      <circle
+        cx="100"
+        cy="100"
+        r="92"
+        stroke="var(--color-accent-hover)"
+        stroke-width={ringWidth}
         fill="none"
         opacity={ringOpacity}
-        filter="url(#adaptiveGlow)"
-        style="transition: r 0.05s ease-out;"
+        style="transition: stroke-width 0.05s ease-out;"
       />
 
-      <!-- White-hot sunrise burst (opacity increases when playing) -->
+      <!-- The planet disc -->
+      <circle cx="100" cy="100" r="68" fill="#0A0A0D" />
+
+      <!-- Inner border separating core disc from corona -->
+      <circle cx="100" cy="100" r="68" stroke="var(--bg-main)" stroke-width="1.5" fill="none" />
+
+      <!-- Coronal burst halo (bass-driven) -->
       <circle
-        cx="368"
-        cy="256"
+        cx="152"
+        cy="57"
         r={burstRadius}
         fill="#ffffff"
         filter="url(#adaptiveGlow)"
@@ -183,11 +205,8 @@
         style="transition: r 0.05s ease-out;"
       />
 
-      <!-- The planet disc -->
-      <circle cx="252" cy="256" r="107" fill="#101015" />
-
-      <!-- Inner border separating core disc from corona -->
-      <circle cx="252" cy="256" r="107" stroke="var(--bg-main)" stroke-width="1.5" fill="none" />
+      <!-- Coronal burst core: fixed, always-visible white highlight -->
+      <circle cx="152" cy="57" r="11" fill="#ffffff" />
     </g>
   </svg>
 </button>
