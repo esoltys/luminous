@@ -477,7 +477,7 @@
               {/if}
               {#if collisionCount > 0}
                 <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-semibold border border-rose-500/40">
-                  {i18n.t("organizer.summaryCollisions", { count: collisionCount })}
+                  {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
                 </span>
               {/if}
               {#if errorCount > 0}
@@ -659,7 +659,7 @@
   {#if collisionCount > 0}
     <span class="text-amber-400 font-medium flex items-center gap-1.5">
       <AlertTriangle class="w-3.5 h-3.5" />
-      {i18n.t("organizer.collisionsSkipped", { count: collisionCount })}
+      {collisionCount === 1 ? i18n.t("organizer.collisionsSkippedOne") : i18n.t("organizer.collisionsSkipped", { count: collisionCount })}
     </span>
   {/if}
 {/snippet}
