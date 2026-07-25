@@ -46,14 +46,6 @@
     collectionStore.selectedAutoPlaylist = null;
   }
 
-  async function openHelp() {
-    try {
-      const { openUrl } = await import("@tauri-apps/plugin-opener");
-      await openUrl("https://github.com/esoltys/luminous");
-    } catch {
-      window.open("https://github.com/esoltys/luminous", "_blank");
-    }
-  }
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}">
@@ -202,8 +194,8 @@
     </button>
 
     <button
-      onclick={openHelp}
-      class="flex items-center gap-3 transition-all duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      onclick={() => { collectionStore.activeTab = "help"; }}
+      class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'help' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
       title={i18n.t('sidebar.help')}
     >
       <HelpCircle class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />

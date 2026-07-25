@@ -412,6 +412,9 @@ export const en = {
     editorPlaceholder: "Paste synced LRC or plain text lyrics here...",
     saveFailedPrefix: "Failed to save lyrics: "
   },
+  help: {
+    loading: "Loading user guide..."
+  },
   playerBar: {
     previous: "Previous Track",
     play: "Play",

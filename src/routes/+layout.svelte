@@ -312,7 +312,7 @@
          underneath the gap for the blur to have something to blur. Hidden
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
-    {#if playerStore.currentSong}
+    {#if playerStore.currentSong && collectionStore.activeTab !== 'help'}
       <div class="absolute inset-x-4 bottom-4 z-40">
         <PlayerBar />
       </div>

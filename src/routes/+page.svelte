@@ -6,6 +6,7 @@
   import PlaylistsCollectionView from "../lib/components/PlaylistsCollectionView.svelte";
   import FoldersView from "../lib/components/FoldersView.svelte";
   import LyricsView from "../lib/components/LyricsView.svelte";
+  import HelpView from "../lib/components/HelpView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { collectionStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/collection.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
@@ -127,6 +128,8 @@
       <FoldersView />
     {:else if collectionStore.activeTab === "lyrics"}
       <LyricsView />
+    {:else if collectionStore.activeTab === "help"}
+      <HelpView />
     {/if}
   </div>
 </div>
