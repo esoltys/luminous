@@ -32,11 +32,11 @@
         break;
       case "ArrowLeft":
         event.preventDefault();
-        playerStore.seekRelative(-SEEK_STEP_NS).catch((err) => console.error("Failed to seek backward:", err));
+        playerStore.previous().catch((err) => console.error("Failed to play previous track:", err));
         break;
       case "ArrowRight":
         event.preventDefault();
-        playerStore.seekRelative(SEEK_STEP_NS).catch((err) => console.error("Failed to seek forward:", err));
+        playerStore.next().catch((err) => console.error("Failed to play next track:", err));
         break;
       case "ArrowUp":
         event.preventDefault();
@@ -48,11 +48,11 @@
         break;
       case "PageUp":
         event.preventDefault();
-        playerStore.previous().catch((err) => console.error("Failed to play previous track:", err));
+        playerStore.seekRelative(-SEEK_STEP_NS).catch((err) => console.error("Failed to seek backward:", err));
         break;
       case "PageDown":
         event.preventDefault();
-        playerStore.next().catch((err) => console.error("Failed to play next track:", err));
+        playerStore.seekRelative(SEEK_STEP_NS).catch((err) => console.error("Failed to seek forward:", err));
         break;
     }
   }

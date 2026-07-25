@@ -678,5 +678,30 @@ export const en = {
     applySuccess: "Successfully reorganized {count} file(s)",
     organizeFilesTooltip: "Organize files by tag template",
     organizeEntireLibrary: "Organize"
+  },
+  shortcuts: {
+    title: "Keyboard shortcuts",
+    tooltip: "Keyboard shortcuts (Ctrl+/)",
+    groupPlayback: "Playback",
+    groupNavigation: "Navigation",
+    groupLayout: "Layout & View",
+    playPause: "Play / pause",
+    previousTrack: "Previous track",
+    nextTrack: "Next track",
+    volumeUp: "Volume up",
+    volumeDown: "Volume down",
+    seekBack: "Seek back 10s",
+    seekForward: "Seek forward 10s",
+    focusSearch: "Focus the search bar",
+    closeSearch: "Close search dropdown",
+    goBack: "Go back",
+    goForward: "Go forward",
+    toggleSidebar: "Toggle left sidebar",
+    toggleImmersive: "Toggle immersion mode",
+    toggleRightPanel: "Toggle right panel",
+    toggleMiniplayer: "Toggle miniplayer",
+    openSettings: "Open Settings",
+    showShortcuts: "Show this list",
+    footnote: "Mouse side buttons and dedicated browser back/forward keys also navigate history. Media buttons on your keyboard or device also control playback."
   }
 };
