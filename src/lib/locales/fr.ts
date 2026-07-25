@@ -675,5 +675,30 @@ export const fr = {
     applySuccess: "{count} fichier(s) réorganisé(s) avec succès",
     organizeFilesTooltip: "Organiser les fichiers par modèle de tags",
     organizeEntireLibrary: "Organiser"
+  },
+  shortcuts: {
+    title: "Raccourcis clavier",
+    tooltip: "Raccourcis clavier (Ctrl+/)",
+    groupPlayback: "Lecture",
+    groupNavigation: "Navigation",
+    groupLayout: "Disposition et affichage",
+    playPause: "Lecture / pause",
+    previousTrack: "Piste précédente",
+    nextTrack: "Piste suivante",
+    volumeUp: "Augmenter le volume",
+    volumeDown: "Diminuer le volume",
+    seekBack: "Reculer de 10 s",
+    seekForward: "Avancer de 10 s",
+    focusSearch: "Activer la barre de recherche",
+    closeSearch: "Fermer le menu de recherche",
+    goBack: "Retour",
+    goForward: "Avancer",
+    toggleSidebar: "Basculer la barre latérale gauche",
+    toggleImmersive: "Basculer le mode immersion",
+    toggleRightPanel: "Basculer le panneau droit",
+    toggleMiniplayer: "Basculer le mini-lecteur",
+    openSettings: "Ouvrir les paramètres",
+    showShortcuts: "Afficher cette liste",
+    footnote: "Les boutons latéraux de la souris et les touches dédiées de navigation du navigateur permettent aussi de naviguer dans l'historique. Les boutons multimédias de votre clavier ou de votre appareil permettent aussi de contrôler la lecture."
   }
 };
