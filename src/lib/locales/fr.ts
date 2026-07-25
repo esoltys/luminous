@@ -646,7 +646,7 @@ export const fr = {
     destinationDefault: "Dossier(s) d'origine de la bibliothèque",
     browse: "Parcourir...",
     replaceSpaces: "Remplacer les espaces par des tirets bas (_)",
-    asciiOnly: "Convertir les lettres accentuées en ASCII",
+    asciiOnly: "Changer les lettres accentuées et la ponctuation",
     cleanEmptyDirs: "Nettoyer les dossiers source vides",
     moveExtraFiles: "Déplacer les fichiers connexes (pochettes, paroles, logs, fiches CUE)",
     previewTitle: "Aperçu avant application ({count} éléments)",

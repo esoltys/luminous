@@ -733,10 +733,16 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
     for entry in walkdir::WalkDir::new(root)
         .min_depth(1)
         .contents_first(true)
+        .follow_links(true)
         .into_iter()
         .filter_map(|e| e.ok())
     {
-        if !entry.file_type().is_dir() {
+        // Cloud-synced folders (e.g. OneDrive Files On-Demand placeholders)
+        // carry a reparse-point attribute, so `entry.file_type()` (which
+        // doesn't follow reparse points) reports them as something other
+        // than a plain directory even though they are one. Check the
+        // resolved path instead so these aren't silently skipped.
+        if !entry.path().is_dir() {
             continue;
         }
         let dir = entry.path();
