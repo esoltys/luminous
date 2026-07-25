@@ -315,6 +315,24 @@ async function main() {
       await page.getByRole("button", { name: "20-band parametric", exact: true }).click();
       await page.waitForTimeout(400);
     },
+    "click-settings-folders": async (page) => {
+      await page.getByRole("button", { name: "Folders", exact: true }).click();
+      await page.waitForTimeout(400);
+    },
+    "click-settings-tools": async (page) => {
+      await page.getByRole("button", { name: "Organize", exact: true }).click();
+      await page.waitForTimeout(400);
+      // Swap in a template that actually changes the mock library's paths
+      // (the default template already matches how the mock data is laid
+      // out, so every row would show "Unchanged" otherwise).
+      const templateInput = page.locator("#template-input");
+      await templateInput.fill("%albumartist/{%album/}{Disc %disc/}{%track }%title");
+      await page.waitForTimeout(600);
+    },
+    "click-settings-about": async (page) => {
+      await page.getByRole("button", { name: "About & Credits", exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "click-moodbar-toggle": async (page) => {
       await page.getByTitle("Waveform mode — click to switch to moodbar").click();
       await page.waitForTimeout(400);
@@ -325,18 +343,6 @@ async function main() {
         if (card) (card as HTMLElement).click();
       });
       await page.waitForTimeout(400);
-    },
-    "click-organize-files": async (page) => {
-      await page.getByRole("button", { name: "Watched Folders", exact: true }).click();
-      await page.waitForTimeout(300);
-      await page.getByRole("button", { name: "Organize Entire Library...", exact: true }).click();
-      await page.waitForTimeout(400);
-      // Swap in a template that actually changes the mock library's paths
-      // (the default template already matches how the mock data is laid
-      // out, so every row would show "Unchanged" otherwise).
-      const templateInput = page.locator("#template-input");
-      await templateInput.fill("%albumartist/{%album/}{Disc %disc/}{%track }%title");
-      await page.waitForTimeout(600);
     },
     "click-smart-playlist": async (page) => {
       await page.getByRole("button", { name: "New Playlist", exact: true }).click();
@@ -373,9 +379,10 @@ async function main() {
       await page.waitForTimeout(100);
       await valInputs.nth(2).fill("1989");
 
-      const toggle = page.locator('form input[type="checkbox"]');
-      if (!(await toggle.isChecked())) {
-        await toggle.check();
+      // Toggle is a <button role="switch" aria-checked>, not a real checkbox input.
+      const toggle = page.getByRole("switch", { name: "Auto-Refill Batch Playback" });
+      if ((await toggle.getAttribute("aria-checked")) !== "true") {
+        await toggle.click();
       }
       await page.waitForTimeout(400);
     },
