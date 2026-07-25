@@ -23,18 +23,20 @@ describe("AlbumCard.svelte", () => {
     art_embedded: false,
     art_automatic: null,
     art_manual: null,
+    genre: "Alternative",
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("renders album title, artist, year, and category", () => {
+  it("renders album title, artist, year, genre, and category", () => {
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
 
     expect(getByText("Fake Nudes")).toBeInTheDocument();
     expect(getByText("Barenaked Ladies")).toBeInTheDocument();
     expect(getByText("2017")).toBeInTheDocument();
+    expect(getByText("Alternative")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
   });
 

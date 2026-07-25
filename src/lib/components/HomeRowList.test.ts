@@ -54,14 +54,14 @@ function makePlaylist(overrides: Partial<Playlist> = {}): Playlist {
 }
 
 describe("HomeRowList.svelte", () => {
-  it("renders a rank numeral and track duration for song rows in the rank variant", () => {
+  it("renders a rank numeral and 'Song' label for song rows in the rank variant", () => {
     const items: HomeItem[] = [{ type: "song", song: makeSong() }];
     const { getByText } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("01")).toBeInTheDocument();
     expect(getByText("Wildflowers")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    expect(getByText("3:15")).toBeInTheDocument();
+    expect(getByText("Song")).toBeInTheDocument();
   });
 
   it("omits the rank numeral in the added variant", () => {
@@ -94,12 +94,28 @@ describe("HomeRowList.svelte", () => {
     expect(queryByText("Rock")).not.toBeInTheDocument();
   });
 
-  it("renders playlist rows using the playlist name and track count", () => {
+  it("renders playlist rows with a 'Playlist' label, category, and track count", () => {
     const items: HomeItem[] = [{ type: "playlist", playlist: makePlaylist() }];
     const { getByText } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("Road Trip")).toBeInTheDocument();
+    expect(getByText("Playlist")).toBeInTheDocument();
+    expect(getByText("Custom")).toBeInTheDocument();
     expect(getByText("5 songs")).toBeInTheDocument();
+  });
+
+  it("labels dynamic playlists with their auto-playlist category", () => {
+    const decadeItems: HomeItem[] = [
+      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "decade:1990s" }) },
+    ];
+    const { getByText: getByTextDecade } = render(HomeRowList, { props: { items: decadeItems, variant: "rank" } });
+    expect(getByTextDecade("Decade")).toBeInTheDocument();
+
+    const genreItems: HomeItem[] = [
+      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "Rock" }) },
+    ];
+    const { getByText: getByTextGenre } = render(HomeRowList, { props: { items: genreItems, variant: "rank" } });
+    expect(getByTextGenre("Genre")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no items", () => {

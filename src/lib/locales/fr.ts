@@ -350,6 +350,8 @@ export const fr = {
     populationModeTooltipDeepCuts: "Titres jamais ou presque jamais écoutés",
     genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Décennie",
+    smartAutoPlaylist: "Intelligente",
+    playlistTypeLabel: "Playlist",
     favouritesAutoPlaylist: "Liste auto",
     recentlyAddedAutoPlaylist: "Liste auto",
     relativeToday: "Aujourd'hui",

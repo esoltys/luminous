@@ -351,6 +351,8 @@ export const en = {
     populationModeTooltipDeepCuts: "Tracks you've never or barely played",
     genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Decade",
+    smartAutoPlaylist: "Smart",
+    playlistTypeLabel: "Playlist",
     favouritesAutoPlaylist: "Auto-Playlist",
     recentlyAddedAutoPlaylist: "Auto-Playlist",
     relativeToday: "Today",

@@ -8,6 +8,7 @@
   import type { Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
+  import Toggle from "./Toggle.svelte";
 
   interface Props {
     initialRules?: Rule[];
@@ -332,15 +333,16 @@
       </div>
 
       <!-- Auto-Refill Toggle -->
-      <div class="flex items-center gap-3 pt-2">
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" bind:checked={autoPlay} class="sr-only peer" />
-          <div class="w-9 h-5 bg-brand-main peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-accent"></div>
-        </label>
+      <div class="flex items-center justify-between gap-3 pt-2">
         <div>
           <span class="text-xs font-semibold text-brand-text-primary block">Auto-Refill Batch Playback</span>
           <span class="text-[11px] text-brand-text-secondary/70">Automatically queue matching tracks as playback nears the end</span>
         </div>
+        <Toggle
+          checked={autoPlay}
+          onchange={(v) => { autoPlay = v; }}
+          label="Auto-Refill Batch Playback"
+        />
       </div>
 
       <!-- Queue population mode tabs (#120): applied when this playlist (re)populates -->

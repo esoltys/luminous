@@ -6,6 +6,7 @@
   import { portal } from "../utils/portal";
   import { X, Folder, Sparkles, Check, AlertTriangle, RefreshCw, Layers } from "lucide-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
+  import Toggle from "./Toggle.svelte";
 
   export interface OrganizePreviewItem {
     song_id: number;
@@ -410,32 +411,35 @@
             </div>
           </div>
 
-          <label class="flex items-center gap-2 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer">
-            <input
-              type="checkbox"
-              bind:checked={replaceSpaces}
-              class="w-3.5 h-3.5 rounded border-brand-border accent-brand-accent cursor-pointer"
-            />
+          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
             <span>{i18n.t("organizer.replaceSpaces")}</span>
-          </label>
-
-          <label class="flex items-center gap-2 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer">
-            <input
-              type="checkbox"
-              bind:checked={asciiOnly}
-              class="w-3.5 h-3.5 rounded border-brand-border accent-brand-accent cursor-pointer"
+            <Toggle
+              checked={replaceSpaces}
+              onchange={(v) => { replaceSpaces = v; }}
+              label={i18n.t("organizer.replaceSpaces")}
+              showOnOffLabel={false}
             />
+          </div>
+
+          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
             <span>{i18n.t("organizer.asciiOnly")}</span>
-          </label>
-
-          <label class="flex items-center gap-2 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer">
-            <input
-              type="checkbox"
-              bind:checked={moveExtraFiles}
-              class="w-3.5 h-3.5 rounded border-brand-border accent-brand-accent cursor-pointer"
+            <Toggle
+              checked={asciiOnly}
+              onchange={(v) => { asciiOnly = v; }}
+              label={i18n.t("organizer.asciiOnly")}
+              showOnOffLabel={false}
             />
+          </div>
+
+          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
             <span>{i18n.t("organizer.moveExtraFiles")}</span>
-          </label>
+            <Toggle
+              checked={moveExtraFiles}
+              onchange={(v) => { moveExtraFiles = v; }}
+              label={i18n.t("organizer.moveExtraFiles")}
+              showOnOffLabel={false}
+            />
+          </div>
         </div>
 
         <!-- Preview Table Section -->
