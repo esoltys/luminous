@@ -255,6 +255,7 @@ export const fr = {
     pruneMissingBtn: "Nettoyer",
     pruneMissingHint: "Supprime les chansons manquantes et les dossiers vides",
     pruneCompleteMsg: "{count} chanson(s) manquante(s) nettoyée(s)",
+    pruneCompleteMsgWithFolders: "{count} chanson(s) manquante(s) nettoyée(s), {folders} dossier(s) vide(s) supprimé(s)",
     watchRealtimeLabel: "Surveillance en temps réel des dossiers",
     watchRealtimeHint: "Surveiller automatiquement les dossiers de musique configurés pour détecter ajouts, modifications ou suppressions.",
     scanOnStartupLabel: "Analyser la bibliothèque au démarrage",

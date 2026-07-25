@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, QueuePopulationMode,
-        ScanPhase, ScanProgress, Song, SongSource,
+        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, PruneResult,
+        QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -75,7 +75,7 @@ impl CollectionScanner {
     }
     /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
     /// Also removes any now-empty parent folders left behind by missing files.
-    pub fn prune_missing_songs(&self) -> Result<usize> {
+    pub fn prune_missing_songs(&self) -> Result<PruneResult> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
         let rows = stmt.query_map([], |row| {
@@ -123,11 +123,15 @@ impl CollectionScanner {
             );
         }
 
+        let mut removed_folders = 0;
         for parent in &missing_parents {
-            let _ = crate::organizer::remove_empty_dirs_recursive(parent);
+            removed_folders += crate::organizer::remove_empty_dirs_recursive(parent).unwrap_or(0);
         }
 
-        Ok(deleted_count)
+        Ok(PruneResult {
+            deleted_songs: deleted_count,
+            removed_folders,
+        })
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.
@@ -2773,7 +2777,7 @@ mod tests {
 
         let scanner = CollectionScanner::new(db.clone());
         let pruned = scanner.prune_missing_songs().unwrap();
-        assert_eq!(pruned, 1);
+        assert_eq!(pruned.deleted_songs, 1);
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))

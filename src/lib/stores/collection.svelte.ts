@@ -514,15 +514,15 @@ class CollectionStore {
     });
   }
 
-  async pruneMissing(): Promise<number> {
+  async pruneMissing(): Promise<{ deletedSongs: number; removedFolders: number }> {
     try {
-      const prunedCount = await invoke<number>("prune_missing_songs");
+      const result = await invoke<{ deleted_songs: number; removed_folders: number }>("prune_missing_songs");
       await this.refreshStats();
       await this.refreshLibrary();
-      return prunedCount;
+      return { deletedSongs: result.deleted_songs, removedFolders: result.removed_folders };
     } catch (err) {
       console.error("Failed to prune missing songs:", err);
-      return 0;
+      return { deletedSongs: 0, removedFolders: 0 };
     }
   }
 

@@ -103,10 +103,10 @@ describe("CollectionStore", () => {
   });
 
   it("handles pruneMissing songs call", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce(3 as any);
-    const count = await collectionStore.pruneMissing();
+    vi.mocked(invoke).mockResolvedValueOnce({ deleted_songs: 3, removed_folders: 2 } as any);
+    const result = await collectionStore.pruneMissing();
     expect(invoke).toHaveBeenCalledWith("prune_missing_songs");
-    expect(count).toBe(3);
+    expect(result).toEqual({ deletedSongs: 3, removedFolders: 2 });
   });
 
   it("toggles and persists watchFoldersRealtime and scanOnStartup settings", async () => {

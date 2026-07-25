@@ -699,20 +699,24 @@ pub fn execute_apply(
     })
 }
 
-pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<()> {
+/// Removes `dir` if empty, then walks upward removing each newly-emptied
+/// ancestor in turn. Returns how many directories were actually removed.
+pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> {
     if !dir.exists() || !dir.is_dir() {
-        return Ok(());
+        return Ok(0);
     }
 
     let mut entries = fs::read_dir(dir)?;
     if entries.next().is_none() {
         fs::remove_dir(dir)?;
+        let mut removed = 1;
         if let Some(parent) = dir.parent() {
-            let _ = remove_empty_dirs_recursive(parent);
+            removed += remove_empty_dirs_recursive(parent).unwrap_or(0);
         }
+        return Ok(removed);
     }
 
-    Ok(())
+    Ok(0)
 }
 
 #[cfg(test)]

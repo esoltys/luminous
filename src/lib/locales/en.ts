@@ -256,6 +256,7 @@ export const en = {
     pruneMissingBtn: "Clean Up",
     pruneMissingHint: "Removes missing songs and empty folders",
     pruneCompleteMsg: "Cleaned up {count} missing song(s)",
+    pruneCompleteMsgWithFolders: "Cleaned up {count} missing song(s) and removed {folders} empty folder(s)",
     watchRealtimeLabel: "Real-Time Folder Watching",
     watchRealtimeHint: "Automatically watch monitored music directories for file additions, modifications, or deletions.",
     scanOnStartupLabel: "Rescan Library on Startup",

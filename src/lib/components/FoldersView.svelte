@@ -54,9 +54,11 @@
   let pruneMsg = $state<string | null>(null);
 
   async function handlePruneMissing() {
-    const count = await collectionStore.pruneMissing();
-    pruneMsg = i18n.t('settings.pruneCompleteMsg', { count });
-    setTimeout(() => { pruneMsg = null; }, 4000);
+    const { deletedSongs, removedFolders } = await collectionStore.pruneMissing();
+    pruneMsg = removedFolders > 0
+      ? i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders })
+      : i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+    setTimeout(() => { pruneMsg = null; }, 8000);
   }
 
   onMount(async () => {
