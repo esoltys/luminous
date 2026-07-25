@@ -648,7 +648,7 @@ export const en = {
     destinationDefault: "Original Library Folder(s)",
     browse: "Browse...",
     replaceSpaces: "Replace spaces with underscores",
-    asciiOnly: "Remove accents and punctuation",
+    asciiOnly: "Convert accented letters to plain ASCII",
     cleanEmptyDirs: "Clean up empty source folders",
     moveExtraFiles: "Move companion files (artwork, lyrics, logs, cue sheets)",
     previewTitle: "Dry-Run Preview ({count} items)",
