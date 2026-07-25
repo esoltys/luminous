@@ -189,7 +189,9 @@
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
   let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok" || getItemStatus(i) === "missing_tag").length);
   let unchangedCount = $derived(items.filter((i) => getItemStatus(i) === "unchanged").length);
-  let canApply = $derived(readyCount > 0 && collisionCount === 0 && !isLoading && !isApplying);
+  // Colliding items are already excluded from the apply payload below, so a
+  // collision only blocks itself — not the rest of the batch.
+  let canApply = $derived(readyCount > 0 && !isLoading && !isApplying);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -655,9 +657,9 @@
 
 {#snippet collisionWarning()}
   {#if collisionCount > 0}
-    <span class="text-rose-400 font-medium flex items-center gap-1.5">
+    <span class="text-amber-400 font-medium flex items-center gap-1.5">
       <AlertTriangle class="w-3.5 h-3.5" />
-      Resolve collisions before applying.
+      {i18n.t("organizer.collisionsSkipped", { count: collisionCount })}
     </span>
   {/if}
 {/snippet}

@@ -664,6 +664,7 @@ export const en = {
     summaryReady: "{count} ready to move",
     summaryUnchanged: "{count} unchanged",
     summaryCollisions: "{count} collisions",
+    collisionsSkipped: "{count} file(s) will be skipped due to naming collisions",
     summaryErrors: "{count} errors",
     summaryMissingTags: "{count} missing tags",
     onlyChanging: "Only show changing files",

@@ -661,6 +661,7 @@ export const fr = {
     summaryReady: "{count} prêts à déplacer",
     summaryUnchanged: "{count} inchangés",
     summaryCollisions: "{count} collisions",
+    collisionsSkipped: "{count} fichier(s) seront ignorés en raison de collisions de noms",
     summaryErrors: "{count} erreurs",
     summaryMissingTags: "{count} tags manquants",
     onlyChanging: "Afficher uniquement les fichiers modifiés",
