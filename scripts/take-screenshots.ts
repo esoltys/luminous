@@ -363,10 +363,7 @@ async function main() {
       await page.waitForTimeout(400);
     },
     "click-playlist": async (page) => {
-      await page.evaluate(() => {
-        const card = document.querySelector(".grid > div, .playlists-scroll-container li button");
-        if (card) (card as HTMLElement).click();
-      });
+      await page.getByRole("button", { name: "2010s", exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-smart-playlist": async (page) => {
