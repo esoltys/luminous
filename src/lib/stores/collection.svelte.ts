@@ -13,7 +13,7 @@ import type {
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 
-export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics";
+export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */

@@ -19,3 +19,6 @@ scripts/mock-config.json
 .cargo/
 *.cargo/config.toml
 
+# Synced from docs/luminous-user-guide.html by `bun run sync-docs`
+/static/luminous-user-guide.html
+

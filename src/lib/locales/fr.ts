@@ -411,6 +411,9 @@ export const fr = {
     editorPlaceholder: "Coller les paroles au format LRC synchronisé ou texte brut ici...",
     saveFailedPrefix: "Échec de l'enregistrement des paroles : "
   },
+  help: {
+    loading: "Chargement du guide d'utilisation..."
+  },
   playerBar: {
     previous: "Piste précédente",
     play: "Lire",
