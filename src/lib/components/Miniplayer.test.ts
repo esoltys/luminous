@@ -96,7 +96,7 @@ describe("Miniplayer.svelte", () => {
     const rateSpy = vi.spyOn(playerStore, "rateCurrent").mockResolvedValue(undefined as any);
 
     const { getByTitle } = render(Miniplayer);
-    const heartBtn = getByTitle("Remove from favorites");
+    const heartBtn = getByTitle("Remove from favourites");
     await fireEvent.click(heartBtn);
 
     expect(rateSpy).toHaveBeenCalledWith(-1);
