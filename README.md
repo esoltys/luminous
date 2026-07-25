@@ -4,7 +4,7 @@
 [![Tauri](https://img.shields.io/badge/Tauri-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-ff3e00?style=flat-square&logo=svelte&logoColor=white)](https://svelte.dev)
-[![Release](https://img.shields.io/badge/Release-0.90.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
+[![Release](https://img.shields.io/badge/Release-0.95.0-blue?style=flat-square)](https://github.com/esoltys/luminous/releases/latest)
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-Complete-brightgreen?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 [![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](ROADMAP.md)
 
@@ -86,6 +86,16 @@ You can download the latest installers and portable binaries directly from the G
         </td>
     </tr>
     <tr>
+    	<td width="50%">
+            <h4 align="center">Song Tag Editor</h4>
+            <img src="docs/screenshots/song-tag-editor.png" alt="Song Tag Editor" />
+        </td>
+        <td width="50%">
+            <h4 align="center">Bulk Album Tag Editor</h4>
+            <img src="docs/screenshots/album-tag-editor.png" alt="Bulk Album Tag Editor" />
+        </td>
+    </tr>
+    <tr>
         <td colspan="2">
             <h4 align="center">Immersive Now Playing</h4>
             <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
@@ -119,19 +129,22 @@ You can download the latest installers and portable binaries directly from the G
 *   **Seamless History Navigation**: Dedicated back and forward navigation supporting top-bar controls, keyboard shortcuts, and mouse side buttons (#67).
 *   **Context-Aware Play History**: Track playback retains originating context (album or playlist) under Recently Played and Most Frequently Played views (#99).
 *   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
+*   **Tag-Based File Organizer**: Reorganize your library into a custom folder/filename template with a dry-run preview, conditional path segments, and companion-file (artwork, lyrics, logs, cue sheets) relocation (#81).
 *   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
-*   **Gapless Playback**: Tracks flow into one another with no silence or clicks — ideal for live albums, concept records, and DJ mixes.
+*   **Gapless Playback with Fades & Auto-Crossfade**: Tracks flow into one another with no silence or clicks, with optional fade-in/fade-out and an auto-crossfade mode for gap-free transitions (#79).
 *   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
 *   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
-*   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view.
-*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, Auto-Refill toggle (#26), and import/export M3U, M3U8, PLS, and XSPF files.
+*   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view, including from the Miniplayer.
+*   **Detached Picture-in-Picture Miniplayer**: A floating, always-on-top miniplayer with hover transport controls, drag-to-move/resize, and remembered size and position (#46).
+*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, Auto-Refill toggle with All/Favourites/Familiar/Discover/Deep Cuts biasing (#26, #120), and import/export M3U, M3U8, PLS, and XSPF files.
 *   **Decades & Smart Auto-Playlists**: Automatic playlist categorization by decade (60s through 2020s) with custom category color badges.
 *   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with instrumental track flags (#12), local caching, and plain-text fallback.
-*   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, then write tags back to your files.
+*   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, edit tags individually or in bulk across an entire album (#70), then write tags back to your files.
 *   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with multi-layered stack previews and duplicate cleanup.
 *   **Dynamic Theme Engine**: Curated color themes, or design your own live with the Custom Theme Builder.
 *   **Bilingual Interface**: Made in Canada 🍁 — fully translated between English and French, switchable instantly.
 *   **Seamless State Preservation**: Restores your active queue, playback position, sidebar navigation, playlist selection, volume, and equalizer settings on reopen.
+*   **Keyboard Shortcuts & In-App Help**: A `Ctrl+/` shortcuts overlay, global hotkeys for layout and history navigation, and a full in-app user guide from the Help sidebar item.
 
 ---
 
