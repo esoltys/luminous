@@ -508,11 +508,33 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_songs_by_artist: (args) =>
       library.songs.filter((s) => s.artist === args.artist || s.album_artist === args.artist),
 
+    get_song_details: (args) => {
+      const songId = args.songId as number;
+      const song = library.songs.find((s) => s.id === songId) ?? featuredSong;
+      return {
+        id: song.id,
+        path: song.path,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        album_artist: song.album_artist ?? song.artist ?? "",
+        composer: song.composer ?? "",
+        genre: song.genre ?? "",
+        track: song.track ?? null,
+        disc: song.disc ?? null,
+        year: song.year ?? null,
+        rating: song.rating ?? -1,
+      };
+    },
+
     get_playlists_by_artist: () => [],
     get_playlists: () => library.playlists,
     sync_genre_auto_playlists: () => null,
     sync_decade_auto_playlists: () => null,
-    get_favourite_songs: () => library.songs.slice(0, 5),
+    get_favourite_songs: () => {
+      const cannonsSongs = library.songs.filter((s) => s.artist === "Cannons" || s.album_artist === "Cannons");
+      return (cannonsSongs.length > 0 ? cannonsSongs : library.songs).slice(0, 20);
+    },
     get_recently_added_songs: () => library.songs.slice(0, 5),
     get_songs_by_genre: (args) => library.songs.filter((s) => s.genre === args.genre),
     get_songs_by_decade: (args) => {
@@ -671,6 +693,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "resize_miniplayer", "start_window_drag", "start_window_resize",
+    "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;
 

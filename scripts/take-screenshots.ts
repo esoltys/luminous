@@ -295,6 +295,31 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
     },
+    "click-song-tag-editor": async (page) => {
+      await page.getByTitle("Edit tags").first().click();
+      await page.waitForTimeout(500);
+    },
+    "click-album-tag-editor": async (page, featured) => {
+      await page.evaluate((albumName) => {
+        const cards = Array.from(document.querySelectorAll(".bg-brand-sidebar"));
+        let targetCard = cards.find((c: Element) => {
+          const titleBtn = c.querySelector("button.font-semibold");
+          return titleBtn && titleBtn.textContent?.trim() === albumName;
+        });
+        if (!targetCard && cards.length > 0) {
+          targetCard = cards[0];
+        }
+        if (targetCard) {
+          const titleBtn = targetCard.querySelector("button.font-semibold");
+          if (titleBtn) {
+            (titleBtn as HTMLElement).click();
+          }
+        }
+      }, featured.album ?? featured.song?.album);
+      await page.waitForTimeout(500);
+      await page.getByTitle("Edit album info", { exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "click-themes": async (page) => {
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button"));

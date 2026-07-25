@@ -8,70 +8,91 @@
     "sidebarOpen": true,
     "rightPanelOpen": false,
     "sidebarWidth": 64,
-    "positionSeconds": 111,
-    "featuredSong": "You Wreck Me",
-    "featuredArtist": "Eric Soltys",
-    "featuredAlbum": "Wildflowers"
+    "positionSeconds": 176,
+    "featuredSong": "I Get Weak",
+    "featuredArtist": "Cannons",
+    "featuredAlbum": "Everything Glows",
+    "subTab": ""
   },
   "screenshots": [
     {
       "name": "home",
       "filename": "home.png",
       "tab": "home",
-      "subTab": "",
-      "language": "fr"
+      "sidebarWidth": 220
     },
     {
       "name": "songs",
       "filename": "songs.png",
       "tab": "collection",
-      "subTab": "songs"
+      "subTab": "songs",
+      "sidebarWidth": 220
     },
     {
       "name": "albums",
       "filename": "albums.png",
       "tab": "collection",
-      "subTab": "albums"
+      "subTab": "albums",
+      "sidebarWidth": 220
     },
     {
       "name": "artists",
       "filename": "artists.png",
       "tab": "collection",
-      "subTab": "artists"
+      "subTab": "artists",
+      "sidebarWidth": 220
     },
     {
       "name": "artist-detail",
       "filename": "artist-detail.png",
       "tab": "collection",
       "subTab": "artists",
-      "action": "click-artist"
+      "action": "click-artist",
+      "featuredArtist": "Eric Soltys",
+      "sidebarWidth": 220
     },
     {
       "name": "album-detail",
       "filename": "album-detail.png",
       "tab": "collection",
       "subTab": "albums",
-      "action": "click-album"
+      "action": "click-album",
+      "sidebarWidth": 220,
+      "rightPanelOpen": true,
+      "positionSeconds": 79
+    },
+    {
+      "name": "song-tag-editor",
+      "filename": "song-tag-editor.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "click-song-tag-editor",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "album-tag-editor",
+      "filename": "album-tag-editor.png",
+      "tab": "collection",
+      "subTab": "albums",
+      "action": "click-album-tag-editor",
+      "sidebarWidth": 220
     },
     {
       "name": "settings-general",
       "filename": "settings-general.png",
-      "tab": "settings",
-      "subTab": ""
+      "tab": "settings"
     },
     {
       "name": "settings-folders",
       "filename": "settings-folders.png",
       "tab": "settings",
-      "subTab": "",
       "action": "click-settings-folders",
       "viewportHeight": 1100
     },
     {
-      "name": "organize-files",
-      "filename": "organize-files.png",
+      "name": "settings-tools",
+      "filename": "settings-tools.png",
       "tab": "settings",
-      "subTab": "",
       "action": "click-settings-tools",
       "viewportHeight": 1220
     },
@@ -79,28 +100,26 @@
       "name": "themes",
       "filename": "themes.png",
       "tab": "settings",
-      "subTab": "",
       "action": "click-themes"
     },
     {
       "name": "equalizer",
       "filename": "equalizer.png",
       "tab": "settings",
-      "subTab": "",
-      "action": "click-equalizer"
+      "action": "click-equalizer",
+      "positionSeconds": 79
     },
     {
       "name": "equalizer-parametric",
       "filename": "equalizer-parametric.png",
       "tab": "settings",
-      "subTab": "",
-      "action": "click-equalizer-parametric"
+      "action": "click-equalizer-parametric",
+      "positionSeconds": 79
     },
     {
       "name": "settings-about",
       "filename": "settings-about.png",
       "tab": "settings",
-      "subTab": "",
       "action": "click-settings-about",
       "viewportHeight": 950
     },
@@ -109,41 +128,81 @@
       "filename": "now-playing.png",
       "tab": "collection",
       "subTab": "songs",
-      "isImmersive": true
+      "isImmersive": true,
+      "theme": "dynamic-artwork",
+      "positionSeconds": 79
     },
     {
       "name": "moodbar",
       "filename": "moodbar.png",
       "tab": "collection",
       "subTab": "songs",
-      "action": "click-moodbar-toggle"
+      "action": "click-moodbar-toggle",
+      "sidebarWidth": 220,
+      "positionSeconds": 79
     },
     {
       "name": "lyrics",
       "filename": "lyrics.png",
       "tab": "lyrics",
-      "subTab": ""
+      "positionSeconds": 79
     },
     {
-      "name": "playlist",
-      "filename": "playlist.png",
+      "name": "playlist-auto",
+      "filename": "playlist-auto.png",
       "tab": "playlists",
       "subTab": "auto",
-      "sidebarWidth": 260
+      "sidebarWidth": 220
     },
     {
       "name": "playlist-auto-detail",
       "filename": "playlist-auto-detail.png",
       "tab": "playlists",
       "subTab": "auto",
-      "action": "click-playlist"
+      "action": "click-playlist",
+      "sidebarWidth": 220,
+      "positionSeconds": 79
     },
     {
-      "name": "smart-playlist-editor",
-      "filename": "smart-playlist-editor.png",
+      "name": "playlist",
+      "filename": "playlist.png",
       "tab": "playlists",
       "subTab": "custom",
-      "action": "click-smart-playlist"
+      "sidebarWidth": 220
+    },
+    {
+      "name": "playlist-smart-edit",
+      "filename": "playlist-smart-edit.png",
+      "tab": "playlists",
+      "subTab": "custom",
+      "action": "click-smart-playlist-edit",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "miniplayer",
+      "filename": "miniplayer.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "toggle-miniplayer",
+      "theme": "dynamic-artwork",
+      "viewportWidth": 340,
+      "viewportHeight": 420
+    },
+    {
+      "name": "miniplayer-hover",
+      "filename": "miniplayer-hover.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "toggle-miniplayer-hover",
+      "theme": "dynamic-artwork",
+      "viewportWidth": 340,
+      "viewportHeight": 420
+    },
+    {
+      "name": "search",
+      "filename": "search.png",
+      "tab": "home",
+      "action": "type-search"
     }
   ]
 }
