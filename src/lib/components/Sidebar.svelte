@@ -5,7 +5,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
-  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp } from "lucide-svelte";
+  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp, HelpCircle } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -44,6 +44,15 @@
     collectionStore.playlistsSubTab = subTab;
     collectionStore.selectedPlaylistId = null;
     collectionStore.selectedAutoPlaylist = null;
+  }
+
+  async function openHelp() {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl("https://github.com/esoltys/luminous");
+    } catch {
+      window.open("https://github.com/esoltys/luminous", "_blank");
+    }
   }
 </script>
 
@@ -189,6 +198,17 @@
         <span class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-current/20 border border-current/30 text-current flex items-center justify-center">
           <ArrowUp class="w-2.5 h-2.5 stroke-[2.5]" />
         </span>
+      {/if}
+    </button>
+
+    <button
+      onclick={openHelp}
+      class="flex items-center gap-3 transition-all duration-150 text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+      title={i18n.t('sidebar.help')}
+    >
+      <HelpCircle class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+      {#if !isCollapsed}
+        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.help')}</span>
       {/if}
     </button>
   </nav>

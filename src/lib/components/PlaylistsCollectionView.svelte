@@ -12,7 +12,7 @@
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
-  import { FolderInput, Plus, ListMusic, Sparkles, HelpCircle } from "lucide-svelte";
+  import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
   interface AutoDef {
@@ -229,34 +229,8 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div class="pt-2">
-        {#if collectionStore.playlistsSubTab === "auto"}
-          <!-- Auto-Playlist Info Banner -->
-          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-            <div class="space-y-1">
-              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.autoPlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary leading-relaxed">
-                {i18n.t('playlists.autoPlaylistInfoText')}
-              </p>
-            </div>
-          </div>
-        {:else}
-          <!-- Active Playlist Info Banner -->
-          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-            <div class="space-y-1">
-              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.activePlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary leading-relaxed">
-                {i18n.t('playlists.activePlaylistInfoText')}
-              </p>
-            </div>
-          </div>
-        {/if}
-      </div>
-
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
-      <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
+      <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main pt-2">
         <!-- Showing Count (Left) -->
         <div class="text-xs text-brand-text-secondary font-medium">
           {#if collectionStore.playlistsSubTab === "auto"}
