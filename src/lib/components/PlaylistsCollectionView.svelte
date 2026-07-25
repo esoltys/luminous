@@ -229,6 +229,32 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+      <div class="pt-2">
+        {#if collectionStore.playlistsSubTab === "auto"}
+          <!-- Auto-Playlist Info Banner -->
+          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
+            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
+            <div class="space-y-1">
+              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.autoPlaylistInfoTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">
+                {i18n.t('playlists.autoPlaylistInfoText')}
+              </p>
+            </div>
+          </div>
+        {:else}
+          <!-- Active Playlist Info Banner -->
+          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
+            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
+            <div class="space-y-1">
+              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.activePlaylistInfoTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">
+                {i18n.t('playlists.activePlaylistInfoText')}
+              </p>
+            </div>
+          </div>
+        {/if}
+      </div>
+
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
         <!-- Showing Count (Left) -->
@@ -326,17 +352,6 @@
 
       <div class="pt-2 pb-8">
         {#if collectionStore.playlistsSubTab === "auto"}
-          <!-- Auto-Playlist Info Banner -->
-          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-            <div class="space-y-1">
-              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.autoPlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary leading-relaxed">
-                {i18n.t('playlists.autoPlaylistInfoText')}
-              </p>
-            </div>
-          </div>
-
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {#each sortedAutoDefs as def (def.id)}
               <AutoPlaylistCard
@@ -353,17 +368,6 @@
             {/each}
           </div>
         {:else}
-          <!-- Active Playlist Info Banner -->
-          <div class="mb-5 bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-            <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-            <div class="space-y-1">
-              <h4 class="font-semibold text-brand-text-primary">{i18n.t('playlists.activePlaylistInfoTitle')}</h4>
-              <p class="text-xs text-brand-text-secondary leading-relaxed">
-                {i18n.t('playlists.activePlaylistInfoText')}
-              </p>
-            </div>
-          </div>
-
           {#if sortedPlaylists.length === 0}
             <div class="col-span-full py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">

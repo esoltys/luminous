@@ -37,36 +37,37 @@
     return item.playlist.name;
   }
 
+  /** "Genre" / "Decade" / "Smart" / "Custom" — mirrors PlaylistCard's autoKind derivation. */
+  function playlistCategoryFor(playlist: Playlist): string {
+    if (!playlist.dynamic_enabled) return i18n.t("sidebar.playlistsCustom");
+    if (isSmartPlaylistSpec(playlist.dynamic_spec)) return i18n.t("playlists.smartAutoPlaylist");
+    return playlist.dynamic_spec?.startsWith("decade:")
+      ? i18n.t("playlists.decadeAutoPlaylist")
+      : i18n.t("playlists.genreAutoPlaylist");
+  }
+
   function subtitleFor(item: HomeItem): string {
     if (item.type === "song") return item.song.artist || i18n.t("collection.unknownArtist");
     if (item.type === "album") return item.album.artist || i18n.t("collection.variousArtists");
-    return i18n.t("sidebar.playlists");
-  }
-
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const sec = Math.floor(ns / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
+    return playlistCategoryFor(item.playlist);
   }
 
   function trailingLabel(item: HomeItem): string {
     if (item.type === "song") {
-      return formatDuration(item.song.length_nanosec);
+      return i18n.t("playerBar.songLabel");
     }
     if (item.type === "album") {
       return getAlbumCategoryLabel(item.album.track_count, item.album.disc_count);
     }
-    return item.playlist.track_count === 1
-      ? i18n.t("playlists.oneSong")
-      : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
+    return i18n.t("playlists.playlistTypeLabel");
   }
 
   function genreFor(item: HomeItem): string {
     if (item.type === "song") return item.song.genre || "";
     if (item.type === "album") return item.album.genre || "";
-    return "";
+    return item.playlist.track_count === 1
+      ? i18n.t("playlists.oneSong")
+      : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
   }
 
   function addedDateFor(item: HomeItem): string {
@@ -176,7 +177,7 @@
           {/if}
           <button
             onclick={(e) => { e.stopPropagation(); playItem(item); }}
-            class="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             title={i18n.t('playerBar.play')}
           >
             <Play class="w-4 h-4 text-white fill-current" />

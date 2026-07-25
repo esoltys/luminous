@@ -137,22 +137,27 @@
     >
       {album.album || i18n.t('collection.unknownAlbum')}
     </button>
-    {#if showArtist}
-      {#if album.artist}
-        <button
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
-          class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer mt-0.5 font-medium"
-          title={i18n.t('collection.filterByArtist', { artist: album.artist })}
-        >
-          {album.artist}
-        </button>
+    <div class="flex items-center justify-between mt-0.5 gap-2">
+      {#if showArtist}
+        {#if album.artist}
+          <button
+            onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
+            class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate min-w-0 cursor-pointer font-medium"
+            title={i18n.t('collection.filterByArtist', { artist: album.artist })}
+          >
+            {album.artist}
+          </button>
+        {:else}
+          <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium">{i18n.t('collection.variousArtists')}</span>
+        {/if}
       {:else}
-        <span class="text-xs text-brand-text-secondary text-left w-full mt-0.5 truncate font-medium">{i18n.t('collection.variousArtists')}</span>
+        <span></span>
       {/if}
-    {/if}
-    <div class="flex items-center justify-between mt-auto pt-2 text-xs text-brand-text-secondary font-medium">
-      <span>{album.year || ""}</span>
-      <span>{getAlbumCategoryLabel(album.track_count, album.disc_count)}</span>
+      <span class="text-xs text-brand-text-secondary font-medium shrink-0">{album.year || ""}</span>
+    </div>
+    <div class="flex items-center justify-between mt-0.5 text-xs text-brand-text-secondary font-medium gap-2">
+      <span class="truncate min-w-0">{album.genre || ""}</span>
+      <span class="shrink-0">{getAlbumCategoryLabel(album.track_count, album.disc_count)}</span>
     </div>
   </div>
 </div>

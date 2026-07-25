@@ -149,7 +149,7 @@
   <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
     {subtitleLabel}
   </div>
-  <div class="flex items-center justify-between mt-2 text-xs text-brand-text-secondary">
+  <div class="flex items-center justify-between mt-0.5 text-xs text-brand-text-secondary">
     <span class="truncate">{updatedLabel ?? ""}</span>
     <span class="shrink-0">{trackCount === 1 ? i18n.t('playlists.oneSong') : i18n.t("playlists.songsCount", { count: trackCount })}</span>
   </div>

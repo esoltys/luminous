@@ -11,6 +11,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
+  import Toggle from "./Toggle.svelte";
 
   let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
@@ -413,12 +414,11 @@
               <label for="update-check-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateCheckEnabledLabel')}</label>
               <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateCheckEnabledHint')}</p>
             </div>
-            <input
+            <Toggle
               id="update-check-toggle"
-              type="checkbox"
               checked={updaterStore.updateCheckEnabled}
-              onchange={(e) => updaterStore.setUpdateCheckEnabled(e.currentTarget.checked)}
-              class="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent cursor-pointer accent-brand-accent"
+              onchange={(v) => updaterStore.setUpdateCheckEnabled(v)}
+              label={i18n.t('settings.updateCheckEnabledLabel')}
             />
           </div>
 
@@ -427,13 +427,12 @@
               <label for="update-auto-install-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateAutoInstallLabel')}</label>
               <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateAutoInstallHint')}</p>
             </div>
-            <input
+            <Toggle
               id="update-auto-install-toggle"
-              type="checkbox"
               disabled={!updaterStore.updateCheckEnabled}
               checked={updaterStore.updateAutoInstall}
-              onchange={(e) => updaterStore.setUpdateAutoInstall(e.currentTarget.checked)}
-              class="w-4 h-4 rounded border-brand-border text-brand-accent focus:ring-brand-accent cursor-pointer accent-brand-accent disabled:cursor-not-allowed"
+              onchange={(v) => updaterStore.setUpdateAutoInstall(v)}
+              label={i18n.t('settings.updateAutoInstallLabel')}
             />
           </div>
         </div>
@@ -553,21 +552,11 @@
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
               <p class="text-xs text-brand-text-secondary">{i18n.t('settings.watchRealtimeHint')}</p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
-                {collectionStore.watchFoldersRealtime ? i18n.t('common.on') : i18n.t('common.off')}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={collectionStore.watchFoldersRealtime}
-                aria-label={i18n.t('settings.watchRealtimeLabel')}
-                onclick={() => collectionStore.setWatchFoldersRealtime(!collectionStore.watchFoldersRealtime)}
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {collectionStore.watchFoldersRealtime ? 'bg-brand-accent' : 'bg-brand-border'}"
-              >
-                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {collectionStore.watchFoldersRealtime ? 'translate-x-6' : 'translate-x-1'}"></span>
-              </button>
-            </div>
+            <Toggle
+              checked={collectionStore.watchFoldersRealtime}
+              onchange={(v) => collectionStore.setWatchFoldersRealtime(v)}
+              label={i18n.t('settings.watchRealtimeLabel')}
+            />
           </div>
 
           <!-- Rescan on Startup -->
@@ -576,21 +565,11 @@
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
               <p class="text-xs text-brand-text-secondary">{i18n.t('settings.scanOnStartupHint')}</p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="text-xs font-medium text-brand-text-secondary text-right whitespace-nowrap min-w-[4.5rem]">
-                {collectionStore.scanOnStartup ? i18n.t('common.on') : i18n.t('common.off')}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={collectionStore.scanOnStartup}
-                aria-label={i18n.t('settings.scanOnStartupLabel')}
-                onclick={() => collectionStore.setScanOnStartup(!collectionStore.scanOnStartup)}
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer {collectionStore.scanOnStartup ? 'bg-brand-accent' : 'bg-brand-border'}"
-              >
-                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform {collectionStore.scanOnStartup ? 'translate-x-6' : 'translate-x-1'}"></span>
-              </button>
-            </div>
+            <Toggle
+              checked={collectionStore.scanOnStartup}
+              onchange={(v) => collectionStore.setScanOnStartup(v)}
+              label={i18n.t('settings.scanOnStartupLabel')}
+            />
           </div>
         </div>
 

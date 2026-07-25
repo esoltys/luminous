@@ -61,15 +61,15 @@ describe("Equalizer.svelte", () => {
     expect(getByRole("combobox")).toBeInTheDocument();
   });
 
-  it("toggles equalizer enabled checkbox", async () => {
+  it("toggles equalizer enabled switch", async () => {
     const { getByLabelText } = render(Equalizer);
-    let checkbox: HTMLInputElement;
+    let toggle: HTMLElement;
     await waitFor(() => {
-      checkbox = getByLabelText(/enable eq/i) as HTMLInputElement;
-      expect(checkbox).toBeInTheDocument();
+      toggle = getByLabelText(/enable eq/i);
+      expect(toggle).toBeInTheDocument();
     });
 
-    await fireEvent.click(checkbox!);
+    await fireEvent.click(toggle!);
     expect(invoke).toHaveBeenCalledWith("set_equalizer_enabled", { enabled: false });
   });
 
@@ -98,15 +98,14 @@ describe("Equalizer.svelte", () => {
   });
 
   it("handles loudness normalization toggle", async () => {
-    const { getAllByRole } = render(Equalizer);
-    let loudnessCheckbox: HTMLInputElement;
+    const { getByLabelText } = render(Equalizer);
+    let loudnessToggle: HTMLElement;
     await waitFor(() => {
-      const checkboxes = getAllByRole("checkbox") as HTMLInputElement[];
-      expect(checkboxes.length).toBeGreaterThanOrEqual(2);
-      loudnessCheckbox = checkboxes[1];
+      loudnessToggle = getByLabelText(/loudness normalization/i);
+      expect(loudnessToggle).toBeInTheDocument();
     });
 
-    await fireEvent.click(loudnessCheckbox!);
+    await fireEvent.click(loudnessToggle!);
     expect(invoke).toHaveBeenCalledWith("set_loudness_enabled", { enabled: true });
   });
 });

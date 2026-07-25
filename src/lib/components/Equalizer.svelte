@@ -3,6 +3,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import Toggle from "./Toggle.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -363,12 +364,12 @@
     <div class="flex items-center gap-3 flex-wrap">
       <div class="flex items-center gap-3 bg-brand-sidebar/40 border border-brand-border rounded-lg px-4 py-2">
         <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.enableEq')}</label>
-        <input
+        <Toggle
           id="eq-toggle"
-          type="checkbox"
-          bind:checked={enabled}
-          onchange={handleToggle}
-          class="w-4 h-4 shrink-0 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
+          checked={enabled}
+          onchange={(v) => { enabled = v; handleToggle(); }}
+          label={i18n.t('equalizer.enableEq')}
+          showOnOffLabel={false}
         />
       </div>
 
@@ -449,15 +450,15 @@
           <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h4>
           <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('loudness.subtitle')}</p>
         </div>
-        <label class="flex items-center gap-2 shrink-0">
+        <div class="flex items-center gap-2 shrink-0">
           <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('loudness.enable')}</span>
-          <input
-            type="checkbox"
-            bind:checked={loudnessEnabled}
-            onchange={handleLoudnessToggle}
-            class="w-4 h-4 shrink-0 text-brand-accent-text bg-brand-main border-brand-border rounded focus:ring-brand-accent accent-brand-accent cursor-pointer"
+          <Toggle
+            checked={loudnessEnabled}
+            onchange={(v) => { loudnessEnabled = v; handleLoudnessToggle(); }}
+            label={i18n.t('loudness.title')}
+            showOnOffLabel={false}
           />
-        </label>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -539,11 +540,11 @@
       <div class="flex flex-col gap-1.5 pt-1">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.fadePause')}</span>
-          <input
-            type="checkbox"
-            bind:checked={fadePauseEnabled}
-            onchange={saveFadeSettings}
-            class="toggle-checkbox accent-brand-accent cursor-pointer"
+          <Toggle
+            checked={fadePauseEnabled}
+            onchange={(v) => { fadePauseEnabled = v; saveFadeSettings(); }}
+            label={i18n.t('fades.fadePause')}
+            showOnOffLabel={false}
           />
         </div>
         {#if fadePauseEnabled}
@@ -568,11 +569,11 @@
       <div class="flex flex-col gap-1.5 border-t border-brand-border/40 pt-2">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.crossfadeAuto')}</span>
-          <input
-            type="checkbox"
-            bind:checked={crossfadeAutoEnabled}
-            onchange={saveFadeSettings}
-            class="toggle-checkbox accent-brand-accent cursor-pointer"
+          <Toggle
+            checked={crossfadeAutoEnabled}
+            onchange={(v) => { crossfadeAutoEnabled = v; saveFadeSettings(); }}
+            label={i18n.t('fades.crossfadeAuto')}
+            showOnOffLabel={false}
           />
         </div>
         {#if crossfadeAutoEnabled}
@@ -592,11 +593,11 @@
           />
           <div class="flex items-center justify-between pt-1">
             <span class="text-xs text-brand-text-secondary">{i18n.t('fades.suppressSameAlbum')}</span>
-            <input
-              type="checkbox"
-              bind:checked={crossfadeSuppressSameAlbum}
-              onchange={saveFadeSettings}
-              class="accent-brand-accent cursor-pointer"
+            <Toggle
+              checked={crossfadeSuppressSameAlbum}
+              onchange={(v) => { crossfadeSuppressSameAlbum = v; saveFadeSettings(); }}
+              label={i18n.t('fades.suppressSameAlbum')}
+              showOnOffLabel={false}
             />
           </div>
         {/if}

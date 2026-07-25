@@ -12,6 +12,7 @@
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
+  import Toggle from "./Toggle.svelte";
   import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -461,24 +462,17 @@
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
-            <button
+            <div
               id="auto-play-toggle-{playlistId}"
-              onclick={handleToggleAutoPlay}
               title={autoPlay
                 ? i18n.t('playlists.autoPlayTooltipOn')
                 : i18n.t('playlists.autoPlayTooltipOff')}
-              class="flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-200 cursor-pointer select-none
-                {autoPlay
-                  ? 'bg-brand-accent/15 border-brand-accent text-brand-accent shadow-[0_0_12px_2px] shadow-brand-accent/25 hover:bg-brand-accent/25'
-                  : 'border-brand-border text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+              class="flex items-center gap-2.5 px-4 py-2 rounded-full border border-brand-border text-xs font-semibold whitespace-nowrap shrink-0 text-brand-text-primary"
             >
-              <RefreshCw class="w-3.5 h-3.5 shrink-0 {autoPlay ? 'animate-spin [animation-duration:3s]' : ''}" />
+              <RefreshCw class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary {autoPlay ? 'animate-spin [animation-duration:3s] text-brand-accent-text' : ''}" />
               <span class="whitespace-nowrap">{i18n.t('playlists.autoPlayLabel')}</span>
-              <!-- Toggle pill -->
-              <span class="relative inline-flex items-center w-8 h-4 rounded-full shrink-0 transition-colors duration-200 {autoPlay ? 'bg-brand-accent' : 'bg-brand-border'}">
-                <span class="absolute w-3 h-3 bg-white rounded-full shadow transition-transform duration-200 {autoPlay ? 'translate-x-4' : 'translate-x-0.5'}"></span>
-              </span>
-            </button>
+              <Toggle checked={autoPlay} onchange={handleToggleAutoPlay} label={i18n.t('playlists.autoPlayLabel')} showOnOffLabel={false} />
+            </div>
           {/if}
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
