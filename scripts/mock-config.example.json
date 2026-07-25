@@ -90,8 +90,8 @@
       "viewportHeight": 1100
     },
     {
-      "name": "settings-tools",
-      "filename": "settings-tools.png",
+      "name": "settings-organize",
+      "filename": "settings-organize.png",
       "tab": "settings",
       "action": "click-settings-tools",
       "viewportHeight": 1220
