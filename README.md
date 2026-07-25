@@ -78,7 +78,7 @@ You can download the latest installers and portable binaries directly from the G
     <tr>
     	<td width="50%">
             <h4 align="center">Organize Files</h4>
-            <img src="docs/screenshots/organize-files.png" alt="Organize Files" />
+            <img src="docs/screenshots/settings-organize.png" alt="Organize Files" />
         </td>
         <td width="50%">
             <h4 align="center">Smart Playlist Editor</h4>
@@ -103,7 +103,6 @@ You can download the latest installers and portable binaries directly from the G
     </tr>
   </table>
 </div>
-
 
 
 
