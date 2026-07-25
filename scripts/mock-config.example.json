@@ -22,6 +22,12 @@
       "language": "fr"
     },
     {
+      "name": "songs",
+      "filename": "songs.png",
+      "tab": "collection",
+      "subTab": "songs"
+    },
+    {
       "name": "albums",
       "filename": "albums.png",
       "tab": "collection",
@@ -48,6 +54,28 @@
       "action": "click-album"
     },
     {
+      "name": "settings-general",
+      "filename": "settings-general.png",
+      "tab": "settings",
+      "subTab": ""
+    },
+    {
+      "name": "settings-folders",
+      "filename": "settings-folders.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-settings-folders",
+      "viewportHeight": 1100
+    },
+    {
+      "name": "organize-files",
+      "filename": "organize-files.png",
+      "tab": "settings",
+      "subTab": "",
+      "action": "click-settings-tools",
+      "viewportHeight": 1220
+    },
+    {
       "name": "themes",
       "filename": "themes.png",
       "tab": "settings",
@@ -69,11 +97,12 @@
       "action": "click-equalizer-parametric"
     },
     {
-      "name": "organize-files",
-      "filename": "organize-files.png",
+      "name": "settings-about",
+      "filename": "settings-about.png",
       "tab": "settings",
       "subTab": "",
-      "action": "click-organize-files"
+      "action": "click-settings-about",
+      "viewportHeight": 950
     },
     {
       "name": "now-playing",
@@ -101,6 +130,13 @@
       "tab": "playlists",
       "subTab": "auto",
       "sidebarWidth": 260
+    },
+    {
+      "name": "playlist-auto-detail",
+      "filename": "playlist-auto-detail.png",
+      "tab": "playlists",
+      "subTab": "auto",
+      "action": "click-playlist"
     },
     {
       "name": "smart-playlist-editor",
