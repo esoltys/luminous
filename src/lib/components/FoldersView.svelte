@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, HelpCircle, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
+  import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -447,17 +447,6 @@
         >
           <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
         </button>
-      </div>
-
-      <!-- Info Banner -->
-      <div class="bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-        <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-        <div class="space-y-1">
-          <h4 class="font-semibold text-brand-text-primary">{i18n.t('settings.folderHelpTitle')}</h4>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">
-            {i18n.t('settings.folderHelpText')}
-          </p>
-        </div>
       </div>
 
       <!-- Folders List -->
