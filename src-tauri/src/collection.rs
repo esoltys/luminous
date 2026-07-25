@@ -2421,47 +2421,52 @@ mod tests {
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
 
-        // Artist Low: one song, played twice.
-        let song_low = Song {
-            artist: Some("Artist Low".to_string()),
-            title: Some("Low Track".to_string()),
-            playcount: 2,
-            source: SongSource::LocalFile,
-            path: Some(r"C:\Music\Artist Low\low.mp3".to_string()),
-            ..Default::default()
+        // upsert_song() deliberately never touches playcount (it's owned by
+        // the stats.rs write path, preserved across rescans) — so seed songs
+        // via upsert_song(), then set playcount directly.
+        let seed = |path: &str, artist: &str, title: &str, playcount: i32| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "UPDATE songs SET playcount = ?1 WHERE path = ?2",
+                params![playcount, path],
+            )
+            .unwrap();
         };
-        upsert_song(&conn, &song_low).unwrap();
+
+        // Artist Low: one song, played twice.
+        seed(r"C:\Music\Artist Low\low.mp3", "Artist Low", "Low Track", 2);
 
         // Artist High: two songs, playcounts sum to 10.
-        let song_high_a = Song {
-            artist: Some("Artist High".to_string()),
-            title: Some("High Track A".to_string()),
-            playcount: 6,
-            source: SongSource::LocalFile,
-            path: Some(r"C:\Music\Artist High\a.mp3".to_string()),
-            ..Default::default()
-        };
-        upsert_song(&conn, &song_high_a).unwrap();
-        let song_high_b = Song {
-            artist: Some("Artist High".to_string()),
-            title: Some("High Track B".to_string()),
-            playcount: 4,
-            source: SongSource::LocalFile,
-            path: Some(r"C:\Music\Artist High\b.mp3".to_string()),
-            ..Default::default()
-        };
-        upsert_song(&conn, &song_high_b).unwrap();
+        seed(
+            r"C:\Music\Artist High\a.mp3",
+            "Artist High",
+            "High Track A",
+            6,
+        );
+        seed(
+            r"C:\Music\Artist High\b.mp3",
+            "Artist High",
+            "High Track B",
+            4,
+        );
 
         // Artist Unplayed: never played, must be excluded entirely.
-        let song_unplayed = Song {
-            artist: Some("Artist Unplayed".to_string()),
-            title: Some("Unplayed Track".to_string()),
-            playcount: 0,
-            source: SongSource::LocalFile,
-            path: Some(r"C:\Music\Artist Unplayed\track.mp3".to_string()),
-            ..Default::default()
-        };
-        upsert_song(&conn, &song_unplayed).unwrap();
+        seed(
+            r"C:\Music\Artist Unplayed\track.mp3",
+            "Artist Unplayed",
+            "Unplayed Track",
+            0,
+        );
 
         let scanner = CollectionScanner::new(db.clone());
         let top_artists = scanner.get_top_artists(10).unwrap();
