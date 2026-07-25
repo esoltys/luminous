@@ -17,19 +17,25 @@
 
   let {
     isOpen = false,
+    embedded = false,
     songIds = [],
     initialScope = "selection",
     onClose,
     onSuccess,
   }: {
-    isOpen: boolean;
+    isOpen?: boolean;
+    /** Render inline in the page instead of as a modal dialog — no backdrop, no close button. */
+    embedded?: boolean;
     songIds?: number[];
     initialScope?: "selection" | "library";
-    onClose: () => void;
+    onClose?: () => void;
     onSuccess?: () => void;
   } = $props();
 
-  const DEFAULT_TEMPLATE = "%albumartist/{%album/}{%disc-}{%track }%title";
+  /** Embedded instances are always "open"; modal instances follow the isOpen prop. */
+  let effectiveOpen = $derived(embedded || isOpen);
+
+  const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   const VARIABLE_CHIPS = [
     { label: "%albumartist", desc: "Album Artist" },
     { label: "%artist", desc: "Artist" },
@@ -43,32 +49,6 @@
     { label: "%year", desc: "Year" },
     { label: "%genre", desc: "Genre" },
   ];
-
-  function highlightTemplateHtml(str: string): string {
-    if (!str) return "";
-    let escaped = str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    const regex = /({[^{}]*})|(%[a-z]+)|([/\\])|(\s)/gi;
-    return escaped.replace(regex, (match, pBlock, pVar, pSep, pSpace) => {
-      if (pBlock) {
-        const inner = pBlock.replace(/%[a-z]+/gi, (v: string) => `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${v}</span>`);
-        return `<span class="text-brand-text-primary font-bold bg-brand-sidebar border border-brand-border rounded-xs px-0.5">${inner}</span>`;
-      }
-      if (pVar) {
-        return `<span class="text-brand-accent-text font-bold bg-brand-accent/20 rounded-xs px-0.5">${pVar}</span>`;
-      }
-      if (pSep) {
-        return `<span class="text-brand-text-secondary font-bold px-0.5">${pSep}</span>`;
-      }
-      if (pSpace) {
-        return `<span class="bg-brand-border/40 rounded-xs select-none" title="Space">&nbsp;</span>`;
-      }
-      return match;
-    });
-  }
 
   function highlightPathHtml(path: string): string {
     if (!path) return "";
@@ -89,7 +69,7 @@
   let destinationDir = $state<string>("");
 
   $effect(() => {
-    if (isOpen) {
+    if (effectiveOpen) {
       scope = songIds.length > 0 ? initialScope : "library";
     }
   });
@@ -209,14 +189,16 @@
   let missingTagCount = $derived(items.filter((i) => getItemStatus(i) === "missing_tag").length);
   let readyCount = $derived(items.filter((i) => getItemStatus(i) === "ok" || getItemStatus(i) === "missing_tag").length);
   let unchangedCount = $derived(items.filter((i) => getItemStatus(i) === "unchanged").length);
-  let canApply = $derived(readyCount > 0 && collisionCount === 0 && !isLoading && !isApplying);
+  // Colliding items are already excluded from the apply payload below, so a
+  // collision only blocks itself — not the rest of the batch.
+  let canApply = $derived(readyCount > 0 && !isLoading && !isApplying);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleKeydown(e: KeyboardEvent) {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     if (e.key === "Escape") {
-      onClose();
+      if (!embedded) onClose?.();
     } else if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
@@ -246,7 +228,7 @@
   }
 
   async function fetchPreview() {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     isLoading = true;
     errorMessage = null;
 
@@ -282,7 +264,7 @@
     const _m = moveExtraFiles;
     const _s = scope;
     const _ids = activeSongIds;
-    const _open = isOpen;
+    const _open = effectiveOpen;
 
     if (_open) {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -343,43 +325,7 @@
   });
 </script>
 
-{#if isOpen}
-  <div
-    use:portal
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
-    role="dialog"
-    aria-modal="true"
-  >
-    <div
-      class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
-    >
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
-            <Folder class="w-5 h-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold text-brand-text-primary">
-              {i18n.t("organizer.title")}
-            </h2>
-            <p class="text-xs text-brand-text-secondary">
-              {i18n.t("organizer.subtitle")}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onclick={onClose}
-          class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
-          title="Close"
-        >
-          <X class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Content area -->
-      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+{#snippet body()}
         {#if songIds.length > 0}
           <!-- Scope selector -->
           <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
@@ -415,19 +361,14 @@
             </button>
           </div>
 
-          <!-- Highlighted input box -->
-          <div class="relative w-full rounded-xl bg-brand-sidebar/90 border border-brand-border/90 focus-within:border-brand-accent transition-colors font-mono text-xs overflow-hidden min-h-[40px] flex items-center shadow-inner">
-            <div class="absolute inset-0 px-3.5 py-2.5 text-brand-text-primary whitespace-pre overflow-hidden flex items-center pointer-events-none font-mono text-xs leading-normal tracking-normal select-none z-0">
-              {@html highlightTemplateHtml(template)}
-            </div>
-            <input
-              id="template-input"
-              type="text"
-              bind:value={template}
-              class="relative w-full px-3.5 py-2.5 bg-transparent text-transparent caret-brand-accent font-mono text-xs leading-normal tracking-normal focus:outline-none z-10"
-              spellcheck="false"
-            />
-          </div>
+          <!-- Plain, directly-editable input — bordered like the destination folder input below so it reads as editable -->
+          <input
+            id="template-input"
+            type="text"
+            bind:value={template}
+            class="w-full px-3.5 py-2.5 rounded-xl bg-brand-sidebar/80 border border-brand-border/80 focus:outline-none focus:border-brand-accent text-brand-text-primary caret-brand-accent font-mono text-xs leading-normal tracking-normal transition-colors min-h-[40px]"
+            spellcheck="false"
+          />
 
           <!-- Variable chips -->
           <div class="flex flex-wrap items-center gap-1.5 pt-1">
@@ -536,7 +477,7 @@
               {/if}
               {#if collisionCount > 0}
                 <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-semibold border border-rose-500/40">
-                  {i18n.t("organizer.summaryCollisions", { count: collisionCount })}
+                  {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
                 </span>
               {/if}
               {#if errorCount > 0}
@@ -695,44 +636,122 @@
             {/if}
           </div>
         </div>
+{/snippet}
+
+{#snippet applyButton()}
+  <button
+    type="button"
+    onclick={handleApply}
+    disabled={!canApply}
+    class="px-5 py-2 rounded-xl bg-brand-accent text-brand-accent-contrast font-bold shadow-lg shadow-brand-accent/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2"
+  >
+    {#if isApplying}
+      <RefreshCw class="w-4 h-4 animate-spin" />
+      <span>Applying...</span>
+    {:else}
+      <Sparkles class="w-4 h-4" />
+      <span>{i18n.t("organizer.applyButton")}</span>
+    {/if}
+  </button>
+{/snippet}
+
+{#snippet collisionWarning()}
+  {#if collisionCount > 0}
+    <span class="text-amber-400 font-medium flex items-center gap-1.5">
+      <AlertTriangle class="w-3.5 h-3.5" />
+      {collisionCount === 1 ? i18n.t("organizer.collisionsSkippedOne") : i18n.t("organizer.collisionsSkipped", { count: collisionCount })}
+    </span>
+  {/if}
+{/snippet}
+
+{#if effectiveOpen}
+  {#if embedded}
+    <!-- Inline panel — no backdrop/portal/close button, sits directly in the page -->
+    <div class="w-full bg-brand-sidebar border border-brand-border rounded-2xl overflow-hidden text-brand-text-primary">
+      <div class="px-6 py-4 border-b border-brand-border/40 flex items-center gap-3">
+        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
+          <Folder class="w-5 h-5" />
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-brand-text-primary">
+            {i18n.t("organizer.title")}
+          </h2>
+          <p class="text-xs text-brand-text-secondary">
+            {i18n.t("organizer.subtitle")}
+          </p>
+        </div>
       </div>
 
-      <!-- Footer -->
-      <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
+      <div class="p-6 space-y-4 text-xs">
+        {@render body()}
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between bg-brand-sidebar/50">
         <div class="text-xs text-brand-text-secondary">
-          {#if collisionCount > 0}
-            <span class="text-rose-400 font-medium flex items-center gap-1.5">
-              <AlertTriangle class="w-3.5 h-3.5" />
-              Resolve collisions before applying.
-            </span>
-          {/if}
+          {@render collisionWarning()}
+        </div>
+        {@render applyButton()}
+      </div>
+    </div>
+  {:else}
+    <div
+      use:portal
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
+      >
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
+              <Folder class="w-5 h-5" />
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-brand-text-primary">
+                {i18n.t("organizer.title")}
+              </h2>
+              <p class="text-xs text-brand-text-secondary">
+                {i18n.t("organizer.subtitle")}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onclick={() => onClose?.()}
+            class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            onclick={onClose}
-            class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
-          >
-            {i18n.t("organizer.cancel")}
-          </button>
+        <!-- Content area -->
+        <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+          {@render body()}
+        </div>
 
-          <button
-            type="button"
-            onclick={handleApply}
-            disabled={!canApply}
-            class="px-5 py-2 rounded-xl bg-brand-accent text-brand-accent-contrast font-bold shadow-lg shadow-brand-accent/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2"
-          >
-            {#if isApplying}
-              <RefreshCw class="w-4 h-4 animate-spin" />
-              <span>Applying...</span>
-            {:else}
-              <Sparkles class="w-4 h-4" />
-              <span>{i18n.t("organizer.applyButton")}</span>
-            {/if}
-          </button>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
+          <div class="text-xs text-brand-text-secondary">
+            {@render collisionWarning()}
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              onclick={() => onClose?.()}
+              class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
+            >
+              {i18n.t("organizer.cancel")}
+            </button>
+
+            {@render applyButton()}
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  {/if}
 {/if}

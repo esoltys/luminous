@@ -174,9 +174,15 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
         fpcalc_bin, path
     );
 
-    let output = Command::new(&fpcalc_bin)
-        .arg("-json")
-        .arg(path)
+    let mut cmd = Command::new(&fpcalc_bin);
+    cmd.arg("-json").arg(path);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = cmd
         .output()
         .context("failed to execute fpcalc binary. Is libchromaprint-tools installed?")?;
 
@@ -311,7 +317,7 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
     }
 
     eprintln!("[Luminous Backend] AcoustID: No matching recording found in AcoustID database");
-    Err(anyhow!("no matching audio recordings found on AcoustID"))
+    Err(anyhow!("No matching audio recordings found on AcoustID"))
 }
 
 #[cfg(test)]

@@ -590,6 +590,13 @@ pub struct MusicDirectory {
     pub subdirs: bool,
 }
 
+/// Result of pruning missing/unavailable songs from the library.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PruneResult {
+    pub deleted_songs: usize,
+    pub removed_folders: usize,
+}
+
 /// Scan progress event payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanProgress {

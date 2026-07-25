@@ -1,6 +1,6 @@
 use crate::{
     collection::CollectionScanner,
-    models::{HomeItem, LibraryStats, MusicDirectory, QueuePopulationMode, Song},
+    models::{HomeItem, LibraryStats, MusicDirectory, PruneResult, QueuePopulationMode, Song},
     AppState,
 };
 use tauri::{AppHandle, State};
@@ -49,7 +49,7 @@ pub async fn scan_directories(
 }
 
 #[tauri::command]
-pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<usize, String> {
+pub async fn prune_missing_songs(state: State<'_, AppState>) -> Result<PruneResult, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.prune_missing_songs().map_err(|e| e.to_string())
 }

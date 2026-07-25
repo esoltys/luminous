@@ -57,10 +57,13 @@
           const midAvg = data.slice(8, 20).reduce((sum, v) => sum + v, 0) / 12;
           const coronalAvg = data.slice(20, 32).reduce((sum, v) => sum + v, 0) / 12;
 
-          // Calibrate each band's multiplier for average energy values
-          bassIntensity = Math.min(1.0, bassAvg * 28.0);
-          midIntensity = Math.min(1.0, midAvg * 28.0);
-          coronalIntensity = Math.min(1.0, coronalAvg * 45.0);
+          // Backend bins already arrive normalized to the frame's own peak
+          // (see analyzer::calculate_spectrum), so only a modest boost is
+          // needed for visual punch — a large fixed multiplier here would
+          // just re-saturate every band back to the ceiling.
+          bassIntensity = Math.min(1.0, bassAvg * 1.4);
+          midIntensity = Math.min(1.0, midAvg * 1.4);
+          coronalIntensity = Math.min(1.0, coronalAvg * 1.6);
         } else {
           bassIntensity = 0;
           midIntensity = 0;

@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, QueuePopulationMode,
-        ScanPhase, ScanProgress, Song, SongSource,
+        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, PruneResult,
+        QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -74,7 +74,8 @@ impl CollectionScanner {
         Ok(dirs)
     }
     /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
-    pub fn prune_missing_songs(&self) -> Result<usize> {
+    /// Also sweeps every watched directory for empty folders and removes them.
+    pub fn prune_missing_songs(&self) -> Result<PruneResult> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
         let rows = stmt.query_map([], |row| {
@@ -115,7 +116,16 @@ impl CollectionScanner {
                 deleted_count
             );
         }
-        Ok(deleted_count)
+
+        let mut removed_folders = 0;
+        for dir in self.get_directories()? {
+            removed_folders += crate::organizer::remove_empty_dirs_under_root(Path::new(&dir.path));
+        }
+
+        Ok(PruneResult {
+            deleted_songs: deleted_count,
+            removed_folders,
+        })
     }
 
     /// Scan all watched directories, emitting progress events to the frontend.
@@ -123,6 +133,18 @@ impl CollectionScanner {
     pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
+            // Still tell the frontend we're done — otherwise the isScanning
+            // flag it optimistically set before calling this command is
+            // never cleared, permanently disabling rescan/cleanup controls.
+            let _ = app.emit(
+                "scan-progress",
+                ScanProgress {
+                    phase: ScanPhase::Done,
+                    scanned: 0,
+                    total: 0,
+                    current_path: None,
+                },
+            );
             return Ok(());
         }
 
@@ -1764,6 +1786,98 @@ fn reconcile_moved_songs(conn: &rusqlite::Connection, all_paths: &[PathBuf]) -> 
     Ok(reconciled)
 }
 
+/// Matches paths that disappeared ("removed") against paths that newly
+/// appeared ("added") within the same watcher debounce window, using
+/// filename + file size as the identity heuristic — the same heuristic
+/// `reconcile_moved_songs` uses for a full rescan. A matched pair is
+/// repointed via `UPDATE songs SET path/mtime` in place instead of being
+/// deleted and reinserted, which is what preserves rating/playcount/
+/// playlist membership when a file is moved between (or within) watched
+/// folders while the app is running. Returns the paths that remain
+/// unmatched, for the caller to fall back to normal delete/insert handling.
+fn reconcile_watcher_batch(
+    conn: &rusqlite::Connection,
+    removed_paths: &[PathBuf],
+    added_paths: &[PathBuf],
+) -> Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+    if removed_paths.is_empty() || added_paths.is_empty() {
+        return Ok((removed_paths.to_vec(), added_paths.to_vec()));
+    }
+
+    let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
+        std::collections::HashMap::new();
+    for path in added_paths {
+        let (Some(filename), Ok(metadata)) = (
+            path.file_name().map(|f| f.to_string_lossy().to_lowercase()),
+            std::fs::metadata(path),
+        ) else {
+            continue;
+        };
+        candidates
+            .entry((filename, metadata.len() as i64))
+            .or_default()
+            .push(path);
+    }
+
+    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, &PathBuf)>> =
+        std::collections::HashMap::new();
+    for path in removed_paths {
+        let path_str = path.to_string_lossy().to_string();
+        let Some(filename) = path.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
+            continue;
+        };
+        let row: Option<(i64, i64)> = conn
+            .query_row(
+                "SELECT id, filesize FROM songs WHERE path = ?1 AND filesize IS NOT NULL",
+                params![path_str],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .ok();
+        if let Some((id, filesize)) = row {
+            orphans
+                .entry((filename, filesize))
+                .or_default()
+                .push((id, path));
+        }
+    }
+
+    let mut matched_removed = std::collections::HashSet::new();
+    let mut matched_added = std::collections::HashSet::new();
+    let mut update_stmt = conn.prepare("UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3")?;
+
+    for (key, orphan_list) in &orphans {
+        if orphan_list.len() != 1 {
+            continue; // ambiguous — multiple missing songs share this filename+size
+        }
+        let Some(candidate_list) = candidates.get(key) else {
+            continue;
+        };
+        if candidate_list.len() != 1 {
+            continue; // ambiguous — multiple new files share this filename+size
+        }
+
+        let (song_id, old_path) = orphan_list[0];
+        let new_path = candidate_list[0];
+        let new_path_str = new_path.to_string_lossy().to_string();
+        let mtime = get_mtime(new_path).unwrap_or(0);
+        update_stmt.execute(params![new_path_str, mtime, song_id])?;
+        matched_removed.insert(old_path);
+        matched_added.insert(new_path);
+    }
+
+    let still_removed = removed_paths
+        .iter()
+        .filter(|p| !matched_removed.contains(p))
+        .cloned()
+        .collect();
+    let still_added = added_paths
+        .iter()
+        .filter(|p| !matched_added.contains(p))
+        .cloned()
+        .collect();
+    Ok((still_removed, still_added))
+}
+
 /// Helper to hard-delete a path and its subpaths from the SQLite database.
 pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> {
     let conn = db.pool.get()?;
@@ -1866,7 +1980,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 .ok()
                 .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
 
-            for msg in rx {
+            while let Ok(msg) = rx.recv() {
                 if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
                     continue;
                 }
@@ -1888,25 +2002,82 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     continue;
                 }
 
-                let event = match msg {
-                    WatcherMsg::Event(event) => event,
-                    WatcherMsg::Overflow => {
-                        // We don't know what changed — a full rescan (which also
-                        // reconciles moved files) is the only reliable recovery.
-                        log::warn!("Recovering from a watcher error with a full library rescan");
-                        let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
-                        let app_handle_scan = app_clone.clone();
-                        tauri::async_runtime::block_on(async move {
-                            let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
-                            let _ = app_handle_scan.emit("library-changed", ());
-                        });
-                        continue;
+                // A file move surfaces as a separate "removed" event for the old
+                // path and "added" event for the new one — sometimes in the same
+                // notify::Event, sometimes as two events in quick succession.
+                // Collect everything that arrives within a short debounce window
+                // so both halves of a move can be reconciled together below,
+                // instead of being handled independently as a delete + a fresh
+                // insert (which would reset rating/playcount/added-date on the
+                // "new" row).
+                let mut batch = vec![msg];
+                let deadline = std::time::Instant::now() + std::time::Duration::from_millis(400);
+                while let Some(remaining) =
+                    deadline.checked_duration_since(std::time::Instant::now())
+                {
+                    if remaining.is_zero() {
+                        break;
                     }
-                };
+                    match rx.recv_timeout(remaining) {
+                        Ok(next) => batch.push(next),
+                        Err(_) => break,
+                    }
+                }
 
-                for path in event.paths {
-                    let path_str = path.to_string_lossy().to_string();
-                    if !path.exists() {
+                if batch.iter().any(|m| matches!(m, WatcherMsg::Overflow)) {
+                    // We don't know what changed — a full rescan (which also
+                    // reconciles moved files) is the only reliable recovery.
+                    log::warn!("Recovering from a watcher error with a full library rescan");
+                    let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
+                    let app_handle_scan = app_clone.clone();
+                    tauri::async_runtime::block_on(async move {
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = app_handle_scan.emit("library-changed", ());
+                    });
+                    continue;
+                }
+
+                let mut removed_paths = std::collections::HashSet::new();
+                let mut added_paths = std::collections::HashSet::new();
+                let mut dir_paths = std::collections::HashSet::new();
+                for msg in batch {
+                    let WatcherMsg::Event(event) = msg else {
+                        continue;
+                    };
+                    for path in event.paths {
+                        if !path.exists() {
+                            removed_paths.insert(path);
+                        } else if path.is_file() && is_audio_file(&path) {
+                            added_paths.insert(path);
+                        } else if path.is_dir() {
+                            dir_paths.insert(path);
+                        }
+                    }
+                }
+                let removed_paths: Vec<PathBuf> = removed_paths.into_iter().collect();
+                let added_paths: Vec<PathBuf> = added_paths.into_iter().collect();
+
+                if let Ok(conn) = db_for_thread.pool.get() {
+                    let (still_removed, still_added) =
+                        match reconcile_watcher_batch(&conn, &removed_paths, &added_paths) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                log::error!("Failed to reconcile watcher batch: {e}");
+                                (removed_paths.clone(), added_paths.clone())
+                            }
+                        };
+
+                    let reconciled_count = removed_paths.len() - still_removed.len();
+                    if reconciled_count > 0 {
+                        log::info!(
+                            "Watcher reconciled {} moved song(s) in place (rating/playcount preserved)",
+                            reconciled_count
+                        );
+                        let _ = app_clone.emit("library-changed", ());
+                    }
+
+                    for path in &still_removed {
+                        let path_str = path.to_string_lossy().to_string();
                         log::info!("Watcher detected deletion: {}", path_str);
                         match delete_path_and_subpaths(&db_for_thread, &path_str) {
                             Ok(deleted) => {
@@ -1919,26 +2090,34 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 log::error!("Failed to delete path from db: {e}");
                             }
                         }
-                    } else if path.is_file() && is_audio_file(&path) {
-                        log::info!("Watcher detected file addition/change: {}", path_str);
-                        if let Ok(conn) = db_for_thread.pool.get() {
-                            let result = match &cover_manager {
-                                Some(cm) => read_and_upsert_song(&conn, cm, &path),
-                                None => read_tags(&path).and_then(|song| upsert_song(&conn, &song)),
-                            };
-                            if result.is_ok() {
-                                let _ = app_clone.emit("library-changed", ());
-                            }
-                        }
-                    } else if path.is_dir() {
-                        log::info!("Watcher detected directory addition/change: {}", path_str);
-                        let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
-                        let app_handle_scan = app_clone.clone();
-                        tauri::async_runtime::block_on(async move {
-                            let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
-                            let _ = app_handle_scan.emit("library-changed", ());
-                        });
                     }
+
+                    for path in &still_added {
+                        log::info!(
+                            "Watcher detected file addition/change: {}",
+                            path.to_string_lossy()
+                        );
+                        let result = match &cover_manager {
+                            Some(cm) => read_and_upsert_song(&conn, cm, path),
+                            None => read_tags(path).and_then(|song| upsert_song(&conn, &song)),
+                        };
+                        if result.is_ok() {
+                            let _ = app_clone.emit("library-changed", ());
+                        }
+                    }
+                }
+
+                for path in dir_paths {
+                    log::info!(
+                        "Watcher detected directory addition/change: {}",
+                        path.to_string_lossy()
+                    );
+                    let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
+                    let app_handle_scan = app_clone.clone();
+                    tauri::async_runtime::block_on(async move {
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = app_handle_scan.emit("library-changed", ());
+                    });
                 }
             }
         })
@@ -2604,7 +2783,7 @@ mod tests {
 
         let scanner = CollectionScanner::new(db.clone());
         let pruned = scanner.prune_missing_songs().unwrap();
-        assert_eq!(pruned, 1);
+        assert_eq!(pruned.deleted_songs, 1);
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))

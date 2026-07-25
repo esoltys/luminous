@@ -34,6 +34,8 @@
   let lookupSucceeded = $state(false);
   let errorMsg = $state("");
   let lookupErrorMsg = $state("");
+  /** Fields last changed by an AcoustID lookup, so they can be highlighted until edited or re-looked-up. */
+  let changedFields = $state(new Set<string>());
 
   async function loadMetadata() {
     isLoading = true;
@@ -77,6 +79,7 @@
     isLookingUp = true;
     lookupErrorMsg = "";
     lookupSucceeded = false;
+    changedFields = new Set();
     try {
       const suggestions = await invoke<{
         title: string | null;
@@ -85,10 +88,24 @@
         year: number | null;
       }>("lookup_acoustid_tags", { songId });
 
-      if (suggestions.title) title = suggestions.title;
-      if (suggestions.artist) artist = suggestions.artist;
-      if (suggestions.album) album = suggestions.album;
-      if (suggestions.year) year = suggestions.year;
+      const next = new Set<string>();
+      if (suggestions.title && suggestions.title !== title) {
+        title = suggestions.title;
+        next.add("title");
+      }
+      if (suggestions.artist && suggestions.artist !== artist) {
+        artist = suggestions.artist;
+        next.add("artist");
+      }
+      if (suggestions.album && suggestions.album !== album) {
+        album = suggestions.album;
+        next.add("album");
+      }
+      if (suggestions.year && suggestions.year !== year) {
+        year = suggestions.year;
+        next.add("year");
+      }
+      changedFields = next;
       lookupSucceeded = true;
     } catch (e: any) {
       console.error("AcoustID lookup failed:", e);
@@ -198,7 +215,7 @@
 
           <!-- AcoustID lookup error info -->
           {#if lookupErrorMsg}
-            <div class="flex items-start gap-2.5 bg-red-950/20 border border-red-900/60 rounded-xl p-3 text-red-300 text-xs">
+            <div class="flex items-start gap-2.5 bg-brand-main border border-red-500/40 rounded-xl p-3 text-red-500 text-xs">
               <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
               <span>{lookupErrorMsg}</span>
             </div>
@@ -212,8 +229,9 @@
               <input
                 id="tag-title"
                 bind:value={title}
+                oninput={() => changedFields.delete("title")}
                 disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('title') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
             </div>
 
@@ -223,8 +241,9 @@
               <input
                 id="tag-artist"
                 bind:value={artist}
+                oninput={() => changedFields.delete("artist")}
                 disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('artist') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
             </div>
 
@@ -234,8 +253,9 @@
               <input
                 id="tag-album"
                 bind:value={album}
+                oninput={() => changedFields.delete("album")}
                 disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('album') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
             </div>
 
@@ -289,8 +309,9 @@
                 oninput={(e) => {
                   const val = parseInt((e.target as HTMLInputElement).value, 10);
                   year = isNaN(val) ? null : val;
+                  changedFields.delete("year");
                 }}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('year') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
             </div>
 
@@ -349,8 +370,8 @@
           </button>
           {#if lookupSucceeded}
             <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
-              <Check class="w-3.5 h-3.5 font-bold animate-bounce" />
-              <span>{i18n.t('tagEditor.matched')}</span>
+              <Check class="w-3.5 h-3.5 font-bold {changedFields.size > 0 ? 'animate-bounce' : ''}" />
+              <span>{changedFields.size > 0 ? i18n.t('tagEditor.matched') : i18n.t('tagEditor.noChange')}</span>
             </div>
           {/if}
         </div>

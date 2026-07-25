@@ -12,10 +12,9 @@
   import Equalizer from "./Equalizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "themes" | "equalizer" | "about">("general");
+  let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
-  let showOrganizeModal = $state(false);
 
   async function copyVersion() {
     try {
@@ -55,9 +54,11 @@
   let pruneMsg = $state<string | null>(null);
 
   async function handlePruneMissing() {
-    const count = await collectionStore.pruneMissing();
-    pruneMsg = i18n.t('settings.pruneCompleteMsg', { count });
-    setTimeout(() => { pruneMsg = null; }, 4000);
+    const { deletedSongs, removedFolders } = await collectionStore.pruneMissing();
+    pruneMsg = removedFolders > 0
+      ? i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders })
+      : i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+    setTimeout(() => { pruneMsg = null; }, 8000);
   }
 
   onMount(async () => {
@@ -91,7 +92,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "general" || savedTab === "folders" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
+        if (savedTab === "general" || savedTab === "folders" || savedTab === "tools" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
           settingsTab = savedTab;
         }
       }
@@ -253,6 +254,12 @@
         class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'folders' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabFolders')}
+      </button>
+      <button
+        onclick={() => { settingsTab = "tools"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'tools' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        {i18n.t('settings.tabTools')}
       </button>
       <button
         onclick={() => { settingsTab = "themes"; editingThemeId = null; }}
@@ -459,9 +466,6 @@
         {#each collectionStore.directories as dir}
           <div class="flex items-center justify-between bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 hover:border-brand-border/80 transition-colors">
             <div class="flex items-center gap-3.5 min-w-0">
-              <div class="w-10 h-10 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text">
-                <Folder class="w-5 h-5" />
-              </div>
               <div class="min-w-0">
                 <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
                 <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
@@ -472,7 +476,7 @@
               class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
               title={i18n.t('settings.folderItemStopWatch')}
             >
-              <Trash2 class="w-4 h-4" />
+              <Trash2 class="w-4 h-4 text-brand-accent-text" />
             </button>
           </div>
         {/each}
@@ -539,38 +543,7 @@
             <RotateCcw class="w-4 h-4 text-brand-accent-text" />
             {i18n.t('settings.forceFullScanBtn')}
           </button>
-
-          <button
-            onclick={handlePruneMissing}
-            disabled={collectionStore.isScanning}
-            class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-            title={i18n.t('settings.pruneMissingHint')}
-          >
-            <Eraser class="w-4 h-4" />
-            {i18n.t('settings.pruneMissingBtn')}
-          </button>
-
-          <button
-            onclick={() => { showOrganizeModal = true; }}
-            disabled={collectionStore.isScanning}
-            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-            title={i18n.t('organizer.subtitle')}
-          >
-            <Folder class="w-4 h-4 text-brand-accent-text" />
-            {i18n.t('organizer.organizeEntireLibrary')}
-          </button>
-
-          {#if pruneMsg}
-            <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
-          {/if}
         </div>
-
-        <OrganizeFiles
-          isOpen={showOrganizeModal}
-          songIds={[]}
-          initialScope="library"
-          onClose={() => { showOrganizeModal = false; }}
-        />
 
         <!-- Configuration Toggles -->
         <div class="pt-3 border-t border-brand-border/50 space-y-4">
@@ -652,6 +625,29 @@
         </div>
       </div>
       </div>
+    {:else if settingsTab === "tools"}
+      <!-- Tools Section -->
+      <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabTools')}</h3>
+
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            onclick={handlePruneMissing}
+            disabled={collectionStore.isScanning}
+            class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Eraser class="w-4 h-4 text-brand-accent-text" />
+            {i18n.t('settings.pruneMissingBtn')}
+          </button>
+          <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
+
+          {#if pruneMsg}
+            <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
+          {/if}
+        </div>
+      </div>
+
+      <OrganizeFiles embedded songIds={[]} initialScope="library" />
     {:else if settingsTab === "themes"}
       <!-- UI Themes Section -->
       <div class="space-y-6">
@@ -784,7 +780,7 @@
                   <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">darkMuted (bg-main)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.mainViewDescription')}</span>
                   </div>
                 </div>
 
@@ -793,7 +789,7 @@
                   <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">darkVibrant (bg-sidebar)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.sidebarDescription')}</span>
                   </div>
                 </div>
 
@@ -802,7 +798,7 @@
                   <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">lightMuted (bg-playerbar)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.playerBarDescription')}</span>
                   </div>
                 </div>
 
@@ -811,7 +807,7 @@
                   <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">vibrant (color-accent)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentDescription')}</span>
                   </div>
                 </div>
 
@@ -820,7 +816,7 @@
                   <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">lightVibrant (accent-hover)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentHoverDescription')}</span>
                   </div>
                 </div>
 
@@ -829,7 +825,7 @@
                   <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
                   <div class="flex flex-col">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
-                    <span class="text-[10px] text-brand-text-secondary font-medium">muted (color-border)</span>
+                    <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.bordersDescription')}</span>
                   </div>
                 </div>
               </div>

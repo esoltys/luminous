@@ -53,7 +53,7 @@
 
   function trailingLabel(item: HomeItem): string {
     if (item.type === "song") {
-      return variant === "rank" ? formatDuration(item.song.length_nanosec) : formatRelativeDate(item.song.added);
+      return formatDuration(item.song.length_nanosec);
     }
     if (item.type === "album") {
       return getAlbumCategoryLabel(item.album.track_count, item.album.disc_count);
@@ -64,8 +64,14 @@
   }
 
   function genreFor(item: HomeItem): string {
-    if (item.type !== "album") return "";
-    return item.album.genre || "";
+    if (item.type === "song") return item.song.genre || "";
+    if (item.type === "album") return item.album.genre || "";
+    return "";
+  }
+
+  function addedDateFor(item: HomeItem): string {
+    if (variant !== "added" || item.type !== "song") return "";
+    return formatRelativeDate(item.song.added);
   }
 
   // Mirrors CarouselCard's openPlaylist: genre/decade auto-playlists open in
@@ -178,18 +184,24 @@
         </div>
 
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
+          <div class="flex items-center gap-2">
+            <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
+            {#if item.type === "song"}
+              <span class="shrink-0">
+                <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
+              </span>
+            {/if}
+          </div>
           <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
         </div>
 
-        {#if item.type === "song"}
-          <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
-        {/if}
-
-        <div class="shrink-0 max-w-28 text-right">
+        <div class="shrink-0 max-w-40 text-right">
           <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
           {#if genreFor(item)}
             <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
+          {/if}
+          {#if addedDateFor(item)}
+            <p class="text-xs text-brand-text-secondary/70 truncate">{addedDateFor(item)}</p>
           {/if}
         </div>
       </div>

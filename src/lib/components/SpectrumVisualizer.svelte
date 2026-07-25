@@ -60,8 +60,11 @@
 
     for (let i = 0; i < numBars; i++) {
       const val = spectrumData[i] || 0.0;
-      // Apply scaling so the bars dance satisfyingly
-      const barHeight = Math.max(1.5, val * height * 14.0);
+      // Bins already arrive normalized to the frame's own peak (see
+      // analyzer::calculate_spectrum), so no extra gain is needed here —
+      // a large fixed multiplier would just clip most bars to the same
+      // "maxed out" height instead of showing their real relative shape.
+      const barHeight = Math.min(height, Math.max(1.5, val * height));
 
       const x = i * (barWidth + barGap);
       const y = height - barHeight;

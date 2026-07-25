@@ -436,18 +436,26 @@ pub fn compute_preview(
         }
     }
 
-    for (target_path, indices) in target_paths_map {
-        if indices.len() > 1 && !target_path.trim().is_empty() {
-            for idx in indices {
+    for (_target_path, indices) in target_paths_map {
+        if indices.len() > 1 {
+            for &idx in &indices {
                 let status = preview_items[idx].status.clone();
                 if status != OrganizePreviewStatus::Unchanged
                     && status != OrganizePreviewStatus::Error
                 {
+                    // Name the other file(s) sharing this target so the user
+                    // can actually act on it (e.g. spot a duplicate and
+                    // delete/retag one side) instead of just being told a
+                    // collision exists somewhere.
+                    let other_paths: Vec<String> = indices
+                        .iter()
+                        .filter(|&&other_idx| other_idx != idx)
+                        .map(|&other_idx| preview_items[other_idx].from_path.clone())
+                        .collect();
+
                     preview_items[idx].status = OrganizePreviewStatus::Collision;
-                    preview_items[idx].error_message = Some(format!(
-                        "Multiple files map to target path: {}",
-                        target_path
-                    ));
+                    preview_items[idx].error_message =
+                        Some(format!("Same target as: {}", other_paths.join(", ")));
                 }
             }
         }
@@ -691,20 +699,60 @@ pub fn execute_apply(
     })
 }
 
-fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<()> {
+/// Removes `dir` if empty, then walks upward removing each newly-emptied
+/// ancestor in turn. Returns how many directories were actually removed.
+pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> {
     if !dir.exists() || !dir.is_dir() {
-        return Ok(());
+        return Ok(0);
     }
 
     let mut entries = fs::read_dir(dir)?;
     if entries.next().is_none() {
         fs::remove_dir(dir)?;
+        let mut removed = 1;
         if let Some(parent) = dir.parent() {
-            let _ = remove_empty_dirs_recursive(parent);
+            removed += remove_empty_dirs_recursive(parent).unwrap_or(0);
         }
+        return Ok(removed);
     }
 
-    Ok(())
+    Ok(0)
+}
+
+/// Removes every empty subdirectory under `root` (never the root itself),
+/// deepest first, so a folder left empty only after its own empty children
+/// are removed still gets cleaned up in the same pass. Used by "Clean Up" to
+/// sweep the whole watched library, not just folders tied to a song that was
+/// just pruned from the database.
+pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
+    if !root.is_dir() {
+        return 0;
+    }
+
+    let mut removed = 0;
+    for entry in walkdir::WalkDir::new(root)
+        .min_depth(1)
+        .contents_first(true)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        // Cloud-synced folders (e.g. OneDrive Files On-Demand placeholders)
+        // carry a reparse-point attribute, so `entry.file_type()` (which
+        // doesn't follow reparse points) reports them as something other
+        // than a plain directory even though they are one. Check the
+        // resolved path instead so these aren't silently skipped.
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let dir = entry.path();
+        if let Ok(mut entries) = fs::read_dir(dir) {
+            if entries.next().is_none() && fs::remove_dir(dir).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    removed
 }
 
 #[cfg(test)]
