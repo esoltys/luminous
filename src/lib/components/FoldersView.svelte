@@ -15,7 +15,6 @@
   let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
-  let showOrganizeModal = $state(false);
 
   async function copyVersion() {
     try {
@@ -628,38 +627,17 @@
       <!-- Tools Section -->
       <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabTools')}</h3>
 
-      <!-- Info Banner -->
-      <div class="bg-brand-accent/5 border border-brand-accent/20 rounded-xl p-4 flex gap-3.5 text-sm text-brand-text-secondary">
-        <HelpCircle class="w-5 h-5 text-brand-accent-text shrink-0 mt-0.5" />
-        <div class="space-y-1">
-          <h4 class="font-semibold text-brand-text-primary">{i18n.t('settings.toolsHelpTitle')}</h4>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">
-            {i18n.t('settings.toolsHelpText')}
-          </p>
-        </div>
-      </div>
-
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="flex flex-wrap items-center gap-3">
           <button
             onclick={handlePruneMissing}
             disabled={collectionStore.isScanning}
             class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-            title={i18n.t('settings.pruneMissingHint')}
           >
             <Eraser class="w-4 h-4 text-brand-accent-text" />
             {i18n.t('settings.pruneMissingBtn')}
           </button>
-
-          <button
-            onclick={() => { showOrganizeModal = true; }}
-            disabled={collectionStore.isScanning}
-            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-            title={i18n.t('organizer.subtitle')}
-          >
-            <Folder class="w-4 h-4 text-brand-accent-text" />
-            {i18n.t('organizer.organizeEntireLibrary')}
-          </button>
+          <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
 
           {#if pruneMsg}
             <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
@@ -667,12 +645,7 @@
         </div>
       </div>
 
-      <OrganizeFiles
-        isOpen={showOrganizeModal}
-        songIds={[]}
-        initialScope="library"
-        onClose={() => { showOrganizeModal = false; }}
-      />
+      <OrganizeFiles embedded songIds={[]} initialScope="library" />
     {:else if settingsTab === "themes"}
       <!-- UI Themes Section -->
       <div class="space-y-6">

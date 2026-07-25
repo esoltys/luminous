@@ -17,17 +17,23 @@
 
   let {
     isOpen = false,
+    embedded = false,
     songIds = [],
     initialScope = "selection",
     onClose,
     onSuccess,
   }: {
-    isOpen: boolean;
+    isOpen?: boolean;
+    /** Render inline in the page instead of as a modal dialog — no backdrop, no close button. */
+    embedded?: boolean;
     songIds?: number[];
     initialScope?: "selection" | "library";
-    onClose: () => void;
+    onClose?: () => void;
     onSuccess?: () => void;
   } = $props();
+
+  /** Embedded instances are always "open"; modal instances follow the isOpen prop. */
+  let effectiveOpen = $derived(embedded || isOpen);
 
   const DEFAULT_TEMPLATE = "%albumartist/{%year - }{%album/}{%disc-}{%track }%title";
   const VARIABLE_CHIPS = [
@@ -63,7 +69,7 @@
   let destinationDir = $state<string>("");
 
   $effect(() => {
-    if (isOpen) {
+    if (effectiveOpen) {
       scope = songIds.length > 0 ? initialScope : "library";
     }
   });
@@ -188,9 +194,9 @@
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleKeydown(e: KeyboardEvent) {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     if (e.key === "Escape") {
-      onClose();
+      if (!embedded) onClose?.();
     } else if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
@@ -220,7 +226,7 @@
   }
 
   async function fetchPreview() {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     isLoading = true;
     errorMessage = null;
 
@@ -256,7 +262,7 @@
     const _m = moveExtraFiles;
     const _s = scope;
     const _ids = activeSongIds;
-    const _open = isOpen;
+    const _open = effectiveOpen;
 
     if (_open) {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -317,43 +323,7 @@
   });
 </script>
 
-{#if isOpen}
-  <div
-    use:portal
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
-    role="dialog"
-    aria-modal="true"
-  >
-    <div
-      class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
-    >
-      <!-- Header -->
-      <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
-            <Folder class="w-5 h-5" />
-          </div>
-          <div>
-            <h2 class="text-base font-bold text-brand-text-primary">
-              {i18n.t("organizer.title")}
-            </h2>
-            <p class="text-xs text-brand-text-secondary">
-              {i18n.t("organizer.subtitle")}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onclick={onClose}
-          class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
-          title="Close"
-        >
-          <X class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Content area -->
-      <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+{#snippet body()}
         {#if songIds.length > 0}
           <!-- Scope selector -->
           <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
@@ -664,44 +634,122 @@
             {/if}
           </div>
         </div>
+{/snippet}
+
+{#snippet applyButton()}
+  <button
+    type="button"
+    onclick={handleApply}
+    disabled={!canApply}
+    class="px-5 py-2 rounded-xl bg-brand-accent text-brand-accent-contrast font-bold shadow-lg shadow-brand-accent/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2"
+  >
+    {#if isApplying}
+      <RefreshCw class="w-4 h-4 animate-spin" />
+      <span>Applying...</span>
+    {:else}
+      <Sparkles class="w-4 h-4" />
+      <span>{i18n.t("organizer.applyButton")}</span>
+    {/if}
+  </button>
+{/snippet}
+
+{#snippet collisionWarning()}
+  {#if collisionCount > 0}
+    <span class="text-rose-400 font-medium flex items-center gap-1.5">
+      <AlertTriangle class="w-3.5 h-3.5" />
+      Resolve collisions before applying.
+    </span>
+  {/if}
+{/snippet}
+
+{#if effectiveOpen}
+  {#if embedded}
+    <!-- Inline panel — no backdrop/portal/close button, sits directly in the page -->
+    <div class="w-full bg-brand-sidebar border border-brand-border rounded-2xl overflow-hidden text-brand-text-primary">
+      <div class="px-6 py-4 border-b border-brand-border/40 flex items-center gap-3">
+        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
+          <Folder class="w-5 h-5" />
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-brand-text-primary">
+            {i18n.t("organizer.title")}
+          </h2>
+          <p class="text-xs text-brand-text-secondary">
+            {i18n.t("organizer.subtitle")}
+          </p>
+        </div>
       </div>
 
-      <!-- Footer -->
-      <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
+      <div class="p-6 space-y-4 text-xs">
+        {@render body()}
+      </div>
+
+      <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between bg-brand-sidebar/50">
         <div class="text-xs text-brand-text-secondary">
-          {#if collisionCount > 0}
-            <span class="text-rose-400 font-medium flex items-center gap-1.5">
-              <AlertTriangle class="w-3.5 h-3.5" />
-              Resolve collisions before applying.
-            </span>
-          {/if}
+          {@render collisionWarning()}
+        </div>
+        {@render applyButton()}
+      </div>
+    </div>
+  {:else}
+    <div
+      use:portal
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
+      >
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
+              <Folder class="w-5 h-5" />
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-brand-text-primary">
+                {i18n.t("organizer.title")}
+              </h2>
+              <p class="text-xs text-brand-text-secondary">
+                {i18n.t("organizer.subtitle")}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onclick={() => onClose?.()}
+            class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button
-            type="button"
-            onclick={onClose}
-            class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
-          >
-            {i18n.t("organizer.cancel")}
-          </button>
+        <!-- Content area -->
+        <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+          {@render body()}
+        </div>
 
-          <button
-            type="button"
-            onclick={handleApply}
-            disabled={!canApply}
-            class="px-5 py-2 rounded-xl bg-brand-accent text-brand-accent-contrast font-bold shadow-lg shadow-brand-accent/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2"
-          >
-            {#if isApplying}
-              <RefreshCw class="w-4 h-4 animate-spin" />
-              <span>Applying...</span>
-            {:else}
-              <Sparkles class="w-4 h-4" />
-              <span>{i18n.t("organizer.applyButton")}</span>
-            {/if}
-          </button>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
+          <div class="text-xs text-brand-text-secondary">
+            {@render collisionWarning()}
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              onclick={() => onClose?.()}
+              class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
+            >
+              {i18n.t("organizer.cancel")}
+            </button>
+
+            {@render applyButton()}
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  {/if}
 {/if}

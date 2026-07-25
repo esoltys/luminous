@@ -215,7 +215,7 @@
 
           <!-- AcoustID lookup error info -->
           {#if lookupErrorMsg}
-            <div class="flex items-start gap-2.5 bg-red-950/20 border border-red-900/60 rounded-xl p-3 text-red-300 text-xs">
+            <div class="flex items-start gap-2.5 bg-brand-main border border-red-500/40 rounded-xl p-3 text-red-500 text-xs">
               <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
               <span>{lookupErrorMsg}</span>
             </div>
@@ -370,8 +370,8 @@
           </button>
           {#if lookupSucceeded}
             <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
-              <Check class="w-3.5 h-3.5 font-bold animate-bounce" />
-              <span>{i18n.t('tagEditor.matched')}</span>
+              <Check class="w-3.5 h-3.5 font-bold {changedFields.size > 0 ? 'animate-bounce' : ''}" />
+              <span>{changedFields.size > 0 ? i18n.t('tagEditor.matched') : i18n.t('tagEditor.noChange')}</span>
             </div>
           {/if}
         </div>

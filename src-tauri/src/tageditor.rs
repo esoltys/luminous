@@ -317,7 +317,7 @@ pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<Sug
     }
 
     eprintln!("[Luminous Backend] AcoustID: No matching recording found in AcoustID database");
-    Err(anyhow!("no matching audio recordings found on AcoustID"))
+    Err(anyhow!("No matching audio recordings found on AcoustID"))
 }
 
 #[cfg(test)]
