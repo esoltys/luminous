@@ -476,7 +476,7 @@
               class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
               title={i18n.t('settings.folderItemStopWatch')}
             >
-              <Trash2 class="w-4 h-4" />
+              <Trash2 class="w-4 h-4 text-brand-accent-text" />
             </button>
           </div>
         {/each}

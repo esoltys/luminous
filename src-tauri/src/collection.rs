@@ -74,7 +74,7 @@ impl CollectionScanner {
         Ok(dirs)
     }
     /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
-    /// Also removes any now-empty parent folders left behind by missing files.
+    /// Also sweeps every watched directory for empty folders and removes them.
     pub fn prune_missing_songs(&self) -> Result<PruneResult> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
@@ -85,15 +85,9 @@ impl CollectionScanner {
         })?;
 
         let mut to_delete = Vec::new();
-        let mut missing_parents = Vec::new();
         for (id, path) in rows.flatten() {
             let p = Path::new(&path);
             if !p.exists() {
-                if let Some(parent) = p.parent() {
-                    if !missing_parents.contains(&parent.to_path_buf()) {
-                        missing_parents.push(parent.to_path_buf());
-                    }
-                }
                 to_delete.push(id);
             }
         }
@@ -124,8 +118,8 @@ impl CollectionScanner {
         }
 
         let mut removed_folders = 0;
-        for parent in &missing_parents {
-            removed_folders += crate::organizer::remove_empty_dirs_recursive(parent).unwrap_or(0);
+        for dir in self.get_directories()? {
+            removed_folders += crate::organizer::remove_empty_dirs_under_root(Path::new(&dir.path));
         }
 
         Ok(PruneResult {

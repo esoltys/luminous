@@ -719,6 +719,36 @@ pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> 
     Ok(0)
 }
 
+/// Removes every empty subdirectory under `root` (never the root itself),
+/// deepest first, so a folder left empty only after its own empty children
+/// are removed still gets cleaned up in the same pass. Used by "Clean Up" to
+/// sweep the whole watched library, not just folders tied to a song that was
+/// just pruned from the database.
+pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
+    if !root.is_dir() {
+        return 0;
+    }
+
+    let mut removed = 0;
+    for entry in walkdir::WalkDir::new(root)
+        .min_depth(1)
+        .contents_first(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if !entry.file_type().is_dir() {
+            continue;
+        }
+        let dir = entry.path();
+        if let Ok(mut entries) = fs::read_dir(dir) {
+            if entries.next().is_none() && fs::remove_dir(dir).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    removed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
