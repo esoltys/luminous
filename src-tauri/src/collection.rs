@@ -139,6 +139,18 @@ impl CollectionScanner {
     pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
+            // Still tell the frontend we're done — otherwise the isScanning
+            // flag it optimistically set before calling this command is
+            // never cleared, permanently disabling rescan/cleanup controls.
+            let _ = app.emit(
+                "scan-progress",
+                ScanProgress {
+                    phase: ScanPhase::Done,
+                    scanned: 0,
+                    total: 0,
+                    current_path: None,
+                },
+            );
             return Ok(());
         }
 
