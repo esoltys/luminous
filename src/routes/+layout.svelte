@@ -10,14 +10,16 @@
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import Miniplayer from '../lib/components/Miniplayer.svelte';
+  import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import { Music } from 'lucide-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { onMount } from 'svelte';
-  
+
   let { children } = $props();
   let isLinux = $state(false);
+  let isShortcutsModalOpen = $state(false);
 
   onMount(() => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
@@ -25,9 +27,41 @@
     prefs.init();
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm') {
-        e.preventDefault();
-        collectionStore.toggleMiniplayerMode();
+      if (!(e.ctrlKey || e.metaKey)) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'm':
+          e.preventDefault();
+          collectionStore.toggleMiniplayerMode();
+          break;
+        case ',':
+          e.preventDefault();
+          collectionStore.activeTab = 'settings';
+          break;
+        case '[':
+          e.preventDefault();
+          collectionStore.goBack();
+          break;
+        case ']':
+          e.preventDefault();
+          collectionStore.goForward();
+          break;
+        case '1':
+          e.preventDefault();
+          collectionStore.toggleSidebar();
+          break;
+        case '2':
+          e.preventDefault();
+          collectionStore.toggleImmersiveMode();
+          break;
+        case '3':
+          e.preventDefault();
+          collectionStore.toggleRightPanel();
+          break;
+        case '/':
+          e.preventDefault();
+          isShortcutsModalOpen = !isShortcutsModalOpen;
+          break;
       }
     }
     window.addEventListener('keydown', handleGlobalHotkeys);
@@ -286,6 +320,9 @@
   {/if}
 </div>
 
+{#if isShortcutsModalOpen}
+  <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
+{/if}
 
 <style>
   .flip-perspective {
