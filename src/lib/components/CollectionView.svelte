@@ -19,6 +19,7 @@
   import ArtistCard from "./ArtistCard.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import EmptyState from "./EmptyState.svelte";
+  import NowPlayingBars from "./NowPlayingBars.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -597,9 +598,7 @@
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
                   {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                     <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute group-hover:opacity-0 transition-opacity">
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                      <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                      <NowPlayingBars />
                     </div>
                   {/if}
                   <button

@@ -36,6 +36,7 @@
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import SortableHeader from "./SortableHeader.svelte";
+  import NowPlayingBars from "./NowPlayingBars.svelte";
   import { portal } from "../utils/portal";
 
   let editingSongId = $state<number | null>(null);
@@ -924,9 +925,7 @@
                     <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
                     {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
                       <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                        <NowPlayingBars />
                       </div>
                     {:else}
                       <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">

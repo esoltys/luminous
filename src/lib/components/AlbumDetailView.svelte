@@ -14,6 +14,7 @@
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import EmptyState from "./EmptyState.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
+  import NowPlayingBars from "./NowPlayingBars.svelte";
   import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -505,9 +506,7 @@
               <div class="text-center flex justify-center relative w-9 h-6 items-center">
                 {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                   <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                    <NowPlayingBars />
                   </div>
                 {/if}
                 <button
