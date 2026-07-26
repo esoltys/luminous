@@ -18,6 +18,7 @@
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import SortableHeader from "./SortableHeader.svelte";
+  import EmptyState from "./EmptyState.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -784,11 +785,12 @@
             {/each}
             {#if sortedAlbums.length === 0}
               <div class="col-span-full py-16 text-center">
-                <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                  <FolderClosed class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                  <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noAlbumsTitle')}</h3>
-                  <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('collection.noAlbumsText')}</p>
-                </div>
+                <EmptyState
+                  card
+                  icon={FolderClosed}
+                  title={i18n.t('collection.noAlbumsTitle')}
+                  subtitle={i18n.t('collection.noAlbumsText')}
+                />
               </div>
             {/if}
           </div>
@@ -807,11 +809,12 @@
             {/each}
             {#if sortedArtists.length === 0}
               <div class="col-span-full py-16 text-center">
-                <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                  <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                  <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noArtistsTitle')}</h3>
-                  <p class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('collection.noArtistsText')}</p>
-                </div>
+                <EmptyState
+                  card
+                  icon={Music}
+                  title={i18n.t('collection.noArtistsTitle')}
+                  subtitle={i18n.t('collection.noArtistsText')}
+                />
               </div>
             {/if}
           </div>

@@ -12,6 +12,7 @@
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
+  import EmptyState from "./EmptyState.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -344,11 +345,13 @@
         {:else}
           {#if sortedPlaylists.length === 0}
             <div class="col-span-full py-16 text-center">
-              <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                <ListMusic class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('playlists.noPlaylistsTitle')}</h3>
-                <p class="text-xs text-brand-text-secondary font-medium">{i18n.t('playlists.noPlaylistsText')}</p>
-              </div>
+              <EmptyState
+                card
+                icon={ListMusic}
+                title={i18n.t('playlists.noPlaylistsTitle')}
+                subtitle={i18n.t('playlists.noPlaylistsText')}
+                subtitleClass="text-xs text-brand-text-secondary font-medium"
+              />
             </div>
           {:else}
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">

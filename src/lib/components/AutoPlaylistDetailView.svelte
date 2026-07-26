@@ -15,6 +15,7 @@
   import Toggle from "./Toggle.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
+  import EmptyState from "./EmptyState.svelte";
   import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -580,8 +581,7 @@
             </td></tr>
           {:else if sortedSongs.length === 0}
             <tr><td colspan="7" class="py-16 text-center select-none">
-              <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
-              <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
+              <EmptyState icon={Music} title={i18n.t('collection.noSongsTitle')} />
             </td></tr>
           {:else}
             {#each sortedSongs as song, index (song.id)}
