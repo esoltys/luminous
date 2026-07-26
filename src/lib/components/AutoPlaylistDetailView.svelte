@@ -18,6 +18,7 @@
   import EmptyState from "./EmptyState.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
   import { Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -426,35 +427,35 @@
             disabled={loading || songs.length === 0}
             class="shrink-0"
           />
-          <button
+          <IconActionButton
             onclick={handleAddAllToPlaylist}
             disabled={loading || songs.length === 0}
             title={playlistsStore.activeCustomPlaylist
               ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
               : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+            class="shrink-0"
           >
-            <Plus class="w-4 h-4" />
-          </button>
-          <button
+            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
             onclick={handleSaveAsCustomPlaylist}
             disabled={loading || songs.length === 0}
             title={i18n.t('playlists.saveAsCustomTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+            class="shrink-0"
           >
-            <FolderPlus class="w-4 h-4" />
-          </button>
+            {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Refresh button: force-regenerate playlist with fresh songs from library -->
-            <button
+            <IconActionButton
               onclick={handleRefreshAutoPlaylist}
               disabled={loading || isRefreshing}
               title={i18n.t('playlists.refreshAutoPlaylistTooltip')}
-              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+              class="shrink-0"
             >
-              <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
-            </button>
+              {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
+            </IconActionButton>
           {/if}
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}

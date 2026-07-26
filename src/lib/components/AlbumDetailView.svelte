@@ -15,6 +15,7 @@
   import EmptyState from "./EmptyState.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
   import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -394,24 +395,22 @@
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
-          <button
+          <IconActionButton
             onclick={handleAddAlbumToPlaylist}
             disabled={loading || songs.length === 0}
             title={playlistsStore.activeCustomPlaylist
               ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
               : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
-            <Plus class="w-4 h-4" />
-          </button>
-          <button
+            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
             onclick={openAlbumTagEditor}
             disabled={loading || songs.length === 0}
             title={i18n.t('albumDetail.editInfoTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
-            <Edit3 class="w-4 h-4" />
-          </button>
+            {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
+          </IconActionButton>
         </div>
       </div>
 
