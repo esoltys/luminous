@@ -45,7 +45,7 @@
     if (!playlist.dynamic_enabled) return null;
     if (autoKind === "decade") return i18n.t("playlists.decadeAutoPlaylist");
     if (autoKind === "genre") return i18n.t("playlists.genreAutoPlaylist");
-    return "Smart Rule Playlist";
+    return i18n.t("playlists.smartRulePlaylistLabel");
   });
 
   let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
@@ -108,10 +108,10 @@
     {:else if autoKind === "smart"}
       <div
         class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title="Smart Rule-Based Playlist"
+        title={i18n.t("playlists.smartRuleBasedTooltip")}
       >
         <Sparkles class="w-2.5 h-2.5" />
-        Smart
+        {i18n.t("playlists.smartBadgeLabel")}
       </div>
     {/if}
 

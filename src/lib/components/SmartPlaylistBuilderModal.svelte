@@ -20,7 +20,8 @@
 
   function generateSuggestedName(ruleList: Array<{ field: string; op: string; value: string }>): string {
     const activeRules = ruleList.filter((r) => r.value.trim() !== "");
-    if (activeRules.length === 0) return "Smart Playlist";
+    const fallbackName = i18n.t("smartPlaylistBuilder.fallbackName", {}, "Smart Playlist");
+    if (activeRules.length === 0) return fallbackName;
 
     // Detect a decade range: year >= X and year <= Y where Y - X === 9
     const yearGteIdx = activeRules.findIndex((r) => r.field === "year" && (r.op === ">=" || r.op === ">"));
@@ -55,10 +56,10 @@
       } else if (r.field === "artist") {
         parts.push(val);
       } else if (r.field === "album") {
-        parts.push(`Album: ${val}`);
+        parts.push(i18n.t("collection.albumPlaylistName", { name: val }));
       } else if (r.field === "year") {
         if (r.op === ">=" || r.op === ">") parts.push(`${val}+`);
-        else if (r.op === "<=" || r.op === "<") parts.push(`Pre-${val}`);
+        else if (r.op === "<=" || r.op === "<") parts.push(i18n.t("smartPlaylistBuilder.yearPrefixPre", { value: val }));
         else parts.push(val);
       } else if (r.field === "rating") {
         parts.push(r.op === ">=" || r.op === ">" ? `${val}★+` : `${val}★`);
@@ -67,25 +68,26 @@
       }
     });
 
-    if (parts.length === 0) return "Smart Playlist";
+    const mixWord = i18n.t("smartPlaylistBuilder.mixWord", {}, "Mix");
+    if (parts.length === 0) return fallbackName;
 
     if (parts.length === 1) {
       const single = parts[0];
-      if (decadeToken && single === decadeToken) return `${decadeToken} Mix`;
+      if (decadeToken && single === decadeToken) return `${decadeToken} ${mixWord}`;
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
-      if (firstField === "genre") return `${single} Mix`;
-      if (firstField === "artist") return `${single} Selection`;
-      if (firstField === "rating") return `${single} Songs`;
-      return `${single} Playlist`;
+      if (firstField === "genre") return `${single} ${mixWord}`;
+      if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
+      if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
+      return `${single} ${i18n.t("smartPlaylistBuilder.playlistWord", {}, "Playlist")}`;
     }
 
     if (decadeToken) {
       const rest = parts.filter((p) => p !== decadeToken);
-      return `${decadeToken} ${rest.join(" · ")} Mix`;
+      return `${decadeToken} ${rest.join(" · ")} ${mixWord}`;
     }
 
-    return `${parts.join(" · ")} Mix`;
+    return `${parts.join(" · ")} ${mixWord}`;
   }
 
   interface RuleItem {
@@ -119,35 +121,35 @@
   });
 
   const availableFields = [
-    { key: "artist", label: "Artist", type: "text" },
-    { key: "album", label: "Album", type: "text" },
-    { key: "title", label: "Title", type: "text" },
-    { key: "genre", label: "Genre", type: "text" },
-    { key: "composer", label: "Composer", type: "text" },
-    { key: "year", label: "Year", type: "number" },
-    { key: "rating", label: "Rating (Stars)", type: "number" },
-    { key: "playcount", label: "Play Count", type: "number" },
-    { key: "skipcount", label: "Skip Count", type: "number" },
-    { key: "bitrate", label: "Bitrate", type: "number" },
-    { key: "duration", label: "Duration (MM:SS or Sec)", type: "text" },
+    { key: "artist", label: i18n.t("smartPlaylistBuilder.fieldArtist", {}, "Artist"), type: "text" },
+    { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
+    { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },
+    { key: "genre", label: i18n.t("smartPlaylistBuilder.fieldGenre", {}, "Genre"), type: "text" },
+    { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
+    { key: "year", label: i18n.t("smartPlaylistBuilder.fieldYear", {}, "Year"), type: "number" },
+    { key: "rating", label: i18n.t("smartPlaylistBuilder.fieldRating", {}, "Rating (Stars)"), type: "number" },
+    { key: "playcount", label: i18n.t("smartPlaylistBuilder.fieldPlayCount", {}, "Play Count"), type: "number" },
+    { key: "skipcount", label: i18n.t("smartPlaylistBuilder.fieldSkipCount", {}, "Skip Count"), type: "number" },
+    { key: "bitrate", label: i18n.t("smartPlaylistBuilder.fieldBitrate", {}, "Bitrate"), type: "number" },
+    { key: "duration", label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"), type: "text" },
   ];
 
   function getOperatorsForField(fieldKey: string) {
     const fieldObj = availableFields.find((f) => f.key === fieldKey);
     if (fieldObj && fieldObj.type === "number") {
       return [
-        { op: "=", label: "=" },
-        { op: "!=", label: "!=" },
-        { op: ">=", label: ">=" },
-        { op: "<=", label: "<=" },
-        { op: ">", label: ">" },
-        { op: "<", label: "<" },
+        { op: "=", label: i18n.t("smartPlaylistBuilder.opEquals", {}, "=") },
+        { op: "!=", label: i18n.t("smartPlaylistBuilder.opNotEquals", {}, "!=") },
+        { op: ">=", label: i18n.t("smartPlaylistBuilder.opGte", {}, ">=") },
+        { op: "<=", label: i18n.t("smartPlaylistBuilder.opLte", {}, "<=") },
+        { op: ">", label: i18n.t("smartPlaylistBuilder.opGt", {}, ">") },
+        { op: "<", label: i18n.t("smartPlaylistBuilder.opLt", {}, "<") },
       ];
     }
     return [
-      { op: "contains", label: "contains" },
-      { op: "=", label: "equals" },
-      { op: "!=", label: "does not equal" },
+      { op: "contains", label: i18n.t("smartPlaylistBuilder.opContains", {}, "contains") },
+      { op: "=", label: i18n.t("smartPlaylistBuilder.opTextEquals", {}, "equals") },
+      { op: "!=", label: i18n.t("smartPlaylistBuilder.opTextNotEquals", {}, "does not equal") },
     ];
   }
 
@@ -234,8 +236,8 @@
           <Sparkles class="w-5 h-5" />
         </div>
         <div>
-          <h2 class="text-base font-bold text-brand-text-primary">{editing ? "Edit Smart Playlist" : "Create Smart Playlist"}</h2>
-          <p class="text-xs text-brand-text-secondary/70">Build a dynamic playlist based on custom metadata rules</p>
+          <h2 class="text-base font-bold text-brand-text-primary">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
+          <p class="text-xs text-brand-text-secondary/70">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
         </div>
       </div>
       <button
@@ -251,14 +253,14 @@
       <!-- Playlist Name -->
       <div>
         <label for="smart-playlist-name-input" class="block text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-1.5">
-          Playlist Name
+          {i18n.t("smartPlaylistBuilder.nameLabel")}
         </label>
         <input
           id="smart-playlist-name-input"
           type="text"
           bind:value={playlistName}
           oninput={() => { userHasEditedName = true; }}
-          placeholder="My Smart Playlist"
+          placeholder={i18n.t("smartPlaylistBuilder.namePlaceholder")}
           class="w-full bg-brand-main border border-brand-border rounded-xl px-3.5 py-2 text-sm text-brand-text-primary focus:outline-none focus:border-brand-accent font-medium"
           required
         />
@@ -269,7 +271,7 @@
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
             <SlidersHorizontal class="w-3.5 h-3.5 text-brand-accent-text" />
-            Matching Rules
+            {i18n.t("smartPlaylistBuilder.matchingRules")}
           </span>
           <button
             type="button"
@@ -277,7 +279,7 @@
             class="text-xs text-brand-accent-text hover:text-brand-accent-text-hover font-semibold flex items-center gap-1 transition-colors cursor-pointer"
           >
             <Plus class="w-3.5 h-3.5" />
-            Add Rule
+            {i18n.t("smartPlaylistBuilder.addRule")}
           </button>
         </div>
 
@@ -312,7 +314,7 @@
               <input
                 type="text"
                 bind:value={rule.value}
-                placeholder="Value..."
+                placeholder={i18n.t("smartPlaylistBuilder.valuePlaceholder")}
                 class="flex-1 bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent min-w-0"
               />
 
@@ -322,7 +324,7 @@
                   type="button"
                   onclick={() => removeRule(rule.id)}
                   class="text-brand-text-secondary/60 hover:text-rose-400 p-1 rounded-lg transition-colors cursor-pointer"
-                  title="Remove rule"
+                  title={i18n.t("smartPlaylistBuilder.removeRuleTooltip")}
                 >
                   <X class="w-4 h-4" />
                 </button>
@@ -335,13 +337,13 @@
       <!-- Auto-Refill Toggle -->
       <div class="flex items-center justify-between gap-3 pt-2">
         <div>
-          <span class="text-xs font-semibold text-brand-text-primary block">Auto-Refill Batch Playback</span>
-          <span class="text-[11px] text-brand-text-secondary/70">Automatically queue matching tracks as playback nears the end</span>
+          <span class="text-xs font-semibold text-brand-text-primary block">{i18n.t("smartPlaylistBuilder.autoRefillLabel")}</span>
+          <span class="text-[11px] text-brand-text-secondary/70">{i18n.t("smartPlaylistBuilder.autoRefillHint")}</span>
         </div>
         <Toggle
           checked={autoPlay}
           onchange={(v) => { autoPlay = v; }}
-          label="Auto-Refill Batch Playback"
+          label={i18n.t("smartPlaylistBuilder.autoRefillLabel")}
         />
       </div>
 
@@ -358,14 +360,14 @@
           onclick={onClose}
           class="px-4 py-2 text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
         >
-          Cancel
+          {i18n.t("smartPlaylistBuilder.cancel")}
         </button>
         <button
           type="submit"
           class="px-4 py-2 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast text-xs font-semibold rounded-xl shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
         >
           <Sparkles class="w-3.5 h-3.5" />
-          {editing ? "Update Smart Playlist" : "Create Smart Playlist"}
+          {editing ? i18n.t("smartPlaylistBuilder.updateBtn") : i18n.t("smartPlaylistBuilder.createBtn")}
         </button>
       </div>
     </form>

@@ -687,7 +687,7 @@
                       class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
                       title={i18n.t('settings.editTheme')}
                     >
-                      {i18n.t('settings.editTheme').split(' ')[0]}
+                      {i18n.t('settings.editThemeShort')}
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}

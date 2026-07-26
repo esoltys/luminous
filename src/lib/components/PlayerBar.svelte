@@ -121,7 +121,7 @@
     if (pid && pid > 0) {
       const pl = playlistsStore.playlists.find((p) => p.id === pid);
       if (pl) {
-        return `Go to playlist "${pl.name}"`;
+        return i18n.t('playerBar.goToPlaylist', { name: pl.name });
       }
     }
     return playerStore.currentSong.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : "";

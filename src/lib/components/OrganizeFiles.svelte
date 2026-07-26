@@ -451,7 +451,7 @@
                 type="button"
                 onclick={fetchPreview}
                 class="p-1 rounded-md text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar cursor-pointer transition-colors"
-                title="Refresh Preview"
+                title={i18n.t("organizer.refreshPreviewTooltip")}
               >
                 <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
               </button>
@@ -513,12 +513,12 @@
                 {#if isLoading}
                   <RefreshCw class="w-5 h-5 text-brand-accent-text animate-spin" />
                 {:else}
-                  <span>No tracks to organize.</span>
+                  <span>{i18n.t("organizer.noTracksToOrganize")}</span>
                 {/if}
               </div>
             {:else if displayedItems.length === 0}
               <div class="h-full flex items-center justify-center text-brand-text-secondary">
-                <span>No changing files match filter.</span>
+                <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
               </div>
             {:else}
               <!-- Common Base Path Bar -->
@@ -534,18 +534,18 @@
                 <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
                   <!-- Table Column Header with Draggable Splitters -->
                   <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
-                    <div class="w-24 shrink-0">Status</div>
+                    <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
                     <!-- Original Path Header -->
                     <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
-                      <span class="truncate flex-1">Original Path</span>
+                      <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
                       <button
                         type="button"
-                        aria-label="Resize Original Path Column"
+                        aria-label={i18n.t("organizer.resizeOriginalColumn")}
                         onmousedown={(e) => startResize("from", e)}
                         ondblclick={autoFitColumns}
                         class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
-                        title="Drag to resize column, double-click to auto-fit"
+                        title={i18n.t("organizer.resizeColumnHint")}
                       >
                         <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
                       </button>
@@ -555,14 +555,14 @@
 
                     <!-- Target Path Header -->
                     <div class="flex items-center shrink-0 pl-1" style="width: {toColWidth}px;">
-                      <span class="truncate flex-1">Target Path</span>
+                      <span class="truncate flex-1">{i18n.t("organizer.colDestination")}</span>
                       <button
                         type="button"
-                        aria-label="Resize Target Path Column"
+                        aria-label={i18n.t("organizer.resizeTargetColumn")}
                         onmousedown={(e) => startResize("to", e)}
                         ondblclick={autoFitColumns}
                         class="w-3 h-5 hover:bg-brand-accent/30 cursor-col-resize flex items-center justify-center group shrink-0 bg-transparent border-0 p-0"
-                        title="Drag to resize column, double-click to auto-fit"
+                        title={i18n.t("organizer.resizeColumnHint")}
                       >
                         <div class="w-0.5 h-3 bg-brand-border group-hover:bg-brand-accent"></div>
                       </button>
@@ -611,7 +611,7 @@
                             style="width: {fromColWidth}px;"
                             title={item.from_path}
                           >
-                            {@html highlightPathHtml(displayFrom || "(No path recorded)")}
+                            {@html highlightPathHtml(displayFrom || i18n.t("organizer.noPathRecorded"))}
                           </div>
 
                           <!-- Arrow separator -->
@@ -625,7 +625,7 @@
                           >
                             {#if st === 'error' || st === 'collision' || (item.error_message && st !== 'missing_tag')}
                               <span class="text-rose-400 font-medium">
-                                {item.error_message ? item.error_message : (displayTo || 'Unknown error')}
+                                {item.error_message ? item.error_message : (displayTo || i18n.t("organizer.unknownError"))}
                               </span>
                             {:else}
                               {@html highlightPathHtml(displayTo)}
@@ -651,7 +651,7 @@
   >
     {#if isApplying}
       <RefreshCw class="w-4 h-4 animate-spin" />
-      <span>Applying...</span>
+      <span>{i18n.t("organizer.applying")}</span>
     {:else}
       <Sparkles class="w-4 h-4" />
       <span>{i18n.t("organizer.applyButton")}</span>
@@ -726,7 +726,7 @@
           <button
             onclick={() => onClose?.()}
             class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
-            title="Close"
+            title={i18n.t("organizer.close")}
           >
             <X class="w-4 h-4" />
           </button>

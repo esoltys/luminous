@@ -104,7 +104,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_no_noninteractive_tabindex -->
 <div
   role="region"
-  aria-label="Miniplayer"
+  aria-label={i18n.t('miniplayer.title')}
   onkeydown={handleKeyDown}
   tabindex="0"
   class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
