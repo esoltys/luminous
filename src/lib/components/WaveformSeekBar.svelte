@@ -5,6 +5,10 @@
   import { prefs } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
 
+  const CANVAS_BAR_HEIGHT_PX = 28;
+  const NARROW_WIDTH_BREAKPOINT_PX = 450;
+  const MOODBAR_SEGMENT_COUNT = 40;
+
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
@@ -138,7 +142,7 @@
 
     const dpr = window.devicePixelRatio || 1;
     const width = containerEl.clientWidth || 300;
-    const height = 28;
+    const height = CANVAS_BAR_HEIGHT_PX;
 
     if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
       canvas.width = width * dpr;
@@ -178,7 +182,7 @@
     const isPlaceholder = isLoadingWaveform || waveformData.length === 0;
     const data = isPlaceholder ? Array(150).fill(0) : waveformData;
     const numBars = data.length;
-    const barGap = width < 450 ? 0.5 : 1.0;
+    const barGap = width < NARROW_WIDTH_BREAKPOINT_PX ? 0.5 : 1.0;
     const barWidth = Math.max(1, (width - (numBars - 1) * barGap) / numBars);
 
     // Premium gradients for played part
@@ -242,7 +246,7 @@
     // ~40 wider contiguous blocks reveals the track's actual color
     // structure (verse/chorus-scale regions) the way a real moodbar strip
     // is meant to read at a glance.
-    const segmentCount = Math.min(40, totalPoints);
+    const segmentCount = Math.min(MOODBAR_SEGMENT_COUNT, totalPoints);
     const groupSize = Math.max(1, Math.ceil(totalPoints / segmentCount));
     const segCount = Math.ceil(totalPoints / groupSize);
     const segWidth = width / segCount;

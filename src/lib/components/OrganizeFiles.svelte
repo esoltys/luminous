@@ -8,6 +8,13 @@
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
 
+  const PREVIEW_DEBOUNCE_MS = 300;
+  const COL_MIN_WIDTH_PX = 150;
+  const COL_MAX_WIDTH_PX = 1000;
+  const AUTO_FIT_MIN_FROM_WIDTH_PX = 250;
+  const AUTO_FIT_MIN_TO_WIDTH_PX = 300;
+  const PX_PER_CHAR_ESTIMATE = 7.5;
+
   export interface OrganizePreviewItem {
     song_id: number;
     from_path: string;
@@ -161,9 +168,9 @@
     if (!isResizing) return;
     const diff = e.clientX - resizeStartX;
     if (isResizing === "from") {
-      fromColWidth = Math.max(150, resizeStartWidth + diff);
+      fromColWidth = Math.max(COL_MIN_WIDTH_PX, resizeStartWidth + diff);
     } else {
-      toColWidth = Math.max(150, resizeStartWidth + diff);
+      toColWidth = Math.max(COL_MIN_WIDTH_PX, resizeStartWidth + diff);
     }
   }
 
@@ -174,15 +181,15 @@
   }
 
   function autoFitColumns() {
-    let maxFrom = 250;
-    let maxTo = 300;
+    let maxFrom = AUTO_FIT_MIN_FROM_WIDTH_PX;
+    let maxTo = AUTO_FIT_MIN_TO_WIDTH_PX;
     for (const raw of items) {
       const i = getItemObj(raw);
-      if (i.from_path) maxFrom = Math.max(maxFrom, i.from_path.length * 7.5);
-      if (i.to_path) maxTo = Math.max(maxTo, i.to_path.length * 7.5);
+      if (i.from_path) maxFrom = Math.max(maxFrom, i.from_path.length * PX_PER_CHAR_ESTIMATE);
+      if (i.to_path) maxTo = Math.max(maxTo, i.to_path.length * PX_PER_CHAR_ESTIMATE);
     }
-    fromColWidth = Math.min(1000, Math.max(250, maxFrom));
-    toColWidth = Math.min(1000, Math.max(300, maxTo));
+    fromColWidth = Math.min(COL_MAX_WIDTH_PX, Math.max(AUTO_FIT_MIN_FROM_WIDTH_PX, maxFrom));
+    toColWidth = Math.min(COL_MAX_WIDTH_PX, Math.max(AUTO_FIT_MIN_TO_WIDTH_PX, maxTo));
   }
 
   let collisionCount = $derived(items.filter((i) => getItemStatus(i) === "collision").length);
@@ -271,7 +278,7 @@
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         fetchPreview();
-      }, 300);
+      }, PREVIEW_DEBOUNCE_MS);
     }
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);

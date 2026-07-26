@@ -12,6 +12,7 @@
   import CoverArt from "./CoverArt.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
+  import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
 
   let searchInput: HTMLInputElement | undefined;
   let searchContainerRef: HTMLDivElement | undefined;
@@ -343,7 +344,7 @@
             {:else}
               <div class="flex flex-col gap-1">
                 <!-- Matching Artists (Top 3) -->
-                {#each collectionStore.filteredArtists.slice(0, 3) as artist (artist.name)}
+                {#each collectionStore.filteredArtists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as artist (artist.name)}
                   <div
                     role="button"
                     tabindex="0"
@@ -379,7 +380,7 @@
                 {/each}
 
                 <!-- Matching Albums (Top 3) -->
-                {#each collectionStore.filteredAlbums.slice(0, 3) as album (album.album)}
+                {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album)}
                   <div
                     role="button"
                     tabindex="0"
@@ -420,7 +421,7 @@
                 {/each}
 
                 <!-- Matching Playlists & Auto-playlists (Top 3) -->
-                {#each matchingPlaylists.slice(0, 3) as item (item.id)}
+                {#each matchingPlaylists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as item (item.id)}
                   <div
                     role="button"
                     tabindex="0"
@@ -471,7 +472,7 @@
                 {/each}
 
                 <!-- Matching Songs (Top 3) -->
-                {#each collectionStore.searchResults.slice(0, 3) as song (song.id)}
+                {#each collectionStore.searchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as song (song.id)}
                   <div
                     role="button"
                     tabindex="0"

@@ -13,6 +13,9 @@
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Toggle from "./Toggle.svelte";
 
+  const COPY_FEEDBACK_DURATION_MS = 1500;
+  const PRUNE_MESSAGE_DURATION_MS = 8000;
+
   let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
@@ -21,7 +24,7 @@
     try {
       await navigator.clipboard.writeText(appVersion);
       versionCopied = true;
-      setTimeout(() => { versionCopied = false; }, 1500);
+      setTimeout(() => { versionCopied = false; }, COPY_FEEDBACK_DURATION_MS);
     } catch (e) {
       console.error("Failed to copy version to clipboard:", e);
     }
@@ -59,7 +62,7 @@
     pruneMsg = removedFolders > 0
       ? i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders })
       : i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
-    setTimeout(() => { pruneMsg = null; }, 8000);
+    setTimeout(() => { pruneMsg = null; }, PRUNE_MESSAGE_DURATION_MS);
   }
 
   onMount(async () => {

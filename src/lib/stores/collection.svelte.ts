@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
+import { MAX_RECENT_SEARCHES } from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists";
@@ -572,8 +573,8 @@ class CollectionStore {
     };
 
     this.recentSearches.unshift(newItem);
-    if (this.recentSearches.length > 10) {
-      this.recentSearches = this.recentSearches.slice(0, 10);
+    if (this.recentSearches.length > MAX_RECENT_SEARCHES) {
+      this.recentSearches = this.recentSearches.slice(0, MAX_RECENT_SEARCHES);
     }
     this.saveRecentSearches();
   }
