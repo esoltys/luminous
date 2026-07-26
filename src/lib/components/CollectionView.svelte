@@ -17,6 +17,7 @@
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
+  import SortableHeader from "./SortableHeader.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -439,57 +440,117 @@
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
           <div class="grid items-center py-3 px-4" style="{gridColsStyle}; padding-right: calc(1rem + {scrollbarWidth}px)">
             <div class="text-center w-9"></div>
-            <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}</span>
-            </button>
-            <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}</span>
-            </button>
-            <button onclick={() => toggleSort("artist")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}</span>
-            </button>
-            <button onclick={() => toggleSort("album")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-              <span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}</span>
-            </button>
+            <SortableHeader
+              active={sortField === "track"}
+              {sortAsc}
+              onclick={() => toggleSort("track")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {arrow}</span>{/snippet}
+            </SortableHeader>
+            <SortableHeader
+              active={sortField === "title"}
+              {sortAsc}
+              onclick={() => toggleSort("title")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {arrow}</span>{/snippet}
+            </SortableHeader>
+            <SortableHeader
+              active={sortField === "artist"}
+              {sortAsc}
+              onclick={() => toggleSort("artist")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {arrow}</span>{/snippet}
+            </SortableHeader>
+            <SortableHeader
+              active={sortField === "album"}
+              {sortAsc}
+              onclick={() => toggleSort("album")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {arrow}</span>{/snippet}
+            </SortableHeader>
             {#if collectionStore.visibleColumns.format}
-              <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "filetype"}
+                {sortAsc}
+                onclick={() => toggleSort("filetype")}
+                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">Format {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.year}
-              <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "year"}
+                {sortAsc}
+                onclick={() => toggleSort("year")}
+                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">Year {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.genre}
-              <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "genre"}
+                {sortAsc}
+                onclick={() => toggleSort("genre")}
+                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">Genre {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
-              <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "bitrate"}
+                {sortAsc}
+                onclick={() => toggleSort("bitrate")}
+                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">Bitrate {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.rating}
-              <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate">{i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "rating"}
+                {sortAsc}
+                onclick={() => toggleSort("rating")}
+                class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.playcount}
-              <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate">Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "playcount"}
+                {sortAsc}
+                onclick={() => toggleSort("playcount")}
+                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate">Plays {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.skipcount}
-              <button onclick={() => toggleSort("skipcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate">Skips {sortField === "skipcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
-              </button>
+              <SortableHeader
+                active={sortField === "skipcount"}
+                {sortAsc}
+                onclick={() => toggleSort("skipcount")}
+                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<span class="truncate">Skips {arrow}</span>{/snippet}
+              </SortableHeader>
             {/if}
             {#if collectionStore.visibleColumns.duration}
-              <button onclick={() => toggleSort("length_nanosec")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <Clock class="w-4 h-4 shrink-0" /> {sortField === "length_nanosec" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "length_nanosec"}
+                {sortAsc}
+                onclick={() => toggleSort("length_nanosec")}
+                class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+              >
+                {#snippet label(arrow)}<Clock class="w-4 h-4 shrink-0" /> {arrow}{/snippet}
+              </SortableHeader>
             {/if}
             <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
           </div>

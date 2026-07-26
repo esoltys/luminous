@@ -35,6 +35,7 @@
   import CoverArt from "./CoverArt.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import SortableHeader from "./SortableHeader.svelte";
   import { portal } from "../utils/portal";
 
   let editingSongId = $state<number | null>(null);
@@ -827,34 +828,64 @@
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">
-                <button onclick={() => toggleSort("position")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("playlists.tableHeaderTrack")} {sortField === "position" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "position"}
+                  {sortAsc}
+                  onclick={() => toggleSort("position")}
+                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderTrack")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <button onclick={() => toggleSort("title")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("playlists.tableHeaderTitle")} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "title"}
+                  {sortAsc}
+                  onclick={() => toggleSort("title")}
+                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderTitle")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <button onclick={() => toggleSort("artist")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("playlists.tableHeaderArtist")} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "artist"}
+                  {sortAsc}
+                  onclick={() => toggleSort("artist")}
+                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderArtist")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <button onclick={() => toggleSort("album")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("collection.tableHeaderAlbum")} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "album"}
+                  {sortAsc}
+                  onclick={() => toggleSort("album")}
+                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("collection.tableHeaderAlbum")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">
-                <button onclick={() => toggleSort("rating")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("collection.tableHeaderRating")} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "rating"}
+                  {sortAsc}
+                  onclick={() => toggleSort("rating")}
+                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("collection.tableHeaderRating")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">
-                <button onclick={() => toggleSort("duration")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                  {i18n.t("playlists.tableHeaderDuration")} {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
-                </button>
+                <SortableHeader
+                  active={sortField === "duration"}
+                  {sortAsc}
+                  onclick={() => toggleSort("duration")}
+                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+                >
+                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderDuration")} {arrow}{/snippet}
+                </SortableHeader>
               </th>
               <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t("collection.tableHeaderActions")}</th>
             </tr>
