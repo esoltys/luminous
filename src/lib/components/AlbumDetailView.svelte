@@ -13,7 +13,8 @@
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import EmptyState from "./EmptyState.svelte";
-  import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
+  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
+  import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatTrackNumber } from "../utils/artist";
@@ -387,20 +388,11 @@
 
         <!-- Control Buttons -->
         <div class="flex items-center gap-3 mt-3 select-none">
-          <button
-            onclick={handlePlayAll}
+          <PlayShuffleButtons
+            onPlayAll={handlePlayAll}
+            onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
-          >
-            <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
-          </button>
-          <button
-            onclick={handleShufflePlay}
-            disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
-          </button>
+          />
           <button
             onclick={handleAddAlbumToPlaylist}
             disabled={loading || songs.length === 0}
