@@ -19,6 +19,15 @@
   let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
+  let contentEl = $state<HTMLDivElement | null>(null);
+
+  // The content area is a single scrollable div shared by every tab (only its
+  // children swap via the {#if} chain below), so switching tabs doesn't
+  // naturally reset scroll position the way navigating to a new view would.
+  $effect(() => {
+    void settingsTab;
+    if (contentEl) contentEl.scrollTop = 0;
+  });
 
   async function copyVersion() {
     try {
@@ -287,7 +296,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
