@@ -12,6 +12,7 @@
   import Equalizer from "./Equalizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -305,16 +306,15 @@
         <!-- Language row -->
         <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
           <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
-          <select
+          <Select
             id="language-select"
             value={i18n.currentLocale}
             onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="en">{i18n.t('settings.languageEnglish')}</option>
             <option value="fr">{i18n.t('settings.languageFrench')}</option>
-          </select>
+          </Select>
         </div>
 
         <!-- Rating style row -->
@@ -323,16 +323,15 @@
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
           </div>
-          <select
+          <Select
             id="rating-style-select"
             value={prefs.ratingStyle}
             onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as RatingStyle)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
-          </select>
+          </Select>
         </div>
       </div>
 

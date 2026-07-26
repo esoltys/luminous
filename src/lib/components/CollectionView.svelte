@@ -18,6 +18,7 @@
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import SortableHeader from "./SortableHeader.svelte";
+  import Select from "./Select.svelte";
   import EmptyState from "./EmptyState.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
 
@@ -410,15 +411,14 @@
         </div>
 
         <div class="relative">
-          <select
+          <Select
             value={`${sortField}-${sortAsc}`}
             onchange={(e) => {
               const [field, asc] = e.currentTarget.value.split("-");
               sortField = field as keyof Song;
               sortAsc = asc === "true";
             }}
-            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="title-true">{i18n.t('collection.sortTitleAsc')}</option>
             <option value="title-false">{i18n.t('collection.sortTitleDesc')}</option>
@@ -430,7 +430,7 @@
             <option value="track-false">{i18n.t('collection.sortTrackDesc')}</option>
             <option value="length_nanosec-true">{i18n.t('collection.sortDurationAsc')}</option>
             <option value="length_nanosec-false">{i18n.t('collection.sortDurationDesc')}</option>
-          </select>
+          </Select>
         </div>
       </div>
     </div>
@@ -727,15 +727,14 @@
         <div class="flex items-center gap-4">
           {#if collectionStore.activeSubTab === "albums"}
             <div class="relative">
-              <select
+              <Select
                 value={`${albumSortField}-${albumSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
                   albumSortField = field as "album" | "artist" | "year" | "track_count";
                   albumSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
                 <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
@@ -745,19 +744,18 @@
                 <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
                 <option value="track_count-false">{i18n.t('collection.sortTracksDesc')}</option>
                 <option value="track_count-true">{i18n.t('collection.sortTracksAsc')}</option>
-              </select>
+              </Select>
             </div>
           {:else if collectionStore.activeSubTab === "artists"}
             <div class="relative">
-              <select
+              <Select
                 value={`${artistSortField}-${artistSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
                   artistSortField = field as "name" | "genre" | "song_count";
                   artistSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
                 <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
@@ -765,7 +763,7 @@
                 <option value="genre-false">{i18n.t('collection.sortGenreDesc')}</option>
                 <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
                 <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
-              </select>
+              </Select>
             </div>
           {/if}
         </div>

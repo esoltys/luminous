@@ -4,6 +4,7 @@
   import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -393,11 +394,11 @@
 
       <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
         <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
-        <select
-          bind:value={activePreset}
-          onchange={() => selectPreset(activePreset)}
-          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none cursor-pointer focus:border-brand-accent font-medium appearance-none -webkit-appearance-none"
-          style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.375rem center; background-repeat: no-repeat; background-size: 1.25em;"
+        <Select
+          value={activePreset}
+          onchange={(e) => { activePreset = e.currentTarget.value; selectPreset(activePreset); }}
+          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none focus:border-brand-accent font-medium"
+          chevronPosition="0.375rem"
         >
           {#each presets as preset}
             <option value={preset} class="bg-brand-main text-brand-text-primary">
@@ -407,7 +408,7 @@
           {#if activePreset === "Custom"}
             <option value="Custom" class="bg-brand-main text-brand-text-primary" disabled>{i18n.t('equalizer.customPreset')}</option>
           {/if}
-        </select>
+        </Select>
       </div>
 
       {#if mode === "parametric20"}

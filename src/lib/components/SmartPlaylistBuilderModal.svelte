@@ -9,6 +9,7 @@
   import type { QueuePopulationMode } from "../types";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
   import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
   interface Props {
@@ -287,30 +288,30 @@
           {#each rules as rule (rule.id)}
             <div class="flex items-center gap-2 bg-brand-main/60 p-2.5 rounded-xl border border-brand-border/40">
               <!-- Field Selector -->
-              <select
-                bind:value={rule.field}
-                onchange={() => {
+              <Select
+                value={rule.field}
+                onchange={(e) => {
+                  rule.field = e.currentTarget.value;
                   const ops = getOperatorsForField(rule.field);
                   rule.op = ops[0].op;
                 }}
-                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium cursor-pointer appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
               >
                 {#each availableFields as f}
                   <option value={f.key}>{f.label}</option>
                 {/each}
-              </select>
+              </Select>
 
               <!-- Operator Selector -->
-              <select
-                bind:value={rule.op}
-                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium cursor-pointer appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+              <Select
+                value={rule.op}
+                onchange={(e) => { rule.op = e.currentTarget.value; }}
+                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
               >
                 {#each getOperatorsForField(rule.field) as opItem}
                   <option value={opItem.op}>{opItem.label}</option>
                 {/each}
-              </select>
+              </Select>
 
               <!-- Value Input -->
               <input

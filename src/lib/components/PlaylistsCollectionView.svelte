@@ -13,6 +13,7 @@
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
   import EmptyState from "./EmptyState.svelte";
+  import Select from "./Select.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -264,15 +265,14 @@
 
           <div class="relative">
             {#if collectionStore.playlistsSubTab === "auto"}
-              <select
+              <Select
                 value={`${autoSortField}-${autoSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
                   autoSortField = field as "name" | "track_count" | "updated";
                   autoSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
                 <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
@@ -280,17 +280,16 @@
                 <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
                 <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
                 <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
-              </select>
+              </Select>
             {:else}
-              <select
+              <Select
                 value={`${customSortField}-${customSortAsc}`}
                 onchange={(e) => {
                   const [field, asc] = e.currentTarget.value.split("-");
                   customSortField = field as "name" | "track_count" | "updated";
                   customSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-                style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
                 <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
@@ -298,7 +297,7 @@
                 <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
                 <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
                 <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
-              </select>
+              </Select>
             {/if}
           </div>
         </div>
