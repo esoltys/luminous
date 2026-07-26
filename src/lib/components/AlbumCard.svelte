@@ -4,7 +4,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
-  import { Play } from "lucide-svelte";
+  import PlayOverlayButton from "./PlayOverlayButton.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { getAlbumCategoryLabel } from "../utils/artist";
@@ -117,17 +117,7 @@
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
-    <div
-      class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20"
-    >
-      <button
-        onclick={handlePlayButtonClick}
-        class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
-        title={i18n.t('playerBar.play')}
-      >
-        <Play class="w-5 h-5 fill-current ml-0.5" />
-      </button>
-    </div>
+    <PlayOverlayButton onPlay={handlePlayButtonClick} />
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <button

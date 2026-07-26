@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Play, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
+  import PlayOverlayButton from "./PlayOverlayButton.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
@@ -117,15 +118,7 @@
         <ListMusic class="w-10 h-10 text-white/90" />
       </div>
     {/if}
-    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
-      <button
-        onclick={handlePlayButtonClick}
-        class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
-        title={i18n.t('playerBar.play')}
-      >
-        <Play class="w-5 h-5 fill-current ml-0.5" />
-      </button>
-    </div>
+    <PlayOverlayButton onPlay={handlePlayButtonClick} />
 
     {#if autoPlay}
       <!-- Auto-Play badge (#26) -->
