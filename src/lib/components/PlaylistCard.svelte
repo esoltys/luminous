@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ListMusic, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
   import PlayOverlayButton from "./PlayOverlayButton.svelte";
+  import CardBadge from "./CardBadge.svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
@@ -99,21 +100,9 @@
     {/if}
 
     {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}
-      <div
-        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title={i18n.t('playlists.autoPlayBadgeTooltip')}
-      >
-        <Radio class="w-2.5 h-2.5" />
-        {i18n.t('playlists.autoPlayBadgeLabel')}
-      </div>
+      <CardBadge icon={Radio} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} />
     {:else if autoKind === "smart"}
-      <div
-        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-accent text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg select-none"
-        title={i18n.t("playlists.smartRuleBasedTooltip")}
-      >
-        <Sparkles class="w-2.5 h-2.5" />
-        {i18n.t("playlists.smartBadgeLabel")}
-      </div>
+      <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} />
     {/if}
 
     <PlayOverlayButton onPlay={handlePlayButtonClick} />

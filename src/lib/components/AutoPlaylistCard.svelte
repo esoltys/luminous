@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { ListMusic, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
   import PlayOverlayButton from "./PlayOverlayButton.svelte";
+  import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import { playerStore } from "../stores/player.svelte";
@@ -121,14 +122,7 @@
     <PlayOverlayButton onPlay={handlePlayButtonClick} />
 
     {#if autoPlay}
-      <!-- Auto-Play badge (#26) -->
-      <div
-        class="absolute top-2 right-2 z-30 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand-accent/90 text-brand-accent-contrast text-[9px] font-bold tracking-wide shadow-lg"
-        title={i18n.t('playlists.autoPlayBadgeTooltip')}
-      >
-        <RefreshCw class="w-2.5 h-2.5 animate-spin [animation-duration:3s]" />
-        {i18n.t('playlists.autoPlayBadgeLabel')}
-      </div>
+      <CardBadge icon={RefreshCw} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} spin />
     {/if}
   </div>
 
