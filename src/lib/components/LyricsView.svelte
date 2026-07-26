@@ -133,11 +133,18 @@
     } catch (e: any) {
       console.error("[LyricsView] Failed to load lyrics:", e);
       const errStr = e.toString();
-      if (errStr.toLowerCase().includes("instrumental")) {
+      const errStrLower = errStr.toLowerCase();
+      if (errStrLower.includes("instrumental")) {
         if (playerStore.currentSong && playerStore.currentSong.id === songId) {
           playerStore.currentSong.is_instrumental = true;
         }
         errorMsg = "";
+      } else if (errStrLower.includes("no lyrics found on any online provider")) {
+        // Known backend error (src-tauri/src/lyrics.rs) — surface the translated
+        // message instead of the raw Rust error string.
+        errorMsg = i18n.t('lyrics.noOnlineResults');
+      } else if (errStrLower.includes("insufficient song metadata")) {
+        errorMsg = i18n.t('lyrics.insufficientMetadata');
       } else {
         errorMsg = errStr;
       }
@@ -248,7 +255,7 @@
             onclick={startEditing}
             class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
           >
-            <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editTheme').split(' ')[0]}
+            <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editThemeShort')}
           </button>
         {:else}
           <button
@@ -261,7 +268,7 @@
             onclick={saveManualLyrics}
             class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md cursor-pointer"
           >
-            <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtn').split(' ')[0]}
+            <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtnShort')}
           </button>
         {/if}
       </div>

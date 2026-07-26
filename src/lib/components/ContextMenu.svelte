@@ -3,6 +3,7 @@
   import type { Snippet } from "svelte";
   import { playerStore } from "../stores/player.svelte";
   import { portal } from "../utils/portal";
+  import { CONTEXT_MENU_WIDTH_PX, VIEWPORT_EDGE_PADDING_PX, PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
   interface Props {
     x: number;
@@ -20,18 +21,16 @@
   // Keep menu inside viewport boundaries
   let adjustedX = $derived.by(() => {
     if (typeof window === "undefined") return x;
-    const menuWidth = 200;
-    return Math.min(x, window.innerWidth - menuWidth - 10);
+    return Math.min(x, window.innerWidth - CONTEXT_MENU_WIDTH_PX - VIEWPORT_EDGE_PADDING_PX);
   });
 
   let adjustedY = $derived.by(() => {
     if (typeof window === "undefined") return y;
     const menuHeight = estimatedHeight;
-    // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top
-    // of page content whenever a song is loaded — clamp above it so the
-    // menu's lower items aren't hidden underneath it.
-    const dockClearance = playerStore.currentSong ? 96 : 0;
-    return Math.min(y, window.innerHeight - menuHeight - dockClearance - 10);
+    // Clamp above the floating PlayerBar dock so the menu's lower items
+    // aren't hidden underneath it.
+    const dockClearance = playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0;
+    return Math.min(y, window.innerHeight - menuHeight - dockClearance - VIEWPORT_EDGE_PADDING_PX);
   });
 
   function handleWindowClick(e: MouseEvent) {

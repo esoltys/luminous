@@ -320,7 +320,7 @@
             class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors"
           >
             <Sparkles class="w-3.5 h-3.5" />
-            <span>Advanced...</span>
+            <span>{i18n.t('playlists.advancedBtn')}</span>
           </button>
         </form>
       {/if}

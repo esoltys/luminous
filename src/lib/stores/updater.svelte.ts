@@ -8,6 +8,8 @@ export interface InstallFormatInfo {
 
 export type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
 
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 class UpdaterStore {
   updateCheckEnabled = $state(false);
   updateAutoInstall = $state(false);
@@ -86,12 +88,11 @@ class UpdaterStore {
 
   startPeriodicCheck() {
     this.stopPeriodicCheck();
-    // Check every 4 hours (14,400,000 ms) while app is running
     this.intervalTimer = setInterval(() => {
       if (this.updateCheckEnabled) {
         this.checkForUpdates();
       }
-    }, 4 * 60 * 60 * 1000);
+    }, UPDATE_CHECK_INTERVAL_MS);
   }
 
   stopPeriodicCheck() {

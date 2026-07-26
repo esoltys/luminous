@@ -21,6 +21,9 @@
     Scaling
   } from "lucide-svelte";
 
+  const MINIPLAYER_MIN_SIZE_PX = 220;
+  const MINIPLAYER_MAX_SIZE_PX = 650;
+
   function cycleShuffle() {
     const modes: import("../types").ShuffleMode[] = ["off", "all", "inside_album", "albums", "artists"];
     const currentIdx = modes.indexOf(playerStore.shuffleMode);
@@ -66,8 +69,8 @@
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
-      const newWidth = Math.max(220, Math.min(650, startWidth + deltaX));
-      const newHeight = Math.max(220, Math.min(650, startHeight + deltaY));
+      const newWidth = Math.max(MINIPLAYER_MIN_SIZE_PX, Math.min(MINIPLAYER_MAX_SIZE_PX, startWidth + deltaX));
+      const newHeight = Math.max(MINIPLAYER_MIN_SIZE_PX, Math.min(MINIPLAYER_MAX_SIZE_PX, startHeight + deltaY));
       invoke("resize_miniplayer", { width: newWidth, height: newHeight }).catch(() => {});
     }
 
@@ -104,7 +107,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_no_noninteractive_tabindex -->
 <div
   role="region"
-  aria-label="Miniplayer"
+  aria-label={i18n.t('miniplayer.title')}
   onkeydown={handleKeyDown}
   tabindex="0"
   class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
