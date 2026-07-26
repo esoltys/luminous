@@ -443,7 +443,9 @@ export const en = {
     retrySearch: "Retry Search",
     editorLabel: "Lyrics Text (plain or LRC synced format)",
     editorPlaceholder: "Paste synced LRC or plain text lyrics here...",
-    saveFailedPrefix: "Failed to save lyrics: "
+    saveFailedPrefix: "Failed to save lyrics: ",
+    noOnlineResults: "No lyrics found from any online provider.",
+    insufficientMetadata: "Not enough song info (artist/title) to search for lyrics online."
   },
   help: {
     loading: "Loading user guide..."

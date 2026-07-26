@@ -442,7 +442,9 @@ export const fr = {
     retrySearch: "Réessayer la recherche",
     editorLabel: "Texte des paroles (brut ou format synchronisé LRC)",
     editorPlaceholder: "Coller les paroles au format LRC synchronisé ou texte brut ici...",
-    saveFailedPrefix: "Échec de l'enregistrement des paroles : "
+    saveFailedPrefix: "Échec de l'enregistrement des paroles : ",
+    noOnlineResults: "Aucune parole trouvée auprès des fournisseurs en ligne.",
+    insufficientMetadata: "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne."
   },
   help: {
     loading: "Chargement du guide d'utilisation..."

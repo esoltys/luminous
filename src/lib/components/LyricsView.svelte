@@ -132,11 +132,18 @@
     } catch (e: any) {
       console.error("[LyricsView] Failed to load lyrics:", e);
       const errStr = e.toString();
-      if (errStr.toLowerCase().includes("instrumental")) {
+      const errStrLower = errStr.toLowerCase();
+      if (errStrLower.includes("instrumental")) {
         if (playerStore.currentSong && playerStore.currentSong.id === songId) {
           playerStore.currentSong.is_instrumental = true;
         }
         errorMsg = "";
+      } else if (errStrLower.includes("no lyrics found on any online provider")) {
+        // Known backend error (src-tauri/src/lyrics.rs) — surface the translated
+        // message instead of the raw Rust error string.
+        errorMsg = i18n.t('lyrics.noOnlineResults');
+      } else if (errStrLower.includes("insufficient song metadata")) {
+        errorMsg = i18n.t('lyrics.insufficientMetadata');
       } else {
         errorMsg = errStr;
       }
