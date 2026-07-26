@@ -6,6 +6,18 @@ import { fileURLToPath } from "url";
 import { compileMockScript } from "./compile-mock-script";
 import { loadMockConfig, loadMockLibrary, resolveFeatured, resolveScreenshotSettings } from "./mock-library";
 import type { FeaturedSelection } from "./mock-library";
+import { en } from "../src/lib/locales/en";
+import { fr } from "../src/lib/locales/fr";
+
+// The app renders all button/tooltip text in the active locale, so any UI
+// text used to find elements to click must be looked up per-language rather
+// than hardcoded in English.
+const locales: Record<string, Record<string, unknown>> = { en, fr };
+function t(language: string, keyPath: string): string {
+  const dict = locales[language] ?? en;
+  const value = keyPath.split(".").reduce<unknown>((obj, key) => (obj as Record<string, unknown> | undefined)?.[key], dict);
+  return typeof value === "string" ? value : keyPath;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,7 +142,7 @@ async function main() {
     filename: string;
     featured: FeaturedSelection;
     language?: string;
-    afterLoad?: (page: import("playwright").Page, featured: FeaturedSelection) => Promise<void>;
+    afterLoad?: (page: import("playwright").Page, featured: FeaturedSelection, language: string) => Promise<void>;
     isImmersive?: boolean;
     sidebarOpen?: boolean;
     rightPanelOpen?: boolean;
@@ -219,7 +231,7 @@ async function main() {
 
     // Optional post-load interaction (e.g. clicking into a sub-tab)
     if (afterLoad) {
-      await afterLoad(page, featured);
+      await afterLoad(page, featured, language);
     }
     // Let any rendering and async effects fire
     await page.waitForTimeout(600);
@@ -264,7 +276,7 @@ async function main() {
     await page.close();
   }
 
-  const actionRegistry: Record<string, (page: import("playwright").Page, featured: FeaturedSelection) => Promise<void>> = {
+  const actionRegistry: Record<string, (page: import("playwright").Page, featured: FeaturedSelection, language: string) => Promise<void>> = {
     "click-artist": async (page, featured) => {
       await page.evaluate((artistName) => {
         const cards = Array.from(document.querySelectorAll(".artist-card"));
@@ -295,11 +307,11 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
     },
-    "click-song-tag-editor": async (page) => {
-      await page.getByTitle("Edit tags").first().click();
+    "click-song-tag-editor": async (page, _featured, language) => {
+      await page.getByTitle(t(language, "collection.editTagsTooltip")).first().click();
       await page.waitForTimeout(500);
     },
-    "click-album-tag-editor": async (page, featured) => {
+    "click-album-tag-editor": async (page, featured, language) => {
       await page.evaluate((albumName) => {
         const cards = Array.from(document.querySelectorAll(".bg-brand-sidebar"));
         let targetCard = cards.find((c: Element) => {
@@ -317,35 +329,35 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
       await page.waitForTimeout(500);
-      await page.getByTitle("Edit album info", { exact: true }).click();
+      await page.getByTitle(t(language, "albumDetail.editInfoTooltip"), { exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-themes": async (page) => {
-      await page.evaluate(() => {
+    "click-themes": async (page, _featured, language) => {
+      await page.evaluate((label) => {
         const btns = Array.from(document.querySelectorAll("button"));
-        const t = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === "UI Themes");
-        if (t) (t as HTMLElement).click();
-      });
+        const match = btns.find((b: Element) => (b as HTMLElement).textContent?.trim() === label);
+        if (match) (match as HTMLElement).click();
+      }, t(language, "settings.tabThemes"));
     },
-    "click-equalizer": async (page) => {
+    "click-equalizer": async (page, _featured, language) => {
       // Locator click auto-waits for the button to be actionable — more
       // reliable than a fixed-delay evaluate() when the settings sub-tabs
       // haven't finished rendering yet.
-      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+      await page.getByRole("button", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-equalizer-parametric": async (page) => {
-      await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+    "click-equalizer-parametric": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabEqualizer"), exact: true }).click();
       await page.waitForTimeout(400);
-      await page.getByRole("button", { name: "20-band parametric", exact: true }).click();
-      await page.waitForTimeout(400);
-    },
-    "click-settings-folders": async (page) => {
-      await page.getByRole("button", { name: "Folders", exact: true }).click();
+      await page.getByRole("button", { name: t(language, "equalizer.modeParametric"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-settings-tools": async (page) => {
-      await page.getByRole("button", { name: "Organize", exact: true }).click();
+    "click-settings-folders": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabFolders"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
+    "click-settings-tools": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabTools"), exact: true }).click();
       await page.waitForTimeout(400);
       // Swap in a template that actually changes the mock library's paths
       // (the default template already matches how the mock data is laid
@@ -354,37 +366,40 @@ async function main() {
       await templateInput.fill("%albumartist/{%album/}{Disc %disc/}{%track }%title");
       await page.waitForTimeout(600);
     },
-    "click-settings-about": async (page) => {
-      await page.getByRole("button", { name: "About & Credits", exact: true }).click();
+    "click-settings-about": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabAbout"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-moodbar-toggle": async (page) => {
-      await page.getByTitle("Waveform mode — click to switch to moodbar").click();
+    "click-moodbar-toggle": async (page, _featured, language) => {
+      await page.getByTitle(t(language, "playerBar.seekbarModeWaveform")).click();
       await page.waitForTimeout(400);
     },
     "click-playlist": async (page) => {
+      // "2010s" is a mock playlist name (data), not app UI copy — same in every locale.
       await page.getByRole("button", { name: "2010s", exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-smart-playlist": async (page) => {
-      await page.getByRole("button", { name: "New Playlist", exact: true }).click();
+    "click-smart-playlist": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "playlists.newPlaylistBtn"), exact: true }).click();
       await page.waitForTimeout(300);
-      await page.getByRole("button", { name: "Advanced...", exact: true }).click();
+      await page.getByRole("button", { name: t(language, "playlists.advancedBtn"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-smart-playlist-edit": async (page) => {
-      await page.getByRole("button", { name: "New Playlist", exact: true }).click();
+    "click-smart-playlist-edit": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "playlists.newPlaylistBtn"), exact: true }).click();
       await page.waitForTimeout(300);
-      await page.getByRole("button", { name: "Advanced...", exact: true }).click();
+      await page.getByRole("button", { name: t(language, "playlists.advancedBtn"), exact: true }).click();
       await page.waitForTimeout(400);
       const nameInput = page.locator("#smart-playlist-name-input");
       await nameInput.fill("1980s Rock Mix");
       await page.waitForTimeout(200);
 
-      const valInputs = page.locator('input[placeholder="Value..."]');
+      const valuePlaceholder = t(language, "smartPlaylistBuilder.valuePlaceholder");
+      const valInputs = page.locator(`input[placeholder="${valuePlaceholder}"]`);
       await valInputs.nth(0).fill("Rock");
 
-      await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+      const addRuleLabel = t(language, "smartPlaylistBuilder.addRule");
+      await page.getByRole("button", { name: addRuleLabel, exact: true }).click();
       await page.waitForTimeout(200);
       const selects = page.locator("form select");
       await selects.nth(2).selectOption("year");
@@ -393,7 +408,7 @@ async function main() {
       await page.waitForTimeout(100);
       await valInputs.nth(1).fill("1980");
 
-      await page.getByRole("button", { name: "Add Rule", exact: true }).click();
+      await page.getByRole("button", { name: addRuleLabel, exact: true }).click();
       await page.waitForTimeout(200);
       await selects.nth(4).selectOption("year");
       await page.waitForTimeout(100);
@@ -402,14 +417,15 @@ async function main() {
       await valInputs.nth(2).fill("1989");
 
       // Toggle is a <button role="switch" aria-checked>, not a real checkbox input.
-      const toggle = page.getByRole("switch", { name: "Auto-Refill Batch Playback" });
+      const toggle = page.getByRole("switch", { name: t(language, "smartPlaylistBuilder.autoRefillLabel") });
       if ((await toggle.getAttribute("aria-checked")) !== "true") {
         await toggle.click();
       }
       await page.waitForTimeout(400);
     },
-    "type-search": async (page) => {
-      const searchInput = page.locator('input[placeholder*="Search"]');
+    "type-search": async (page, _featured, language) => {
+      const searchPlaceholder = t(language, "topNav.searchPlaceholder");
+      const searchInput = page.locator(`input[placeholder="${searchPlaceholder}"]`);
       await searchInput.focus();
       await searchInput.fill("evan");
       await page.waitForTimeout(400);
@@ -418,13 +434,20 @@ async function main() {
       await page.keyboard.press("Control+m");
       await page.waitForTimeout(400);
     },
-    "toggle-miniplayer-hover": async (page) => {
+    "toggle-miniplayer-hover": async (page, _featured, language) => {
       await page.keyboard.press("Control+m");
       await page.waitForTimeout(400);
-      const miniRegion = page.locator('[role="region"][aria-label="Miniplayer"]');
+      const miniplayerLabel = t(language, "miniplayer.title");
+      const miniRegion = page.locator(`[role="region"][aria-label="${miniplayerLabel}"]`);
       await miniRegion.hover();
       await page.waitForTimeout(400);
     }
+  };
+
+  const withLanguageSuffix = (filename: string, language: string) => {
+    const suffix = language.toUpperCase();
+    const dotIndex = filename.lastIndexOf(".");
+    return dotIndex === -1 ? `${filename}-${suffix}` : `${filename.slice(0, dotIndex)}-${suffix}${filename.slice(dotIndex)}`;
   };
 
   const cleanThemeId = (theme: string) => {
@@ -444,22 +467,27 @@ async function main() {
         const featured = resolveFeatured(mockLibrary, settings);
         const afterLoad = s.action ? actionRegistry[s.action] : undefined;
 
-        await capture({
-          tab: s.tab,
-          subTab: s.subTab,
-          theme: cleanThemeId(settings.theme),
-          filename: s.filename,
-          featured,
-          language: settings.language,
-          afterLoad,
-          isImmersive: s.isImmersive ?? false,
-          sidebarOpen: settings.sidebarOpen,
-          rightPanelOpen: settings.rightPanelOpen,
-          sidebarWidth: settings.sidebarWidth,
-          positionSeconds: settings.positionSeconds,
-          viewportWidth: s.viewportWidth,
-          viewportHeight: s.viewportHeight,
-        });
+        // Every screenshot is captured once per supported locale (see the
+        // `locales` map above), so adding a language only requires adding its
+        // locale file there — no changes needed here or in mock-config.json.
+        for (const language of Object.keys(locales)) {
+          await capture({
+            tab: s.tab,
+            subTab: s.subTab,
+            theme: cleanThemeId(settings.theme),
+            filename: withLanguageSuffix(s.filename, language),
+            featured,
+            language,
+            afterLoad,
+            isImmersive: s.isImmersive ?? false,
+            sidebarOpen: settings.sidebarOpen,
+            rightPanelOpen: settings.rightPanelOpen,
+            sidebarWidth: settings.sidebarWidth,
+            positionSeconds: settings.positionSeconds,
+            viewportWidth: s.viewportWidth,
+            viewportHeight: s.viewportHeight,
+          });
+        }
       }
     } else {
       // Predefined default captures fallback

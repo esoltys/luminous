@@ -3,7 +3,6 @@
   "dbPath": "",
   "songLimit": 2000,
   "default": {
-    "language": "en",
     "theme": "system",
     "sidebarOpen": true,
     "rightPanelOpen": false,

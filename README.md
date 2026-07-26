@@ -22,93 +22,93 @@ You can download the latest installers and portable binaries directly from the G
     <tr>
         <td colspan="2">
             <h4 align="center">Home Hub</h4>
-            <img src="docs/screenshots/home.png" alt="Home View" />
+            <img src="docs/screenshots/home-EN.png" alt="Home View" />
         </td>
     </tr>
     <tr>
       <td width="50%">
         <h4 align="center">Albums</h4>
-        <img src="docs/screenshots/albums.png" alt="Albums Overview" />
+        <img src="docs/screenshots/albums-EN.png" alt="Albums Overview" />
       </td>
       <td width="50%">
         <h4 align="center">Album View</h4>
-        <img src="docs/screenshots/album-detail.png" alt="Album Detail" />
+        <img src="docs/screenshots/album-detail-EN.png" alt="Album Detail" />
       </td>
     </tr>
     <tr>
       <td width="50%">
         <h4 align="center">Artists</h4>
-        <img src="docs/screenshots/artists.png" alt="Artists Overview" />
+        <img src="docs/screenshots/artists-EN.png" alt="Artists Overview" />
       </td>
       <td width="50%">
         <h4 align="center">Artist View</h4>
-        <img src="docs/screenshots/artist-detail.png" alt="Artist Detail" />
+        <img src="docs/screenshots/artist-detail-EN.png" alt="Artist Detail" />
       </td>
     </tr>
     <tr>
       <td width="50%">
         <h4 align="center">Custom Theme Builder</h4>
-        <img src="docs/screenshots/themes.png" alt="Custom Theme Builder" />
+        <img src="docs/screenshots/themes-EN.png" alt="Custom Theme Builder" />
       </td>
       <td width="50%">
         <h4 align="center">Synced Lyrics</h4>
-        <img src="docs/screenshots/lyrics.png" alt="Synced Lyrics" />
+        <img src="docs/screenshots/lyrics-EN.png" alt="Synced Lyrics" />
       </td>
     </tr>
     <tr>
         <td width="50%">
             <h4 align="center">Dual-mode Equalizer</h4>
-            <img src="docs/screenshots/equalizer.png" alt="Dual-mode Equializer" />
+            <img src="docs/screenshots/equalizer-EN.png" alt="Dual-mode Equializer" />
         </td>
         <td width="50%">
             <h4 align="center">Search</h4>
-            <img src="docs/screenshots/search.png" alt="Search" />
+            <img src="docs/screenshots/search-EN.png" alt="Search" />
         </td>
     </tr>
     <tr>
         <td width="50%">
             <h4 align="center">Auto Playlists</h4>
-            <img src="docs/screenshots/playlist-auto.png" alt="Auto Playlists" />
+            <img src="docs/screenshots/playlist-auto-EN.png" alt="Auto Playlists" />
         </td>
         <td width="50%">
             <h4 align="center">Custom Playlists</h4>
-            <img src="docs/screenshots/playlist.png" alt="Custom Playlists" />
+            <img src="docs/screenshots/playlist-EN.png" alt="Custom Playlists" />
         </td>
     </tr>
     <tr>
     	<td width="50%">
             <h4 align="center">Organize Files</h4>
-            <img src="docs/screenshots/settings-organize.png" alt="Organize Files" />
+            <img src="docs/screenshots/settings-organize-EN.png" alt="Organize Files" />
         </td>
         <td width="50%">
             <h4 align="center">Smart Playlist Editor</h4>
-            <img src="docs/screenshots/playlist-smart-edit.png" alt="Smart Playlist Editor" />
+            <img src="docs/screenshots/playlist-smart-edit-EN.png" alt="Smart Playlist Editor" />
         </td>
     </tr>
     <tr>
     	<td width="50%">
             <h4 align="center">Song Tag Editor</h4>
-            <img src="docs/screenshots/song-tag-editor.png" alt="Song Tag Editor" />
+            <img src="docs/screenshots/song-tag-editor-EN.png" alt="Song Tag Editor" />
         </td>
         <td width="50%">
             <h4 align="center">Bulk Album Tag Editor</h4>
-            <img src="docs/screenshots/album-tag-editor.png" alt="Bulk Album Tag Editor" />
+            <img src="docs/screenshots/album-tag-editor-EN.png" alt="Bulk Album Tag Editor" />
         </td>
     </tr>
     <tr>
         <td colspan="2">
             <h4 align="center">Immersive Now Playing</h4>
-            <img src="docs/screenshots/now-playing.png" alt="Immersive Now Playing" />
+            <img src="docs/screenshots/now-playing-EN.png" alt="Immersive Now Playing" />
         </td>
     </tr>
     <tr>
     	<td width="50%" align="center">
             <h4>Miniplayer</h4>
-            <img src="docs/screenshots/miniplayer.png" width="66%" height="66%" alt="Miniplayer" />
+            <img src="docs/screenshots/miniplayer-EN.png" width="66%" height="66%" alt="Miniplayer" />
         </td>
         <td width="50%" align="center">
             <h4>Miniplayer (Hover)</h4>
-            <img src="docs/screenshots/miniplayer-hover.png" width="66%" height="66%" alt="Miniplayer (Hover)" />
+            <img src="docs/screenshots/miniplayer-hover-EN.png" width="66%" height="66%" alt="Miniplayer (Hover)" />
         </td>
     </tr>
   </table>

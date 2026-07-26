@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "bun run sync-docs && svelte-kit sync && vite dev",
     "build": "bun run sync-docs && svelte-kit sync && vite build",
-    "sync-docs": "node -e \"require('fs').copyFileSync('docs/luminous-user-guide.html','static/luminous-user-guide.html')\"",
+    "sync-docs": "bun run scripts/sync-docs.ts",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "install:git-hooks": "git config core.hooksPath .githooks",
