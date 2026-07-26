@@ -20,7 +20,7 @@
     ? 'hover:bg-red-500/10 hover:text-red-400 text-red-400'
     : accent
       ? 'hover:bg-brand-accent/15 hover:text-brand-accent-text'
-      : 'hover:bg-brand-sidebar/80 hover:text-brand-text-primary'}"
+      : 'hover:bg-brand-main hover:text-brand-text-primary'}"
   role="menuitem"
 >
   <Icon
