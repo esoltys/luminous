@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { LoaderCircle } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
 
   let isLoading = $state(true);
 </script>
@@ -8,8 +8,7 @@
 <div class="relative flex flex-col h-full overflow-hidden bg-brand-main">
   {#if isLoading}
     <div class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-brand-main">
-      <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent-text" />
-      <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('help.loading', {}, "Loading user guide...")}</span>
+      <LoadingSpinner label={i18n.t('help.loading', {}, "Loading user guide...")} />
     </div>
   {/if}
   <iframe

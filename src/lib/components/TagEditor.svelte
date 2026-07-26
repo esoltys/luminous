@@ -7,6 +7,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import SongRating from "./SongRating.svelte";
   import FormField from "./FormField.svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
   import { portal } from "../utils/portal";
 
   interface Props {
@@ -197,8 +198,7 @@
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       {#if isLoading}
         <div class="w-full py-16 flex flex-col items-center justify-center gap-3">
-          <LoaderCircle class="w-6 h-6 animate-spin text-brand-accent-text" />
-          <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('tagEditor.readingTags')}</span>
+          <LoadingSpinner label={i18n.t('tagEditor.readingTags')} size="sm" />
         </div>
       {:else if errorMsg}
         <div class="w-full py-12 flex flex-col items-center justify-center gap-3 text-center">
