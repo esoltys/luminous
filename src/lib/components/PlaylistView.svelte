@@ -36,6 +36,15 @@
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { portal } from "../utils/portal";
+  import {
+    COVER_STACK_OFFSET_X_PX,
+    COVER_STACK_OFFSET_Y_PX,
+    COVER_STACK_ROTATION_DEG,
+    COVER_STACK_SCALE_STEP,
+    COVER_STACK_OPACITY_STEP,
+  } from "../constants";
+
+  const DRAG_RESET_DELAY_MS = 100;
 
   let editingSongId = $state<number | null>(null);
 
@@ -502,7 +511,7 @@
     dragOverIndex = null;
     setTimeout(() => {
       draggedIndex = null;
-    }, 100);
+    }, DRAG_RESET_DELAY_MS);
   }
 
   function handleDrop(event: DragEvent, targetIndex: number) {
@@ -693,7 +702,7 @@
             {#each topAlbums.slice(0, 6) as album, i (i)}
               <div
                 class="absolute bottom-0 right-0 w-28 h-28 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
-                style="z-index: {10 - i}; transform: translate({i * -18}px, {i * -10}px) rotate({i * -5}deg) scale({1 - i * 0.05}); opacity: {1 - i * 0.07};"
+                style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
               >
                 <CoverArt
                   songId={album.songId}

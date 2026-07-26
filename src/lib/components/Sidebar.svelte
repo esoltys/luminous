@@ -8,6 +8,7 @@
   import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp, HelpCircle } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
 
   import { invoke } from "@tauri-apps/api/core";
 
@@ -15,7 +16,7 @@
 
   let showAddDirModal = $state(false);
 
-  let isCollapsed = $derived(width < 180);
+  let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
 
   function navigateToFoldersSettings() {
     collectionStore.activeTab = "settings";

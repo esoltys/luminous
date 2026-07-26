@@ -15,6 +15,9 @@ import {
   generatePaletteFromSeed,
   type ColorCount
 } from "../utils/colorUtils";
+import { LIGHTNESS_STEP } from "../constants";
+
+const MAX_READABILITY_ADJUST_STEPS = 30;
 
 export interface ThemeColors {
   "bg-main": string;
@@ -194,13 +197,13 @@ function clampLightness(rgb: Rgb, minL: number, maxL: number): Rgb {
 function darkenUntilReadable(rgb: Rgb): Rgb {
   let candidate = rgb;
   let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < MAX_READABILITY_ADJUST_STEPS; i++) {
     const hex = rgbToHex(candidate.r, candidate.g, candidate.b);
     const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY_DARK, hex).wcagAA;
     const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY_DARK, hex).wcagAA;
     if (primaryOk && secondaryOk) return candidate;
     if (hsl.l <= 0) return candidate;
-    hsl = { ...hsl, l: Math.max(0, hsl.l - 0.02) };
+    hsl = { ...hsl, l: Math.max(0, hsl.l - LIGHTNESS_STEP) };
     candidate = hslToRgb(hsl.h, hsl.s, hsl.l);
   }
   return candidate;
@@ -210,13 +213,13 @@ function darkenUntilReadable(rgb: Rgb): Rgb {
 function lightenUntilReadable(rgb: Rgb): Rgb {
   let candidate = rgb;
   let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < MAX_READABILITY_ADJUST_STEPS; i++) {
     const hex = rgbToHex(candidate.r, candidate.g, candidate.b);
     const primaryOk = checkWcagCompliance(ARTWORK_TEXT_PRIMARY_LIGHT, hex).wcagAA;
     const secondaryOk = checkWcagCompliance(ARTWORK_TEXT_SECONDARY_LIGHT, hex).wcagAA;
     if (primaryOk && secondaryOk) return candidate;
     if (hsl.l >= 1) return candidate;
-    hsl = { ...hsl, l: Math.min(1, hsl.l + 0.02) };
+    hsl = { ...hsl, l: Math.min(1, hsl.l + LIGHTNESS_STEP) };
     candidate = hslToRgb(hsl.h, hsl.s, hsl.l);
   }
   return candidate;

@@ -11,6 +11,9 @@
 
   let { title, headerExtra, children }: Props = $props();
 
+  const SCROLL_END_BUFFER_PX = 10;
+  const SCROLL_STEP_PX = 600; // approximate 3 card-widths including gap
+
   let scrollContainer = $state<HTMLDivElement | undefined>(undefined);
   let canScrollLeft = $state(false);
   let canScrollRight = $state(false);
@@ -19,12 +22,12 @@
     if (!scrollContainer) return;
     canScrollLeft = scrollContainer.scrollLeft > 0;
     canScrollRight =
-      scrollContainer.scrollLeft < scrollContainer.scrollWidth - scrollContainer.clientWidth - 10;
+      scrollContainer.scrollLeft < scrollContainer.scrollWidth - scrollContainer.clientWidth - SCROLL_END_BUFFER_PX;
   }
 
   function scroll(direction: "left" | "right") {
     if (!scrollContainer) return;
-    const scrollAmount = 200 * 3; // approximate card width including gap
+    const scrollAmount = SCROLL_STEP_PX;
     scrollContainer.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
       behavior: "smooth",
