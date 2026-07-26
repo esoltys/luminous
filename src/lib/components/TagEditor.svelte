@@ -6,6 +6,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import SongRating from "./SongRating.svelte";
+  import FormField from "./FormField.svelte";
   import { portal } from "../utils/portal";
 
   interface Props {
@@ -224,8 +225,7 @@
           <!-- Grid form -->
           <div class="grid grid-cols-2 gap-4">
             <!-- Title -->
-            <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-title" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.titleField')}</label>
+            <FormField label={i18n.t('tagEditor.titleField')} for="tag-title" span2>
               <input
                 id="tag-title"
                 bind:value={title}
@@ -233,11 +233,10 @@
                 disabled={isSaving}
                 class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('title') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
-            </div>
+            </FormField>
 
             <!-- Artist -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-artist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.artistField')}</label>
+            <FormField label={i18n.t('tagEditor.artistField')} for="tag-artist">
               <input
                 id="tag-artist"
                 bind:value={artist}
@@ -245,11 +244,10 @@
                 disabled={isSaving}
                 class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('artist') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
-            </div>
+            </FormField>
 
             <!-- Album -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-album" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.albumField')}</label>
+            <FormField label={i18n.t('tagEditor.albumField')} for="tag-album">
               <input
                 id="tag-album"
                 bind:value={album}
@@ -257,40 +255,37 @@
                 disabled={isSaving}
                 class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('album') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
-            </div>
+            </FormField>
 
             <!-- Album Artist -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-albumartist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.albumArtistField')}</label>
+            <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist">
               <input
                 id="tag-albumartist"
                 bind:value={albumArtist}
                 disabled={isSaving}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
-            </div>
+            </FormField>
 
             <!-- Composer -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-composer" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.composerField')}</label>
+            <FormField label={i18n.t('tagEditor.composerField')} for="tag-composer">
               <input
                 id="tag-composer"
                 bind:value={composer}
                 disabled={isSaving}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
-            </div>
+            </FormField>
 
             <!-- Genre -->
-            <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-genre" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.genreField')}</label>
+            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2>
               <input
                 id="tag-genre"
                 bind:value={genre}
                 disabled={isSaving}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
-            </div>
+            </FormField>
 
             <!-- Rating (library-only, saves immediately) -->
             <div class="flex flex-col gap-1.5 col-span-2">
@@ -299,8 +294,7 @@
             </div>
 
             <!-- Year -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-year" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.yearField')}</label>
+            <FormField label={i18n.t('tagEditor.yearField')} for="tag-year">
               <input
                 id="tag-year"
                 type="number"
@@ -313,11 +307,10 @@
                 }}
                 class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('year') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
               />
-            </div>
+            </FormField>
 
             <!-- Track Number -->
-            <div class="flex flex-col gap-1">
-              <label for="tag-track" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.trackField')}</label>
+            <FormField label={i18n.t('tagEditor.trackField')} for="tag-track">
               <input
                 id="tag-track"
                 type="number"
@@ -329,11 +322,10 @@
                 }}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
-            </div>
+            </FormField>
 
             <!-- Disc Number -->
-            <div class="flex flex-col gap-1 col-span-2">
-              <label for="tag-disc" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('tagEditor.discField')}</label>
+            <FormField label={i18n.t('tagEditor.discField')} for="tag-disc" span2>
               <input
                 id="tag-disc"
                 type="number"
@@ -345,7 +337,7 @@
                 }}
                 class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
               />
-            </div>
+            </FormField>
           </div>
         </div>
       {/if}

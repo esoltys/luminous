@@ -3,6 +3,7 @@
   import { Sliders, Save, X, LoaderCircle, Layers } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import FormField from "./FormField.svelte";
   import { portal } from "../utils/portal";
 
   interface Props {
@@ -100,49 +101,37 @@
         <!-- Form fields -->
         <div class="grid grid-cols-2 gap-4">
           <!-- Album Title -->
-          <div class="flex flex-col gap-1 col-span-2">
-            <label for="album-tag-album" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">
-              {i18n.t('albumTagEditor.albumField')}
-            </label>
+          <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
             <input
               id="album-tag-album"
               bind:value={album}
               disabled={isSaving}
               class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
             />
-          </div>
+          </FormField>
 
           <!-- Album Artist -->
-          <div class="flex flex-col gap-1 col-span-2">
-            <label for="album-tag-albumartist" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">
-              {i18n.t('albumTagEditor.albumArtistField')}
-            </label>
+          <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
             <input
               id="album-tag-albumartist"
               bind:value={albumArtist}
               disabled={isSaving}
               class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
             />
-          </div>
+          </FormField>
 
           <!-- Genre -->
-          <div class="flex flex-col gap-1">
-            <label for="album-tag-genre" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">
-              {i18n.t('albumTagEditor.genreField')}
-            </label>
+          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre">
             <input
               id="album-tag-genre"
               bind:value={genre}
               disabled={isSaving}
               class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
             />
-          </div>
+          </FormField>
 
           <!-- Year -->
-          <div class="flex flex-col gap-1">
-            <label for="album-tag-year" class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">
-              {i18n.t('albumTagEditor.yearField')}
-            </label>
+          <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
             <input
               id="album-tag-year"
               type="number"
@@ -150,7 +139,7 @@
               disabled={isSaving}
               class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
             />
-          </div>
+          </FormField>
         </div>
       </div>
     </div>
