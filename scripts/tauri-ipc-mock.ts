@@ -71,7 +71,6 @@ declare global {
     __LUMINOUS_MOCK_CONFIG__?: {
       default?: {
         theme?: string;
-        language?: string;
         sidebarOpen?: boolean;
         sidebarWidth?: number;
         rightPanelOpen?: boolean;
@@ -110,12 +109,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     custom_themes: "[]",
     active_tab: "collection",
     active_sub_tab: "songs",
-    language: mockDefaults.language || "en",
+    language: "en",
   };
-
-  if (mockDefaults.language && window.mockSettings && !window.mockSettings.language) {
-    window.mockSettings.language = mockDefaults.language;
-  }
 
   if (!isScreenshotMode) {
     if (mockDefaults.sidebarOpen !== undefined) {

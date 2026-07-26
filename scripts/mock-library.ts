@@ -62,7 +62,6 @@ const FILE_TYPES = [
 
 /** The subset of per-screenshot settings that also have a run-wide fallback under `default`. */
 export interface MockConfigDefaults {
-  language?: string;
   theme?: string;
   sidebarOpen?: boolean;
   rightPanelOpen?: boolean;
@@ -99,7 +98,6 @@ export interface MockConfig {
 
 /** Effective settings for a single screenshot: `screenshot.*` wins, falling back to `config.default.*`, then a hardcoded default. */
 export interface ResolvedScreenshotSettings {
-  language: string;
   theme: string;
   sidebarOpen: boolean;
   rightPanelOpen: boolean;
@@ -116,7 +114,6 @@ export function resolveScreenshotSettings(
 ): ResolvedScreenshotSettings {
   const d = config.default ?? {};
   return {
-    language: screenshot.language ?? d.language ?? "en",
     theme: screenshot.theme ?? d.theme ?? "nordic-blue",
     sidebarOpen: screenshot.sidebarOpen ?? d.sidebarOpen ?? true,
     rightPanelOpen: screenshot.rightPanelOpen ?? d.rightPanelOpen ?? false,
