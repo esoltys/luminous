@@ -1,6 +1,13 @@
 <script lang="ts">
   import CoverArt from "./CoverArt.svelte";
   import { getArtistGradient } from "../utils/artist";
+  import {
+    COVER_STACK_OFFSET_X_PX,
+    COVER_STACK_OFFSET_Y_PX,
+    COVER_STACK_ROTATION_DEG,
+    COVER_STACK_SCALE_STEP,
+    COVER_STACK_OPACITY_STEP,
+  } from "../constants";
 
   export interface CoverItem {
     songId?: number;
@@ -43,17 +50,17 @@
       return `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`;
     } else {
       // Left stack (used in ArtistDetailView hero header)
-      const x = i * -18;
-      const y = i * -10;
-      const rot = i * -5;
-      const scale = 1 - i * 0.05;
+      const x = i * COVER_STACK_OFFSET_X_PX;
+      const y = i * COVER_STACK_OFFSET_Y_PX;
+      const rot = i * COVER_STACK_ROTATION_DEG;
+      const scale = 1 - i * COVER_STACK_SCALE_STEP;
       return `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${scale})`;
     }
   }
 
   function getOpacity(i: number, count: number): number {
     if (count <= 1) return 1;
-    return 1 - i * (direction === "left" ? 0.07 : 0.09);
+    return 1 - i * (direction === "left" ? COVER_STACK_OPACITY_STEP : 0.09);
   }
 </script>
 

@@ -9,6 +9,7 @@
   import type { QueuePopulationMode } from "../types";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
+  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
   interface Props {
     initialRules?: Rule[];
@@ -211,10 +212,9 @@
     }
   }
 
-  // The floating PlayerBar dock (h-20 + bottom-4 inset ≈ 96px) sits on top of
-  // page content whenever a song is loaded — reserve room for it so the modal
-  // shrinks and its form scrolls internally instead of sliding underneath it.
-  let dockClearance = $derived(playerStore.currentSong ? 96 : 0);
+  // Reserve room for the floating PlayerBar dock so the modal shrinks and its
+  // form scrolls internally instead of sliding underneath it.
+  let dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />

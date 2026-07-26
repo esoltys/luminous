@@ -1,6 +1,11 @@
 // CIE Color Science and Accessibility Utilities
 // Based on International Commission on Illumination (CIE) standards
 
+import { LIGHTNESS_STEP } from "../constants";
+
+const MAX_CONTRAST_ADJUST_STEPS = 50;
+const MAX_PALETTE_TEXT_ADJUST_STEPS = 20;
+
 export interface ColorMetrics {
   hex: string;
   rgb: { r: number; g: number; b: number };
@@ -180,8 +185,8 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
   let hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   let candidateHex = hex;
 
-  for (let i = 0; i < 50; i++) {
-    const nextL = bgIsLight ? hsl.l - 0.02 : hsl.l + 0.02;
+  for (let i = 0; i < MAX_CONTRAST_ADJUST_STEPS; i++) {
+    const nextL = bgIsLight ? hsl.l - LIGHTNESS_STEP : hsl.l + LIGHTNESS_STEP;
     if (nextL < 0 || nextL > 1) break;
     hsl = { ...hsl, l: nextL };
     const candidateRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
@@ -573,18 +578,18 @@ export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette 
     return backgroundHexes.every(bg => checkWcagCompliance(hex, bg).wcagAA);
   };
 
-  for (let i = 0; i < 20 && !meetsAA(textPrimary); i++) {
-    textPrimary = { ...textPrimary, l: Math.min(1, textPrimary.l + 0.02) };
+  for (let i = 0; i < MAX_PALETTE_TEXT_ADJUST_STEPS && !meetsAA(textPrimary); i++) {
+    textPrimary = { ...textPrimary, l: Math.min(1, textPrimary.l + LIGHTNESS_STEP) };
   }
-  for (let i = 0; i < 20 && !meetsAA(textSecondary); i++) {
-    textSecondary = { ...textSecondary, l: Math.min(1, textSecondary.l + 0.02) };
+  for (let i = 0; i < MAX_PALETTE_TEXT_ADJUST_STEPS && !meetsAA(textSecondary); i++) {
+    textSecondary = { ...textSecondary, l: Math.min(1, textSecondary.l + LIGHTNESS_STEP) };
   }
 
   let accentAdjusted = accent;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < MAX_PALETTE_TEXT_ADJUST_STEPS; i++) {
     const accentHex = toHex(hslToRgb(accentAdjusted.h, accentAdjusted.s, accentAdjusted.l));
     if (checkWcagCompliance(accentHex, backgroundHexes[0]).ratio >= 3) break;
-    accentAdjusted = { ...accentAdjusted, l: Math.min(0.85, accentAdjusted.l + 0.02) };
+    accentAdjusted = { ...accentAdjusted, l: Math.min(0.85, accentAdjusted.l + LIGHTNESS_STEP) };
   }
 
   return {

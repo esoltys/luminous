@@ -16,6 +16,14 @@
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { onMount } from 'svelte';
+  import {
+    SIDEBAR_MIN_WIDTH_PX,
+    SIDEBAR_MAX_WIDTH_PX,
+    SIDEBAR_COLLAPSED_WIDTH_PX,
+    RIGHT_PANEL_MIN_WIDTH_PX,
+    RIGHT_PANEL_MAX_WIDTH_PX,
+    PANEL_RESIZE_STEP_PX,
+  } from '../lib/constants';
 
   let { children } = $props();
   let isLinux = $state(false);
@@ -93,9 +101,9 @@
       const deltaX = moveEvent.clientX - startX;
       let newWidth = startWidth + deltaX;
       if (newWidth < 120) {
-        newWidth = 64;
+        newWidth = SIDEBAR_COLLAPSED_WIDTH_PX;
       } else {
-        newWidth = Math.max(180, Math.min(400, newWidth));
+        newWidth = Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(SIDEBAR_MAX_WIDTH_PX, newWidth));
       }
       collectionStore.setSidebarWidth(newWidth);
     }
@@ -117,7 +125,7 @@
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      collectionStore.setRightPanelWidth(Math.max(220, Math.min(480, startWidth - deltaX)));
+      collectionStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)));
     }
 
     function onPointerUp() {
@@ -135,19 +143,19 @@
       e.preventDefault();
       e.stopPropagation();
       const currentWidth = collectionStore.sidebarWidth;
-      if (currentWidth === 180) {
-        collectionStore.setSidebarWidth(64);
-      } else if (currentWidth > 180) {
-        collectionStore.setSidebarWidth(Math.max(180, currentWidth - 10));
+      if (currentWidth === SIDEBAR_MIN_WIDTH_PX) {
+        collectionStore.setSidebarWidth(SIDEBAR_COLLAPSED_WIDTH_PX);
+      } else if (currentWidth > SIDEBAR_MIN_WIDTH_PX) {
+        collectionStore.setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH_PX, currentWidth - PANEL_RESIZE_STEP_PX));
       }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
       const currentWidth = collectionStore.sidebarWidth;
-      if (currentWidth === 64) {
-        collectionStore.setSidebarWidth(180);
+      if (currentWidth === SIDEBAR_COLLAPSED_WIDTH_PX) {
+        collectionStore.setSidebarWidth(SIDEBAR_MIN_WIDTH_PX);
       } else {
-        collectionStore.setSidebarWidth(Math.min(400, currentWidth + 10));
+        collectionStore.setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX));
       }
     }
   }
@@ -157,11 +165,11 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setRightPanelWidth(Math.min(480, collectionStore.rightPanelWidth + 10));
+      collectionStore.setRightPanelWidth(Math.min(RIGHT_PANEL_MAX_WIDTH_PX, collectionStore.rightPanelWidth + PANEL_RESIZE_STEP_PX));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setRightPanelWidth(Math.max(220, collectionStore.rightPanelWidth - 10));
+      collectionStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, collectionStore.rightPanelWidth - PANEL_RESIZE_STEP_PX));
     }
   }
 </script>
@@ -199,8 +207,8 @@
                 <div 
                   role="separator"
                   aria-valuenow={collectionStore.sidebarWidth}
-                  aria-valuemin={64}
-                  aria-valuemax={400}
+                  aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
+                  aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
                   aria-label={i18n.t('topNav.resizeSidebar')}
                   tabindex="0"
                   class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
@@ -227,8 +235,8 @@
                 <div 
                   role="separator"
                   aria-valuenow={collectionStore.rightPanelWidth}
-                  aria-valuemin={220}
-                  aria-valuemax={480}
+                  aria-valuemin={RIGHT_PANEL_MIN_WIDTH_PX}
+                  aria-valuemax={RIGHT_PANEL_MAX_WIDTH_PX}
                   aria-label={i18n.t('topNav.resizeRightPanel')}
                   tabindex="0"
                   class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
