@@ -4,6 +4,7 @@
   import { FileText, Edit3, Save, X, RefreshCw, Music2 } from "lucide-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
 
   interface LyricLine {
     timeMs: number;
@@ -170,7 +171,7 @@
       }
     } catch (e: any) {
       console.error("[LyricsView] Failed to toggle instrumental status:", e);
-      alert(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString());
+      toastStore.show(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString(), "error");
     }
   }
 
@@ -188,7 +189,7 @@
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
-      alert(i18n.t('lyrics.saveFailedPrefix') + e.toString());
+      toastStore.show(i18n.t('lyrics.saveFailedPrefix') + e.toString(), "error");
     }
   }
 

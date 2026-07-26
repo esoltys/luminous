@@ -5,6 +5,7 @@
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import SongRating from "./SongRating.svelte";
   import FormField from "./FormField.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
@@ -148,7 +149,7 @@
       onClose();
     } catch (e: any) {
       console.error("Failed to save tags:", e);
-      alert(i18n.t('tagEditor.saveFailedPrefix') + e.toString());
+      toastStore.show(i18n.t('tagEditor.saveFailedPrefix') + e.toString(), "error");
     } finally {
       isSaving = false;
     }

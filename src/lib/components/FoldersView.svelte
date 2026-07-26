@@ -5,6 +5,7 @@
   import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { onMount } from "svelte";
@@ -206,7 +207,7 @@
 
   async function saveCustomTheme() {
     if (newThemeName.trim() === "") {
-      alert(i18n.t('settings.enterThemeNameAlert'));
+      toastStore.show(i18n.t('settings.enterThemeNameAlert'));
       return;
     }
 

@@ -9,6 +9,7 @@
   import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3, Columns, FilterX } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
@@ -109,7 +110,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -332,7 +333,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
-      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 
@@ -872,7 +873,7 @@
       if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
         await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
       } else if (songs.length > 0) {
-        alert(i18n.t("collection.selectPlaylistFirstAlert"));
+        toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
       }
     }}
     onGoToArtist={album.artist ? () => collectionStore.viewArtist(album.artist || "") : undefined}

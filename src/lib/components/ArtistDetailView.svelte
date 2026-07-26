@@ -17,6 +17,7 @@
   import { songsToCoverStack } from "../utils/covers";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
 
   let { artistName }: { artistName: string } = $props();
 
@@ -330,7 +331,7 @@
       if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
         await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
       } else if (songs.length > 0) {
-        alert(i18n.t("collection.selectPlaylistFirstAlert"));
+        toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
       }
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}

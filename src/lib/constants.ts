@@ -47,3 +47,6 @@ export const MAX_RECENT_SEARCHES = 10;
 
 /** Lightness step used when nudging a color's HSL lightness to reach a target contrast ratio. */
 export const LIGHTNESS_STEP = 0.02;
+
+/** How long a toast notification stays visible before auto-dismissing. */
+export const TOAST_DURATION_MS = 4000;

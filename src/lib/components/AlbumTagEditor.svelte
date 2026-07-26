@@ -3,6 +3,7 @@
   import { Sliders, Save, X, LoaderCircle, Layers } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
 
@@ -55,7 +56,7 @@
       onClose();
     } catch (e: any) {
       console.error("Failed to save album tags:", e);
-      alert(i18n.t("albumTagEditor.saveFailedPrefix") + e.toString());
+      toastStore.show(i18n.t("albumTagEditor.saveFailedPrefix") + e.toString(), "error");
     } finally {
       isSaving = false;
     }

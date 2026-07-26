@@ -20,6 +20,7 @@
   import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
 
   let { albumName }: { albumName: string } = $props();
@@ -102,7 +103,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -272,7 +273,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
-      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 
@@ -281,7 +282,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
     } else {
-      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 
