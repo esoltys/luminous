@@ -614,10 +614,10 @@
                 class="bg-brand-sidebar border border-brand-accent text-brand-text-primary px-3 py-1 text-2xl font-bold rounded-lg focus:outline-none"
                 use:focusAndSelect
               />
-              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent cursor-pointer" title="Save">
+              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent cursor-pointer" title={i18n.t('playlists.saveRenameTooltip')}>
                 <Check class="w-5 h-5" />
               </button>
-              <button onclick={cancelRename} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer" title="Cancel">
+              <button onclick={cancelRename} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer" title={i18n.t('playlists.cancel')}>
                 <X class="w-5 h-5" />
               </button>
             </div>

@@ -138,7 +138,7 @@
         kind: "query",
         title: q,
         query: q,
-        subtitle: "Search query"
+        subtitle: i18n.t('topNav.searchQuerySubtitle', {}, "Search query")
       });
       collectionStore.search(q);
     }
@@ -299,25 +299,25 @@
               </div>
               <div>
                 <div class="text-xs font-bold text-brand-text-primary group-hover:text-indigo-300 transition-colors">
-                  Create Smart Playlist from Search
+                  {i18n.t('topNav.createSmartPlaylistFromSearch')}
                 </div>
                 <div class="text-[11px] text-brand-text-secondary/80">
-                  Pre-fill builder with rules from active search query
+                  {i18n.t('topNav.createSmartPlaylistFromSearchHint')}
                 </div>
               </div>
             </div>
-            <span class="text-xs font-semibold text-indigo-400 group-hover:underline">Open Builder →</span>
+            <span class="text-xs font-semibold text-indigo-400 group-hover:underline">{i18n.t('topNav.openBuilder')}</span>
           </button>
         {/if}
 
         {#if collectionStore.searchQuery.includes(":")}
           <div class="p-2.5 mb-2.5 rounded-xl bg-brand-main/60 border border-brand-border/40 text-xs text-brand-text-secondary/90">
             <div class="font-semibold text-brand-text-primary mb-1 flex items-center gap-1">
-              <span>💡 Filter Syntax Hint</span>
+              <span>{i18n.t('topNav.filterSyntaxHint')}</span>
             </div>
             <div class="space-y-0.5 text-[11px]">
-              <div><span class="font-medium text-brand-text-primary">Fields:</span> <code class="bg-brand-sidebar px-1 rounded">artist</code>, <code class="bg-brand-sidebar px-1 rounded">album</code>, <code class="bg-brand-sidebar px-1 rounded">title</code>, <code class="bg-brand-sidebar px-1 rounded">genre</code>, <code class="bg-brand-sidebar px-1 rounded">year</code>, <code class="bg-brand-sidebar px-1 rounded">rating</code>, <code class="bg-brand-sidebar px-1 rounded">duration</code>, <code class="bg-brand-sidebar px-1 rounded">playcount</code></div>
-              <div><span class="font-medium text-brand-text-primary">Operators:</span> <code class="bg-brand-sidebar px-1 rounded">=</code> <code class="bg-brand-sidebar px-1 rounded">!=</code> <code class="bg-brand-sidebar px-1 rounded">&gt;</code> <code class="bg-brand-sidebar px-1 rounded">&gt;=</code> <code class="bg-brand-sidebar px-1 rounded">&lt;</code> <code class="bg-brand-sidebar px-1 rounded">&lt;=</code></div>
+              <div><span class="font-medium text-brand-text-primary">{i18n.t('topNav.filterFieldsLabel')}</span> <code class="bg-brand-sidebar px-1 rounded">artist</code>, <code class="bg-brand-sidebar px-1 rounded">album</code>, <code class="bg-brand-sidebar px-1 rounded">title</code>, <code class="bg-brand-sidebar px-1 rounded">genre</code>, <code class="bg-brand-sidebar px-1 rounded">year</code>, <code class="bg-brand-sidebar px-1 rounded">rating</code>, <code class="bg-brand-sidebar px-1 rounded">duration</code>, <code class="bg-brand-sidebar px-1 rounded">playcount</code></div>
+              <div><span class="font-medium text-brand-text-primary">{i18n.t('topNav.filterOperatorsLabel')}</span> <code class="bg-brand-sidebar px-1 rounded">=</code> <code class="bg-brand-sidebar px-1 rounded">!=</code> <code class="bg-brand-sidebar px-1 rounded">&gt;</code> <code class="bg-brand-sidebar px-1 rounded">&gt;=</code> <code class="bg-brand-sidebar px-1 rounded">&lt;</code> <code class="bg-brand-sidebar px-1 rounded">&lt;=</code></div>
               <div class="text-brand-text-secondary/60 italic pt-0.5">e.g. rating:&gt;=4 year:&lt;2000 genre:jazz "miles davis"</div>
             </div>
           </div>
@@ -390,7 +390,7 @@
                         collectionStore.addRecentSearch({
                           kind: "album",
                           title: album.album,
-                          subtitle: `${i18n.t('collection.albumLabel', {}, 'Album')} • ${album.artist || 'Unknown'}`,
+                          subtitle: `${i18n.t('collection.albumLabel', {}, 'Album')} • ${album.artist || i18n.t('collection.unknownArtist')}`,
                           query: album.album,
                           artUrl: album.art_manual || album.art_automatic
                         });
@@ -413,7 +413,7 @@
                           {album.album}
                         </span>
                         <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {i18n.t('collection.albumLabel', {}, 'Album')} • {album.artist || 'Unknown'}
+                          {i18n.t('collection.albumLabel', {}, 'Album')} • {album.artist || i18n.t('collection.unknownArtist')}
                         </span>
                       </div>
                     </div>
@@ -477,7 +477,7 @@
                     role="button"
                     tabindex="0"
                     onclick={() => {
-                      const songTitle = song.title || "Unknown";
+                      const songTitle = song.title || i18n.t('collection.unknownSong');
                       if (song.album) {
                         collectionStore.viewAlbum(song.album);
                       } else {
@@ -487,7 +487,7 @@
                       collectionStore.addRecentSearch({
                         kind: "song",
                         title: songTitle,
-                        subtitle: `${i18n.t('collection.songLabel', {}, 'Song')} • ${song.artist || 'Unknown'}`,
+                        subtitle: `${i18n.t('collection.songLabel', {}, 'Song')} • ${song.artist || i18n.t('collection.unknownArtist')}`,
                         query: song.album || songTitle,
                         artUrl: song.art_manual || song.art_automatic
                       });
@@ -512,10 +512,10 @@
                       />
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
-                          {song.title || 'Unknown'}
+                          {song.title || i18n.t('collection.unknownSong')}
                         </span>
                         <span class="text-xs text-brand-text-secondary/70 truncate">
-                          {i18n.t('collection.songLabel', {}, 'Song')} • {song.artist || 'Unknown'}
+                          {i18n.t('collection.songLabel', {}, 'Song')} • {song.artist || i18n.t('collection.unknownArtist')}
                         </span>
                       </div>
                     </div>
@@ -600,7 +600,7 @@
                     collectionStore.removeRecentSearch(item.id);
                   }}
                   class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-400 text-brand-text-secondary/60 transition-all cursor-pointer rounded"
-                  title="Remove from recent searches"
+                  title={i18n.t('topNav.removeRecentSearchTooltip')}
                 >
                   <X class="w-3.5 h-3.5" />
                 </button>

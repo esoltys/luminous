@@ -359,48 +359,48 @@
           <button
             onclick={() => { showColumnsMenu = !showColumnsMenu; }}
             class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none transition-all cursor-pointer font-medium"
-            title="Custom Visible Columns"
+            title={i18n.t('collection.columnsMenuTooltip')}
           >
             <Columns class="w-3.5 h-3.5 text-brand-accent-text" />
-            <span>Columns</span>
+            <span>{i18n.t('collection.columnsBtn')}</span>
           </button>
 
           {#if showColumnsMenu}
             <div class="absolute right-0 top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-52 flex flex-col gap-1.5 select-none">
               <div class="text-[11px] font-bold text-brand-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-brand-border/40">
-                Visible Columns
+                {i18n.t('collection.visibleColumnsHeader')}
               </div>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.format} onchange={() => collectionStore.toggleColumn("format")} class="rounded accent-brand-accent" />
-                Format
+                {i18n.t('collection.columnFormat')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.year} onchange={() => collectionStore.toggleColumn("year")} class="rounded accent-brand-accent" />
-                Year
+                {i18n.t('collection.columnYear')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.genre} onchange={() => collectionStore.toggleColumn("genre")} class="rounded accent-brand-accent" />
-                Genre
+                {i18n.t('collection.columnGenre')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.bitrate} onchange={() => collectionStore.toggleColumn("bitrate")} class="rounded accent-brand-accent" />
-                Bitrate
+                {i18n.t('collection.columnBitrate')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.rating} onchange={() => collectionStore.toggleColumn("rating")} class="rounded accent-brand-accent" />
-                Rating
+                {i18n.t('collection.columnRating')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.playcount} onchange={() => collectionStore.toggleColumn("playcount")} class="rounded accent-brand-accent" />
-                Play Count
+                {i18n.t('collection.columnPlayCount')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.skipcount} onchange={() => collectionStore.toggleColumn("skipcount")} class="rounded accent-brand-accent" />
-                Skip Count
+                {i18n.t('collection.columnSkipCount')}
               </label>
               <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
                 <input type="checkbox" checked={collectionStore.visibleColumns.duration} onchange={() => collectionStore.toggleColumn("duration")} class="rounded accent-brand-accent" />
-                Duration
+                {i18n.t('collection.columnDuration')}
               </label>
             </div>
           {/if}
@@ -453,22 +453,22 @@
             </button>
             {#if collectionStore.visibleColumns.format}
               <button onclick={() => toggleSort("filetype")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Format {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {sortField === "filetype" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.year}
               <button onclick={() => toggleSort("year")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Year {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {sortField === "year" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.genre}
               <button onclick={() => toggleSort("genre")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Genre {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {sortField === "genre" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
               <button onclick={() => toggleSort("bitrate")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate max-w-[calc(100%-0.5rem)]">Bitrate {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {sortField === "bitrate" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.rating}
@@ -478,12 +478,12 @@
             {/if}
             {#if collectionStore.visibleColumns.playcount}
               <button onclick={() => toggleSort("playcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate">Plays {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate">{i18n.t('collection.tableHeaderPlays')} {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.skipcount}
               <button onclick={() => toggleSort("skipcount")} class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0">
-                <span class="truncate">Skips {sortField === "skipcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
+                <span class="truncate">{i18n.t('collection.tableHeaderSkips')} {sortField === "skipcount" ? (sortAsc ? "▲" : "▼") : ""}</span>
               </button>
             {/if}
             {#if collectionStore.visibleColumns.duration}
@@ -500,10 +500,10 @@
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <FilterX class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">All results filtered out</h3>
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.allFilteredOutTitle')}</h3>
                 <p class="text-xs text-brand-text-secondary mb-4">
                   {#if collectionStore.searchQuery}
-                    No tracks match your query: <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
+                    {i18n.t('collection.noTracksMatchQuery')} <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
                   {:else}
                     {i18n.t('collection.noSongsLibraryEmpty')}
                   {/if}
@@ -514,7 +514,7 @@
                     class="px-3.5 py-2 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-xl shadow transition-all font-semibold cursor-pointer flex items-center gap-1.5"
                   >
                     <FilterX class="w-3.5 h-3.5" />
-                    Reset Search & Filters
+                    {i18n.t('collection.resetSearchFilters')}
                   </button>
                 {/if}
               </div>
