@@ -833,7 +833,24 @@
     // Public: host's "Import from computer" calls this to run local browse.
     openFilePicker() { this._exitReframe(true); this._input.click(); }
 
-    attributeChangedCallback() { if (this.shadowRoot) this._render(); }
+    // A src write is a newer intent for this slot's content — the host
+    // pick path (setImageSlotImage) or an agent edit — so it must win
+    // over any encode still in flight from an earlier drop: left live,
+    // that encode lands later, passes _ingest's gen guard, and its
+    // setSlot silently overwrites the pick (the stored value shadows
+    // src in _render). Bumping _gen kills the encode before its own
+    // _swapGen clear runs, so clear the dead claim here too — otherwise
+    // _releaseMask (gated on !_swapGen) never fires and the pick's
+    // spinner is stranded. src ONLY: the pick sets credit/credit-href
+    // in the same task, and clearing _swapGen on those would let the
+    // same-src branch unmask the old image mid-encode.
+    attributeChangedCallback(name, oldVal, newVal) {
+      if (name === 'src' && oldVal !== newVal) {
+        this._gen++;
+        this._swapGen = 0;
+      }
+      if (this.shadowRoot) this._render();
+    }
 
     // handleEvent — one listener object for all four drag events keeps the
     // add/remove symmetric and the depth counter correct.
