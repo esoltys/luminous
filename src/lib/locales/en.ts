@@ -431,7 +431,7 @@ export const en = {
     adjustTiming: "Adjust Timing",
     syncOffsetLabel: "Sync Offset",
     offsetSeconds: "{seconds}s",
-    lyricsHelpText: "Luminous automatically searches for local .lrc files or embedded lyrics.",
+    lyricsHelpText: "Luminous automatically searches embedded tags and online sources for lyrics.",
     searchLyricsTitle: "Search Lyrics Online",
     searchLyricsBtn: "Search",
     importLrcBtn: "Import LRC",

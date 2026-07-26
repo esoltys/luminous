@@ -430,7 +430,7 @@ export const fr = {
     adjustTiming: "Ajuster la synchronisation",
     syncOffsetLabel: "Décalage de synchro",
     offsetSeconds: "{seconds}s",
-    lyricsHelpText: "Luminous recherche automatiquement les fichiers locaux .lrc ou les paroles intégrées.",
+    lyricsHelpText: "Luminous recherche automatiquement les paroles dans les tags intégrés et en ligne.",
     searchLyricsTitle: "Rechercher des paroles en ligne",
     searchLyricsBtn: "Rechercher",
     importLrcBtn: "Importer LRC",
