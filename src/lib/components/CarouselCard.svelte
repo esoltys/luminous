@@ -6,7 +6,8 @@
   import CoverArt from "./CoverArt.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
-  import { Play } from "lucide-svelte";
+  import PlayOverlayButton from "./PlayOverlayButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -60,15 +61,7 @@
         />
 
         <!-- Play Button Overlay -->
-        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
-          <button
-            onclick={handlePlay}
-            class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
-            title={i18n.t('playerBar.play')}
-          >
-            <Play class="w-5 h-5 fill-current ml-0.5" />
-          </button>
-        </div>
+        <PlayOverlayButton onPlay={handlePlay} />
       </div>
 
       <!-- Metadata -->
@@ -76,14 +69,13 @@
         <!-- Song Title -->
         {#if item.song.album}
           <h3 class="truncate">
-            <button
-              type="button"
+            <LinkButton
               onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song.album || ""); }}
-              class="font-semibold text-sm text-brand-text-primary truncate hover:underline hover:text-brand-accent-text transition-colors cursor-pointer text-left max-w-full"
+              class="font-semibold text-sm text-brand-text-primary truncate max-w-full"
               title={i18n.t('collection.filterByAlbum', { album: item.song.album })}
             >
               {item.song.title || i18n.t('collection.unknownSong')}
-            </button>
+            </LinkButton>
           </h3>
         {:else}
           <h3 class="font-semibold text-sm text-brand-text-primary truncate" title={item.song.title}>
@@ -94,14 +86,13 @@
         <!-- Song Artist -->
         {#if item.song.artist}
           <p class="truncate mt-0.5">
-            <button
-              type="button"
+            <LinkButton
               onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song.album_artist?.trim() || item.song.artist || ""); }}
-              class="text-xs text-brand-text-secondary font-medium truncate hover:underline hover:text-brand-accent-text transition-colors cursor-pointer text-left max-w-full"
+              class="text-xs text-brand-text-secondary font-medium truncate max-w-full"
               title={i18n.t('collection.filterByArtist', { artist: item.song.artist })}
             >
               {item.song.artist}
-            </button>
+            </LinkButton>
           </p>
         {:else}
           <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium">

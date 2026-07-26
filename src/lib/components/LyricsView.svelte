@@ -1,8 +1,10 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
-  import { FileText, Edit3, Save, X, RefreshCw, LoaderCircle, Music2 } from "lucide-svelte";
+  import { FileText, Edit3, Save, X, RefreshCw, Music2 } from "lucide-svelte";
+  import LoadingSpinner from "./LoadingSpinner.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
 
   interface LyricLine {
     timeMs: number;
@@ -169,7 +171,7 @@
       }
     } catch (e: any) {
       console.error("[LyricsView] Failed to toggle instrumental status:", e);
-      alert(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString());
+      toastStore.show(i18n.t('lyrics.saveFailedPrefix', {}, "Failed to save: ") + e.toString(), "error");
     }
   }
 
@@ -187,7 +189,7 @@
       isEditing = false;
     } catch (e: any) {
       console.error("[LyricsView] Failed to save lyrics manually:", e);
-      alert(i18n.t('lyrics.saveFailedPrefix') + e.toString());
+      toastStore.show(i18n.t('lyrics.saveFailedPrefix') + e.toString(), "error");
     }
   }
 
@@ -278,8 +280,7 @@
   <div class="flex-1 overflow-y-auto px-6 py-12" class:pb-28={!!playerStore.currentSong} bind:this={containerEl}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
-        <LoaderCircle class="w-8 h-8 animate-spin text-brand-accent-text" />
-        <span class="text-xs text-brand-text-secondary/60 font-medium">{i18n.t('lyrics.fetching', {}, "Fetching lyrics...")}</span>
+        <LoadingSpinner label={i18n.t('lyrics.fetching', {}, "Fetching lyrics...")} />
       </div>
     {:else if playerStore.currentSong?.is_instrumental}
       <!-- Instrumental View -->

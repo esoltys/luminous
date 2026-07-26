@@ -5,6 +5,7 @@
   import { Music, Clock } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
+  import LinkButton from "./LinkButton.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -69,13 +70,13 @@
         <div class="space-y-1">
           <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.artistLabel', {}, 'Artist')}</p>
           {#if currentSong.artist}
-            <button
+            <LinkButton
               onclick={() => collectionStore.viewArtist(currentSong.album_artist?.trim() || currentSong.artist || "")}
-              class="text-sm text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 break-words cursor-pointer text-left w-full"
+              class="text-sm text-brand-text-secondary break-words w-full"
               title={i18n.t('collection.filterByArtist', { artist: currentSong.artist })}
             >
               {currentSong.artist}
-            </button>
+            </LinkButton>
           {:else}
             <p class="text-sm text-brand-text-secondary break-words">{i18n.t('collection.unknownArtist')}</p>
           {/if}

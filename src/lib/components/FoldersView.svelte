@@ -5,6 +5,7 @@
   import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { onMount } from "svelte";
@@ -12,6 +13,7 @@
   import Equalizer from "./Equalizer.svelte";
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Toggle from "./Toggle.svelte";
+  import Select from "./Select.svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -19,6 +21,15 @@
   let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
   let appVersion = $state("");
   let versionCopied = $state(false);
+  let contentEl = $state<HTMLDivElement | null>(null);
+
+  // The content area is a single scrollable div shared by every tab (only its
+  // children swap via the {#if} chain below), so switching tabs doesn't
+  // naturally reset scroll position the way navigating to a new view would.
+  $effect(() => {
+    void settingsTab;
+    if (contentEl) contentEl.scrollTop = 0;
+  });
 
   async function copyVersion() {
     try {
@@ -196,7 +207,7 @@
 
   async function saveCustomTheme() {
     if (newThemeName.trim() === "") {
-      alert(i18n.t('settings.enterThemeNameAlert'));
+      toastStore.show(i18n.t('settings.enterThemeNameAlert'));
       return;
     }
 
@@ -287,7 +298,7 @@
   </div>
 
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
@@ -296,16 +307,15 @@
         <!-- Language row -->
         <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
           <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
-          <select
+          <Select
             id="language-select"
             value={i18n.currentLocale}
             onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="en">{i18n.t('settings.languageEnglish')}</option>
             <option value="fr">{i18n.t('settings.languageFrench')}</option>
-          </select>
+          </Select>
         </div>
 
         <!-- Rating style row -->
@@ -314,16 +324,15 @@
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
           </div>
-          <select
+          <Select
             id="rating-style-select"
             value={prefs.ratingStyle}
             onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as RatingStyle)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all cursor-pointer font-medium appearance-none -webkit-appearance-none"
-            style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right 0.625rem center; background-repeat: no-repeat; background-size: 1.25em;"
+            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
-          </select>
+          </Select>
         </div>
       </div>
 

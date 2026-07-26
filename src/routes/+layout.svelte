@@ -11,6 +11,7 @@
   import CoverArt from '../lib/components/CoverArt.svelte';
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
+  import Toast from '../lib/components/Toast.svelte';
   import { Music } from 'lucide-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
@@ -331,6 +332,8 @@
 {#if isShortcutsModalOpen}
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
 {/if}
+
+<Toast />
 
 <style>
   .flip-perspective {

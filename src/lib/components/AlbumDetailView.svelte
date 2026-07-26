@@ -10,9 +10,17 @@
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play, Shuffle, Plus, Edit3, Clock, Music } from "lucide-svelte";
+  import SortableHeader from "./SortableHeader.svelte";
+  import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
+  import EmptyState from "./EmptyState.svelte";
+  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
+  import NowPlayingBars from "./NowPlayingBars.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
+  import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
 
   let { albumName }: { albumName: string } = $props();
@@ -95,7 +103,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -265,7 +273,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
-      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 
@@ -274,7 +282,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
     } else {
-      alert(i18n.t('collection.selectPlaylistFirstAlert'));
+      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
     }
   }
 
@@ -349,12 +357,12 @@
 
         <div class="flex items-center gap-2 text-base font-semibold text-brand-accent-text">
           {#if artistName}
-            <button
+            <LinkButton
               onclick={() => collectionStore.viewArtist(artistName)}
-              class="hover:underline cursor-pointer transition-colors text-left font-bold"
+              class="font-bold"
             >
               {artistName}
-            </button>
+            </LinkButton>
           {:else}
             <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
           {/if}
@@ -384,38 +392,27 @@
 
         <!-- Control Buttons -->
         <div class="flex items-center gap-3 mt-3 select-none">
-          <button
-            onclick={handlePlayAll}
+          <PlayShuffleButtons
+            onPlayAll={handlePlayAll}
+            onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
-          >
-            <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
-          </button>
-          <button
-            onclick={handleShufflePlay}
-            disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
-          </button>
-          <button
+          />
+          <IconActionButton
             onclick={handleAddAlbumToPlaylist}
             disabled={loading || songs.length === 0}
             title={playlistsStore.activeCustomPlaylist
               ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
               : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
-            <Plus class="w-4 h-4" />
-          </button>
-          <button
+            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
             onclick={openAlbumTagEditor}
             disabled={loading || songs.length === 0}
             title={i18n.t('albumDetail.editInfoTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
           >
-            <Edit3 class="w-4 h-4" />
-          </button>
+            {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
+          </IconActionButton>
         </div>
       </div>
 
@@ -441,21 +438,46 @@
       <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
         <div class="grid grid-cols-[36px_56px_1fr_96px_60px_60px_80px] items-center py-2.5 px-4">
           <div class="text-center w-9"></div>
-          <button onclick={() => toggleSort("track")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-            {i18n.t('collection.tableHeaderTrack')} {sortField === "track" ? (sortAsc ? "▲" : "▼") : ""}
-          </button>
-          <button onclick={() => toggleSort("title")} class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider">
-            {i18n.t('collection.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
-          </button>
-          <button onclick={() => toggleSort("rating")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-            {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
-          </button>
-          <button onclick={() => toggleSort("playcount")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-            {i18n.t('collection.tableHeaderPlays')} {sortField === "playcount" ? (sortAsc ? "▲" : "▼") : ""}
-          </button>
-          <button onclick={() => toggleSort("duration")} class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider">
-            <Clock class="w-3.5 h-3.5 mx-auto" /> {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
-          </button>
+          <SortableHeader
+            active={sortField === "track"}
+            {sortAsc}
+            onclick={() => toggleSort("track")}
+            class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider"
+          >
+            {#snippet label(arrow)}{i18n.t('collection.tableHeaderTrack')} {arrow}{/snippet}
+          </SortableHeader>
+          <SortableHeader
+            active={sortField === "title"}
+            {sortAsc}
+            onclick={() => toggleSort("title")}
+            class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider"
+          >
+            {#snippet label(arrow)}{i18n.t('collection.tableHeaderTitle')} {arrow}{/snippet}
+          </SortableHeader>
+          <SortableHeader
+            active={sortField === "rating"}
+            {sortAsc}
+            onclick={() => toggleSort("rating")}
+            class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider"
+          >
+            {#snippet label(arrow)}{i18n.t('collection.tableHeaderRating')} {arrow}{/snippet}
+          </SortableHeader>
+          <SortableHeader
+            active={sortField === "playcount"}
+            {sortAsc}
+            onclick={() => toggleSort("playcount")}
+            class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider"
+          >
+            {#snippet label(arrow)}{i18n.t('collection.tableHeaderPlays')} {arrow}{/snippet}
+          </SortableHeader>
+          <SortableHeader
+            active={sortField === "duration"}
+            {sortAsc}
+            onclick={() => toggleSort("duration")}
+            class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider"
+          >
+            {#snippet label(arrow)}<Clock class="w-3.5 h-3.5 mx-auto" /> {arrow}{/snippet}
+          </SortableHeader>
           <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
         </div>
       </div>
@@ -468,8 +490,7 @@
           </div>
         {:else if sortedSongs.length === 0}
           <div class="py-16 text-center select-none">
-            <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
-            <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
+            <EmptyState icon={Music} title={i18n.t('collection.noSongsTitle')} />
           </div>
         {:else}
           {#each sortedSongs as song, index (song.id)}
@@ -486,9 +507,7 @@
               <div class="text-center flex justify-center relative w-9 h-6 items-center">
                 {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                   <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                    <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                    <NowPlayingBars />
                   </div>
                 {/if}
                 <button
@@ -599,37 +618,12 @@
 {/if}
 
 {#if selectedSongIds.size > 0}
-  <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
-    <span class="text-brand-accent-text font-bold">
-      {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
-    </span>
-    <div class="h-4 w-px bg-brand-border/60"></div>
-    <button
-      onclick={handlePlaySelected}
-      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
-    >
-      <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
-      <span>{i18n.t('playlists.playSelected')}</span>
-    </button>
-    <button
-      onclick={handleBulkAddToPlaylist}
-      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
-    >
-      <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
-      <span>
-        {playlistsStore.activeCustomPlaylist
-          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: playlistsStore.activeCustomPlaylist.name })
-          : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
-      </span>
-    </button>
-    <div class="h-4 w-px bg-brand-border/60"></div>
-    <button
-      onclick={() => { selectedSongIds = new Set(); }}
-      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-    >
-      {i18n.t('playlists.clearSelection')}
-    </button>
-  </div>
+  <SongSelectionToolbar
+    count={selectedSongIds.size}
+    onPlaySelected={handlePlaySelected}
+    onAddToPlaylist={handleBulkAddToPlaylist}
+    onClear={() => { selectedSongIds = new Set(); }}
+  />
 {/if}
 
 <style>

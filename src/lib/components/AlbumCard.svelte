@@ -4,7 +4,8 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
-  import { Play } from "lucide-svelte";
+  import PlayOverlayButton from "./PlayOverlayButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { getAlbumCategoryLabel } from "../utils/artist";
@@ -117,36 +118,26 @@
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
-    <div
-      class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20"
-    >
-      <button
-        onclick={handlePlayButtonClick}
-        class="w-12 h-12 rounded-full bg-brand-accent text-brand-accent-contrast flex items-center justify-center scale-75 group-hover:scale-100 transition-transform cursor-pointer"
-        title={i18n.t('playerBar.play')}
-      >
-        <Play class="w-5 h-5 fill-current ml-0.5" />
-      </button>
-    </div>
+    <PlayOverlayButton onPlay={handlePlayButtonClick} />
   </div>
   <div class="p-3.5 flex flex-col flex-1">
-    <button
+    <LinkButton
       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
-      class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+      class="font-semibold text-sm text-brand-text-primary truncate w-full"
       title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
     >
       {album.album || i18n.t('collection.unknownAlbum')}
-    </button>
+    </LinkButton>
     <div class="flex items-center justify-between mt-0.5 gap-2">
       {#if showArtist}
         {#if album.artist}
-          <button
+          <LinkButton
             onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
-            class="text-xs text-brand-text-secondary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate min-w-0 cursor-pointer font-medium"
+            class="text-xs text-brand-text-secondary truncate min-w-0 font-medium"
             title={i18n.t('collection.filterByArtist', { artist: album.artist })}
           >
             {album.artist}
-          </button>
+          </LinkButton>
         {:else}
           <span class="text-xs text-brand-text-secondary text-left truncate min-w-0 font-medium">{i18n.t('collection.variousArtists')}</span>
         {/if}

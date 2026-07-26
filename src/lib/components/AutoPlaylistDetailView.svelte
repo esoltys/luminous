@@ -13,9 +13,17 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
-  import { Play, Shuffle, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
+  import SortableHeader from "./SortableHeader.svelte";
+  import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
+  import EmptyState from "./EmptyState.svelte";
+  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
+  import NowPlayingBars from "./NowPlayingBars.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
+  import { Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
 
   let { view }: { view: AutoPlaylistRef } = $props();
 
@@ -102,7 +110,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -198,7 +206,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -207,7 +215,7 @@
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
     } else {
-      alert(i18n.t("collection.selectPlaylistFirstAlert"));
+      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
@@ -415,49 +423,41 @@
 
         <!-- Control Buttons -->
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
-          <button
-            onclick={handlePlayAll}
+          <PlayShuffleButtons
+            onPlayAll={handlePlayAll}
+            onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20 shrink-0"
-          >
-            <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
-          </button>
-          <button
-            onclick={handleShufflePlay}
-            disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          >
-            <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
-          </button>
-          <button
+            class="shrink-0"
+          />
+          <IconActionButton
             onclick={handleAddAllToPlaylist}
             disabled={loading || songs.length === 0}
             title={playlistsStore.activeCustomPlaylist
               ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
               : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+            class="shrink-0"
           >
-            <Plus class="w-4 h-4" />
-          </button>
-          <button
+            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
             onclick={handleSaveAsCustomPlaylist}
             disabled={loading || songs.length === 0}
             title={i18n.t('playlists.saveAsCustomTooltip')}
-            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+            class="shrink-0"
           >
-            <FolderPlus class="w-4 h-4" />
-          </button>
+            {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
+          </IconActionButton>
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Refresh button: force-regenerate playlist with fresh songs from library -->
-            <button
+            <IconActionButton
               onclick={handleRefreshAutoPlaylist}
               disabled={loading || isRefreshing}
               title={i18n.t('playlists.refreshAutoPlaylistTooltip')}
-              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
+              class="shrink-0"
             >
-              <RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />
-            </button>
+              {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
+            </IconActionButton>
           {/if}
 
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
@@ -509,34 +509,64 @@
         <thead>
           <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">
-              <button onclick={() => toggleSort("track")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('playlists.tableHeaderTrack')} {sortField === "track" || sortField === "default" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "track" || sortField === "default"}
+                {sortAsc}
+                onclick={() => toggleSort("track")}
+                class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('playlists.tableHeaderTrack')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-              <button onclick={() => toggleSort("title")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('playlists.tableHeaderTitle')} {sortField === "title" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "title"}
+                {sortAsc}
+                onclick={() => toggleSort("title")}
+                class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('playlists.tableHeaderTitle')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-              <button onclick={() => toggleSort("artist")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('playlists.tableHeaderArtist')} {sortField === "artist" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "artist"}
+                {sortAsc}
+                onclick={() => toggleSort("artist")}
+                class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('playlists.tableHeaderArtist')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-              <button onclick={() => toggleSort("album")} class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('collection.tableHeaderAlbum')} {sortField === "album" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "album"}
+                {sortAsc}
+                onclick={() => toggleSort("album")}
+                class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('collection.tableHeaderAlbum')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">
-              <button onclick={() => toggleSort("rating")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('collection.tableHeaderRating')} {sortField === "rating" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "rating"}
+                {sortAsc}
+                onclick={() => toggleSort("rating")}
+                class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('collection.tableHeaderRating')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">
-              <button onclick={() => toggleSort("duration")} class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold">
-                {i18n.t('playlists.tableHeaderDuration')} {sortField === "duration" ? (sortAsc ? "▲" : "▼") : ""}
-              </button>
+              <SortableHeader
+                active={sortField === "duration"}
+                {sortAsc}
+                onclick={() => toggleSort("duration")}
+                class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
+              >
+                {#snippet label(arrow)}{i18n.t('playlists.tableHeaderDuration')} {arrow}{/snippet}
+              </SortableHeader>
             </th>
             <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t('collection.tableHeaderActions')}</th>
           </tr>
@@ -548,8 +578,7 @@
             </td></tr>
           {:else if sortedSongs.length === 0}
             <tr><td colspan="7" class="py-16 text-center select-none">
-              <Music class="w-12 h-12 text-brand-accent-text/40 mb-3 mx-auto animate-pulse" />
-              <h3 class="text-sm font-semibold text-brand-text-primary mb-1">{i18n.t('collection.noSongsTitle')}</h3>
+              <EmptyState icon={Music} title={i18n.t('collection.noSongsTitle')} />
             </td></tr>
           {:else}
             {#each sortedSongs as song, index (song.id)}
@@ -565,9 +594,7 @@
                   <div class="relative w-9 h-4 mx-auto flex items-center justify-center">
                     {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                       <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.1s"></span>
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-2/3" style="animation-delay: 0.2s"></span>
-                        <span class="w-0.5 bg-brand-accent animate-bounce h-full" style="animation-delay: 0.3s"></span>
+                        <NowPlayingBars />
                       </div>
                     {:else}
                       <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity whitespace-nowrap">
@@ -588,34 +615,28 @@
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.artist}
-                    <span
-                      role="button"
-                      tabindex="0"
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
-                    </span>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.album}
-                    <span
-                      role="button"
-                      tabindex="0"
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
-                    </span>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-center">
@@ -699,35 +720,10 @@
 {/if}
 
 {#if selectedSongIds.size > 0}
-  <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
-    <span class="text-brand-accent-text font-bold">
-      {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
-    </span>
-    <div class="h-4 w-px bg-brand-border/60"></div>
-    <button
-      onclick={handlePlaySelected}
-      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
-    >
-      <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
-      <span>{i18n.t('playlists.playSelected')}</span>
-    </button>
-    <button
-      onclick={handleBulkAddToPlaylist}
-      class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
-    >
-      <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
-      <span>
-        {playlistsStore.activeCustomPlaylist
-          ? i18n.t('playlists.contextMenuAddToPlaylist', { name: playlistsStore.activeCustomPlaylist.name })
-          : i18n.t('playlists.contextMenuAddToPlaylistDefault')}
-      </span>
-    </button>
-    <div class="h-4 w-px bg-brand-border/60"></div>
-    <button
-      onclick={() => { selectedSongIds = new Set(); }}
-      class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-    >
-      {i18n.t('playlists.clearSelection')}
-    </button>
-  </div>
+  <SongSelectionToolbar
+    count={selectedSongIds.size}
+    onPlaySelected={handlePlaySelected}
+    onAddToPlaylist={handleBulkAddToPlaylist}
+    onClear={() => { selectedSongIds = new Set(); }}
+  />
 {/if}

@@ -11,12 +11,13 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
-  import { Play, Shuffle } from "lucide-svelte";
+  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
   import { getArtistAlbums } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
 
   let { artistName }: { artistName: string } = $props();
 
@@ -206,20 +207,11 @@
 
         <!-- Action Buttons: Play All & Shuffle Play -->
         <div class="flex items-center gap-3 mt-3">
-          <button
-            onclick={handlePlayAll}
+          <PlayShuffleButtons
+            onPlayAll={handlePlayAll}
+            onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
-          >
-            <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
-          </button>
-          <button
-            onclick={handleShufflePlay}
-            disabled={loading || songs.length === 0}
-            class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}
-          </button>
+          />
         </div>
       </div>
 
@@ -339,7 +331,7 @@
       if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
         await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
       } else if (songs.length > 0) {
-        alert(i18n.t("collection.selectPlaylistFirstAlert"));
+        toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
       }
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}
