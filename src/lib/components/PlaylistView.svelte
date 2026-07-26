@@ -38,6 +38,7 @@
   import SortableHeader from "./SortableHeader.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import Button from "./Button.svelte";
   import { portal } from "../utils/portal";
   import {
     COVER_STACK_OFFSET_X_PX,
@@ -658,39 +659,35 @@
 
           <!-- Action Buttons: Play All & Shuffle Play -->
           <div class="flex items-center gap-3 mt-3">
-            <button
+            <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
-              class="flex items-center gap-2 px-5 py-2 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-brand-accent/20"
+              variant="primary"
             >
               <Play class="w-4 h-4 fill-current" /> {i18n.t("artistDetail.playAll")}
-            </button>
-            <button
+            </Button>
+            <Button
               onclick={handleShufflePlay}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
-              class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="secondary"
             >
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
-            </button>
+            </Button>
             {#if isSmartPlaylist}
-              <button
-                onclick={handleEditSmartPlaylist}
-                class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-border text-brand-text-primary hover:bg-brand-sidebar font-semibold text-sm transition-colors cursor-pointer"
-                title={i18n.t("playlists.editSmartPlaylistBtn")}
-              >
+              <Button onclick={handleEditSmartPlaylist} variant="secondary" title={i18n.t("playlists.editSmartPlaylistBtn")}>
                 <Pencil class="w-4 h-4" />
                 <span>{i18n.t("playlists.editSmartPlaylistBtn")}</span>
-              </button>
+              </Button>
             {/if}
             {#if !isActive && activePlaylist && !activePlaylist.dynamic_enabled}
-              <button
+              <Button
                 onclick={() => playlistsStore.pinPlaylist(activePlaylist.id)}
-                class="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-accent/60 bg-brand-accent/10 hover:bg-brand-accent text-brand-accent-text hover:text-brand-accent-contrast font-semibold text-sm transition-all cursor-pointer shadow-sm"
+                variant="accent-soft"
                 title={i18n.t("playlists.makeActiveBtn")}
               >
                 <Radio class="w-4 h-4" />
                 <span>{i18n.t("playlists.makeActiveBtn")}</span>
-              </button>
+              </Button>
             {/if}
           </div>
         </div>
@@ -747,33 +744,26 @@
 
         <div class="flex items-center gap-2">
           <!-- Undo/Redo controls with labels -->
-          <button
-            onclick={() => playlistsStore.undo()}
-            class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
-            title={i18n.t("playlists.undoTooltip")}
-          >
+          <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
             <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
             <span>{i18n.t("playlists.undoBtn")}</span>
-          </button>
-          <button
-            onclick={() => playlistsStore.redo()}
-            class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
-            title={i18n.t("playlists.redoTooltip")}
-          >
+          </Button>
+          <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
             <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
             <span>{i18n.t("playlists.redoBtn")}</span>
-          </button>
+          </Button>
 
           <!-- Deduplicate Button -->
           {#if duplicateCount > 0}
-            <button
+            <Button
               onclick={removeDuplicates}
-              class="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:text-purple-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+              variant="info"
+              size="sm"
               title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
             >
               <CopyPlus class="w-3.5 h-3.5" />
               <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
-            </button>
+            </Button>
           {/if}
         </div>
       </div>
@@ -781,53 +771,53 @@
       <!-- Line 2: Import, Export, Remove Unavailable, Clear Playlist, Delete -->
       <div class="flex items-center justify-end gap-2 w-full">
         <!-- Import / Export buttons -->
-        <button
-          onclick={handleImportPlaylist}
-          class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
-          title={i18n.t("playlists.importPlaylistTooltip")}
-        >
+        <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
           <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
           <span>{i18n.t("playlists.importPlaylistBtn")}</span>
-        </button>
+        </Button>
 
-        <button
+        <Button
           onclick={() => { showExportOptionsModal = true; }}
-          class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+          variant="secondary"
+          size="sm"
           title={i18n.t("playlists.exportPlaylistTooltip")}
         >
           <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
           <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
-        </button>
+        </Button>
 
         <!-- Remove Unavailable Button -->
         {#if unavailableCount > 0}
-          <button
+          <Button
             onclick={removeUnavailableTracks}
-            class="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+            variant="warning"
+            size="sm"
             title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
           >
             <AlertTriangle class="w-3.5 h-3.5" />
             <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
-          </button>
+          </Button>
         {/if}
 
-        <button
+        <Button
           onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
-          class="bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+          variant="secondary"
+          size="sm"
           title={i18n.t("playlists.clearPlaylistTooltip")}
         >
           {i18n.t("playlists.clearPlaylistBtn")}
-        </button>
+        </Button>
 
         {#if !isQueue}
-          <button
+          <Button
             onclick={() => { showDeleteConfirm = true; }}
-            class="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+            variant="destructive"
+            size="sm"
             title={i18n.t("playlists.deletePlaylistTooltip")}
           >
             <Trash2 class="w-3.5 h-3.5" />
             <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
-          </button>
+          </Button>
         {/if}
       </div>
     </div>

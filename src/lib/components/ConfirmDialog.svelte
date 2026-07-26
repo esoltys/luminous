@@ -1,6 +1,7 @@
 <script lang="ts">
   import { AlertTriangle, X } from "lucide-svelte";
   import Modal from "./Modal.svelte";
+  import Button from "./Button.svelte";
 
   let {
     title,
@@ -46,17 +47,11 @@
   </div>
 
   <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-main">
-    <button
-      onclick={onCancel}
-      class="px-4 py-2 text-xs font-semibold rounded-md border border-brand-border text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
-    >
+    <Button onclick={onCancel} variant="secondary" size="sm">
       {cancelLabel}
-    </button>
-    <button
-      onclick={onConfirm}
-      class="px-4 py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer {danger ? 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300' : 'bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast'}"
-    >
+    </Button>
+    <Button onclick={onConfirm} variant={danger ? "destructive" : "primary"} size="sm">
       {confirmLabel}
-    </button>
+    </Button>
   </div>
 </Modal>
