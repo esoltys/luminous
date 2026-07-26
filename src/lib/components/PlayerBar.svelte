@@ -12,6 +12,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
+  import LinkButton from "./LinkButton.svelte";
 
 
   import {
@@ -199,13 +200,13 @@
         {/if}
       </div>
       {#if playerStore.currentSong?.artist}
-        <button
+        <LinkButton
           onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
-          class="text-xs text-brand-text-secondary/70 hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate cursor-pointer"
+          class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
           {playerStore.currentSong.artist}
-        </button>
+        </LinkButton>
       {:else}
         <span class="text-xs text-brand-text-secondary/70 truncate">
           {playerStore.currentSong ? i18n.t('collection.unknownArtist') : ""}

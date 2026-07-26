@@ -19,6 +19,7 @@
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import IconActionButton from "./IconActionButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
   import { Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -613,34 +614,28 @@
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.artist}
-                    <span
-                      role="button"
-                      tabindex="0"
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
-                    </span>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
                   {#if song.album}
-                    <span
-                      role="button"
-                      tabindex="0"
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); } }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
-                    </span>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </td>
                 <td class="py-2.5 px-4 text-center">

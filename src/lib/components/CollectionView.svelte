@@ -21,6 +21,7 @@
   import Select from "./Select.svelte";
   import EmptyState from "./EmptyState.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
+  import LinkButton from "./LinkButton.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -622,28 +623,28 @@
                 </div>
                 <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
-                    <button
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
-                    </button>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
                 <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
                   {#if song.album}
-                    <button
+                    <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      class="hover:underline hover:text-brand-accent-text transition-all duration-150 text-left truncate cursor-pointer text-brand-text-secondary"
+                      class="text-brand-text-secondary truncate"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
-                    </button>
+                    </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
                 {#if collectionStore.visibleColumns.format}

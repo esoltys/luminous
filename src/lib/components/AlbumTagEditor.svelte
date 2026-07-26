@@ -4,7 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import FormField from "./FormField.svelte";
-  import { portal } from "../utils/portal";
+  import Modal from "./Modal.svelte";
 
   interface Props {
     songIds: number[];
@@ -62,9 +62,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      onClose();
-    } else if (e.key === "Enter") {
+    if (e.key === "Enter") {
       const target = e.target as HTMLElement;
       if (target.tagName === "BUTTON" || target.tagName === "TEXTAREA") return;
       if (isSaving) return;
@@ -74,10 +72,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div use:portal class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
-  <div class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col text-brand-text-primary">
+<Modal onClose={onClose} onKeydown={handleKeydown}>
     <!-- Header -->
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
@@ -167,5 +162,4 @@
         {/if}
       </button>
     </div>
-  </div>
-</div>
+</Modal>

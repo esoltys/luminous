@@ -16,6 +16,7 @@
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import IconActionButton from "./IconActionButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
   import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -355,12 +356,12 @@
 
         <div class="flex items-center gap-2 text-base font-semibold text-brand-accent-text">
           {#if artistName}
-            <button
+            <LinkButton
               onclick={() => collectionStore.viewArtist(artistName)}
-              class="hover:underline cursor-pointer transition-colors text-left font-bold"
+              class="font-bold"
             >
               {artistName}
-            </button>
+            </LinkButton>
           {:else}
             <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
           {/if}

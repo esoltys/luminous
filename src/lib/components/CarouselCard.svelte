@@ -7,6 +7,7 @@
   import AlbumCard from "./AlbumCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
   import PlayOverlayButton from "./PlayOverlayButton.svelte";
+  import LinkButton from "./LinkButton.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -68,14 +69,13 @@
         <!-- Song Title -->
         {#if item.song.album}
           <h3 class="truncate">
-            <button
-              type="button"
+            <LinkButton
               onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song.album || ""); }}
-              class="font-semibold text-sm text-brand-text-primary truncate hover:underline hover:text-brand-accent-text transition-colors cursor-pointer text-left max-w-full"
+              class="font-semibold text-sm text-brand-text-primary truncate max-w-full"
               title={i18n.t('collection.filterByAlbum', { album: item.song.album })}
             >
               {item.song.title || i18n.t('collection.unknownSong')}
-            </button>
+            </LinkButton>
           </h3>
         {:else}
           <h3 class="font-semibold text-sm text-brand-text-primary truncate" title={item.song.title}>
@@ -86,14 +86,13 @@
         <!-- Song Artist -->
         {#if item.song.artist}
           <p class="truncate mt-0.5">
-            <button
-              type="button"
+            <LinkButton
               onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song.album_artist?.trim() || item.song.artist || ""); }}
-              class="text-xs text-brand-text-secondary font-medium truncate hover:underline hover:text-brand-accent-text transition-colors cursor-pointer text-left max-w-full"
+              class="text-xs text-brand-text-secondary font-medium truncate max-w-full"
               title={i18n.t('collection.filterByArtist', { artist: item.song.artist })}
             >
               {item.song.artist}
-            </button>
+            </LinkButton>
           </p>
         {:else}
           <p class="text-xs text-brand-text-secondary truncate mt-0.5 font-medium">
