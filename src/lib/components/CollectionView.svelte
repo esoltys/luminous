@@ -23,6 +23,7 @@
   import EmptyState from "./EmptyState.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import Button from "./Button.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -574,13 +575,10 @@
                   {/if}
                 </p>
                 {#if collectionStore.searchQuery}
-                  <button
-                    onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-                    class="px-3.5 py-2 text-xs bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-xl shadow transition-all font-semibold cursor-pointer flex items-center gap-1.5"
-                  >
+                  <Button onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }} variant="primary" size="sm">
                     <FilterX class="w-3.5 h-3.5" />
                     {i18n.t('collection.resetSearchFilters')}
-                  </button>
+                  </Button>
                 {/if}
               </div>
             </div>

@@ -6,6 +6,8 @@
   import { toastStore } from "../stores/toast.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
+  import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
 
   interface Props {
     songIds: number[];
@@ -98,43 +100,22 @@
         <div class="grid grid-cols-2 gap-4">
           <!-- Album Title -->
           <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
-            <input
-              id="album-tag-album"
-              bind:value={album}
-              disabled={isSaving}
-              class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-            />
+            <Input id="album-tag-album" bind:value={album} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
 
           <!-- Album Artist -->
           <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-            <input
-              id="album-tag-albumartist"
-              bind:value={albumArtist}
-              disabled={isSaving}
-              class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-            />
+            <Input id="album-tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
 
           <!-- Genre -->
           <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre">
-            <input
-              id="album-tag-genre"
-              bind:value={genre}
-              disabled={isSaving}
-              class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-            />
+            <Input id="album-tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
 
           <!-- Year -->
           <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
-            <input
-              id="album-tag-year"
-              type="number"
-              bind:value={year}
-              disabled={isSaving}
-              class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-            />
+            <Input id="album-tag-year" type="number" bind:value={year} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
         </div>
       </div>
@@ -142,18 +123,10 @@
 
     <!-- Footer -->
     <div class="h-16 flex items-center justify-end px-6 border-t border-brand-border gap-3 bg-brand-main shrink-0">
-      <button
-        onclick={onClose}
-        disabled={isSaving}
-        class="px-4 py-2 text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50"
-      >
+      <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
         {i18n.t('albumTagEditor.cancelBtn')}
-      </button>
-      <button
-        onclick={handleSave}
-        disabled={isSaving}
-        class="flex items-center gap-2 px-5 py-2 rounded-xl bg-brand-accent hover:bg-brand-accent-hover text-white text-xs font-bold transition-all shadow-md shadow-brand-accent/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      </Button>
+      <Button onclick={handleSave} disabled={isSaving} variant="primary" size="sm">
         {#if isSaving}
           <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
           <span>{i18n.t('albumTagEditor.saving')}</span>
@@ -161,6 +134,6 @@
           <Save class="w-3.5 h-3.5" />
           <span>{i18n.t('albumTagEditor.saveBtn')}</span>
         {/if}
-      </button>
+      </Button>
     </div>
 </Modal>

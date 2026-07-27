@@ -14,6 +14,8 @@
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
+  import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
 
@@ -245,22 +247,14 @@
         <!-- Actions + Sort Dropdown (Right) -->
         <div class="flex items-center gap-2">
           {#if collectionStore.playlistsSubTab === "custom"}
-            <button
-              onclick={() => { showCreateForm = !showCreateForm; }}
-              class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              title={i18n.t('playlists.newPlaylistBtn')}
-            >
+            <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" size="sm" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-3.5 h-3.5" />
               <span>{i18n.t('playlists.newPlaylistBtn')}</span>
-            </button>
-            <button
-              onclick={handleImportPlaylist}
-              class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border/60 text-brand-text-primary px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              title={i18n.t('playlists.importPlaylistTooltip')}
-            >
+            </Button>
+            <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t('playlists.importPlaylistTooltip')}>
               <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
               <span>{i18n.t('playlists.importPlaylistBtn')}</span>
-            </button>
+            </Button>
           {/if}
 
           <div class="relative">
@@ -305,22 +299,14 @@
 
       {#if collectionStore.playlistsSubTab === "custom" && showCreateForm}
         <form onsubmit={handleCreatePlaylist} class="flex items-center gap-2 mb-4">
-          <input
-            bind:value={newPlaylistName}
-            placeholder={i18n.t('playlists.createPlaylistPlaceholder')}
-            class="bg-brand-sidebar border border-brand-border rounded-lg px-3 py-1.5 text-xs w-64 text-brand-text-primary focus:outline-none focus:border-brand-accent"
-          />
-          <button type="submit" class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer">
+          <Input bind:value={newPlaylistName} placeholder={i18n.t('playlists.createPlaylistPlaceholder')} size="sm" surface="sidebar" class="w-64" />
+          <Button type="submit" variant="primary" size="sm">
             {i18n.t('sidebar.create')}
-          </button>
-          <button
-            type="button"
-            onclick={() => collectionStore.openSmartBuilder()}
-            class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors"
-          >
+          </Button>
+          <Button type="button" onclick={() => collectionStore.openSmartBuilder()} variant="accent-soft" size="sm">
             <Sparkles class="w-3.5 h-3.5" />
             <span>{i18n.t('playlists.advancedBtn')}</span>
-          </button>
+          </Button>
         </form>
       {/if}
 

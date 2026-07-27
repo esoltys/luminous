@@ -7,7 +7,8 @@
   import type { Snippet } from "svelte";
 
   interface Props {
-    onclick: (e: MouseEvent) => void;
+    onclick?: (e: MouseEvent) => void;
+    type?: "button" | "submit";
     disabled?: boolean;
     title?: string;
     variant?: ButtonVariant;
@@ -18,6 +19,7 @@
 
   let {
     onclick,
+    type = "button",
     disabled = false,
     title,
     variant = "secondary",
@@ -44,6 +46,7 @@
 
 <button
   {onclick}
+  {type}
   {disabled}
   {title}
   class="flex items-center justify-center rounded-full font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[size]} {variantClasses[variant]} {className}"

@@ -10,6 +10,8 @@
   import FormField from "./FormField.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Modal from "./Modal.svelte";
+  import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
 
   interface Props {
     songId: number;
@@ -222,65 +224,56 @@
           <div class="grid grid-cols-2 gap-4">
             <!-- Title -->
             <FormField label={i18n.t('tagEditor.titleField')} for="tag-title" span2>
-              <input
+              <Input
                 id="tag-title"
                 bind:value={title}
                 oninput={() => changedFields.delete("title")}
                 disabled={isSaving}
-                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('title') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
+                size="sm"
+                highlighted={changedFields.has('title')}
+                class="w-full"
               />
             </FormField>
 
             <!-- Artist -->
             <FormField label={i18n.t('tagEditor.artistField')} for="tag-artist">
-              <input
+              <Input
                 id="tag-artist"
                 bind:value={artist}
                 oninput={() => changedFields.delete("artist")}
                 disabled={isSaving}
-                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('artist') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
+                size="sm"
+                highlighted={changedFields.has('artist')}
+                class="w-full"
               />
             </FormField>
 
             <!-- Album -->
             <FormField label={i18n.t('tagEditor.albumField')} for="tag-album">
-              <input
+              <Input
                 id="tag-album"
                 bind:value={album}
                 oninput={() => changedFields.delete("album")}
                 disabled={isSaving}
-                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('album') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
+                size="sm"
+                highlighted={changedFields.has('album')}
+                class="w-full"
               />
             </FormField>
 
             <!-- Album Artist -->
             <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist">
-              <input
-                id="tag-albumartist"
-                bind:value={albumArtist}
-                disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-              />
+              <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
             <!-- Composer -->
             <FormField label={i18n.t('tagEditor.composerField')} for="tag-composer">
-              <input
-                id="tag-composer"
-                bind:value={composer}
-                disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-              />
+              <Input id="tag-composer" bind:value={composer} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
             <!-- Genre -->
             <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2>
-              <input
-                id="tag-genre"
-                bind:value={genre}
-                disabled={isSaving}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
-              />
+              <Input id="tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
             <!-- Rating (library-only, saves immediately) -->
@@ -291,47 +284,51 @@
 
             <!-- Year -->
             <FormField label={i18n.t('tagEditor.yearField')} for="tag-year">
-              <input
+              <Input
                 id="tag-year"
                 type="number"
                 value={year ?? ""}
                 disabled={isSaving}
                 oninput={(e) => {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                  const val = parseInt(e.currentTarget.value, 10);
                   year = isNaN(val) ? null : val;
                   changedFields.delete("year");
                 }}
-                class="bg-brand-main border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50 transition-colors {changedFields.has('year') ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'}"
+                size="sm"
+                highlighted={changedFields.has('year')}
+                class="w-full"
               />
             </FormField>
 
             <!-- Track Number -->
             <FormField label={i18n.t('tagEditor.trackField')} for="tag-track">
-              <input
+              <Input
                 id="tag-track"
                 type="number"
                 value={track ?? ""}
                 disabled={isSaving}
                 oninput={(e) => {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                  const val = parseInt(e.currentTarget.value, 10);
                   track = isNaN(val) ? null : val;
                 }}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                size="sm"
+                class="w-full"
               />
             </FormField>
 
             <!-- Disc Number -->
             <FormField label={i18n.t('tagEditor.discField')} for="tag-disc" span2>
-              <input
+              <Input
                 id="tag-disc"
                 type="number"
                 value={disc ?? ""}
                 disabled={isSaving}
                 oninput={(e) => {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                  const val = parseInt(e.currentTarget.value, 10);
                   disc = isNaN(val) ? null : val;
                 }}
-                class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent disabled:opacity-50"
+                size="sm"
+                class="w-full"
               />
             </FormField>
           </div>
@@ -343,11 +340,7 @@
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border shrink-0 bg-brand-main">
       {#if !isLoading && !errorMsg}
         <div class="flex items-center gap-3">
-          <button
-            onclick={handleLookup}
-            disabled={isLookingUp || isSaving}
-            class="flex items-center gap-1.5 bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
-          >
+          <Button onclick={handleLookup} disabled={isLookingUp || isSaving} variant="secondary" size="sm">
             {#if isLookingUp}
               <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent-text" />
               {i18n.t('tagEditor.lookingUp')}
@@ -355,7 +348,7 @@
               <Sparkles class="w-3.5 h-3.5 text-brand-accent-text" />
               {i18n.t('tagEditor.lookupAcoustID')}
             {/if}
-          </button>
+          </Button>
           {#if lookupSucceeded}
             <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
               <Check class="w-3.5 h-3.5 font-bold {changedFields.size > 0 ? 'animate-bounce' : ''}" />
@@ -368,18 +361,10 @@
       {/if}
 
       <div class="flex items-center gap-2">
-        <button
-          onclick={onClose}
-          disabled={isSaving}
-          class="bg-brand-sidebar border border-brand-border hover:bg-brand-main text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-        >
+        <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
           {i18n.t('tagEditor.cancelBtn')}
-        </button>
-        <button
-          onclick={handleSave}
-          disabled={isLoading || !!errorMsg || isSaving}
-          class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50"
-        >
+        </Button>
+        <Button onclick={handleSave} disabled={isLoading || !!errorMsg || isSaving} variant="primary" size="sm">
           {#if isSaving}
             <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
             {i18n.t('tagEditor.updatingTags')}
@@ -387,7 +372,7 @@
             <Save class="w-3.5 h-3.5" />
             {i18n.t('tagEditor.saveBtn')}
           {/if}
-        </button>
+        </Button>
       </div>
     </div>
 </Modal>

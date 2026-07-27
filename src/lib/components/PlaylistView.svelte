@@ -39,6 +39,7 @@
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
   import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
   import { portal } from "../utils/portal";
   import {
     COVER_STACK_OFFSET_X_PX,
@@ -725,11 +726,13 @@
         <!-- Search Filter Bar -->
         <div class="relative flex-1 max-w-xs">
           <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-          <input
+          <Input
             type="text"
             bind:value={filterQuery}
             placeholder={i18n.t("playlists.filterPlaceholder")}
-            class="w-full pl-8 pr-7 py-1 text-xs bg-brand-sidebar/60 border border-brand-border/60 rounded-md text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent transition-colors"
+            size="sm"
+            class="w-full"
+            style="padding-left: 2rem; padding-right: 1.75rem;"
           />
           {#if filterQuery}
             <button

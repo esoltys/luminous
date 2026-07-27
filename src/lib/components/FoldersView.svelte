@@ -14,6 +14,8 @@
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
+  import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -340,14 +342,10 @@
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.appAndUpdatesTitle')}</h3>
-          <button
-            onclick={() => updaterStore.checkForUpdates()}
-            disabled={updaterStore.checkStatus === 'checking'}
-            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-main border border-brand-border hover:bg-brand-sidebar hover:border-brand-accent/50 text-brand-text-primary transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
+          <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm">
             <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
             {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
-          </button>
+          </Button>
         </div>
 
         <!-- Version & Format Info Row -->
@@ -400,13 +398,10 @@
                 </p>
               </div>
             </div>
-            <button
-              onclick={() => openExternalUrl(updaterStore.downloadUrl || updaterStore.releaseUrl)}
-              class="px-4 py-2 rounded-lg bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shrink-0"
-            >
+            <Button onclick={() => openExternalUrl(updaterStore.downloadUrl || updaterStore.releaseUrl)} variant="primary" size="sm" class="shrink-0">
               <Download class="w-4 h-4" />
               {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateDownloadBtn') : i18n.t('settings.updateDownloadGithubBtn')}
-            </button>
+            </Button>
           </div>
         {:else if updaterStore.checkStatus === 'up-to-date'}
           <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5 pt-1">
@@ -453,12 +448,9 @@
       <!-- Watched Folders Section -->
       <div class="flex justify-between items-center">
         <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabFolders')}</h3>
-        <button
-          onclick={handleAddDirectory}
-          class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-brand-accent/20 cursor-pointer"
-        >
+        <Button onclick={handleAddDirectory} variant="primary" size="sm">
           <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
-        </button>
+        </Button>
       </div>
 
       <!-- Folders List -->
@@ -524,25 +516,27 @@
 
         <!-- Manual Action Buttons -->
         <div class="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             onclick={() => collectionStore.startScan(false)}
             disabled={collectionStore.isScanning}
-            class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-brand-accent/10 cursor-pointer disabled:opacity-50"
+            variant="primary"
+            size="sm"
             title={i18n.t('settings.incrementalRescanHint')}
           >
             <RefreshCw class="w-4 h-4" />
             {i18n.t('settings.incrementalRescanBtn')}
-          </button>
+          </Button>
 
-          <button
+          <Button
             onclick={() => collectionStore.startScan(true)}
             disabled={collectionStore.isScanning}
-            class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            variant="secondary"
+            size="sm"
             title={i18n.t('settings.forceFullScanHint')}
           >
             <RotateCcw class="w-4 h-4 text-brand-accent-text" />
             {i18n.t('settings.forceFullScanBtn')}
-          </button>
+          </Button>
         </div>
 
         <!-- Configuration Toggles -->
@@ -611,14 +605,10 @@
 
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="flex flex-wrap items-center gap-3">
-          <button
-            onclick={handlePruneMissing}
-            disabled={collectionStore.isScanning}
-            class="bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <Eraser class="w-4 h-4 text-brand-accent-text" />
+          <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="destructive" size="sm">
+            <Eraser class="w-4 h-4" />
             {i18n.t('settings.pruneMissingBtn')}
-          </button>
+          </Button>
           <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
 
           {#if pruneMsg}
@@ -725,12 +715,9 @@
               </h4>
             </div>
             {#if editingThemeId}
-              <button
-                onclick={() => { editingThemeId = null; }}
-                class="text-xs text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg border border-brand-border hover:border-brand-accent/40 transition-colors cursor-pointer"
-              >
+              <Button onclick={() => { editingThemeId = null; }} variant="secondary" size="sm">
                 {i18n.t('settings.cancel')}
-              </button>
+              </Button>
             {/if}
           </div>
 
@@ -738,20 +725,18 @@
               <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
                 <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
                   <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
-                  <input
+                  <Input
                     id="theme-name-input"
                     type="text"
                     bind:value={newThemeName}
                     placeholder={i18n.t('settings.themeNamePlaceholder')}
-                    class="bg-brand-main border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-text-primary outline-none focus:border-brand-accent w-full"
+                    size="md"
+                    class="w-full"
                   />
                 </div>
-                <button
-                  onclick={loadActiveThemeColors}
-                  class="bg-brand-main hover:bg-brand-sidebar border border-brand-border hover:border-brand-accent/40 text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 h-9"
-                >
+                <Button onclick={loadActiveThemeColors} variant="secondary" size="sm" class="shrink-0 h-9">
                   <RotateCcw class="w-4 h-4 text-brand-accent-text" /> {i18n.t('settings.importColors')}
-                </button>
+                </Button>
               </div>
 
               <div class="grid grid-cols-2 md:grid-cols-3 gap-6 pt-2">
@@ -811,18 +796,12 @@
               </div>
 
               <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-brand-border">
-                <button
-                  onclick={saveCustomTheme}
-                  class="bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-brand-accent/10 cursor-pointer"
-                >
+                <Button onclick={saveCustomTheme} variant="primary" size="sm">
                   {editingThemeId ? i18n.t('settings.saveChanges') : i18n.t('settings.saveCustom')}
-                </button>
-                <button
-                  onclick={applyCustomTheme}
-                  class="bg-brand-main hover:bg-brand-sidebar border border-brand-accent/60 text-brand-accent-text hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                >
+                </Button>
+                <Button onclick={applyCustomTheme} variant="accent-soft" size="sm">
                   {i18n.t('settings.applyTheme')}
-                </button>
+                </Button>
               </div>
             </div>
         </div>

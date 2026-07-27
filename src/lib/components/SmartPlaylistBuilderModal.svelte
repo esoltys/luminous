@@ -10,6 +10,8 @@
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
+  import Button from "./Button.svelte";
+  import Input from "./Input.svelte";
   import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
 
   interface Props {
@@ -256,13 +258,13 @@
         <label for="smart-playlist-name-input" class="block text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-1.5">
           {i18n.t("smartPlaylistBuilder.nameLabel")}
         </label>
-        <input
+        <Input
           id="smart-playlist-name-input"
           type="text"
           bind:value={playlistName}
           oninput={() => { userHasEditedName = true; }}
           placeholder={i18n.t("smartPlaylistBuilder.namePlaceholder")}
-          class="w-full bg-brand-main border border-brand-border rounded-xl px-3.5 py-2 text-sm text-brand-text-primary focus:outline-none focus:border-brand-accent font-medium"
+          class="w-full"
           required
         />
       </div>
@@ -314,11 +316,13 @@
               </Select>
 
               <!-- Value Input -->
-              <input
+              <Input
                 type="text"
                 bind:value={rule.value}
                 placeholder={i18n.t("smartPlaylistBuilder.valuePlaceholder")}
-                class="flex-1 bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-brand-accent min-w-0"
+                size="sm"
+                surface="sidebar"
+                class="flex-1 min-w-0"
               />
 
               <!-- Delete Rule -->
@@ -358,20 +362,13 @@
 
       <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-brand-border/60">
-        <button
-          type="button"
-          onclick={onClose}
-          class="px-4 py-2 text-xs font-semibold text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-        >
+        <Button type="button" onclick={onClose} variant="secondary" size="sm">
           {i18n.t("smartPlaylistBuilder.cancel")}
-        </button>
-        <button
-          type="submit"
-          class="px-4 py-2 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast text-xs font-semibold rounded-xl shadow-lg transition-all cursor-pointer flex items-center gap-1.5"
-        >
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
           <Sparkles class="w-3.5 h-3.5" />
           {editing ? i18n.t("smartPlaylistBuilder.updateBtn") : i18n.t("smartPlaylistBuilder.createBtn")}
-        </button>
+        </Button>
       </div>
     </form>
   </div>
