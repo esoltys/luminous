@@ -204,6 +204,7 @@ export function deriveArtists(songs: Song[]): ArtistItem[] {
 
   const fullAlbumsByArtist = new Map<string, Set<string>>();
   const songCountByArtist = new Map<string, number>();
+  const genreCountsByArtist = new Map<string, Map<string, number>>();
   for (const song of songs) {
     const artist = song.album_artist || song.artist;
     if (!artist) continue;
@@ -212,13 +213,26 @@ export function deriveArtists(songs: Song[]): ArtistItem[] {
       if (!fullAlbumsByArtist.has(artist)) fullAlbumsByArtist.set(artist, new Set());
       fullAlbumsByArtist.get(artist)!.add(song.album);
     }
+    if (song.genre) {
+      if (!genreCountsByArtist.has(artist)) genreCountsByArtist.set(artist, new Map());
+      const counts = genreCountsByArtist.get(artist)!;
+      counts.set(song.genre, (counts.get(song.genre) ?? 0) + 1);
+    }
   }
+  // Mirrors the real backend's get_top_artists: the artist's most common
+  // song genre, ties broken alphabetically (src-tauri/src/collection.rs).
+  const topGenre = (artist: string): string | null => {
+    const counts = genreCountsByArtist.get(artist);
+    if (!counts) return null;
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+  };
   return [...songCountByArtist.keys()]
     .sort((a, b) => a.localeCompare(b))
     .map((name) => ({
       name,
       album_count: fullAlbumsByArtist.get(name)?.size ?? 0,
       song_count: songCountByArtist.get(name) ?? 0,
+      genre: topGenre(name),
     }));
 }
 
