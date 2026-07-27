@@ -6,7 +6,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Clock, FileText, Music, FolderClosed, Edit3, Columns, FilterX } from "lucide-svelte";
+  import { Play, Plus, Clock, FileText, DiscAlbum, Mic2, Edit3, Columns, FilterX } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -785,7 +785,7 @@
               <div class="col-span-full py-16 text-center">
                 <EmptyState
                   card
-                  icon={FolderClosed}
+                  icon={DiscAlbum}
                   title={i18n.t('collection.noAlbumsTitle')}
                   subtitle={i18n.t('collection.noAlbumsText')}
                 />
@@ -813,7 +813,7 @@
               <div class="col-span-full py-16 text-center">
                 <EmptyState
                   card
-                  icon={Music}
+                  icon={Mic2}
                   title={i18n.t('collection.noArtistsTitle')}
                   subtitle={i18n.t('collection.noArtistsText')}
                 />
