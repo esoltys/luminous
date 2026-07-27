@@ -21,6 +21,14 @@
       "sidebarWidth": 220
     },
     {
+      "name": "welcome-empty",
+      "filename": "welcome-empty.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "sidebarWidth": 220,
+      "emptyLibrary": true
+    },
+    {
       "name": "songs",
       "filename": "songs.png",
       "tab": "collection",
