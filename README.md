@@ -26,6 +26,8 @@ flowchart TD
         UI["UI, state & rendering"]
     end
 
+    IPC{{"Tauri IPC"}}
+
     subgraph Backend["Rust Backend"]
         Audio["Audio decoding & playback"]
         DB["SQLite library index"]
@@ -35,8 +37,8 @@ flowchart TD
 
     Frontend ~~~ Backend
 
-    UI -- "invoke commands" --> Backend
-    Backend -- "emit events<br/>(position, scan progress, now-playing metadata)" --> UI
+    UI -- "invoke commands" --> IPC --> Backend
+    Backend -- "emit events (position, scan progress, now-playing metadata)" --> IPC --> UI
 ```
 
 ```
