@@ -8,143 +8,11 @@
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-Complete-brightgreen?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 [![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](https://github.com/esoltys/luminous/milestones)
 
-Luminous is a high-performance desktop music player designed for modern local audio listening. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**, it offers a lightweight, premium desktop experience with a beautiful dynamic user interface. Made in Canada 🍁 and available in both English and French.
+**[esoltys.github.io/luminous.dc.html](https://esoltys.github.io/luminous.dc.html)** — downloads, screenshots, and feature overview.
 
-### Downloads
+# A high-performance home for the music you already own.
 
-You can download the latest installers and portable binaries directly from the GitHub Releases page:
-
-* **🐧 Linux** — **[Download .deb / .AppImage](https://github.com/esoltys/luminous/releases/latest)** (Debian, Ubuntu, and AppImage packages for x64)
-* **🪟 Windows** — **[Download .exe / .msi](https://github.com/esoltys/luminous/releases/latest)** (Installers and portable binaries for Windows x64)
-
-<div align="center">
-  <table>
-    <tr>
-        <td colspan="2">
-            <h4 align="center">Home Hub</h4>
-            <img src="docs/screenshots/home-EN.png" alt="Home View" />
-        </td>
-    </tr>
-    <tr>
-      <td width="50%">
-        <h4 align="center">Albums</h4>
-        <img src="docs/screenshots/albums-EN.png" alt="Albums Overview" />
-      </td>
-      <td width="50%">
-        <h4 align="center">Album View</h4>
-        <img src="docs/screenshots/album-detail-EN.png" alt="Album Detail" />
-      </td>
-    </tr>
-    <tr>
-      <td width="50%">
-        <h4 align="center">Artists</h4>
-        <img src="docs/screenshots/artists-EN.png" alt="Artists Overview" />
-      </td>
-      <td width="50%">
-        <h4 align="center">Artist View</h4>
-        <img src="docs/screenshots/artist-detail-EN.png" alt="Artist Detail" />
-      </td>
-    </tr>
-    <tr>
-      <td width="50%">
-        <h4 align="center">Custom Theme Builder</h4>
-        <img src="docs/screenshots/themes-EN.png" alt="Custom Theme Builder" />
-      </td>
-      <td width="50%">
-        <h4 align="center">Synced Lyrics</h4>
-        <img src="docs/screenshots/lyrics-EN.png" alt="Synced Lyrics" />
-      </td>
-    </tr>
-    <tr>
-        <td width="50%">
-            <h4 align="center">Dual-mode Equalizer</h4>
-            <img src="docs/screenshots/equalizer-EN.png" alt="Dual-mode Equializer" />
-        </td>
-        <td width="50%">
-            <h4 align="center">Search</h4>
-            <img src="docs/screenshots/search-EN.png" alt="Search" />
-        </td>
-    </tr>
-    <tr>
-        <td width="50%">
-            <h4 align="center">Auto Playlists</h4>
-            <img src="docs/screenshots/playlist-auto-EN.png" alt="Auto Playlists" />
-        </td>
-        <td width="50%">
-            <h4 align="center">Custom Playlists</h4>
-            <img src="docs/screenshots/playlist-EN.png" alt="Custom Playlists" />
-        </td>
-    </tr>
-    <tr>
-    	<td width="50%">
-            <h4 align="center">Organize Files</h4>
-            <img src="docs/screenshots/settings-organize-EN.png" alt="Organize Files" />
-        </td>
-        <td width="50%">
-            <h4 align="center">Smart Playlist Editor</h4>
-            <img src="docs/screenshots/playlist-smart-edit-EN.png" alt="Smart Playlist Editor" />
-        </td>
-    </tr>
-    <tr>
-    	<td width="50%">
-            <h4 align="center">Song Tag Editor</h4>
-            <img src="docs/screenshots/song-tag-editor-EN.png" alt="Song Tag Editor" />
-        </td>
-        <td width="50%">
-            <h4 align="center">Bulk Album Tag Editor</h4>
-            <img src="docs/screenshots/album-tag-editor-EN.png" alt="Bulk Album Tag Editor" />
-        </td>
-    </tr>
-    <tr>
-        <td colspan="2">
-            <h4 align="center">Immersive Now Playing</h4>
-            <img src="docs/screenshots/now-playing-EN.png" alt="Immersive Now Playing" />
-        </td>
-    </tr>
-    <tr>
-    	<td width="50%" align="center">
-            <h4>Miniplayer</h4>
-            <img src="docs/screenshots/miniplayer-EN.png" width="66%" height="66%" alt="Miniplayer" />
-        </td>
-        <td width="50%" align="center">
-            <h4>Miniplayer (Hover)</h4>
-            <img src="docs/screenshots/miniplayer-hover-EN.png" width="66%" height="66%" alt="Miniplayer (Hover)" />
-        </td>
-    </tr>
-  </table>
-</div>
-
-
-
-
----
-
-## Product Highlights
-
-*   **Personalized Home Hub**: A tailored dashboard with Recently Played, Most Played, and Recently Added rows, plus cover art carousels for browsing.
-*   **Instant Search & Auto-Suggestions**: Find any track, album, artist, or playlist instantly with database-level search, live auto-suggestions (#100), and recent search history.
-*   **Native OS Media Integration**: Full integration with OS system media transport controls (Windows SMTC, Linux MPRIS2, macOS Now Playing) for lock screen controls, system media keys, and live track metadata (#101).
-*   **Smart Playlist Builder & Advanced Filtering**: Create dynamic rule-based playlists with live track matching, decade range auto-naming (*1980s Rock Mix*), and target field search filters (`artist:`, `album:`, `year:`, `rating:`, etc.) (#13).
-*   **Customizable Library Columns**: Reorder and toggle table columns including dedicated audio format and channel indicators (#13).
-*   **Seamless History Navigation**: Dedicated back and forward navigation supporting top-bar controls, keyboard shortcuts, and mouse side buttons (#67).
-*   **Context-Aware Play History**: Track playback retains originating context (album or playlist) under Recently Played and Most Frequently Played views (#99).
-*   **High-Performance Library Scanner**: Index thousands of local audio files (MP3, WAV, FLAC, AAC, Ogg Vorbis) in seconds, skipping unchanged files on rescan.
-*   **Tag-Based File Organizer**: Reorganize your library into a custom folder/filename template with a dry-run preview, conditional path segments, and companion-file (artwork, lyrics, logs, cue sheets) relocation (#81).
-*   **Immersive Audio Visualizers**: A real-time spectrum analyzer, colorized moodbars with a one-click waveform/moodbar toggle, and SoundCloud-style peak waveform seek bars.
-*   **Gapless Playback with Fades & Auto-Crossfade**: Tracks flow into one another with no silence or clicks, with optional fade-in/fade-out and an auto-crossfade mode for gap-free transitions (#79).
-*   **Dual-Mode Equalizer**: A 10-band graphic equalizer with genre presets, or a 20-band parametric mode with a live response-curve preview.
-*   **EBU R128 Loudness Analysis**: Automatic loudness normalization with ReplayGain fallback, so you don't have to reach for the volume knob between songs.
-*   **Play Statistics & Ratings**: Tracks play counts and last-played times, with hearts or 5-star ratings synced live across every view, including from the Miniplayer.
-*   **Detached Picture-in-Picture Miniplayer**: A floating, always-on-top miniplayer with hover transport controls, drag-to-move/resize, and remembered size and position (#46).
-*   **Powerful Playlist Editor**: Multi-select, batch drag-to-reorder, inline rename, duplicate detection, undo/redo changes, Auto-Refill toggle with All/Favourites/Familiar/Discover/Deep Cuts biasing (#26, #120), and import/export M3U, M3U8, PLS, and XSPF files.
-*   **Decades & Smart Auto-Playlists**: Automatic playlist categorization by decade (60s through 2020s) with custom category color badges.
-*   **Karaoke Synced Lyrics**: Real-time, scrolling synced lyrics fetched automatically, with instrumental track flags (#12), local caching, and plain-text fallback.
-*   **AcoustID Fingerprinting and Tag Editor**: Identify tracks and correct metadata automatically, edit tags individually or in bulk across an entire album (#70), then write tags back to your files.
-*   **Smart Cover Art Engine**: Extracts embedded artwork automatically, with multi-layered stack previews and duplicate cleanup.
-*   **Dynamic Theme Engine**: Curated color themes, or design your own live with the Custom Theme Builder.
-*   **Bilingual Interface**: Made in Canada 🍁 — fully translated between English and French, switchable instantly.
-*   **Seamless State Preservation**: Restores your active queue, playback position, sidebar navigation, playlist selection, volume, and equalizer settings on reopen.
-*   **Keyboard Shortcuts & In-App Help**: A `Ctrl+/` shortcuts overlay, global hotkeys for layout and history navigation, and a full in-app user guide from the Help sidebar item.
+Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
 
 ---
 
@@ -156,9 +24,10 @@ luminous/
 ├── src/                      # Svelte 5 + TypeScript Frontend
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
-│   │   ├── stores/           # Global stores (player, collection, playlists, theme)
+│   │   ├── locales/          # English & French translation strings
+│   │   ├── stores/           # Global stores (player, collection, playlists, theme, i18n, prefs)
 │   │   ├── types/            # Frontend interfaces
-│   │   └── utils/            # Shared utilities (color parsing, accessibility, etc.)
+│   │   └── utils/            # Shared utilities (color parsing, filter parsing, lyrics, stats, etc.)
 │   └── routes/               # Layouts and navigation views
 └── src-tauri/                # Tauri + Rust Backend Core
     ├── src/
@@ -168,13 +37,20 @@ luminous/
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
     │   ├── equalizer.rs      # Biquad DSP: 10-band graphic & 20-band parametric filters
+    │   ├── filter_parser.rs  # Search filter syntax parser (artist:, album:, year:, etc.)
+    │   ├── install_format.rs # Distro/package format detection for the updater
     │   ├── lib.rs            # Library entry point, background loops, & IPC registry
+    │   ├── loudness.rs       # EBU R128 loudness analysis & ReplayGain fallback
     │   ├── lyrics.rs         # LRCLIB & Lyrics.ovh client integrations
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
+    │   ├── media_session.rs  # OS media transport integration (SMTC, MPRIS2, Now Playing)
     │   ├── models.rs         # Shared structs and types
     │   ├── moodbar.rs        # Spectral audio analysis scanner
+    │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
     │   ├── playlist.rs       # Playlist manager & undo/redo command stack
+    │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
+    │   ├── stats.rs          # Play counts, ratings, and history tracking
     │   ├── tageditor.rs      # lofty tag writer & AcoustID fingerprint generator
     │   ├── waveform.rs       # Background audio peak analyzer
     │   └── commands/         # Tauri IPC command handlers
