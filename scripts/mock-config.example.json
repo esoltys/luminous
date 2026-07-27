@@ -15,23 +15,21 @@
   },
   "screenshots": [
     {
-      "name": "home",
-      "filename": "home.png",
-      "tab": "home",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "home-welcome",
-      "filename": "home-welcome.png",
-      "tab": "home",
-      "sidebarWidth": 220,
-      "emptyLibrary": true
-    },
-    {
-      "name": "songs",
-      "filename": "songs.png",
+      "name": "album-detail",
+      "filename": "album-detail.png",
       "tab": "collection",
-      "subTab": "songs",
+      "subTab": "albums",
+      "action": "click-album",
+      "sidebarWidth": 220,
+      "rightPanelOpen": true,
+      "positionSeconds": 79
+    },
+    {
+      "name": "album-tag-editor",
+      "filename": "album-tag-editor.png",
+      "tab": "collection",
+      "subTab": "albums",
+      "action": "click-album-tag-editor",
       "sidebarWidth": 220
     },
     {
@@ -39,13 +37,6 @@
       "filename": "albums.png",
       "tab": "collection",
       "subTab": "albums",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "artists",
-      "filename": "artists.png",
-      "tab": "collection",
-      "subTab": "artists",
       "sidebarWidth": 220
     },
     {
@@ -58,63 +49,11 @@
       "sidebarWidth": 220
     },
     {
-      "name": "album-detail",
-      "filename": "album-detail.png",
+      "name": "artists",
+      "filename": "artists.png",
       "tab": "collection",
-      "subTab": "albums",
-      "action": "click-album",
-      "sidebarWidth": 220,
-      "rightPanelOpen": true,
-      "positionSeconds": 79
-    },
-    {
-      "name": "song-tag-editor",
-      "filename": "song-tag-editor.png",
-      "tab": "collection",
-      "subTab": "songs",
-      "action": "click-song-tag-editor",
+      "subTab": "artists",
       "sidebarWidth": 220
-    },
-    {
-      "name": "album-tag-editor",
-      "filename": "album-tag-editor.png",
-      "tab": "collection",
-      "subTab": "albums",
-      "action": "click-album-tag-editor",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "settings-general",
-      "filename": "settings-general.png",
-      "tab": "settings"
-    },
-    {
-      "name": "settings-folders",
-      "filename": "settings-folders.png",
-      "tab": "settings",
-      "action": "click-settings-folders",
-      "viewportHeight": 1100
-    },
-    {
-      "name": "settings-organize",
-      "filename": "settings-organize.png",
-      "tab": "settings",
-      "action": "click-settings-tools",
-      "viewportHeight": 1220
-    },
-    {
-      "name": "themes",
-      "filename": "themes.png",
-      "tab": "settings",
-      "action": "click-themes",
-      "theme": "dynamic-artwork"
-    },
-    {
-      "name": "equalizer",
-      "filename": "equalizer.png",
-      "tab": "settings",
-      "action": "click-equalizer",
-      "positionSeconds": 79
     },
     {
       "name": "equalizer-parametric",
@@ -124,76 +63,30 @@
       "positionSeconds": 79
     },
     {
-      "name": "settings-about",
-      "filename": "settings-about.png",
+      "name": "equalizer",
+      "filename": "equalizer.png",
       "tab": "settings",
-      "action": "click-settings-about",
-      "viewportHeight": 950
-    },
-    {
-      "name": "now-playing",
-      "filename": "now-playing.png",
-      "tab": "collection",
-      "subTab": "songs",
-      "isImmersive": true,
-      "theme": "dynamic-artwork",
+      "action": "click-equalizer",
       "positionSeconds": 79
     },
     {
-      "name": "moodbar",
-      "filename": "moodbar.png",
-      "tab": "collection",
-      "subTab": "songs",
-      "action": "click-moodbar-toggle",
+      "name": "home-welcome",
+      "filename": "home-welcome.png",
+      "tab": "home",
       "sidebarWidth": 220,
-      "positionSeconds": 79
+      "emptyLibrary": true
+    },
+    {
+      "name": "home",
+      "filename": "home.png",
+      "tab": "home",
+      "sidebarWidth": 220
     },
     {
       "name": "lyrics",
       "filename": "lyrics.png",
       "tab": "lyrics",
       "positionSeconds": 79
-    },
-    {
-      "name": "playlist-auto",
-      "filename": "playlist-auto.png",
-      "tab": "playlists",
-      "subTab": "auto",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "playlist-auto-detail",
-      "filename": "playlist-auto-detail.png",
-      "tab": "playlists",
-      "subTab": "auto",
-      "action": "click-playlist",
-      "sidebarWidth": 220,
-      "positionSeconds": 79
-    },
-    {
-      "name": "playlist",
-      "filename": "playlist.png",
-      "tab": "playlists",
-      "subTab": "custom",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "playlist-smart-edit",
-      "filename": "playlist-smart-edit.png",
-      "tab": "playlists",
-      "subTab": "custom",
-      "action": "click-smart-playlist-edit",
-      "sidebarWidth": 220
-    },
-    {
-      "name": "miniplayer",
-      "filename": "miniplayer.png",
-      "tab": "collection",
-      "subTab": "songs",
-      "action": "toggle-miniplayer",
-      "theme": "dynamic-artwork",
-      "viewportWidth": 340,
-      "viewportHeight": 420
     },
     {
       "name": "miniplayer-hover",
@@ -206,10 +99,117 @@
       "viewportHeight": 420
     },
     {
+      "name": "miniplayer",
+      "filename": "miniplayer.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "toggle-miniplayer",
+      "theme": "dynamic-artwork",
+      "viewportWidth": 340,
+      "viewportHeight": 420
+    },
+    {
+      "name": "moodbar",
+      "filename": "moodbar.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "click-moodbar-toggle",
+      "sidebarWidth": 220,
+      "positionSeconds": 79
+    },
+    {
+      "name": "now-playing",
+      "filename": "now-playing.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "isImmersive": true,
+      "theme": "dynamic-artwork",
+      "positionSeconds": 79
+    },
+    {
+      "name": "playlist-auto-detail",
+      "filename": "playlist-auto-detail.png",
+      "tab": "playlists",
+      "subTab": "auto",
+      "action": "click-playlist",
+      "sidebarWidth": 220,
+      "positionSeconds": 79
+    },
+    {
+      "name": "playlist-auto",
+      "filename": "playlist-auto.png",
+      "tab": "playlists",
+      "subTab": "auto",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "playlist-smart-edit",
+      "filename": "playlist-smart-edit.png",
+      "tab": "playlists",
+      "subTab": "custom",
+      "action": "click-smart-playlist-edit",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "playlist",
+      "filename": "playlist.png",
+      "tab": "playlists",
+      "subTab": "custom",
+      "sidebarWidth": 220
+    },
+    {
       "name": "search",
       "filename": "search.png",
       "tab": "home",
       "action": "type-search"
+    },
+    {
+      "name": "settings-about",
+      "filename": "settings-about.png",
+      "tab": "settings",
+      "action": "click-settings-about",
+      "viewportHeight": 950
+    },
+    {
+      "name": "settings-folders",
+      "filename": "settings-folders.png",
+      "tab": "settings",
+      "action": "click-settings-folders",
+      "viewportHeight": 1100
+    },
+    {
+      "name": "settings-general",
+      "filename": "settings-general.png",
+      "tab": "settings"
+    },
+    {
+      "name": "settings-organize",
+      "filename": "settings-organize.png",
+      "tab": "settings",
+      "action": "click-settings-tools",
+      "viewportHeight": 1220
+    },
+    {
+      "name": "song-tag-editor",
+      "filename": "song-tag-editor.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "click-song-tag-editor",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "songs",
+      "filename": "songs.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "themes",
+      "filename": "themes.png",
+      "tab": "settings",
+      "action": "click-themes",
+      "theme": "dynamic-artwork"
     }
   ]
 }

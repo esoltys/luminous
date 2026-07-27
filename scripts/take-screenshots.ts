@@ -215,7 +215,7 @@ async function main() {
       window.localStorage.setItem("layout_rightPanelOpen", "${rightPanelOpen ? 'true' : 'false'}");
       window.localStorage.setItem("layout_sidebarWidth", "${sidebarWidth}");
       if ("${subTab}" === "artists") {
-        window.localStorage.setItem("sort_artist_field", "album_count");
+        window.localStorage.setItem("sort_artist_field", "song_count");
         window.localStorage.setItem("sort_artist_asc", "false");
       } else if ("${subTab}" === "albums") {
         window.localStorage.setItem("sort_album_field", "year");
