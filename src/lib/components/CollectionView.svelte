@@ -6,7 +6,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Clock, FileText, DiscAlbum, Mic2, Edit3, Columns, FilterX } from "lucide-svelte";
+  import { Play, Plus, Clock, FileText, Music, DiscAlbum, Mic2, Edit3, Columns } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -20,11 +20,10 @@
   import ArtistCard from "./ArtistCard.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import Select from "./Select.svelte";
-  import EmptyState from "./EmptyState.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
-  import Button from "./Button.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
+  import SearchEmptyState from "./SearchEmptyState.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -565,17 +564,13 @@
         <div class="flex-1 min-h-0 relative">
           {#if filteredSongs.length === 0 && collectionStore.searchQuery}
             <div class="py-16 text-center">
-              <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
-                <FilterX class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.allFilteredOutTitle')}</h3>
-                <p class="text-xs text-brand-text-secondary mb-4">
-                  {i18n.t('collection.noTracksMatchQuery')} <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
-                </p>
-                <Button onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }} variant="primary" size="sm">
-                  <FilterX class="w-3.5 h-3.5" />
-                  {i18n.t('collection.resetSearchFilters')}
-                </Button>
-              </div>
+              <SearchEmptyState
+                icon={Music}
+                title={i18n.t('collection.noSongsTitle')}
+                matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+                query={collectionStore.searchQuery}
+                onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+              />
             </div>
           {:else if filteredSongs.length === 0}
             <!-- Library has no songs at all yet (no watched folders) — a distinct
@@ -783,11 +778,12 @@
             {/each}
             {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
               <div class="col-span-full py-16 text-center">
-                <EmptyState
-                  card
+                <SearchEmptyState
                   icon={DiscAlbum}
                   title={i18n.t('collection.noAlbumsTitle')}
-                  subtitle={i18n.t('collection.noAlbumsText')}
+                  matchQueryText={i18n.t('collection.noAlbumsMatchQuery')}
+                  query={collectionStore.searchQuery}
+                  onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
                 />
               </div>
             {:else if sortedAlbums.length === 0}
@@ -811,11 +807,12 @@
             {/each}
             {#if sortedArtists.length === 0 && collectionStore.searchQuery}
               <div class="col-span-full py-16 text-center">
-                <EmptyState
-                  card
+                <SearchEmptyState
                   icon={Mic2}
                   title={i18n.t('collection.noArtistsTitle')}
-                  subtitle={i18n.t('collection.noArtistsText')}
+                  matchQueryText={i18n.t('collection.noArtistsMatchQuery')}
+                  query={collectionStore.searchQuery}
+                  onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
                 />
               </div>
             {:else if sortedArtists.length === 0}
