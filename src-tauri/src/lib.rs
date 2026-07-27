@@ -642,7 +642,6 @@ pub fn run() {
             commands::window::exit_miniplayer_mode,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
-            commands::window::resize_miniplayer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");

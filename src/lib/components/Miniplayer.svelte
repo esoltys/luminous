@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
@@ -17,12 +16,38 @@
     Repeat,
     Repeat1,
     Maximize2,
-    GripHorizontal,
-    Scaling
+    Volume2,
+    VolumeX
   } from "lucide-svelte";
 
-  const MINIPLAYER_MIN_SIZE_PX = 220;
-  const MINIPLAYER_MAX_SIZE_PX = 650;
+  // Volume slider gradient style (mirrors PlayerBar.svelte's volume control)
+  let volumePercent = $derived(playerStore.volume * 100);
+  let volumeSliderStyle = $derived(
+    `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
+  );
+
+  function handleVolumeChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    playerStore.setVolume(parseFloat(input.value));
+  }
+
+  function releaseVolumeFocus(e: Event) {
+    (e.currentTarget as HTMLInputElement).blur();
+  }
+
+  let isMuted = $state(false);
+  let previousVolume = $state(1.0);
+
+  function toggleMute() {
+    if (isMuted) {
+      playerStore.setVolume(previousVolume);
+      isMuted = false;
+    } else {
+      previousVolume = playerStore.volume;
+      playerStore.setVolume(0.0);
+      isMuted = true;
+    }
+  }
 
   function cycleShuffle() {
     const modes: import("../types").ShuffleMode[] = ["off", "all", "inside_album", "albums", "artists"];
@@ -40,47 +65,6 @@
 
   function handleStartDrag(e: PointerEvent) {
     invoke("start_window_drag").catch(() => {});
-  }
-
-  function handleStartResize(e: PointerEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Native OS resize and the manual pointer-drag fallback below must be
-    // mutually exclusive: if both run, they fight over the window size
-    // (the fallback computes deltas from a stale start size while the OS
-    // resizes live), producing an unpredictable final size that doesn't
-    // match what the user actually dragged to.
-    try {
-      const appWindow = getCurrentWindow() as any;
-      if (appWindow && typeof appWindow.startResizing === "function") {
-        appWindow.startResizing("south-east").catch(() => {});
-        return;
-      }
-    } catch {
-      // Fall through to manual pointer drag resize
-    }
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startWidth = window.innerWidth;
-    const startHeight = window.innerHeight;
-
-    function onPointerMove(moveEvent: PointerEvent) {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
-      const newWidth = Math.max(MINIPLAYER_MIN_SIZE_PX, Math.min(MINIPLAYER_MAX_SIZE_PX, startWidth + deltaX));
-      const newHeight = Math.max(MINIPLAYER_MIN_SIZE_PX, Math.min(MINIPLAYER_MAX_SIZE_PX, startHeight + deltaY));
-      invoke("resize_miniplayer", { width: newWidth, height: newHeight }).catch(() => {});
-    }
-
-    function onPointerUp() {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    }
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -155,35 +139,16 @@
   <div
     class="absolute inset-0 z-30 bg-brand-main/85 backdrop-blur-md flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto"
   >
-    <!-- Top-aligned Window Drag Region and Close/Restore boundary (`X`) -->
-    <div class="flex items-center justify-between w-full flex-shrink-0 z-40">
-      <!-- Clean Drag Handle icon -->
-      <div
-        data-tauri-drag-region
-        onpointerdown={handleStartDrag}
-        role="button"
-        tabindex="0"
-        aria-label={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
-        class="flex items-center justify-center cursor-grab active:cursor-grabbing text-brand-text-secondary/70 hover:text-brand-text-primary transition-colors p-1.5 rounded bg-brand-sidebar/40 hover:bg-brand-sidebar/80"
-        title={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
-      >
-        <GripHorizontal class="w-4 h-4" />
-      </div>
-
-      <!-- Title / App Label -->
-      <span class="text-[10px] font-semibold tracking-wider uppercase text-brand-accent-text opacity-90 truncate max-w-[120px]">
-        Luminous
-      </span>
-
-      <!-- Restore / Exit Miniplayer Button -->
-      <button
-        onclick={() => collectionStore.exitMiniplayerMode()}
-        class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors cursor-pointer"
-        title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Esc)')}
-      >
-        <Maximize2 class="w-4 h-4" />
-      </button>
-    </div>
+    <!-- Full-width Window Drag Region spanning the top edge, textured with a grabber dot pattern -->
+    <div
+      data-tauri-drag-region
+      onpointerdown={handleStartDrag}
+      role="button"
+      tabindex="0"
+      aria-label={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
+      class="drag-grabber w-full h-5 flex-shrink-0 z-40 cursor-grab active:cursor-grabbing text-brand-text-secondary/40 hover:text-brand-text-secondary/80 transition-colors"
+      title={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
+    ></div>
 
     <!-- Song Metadata Info in Hover Mask -->
     <div class="w-full text-center px-1 py-0.5 flex flex-col items-center justify-center flex-shrink-0 mt-auto">
@@ -288,16 +253,46 @@
       </div>
     </div>
 
-    <!-- Pixel-Resize Grab Handle anchored in absolute bottom-right corner -->
-    <div
-      onpointerdown={handleStartResize}
-      role="button"
-      tabindex="0"
-      aria-label={i18n.t('miniplayer.resizeHint', {}, 'Resize Window')}
-      class="absolute bottom-1 right-1 p-1 text-brand-text-secondary/60 hover:text-brand-text-primary cursor-se-resize transition-colors z-50 rounded hover:bg-brand-sidebar/40"
-      title={i18n.t('miniplayer.resizeHint', {}, 'Resize Window')}
-    >
-      <Scaling class="w-3.5 h-3.5 rotate-90" />
+    <!-- Bottom-aligned Volume (left) & Restore (right) Controls -->
+    <div class="flex items-center justify-between w-full flex-shrink-0 z-50">
+      <!-- Volume Control -->
+      <div class="flex items-center gap-1.5">
+        <button
+          onclick={toggleMute}
+          class="p-1 text-brand-text-secondary/70 hover:text-brand-text-primary transition-colors cursor-pointer"
+          title={i18n.t('playerBar.volume')}
+        >
+          {#if isMuted || playerStore.volume === 0}
+            <VolumeX class="w-3.5 h-3.5" />
+          {:else}
+            <Volume2 class="w-3.5 h-3.5" />
+          {/if}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={playerStore.volume}
+          oninput={handleVolumeChange}
+          onchange={releaseVolumeFocus}
+          onpointerup={releaseVolumeFocus}
+          onkeyup={releaseVolumeFocus}
+          class="volume-slider w-14 h-1 rounded-lg cursor-pointer outline-none"
+          style={volumeSliderStyle}
+          aria-label={i18n.t('playerBar.volumeSlider')}
+          title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
+        />
+      </div>
+
+      <!-- Restore -->
+      <button
+        onclick={() => collectionStore.exitMiniplayerMode()}
+        class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors cursor-pointer"
+        title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Ctrl+M)')}
+      >
+        <Maximize2 class="w-3.5 h-3.5" />
+      </button>
     </div>
   </div>
 </div>
@@ -306,5 +301,54 @@
   :global(.glass-surface) {
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* Grabber texture: a repeating dot pattern spanning the full drag region,
+     rather than a single centered grip icon — signals the whole top edge
+     is draggable, not just its midpoint. */
+  .drag-grabber {
+    background-image: radial-gradient(circle, currentColor 1px, transparent 1.5px);
+    background-size: 8px 8px;
+    background-position: center;
+  }
+
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    transition: background 0.15s ease;
+  }
+
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid var(--color-accent);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+
+  .volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.25);
+    border-color: var(--color-accent-hover);
+  }
+
+  .volume-slider::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--color-accent);
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+
+  .volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.25);
+    border-color: var(--color-accent-hover);
   }
 </style>
