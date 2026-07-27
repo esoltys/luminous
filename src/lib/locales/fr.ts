@@ -513,9 +513,8 @@ export const fr = {
   miniplayer: {
     title: "Mini-lecteur",
     toggleTooltip: "Mini-lecteur Picture-in-Picture (Ctrl+M)",
-    exit: "Restaurer la fenêtre principale (Esc)",
-    dragHint: "Déplacer la fenêtre",
-    resizeHint: "Redimensionner la fenêtre"
+    exit: "Restaurer la fenêtre principale (Ctrl+M)",
+    dragHint: "Déplacer la fenêtre"
   },
 
   tagEditor: {

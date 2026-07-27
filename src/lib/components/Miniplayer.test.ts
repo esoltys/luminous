@@ -116,4 +116,22 @@ describe("Miniplayer.svelte", () => {
     await fireEvent.keyDown(region, { key: "Escape" });
     expect(exitSpy).toHaveBeenCalledTimes(2);
   });
+
+  it("adjusts volume via the slider and mutes/unmutes via the volume button", async () => {
+    playerStore.currentSong = mockSong;
+    const setVolumeSpy = vi.spyOn(playerStore, "setVolume");
+
+    const { getByTitle, getByLabelText } = render(Miniplayer);
+
+    const slider = getByLabelText("Volume Slider") as HTMLInputElement;
+    await fireEvent.input(slider, { target: { value: "0.4" } });
+    expect(setVolumeSpy).toHaveBeenCalledWith(0.4);
+
+    const muteBtn = getByTitle("Volume");
+    await fireEvent.click(muteBtn);
+    expect(setVolumeSpy).toHaveBeenCalledWith(0.0);
+
+    await fireEvent.click(muteBtn);
+    expect(setVolumeSpy).toHaveBeenLastCalledWith(0.4);
+  });
 });

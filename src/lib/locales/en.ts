@@ -515,10 +515,9 @@ export const en = {
   miniplayer: {
     title: "Miniplayer",
     toggleTooltip: "Picture-in-Picture Mode (Ctrl+M)",
-    exit: "Restore Full Window (Esc)",
+    exit: "Restore Full Window (Ctrl+M)",
 
-    dragHint: "Drag window",
-    resizeHint: "Resize window"
+    dragHint: "Drag window"
   },
 
   tagEditor: {

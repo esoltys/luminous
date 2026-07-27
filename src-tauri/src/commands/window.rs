@@ -8,12 +8,12 @@ pub async fn enter_miniplayer_mode(
     width: Option<f64>,
     height: Option<f64>,
 ) -> Result<serde_json::Value, String> {
-    // set_size() (below, and in resize_miniplayer) sets the window's *inner*
-    // (client area) size — it maps to winit's set_inner_size(). Capturing
-    // via outer_size() here (which includes the title bar/borders) and later
-    // restoring it via set_size() would grow the window by the decoration
-    // thickness on every enter/exit round-trip, so read inner_size() to stay
-    // consistent with what we write.
+    // set_size() (below) sets the window's *inner* (client area) size — it
+    // maps to winit's set_inner_size(). Capturing via outer_size() here
+    // (which includes the title bar/borders) and later restoring it via
+    // set_size() would grow the window by the decoration thickness on every
+    // enter/exit round-trip, so read inner_size() to stay consistent with
+    // what we write.
     let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let logical_width = current_size.width as f64 / scale_factor;
@@ -46,11 +46,10 @@ pub async fn exit_miniplayer_mode(
     saved_height: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     // Capture the miniplayer's actual current size before restoring the full
-    // window — this reflects whatever the user resized it to, whether via
-    // the native OS resize handle or the manual pointer-drag fallback. Use
-    // inner_size() (client area) to match what set_size() below writes —
-    // see the comment in enter_miniplayer_mode for why outer_size() here
-    // would compound growth across enter/exit cycles.
+    // window — this reflects whatever the user resized it to via the native
+    // OS resize handle. Use inner_size() (client area) to match what
+    // set_size() below writes — see the comment in enter_miniplayer_mode for
+    // why outer_size() here would compound growth across enter/exit cycles.
     let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let mini_width = current_size.width as f64 / scale_factor;
@@ -85,22 +84,6 @@ pub async fn start_window_drag(window: WebviewWindow) -> Result<(), String> {
 pub async fn start_window_resize(window: WebviewWindow) -> Result<(), String> {
     let _ = window;
     Ok(())
-}
-
-#[tauri::command]
-pub async fn resize_miniplayer(
-    window: WebviewWindow,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    let clamped_w = width.max(200.0).min(700.0);
-    let clamped_h = height.max(200.0).min(700.0);
-    window
-        .set_size(tauri::Size::Logical(tauri::LogicalSize {
-            width: clamped_w,
-            height: clamped_h,
-        }))
-        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
