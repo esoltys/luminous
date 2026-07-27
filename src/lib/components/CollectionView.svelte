@@ -562,24 +562,39 @@
         </div>
 
         <div class="flex-1 min-h-0 relative">
-          {#if filteredSongs.length === 0}
+          {#if filteredSongs.length === 0 && collectionStore.searchQuery}
             <div class="py-16 text-center">
               <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-6 bg-brand-sidebar/20 rounded-xl border border-dashed border-brand-border/60 select-none">
                 <FilterX class="w-12 h-12 text-brand-accent-text/40 mb-3 animate-pulse" />
                 <h3 class="text-base font-semibold text-brand-text-primary mb-1">{i18n.t('collection.allFilteredOutTitle')}</h3>
                 <p class="text-xs text-brand-text-secondary mb-4">
-                  {#if collectionStore.searchQuery}
-                    {i18n.t('collection.noTracksMatchQuery')} <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
-                  {:else}
-                    {i18n.t('collection.noSongsLibraryEmpty')}
-                  {/if}
+                  {i18n.t('collection.noTracksMatchQuery')} <code class="bg-brand-sidebar px-1 py-0.5 rounded font-mono text-brand-accent-text">{collectionStore.searchQuery}</code>
                 </p>
-                {#if collectionStore.searchQuery}
-                  <Button onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }} variant="primary" size="sm">
-                    <FilterX class="w-3.5 h-3.5" />
-                    {i18n.t('collection.resetSearchFilters')}
+                <Button onclick={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }} variant="primary" size="sm">
+                  <FilterX class="w-3.5 h-3.5" />
+                  {i18n.t('collection.resetSearchFilters')}
+                </Button>
+              </div>
+            </div>
+          {:else if filteredSongs.length === 0}
+            <!-- Library has no songs at all yet (no watched folders) — a distinct
+                 welcome moment, not a "your search/filters found nothing" state. -->
+            <div class="py-16 text-center">
+              <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
+                <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
+                  <Music class="w-7 h-7 text-brand-accent-text" />
+                </div>
+                <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('collection.welcomeTitle')}</h3>
+                <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">{i18n.t('collection.noSongsLibraryEmpty')}</p>
+                <div class="flex items-center gap-2">
+                  <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
+                    <FolderClosed class="w-3.5 h-3.5" />
+                    {i18n.t('settings.addFolder')}
                   </Button>
-                {/if}
+                  <Button onclick={() => { collectionStore.activeTab = 'help'; }} variant="secondary" size="sm">
+                    {i18n.t('sidebar.help')}
+                  </Button>
+                </div>
               </div>
             </div>
           {:else}

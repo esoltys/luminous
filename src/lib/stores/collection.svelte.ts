@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { i18n } from "./i18n.svelte";
 import type {
   Song,
   MusicDirectory,
@@ -500,6 +502,21 @@ class CollectionStore {
   async addDirectory(path: string) {
     await invoke("add_directory", { path });
     await this.refreshDirectories();
+  }
+
+  async addDirectoryDialog() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: i18n.t('settings.selectMusicDirectory'),
+      });
+      if (selected && typeof selected === "string") {
+        await this.addDirectory(selected);
+      }
+    } catch (err) {
+      console.error("Failed to open directory dialog:", err);
+    }
   }
 
   async removeDirectory(path: string) {

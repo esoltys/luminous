@@ -3,7 +3,6 @@
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -127,22 +126,6 @@
       });
     }
   });
-
-  // Folders operations
-  async function handleAddDirectory() {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: i18n.t('settings.selectMusicDirectory'),
-      });
-      if (selected && typeof selected === "string") {
-        await collectionStore.addDirectory(selected);
-      }
-    } catch (err) {
-      console.error("Failed to open directory dialog:", err);
-    }
-  }
 
   async function handleRemoveDirectory(path: string) {
     if (confirm(i18n.t('settings.confirmRemoveFolder', { path }))) {
@@ -449,7 +432,7 @@
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="flex justify-between items-center">
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.watchedFoldersTitle')}</h3>
-          <Button onclick={handleAddDirectory} variant="primary" size="sm">
+          <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
             <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
           </Button>
         </div>

@@ -69,6 +69,7 @@ export const en = {
     showingOneArtist: "Showing 1 artist",
     noSongsTitle: "No songs found",
     noSongsSearchEmpty: "We couldn't find any songs matching \"{query}\". Try adjusting your keywords.",
+    welcomeTitle: "Welcome to Luminous",
     noSongsLibraryEmpty: "Your music library is currently empty. Check out Help in the sidebar to get started, or add a folder to begin scanning your music.",
     clearSearchFilter: "Clear Search Filter",
     tableHeaderTrack: "#",

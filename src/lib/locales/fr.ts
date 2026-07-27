@@ -69,6 +69,7 @@ export const fr = {
     showingOneArtist: "Affichage de 1 artiste",
     noSongsTitle: "Aucune chanson trouvée",
     noSongsSearchEmpty: "Nous n'avons trouvé aucune chanson correspondant à « {query} ». Essayez d'ajuster vos mots-clés.",
+    welcomeTitle: "Bienvenue dans Luminous",
     noSongsLibraryEmpty: "Votre bibliothèque musicale est actuellement vide. Consultez l'Aide dans la barre latérale pour commencer, ou ajoutez un dossier pour analyser votre musique.",
     clearSearchFilter: "Effacer le filtre de recherche",
     tableHeaderTrack: "#",
