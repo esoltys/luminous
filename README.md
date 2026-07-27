@@ -8,11 +8,11 @@
 [![Milestone 1.0](https://img.shields.io/badge/Milestone%201.0-Complete-brightgreen?style=flat-square)](https://github.com/esoltys/luminous/milestone/1)
 [![Roadmap](https://img.shields.io/badge/Roadmap-v1.0--v4.0-purple?style=flat-square)](https://github.com/esoltys/luminous/milestones)
 
-**[esoltys.github.io/luminous.dc.html](https://esoltys.github.io/luminous.dc.html)** — downloads, screenshots, and feature overview.
-
 # A high-performance home for the music you already own.
 
 Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
+
+**[esoltys.github.io/luminous.dc.html](https://esoltys.github.io/luminous.dc.html)** — downloads, screenshots, and feature overview.
 
 ---
 
