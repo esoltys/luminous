@@ -63,6 +63,7 @@
       {/if}
     </button>
 
+    {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0}
     <div class="w-full flex flex-col {isCollapsed ? 'items-center' : ''}">
       <button
         onclick={() => { collectionStore.activeTab = "collection"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
@@ -172,6 +173,7 @@
         <span class="truncate whitespace-nowrap">{i18n.t('sidebar.lyrics')}</span>
       {/if}
     </button>
+    {/if}
 
     <button
       onclick={() => { collectionStore.activeTab = "settings"; }}

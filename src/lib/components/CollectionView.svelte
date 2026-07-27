@@ -24,6 +24,7 @@
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
   import Button from "./Button.svelte";
+  import LibraryWelcome from "./LibraryWelcome.svelte";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -580,22 +581,7 @@
             <!-- Library has no songs at all yet (no watched folders) — a distinct
                  welcome moment, not a "your search/filters found nothing" state. -->
             <div class="py-16 text-center">
-              <div class="flex flex-col items-center justify-center max-w-sm mx-auto p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
-                <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
-                  <Music class="w-7 h-7 text-brand-accent-text" />
-                </div>
-                <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('collection.welcomeTitle')}</h3>
-                <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">{i18n.t('collection.noSongsLibraryEmpty')}</p>
-                <div class="flex items-center gap-2">
-                  <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
-                    <FolderClosed class="w-3.5 h-3.5" />
-                    {i18n.t('settings.addFolder')}
-                  </Button>
-                  <Button onclick={() => { collectionStore.activeTab = 'help'; }} variant="secondary" size="sm">
-                    {i18n.t('sidebar.help')}
-                  </Button>
-                </div>
-              </div>
+              <LibraryWelcome />
             </div>
           {:else}
             <VirtualList items={filteredSongs} let:item={song}>
@@ -795,7 +781,7 @@
                 oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
               />
             {/each}
-            {#if sortedAlbums.length === 0}
+            {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
               <div class="col-span-full py-16 text-center">
                 <EmptyState
                   card
@@ -803,6 +789,10 @@
                   title={i18n.t('collection.noAlbumsTitle')}
                   subtitle={i18n.t('collection.noAlbumsText')}
                 />
+              </div>
+            {:else if sortedAlbums.length === 0}
+              <div class="col-span-full py-16 text-center">
+                <LibraryWelcome />
               </div>
             {/if}
           </div>
@@ -819,7 +809,7 @@
                 onclick={() => collectionStore.viewArtist(artist.name || "")}
               />
             {/each}
-            {#if sortedArtists.length === 0}
+            {#if sortedArtists.length === 0 && collectionStore.searchQuery}
               <div class="col-span-full py-16 text-center">
                 <EmptyState
                   card
@@ -827,6 +817,10 @@
                   title={i18n.t('collection.noArtistsTitle')}
                   subtitle={i18n.t('collection.noArtistsText')}
                 />
+              </div>
+            {:else if sortedArtists.length === 0}
+              <div class="col-span-full py-16 text-center">
+                <LibraryWelcome />
               </div>
             {/if}
           </div>

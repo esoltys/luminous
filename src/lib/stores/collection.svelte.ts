@@ -68,6 +68,11 @@ class CollectionStore {
     total_duration_nanosec: 0,
     total_filesize_bytes: 0,
   });
+  /** False until the first refreshStats() resolves — `stats.total_songs` starts at 0
+   *  before that, so code gating on "library is empty" must wait for this to avoid
+   *  treating "not loaded yet" as "confirmed empty" (e.g. flashing the sidebar/tab
+   *  to an empty-library state on every launch before real stats arrive). */
+  statsLoaded = $state<boolean>(false);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
 
@@ -491,6 +496,7 @@ class CollectionStore {
 
   async refreshStats() {
     this.stats = await invoke("get_library_stats");
+    this.statsLoaded = true;
   }
 
   async refreshLibrary() {
