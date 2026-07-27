@@ -83,7 +83,25 @@
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:32px;"><b style="color:#f1f3f8;">Accueil</b> est la première chose que vous voyez : vos artistes préférés, les chansons les plus jouées, et ce qui a été ajouté récemment.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="home-fr" src="screenshots/home-FR.png" shape="rect" placeholder="Écran d'accueil"></image-slot>
+          <image-slot id="home-fr" src="screenshots/home-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Écran d'accueil"></image-slot>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isHome }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Les bases</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Accueil</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Accueil est la première chose que vous voyez à l'ouverture de Luminous — un aperçu continu de votre bibliothèque qui se met à jour à mesure que vous écoutez. Le message d'accueil en haut change selon le moment de la journée.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Top Artistes</b> — les artistes vers lesquels vous vous tournez le plus.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Les plus jouées</b> — les chansons que vous avez le plus écoutées.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Ajouts récents</b> — ce qui vient d'arriver dans votre bibliothèque.</div></div>
+        </div>
+        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
+          <image-slot id="home-full-fr" src="screenshots/home-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Écran d'accueil"></image-slot>
+        </div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Rien n'a encore été analysé? Accueil affiche plutôt une invite simple, avec un raccourci pour ajouter un dossier ou ouvrir l'aide.</div>
+        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <image-slot id="home-welcome-fr" src="screenshots/home-welcome-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="État initial d'Accueil"></image-slot>
         </div>
       </sc-if>
 
@@ -97,24 +115,24 @@
           <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Chansons :</b> titre, artiste, album, numéro de piste, durée.</div>
         </div>
         <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:32px;">
-          <image-slot id="albums-fr" src="screenshots/albums-FR.png" shape="rect" placeholder="Grille des albums"></image-slot>
+          <image-slot id="albums-fr" src="screenshots/albums-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Grille des albums"></image-slot>
         </div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">La vue Chansons liste toute votre bibliothèque sous forme de tableau triable. Cliquez sur <b style="color:#f1f3f8;">Colonnes</b> pour ajouter ou retirer les champs affichés.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">La vue Chansons liste toute votre bibliothèque sous forme de tableau triable. Cliquez sur <b style="color:#f1f3f8;">Colonnes</b> pour ajouter ou retirer les champs affichés — y compris <b style="color:#f1f3f8;">Nombre d'écoutes</b> et <b style="color:#f1f3f8;">Nombre de sauts</b>, si vous voulez un aperçu de vos propres habitudes d'écoute.</div>
         <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:32px;">
-          <image-slot id="songs-fr" src="screenshots/songs-FR.png" shape="rect" placeholder="Grille des chansons"></image-slot>
+          <image-slot id="songs-fr" src="screenshots/songs-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Grille des chansons"></image-slot>
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Ouvrez un album pour voir sa liste de pistes complète, ainsi qu'un panneau latéral avec les détails du fichier de la chanson en cours — format, débit binaire, fréquence d'échantillonnage et volume sonore. <b style="color:#f1f3f8;">Tout jouer</b> commence à la première piste; <b style="color:#f1f3f8;">Aléatoire et jouer</b> mélange l'ordre; le bouton <b style="color:#f1f3f8;">+</b> ajoute cet album ou cette chanson à la liste de lecture active — la file d'attente, par défaut.</div>
         <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:32px;">
-          <image-slot id="album-detail-fr" src="screenshots/album-detail-FR.png" shape="rect" placeholder="Détail de l'album"></image-slot>
+          <image-slot id="album-detail-fr" src="screenshots/album-detail-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Détail de l'album"></image-slot>
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Cliquez sur l'icône de crayon à côté de Tout jouer pour ouvrir <b style="color:#f1f3f8;">Modifier les étiquettes de l'album</b> — corrigez le titre, l'artiste, le genre ou l'année de sortie pour toutes les pistes de l'album à la fois. Le même éditeur est offert par piste depuis l'icône de crayon de chaque rangée. <b style="color:#f1f3f8;">Rechercher AcoustID</b> tente d'identifier la chanson et de récupérer automatiquement les bonnes étiquettes de métadonnées.</div>
         <div style="max-width:460px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:32px;">
-          <image-slot id="song-tag-editor-fr" src="screenshots/song-tag-editor-FR.png" shape="rect" placeholder="Modifier les étiquettes de la chanson"></image-slot>
+          <image-slot id="song-tag-editor-fr" src="screenshots/song-tag-editor-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Modifier les étiquettes de la chanson"></image-slot>
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Une page d'artiste regroupe son travail en <b style="color:#f1f3f8;">Albums</b>, <b style="color:#f1f3f8;">EP</b> et <b style="color:#f1f3f8;">Singles</b> sous une bande d'onglets Discographie. Sous la Discographie se trouvent les listes de lecture qui incluent l'artiste.</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px;">
-          <div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="artists-fr" src="screenshots/artists-FR.png" shape="rect" placeholder="Grille des artistes"></image-slot></div>
-          <div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="artist-detail-fr" src="screenshots/artist-detail-FR.png" shape="rect" placeholder="Détail de l'artiste"></image-slot></div>
+          <div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="artists-fr" src="screenshots/artists-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Grille des artistes"></image-slot></div>
+          <div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="artist-detail-fr" src="screenshots/artist-detail-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Détail de l'artiste"></image-slot></div>
         </div>
       </sc-if>
 
@@ -123,7 +141,7 @@
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Recherche et navigation</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">La barre de recherche en haut de la fenêtre parcourt à la fois les chansons, les albums et les artistes — vous n'avez jamais à réfléchir à l'endroit où quelque chose est classé avant de partir à sa recherche.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
-          <image-slot id="searchbar-fr" src="assets/searchbar-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:640/90;" placeholder="Barre de recherche"></image-slot>
+          <image-slot id="searchbar-fr" src="assets/searchbar-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1918/122;" placeholder="Barre de recherche"></image-slot>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:32px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les trois icônes à côté de la barre de recherche affichent ou masquent les panneaux latéraux gauche et droit, ou basculent le mode immersif Lecture en cours. Leurs raccourcis sont <kbd>Ctrl</kbd><kbd>1</kbd>, <kbd>Ctrl</kbd><kbd>2</kbd> et <kbd>Ctrl</kbd><kbd>3</kbd>.</div></div>
@@ -134,7 +152,7 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">4</div><div>Cliquez sur l'icône de dossier pour ouvrir une chanson depuis n'importe où sur votre ordinateur.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="search-fr" src="screenshots/search-FR.png" shape="rect" placeholder="Résultats de recherche"></image-slot>
+          <image-slot id="search-fr" src="screenshots/search-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Résultats de recherche"></image-slot>
         </div>
       </sc-if>
 
@@ -143,19 +161,20 @@
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Lecture en cours et le mini lecteur</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Une barre de lecture apparaît au bas de la fenêtre lorsqu'une chanson joue, avec la forme d'onde, les commandes de lecture, le volume et un raccourci vers la vue Lecture en cours complète.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
-          <image-slot id="playbar-fr" src="assets/playbar-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:640/90;" placeholder="Barre de lecture"></image-slot>
+          <image-slot id="playbar-fr" src="assets/playbar-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1324/144;" placeholder="Barre de lecture"></image-slot>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur la forme d'onde pour sauter à un autre moment de la chanson.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt le <b style="color:#f1f3f8;">moodbar</b>. Ses bandes de couleur reflètent l'équilibre des fréquences de la chanson — rouge pour les graves, vert pour les médiums, bleu pour les aigus — les régions plus lumineuses portant plus d'énergie.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un petit affichage du spectre à côté du contrôle de volume vous donne un aperçu en direct des fréquences de la chanson pendant sa lecture.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône à l'extrême droite détache le lecteur en un petit <b style="color:#f1f3f8;">mini lecteur</b> flottant — pratique pour garder un œil sur la lecture pendant que vous travaillez dans d'autres applications. <kbd>Ctrl</kbd><kbd>M</kbd> l'active ou le désactive depuis n'importe où.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur <b style="color:#f1f3f8;">Aléatoire</b> pour parcourir cinq modes : tout mélanger, mélanger dans l'album, mélanger les albums, mélanger les artistes, et sans aléatoire.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur <b style="color:#f1f3f8;">Répéter</b> pour parcourir cinq modes : répéter la chanson, répéter l'album, répéter la liste de lecture, répéter une par une, et sans répétition.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur le cœur pour ajouter la chanson à vos favoris, ou donnez-lui une note de 1 à 5 étoiles, selon vos paramètres.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Appuyez sur <kbd>Ctrl</kbd><kbd>2</kbd> n'importe où pour activer le mode Lecture en cours immersif — une version plein écran sans distraction de la vue.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les touches multimédias lecture/pause, piste suivante et volume fonctionnent même lorsque Luminous n'est pas la fenêtre active, et la lecture apparaît dans les commandes multimédias de votre système — pour la voir et la piloter sans revenir à l'application.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-top:24px; margin-bottom:28px;">
-          <image-slot id="now-playing-fr" src="screenshots/now-playing-FR.png" shape="rect" placeholder="Lecture en cours"></image-slot>
+          <image-slot id="now-playing-fr" src="screenshots/now-playing-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Lecture en cours"></image-slot>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:20px;">
           <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="miniplayer-fr" src="screenshots/miniplayer-FR.png" shape="rect" fit="contain" style="height:auto;" placeholder="Mini lecteur"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Mini lecteur, au repos</div></div>
@@ -163,9 +182,9 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Survolez le mini lecteur pour révéler ses commandes de lecture et de fenêtre. Vous pouvez noter la chanson.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">↖</div><div><b style="color:#f1f3f8;">Déplacez</b> le mini lecteur en le saisissant par le coin supérieur gauche.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">↗</div><div><b style="color:#f1f3f8;">Désactivez-le</b> depuis le coin supérieur droit.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">↘</div><div><b style="color:#f1f3f8;">Redimensionnez</b> la fenêtre depuis le coin inférieur droit.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Déplacez</b> le mini lecteur en le saisissant n'importe où le long du haut.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Faites glisser le <b style="color:#f1f3f8;">curseur de volume</b> en bas à gauche pour régler le volume.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Restaurer la fenêtre complète</b> (<kbd>Ctrl</kbd><kbd>M</kbd>) en bas à droite.</div></div>
         </div>
       </sc-if>
 
@@ -181,13 +200,13 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Automatique :</b> les listes par Genre et par Décennie se créent d'elles-mêmes à partir de votre bibliothèque et s'actualisent chaque jour avec jusqu'à 25 pistes — un Genre ou une Décennie n'apparaît qu'une fois qu'il compte au moins 25 chansons correspondantes. Cliquez sur une liste pour parcourir ses pistes, ou appuyez sur Actualiser à tout moment pour une nouvelle sélection.</div></div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-fr" src="screenshots/playlist-FR.png" shape="rect" placeholder="Liste de lecture personnalisée"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Une liste de lecture personnalisée</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-smart-edit-fr" src="screenshots/playlist-smart-edit-FR.png" shape="rect" placeholder="Modification d'une règle intelligente"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Modification d'une règle intelligente</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-fr" src="screenshots/playlist-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Liste de lecture personnalisée"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Une liste de lecture personnalisée</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-smart-edit-fr" src="screenshots/playlist-smart-edit-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Modification d'une règle intelligente"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Modification d'une règle intelligente</div></div>
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Si vous cliquez sur le <b style="color:#f1f3f8;">+</b> à côté d'une chanson ou d'un album, il se retrouve dans votre liste Queue par défaut. Vous créez une nouvelle liste et voulez y ajouter des éléments plutôt? Marquez-la <b style="color:#f1f3f8;">Active</b> d'abord, et tout ce que vous ajoutez avec <b style="color:#f1f3f8;">+</b> par la suite s'y retrouvera à la place.</div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-fr" src="screenshots/playlist-auto-FR.png" shape="rect" placeholder="Une liste de lecture générée automatiquement"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Vignette de liste automatique</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-detail-fr" src="screenshots/playlist-auto-detail-FR.png" shape="rect" placeholder="Détail d'une liste automatique"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">En parcourir une</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-fr" src="screenshots/playlist-auto-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Une liste de lecture générée automatiquement"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Vignette de liste automatique</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-detail-fr" src="screenshots/playlist-auto-detail-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Détail d'une liste automatique"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">En parcourir une</div></div>
         </div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:16px;">Dans une liste automatique, activez <b style="color:#f1f3f8;">Remplissage auto</b> pour continuer d'ajouter des chansons une fois la fin atteinte, en plus de son actualisation quotidienne — et choisissez une saveur pour orienter les chansons qu'elle choisit :</div>
         <div style="display:flex; flex-direction:column; gap:10px; max-width:640px;">
@@ -196,6 +215,19 @@
           <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Familier :</b> privilégie les chansons que vous avez souvent écoutées.</div>
           <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Découverte :</b> privilégie les chansons que vous n'avez pas souvent écoutées.</div>
           <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Trésors cachés :</b> privilégie les chansons que vous avez presque jamais écoutées.</div>
+        </div>
+
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px; margin-top:32px;">Gérer une liste de lecture</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Double-cliquez sur le nom d'une liste de lecture (ou utilisez son icône crayon) pour la renommer directement.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Faites glisser des rangées pour réorganiser une liste — sélectionnez-en plusieurs d'abord pour les déplacer en groupe. Cliquez sur l'en-tête d'une colonne pour trier selon celle-ci, ou utilisez le champ de recherche au-dessus de la liste de pistes pour filtrer les chansons correspondantes.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Supprimer les doublons</b> et <b style="color:#f1f3f8;">Supprimer les pistes indisponibles</b> nettoient une liste en un clic; <b style="color:#f1f3f8;">Vider la liste</b> la vide; <b style="color:#f1f3f8;">Supprimer la liste</b> la retire pour de bon.</div></div>
+        </div>
+
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Importer et exporter</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Importez des listes de lecture depuis d'autres applications, ou exportez les vôtres, aux formats .m3u, .m3u8, .pls ou .xspf.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'exportation propose une option <b style="color:#f1f3f8;">Chemins relatifs</b>, pour que la liste fonctionne toujours après l'avoir déplacée vers un autre dossier ou ordinateur.</div></div>
         </div>
       </sc-if>
 
@@ -210,37 +242,49 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur une ligne des paroles pour sauter à ce moment de la chanson.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
-          <image-slot id="lyrics-fr" src="screenshots/lyrics-FR.png" shape="rect" placeholder="Paroles synchronisées"></image-slot>
+          <image-slot id="lyrics-fr" src="screenshots/lyrics-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Paroles synchronisées"></image-slot>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="lyrics-edit-fr" src="assets/lyrics-edit-FR.png" shape="rect" placeholder="Modification des paroles"></image-slot>
+          <image-slot id="lyrics-edit-fr" src="assets/lyrics-edit-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1350/1909;" placeholder="Modification des paroles"></image-slot>
         </div>
       </sc-if>
 
       <sc-if value="{{ isGeneral }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Général</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Les préférences à l'échelle de l'application — comportement au démarrage et autres paramètres par défaut du quotidien se trouvent ici.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Les préférences à l'échelle de l'application — comportement au démarrage et autres paramètres par défaut du quotidien se trouvent ici.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Langue :</b> basculez l'interface entre l'anglais et le français.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Style de notation :</b> choisissez si les chansons sont notées avec un cœur, ou sur une échelle de 1 à 5 étoiles — c'est le paramètre mentionné dans la section Lecture en cours.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Application et mises à jour :</b> vérifiez les mises à jour à la demande et consultez votre version installée. Un badge indique si cette version se met à jour automatiquement (<b style="color:#f1f3f8;">Prête pour la mise à jour automatique</b>) ou se contente de vous prévenir (<b style="color:#f1f3f8;">Notification seulement</b>). Quand une mise à jour est proposée, une bannière apparaît avec un téléchargement direct, ainsi que des options pour activer les mises à jour et leur installation automatique.</div></div>
+        </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="settings-general-fr" src="screenshots/settings-general-FR.png" shape="rect" placeholder="Paramètres généraux"></image-slot>
+          <image-slot id="settings-general-fr" src="screenshots/settings-general-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Paramètres généraux"></image-slot>
         </div>
       </sc-if>
 
       <sc-if value="{{ isFolders }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Dossiers</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Ajoutez ou retirez les dossiers que Luminous surveille pour la musique. Une fois un dossier ajouté, il reste surveillé — les nouveaux fichiers apparaissent d'eux-mêmes, sans nouvelle analyse.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Ajoutez ou retirez les dossiers que Luminous surveille pour la musique. Une fois un dossier ajouté, il reste surveillé — les nouveaux fichiers apparaissent d'eux-mêmes, sans nouvelle analyse.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Surveiller les dossiers en temps réel</b> bascule si Luminous surveille les changements en direct, ou vérifie seulement quand vous le lui demandez.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Réanalyser au démarrage</b> fait vérifier vos dossiers par Luminous à chaque lancement.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Analyse incrémentielle</b> ne recherche que ce qui a changé; <b style="color:#f1f3f8;">Analyse complète forcée</b> relit tout depuis le début. Les deux affichent une progression en direct.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un panneau de statistiques indique la dernière analyse de votre bibliothèque, ainsi que le nombre de chansons, d'albums, d'artistes et la taille totale.</div></div>
+        </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="settings-folders-fr" src="screenshots/settings-folders-FR.png" shape="rect" placeholder="Paramètres des dossiers"></image-slot>
+          <image-slot id="settings-folders-fr" src="screenshots/settings-folders-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1100;" placeholder="Paramètres des dossiers"></image-slot>
         </div>
       </sc-if>
 
       <sc-if value="{{ isOrganize }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Organiser</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Des outils groupés pour ranger votre bibliothèque — nettoyer les étiquettes et les fichiers de plusieurs pistes à la fois, plutôt qu'une par une.</div>
-        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
-          <image-slot id="settings-tools-fr" src="screenshots/settings-organize-FR.png" shape="rect" placeholder="Outils d'organisation"></image-slot>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Des outils groupés pour ranger votre bibliothèque — nettoyer les étiquettes et les fichiers de plusieurs pistes à la fois, plutôt qu'une par une. <b style="color:#f1f3f8;">Purger les chansons manquantes</b> retire en un clic les entrées des fichiers qui n'existent plus sur le disque.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">L'outil de renommage fonctionne sur votre <b style="color:#f1f3f8;">Sélection</b> actuelle ou sur toute la <b style="color:#f1f3f8;">Bibliothèque</b>. Cliquez sur <b style="color:#f1f3f8;">Aperçu</b> avant que quoi que ce soit ne bouge : un tableau De → Vers liste chaque fichier avec un statut — <b style="color:#f1f3f8;">OK</b>, <b style="color:#f1f3f8;">Inchangé</b>, <b style="color:#f1f3f8;">Collision</b>, <b style="color:#f1f3f8;">Étiquette manquante</b> ou <b style="color:#f1f3f8;">Erreur</b> — avec un filtre pour n'afficher que les fichiers qui changent réellement, des colonnes redimensionnables, et une ligne de résumé qui totalise ce qui va se passer avant de valider avec <b style="color:#f1f3f8;">Appliquer</b>. Une substitution de dossier de destination envoie les résultats vers un dossier différent de celui analysé, si vous préférez ne pas réorganiser sur place. Des options supplémentaires permettent de remplacer les espaces par des tirets bas, de garder les noms de fichiers en ASCII seulement, et de déplacer les fichiers supplémentaires comme les pochettes pour qu'ils suivent au nouvel emplacement.</div>
+        <div style="max-width:900px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
+          <image-slot id="settings-tools-fr" src="screenshots/settings-organize-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1220;" placeholder="Outils d'organisation"></image-slot>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Variables de nommage des fichiers</div>
@@ -259,6 +303,8 @@
           <div style="display:grid; grid-template-columns:140px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%title</code><div>Titre de la piste</div></div>
           <div style="display:grid; grid-template-columns:140px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%year</code><div>Année de sortie</div></div>
           <div style="display:grid; grid-template-columns:140px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%genre</code><div>Genre</div></div>
+          <div style="display:grid; grid-template-columns:140px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%track3</code><div>Numéro de piste, complété à trois chiffres</div></div>
+          <div style="display:grid; grid-template-columns:140px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%rawtrack</code><div>Numéro de piste tel qu'enregistré dans l'étiquette, sans complément</div></div>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Exemples</div>
@@ -267,6 +313,8 @@
           <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">Disc %disc</code><div>Disc 2</div></div>
           <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">%year - %album</code><div>2019 - Reservoir</div></div>
           <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">{%album/}</code><div>Ajoute un dossier au nom de l'album, seulement si la piste en a un</div></div>
+          <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">{%disc-}%track</code><div>Omet le « 1- » quand il n'y a pas de numéro de disque : 07, ou 1-07</div></div>
+          <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">{%track }%title</code><div>Ajoute « 07 » avant le titre, seulement s'il y a un numéro de piste</div></div>
         </div>
       </sc-if>
 
@@ -280,8 +328,8 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Fondus et enchainés</b> adoucit le bouton pause/arrêt et peut fondre la fin d'une chanson dans le début de la suivante.</div></div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:900px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-fr" src="screenshots/equalizer-FR.png" shape="rect" placeholder="Égaliseur graphique à 10 bandes"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Graphique à 10 bandes</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-parametric-fr" src="screenshots/equalizer-parametric-FR.png" shape="rect" placeholder="Égaliseur paramétrique à 20 bandes"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Paramétrique à 20 bandes</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-fr" src="screenshots/equalizer-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Égaliseur graphique à 10 bandes"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Graphique à 10 bandes</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-parametric-fr" src="screenshots/equalizer-parametric-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Égaliseur paramétrique à 20 bandes"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Paramétrique à 20 bandes</div></div>
         </div>
       </sc-if>
 
@@ -289,9 +337,10 @@
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Thèmes d'interface</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Choisissez parmi plusieurs thèmes intégrés, suivez le réglage clair/sombre de votre système, ou activez <b style="color:#f1f3f8;">Pochette dynamique</b> pour que toute l'application — y compris Lecture en cours et le mini lecteur — tire ses couleurs de la pochette d'album en cours de lecture. Toute l'application se met à jour immédiatement, sans redémarrage.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Pochette dynamique est aussi une excellente façon de découvrir de nouveaux thèmes — quand la pochette d'une chanson tombe sur une combinaison qui vous plaît, enregistrez-la comme Thème personnalisé pour la garder.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Vous voulez un contrôle total? Le créateur de thème personnalisé vous permet de définir vos propres couleurs de A à Z.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="themes-fr" src="screenshots/themes-FR.png" shape="rect" placeholder="Sélecteur de thème"></image-slot>
+          <image-slot id="themes-fr" src="screenshots/themes-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Sélecteur de thème"></image-slot>
         </div>
       </sc-if>
 
@@ -315,9 +364,21 @@
       <sc-if value="{{ isAbout }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">À propos et crédits</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Code source disponible sur <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Code source disponible sur <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, avec des liens vers CREDITS.md et LICENSE pour la liste complète des bibliothèques utilisées par Luminous et les conditions de partage.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Sous le capot : un noyau Rust et Tauri, une interface Svelte 5, et des bibliothèques dédiées au décodage et à l'analyse audio.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="settings-about-fr" src="screenshots/settings-about-FR.png" shape="rect" placeholder="À propos et crédits"></image-slot>
+          <image-slot id="settings-about-fr" src="screenshots/settings-about-FR.png" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/950;" placeholder="À propos et crédits"></image-slot>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isContextMenus }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Trucs et astuces</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Menus contextuels et sélection multiple</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">La plupart des listes de Luminous prennent en charge les menus contextuels (clic droit) et la sélection multiple, pour agir sur plusieurs pistes à la fois plutôt qu'une par une.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Clic droit sur une chanson, un album ou une ligne de liste de lecture pour des actions rapides — Jouer, Ajouter à une liste de lecture, Aller à l'artiste/l'album, Organiser les fichiers, Modifier les étiquettes, Retirer.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Maj-clic pour sélectionner une plage, Ctrl-clic pour ajouter des lignes individuelles, et <kbd>Ctrl</kbd><kbd>A</kbd> pour Tout sélectionner dans la vue de liste actuelle.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Avec une sélection active, une barre d'outils flottante apparaît avec Jouer la sélection, Ajouter à une liste de lecture, et Effacer la sélection.</div></div>
         </div>
       </sc-if>
 
@@ -329,6 +390,7 @@
 <script type="text/x-dc" data-dc-script>
 const NAV = [
   { id: 'getting-started', label: 'Prise en main', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h5v-6h2v6h5v-9"/></svg>' },
+  { id: 'home', label: 'Accueil', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>' },
   { id: 'collection', label: 'Votre collection', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>' },
   { id: 'search', label: 'Recherche et navigation', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>' },
   { id: 'now-playing', label: 'Lecture en cours et mini lecteur', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 17V7M9 20V4M14 17V7M19 14v-4"/></svg>' },
@@ -341,6 +403,7 @@ const NAV = [
   { id: 'equalizer', label: '\u00c9galiseur', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>' },
   { id: 'about', label: '\u00c0 propos et cr\u00e9dits', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 11h1v5h1"/></svg>' },
   { id: 'shortcuts', label: 'Raccourcis clavier', group: 'tips', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg>' },
+  { id: 'context-menus', label: 'Menus contextuels et s\u00e9lection multiple', group: 'tips', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M6 3l4 16 2-6 6-2-12-8Z"/></svg>' },
 ];
 
 class Component extends DCLogic {
@@ -371,8 +434,10 @@ class Component extends DCLogic {
       { label: 'Navigation', items: wrapKeys([
         { keys: ['Ctrl', 'L'], action: 'Placer le curseur dans la barre de recherche' },
         { keys: ['\u00c9chap'], action: 'Fermer le menu de recherche' },
+        { keys: ['Ctrl', 'O'], action: 'Ouvrir la chanson' },
         { keys: ['Ctrl', '['], action: 'Reculer' },
         { keys: ['Ctrl', ']'], action: 'Avancer' },
+        { keys: ['Ctrl', 'A'], action: 'Tout s\u00e9lectionner dans la vue de liste actuelle' },
       ]) },
       { label: 'Disposition et affichage', items: wrapKeys([
         { keys: ['Ctrl', '1'], action: 'Afficher/masquer la barre lat\u00e9rale gauche' },
@@ -391,6 +456,7 @@ class Component extends DCLogic {
       settingsItems: NAV.filter(n => n.group === 'customize' && n.label.toLowerCase().includes(this.state.query.toLowerCase())).map(mk),
       tipsItems: NAV.filter(n => n.group === 'tips' && n.label.toLowerCase().includes(this.state.query.toLowerCase())).map(mk),
       isGettingStarted: active === 'getting-started',
+      isHome: active === 'home',
       isCollection: active === 'collection',
       isSearch: active === 'search',
       isNowPlaying: active === 'now-playing',
@@ -403,6 +469,7 @@ class Component extends DCLogic {
       isThemes: active === 'ui-themes',
       isShortcuts: active === 'shortcuts',
       isAbout: active === 'about',
+      isContextMenus: active === 'context-menus',
       shortcutGroups,
     };
   }
