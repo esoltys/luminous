@@ -71,6 +71,10 @@
           e.preventDefault();
           isShortcutsModalOpen = !isShortcutsModalOpen;
           break;
+        case 'o':
+          e.preventDefault();
+          playerStore.openFileDialog();
+          break;
       }
     }
     window.addEventListener('keydown', handleGlobalHotkeys);
@@ -89,6 +93,22 @@
   $effect(() => {
     if (!playerStore.currentSong) {
       collectionStore.exitImmersiveMode();
+    }
+  });
+
+  // Collection/Playlists/Lyrics are hidden from the sidebar until the library
+  // has songs (see Sidebar.svelte). If the last watched folder is removed
+  // while one of those tabs is active, its nav button vanishes — bounce back
+  // to Home rather than stranding the user on a tab they can no longer reach.
+  $effect(() => {
+    if (
+      collectionStore.statsLoaded &&
+      collectionStore.stats.total_songs === 0 &&
+      (collectionStore.activeTab === "collection" ||
+        collectionStore.activeTab === "playlists" ||
+        collectionStore.activeTab === "lyrics")
+    ) {
+      collectionStore.activeTab = "home";
     }
   });
 

@@ -21,6 +21,13 @@
       "sidebarWidth": 220
     },
     {
+      "name": "home-welcome",
+      "filename": "home-welcome.png",
+      "tab": "home",
+      "sidebarWidth": 220,
+      "emptyLibrary": true
+    },
+    {
       "name": "songs",
       "filename": "songs.png",
       "tab": "collection",

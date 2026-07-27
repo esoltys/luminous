@@ -351,7 +351,7 @@
 </script>
 
 <div class="flex flex-col text-brand-text-primary">
-  <div class="flex items-center justify-between mb-6 pb-4 border-b border-brand-border gap-4 flex-wrap">
+  <div class="flex flex-col items-start gap-4 mb-6 pb-4 border-b border-brand-border">
     <div>
       <h3 class="text-sm font-bold text-brand-text-primary">
         {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
@@ -423,9 +423,9 @@
   </div>
 
   <!-- Rack Container -->
-  <div class="bg-brand-sidebar/20 border border-brand-border rounded-2xl p-6 md:p-8 flex flex-col gap-8 shadow-xl shadow-black/30">
+  <div class="flex flex-col gap-8">
     <!-- Preamp -->
-    <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+    <div class="flex flex-col gap-2 bg-brand-sidebar border border-brand-border rounded-xl p-4">
       <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
         <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
         <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary"}>
@@ -445,7 +445,7 @@
     </div>
 
     <!-- Loudness Normalization (#77) -->
-    <div class="flex flex-col gap-3 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+    <div class="flex flex-col gap-3 bg-brand-sidebar border border-brand-border rounded-xl p-4">
       <div class="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h4>
@@ -531,7 +531,7 @@
     </div>
 
     <!-- Playback Fades & Crossfade (#79) -->
-    <div class="bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 flex flex-col gap-3">
+    <div class="bg-brand-sidebar border border-brand-border rounded-xl p-4 flex flex-col gap-3">
       <div>
         <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('fades.title')}</h4>
         <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('fades.subtitle')}</p>
@@ -641,7 +641,7 @@
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <!-- Gain display -->
-            <span class="text-[9px] font-mono font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
+            <span class="text-[10px] font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
               {gain > 0 ? "+" : ""}{gain.toFixed(1)}
             </span>
 
@@ -661,7 +661,7 @@
             </div>
 
             <!-- Label -->
-            <span class="text-[9px] md:text-[10px] font-medium text-brand-text-secondary font-mono text-center tracking-tighter truncate w-full">
+            <span class="text-[10px] md:text-[11px] font-medium text-brand-text-secondary text-center truncate w-full">
               {bandLabels[idx]}
             </span>
           </div>
@@ -680,7 +680,7 @@
             aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
           >
             <!-- Gain display -->
-            <span class="text-[8px] font-mono font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
+            <span class="text-[9px] font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
               {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
             </span>
 
@@ -700,7 +700,7 @@
             </div>
 
             <!-- Frequency label -->
-            <span class="text-[8px] font-medium font-mono text-center tracking-tighter truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">
+            <span class="text-[9px] font-medium text-center truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">
               {formatFreq(band.freq)}
             </span>
           </div>
@@ -709,7 +709,7 @@
 
       <!-- Selected band detail: Q only (band frequencies are fixed) -->
       {#if parametric[selectedBand]}
-        <div class="flex flex-col gap-2 bg-brand-sidebar/40 border border-brand-border rounded-xl p-4">
+        <div class="flex flex-col gap-2 bg-brand-sidebar border border-brand-border rounded-xl p-4">
           <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
             <span>
               {i18n.t('equalizer.bandLabel')} {selectedBand + 1}

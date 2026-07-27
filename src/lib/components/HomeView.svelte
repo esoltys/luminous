@@ -8,7 +8,7 @@
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import HomeRowList from "./HomeRowList.svelte";
-  import { Disc3 } from "lucide-svelte";
+  import LibraryWelcome from "./LibraryWelcome.svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   let topArtists = $state<ArtistItem[]>([]);
@@ -96,11 +96,8 @@
 
       <!-- Empty State -->
       {#if topArtists.length === 0 && frequentlyPlayed.length === 0 && recentlyAdded.length === 0}
-        <div class="flex flex-col items-center justify-center h-64 text-center">
-          <Disc3 class="w-16 h-16 text-brand-text-secondary/30 mb-4" />
-          <p class="text-brand-text-secondary">
-            {i18n.t('home.emptyState')}
-          </p>
+        <div class="flex items-center justify-center py-16">
+          <LibraryWelcome />
         </div>
       {/if}
     {/if}

@@ -438,10 +438,13 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       };
     },
 
-    get_directories: () => [
-      { id: 1, path: "C:\\Users\\ericj\\Music\\Retro Hits", subdirs: true },
-      { id: 2, path: "C:\\Users\\ericj\\Music\\Studio Masters", subdirs: true },
-    ],
+    get_directories: () =>
+      library.songs.length > 0
+        ? [
+            { id: 1, path: "C:\\Users\\ericj\\Music\\Retro Hits", subdirs: true },
+            { id: 2, path: "C:\\Users\\ericj\\Music\\Studio Masters", subdirs: true },
+          ]
+        : [],
 
     get_library_stats: () => ({
       total_songs: library.songs.length,

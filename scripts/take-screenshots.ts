@@ -150,6 +150,7 @@ async function main() {
     positionSeconds?: number;
     viewportWidth?: number;
     viewportHeight?: number;
+    emptyLibrary?: boolean;
   }
 
   async function capture({
@@ -167,6 +168,7 @@ async function main() {
     positionSeconds = 122,
     viewportWidth = 1280,
     viewportHeight = 800,
+    emptyLibrary = false,
   }: CaptureOptions) {
     console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Language: ${language}, Immersive: ${isImmersive})...`);
     const page = await browser.newPage();
@@ -188,10 +190,13 @@ async function main() {
       console.error(`[Page error] ${msg}`);
     });
 
-    // Inject the mock library data, then the mock Tauri IPC bridge that reads it
+    // Inject the mock library data, then the mock Tauri IPC bridge that reads it.
+    // emptyLibrary swaps in a zeroed-out library (used for the no-folders-added
+    // welcome/empty-state capture) instead of the real mock data.
+    const emptyLibraryJson = JSON.stringify({ songs: [], albums: [], artists: [], playlists: [], playlistTracks: {}, lyrics: "" });
     await page.addInitScript(`
-      window.__LUMINOUS_MOCK_LIBRARY__ = ${libraryJson};
-      window.__LUMINOUS_MOCK_FEATURED__ = ${JSON.stringify(featured)};
+      window.__LUMINOUS_MOCK_LIBRARY__ = ${emptyLibrary ? emptyLibraryJson : libraryJson};
+      window.__LUMINOUS_MOCK_FEATURED__ = ${emptyLibrary ? "{}" : JSON.stringify(featured)};
     `);
     await page.addInitScript(mockCode);
 
@@ -486,6 +491,7 @@ async function main() {
             positionSeconds: settings.positionSeconds,
             viewportWidth: s.viewportWidth,
             viewportHeight: s.viewportHeight,
+            emptyLibrary: s.emptyLibrary,
           });
         }
       }

@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { i18n } from "./i18n.svelte";
 import type {
   Song,
   MusicDirectory,
@@ -66,6 +68,11 @@ class CollectionStore {
     total_duration_nanosec: 0,
     total_filesize_bytes: 0,
   });
+  /** False until the first refreshStats() resolves — `stats.total_songs` starts at 0
+   *  before that, so code gating on "library is empty" must wait for this to avoid
+   *  treating "not loaded yet" as "confirmed empty" (e.g. flashing the sidebar/tab
+   *  to an empty-library state on every launch before real stats arrive). */
+  statsLoaded = $state<boolean>(false);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
 
@@ -489,6 +496,7 @@ class CollectionStore {
 
   async refreshStats() {
     this.stats = await invoke("get_library_stats");
+    this.statsLoaded = true;
   }
 
   async refreshLibrary() {
@@ -500,6 +508,21 @@ class CollectionStore {
   async addDirectory(path: string) {
     await invoke("add_directory", { path });
     await this.refreshDirectories();
+  }
+
+  async addDirectoryDialog() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: i18n.t('settings.selectMusicDirectory'),
+      });
+      if (selected && typeof selected === "string") {
+        await this.addDirectory(selected);
+      }
+    } catch (err) {
+      console.error("Failed to open directory dialog:", err);
+    }
   }
 
   async removeDirectory(path: string) {

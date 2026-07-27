@@ -84,6 +84,8 @@ export interface ScreenshotConfig extends MockConfigDefaults {
   isImmersive?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;
+  /** Serves a zeroed-out library (no songs/albums/artists/directories) instead of the real mock data — for the no-folders-added empty-state capture. */
+  emptyLibrary?: boolean;
 }
 
 export interface MockConfig {

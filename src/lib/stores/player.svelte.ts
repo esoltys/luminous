@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
+import { i18n } from "./i18n.svelte";
 
 /** Minimum remaining tracks before the auto-refill is triggered (#26). */
 const AUTO_PLAY_REFILL_THRESHOLD = 3;
@@ -151,6 +153,39 @@ export class PlayerStore {
 
   async openAndPlay(paths: string[]) {
     await invoke("open_and_play", { paths });
+  }
+
+  async openFileDialog() {
+    try {
+      const selected = await open({
+        multiple: true,
+        directory: false,
+        title: i18n.t('topNav.openFilesTitle', {}, "Open Audio Files or Playlists"),
+        filters: [
+          {
+            name: "Supported Files",
+            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u"]
+          },
+          {
+            name: "Audio Files",
+            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"]
+          },
+          {
+            name: "Playlists",
+            extensions: ["m3u"]
+          }
+        ]
+      });
+
+      if (selected) {
+        const paths = Array.isArray(selected) ? selected : [selected];
+        if (paths.length > 0) {
+          await this.openAndPlay(paths);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to open files/playlists:", err);
+    }
   }
 
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext) {

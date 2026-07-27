@@ -7,7 +7,6 @@
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
   import CoverArt from "./CoverArt.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
@@ -175,38 +174,6 @@
     collectionStore.search("");
   }
 
-  async function handleOpenFiles() {
-    try {
-      const selected = await open({
-        multiple: true,
-        directory: false,
-        title: i18n.t('topNav.openFilesTitle', {}, "Open Audio Files or Playlists"),
-        filters: [
-          {
-            name: "Supported Files",
-            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u"]
-          },
-          {
-            name: "Audio Files",
-            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"]
-          },
-          {
-            name: "Playlists",
-            extensions: ["m3u"]
-          }
-        ]
-      });
-
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        if (paths.length > 0) {
-          await playerStore.openAndPlay(paths);
-        }
-      }
-    } catch (err) {
-      console.error("Failed to open files/playlists:", err);
-    }
-  }
 
 </script>
 
@@ -253,7 +220,7 @@
       <!-- Open Files/Playlists button -->
       <button
         type="button"
-        onclick={handleOpenFiles}
+        onclick={() => playerStore.openFileDialog()}
         class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 cursor-pointer"
         title={i18n.t('topNav.openFilesTooltip')}
       >

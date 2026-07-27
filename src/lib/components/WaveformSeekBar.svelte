@@ -364,7 +364,7 @@
   onmousedown={handleMouseDown}
   class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
   title={prefs.seekBarMode === 'moodbar'
-    ? i18n.t('playerBar.moodbarLegend', {}, 'Moodbar — color reflects the track\'s frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band')
+    ? i18n.t('playerBar.moodbarLegend', {}, 'Moodbar — color reflects the song\'s frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band')
     : undefined}
 >
   <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>
