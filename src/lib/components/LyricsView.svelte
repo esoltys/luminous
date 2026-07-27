@@ -3,6 +3,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { FileText, Edit3, Save, X, RefreshCw, Music2 } from "lucide-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
+  import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
 
@@ -238,39 +239,23 @@
     {#if playerStore.currentSong}
       <div class="flex items-center gap-2">
         {#if playerStore.currentSong.is_instrumental}
-          <button
-            onclick={() => toggleInstrumental(false)}
-            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
-          >
+          <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm">
             <Music2 class="w-3.5 h-3.5" /> {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
-          </button>
+          </Button>
         {:else if !isEditing}
-          <button
-            onclick={() => loadLyrics(playerStore.currentSong?.id, true)}
-            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
-            title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}
-          >
+          <Button onclick={() => loadLyrics(playerStore.currentSong?.id, true)} variant="secondary" size="sm" title={i18n.t('lyrics.refetchTooltip', {}, "Refetch lyrics online")}>
             <RefreshCw class="w-3.5 h-3.5" /> {i18n.t('lyrics.refetchBtn', {}, "Refetch")}
-          </button>
-          <button
-            onclick={startEditing}
-            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 shadow-lg shadow-brand-accent/20 cursor-pointer"
-          >
+          </Button>
+          <Button onclick={startEditing} variant="primary" size="sm">
             <Edit3 class="w-3.5 h-3.5" /> {i18n.t('settings.editThemeShort')}
-          </button>
+          </Button>
         {:else}
-          <button
-            onclick={() => { isEditing = false; }}
-            class="flex items-center gap-1.5 bg-brand-main/50 border border-brand-border hover:bg-brand-main/80 text-brand-text-secondary hover:text-brand-text-primary px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-          >
+          <Button onclick={() => { isEditing = false; }} variant="secondary" size="sm">
             <X class="w-3.5 h-3.5" /> {i18n.t('settings.cancel')}
-          </button>
-          <button
-            onclick={saveManualLyrics}
-            class="flex items-center gap-1.5 bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md cursor-pointer"
-          >
+          </Button>
+          <Button onclick={saveManualLyrics} variant="primary" size="sm">
             <Save class="w-3.5 h-3.5" /> {i18n.t('tagEditor.saveBtnShort')}
-          </button>
+          </Button>
         {/if}
       </div>
     {/if}
@@ -296,12 +281,9 @@
             {i18n.t('lyrics.instrumentalDesc', {}, "This track is marked as instrumental. Online lyrics search is bypassed.")}
           </p>
         </div>
-        <button
-          onclick={() => toggleInstrumental(false)}
-          class="mt-2 bg-brand-main/60 hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
-        >
+        <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm" class="mt-2">
           {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
-        </button>
+        </Button>
       </div>
     {:else if isEditing}
       <!-- Editor Mode -->
@@ -350,19 +332,13 @@
         <p class="text-sm font-semibold text-rose-400">{i18n.t('lyrics.lyricsNotFound')}</p>
         <p class="text-xs text-brand-text-secondary/50 max-w-sm">{errorMsg}</p>
         <div class="flex items-center gap-2 mt-2">
-          <button
-            onclick={() => loadLyrics(playerStore.currentSong?.id)}
-            class="bg-brand-main/50 hover:bg-brand-main/80 border border-brand-border text-brand-text-secondary hover:text-brand-text-primary px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-          >
+          <Button onclick={() => loadLyrics(playerStore.currentSong?.id)} variant="secondary" size="sm">
             {i18n.t('lyrics.retrySearch', {}, "Retry Search")}
-          </button>
+          </Button>
           {#if playerStore.currentSong}
-            <button
-              onclick={() => toggleInstrumental(true)}
-              class="bg-brand-accent/20 hover:bg-brand-accent/30 border border-brand-accent/40 text-brand-accent-text px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-            >
+            <Button onclick={() => toggleInstrumental(true)} variant="accent-soft" size="sm">
               {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
-            </button>
+            </Button>
           {/if}
         </div>
       </div>
@@ -372,12 +348,9 @@
         {#if playerStore.currentSong}
           <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('lyrics.lyricsNotFound')}</p>
           <p class="text-xs text-brand-text-secondary/50 max-w-xs mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
-          <button
-            onclick={() => toggleInstrumental(true)}
-            class="mt-3 bg-brand-accent/20 hover:bg-brand-accent/30 border border-brand-accent/40 text-brand-accent-text px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-          >
+          <Button onclick={() => toggleInstrumental(true)} variant="accent-soft" size="sm" class="mt-3">
             {i18n.t('lyrics.markInstrumental', {}, "Mark as Instrumental")}
-          </button>
+          </Button>
         {:else}
           <p class="text-sm font-semibold text-brand-text-secondary/80">{i18n.t('playerBar.notPlaying')}</p>
           <p class="text-xs text-brand-text-secondary/50 mt-1">{i18n.t('lyrics.lyricsHelpText')}</p>
