@@ -321,7 +321,7 @@
         </div>
 
         <!-- Rating style row -->
-        <div class="flex items-center justify-between gap-4 py-4">
+        <div class="flex items-center justify-between gap-4 pt-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
@@ -446,40 +446,42 @@
       </div>
     {:else if settingsTab === "folders"}
       <!-- Watched Folders Section -->
-      <div class="flex justify-between items-center">
-        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabFolders')}</h3>
-        <Button onclick={handleAddDirectory} variant="primary" size="sm">
-          <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
-        </Button>
-      </div>
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+        <div class="flex justify-between items-center">
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.watchedFoldersTitle')}</h3>
+          <Button onclick={handleAddDirectory} variant="primary" size="sm">
+            <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
+          </Button>
+        </div>
 
-      <!-- Folders List -->
-      <div class="space-y-2">
-        {#each collectionStore.directories as dir}
-          <div class="flex items-center justify-between bg-brand-sidebar/40 border border-brand-border rounded-xl p-4 hover:border-brand-border/80 transition-colors">
-            <div class="flex items-center gap-3.5 min-w-0">
-              <div class="min-w-0">
-                <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
+        <!-- Folders List -->
+        <div class="space-y-2">
+          {#each collectionStore.directories as dir}
+            <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
+                  <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
+                </div>
               </div>
+              <button
+                onclick={() => handleRemoveDirectory(dir.path)}
+                class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
+                title={i18n.t('settings.folderItemStopWatch')}
+              >
+                <Trash2 class="w-4 h-4 text-brand-accent-text" />
+              </button>
             </div>
-            <button
-              onclick={() => handleRemoveDirectory(dir.path)}
-              class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
-              title={i18n.t('settings.folderItemStopWatch')}
-            >
-              <Trash2 class="w-4 h-4 text-brand-accent-text" />
-            </button>
-          </div>
-        {/each}
+          {/each}
 
-        {#if collectionStore.directories.length === 0}
-          <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
-            <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
-            <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
-            <p class="text-xs text-brand-text-secondary mb-4">{i18n.t('settings.noFoldersText')}</p>
-          </div>
-        {/if}
+          {#if collectionStore.directories.length === 0}
+            <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
+              <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
+              <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
+              <p class="text-xs text-brand-text-secondary mb-4">{i18n.t('settings.noFoldersText')}</p>
+            </div>
+          {/if}
+        </div>
       </div>
 
       <!-- Library Scanning & Maintenance Section -->
@@ -601,11 +603,11 @@
       </div>
     {:else if settingsTab === "tools"}
       <!-- Tools Section -->
-      <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.tabTools')}</h3>
+      <OrganizeFiles embedded songIds={[]} initialScope="library" />
 
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="flex flex-wrap items-center gap-3">
-          <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="destructive" size="sm">
+          <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
             <Eraser class="w-4 h-4" />
             {i18n.t('settings.pruneMissingBtn')}
           </Button>
@@ -616,11 +618,10 @@
           {/if}
         </div>
       </div>
-
-      <OrganizeFiles embedded songIds={[]} initialScope="library" />
     {:else if settingsTab === "themes"}
       <!-- UI Themes Section -->
       <div class="space-y-6">
+        <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-6">
         <div>
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes')}</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -628,7 +629,7 @@
               {@const previewColors = getPreviewColors(theme)}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
-                class="bg-brand-sidebar/40 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border'}"
+                class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
               >
                 <div class="flex items-center justify-between w-full">
                   <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
@@ -669,7 +670,7 @@
                   onclick={() => themeStore.setTheme(theme.id)}
                   role="button"
                   tabindex="0"
-                  class="bg-brand-sidebar/40 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors cursor-pointer w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border hover:border-brand-border/80'}"
+                  class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors cursor-pointer w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
                 >
                   <div class="flex items-center justify-between w-full">
                     <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
@@ -704,6 +705,7 @@
             </div>
           </div>
         {/if}
+        </div>
 
         <!-- Custom Theme Builder Form -->
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
@@ -808,7 +810,7 @@
       </div>
     {:else if settingsTab === "equalizer"}
       <!-- Equalizer Section -->
-      <div class="space-y-6">
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
         <Equalizer />
       </div>
     {:else if settingsTab === "about"}

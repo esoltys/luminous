@@ -71,6 +71,10 @@
           e.preventDefault();
           isShortcutsModalOpen = !isShortcutsModalOpen;
           break;
+        case 'o':
+          e.preventDefault();
+          playerStore.openFileDialog();
+          break;
       }
     }
     window.addEventListener('keydown', handleGlobalHotkeys);

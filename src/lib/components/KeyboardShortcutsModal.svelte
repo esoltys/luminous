@@ -26,6 +26,7 @@
       entries: [
         { keys: ["Ctrl", "L"], label: i18n.t("shortcuts.focusSearch") },
         { keys: ["Esc"], label: i18n.t("shortcuts.closeSearch") },
+        { keys: ["Ctrl", "O"], label: i18n.t("shortcuts.openSong") },
         { keys: ["Ctrl", "["], label: i18n.t("shortcuts.goBack") },
         { keys: ["Ctrl", "]"], label: i18n.t("shortcuts.goForward") }
       ]

@@ -429,21 +429,21 @@
           </div>
 
           <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-            <span>{i18n.t("organizer.asciiOnly")}</span>
-            <Toggle
-              checked={asciiOnly}
-              onchange={(v) => { asciiOnly = v; }}
-              label={i18n.t("organizer.asciiOnly")}
-              showOnOffLabel={false}
-            />
-          </div>
-
-          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
             <span>{i18n.t("organizer.moveExtraFiles")}</span>
             <Toggle
               checked={moveExtraFiles}
               onchange={(v) => { moveExtraFiles = v; }}
               label={i18n.t("organizer.moveExtraFiles")}
+              showOnOffLabel={false}
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+            <span>{i18n.t("organizer.asciiOnly")}</span>
+            <Toggle
+              checked={asciiOnly}
+              onchange={(v) => { asciiOnly = v; }}
+              label={i18n.t("organizer.asciiOnly")}
               showOnOffLabel={false}
             />
           </div>

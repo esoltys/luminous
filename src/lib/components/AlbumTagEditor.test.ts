@@ -39,7 +39,7 @@ describe("AlbumTagEditor.svelte", () => {
       onClose,
     });
 
-    expect(getByText("Applies to 2 tracks")).toBeInTheDocument();
+    expect(getByText("Applies to 2 songs")).toBeInTheDocument();
 
     const albumInput = getByLabelText("Album Title") as HTMLInputElement;
     const artistInput = getByLabelText("Album Artist") as HTMLInputElement;

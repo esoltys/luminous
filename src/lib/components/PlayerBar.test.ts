@@ -100,10 +100,10 @@ describe("PlayerBar.svelte", () => {
     const nextSpy = vi.spyOn(playerStore, "next").mockImplementation(async () => {});
 
     const { getByTitle } = render(PlayerBar);
-    await fireEvent.click(getByTitle(/previous track/i));
+    await fireEvent.click(getByTitle(/previous song/i));
     expect(prevSpy).toHaveBeenCalled();
 
-    await fireEvent.click(getByTitle(/next track/i));
+    await fireEvent.click(getByTitle(/next song/i));
     expect(nextSpy).toHaveBeenCalled();
   });
 
