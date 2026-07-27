@@ -260,6 +260,37 @@ describe("Custom Theme Builder & ThemeStore", () => {
     const colors = themeStore.resolvedColors;
     expect(colors["bg-main"]).toBe("#2e3440");
     expect(colors["color-accent"]).toBe("#88c0d0");
+    // Fallback palette is dark (isLight: false) -> light/white text
+    expect(colors["color-text-primary"]).toBe("#ffffff");
+    expect(colors["color-text-secondary"]).toBe("#e2e8f0");
+  });
+
+  it("resolvedColors text color tracks artworkColors.isLight, matching what applyActiveTheme renders live (#156)", () => {
+    themeStore.activeThemeId = "dynamic-artwork";
+
+    themeStore.artworkColors = {
+      isLight: true,
+      primary: "#eeeeee",
+      sidebar: "#f5f5f5",
+      playerbar: "#f0f0f0",
+      accent: "#123456",
+      accentHover: "#234567",
+      border: "#dddddd"
+    };
+    expect(themeStore.resolvedColors["color-text-primary"]).toBe("#16181d");
+    expect(themeStore.resolvedColors["color-text-secondary"]).toBe("#5a6072");
+
+    themeStore.artworkColors = {
+      isLight: false,
+      primary: "#111111",
+      sidebar: "#050505",
+      playerbar: "#0a0a0a",
+      accent: "#123456",
+      accentHover: "#234567",
+      border: "#222222"
+    };
+    expect(themeStore.resolvedColors["color-text-primary"]).toBe("#ffffff");
+    expect(themeStore.resolvedColors["color-text-secondary"]).toBe("#e2e8f0");
   });
 
   it("switching to Dynamic Artwork applies already-cached artwork colors immediately, not just on the next track change", async () => {

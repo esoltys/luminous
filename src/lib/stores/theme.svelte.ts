@@ -179,6 +179,18 @@ const ARTWORK_TEXT_SECONDARY_DARK = "#e2e8f0";
 const ARTWORK_TEXT_PRIMARY_LIGHT = "#16181d";
 const ARTWORK_TEXT_SECONDARY_LIGHT = "#5a6072";
 
+/**
+ * Single source of truth for Dynamic Artwork's text color, conditioned on
+ * the extracted cover art's isLight. Shared by resolvedColors (used to seed
+ * "Save as Custom Theme") and applyActiveTheme (the live-rendered CSS
+ * vars) so the two can't drift apart again (#156).
+ */
+function getArtworkTextColors(artColors: ExtractedColors): Pick<ThemeColors, "color-text-primary" | "color-text-secondary"> {
+  return artColors.isLight
+    ? { "color-text-primary": ARTWORK_TEXT_PRIMARY_LIGHT, "color-text-secondary": ARTWORK_TEXT_SECONDARY_LIGHT }
+    : { "color-text-primary": ARTWORK_TEXT_PRIMARY_DARK, "color-text-secondary": ARTWORK_TEXT_SECONDARY_DARK };
+}
+
 type Rgb = { r: number; g: number; b: number };
 
 /** Re-lightens/darkens an RGB color in HSL space, holding hue+saturation fixed. */
@@ -458,7 +470,8 @@ export class ThemeStore {
         "bg-playerbar": artColors.playerbar,
         "color-accent": artColors.accent,
         "color-accent-hover": artColors.accentHover,
-        "color-border": artColors.border
+        "color-border": artColors.border,
+        ...getArtworkTextColors(artColors)
       };
     }
     return theme.colors;
@@ -693,13 +706,11 @@ export class ThemeStore {
     const accentText = clampForContrast(resolvedAccent, resolvedBgMain, 4.5);
     const accentTextHover = clampForContrast(resolvedAccentHover, resolvedBgMain, 4.5);
 
-    const textPrimary = theme.id === "dynamic-artwork"
-      ? ((this.artworkColors || getFallbackColors()).isLight ? ARTWORK_TEXT_PRIMARY_LIGHT : ARTWORK_TEXT_PRIMARY_DARK)
-      : colors["color-text-primary"];
-
-    const textSecondary = theme.id === "dynamic-artwork"
-      ? ((this.artworkColors || getFallbackColors()).isLight ? ARTWORK_TEXT_SECONDARY_LIGHT : ARTWORK_TEXT_SECONDARY_DARK)
-      : colors["color-text-secondary"];
+    const artworkTextColors = theme.id === "dynamic-artwork"
+      ? getArtworkTextColors(this.artworkColors || getFallbackColors())
+      : null;
+    const textPrimary = artworkTextColors ? artworkTextColors["color-text-primary"] : colors["color-text-primary"];
+    const textSecondary = artworkTextColors ? artworkTextColors["color-text-secondary"] : colors["color-text-secondary"];
 
     let styleEl = document.getElementById("luminous-theme-style");
     if (!styleEl) {
