@@ -73,24 +73,92 @@ impl CollectionScanner {
             .collect();
         Ok(dirs)
     }
-    /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
-    /// Also sweeps every watched directory for empty folders and removes them.
-    pub fn prune_missing_songs(&self) -> Result<PruneResult> {
-        let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
+    /// Returns ids of songs (from `path`) whose file no longer exists on disk, excluding
+    /// any song that lives under a watched directory root which is currently unreachable.
+    ///
+    /// A disconnected network share or a sleeping external drive makes every file under it
+    /// look identically "gone" to a plain `Path::exists()` check, so without this guard a
+    /// scan that happens to run while a watched drive is unmounted would read as "the user
+    /// deleted their whole library" and hard-delete every song under it. Treating "can't
+    /// currently verify" as distinct from "confirmed missing" keeps that from happening.
+    fn find_missing_song_ids(
+        &self,
+        conn: &rusqlite::Connection,
+        only_available: bool,
+    ) -> Result<Vec<i64>> {
+        let unreachable_roots: Vec<PathBuf> = self
+            .get_directories()?
+            .into_iter()
+            .map(|d| PathBuf::from(d.path))
+            .filter(|root| std::fs::read_dir(root).is_err())
+            .collect();
+        for root in &unreachable_roots {
+            log::warn!(
+                "Watched directory '{}' is unreachable (disconnected drive or network share?); \
+                 songs under it will not be treated as missing this scan",
+                root.display()
+            );
+        }
+
+        let query = if only_available {
+            "SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0"
+        } else {
+            "SELECT id, path FROM songs WHERE path IS NOT NULL"
+        };
+        let mut stmt = conn.prepare(query)?;
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
             Ok((id, path))
         })?;
 
-        let mut to_delete = Vec::new();
+        let mut missing = Vec::new();
         for (id, path) in rows.flatten() {
             let p = Path::new(&path);
-            if !p.exists() {
-                to_delete.push(id);
+            if p.exists() {
+                continue;
             }
+            if unreachable_roots.iter().any(|root| p.starts_with(root)) {
+                continue;
+            }
+            missing.push(id);
         }
+        Ok(missing)
+    }
+
+    /// Soft-deletes songs whose file no longer exists on disk by flagging them `unavailable`,
+    /// without ever removing rows. This is the automatic counterpart run after every scan;
+    /// only the explicit "Clean Up Missing Songs" action (`prune_missing_songs`) hard-deletes.
+    /// Songs under a watched directory root that can't currently be verified (see
+    /// `find_missing_song_ids`) are left untouched rather than flagged.
+    pub fn mark_missing_unavailable(&self) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+        let to_mark = self.find_missing_song_ids(&conn, true)?;
+
+        let marked = to_mark.len();
+        if !to_mark.is_empty() {
+            let tx = conn.unchecked_transaction()?;
+            {
+                let mut upd_stmt = tx.prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")?;
+                for id in &to_mark {
+                    upd_stmt.execute(params![id])?;
+                }
+            }
+            tx.commit()?;
+            log::info!("Marked {marked} song(s) unavailable (file missing on disk)");
+        }
+        Ok(marked)
+    }
+
+    /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
+    /// Also sweeps every watched directory for empty folders and removes them.
+    ///
+    /// This is only ever invoked explicitly (the "Clean Up Missing Songs" action) — automatic
+    /// scans call `mark_missing_unavailable` instead, which never deletes.
+    pub fn prune_missing_songs(&self) -> Result<PruneResult> {
+        let conn = self.db.pool.get()?;
+
+        let mut to_delete = self.find_missing_song_ids(&conn, false)?;
 
         let mut stmt_unavail = conn.prepare("SELECT id FROM songs WHERE unavailable = 1")?;
         let unavail_rows = stmt_unavail.query_map([], |row| row.get::<_, i64>(0))?;
@@ -193,8 +261,8 @@ impl CollectionScanner {
 
             // Repoint DB rows for files that moved to a different watched folder
             // (e.g. a library split/reorganization) before doing anything else,
-            // so the per-file loop below and prune_missing_songs() both see the
-            // corrected path instead of treating the move as delete+new-insert.
+            // so the per-file loop below and mark_missing_unavailable() both see
+            // the corrected path instead of treating the move as delete+new-insert.
             match reconcile_moved_songs(&conn, &all_paths) {
                 Ok(0) => {}
                 Ok(n) => log::info!("Reconciled {n} moved song(s) to their new path"),
@@ -243,10 +311,13 @@ impl CollectionScanner {
             }
         }
 
-        // Mark songs from these directories that no longer exist as unavailable
-        // (soft-delete: set lastseen to 0 rather than deleting)
-        if let Err(e) = self.prune_missing_songs() {
-            log::error!("Failed to prune missing songs during scan: {e}");
+        // Mark songs from these directories that no longer exist as unavailable.
+        // This is a soft-delete only: automatic scans never hard-delete, so a watched
+        // directory that's merely unreachable (asleep drive, disconnected network share)
+        // at scan time can't cause data loss. Hard-deleting is reserved for the explicit
+        // "Clean Up Missing Songs" action (`prune_missing_songs`).
+        if let Err(e) = self.mark_missing_unavailable() {
+            log::error!("Failed to mark missing songs during scan: {e}");
         }
 
         // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
@@ -2799,6 +2870,108 @@ mod tests {
             .query_row("SELECT path FROM songs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(remaining_path, real_file.to_string_lossy().to_string());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_prune_missing_songs_skips_unreachable_watched_root() {
+        // Simulates a watched directory that lives on a drive that's disconnected or
+        // unmounted at scan time: the root itself can't be read, so every song under it
+        // must NOT be treated as user-deleted, even though a plain `Path::exists()` check
+        // on each song's path would say "gone" just the same as if the folder were removed.
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_unreachable_root_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        // A watched directory root that never exists on disk (stand-in for an
+        // unmounted network share or a sleeping external drive).
+        let unreachable_root = temp_dir.join("unreachable_share");
+        let scanner = CollectionScanner::new(db.clone());
+        scanner
+            .add_directory(&unreachable_root.to_string_lossy())
+            .unwrap();
+
+        let song_under_unreachable_root = Song {
+            path: Some(
+                unreachable_root
+                    .join("track.mp3")
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+            title: Some("On The Unreachable Share".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_under_unreachable_root).unwrap();
+
+        // A song whose path is missing but isn't under any watched root at all —
+        // reachability doesn't apply to it, so it should still be treated as missing.
+        let song_orphaned = Song {
+            path: Some(
+                temp_dir
+                    .join("not_under_any_watched_dir.mp3")
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+            title: Some("Orphaned Track".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_orphaned).unwrap();
+
+        // Automatic path: mark_missing_unavailable must leave the song under the
+        // unreachable root alone, while still flagging the orphaned one.
+        let marked = scanner.mark_missing_unavailable().unwrap();
+        assert_eq!(
+            marked, 1,
+            "only the orphaned song should be flagged missing"
+        );
+
+        let unavailable_flags: Vec<(String, bool)> = {
+            let mut stmt = conn.prepare("SELECT path, unavailable FROM songs").unwrap();
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .unwrap()
+                .flatten()
+                .collect()
+        };
+        for (path, unavailable) in &unavailable_flags {
+            if path.contains("unreachable_share") {
+                assert!(
+                    !unavailable,
+                    "song under unreachable watched root must not be flagged missing"
+                );
+            } else {
+                assert!(*unavailable, "orphaned missing song should be flagged");
+            }
+        }
+
+        // Explicit path: prune_missing_songs must not hard-delete the song under the
+        // unreachable root either, even though its file path fails Path::exists().
+        let pruned = scanner.prune_missing_songs().unwrap();
+        assert_eq!(
+            pruned.deleted_songs, 1,
+            "only the already-flagged orphaned song should be hard-deleted"
+        );
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "song under the unreachable watched root must survive the prune"
+        );
+
+        let remaining_path: String = conn
+            .query_row("SELECT path FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert!(remaining_path.contains("unreachable_share"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
