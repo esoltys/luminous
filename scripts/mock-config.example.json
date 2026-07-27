@@ -99,7 +99,8 @@
       "name": "themes",
       "filename": "themes.png",
       "tab": "settings",
-      "action": "click-themes"
+      "action": "click-themes",
+      "theme": "dynamic-artwork"
     },
     {
       "name": "equalizer",
