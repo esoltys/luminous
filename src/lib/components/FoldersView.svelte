@@ -7,6 +7,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
   import { updaterStore } from "../stores/updater.svelte";
+  import { loudnessStore } from "../stores/loudness.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
@@ -78,6 +79,8 @@
   }
 
   onMount(async () => {
+    loudnessStore.init();
+
     let ver = "";
     try {
       const { getVersion } = await import("@tauri-apps/api/app");
@@ -436,6 +439,13 @@
             <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
           </Button>
         </div>
+
+        {#if loudnessStore.enabled && loudnessStore.analysisRemaining > 0}
+          <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
+            <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
+            <span>{i18n.t('settings.loudnessAnalysisActive', { remaining: loudnessStore.analysisRemaining })}</span>
+          </div>
+        {/if}
 
         <!-- Folders List -->
         <div class="space-y-2">

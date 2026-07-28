@@ -1,8 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { loudnessStore } from "../stores/loudness.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
 
@@ -235,17 +235,14 @@
     fallback_gain_db: number;
   }
 
-  let loudnessEnabled = $state(false);
   let targetLufs = $state(-18.0);
   let loudnessMode = $state<LoudnessMode>("track");
   let fallbackGainDb = $state(-6.0);
-  let analysisRemaining = $state(0);
-  let unlistenAnalysis: (() => void) | undefined;
 
   async function loadLoudnessSettings() {
     try {
       const settings = await invoke<LoudnessSettings>("get_loudness_settings");
-      loudnessEnabled = settings.enabled;
+      loudnessStore.setEnabled(settings.enabled);
       targetLufs = settings.target_lufs;
       loudnessMode = settings.mode;
       fallbackGainDb = settings.fallback_gain_db;
@@ -254,16 +251,9 @@
     }
   }
 
-  async function loadAnalysisRemaining() {
-    try {
-      analysisRemaining = await invoke<number>("get_loudness_analysis_remaining");
-    } catch (e) {
-      console.error("Failed to load loudness analysis progress:", e);
-    }
-  }
-
-  async function handleLoudnessToggle() {
-    await invoke("set_loudness_enabled", { enabled: loudnessEnabled });
+  async function handleLoudnessToggle(enabled: boolean) {
+    loudnessStore.setEnabled(enabled);
+    await invoke("set_loudness_enabled", { enabled });
   }
 
   async function handleTargetLufsChange() {
@@ -336,17 +326,7 @@
     loadConfig();
     loadLoudnessSettings();
     loadFadeSettings();
-    loadAnalysisRemaining();
-    unlistenAnalysis = await listen<{ remaining: number }>(
-      "loudness-analysis-progress",
-      (event) => {
-        analysisRemaining = event.payload.remaining;
-      }
-    );
-  });
-
-  onDestroy(() => {
-    unlistenAnalysis?.();
+    loudnessStore.init();
   });
 </script>
 
@@ -454,8 +434,8 @@
         <div class="flex items-center gap-2 shrink-0">
           <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('loudness.enable')}</span>
           <Toggle
-            checked={loudnessEnabled}
-            onchange={(v) => { loudnessEnabled = v; handleLoudnessToggle(); }}
+            checked={loudnessStore.enabled}
+            onchange={(v) => handleLoudnessToggle(v)}
             label={i18n.t('loudness.title')}
             showOnOffLabel={false}
           />
@@ -475,7 +455,7 @@
             step="0.5"
             bind:value={targetLufs}
             oninput={handleTargetLufsChange}
-            disabled={!loudnessEnabled}
+            disabled={!loudnessStore.enabled}
             class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={rangeFillStyle(targetLufs, -24.0, -14.0)}
           />
@@ -488,7 +468,7 @@
               class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("track")}
               aria-pressed={loudnessMode === "track"}
-              disabled={!loudnessEnabled}
+              disabled={!loudnessStore.enabled}
             >
               {i18n.t('loudness.modeTrack')}
             </button>
@@ -496,7 +476,7 @@
               class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("album")}
               aria-pressed={loudnessMode === "album"}
-              disabled={!loudnessEnabled}
+              disabled={!loudnessStore.enabled}
             >
               {i18n.t('loudness.modeAlbum')}
             </button>
@@ -515,7 +495,7 @@
             step="0.5"
             bind:value={fallbackGainDb}
             oninput={handleFallbackGainChange}
-            disabled={!loudnessEnabled}
+            disabled={!loudnessStore.enabled}
             class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={rangeFillStyle(fallbackGainDb, -24.0, 0.0)}
           />
@@ -524,12 +504,12 @@
       </div>
 
       <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
-        {#if analysisRemaining === 0}
+        {#if loudnessStore.analysisRemaining === 0}
           {i18n.t('loudness.analyzed')}
-        {:else if loudnessEnabled}
-          {i18n.t('loudness.analyzing', { remaining: analysisRemaining })}
+        {:else if loudnessStore.enabled}
+          {i18n.t('loudness.analyzing', { remaining: loudnessStore.analysisRemaining })}
         {:else}
-          {i18n.t('loudness.analysisPaused', { remaining: analysisRemaining })}
+          {i18n.t('loudness.analysisPaused', { remaining: loudnessStore.analysisRemaining })}
         {/if}
       </p>
     </div>

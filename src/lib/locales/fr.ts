@@ -214,6 +214,7 @@ export const fr = {
     folderItemRecursive: "Analyse récursive active",
     folderItemRecursiveWatchOff: "Analyse récursive (surveillance en temps réel désactivée)",
     folderItemStopWatch: "Ne plus surveiller ce dossier",
+    loudnessAnalysisActive: "La normalisation du volume analyse {remaining} chanson(s) en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter.",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
     predefinedThemes: "Thèmes prédéfinis",

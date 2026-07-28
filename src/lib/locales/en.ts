@@ -214,6 +214,7 @@ export const en = {
     folderItemRecursive: "Recursive scanning active",
     folderItemRecursiveWatchOff: "Recursive scanning (real-time watching off)",
     folderItemStopWatch: "Stop watching this folder",
+    loudnessAnalysisActive: "Loudness Normalization is analyzing {remaining} song(s) in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
     predefinedThemes: "Predefined Themes",
