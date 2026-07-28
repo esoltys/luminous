@@ -1,0 +1,48 @@
+name: ✨ Feature Request
+description: Propose a new feature or improvement for Luminous.
+title: 'Feature: '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Pre-flight Checklist
+      options:
+        - label: I have searched existing issues to ensure this feature hasn't already been requested.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what problem or pain point this solves.
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the solution you'd like
+      description: What would you like Luminous to do?
+      placeholder: It would be great if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Describe alternatives you've considered
+      description: Any alternative solutions or workarounds you've tried.
+      placeholder: Alternatively, I tried...
+    validations:
+      required: false
+
+  - type: textarea
+    id: technical
+    attributes:
+      label: Proposed Implementation Details (Optional)
+      description: If you have ideas on UI layout, state handling, or API changes, detail them here.
+      placeholder: Suggestions for data structures, UI components, or backend flow...
+    validations:
+      required: false

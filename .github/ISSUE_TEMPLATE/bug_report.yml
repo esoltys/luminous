@@ -1,0 +1,72 @@
+name: 🐛 Bug Report
+description: Report something that isn't working as expected in Luminous.
+title: 'Bug: '
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Luminous! Please search existing issues before opening a new one.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Pre-flight Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug.
+      placeholder: Describe what went wrong...
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS & Version
+      placeholder: e.g. Windows 11 / Kubuntu 24.04 / macOS Sonoma
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How do we trigger this bug?
+      placeholder: |
+        1. Open application
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots or Logs
+      description: Paste relevant terminal output, console logs, or drag/drop screenshots here.
+      placeholder: Drag and drop images or paste log text here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: dev_notes
+    attributes:
+      label: Technical Context / Suggested Fix (Optional)
+      description: If you've looked at the source code, feel free to link files or suggest a fix here!
+      placeholder: File paths, root cause thoughts, or proposed code changes...
+    validations:
+      required: false
