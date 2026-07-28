@@ -23,16 +23,34 @@ export type ActiveSubTab = "songs" | "albums" | "artists";
 export type PlaylistsSubTab = "auto" | "custom";
 
 export interface VisibleColumns {
-  format: boolean;
+  // Core columns (on by default)
+  track: boolean;
+  title: boolean;
+  artist: boolean;
+  album: boolean;
+  // Optional metatag columns
+  album_artist: boolean;
+  bitdepth: boolean;
   bitrate: boolean;
-  year: boolean;
-  path: boolean;
+  bpm: boolean;
+  channels: boolean;
+  composer: boolean;
+  filesize: boolean;
+  format: boolean;
   genre: boolean;
-  rating: boolean;
-  playcount: boolean;
-  skipcount: boolean;
-  lastplayed: boolean;
+  grouping: boolean;
+  initial_key: boolean;
+  path: boolean;
+  samplerate: boolean;
+  year: boolean;
+  // Luminous-derived columns
+  actions: boolean;
+  added: boolean;
   duration: boolean;
+  lastplayed: boolean;
+  playcount: boolean;
+  rating: boolean;
+  skipcount: boolean;
 }
 
 /** An auto-playlist reference (Favourites, Recently Added, genre, or decade), for the auto-playlist detail view. */
@@ -88,16 +106,34 @@ class CollectionStore {
   visibleColumns = $state<VisibleColumns>(
     (() => {
       const defaultCols: VisibleColumns = {
-        format: true,
-        year: true,
-        rating: true,
-        duration: true,
+        // Core columns on by default
+        track: true,
+        title: true,
+        artist: true,
+        album: true,
+        // Optional metatag columns
+        album_artist: false,
+        bitdepth: false,
         bitrate: false,
-        path: false,
+        bpm: false,
+        channels: false,
+        composer: false,
+        filesize: false,
+        format: true,
         genre: false,
-        playcount: false,
-        skipcount: false,
+        grouping: false,
+        initial_key: false,
+        path: false,
+        samplerate: false,
+        year: true,
+        // Luminous-derived columns
+        actions: true,
+        added: false,
+        duration: true,
         lastplayed: false,
+        playcount: false,
+        rating: true,
+        skipcount: false,
       };
       if (typeof window !== "undefined") {
         const saved = localStorage.getItem("luminous_visible_columns");

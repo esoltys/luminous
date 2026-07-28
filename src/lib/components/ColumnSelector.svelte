@@ -1,5 +1,6 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
+  import type { VisibleColumns } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { Columns } from "lucide-svelte";
 
@@ -20,6 +21,73 @@
       }
     }
   }
+
+  // Ordered list of all columns as they appear in the table (left-to-right)
+  const TABLE_ORDER: { key: keyof VisibleColumns; label: string }[] = [
+    { key: "track",       label: "collection.columnTrack" },
+    { key: "title",       label: "collection.columnTitle" },
+    { key: "artist",      label: "collection.columnArtist" },
+    { key: "album",       label: "collection.columnAlbum" },
+    { key: "composer",    label: "collection.columnComposer" },
+    { key: "album_artist",label: "collection.columnAlbumArtist" },
+    { key: "format",      label: "collection.columnFormat" },
+    { key: "year",        label: "collection.columnYear" },
+    { key: "genre",       label: "collection.columnGenre" },
+    { key: "grouping",    label: "collection.columnGrouping" },
+    { key: "bpm",         label: "collection.columnBpm" },
+    { key: "initial_key", label: "collection.columnInitialKey" },
+    { key: "bitrate",     label: "collection.columnBitrate" },
+    { key: "samplerate",  label: "collection.columnSampleRate" },
+    { key: "bitdepth",    label: "collection.columnBitDepth" },
+    { key: "channels",    label: "collection.columnChannels" },
+    { key: "filesize",    label: "collection.columnFileSize" },
+    { key: "path",        label: "collection.columnPath" },
+    { key: "rating",      label: "collection.columnRating" },
+    { key: "playcount",   label: "collection.columnPlayCount" },
+    { key: "skipcount",   label: "collection.columnSkipCount" },
+    { key: "lastplayed",  label: "collection.columnLastPlayed" },
+    { key: "added",       label: "collection.columnAdded" },
+    { key: "duration",    label: "collection.columnDuration" },
+    { key: "actions",     label: "collection.columnActions" },
+  ];
+
+  // Metatag columns (embedded in audio file), alphabetical
+  const METATAG_COLS: { key: keyof VisibleColumns; label: string }[] = [
+    { key: "album",       label: "collection.columnAlbum" },
+    { key: "album_artist",label: "collection.columnAlbumArtist" },
+    { key: "artist",      label: "collection.columnArtist" },
+    { key: "bitdepth",    label: "collection.columnBitDepth" },
+    { key: "bitrate",     label: "collection.columnBitrate" },
+    { key: "bpm",         label: "collection.columnBpm" },
+    { key: "channels",    label: "collection.columnChannels" },
+    { key: "composer",    label: "collection.columnComposer" },
+    { key: "filesize",    label: "collection.columnFileSize" },
+    { key: "format",      label: "collection.columnFormat" },
+    { key: "genre",       label: "collection.columnGenre" },
+    { key: "grouping",    label: "collection.columnGrouping" },
+    { key: "initial_key", label: "collection.columnInitialKey" },
+    { key: "path",        label: "collection.columnPath" },
+    { key: "samplerate",  label: "collection.columnSampleRate" },
+    { key: "title",       label: "collection.columnTitle" },
+    { key: "track",       label: "collection.columnTrack" },
+    { key: "year",        label: "collection.columnYear" },
+  ];
+
+  // Luminous-derived columns (not stored in file tags), alphabetical
+  const LUMINOUS_COLS: { key: keyof VisibleColumns; label: string }[] = [
+    { key: "actions",   label: "collection.columnActions" },
+    { key: "added",     label: "collection.columnAdded" },
+    { key: "duration",  label: "collection.columnDuration" },
+    { key: "lastplayed",label: "collection.columnLastPlayed" },
+    { key: "playcount", label: "collection.columnPlayCount" },
+    { key: "rating",    label: "collection.columnRating" },
+    { key: "skipcount", label: "collection.columnSkipCount" },
+  ];
+
+  // Currently-visible columns in table order
+  let visibleInOrder = $derived(
+    TABLE_ORDER.filter(col => collectionStore.visibleColumns[col.key])
+  );
 </script>
 
 <svelte:window onclick={handleWindowClick} />
@@ -37,102 +105,45 @@
 
   {#if showMenu}
     <div
-      class="absolute top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-52 flex flex-col gap-1.5 select-none
+      class="absolute top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 max-h-[28rem] overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar
         {align === 'left' ? 'left-0' : 'right-0'}"
     >
-      <div
-        class="text-[11px] font-bold text-brand-text-secondary uppercase tracking-wider px-2 pb-1 border-b border-brand-border/40"
-      >
-        {i18n.t("collection.visibleColumnsHeader")}
+      <!-- Visible: currently-on columns in table order -->
+      <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5">
+        Visible
       </div>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.format}
-          onchange={() => collectionStore.toggleColumn("format")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnFormat")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.year}
-          onchange={() => collectionStore.toggleColumn("year")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnYear")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.genre}
-          onchange={() => collectionStore.toggleColumn("genre")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnGenre")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.bitrate}
-          onchange={() => collectionStore.toggleColumn("bitrate")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnBitrate")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.rating}
-          onchange={() => collectionStore.toggleColumn("rating")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnRating")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.playcount}
-          onchange={() => collectionStore.toggleColumn("playcount")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnPlayCount")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.skipcount}
-          onchange={() => collectionStore.toggleColumn("skipcount")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnSkipCount")}
-      </label>
-      <label
-        class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary"
-      >
-        <input
-          type="checkbox"
-          checked={collectionStore.visibleColumns.duration}
-          onchange={() => collectionStore.toggleColumn("duration")}
-          class="rounded accent-brand-accent"
-        />
-        {i18n.t("collection.columnDuration")}
-      </label>
+      {#if visibleInOrder.length === 0}
+        <div class="px-2 py-2 text-[11px] text-brand-text-secondary/60 italic">No columns visible</div>
+      {:else}
+        {#each visibleInOrder as col (col.key)}
+          <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+            <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
+            {i18n.t(col.label)}
+          </label>
+        {/each}
+      {/if}
+
+      <!-- Metatags: all metatag columns alphabetically -->
+      <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30">
+        Metatags
+      </div>
+      {#each METATAG_COLS as col (col.key)}
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
+          <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
+          {i18n.t(col.label)}
+        </label>
+      {/each}
+
+      <!-- Luminous: derived values alphabetically -->
+      <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30">
+        Luminous
+      </div>
+      {#each LUMINOUS_COLS as col (col.key)}
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
+          <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
+          {i18n.t(col.label)}
+        </label>
+      {/each}
     </div>
   {/if}
 </div>
