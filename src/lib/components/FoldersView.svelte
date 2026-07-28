@@ -69,12 +69,14 @@
   let useAdvancedBuilder = $state(false);
 
   let pruneMsg = $state<string | null>(null);
+  let organizeRefreshKey = $state(0);
 
   async function handlePruneMissing() {
     const { deletedSongs, removedFolders } = await collectionStore.pruneMissing();
     pruneMsg = removedFolders > 0
       ? i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders })
       : i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+    organizeRefreshKey++;
     setTimeout(() => { pruneMsg = null; }, PRUNE_MESSAGE_DURATION_MS);
   }
 
@@ -600,7 +602,7 @@
       </div>
     {:else if settingsTab === "tools"}
       <!-- Tools Section -->
-      <OrganizeFiles embedded songIds={[]} initialScope="library" />
+      <OrganizeFiles embedded songIds={[]} initialScope="library" refreshKey={organizeRefreshKey} />
 
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="flex flex-wrap items-center gap-3">

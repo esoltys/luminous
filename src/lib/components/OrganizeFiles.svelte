@@ -7,6 +7,7 @@
   import { X, Folder, Sparkles, Check, AlertTriangle, RefreshCw, Layers } from "lucide-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
+  import Button from "./Button.svelte";
 
   const PREVIEW_DEBOUNCE_MS = 300;
   const COL_MIN_WIDTH_PX = 150;
@@ -107,7 +108,7 @@
     return "error";
   }
 
-  let showOnlyChanging = $state(false);
+  let showOnlyChanging = $state(true);
 
   let displayedItems = $derived(
     showOnlyChanging
@@ -650,20 +651,18 @@
 {/snippet}
 
 {#snippet applyButton()}
-  <button
-    type="button"
+  <Button
+    variant="primary"
     onclick={handleApply}
     disabled={!canApply}
-    class="px-5 py-2 rounded-xl bg-brand-accent text-brand-accent-contrast font-bold shadow-lg shadow-brand-accent/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-2"
   >
     {#if isApplying}
       <RefreshCw class="w-4 h-4 animate-spin" />
       <span>{i18n.t("organizer.applying")}</span>
     {:else}
-      <Sparkles class="w-4 h-4" />
       <span>{i18n.t("organizer.applyButton")}</span>
     {/if}
-  </button>
+  </Button>
 {/snippet}
 
 {#snippet collisionWarning()}
