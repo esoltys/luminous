@@ -12,7 +12,11 @@
 
 Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played. Built with **Rust**, **Tauri v2**, **TypeScript**, and **Svelte 5 (Runes)**.
 
-⭐ **[https://esoltys.dev/luminous.dc.html](https://esoltys.dev/luminous.dc.html)** — downloads, screenshots, and feature overview.
+ 🏠 **[Luminous Homepage](https://esoltys.dev/luminous.dc.html)** — downloads, screenshots, and feature overview
+ 
+💬 **[Luminous Discussions](https://github.com/esoltys/luminous/discussions)** - announcements, general discussion, Q&A, Show and Tell
+
+⭐ **[Issues](https://github.com/esoltys/luminous/issues)** - file a bug report or a feature request
 
 ---
 
