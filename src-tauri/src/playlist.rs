@@ -256,9 +256,14 @@ impl PlaylistManager {
                 .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
                 .unwrap_or_default();
 
-            // Always check song count first — prune the playlist if it falls below threshold.
-            let songs = scanner.get_songs_by_genre(genre, 25, mode)?;
-            if songs.len() < 25 {
+            // Check library threshold first. Auto-playlists are created if the library
+            // has at least 25 total songs for this genre (QueuePopulationMode::All).
+            // Once created, an auto-playlist is only pruned if all songs for this genre are removed (0 songs).
+            let total_songs = scanner.get_songs_by_genre(genre, 25, QueuePopulationMode::All)?;
+            if existing_row.is_none() && total_songs.len() < 25 {
+                continue;
+            }
+            if existing_row.is_some() && total_songs.is_empty() {
                 if let Some((id, _, _, _)) = existing_row {
                     conn.execute(
                         "DELETE FROM playlist_items WHERE playlist_id = ?1",
@@ -269,11 +274,11 @@ impl PlaylistManager {
                 continue;
             }
 
+            let songs = scanner.get_songs_by_genre(genre, 25, mode)?;
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated, track_count, _)) => {
-                    now - updated > STALE_AFTER_SECS || track_count != 25
-                }
+                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
             };
             if !needs_generation {
                 continue;
@@ -352,9 +357,14 @@ impl PlaylistManager {
                 .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
                 .unwrap_or_default();
 
-            // Always check song count first — prune the playlist if it falls below threshold.
-            let songs = scanner.get_songs_by_decade(decade, 25, mode)?;
-            if songs.len() < 25 {
+            // Check library threshold first. Auto-playlists are created if the library
+            // has at least 25 total songs for this decade (QueuePopulationMode::All).
+            // Once created, an auto-playlist is only pruned if all songs for this decade are removed (0 songs).
+            let total_songs = scanner.get_songs_by_decade(decade, 25, QueuePopulationMode::All)?;
+            if existing_row.is_none() && total_songs.len() < 25 {
+                continue;
+            }
+            if existing_row.is_some() && total_songs.is_empty() {
                 if let Some((id, _, _, _)) = existing_row {
                     conn.execute(
                         "DELETE FROM playlist_items WHERE playlist_id = ?1",
@@ -365,11 +375,11 @@ impl PlaylistManager {
                 continue;
             }
 
+            let songs = scanner.get_songs_by_decade(decade, 25, mode)?;
+
             let needs_generation = match existing_row {
                 None => true,
-                Some((_, updated, track_count, _)) => {
-                    now - updated > STALE_AFTER_SECS || track_count != 25
-                }
+                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
             };
             if !needs_generation {
                 continue;
@@ -1680,6 +1690,63 @@ mod tests {
         assert_eq!(
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("Unheard Cut")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_auto_playlists_does_not_delete_when_filtered_mode_has_less_than_25_songs() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Add 30 Rock songs: 29 played, 1 deep cut
+            for i in 1..=29 {
+                conn.execute(
+                    &format!("INSERT INTO songs (title, genre, source, unavailable, playcount) VALUES ('Rock Song {}', 'Rock', 1, 0, 5)", i),
+                    [],
+                )
+                .unwrap();
+            }
+            conn.execute(
+                "INSERT INTO songs (title, genre, source, unavailable, playcount) VALUES ('Deep Cut Rock', 'Rock', 1, 0, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_genre_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let rock_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("Rock"))
+            .expect("Rock auto playlist should be created");
+
+        // Change mode to DeepCuts (which has only 1 matching track < 25)
+        manager
+            .set_playlist_population_mode(rock_pl.id, QueuePopulationMode::DeepCuts)
+            .unwrap();
+        manager.populate_dynamic_playlist(rock_pl.id).unwrap();
+
+        // Trigger sync pass again
+        manager.sync_genre_auto_playlists().unwrap();
+
+        let playlists_after = manager.get_playlists().unwrap();
+        let rock_pl_after = playlists_after
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("Rock"));
+
+        assert!(
+            rock_pl_after.is_some(),
+            "Rock auto playlist should NOT be deleted during sync even though DeepCuts has < 25 songs"
+        );
+        assert_eq!(
+            rock_pl_after.unwrap().population_mode,
+            QueuePopulationMode::DeepCuts
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

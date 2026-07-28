@@ -8,6 +8,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
+  import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
@@ -62,7 +63,7 @@
             results.push({
               type: "auto",
               id: `auto:decade:${p.id}`,
-              label: p.name,
+              label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Decade`,
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
             });
@@ -71,7 +72,7 @@
             results.push({
               type: "auto",
               id: `auto:genre:${p.id}`,
-              label: p.name,
+              label: getPlaylistDisplayName(p),
               subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Genre`,
               ref: { kind: "genre", genre, playlistId: p.id, updated: p.updated }
             });
