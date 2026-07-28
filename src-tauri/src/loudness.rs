@@ -249,6 +249,17 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
         .spawn(move || {
             let mut analyzed: u64 = 0;
             loop {
+                // Only grind through the backlog while the user has actually
+                // opted into loudness normalization — otherwise this thread
+                // would decode the entire library (slow and disk-heavy on
+                // external drives) for a feature that's off by default and
+                // never gets used.
+                let enabled = get_settings(&db).map(|s| s.enabled).unwrap_or(false);
+                if !enabled {
+                    std::thread::sleep(Duration::from_secs(15));
+                    continue;
+                }
+
                 let next: Option<(i64, String)> = match db.pool.get() {
                     Ok(conn) => conn
                         .query_row(

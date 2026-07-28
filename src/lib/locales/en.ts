@@ -602,7 +602,8 @@ export const en = {
     fallbackGain: "Fallback Gain",
     fallbackGainHint: "Applied when a song has neither R128 analysis nor a ReplayGain tag",
     analyzing: "Analyzing library: {remaining} song(s) remaining",
-    analyzed: "All songs analyzed"
+    analyzed: "All songs analyzed",
+    analysisPaused: "{remaining} song(s) not yet analyzed — enable to analyze in the background"
   },
   fades: {
     title: "Playback Fades & Crossfade",

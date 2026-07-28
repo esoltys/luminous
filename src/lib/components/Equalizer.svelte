@@ -524,9 +524,13 @@
       </div>
 
       <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
-        {analysisRemaining > 0
-          ? i18n.t('loudness.analyzing', { remaining: analysisRemaining })
-          : i18n.t('loudness.analyzed')}
+        {#if analysisRemaining === 0}
+          {i18n.t('loudness.analyzed')}
+        {:else if loudnessEnabled}
+          {i18n.t('loudness.analyzing', { remaining: analysisRemaining })}
+        {:else}
+          {i18n.t('loudness.analysisPaused', { remaining: analysisRemaining })}
+        {/if}
       </p>
     </div>
 

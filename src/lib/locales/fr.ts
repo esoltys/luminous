@@ -599,7 +599,8 @@ export const fr = {
     fallbackGain: "Gain de secours",
     fallbackGainHint: "Appliqué lorsqu'une chanson n'a ni analyse R128 ni tag ReplayGain",
     analyzing: "Analyse de la bibliothèque : {remaining} chanson(s) restante(s)",
-    analyzed: "Toutes les chansons sont analysées"
+    analyzed: "Toutes les chansons sont analysées",
+    analysisPaused: "{remaining} chanson(s) non analysée(s) — activez pour analyser en arrière-plan"
   },
   fades: {
     title: "Fondu & Fondu enchaîné",
