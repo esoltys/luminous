@@ -440,8 +440,8 @@
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Auto-Playlist Hero & Summary Banner Header -->
-  <div class="relative w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
-    <div class="flex items-end justify-between gap-6 relative z-10">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
+    <div class="flex items-start justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
@@ -458,7 +458,7 @@
           {/if}
         </div>
 
-        <!-- Control Buttons -->
+        <!-- Primary Control Buttons Row -->
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
@@ -496,9 +496,10 @@
               {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
             </IconActionButton>
           {/if}
+        </div>
 
-          <ColumnSelector />
-
+        <!-- Secondary Control Buttons Row -->
+        <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
           {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
             <div
@@ -506,15 +507,13 @@
               title={autoPlay
                 ? i18n.t('playlists.autoPlayTooltipOn')
                 : i18n.t('playlists.autoPlayTooltipOff')}
-              class="flex items-center gap-2.5 px-4 py-2 rounded-full border border-brand-border text-xs font-semibold whitespace-nowrap shrink-0 text-brand-text-primary"
+              class="flex items-center gap-2 pl-2.5 pr-0.5 h-7 rounded-full border border-brand-border bg-brand-main/40 text-xs font-semibold whitespace-nowrap shrink-0 text-brand-text-primary"
             >
               <RefreshCw class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary {autoPlay ? 'animate-spin [animation-duration:3s] text-brand-accent-text' : ''}" />
-              <span class="whitespace-nowrap">{i18n.t('playlists.autoPlayLabel')}</span>
+              <span class="whitespace-nowrap text-[11px]">{i18n.t('playlists.autoPlayLabel')}</span>
               <Toggle checked={autoPlay} onchange={handleToggleAutoPlay} label={i18n.t('playlists.autoPlayLabel')} showOnOffLabel={false} />
             </div>
-          {/if}
 
-          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
               mode={populationMode}
@@ -522,9 +521,9 @@
               onChange={handleChangePopulationMode}
             />
           {/if}
+
+          <ColumnSelector size="sm" align="left" />
         </div>
-
-
       </div>
 
       <!-- Right: Cover Stack -->
