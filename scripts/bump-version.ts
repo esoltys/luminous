@@ -1,4 +1,6 @@
-// scripts/bump-version.ts
+// Bumps the app version across package.json, src-tauri/tauri.conf.json, and
+// src-tauri/Cargo.toml in one shot, so a release doesn't miss one of them.
+// Usage: bun run scripts/bump-version.ts <version>
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";

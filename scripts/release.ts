@@ -1,4 +1,7 @@
-// scripts/release.ts
+// End-to-end release driver: bumps the version, runs the frontend/backend
+// checks, commits, tags, and (with --push) pushes — then pings Eric's Beeper
+// self-chat with progress if Beeper's local API is running.
+// Usage: bun run scripts/release.ts <version> [--push]
 import { Database } from "bun:sqlite";
 import { execSync } from "child_process";
 import * as fs from "fs";

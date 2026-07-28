@@ -1,4 +1,5 @@
 {
+  "//": "Tracked template for scripts/mock-config.json (gitignored) — copy this file to mock-config.json in your worktree to configure bun run take-screenshots. See .claude/CLAUDE.md.",
   "//dbPath": "Optional. Auto-detected from the real app's Tauri app-data dir (e.g. %APPDATA%\\org.luminous.app\\luminous.db on Windows) if omitted. Set this to point at a different database instead.",
   "dbPath": "",
   "songLimit": 2000,

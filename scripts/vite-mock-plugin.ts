@@ -1,3 +1,6 @@
+// Vite dev-server plugin for browser-only mock mode: serves the compiled
+// tauri-ipc-mock.ts at /tauri-ipc-mock.js and resolves /covers/* requests
+// against the mock's embedded-art cache or the real app's covers/ dir.
 import type { Plugin } from "vite";
 import { compileMockScript } from "./compile-mock-script";
 import { EMBEDDED_ART_CACHE_DIR } from "./embedded-art-cache";
