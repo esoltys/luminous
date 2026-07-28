@@ -1,7 +1,7 @@
 ---
-name: Feature Request
-description: Propose a new feature for Luminous
-title: 'Feature: '
+name: 🏗️ Feature (Internal / Dev Template)
+description: Internal template with technical implementation strategy and architecture
+title: '[FEATURE]: '
 labels: ['enhancement']
 ---
 

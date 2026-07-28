@@ -1,7 +1,7 @@
 ---
-name: Bug Report
-description: Report a bug in Luminous
-title: 'Bug: '
+name: 🛠️ Bug (Internal / Dev Template)
+description: Internal template with root cause analysis and affected components
+title: '[BUG]: '
 labels: ['bug']
 ---
 
