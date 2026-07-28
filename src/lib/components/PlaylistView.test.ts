@@ -138,8 +138,8 @@ describe("PlaylistView.svelte", () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItem");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("tr")!;
-    const rowThree = getByText("Track Three").closest("tr")!;
+    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
+    const rowThree = getByText("Track Three").closest("[data-playlist-row]")!;
 
     const dataTransfer = {
       setData: vi.fn(),
@@ -165,7 +165,7 @@ describe("PlaylistView.svelte", () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItem");
     const { getByText } = render(PlaylistView);
 
-    const rowTwo = getByText("Track Two").closest("tr")!;
+    const rowTwo = getByText("Track Two").closest("[data-playlist-row]")!;
 
     const dataTransfer = {
       setData: vi.fn(),
@@ -215,8 +215,8 @@ describe("PlaylistView.svelte", () => {
   it("handles multi-selection with Shift+Click and shows batch floating bar", async () => {
     const { getByText, queryByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("tr")!;
-    const rowThree = getByText("Track Three").closest("tr")!;
+    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
+    const rowThree = getByText("Track Three").closest("[data-playlist-row]")!;
 
     await fireEvent.click(rowOne);
     await fireEvent.click(rowThree, { shiftKey: true });
@@ -232,7 +232,7 @@ describe("PlaylistView.svelte", () => {
 
   it("opens context menu on right-click", async () => {
     const { getByText, getAllByText } = render(PlaylistView);
-    const rowOne = getByText("Track One").closest("tr")!;
+    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
 
     await fireEvent.contextMenu(rowOne);
 
