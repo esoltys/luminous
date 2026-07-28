@@ -275,13 +275,11 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const albumName = song.album?.trim();
       if (albumName) {
         const artistName = song.album_artist || song.artist || "";
-        const albumSongs = library.songs.filter(
-          (s) => s.album === song.album && (s.album_artist || s.artist || "") === artistName
-        );
+        const albumSongs = library.songs.filter((s) => s.album === song.album);
         const albumTrackCount = albumSongs.length;
 
         if (albumTrackCount > 1) {
-          const albumKey = `${song.album}::${artistName}`;
+          const albumKey = albumName.toLowerCase();
           if (!seenAlbums.has(albumKey)) {
             seenAlbums.add(albumKey);
             items.push({
