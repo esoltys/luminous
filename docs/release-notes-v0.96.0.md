@@ -12,8 +12,9 @@ milestone: the first bug reported by someone other than the developer, fixed.
   [github.com/esoltys/luminous/issues](https://github.com/esoltys/luminous/issues).
 - **First user-reported bug, fixed**: [#166](https://github.com/esoltys/luminous/issues/166)
   — background disk activity being mistaken for a scan that never finishes — was the very
-  first bug reported by an actual user rather than found in-house. Thank you to whoever
-  filed it; it's fixed below, and it won't be the last one we chase down together. 🎉
+  first bug reported by an actual user rather than found in-house, filed by
+  [@Crocodile73](https://github.com/Crocodile73). Thank you for the report; it's fixed
+  below, and it won't be the last one we chase down together. 🎉
 
 ### 🎨 Visual & UX Improvements
 - **Miniplayer Controls Rework**: Added a volume slider and mute button, extended the
