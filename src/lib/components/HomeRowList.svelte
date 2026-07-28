@@ -13,6 +13,7 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import { Play } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { getPlaylistDisplayName } from "../utils/playlist";
 
   interface Props {
     title?: string;
@@ -34,7 +35,7 @@
   function titleFor(item: HomeItem): string {
     if (item.type === "song") return item.song.title || i18n.t("collection.unknownSong");
     if (item.type === "album") return item.album.album || i18n.t("collection.unknownAlbum");
-    return item.playlist.name;
+    return getPlaylistDisplayName(item.playlist);
   }
 
   /** "Genre" / "Decade" / "Smart" / "Custom" — mirrors PlaylistCard's autoKind derivation. */

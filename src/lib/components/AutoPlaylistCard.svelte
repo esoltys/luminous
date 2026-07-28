@@ -25,7 +25,18 @@
     widthClass?: string;
   }
 
+  import { playlistsStore } from "../stores/playlists.svelte";
+  import { getPlaylistDisplayName } from "../utils/playlist";
+
   let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
+
+  let displayLabel = $derived.by(() => {
+    if ((kind === "genre" || kind === "decade") && playlistId !== undefined) {
+      const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+      if (pl) return getPlaylistDisplayName(pl);
+    }
+    return label;
+  });
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
@@ -129,9 +140,9 @@
   <button
     onclick={(e) => { e.stopPropagation(); onClick(); }}
     class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
-    title={label}
+    title={displayLabel}
   >
-    {label}
+    {displayLabel}
   </button>
   <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
     {subtitleLabel}
