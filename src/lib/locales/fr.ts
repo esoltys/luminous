@@ -212,7 +212,9 @@ export const fr = {
     formatSystemPkg: "Paquet système",
     addFolder: "Ajouter un dossier",
     folderItemRecursive: "Analyse récursive active",
+    folderItemRecursiveWatchOff: "Analyse récursive (surveillance en temps réel désactivée)",
     folderItemStopWatch: "Ne plus surveiller ce dossier",
+    loudnessAnalysisActive: "La normalisation du volume analyse {remaining} chanson(s) en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter.",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
     predefinedThemes: "Thèmes prédéfinis",
@@ -599,7 +601,8 @@ export const fr = {
     fallbackGain: "Gain de secours",
     fallbackGainHint: "Appliqué lorsqu'une chanson n'a ni analyse R128 ni tag ReplayGain",
     analyzing: "Analyse de la bibliothèque : {remaining} chanson(s) restante(s)",
-    analyzed: "Toutes les chansons sont analysées"
+    analyzed: "Toutes les chansons sont analysées",
+    analysisPaused: "{remaining} chanson(s) non analysée(s) — activez pour analyser en arrière-plan"
   },
   fades: {
     title: "Fondu & Fondu enchaîné",

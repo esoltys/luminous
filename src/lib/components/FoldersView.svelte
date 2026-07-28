@@ -7,6 +7,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
   import { updaterStore } from "../stores/updater.svelte";
+  import { loudnessStore } from "../stores/loudness.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Equalizer from "./Equalizer.svelte";
@@ -78,6 +79,8 @@
   }
 
   onMount(async () => {
+    loudnessStore.init();
+
     let ver = "";
     try {
       const { getVersion } = await import("@tauri-apps/api/app");
@@ -437,6 +440,13 @@
           </Button>
         </div>
 
+        {#if loudnessStore.enabled && loudnessStore.analysisRemaining > 0}
+          <div class="flex items-center gap-2.5 bg-brand-accent/10 border border-brand-accent/30 rounded-xl px-4 py-2.5 text-xs text-brand-text-secondary">
+            <Activity class="w-4 h-4 text-brand-accent-text shrink-0" />
+            <span>{i18n.t('settings.loudnessAnalysisActive', { remaining: loudnessStore.analysisRemaining })}</span>
+          </div>
+        {/if}
+
         <!-- Folders List -->
         <div class="space-y-2">
           {#each collectionStore.directories as dir}
@@ -444,7 +454,11 @@
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                  <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
+                  <p class="text-xs text-brand-text-secondary mt-0.5">
+                    {collectionStore.watchFoldersRealtime
+                      ? i18n.t('settings.folderItemRecursive')
+                      : i18n.t('settings.folderItemRecursiveWatchOff')}
+                  </p>
                 </div>
               </div>
               <button

@@ -212,7 +212,9 @@ export const en = {
     formatSystemPkg: "System Package",
     addFolder: "Add Folder",
     folderItemRecursive: "Recursive scanning active",
+    folderItemRecursiveWatchOff: "Recursive scanning (real-time watching off)",
     folderItemStopWatch: "Stop watching this folder",
+    loudnessAnalysisActive: "Loudness Normalization is analyzing {remaining} song(s) in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
     predefinedThemes: "Predefined Themes",
@@ -602,7 +604,8 @@ export const en = {
     fallbackGain: "Fallback Gain",
     fallbackGainHint: "Applied when a song has neither R128 analysis nor a ReplayGain tag",
     analyzing: "Analyzing library: {remaining} song(s) remaining",
-    analyzed: "All songs analyzed"
+    analyzed: "All songs analyzed",
+    analysisPaused: "{remaining} song(s) not yet analyzed — enable to analyze in the background"
   },
   fades: {
     title: "Playback Fades & Crossfade",

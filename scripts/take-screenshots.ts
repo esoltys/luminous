@@ -1,4 +1,8 @@
-// scripts/take-screenshots.ts
+// Docs-screenshot harness: boots its own Vite dev server, injects the mocked
+// Tauri IPC bridge (see tauri-ipc-mock.ts), captures each view listed in
+// mock-config.json via Playwright, then kills the dev server. See
+// .claude/CLAUDE.md for the mock-config.json setup trap in a fresh worktree.
+// Usage: bun run take-screenshots [--name=<entry>]
 import { spawn, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
