@@ -605,9 +605,9 @@
   {/if}
 
   {#if activePlaylist}
-    <div class="flex-1 overflow-y-auto relative z-10">
+    <div class="flex-1 flex flex-col min-h-0 relative z-10">
     <!-- Stacked Cover Art Hero & Summary Banner Header -->
-    <div class="relative w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+    <div class="relative w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-end justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
         <div class="flex flex-col justify-end gap-2 max-w-xl">
@@ -826,8 +826,8 @@
     </div>
 
     <!-- Tracks List Container -->
-    <div class="p-6" class:pb-28={!!playerStore.currentSong}>
-      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-x-auto">
+    <div class="flex-1 min-h-0 p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+      <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto">
         <table class="w-full text-left text-sm border-collapse min-w-[800px]">
           <thead>
             <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">

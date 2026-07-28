@@ -401,9 +401,9 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full">
+<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Auto-Playlist Hero & Summary Banner Header -->
-  <div class="relative w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+  <div class="relative w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-end justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
@@ -503,8 +503,8 @@
     </div>
   </div>
 
-  <div class="px-6 md:px-8 py-6" class:pb-28={!!playerStore.currentSong}>
-    <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-x-auto">
+  <div class="flex-1 min-h-0 px-6 md:px-8 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+    <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto">
       <table class="w-full text-left text-sm border-collapse min-w-[800px]">
         <thead>
           <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
