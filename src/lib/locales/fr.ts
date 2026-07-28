@@ -212,6 +212,7 @@ export const fr = {
     formatSystemPkg: "Paquet système",
     addFolder: "Ajouter un dossier",
     folderItemRecursive: "Analyse récursive active",
+    folderItemRecursiveWatchOff: "Analyse récursive (surveillance en temps réel désactivée)",
     folderItemStopWatch: "Ne plus surveiller ce dossier",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",

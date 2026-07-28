@@ -444,7 +444,11 @@
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                  <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.folderItemRecursive')}</p>
+                  <p class="text-xs text-brand-text-secondary mt-0.5">
+                    {collectionStore.watchFoldersRealtime
+                      ? i18n.t('settings.folderItemRecursive')
+                      : i18n.t('settings.folderItemRecursiveWatchOff')}
+                  </p>
                 </div>
               </div>
               <button

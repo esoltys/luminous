@@ -212,6 +212,7 @@ export const en = {
     formatSystemPkg: "System Package",
     addFolder: "Add Folder",
     folderItemRecursive: "Recursive scanning active",
+    folderItemRecursiveWatchOff: "Recursive scanning (real-time watching off)",
     folderItemStopWatch: "Stop watching this folder",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
