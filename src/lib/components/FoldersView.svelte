@@ -171,7 +171,11 @@
   }
 
   function loadActiveThemeColors() {
-    customColors = { ...themeStore.resolvedColors };
+    if (editingTheme) {
+      customColors = { ...editingTheme.colors };
+    } else {
+      customColors = { ...themeStore.resolvedColors };
+    }
   }
 
   // Pre-fill theme builder with current active theme colors on mount and
@@ -195,11 +199,24 @@
     }
   });
 
-  function applyCustomTheme() {
+  $effect(() => {
     if (customColors) {
+      // deep read to trigger reactivity
+      const _ = customColors["bg-main"] + customColors["bg-sidebar"] + customColors["bg-playerbar"] + customColors["color-accent"] + customColors["color-accent-hover"] + customColors["color-border"];
       themeStore.applyThemeColorsPreview(customColors);
     }
-  }
+  });
+
+  $effect(() => {
+    if (settingsTab !== "themes") {
+      themeStore.applyActiveTheme();
+    }
+  });
+
+  import { onDestroy } from 'svelte';
+  onDestroy(() => {
+    themeStore.applyActiveTheme();
+  });
 
   async function saveCustomTheme() {
     if (newThemeName.trim() === "") {
@@ -765,7 +782,7 @@
               </h4>
             </div>
             {#if editingThemeId}
-              <Button onclick={() => { editingThemeId = null; }} variant="secondary" size="sm">
+              <Button onclick={() => { editingThemeId = null; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
                 {i18n.t('settings.cancel')}
               </Button>
             {/if}
@@ -792,8 +809,11 @@
               <div class="grid grid-cols-2 md:grid-cols-3 gap-6 pt-2">
                 <!-- Dark Muted (Main Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['bg-main']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.mainViewDescription')}</span>
                   </div>
@@ -801,8 +821,11 @@
 
                 <!-- Dark Vibrant (Sidebar Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['bg-sidebar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.sidebarDescription')}</span>
                   </div>
@@ -810,8 +833,11 @@
 
                 <!-- Light Muted (Player Bar Background) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['bg-playerbar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.playerBarDescription')}</span>
                   </div>
@@ -819,8 +845,11 @@
 
                 <!-- Vibrant (Accent Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['color-accent']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentDescription')}</span>
                   </div>
@@ -828,8 +857,11 @@
 
                 <!-- Light Vibrant (Accent Hover Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['color-accent-hover']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentHoverDescription')}</span>
                   </div>
@@ -837,8 +869,11 @@
 
                 <!-- Muted (Border Color) -->
                 <div class="flex items-center gap-3">
-                  <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 rounded border border-brand-border cursor-pointer bg-transparent shrink-0" />
-                  <div class="flex flex-col">
+                  <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
+                    <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="text" bind:value={customColors['color-border']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
+                  </div>
+                  <div class="flex flex-col min-w-0">
                     <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
                     <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.bordersDescription')}</span>
                   </div>
@@ -848,9 +883,6 @@
               <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-brand-border">
                 <Button onclick={saveCustomTheme} variant="primary" size="sm">
                   {editingThemeId ? i18n.t('settings.saveChanges') : i18n.t('settings.saveCustom')}
-                </Button>
-                <Button onclick={applyCustomTheme} variant="accent-soft" size="sm">
-                  {i18n.t('settings.applyTheme')}
                 </Button>
               </div>
             </div>
