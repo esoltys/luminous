@@ -29,6 +29,7 @@
     embedded = false,
     songIds = [],
     initialScope = "selection",
+    refreshKey = 0,
     onClose,
     onSuccess,
   }: {
@@ -37,6 +38,8 @@
     embedded?: boolean;
     songIds?: number[];
     initialScope?: "selection" | "library";
+    /** Bump this to force the preview to refetch (e.g. after an external prune). */
+    refreshKey?: number;
     onClose?: () => void;
     onSuccess?: () => void;
   } = $props();
@@ -274,6 +277,7 @@
     const _s = scope;
     const _ids = activeSongIds;
     const _open = effectiveOpen;
+    const _refresh = refreshKey;
 
     if (_open) {
       if (debounceTimer) clearTimeout(debounceTimer);
