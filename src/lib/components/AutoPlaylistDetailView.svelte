@@ -5,7 +5,7 @@
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getArtistGradient, formatTrackNumber } from "../utils/artist";
+  import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
@@ -33,10 +33,9 @@
   let kind = $derived(view.kind);
 
   let gridColsStyle = $derived.by(() => {
-    const cols: string[] = ["56px"]; // play indicator
+    const cols: string[] = ["56px"]; // play indicator + position number, always present
     const vc = collectionStore.visibleColumns;
 
-    if (vc.track) cols.push("40px");
     if (vc.title) cols.push("2fr");
     if (vc.artist) cols.push("1.5fr");
     if (vc.album) cols.push("1.5fr");
@@ -420,23 +419,6 @@
     });
   });
 
-  // Best-effort per-release disc count from whatever tracks of that release
-  // are actually present in this auto-playlist — enough to tell whether a
-  // song's own disc-1 tracks should still get the "{disc}-{track}" prefix
-  // (see formatTrackNumber()) without a dedicated per-album lookup.
-  let releaseDiscCounts = $derived.by(() => {
-    const map = new Map<string, number>();
-    for (const s of songs) {
-      const key = `${s.album_artist?.trim() || s.artist?.trim() || ""}::${s.album ?? ""}`;
-      map.set(key, Math.max(map.get(key) ?? 1, s.disc ?? 1));
-    }
-    return map;
-  });
-
-  function discCountFor(song: Song): number {
-    const key = `${song.album_artist?.trim() || song.artist?.trim() || ""}::${song.album ?? ""}`;
-    return releaseDiscCounts.get(key) ?? 1;
-  }
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
@@ -547,16 +529,14 @@
       <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
-          {#if collectionStore.visibleColumns.track}
-            <SortableHeader
-              active={sortField === "track" || sortField === "default"}
-              {sortAsc}
-              onclick={() => toggleSort("track")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
-            >
-              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTrack')} {arrow}</span>{/snippet}
-            </SortableHeader>
-          {/if}
+          <SortableHeader
+            active={sortField === "track" || sortField === "default"}
+            {sortAsc}
+            onclick={() => toggleSort("track")}
+            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+          >
+            {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTrack')} {arrow}</span>{/snippet}
+          </SortableHeader>
           {#if collectionStore.visibleColumns.title}
             <SortableHeader
               active={sortField === "title"}
@@ -822,6 +802,10 @@
                     <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                       <NowPlayingBars />
                     </div>
+                  {:else}
+                    <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity whitespace-nowrap">
+                      {index + 1}
+                    </span>
                   {/if}
                   <button
                     onclick={(e) => { e.stopPropagation(); handlePlaySong(song); }}
@@ -832,11 +816,6 @@
                   </button>
                 </div>
               </div>
-              {#if collectionStore.visibleColumns.track}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0 font-medium">
-                  {formatTrackNumber(song.track, song.disc, discCountFor(song), index)}
-                </div>
-              {/if}
               {#if collectionStore.visibleColumns.title}
                 <div class="font-medium truncate pr-4 min-w-0 {selectedSongIds.has(song.id) || (playerStore.currentSong && playerStore.currentSong.id === song.id) ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
                   <span class="truncate" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
