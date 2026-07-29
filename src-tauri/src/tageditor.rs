@@ -201,8 +201,15 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
     Ok((res.fingerprint, res.duration.round() as u32))
 }
 
-pub async fn lookup_acoustid(fingerprint: &str, duration_sec: u32) -> Result<SuggestedTags> {
-    let client_key = std::env::var("ACOUSTID_API_KEY").unwrap_or_else(|_| "8Xt5vjYtOS".to_string());
+pub async fn lookup_acoustid(
+    fingerprint: &str,
+    duration_sec: u32,
+    api_key: Option<String>,
+) -> Result<SuggestedTags> {
+    let client_key = match api_key.or_else(|| std::env::var("ACOUSTID_API_KEY").ok()) {
+        Some(k) if !k.trim().is_empty() => k,
+        _ => return Err(anyhow!("NO_API_KEY")),
+    };
 
     let masked_key = if client_key.len() > 4 {
         format!(
@@ -347,7 +354,7 @@ mod tests {
             duration_sec
         );
 
-        let suggestions = lookup_acoustid(&fingerprint, duration_sec).await;
+        let suggestions = lookup_acoustid(&fingerprint, duration_sec, None).await;
         match suggestions {
             Ok(s) => println!("Success! Suggestions: {:?}", s),
             Err(e) => println!("Error during AcoustID lookup: {:?}", e),

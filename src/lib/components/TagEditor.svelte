@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check } from "lucide-svelte";
+  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -39,6 +39,7 @@
   let lookupSucceeded = $state(false);
   let errorMsg = $state("");
   let lookupErrorMsg = $state("");
+  let lookupNotFound = $state(false);
   /** Fields last changed by an AcoustID lookup, so they can be highlighted until edited or re-looked-up. */
   let changedFields = $state(new Set<string>());
 
@@ -81,9 +82,11 @@
   }
 
   async function handleLookup() {
+    if (!songId) return;
     isLookingUp = true;
     lookupErrorMsg = "";
     lookupSucceeded = false;
+    lookupNotFound = false;
     changedFields = new Set();
     try {
       const suggestions = await invoke<{
@@ -115,10 +118,17 @@
     } catch (e: any) {
       console.error("AcoustID lookup failed:", e);
       const str = e.toString();
-      if (str.includes("fpcalc") || str.includes("chromaprint")) {
+      if (str.includes("NO_API_KEY")) {
+        collectionStore.activeTab = "settings";
+        invoke("set_app_setting", { key: "active_settings_tab", value: "tools" });
+        onClose();
+        return;
+      } else if (str.includes("fpcalc") || str.includes("chromaprint")) {
         lookupErrorMsg = i18n.t('tagEditor.acoustidFpcalcError');
       } else if (str.includes("invalid API key") || str.includes("API key")) {
         lookupErrorMsg = i18n.t('tagEditor.acoustidApiKeyError');
+      } else if (str.includes("No matching")) {
+        lookupNotFound = true;
       } else {
         lookupErrorMsg = str;
       }
@@ -353,6 +363,11 @@
             <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
               <Check class="w-3.5 h-3.5 font-bold {changedFields.size > 0 ? 'animate-bounce' : ''}" />
               <span>{changedFields.size > 0 ? i18n.t('tagEditor.matched') : i18n.t('tagEditor.noChange')}</span>
+            </div>
+          {:else if lookupNotFound}
+            <div in:fade class="flex items-center gap-1.5 text-brand-text-secondary text-xs font-semibold">
+              <SearchX class="w-3.5 h-3.5" />
+              <span>{i18n.t('tagEditor.notFound')}</span>
             </div>
           {/if}
         </div>

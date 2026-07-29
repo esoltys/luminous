@@ -49,6 +49,11 @@ pub async fn get_song_details(
 }
 
 #[tauri::command]
+pub async fn has_acoustid_env_key() -> Result<bool, String> {
+    Ok(std::env::var("ACOUSTID_API_KEY").is_ok())
+}
+
+#[tauri::command]
 pub async fn lookup_acoustid_tags(
     state: State<'_, AppState>,
     song_id: i64,
@@ -63,6 +68,15 @@ pub async fn lookup_acoustid_tags(
         )
         .map_err(|_| "Song not found in library".to_string())?;
 
+    let api_key: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_state WHERE key = 'acoustid_api_key'",
+            [],
+            |row| row.get(0),
+        )
+        .ok()
+        .filter(|s: &String| !s.trim().is_empty());
+
     let path = std::path::PathBuf::from(path_str);
 
     // 2. Generate fingerprint (blocking subprocess invocation)
@@ -73,7 +87,7 @@ pub async fn lookup_acoustid_tags(
             .map_err(|e| e.to_string())?;
 
     // 3. Query AcoustID web service lookup
-    let suggestions = crate::tageditor::lookup_acoustid(&fingerprint, duration_sec)
+    let suggestions = crate::tageditor::lookup_acoustid(&fingerprint, duration_sec, api_key)
         .await
         .map_err(|e| e.to_string())?;
 
