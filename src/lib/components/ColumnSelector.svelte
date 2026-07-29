@@ -3,6 +3,7 @@
   import type { VisibleColumns } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { portal } from "../utils/portal";
   import { Columns } from "lucide-svelte";
 
   interface Props {
@@ -15,6 +16,8 @@
   let showMenu = $state(false);
   let buttonEl = $state<HTMLButtonElement | undefined>(undefined);
 
+  const MENU_WIDTH_PX = 256; // w-64
+  const MENU_GAP_PX = 8; // mt-2
   const MENU_MAX_HEIGHT_PX = 448; // 28rem ceiling
   const MENU_MIN_HEIGHT_PX = 160;
   // Matches the pb-28 bottom padding views reserve elsewhere to clear the floating PlayerBar dock.
@@ -22,24 +25,35 @@
   const PAGE_BOTTOM_MARGIN_PX = 16;
 
   let menuMaxHeight = $state(MENU_MAX_HEIGHT_PX);
+  let menuTop = $state(0);
+  let menuLeft = $state(0);
 
-  function updateMenuMaxHeight() {
+  // The trigger can sit inside an `overflow-hidden` hero banner, which would
+  // otherwise clip the dropdown once it extends past the banner's edge — so
+  // the menu is portaled to <body> and positioned with fixed viewport coords
+  // computed from the trigger's own position instead of relying on a
+  // CSS-relative `position: absolute` container.
+  function updateMenuPosition() {
     if (!buttonEl) return;
     const rect = buttonEl.getBoundingClientRect();
     const reserve = playerStore.currentSong ? PLAYERBAR_RESERVE_PX : PAGE_BOTTOM_MARGIN_PX;
-    const available = window.innerHeight - rect.bottom - reserve;
+    const available = window.innerHeight - rect.bottom - MENU_GAP_PX - reserve;
     menuMaxHeight = Math.max(MENU_MIN_HEIGHT_PX, Math.min(MENU_MAX_HEIGHT_PX, available));
+    menuTop = rect.bottom + MENU_GAP_PX;
+    menuLeft = align === "left"
+      ? rect.left
+      : Math.max(8, rect.right - MENU_WIDTH_PX);
   }
 
   function toggleMenu() {
     showMenu = !showMenu;
-    if (showMenu) updateMenuMaxHeight();
+    if (showMenu) updateMenuPosition();
   }
 
   function handleWindowClick(e: MouseEvent) {
     if (showMenu) {
       const target = e.target as HTMLElement | null;
-      if (!target?.closest?.(".column-selector-container")) {
+      if (!target?.closest?.(".column-selector-container, .column-selector-menu")) {
         showMenu = false;
       }
     }
@@ -113,7 +127,7 @@
   );
 </script>
 
-<svelte:window onclick={handleWindowClick} onresize={() => showMenu && updateMenuMaxHeight()} />
+<svelte:window onclick={handleWindowClick} onresize={() => showMenu && updateMenuPosition()} />
 
 <div class="relative column-selector-container shrink-0 z-40">
   <button
@@ -129,9 +143,9 @@
 
   {#if showMenu}
     <div
-      class="absolute top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar
-        {align === 'left' ? 'left-0' : 'right-0'}"
-      style="max-height: {menuMaxHeight}px"
+      use:portal
+      class="column-selector-menu fixed bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar"
+      style="top: {menuTop}px; left: {menuLeft}px; max-height: {menuMaxHeight}px"
     >
       <!-- Visible: currently-on columns in table order -->
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5">

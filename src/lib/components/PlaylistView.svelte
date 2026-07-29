@@ -633,7 +633,7 @@
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-start justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
-        <div class="flex flex-col justify-end gap-2 max-w-xl">
+        <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -714,6 +714,105 @@
               </Button>
             {/if}
           </div>
+
+          <!-- Secondary Control Buttons Row -->
+          <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
+            <!-- Search Filter Bar -->
+            <div class="relative w-full max-w-xs">
+              <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
+              <Input
+                type="text"
+                bind:value={filterQuery}
+                placeholder={i18n.t("playlists.filterPlaceholder")}
+                size="sm"
+                class="w-full"
+                style="padding-left: 2rem; padding-right: 1.75rem;"
+              />
+              {#if filterQuery}
+                <button
+                  onclick={() => { filterQuery = ""; }}
+                  class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                  title={i18n.t("playlists.clearFilter")}
+                >
+                  <X class="w-3 h-3" />
+                </button>
+              {/if}
+            </div>
+
+            <ColumnSelector size="sm" align="left" />
+
+            <div class="flex items-center gap-2 shrink-0">
+              <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
+                <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
+                <span>{i18n.t("playlists.undoBtn")}</span>
+              </Button>
+              <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
+                <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
+                <span>{i18n.t("playlists.redoBtn")}</span>
+              </Button>
+            </div>
+
+            {#if duplicateCount > 0}
+              <Button
+                onclick={removeDuplicates}
+                variant="info"
+                size="sm"
+                title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
+              >
+                <CopyPlus class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
+              </Button>
+            {/if}
+
+            <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
+              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t("playlists.importPlaylistBtn")}</span>
+            </Button>
+
+            <Button
+              onclick={() => { showExportOptionsModal = true; }}
+              variant="secondary"
+              size="sm"
+              title={i18n.t("playlists.exportPlaylistTooltip")}
+            >
+              <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
+            </Button>
+
+            {#if unavailableCount > 0}
+              <Button
+                onclick={removeUnavailableTracks}
+                variant="warning"
+                size="sm"
+                title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
+              >
+                <AlertTriangle class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
+              </Button>
+            {/if}
+
+            <Button
+              onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
+              variant="secondary"
+              size="sm"
+              title={i18n.t("playlists.clearPlaylistTooltip")}
+            >
+              {i18n.t("playlists.clearPlaylistBtn")}
+            </Button>
+
+            {#if !isQueue}
+              <Button
+                onclick={() => { showDeleteConfirm = true; }}
+                variant="secondary"
+                size="sm"
+                class="hover:bg-red-950/20 hover:text-red-400 hover:border-red-900/30"
+                title={i18n.t("playlists.deletePlaylistTooltip")}
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
+              </Button>
+            {/if}
+          </div>
         </div>
 
         <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue Banner -->
@@ -738,114 +837,6 @@
               </div>
             {/each}
           </div>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Toolbar: Search filter, actions, import/export, undo/redo -->
-    <div class="px-6 py-2.5 border-b border-brand-border/60 flex flex-col gap-2 relative z-10 bg-brand-main/40 backdrop-blur-md">
-      <!-- Line 1: Filter songs input, Undo & Redo (with labels), Remove duplicates -->
-      <div class="flex items-center justify-between gap-3 w-full">
-        <!-- Search Filter Bar -->
-        <div class="relative flex-1 max-w-xs">
-          <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-          <Input
-            type="text"
-            bind:value={filterQuery}
-            placeholder={i18n.t("playlists.filterPlaceholder")}
-            size="sm"
-            class="w-full"
-            style="padding-left: 2rem; padding-right: 1.75rem;"
-          />
-          {#if filterQuery}
-            <button
-              onclick={() => { filterQuery = ""; }}
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
-              title={i18n.t("playlists.clearFilter")}
-            >
-              <X class="w-3 h-3" />
-            </button>
-          {/if}
-        </div>
-
-          <!-- Column Selector -->
-          <ColumnSelector />
-
-          <!-- Undo/Redo controls with labels -->
-          <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
-            <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
-            <span>{i18n.t("playlists.undoBtn")}</span>
-          </Button>
-          <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
-            <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
-            <span>{i18n.t("playlists.redoBtn")}</span>
-          </Button>
-
-          <!-- Deduplicate Button -->
-          {#if duplicateCount > 0}
-            <Button
-              onclick={removeDuplicates}
-              variant="info"
-              size="sm"
-              title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
-            >
-              <CopyPlus class="w-3.5 h-3.5" />
-              <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
-            </Button>
-          {/if}
-        </div>
-      </div>
-
-      <!-- Line 2: Import, Export, Remove Unavailable, Clear Playlist, Delete -->
-      <div class="flex items-center justify-end gap-2 w-full">
-        <!-- Import / Export buttons -->
-        <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
-          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
-          <span>{i18n.t("playlists.importPlaylistBtn")}</span>
-        </Button>
-
-        <Button
-          onclick={() => { showExportOptionsModal = true; }}
-          variant="secondary"
-          size="sm"
-          title={i18n.t("playlists.exportPlaylistTooltip")}
-        >
-          <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
-          <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
-        </Button>
-
-        <!-- Remove Unavailable Button -->
-        {#if unavailableCount > 0}
-          <Button
-            onclick={removeUnavailableTracks}
-            variant="warning"
-            size="sm"
-            title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
-          >
-            <AlertTriangle class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
-          </Button>
-        {/if}
-
-        <Button
-          onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
-          variant="secondary"
-          size="sm"
-          title={i18n.t("playlists.clearPlaylistTooltip")}
-        >
-          {i18n.t("playlists.clearPlaylistBtn")}
-        </Button>
-
-        {#if !isQueue}
-          <Button
-            onclick={() => { showDeleteConfirm = true; }}
-            variant="destructive"
-            size="sm"
-            title={i18n.t("playlists.deletePlaylistTooltip")}
-          >
-            <Trash2 class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
-          </Button>
         {/if}
       </div>
     </div>
@@ -1363,6 +1354,7 @@
         {/if}
       </div>
     </div>
+  </div>
   </div>
 
     <!-- Floating Multi-Select Batch Toolbar -->
