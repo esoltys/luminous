@@ -188,7 +188,7 @@
       "filename": "settings-organize.png",
       "tab": "settings",
       "action": "click-settings-tools",
-      "viewportHeight": 1220
+      "viewportHeight": 1440
     },
     {
       "name": "song-tag-editor",

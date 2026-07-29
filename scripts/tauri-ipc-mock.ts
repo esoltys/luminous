@@ -410,6 +410,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
+    has_acoustid_env_key: () => true,
 
     preview_organize: (args) => {
       const songIds = (args.songIds as number[] | undefined) ?? [];

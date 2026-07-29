@@ -60,6 +60,9 @@ vi.mock("@tauri-apps/api/core", () => {
           stop_after_current: false,
         };
       }
+      if (cmd === "has_acoustid_env_key") {
+        return false;
+      }
       return null;
     }),
   };

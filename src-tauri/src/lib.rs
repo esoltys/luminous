@@ -623,6 +623,7 @@ pub fn run() {
             // Tag Editor commands
             commands::tageditor::get_song_details,
             commands::tageditor::lookup_acoustid_tags,
+            commands::tageditor::has_acoustid_env_key,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_album_tags,
             // Settings commands

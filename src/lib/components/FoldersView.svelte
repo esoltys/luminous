@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download } from "lucide-svelte";
+  import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download, Eye, EyeOff } from "lucide-svelte";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -70,6 +70,8 @@
 
   let pruneMsg = $state<string | null>(null);
   let organizeRefreshKey = $state(0);
+  let showAcoustidKey = $state(false);
+  let hasEnvKey = $state(false);
 
   async function handlePruneMissing() {
     const { deletedSongs, removedFolders } = await collectionStore.pruneMissing();
@@ -117,8 +119,12 @@
           settingsTab = savedTab;
         }
       }
+      if (appVersion === "") {
+        appVersion = await invoke("get_app_version");
+      }
+      hasEnvKey = await invoke("has_acoustid_env_key");
     } catch (e) {
-      console.error("Failed to restore active_settings_tab:", e);
+      console.error("Failed to fetch settings on mount:", e);
     } finally {
       isTabInitialized = true;
     }
@@ -615,6 +621,49 @@
           {#if pruneMsg}
             <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
           {/if}
+        </div>
+      </div>
+
+      <!-- AcoustID Integration Section -->
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+        <div>
+          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.acoustidIntegration')}</h3>
+          <p class="text-xs text-brand-text-secondary leading-relaxed mb-4">
+            {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline cursor-pointer">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
+            <br />
+            {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline cursor-pointer">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
+          </p>
+          
+          {#if hasEnvKey}
+            <div class="mb-4 text-xs font-medium text-brand-accent-text flex items-center gap-2">
+              <Check class="w-3.5 h-3.5" />
+              <span>{i18n.t('settings.acoustidEnvKeyFound', { env: 'ACOUSTID_API_KEY' })}</span>
+            </div>
+          {/if}
+
+          <div class="flex items-center gap-3 max-w-md">
+            <div class="relative flex-1">
+              <Input
+                type={showAcoustidKey ? "text" : "password"}
+                bind:value={prefs.acoustidApiKey}
+                onchange={() => prefs.setAcoustidApiKey(prefs.acoustidApiKey)}
+                placeholder={i18n.t('settings.acoustidPlaceholder')}
+                class="w-full pr-10"
+              />
+              <button 
+                type="button"
+                onclick={() => showAcoustidKey = !showAcoustidKey}
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+                title={showAcoustidKey ? "Hide key" : "Show key"}
+              >
+                {#if showAcoustidKey}
+                  <EyeOff class="w-4 h-4" />
+                {:else}
+                  <Eye class="w-4 h-4" />
+                {/if}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     {:else if settingsTab === "themes"}

@@ -6,6 +6,7 @@ export type SeekBarMode = "waveform" | "moodbar";
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
+  acoustidApiKey = $state<string>("");
 
   async init() {
     try {
@@ -15,6 +16,9 @@ class PrefsStore {
       }
       if (settings?.seekbar_mode === "waveform" || settings?.seekbar_mode === "moodbar") {
         this.seekBarMode = settings.seekbar_mode;
+      }
+      if (settings?.acoustid_api_key) {
+        this.acoustidApiKey = settings.acoustid_api_key;
       }
     } catch (e) {
       console.error("Failed to load preference settings:", e);
@@ -36,6 +40,15 @@ class PrefsStore {
       await invoke("set_app_setting", { key: "seekbar_mode", value: this.seekBarMode });
     } catch (e) {
       console.error("Failed to save seek bar mode:", e);
+    }
+  }
+
+  async setAcoustidApiKey(key: string) {
+    this.acoustidApiKey = key;
+    try {
+      await invoke("set_app_setting", { key: "acoustid_api_key", value: key });
+    } catch (e) {
+      console.error("Failed to save AcoustID API key:", e);
     }
   }
 
