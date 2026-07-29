@@ -1001,10 +1001,10 @@ impl CollectionScanner {
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let album_track_count: i64 = row.get(56)?;
-                let album_disc_count: i64 = row.get(57)?;
-                let context_type: String = row.get(58)?;
-                let playlist_id: Option<i64> = row.get(59)?;
+                let album_track_count: i64 = row.get(57)?;
+                let album_disc_count: i64 = row.get(58)?;
+                let context_type: String = row.get(59)?;
+                let playlist_id: Option<i64> = row.get(60)?;
                 Ok((
                     song,
                     album_track_count,
@@ -1124,8 +1124,8 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(56)?;
-                let disc_count: i64 = row.get(57)?;
+                let count: i64 = row.get(57)?;
+                let disc_count: i64 = row.get(58)?;
                 Ok((song, count, disc_count))
             })?
             .filter_map(|r| r.ok())
@@ -1335,8 +1335,8 @@ fn get_songs_by_ids(
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
             let song = row_to_song(row)?;
-            let album_track_count: i64 = row.get(56)?;
-            let album_disc_count: i64 = row.get(57)?;
+            let album_track_count: i64 = row.get(57)?;
+            let album_disc_count: i64 = row.get(58)?;
             Ok((song.id, (song, album_track_count, album_disc_count)))
         })?
         .filter_map(|r| r.ok())
@@ -1675,7 +1675,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
     replaygain_track_gain, replaygain_album_gain,
-    is_vbr, is_instrumental
+    is_vbr, is_instrumental, added
 ";
 
 /// Song columns qualified with the `s` alias, plus correlated `album_track_count`
@@ -1695,7 +1695,7 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental,
+    s.is_vbr, s.is_instrumental, s.added,
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
@@ -1772,6 +1772,7 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         replaygain_album_gain: row.get(53)?,
         is_vbr: row.get(54)?,
         is_instrumental: row.get::<_, Option<bool>>(55)?.unwrap_or(false),
+        added: row.get(56)?,
         ..Default::default()
     })
 }
@@ -2846,13 +2847,13 @@ mod tests {
                 .as_nanos()
         ));
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
-        let scanner = LibraryScanner::new(db.clone());
+        let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
 
         let insert_song = |path: &str, title: &str, artist: &str, album: &str| -> i64 {
             let song = Song {
-                source: 1,
-                path: path.to_string(),
+                source: SongSource::LocalFile,
+                path: Some(path.to_string()),
                 title: Some(title.to_string()),
                 artist: Some(artist.to_string()),
                 album: Some(album.to_string()),
