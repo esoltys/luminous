@@ -2,6 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import type { VisibleColumns } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { Columns } from "lucide-svelte";
 
   interface Props {
@@ -12,6 +13,28 @@
   let { align = "right", size = "md" }: Props = $props();
 
   let showMenu = $state(false);
+  let buttonEl = $state<HTMLButtonElement | undefined>(undefined);
+
+  const MENU_MAX_HEIGHT_PX = 448; // 28rem ceiling
+  const MENU_MIN_HEIGHT_PX = 160;
+  // Matches the pb-28 bottom padding views reserve elsewhere to clear the floating PlayerBar dock.
+  const PLAYERBAR_RESERVE_PX = 112;
+  const PAGE_BOTTOM_MARGIN_PX = 16;
+
+  let menuMaxHeight = $state(MENU_MAX_HEIGHT_PX);
+
+  function updateMenuMaxHeight() {
+    if (!buttonEl) return;
+    const rect = buttonEl.getBoundingClientRect();
+    const reserve = playerStore.currentSong ? PLAYERBAR_RESERVE_PX : PAGE_BOTTOM_MARGIN_PX;
+    const available = window.innerHeight - rect.bottom - reserve;
+    menuMaxHeight = Math.max(MENU_MIN_HEIGHT_PX, Math.min(MENU_MAX_HEIGHT_PX, available));
+  }
+
+  function toggleMenu() {
+    showMenu = !showMenu;
+    if (showMenu) updateMenuMaxHeight();
+  }
 
   function handleWindowClick(e: MouseEvent) {
     if (showMenu) {
@@ -41,13 +64,13 @@
     { key: "bitdepth",    label: "collection.columnBitDepth" },
     { key: "channels",    label: "collection.columnChannels" },
     { key: "filesize",    label: "collection.columnFileSize" },
-    { key: "path",        label: "collection.columnPath" },
     { key: "rating",      label: "collection.columnRating" },
     { key: "playcount",   label: "collection.columnPlayCount" },
     { key: "skipcount",   label: "collection.columnSkipCount" },
     { key: "lastplayed",  label: "collection.columnLastPlayed" },
     { key: "added",       label: "collection.columnAdded" },
     { key: "duration",    label: "collection.columnDuration" },
+    { key: "path",        label: "collection.columnPath" },
     { key: "actions",     label: "collection.columnActions" },
   ];
 
@@ -90,11 +113,12 @@
   );
 </script>
 
-<svelte:window onclick={handleWindowClick} />
+<svelte:window onclick={handleWindowClick} onresize={() => showMenu && updateMenuMaxHeight()} />
 
 <div class="relative column-selector-container shrink-0 z-40">
   <button
-    onclick={() => (showMenu = !showMenu)}
+    bind:this={buttonEl}
+    onclick={toggleMenu}
     class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary focus:outline-none transition-all cursor-pointer font-semibold rounded-full
       {size === 'sm' ? 'px-2.5 h-7 text-[11px]' : 'px-3 py-1.5 text-xs'}"
     title={i18n.t("collection.columnsBtn")}
@@ -105,8 +129,9 @@
 
   {#if showMenu}
     <div
-      class="absolute top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 max-h-[28rem] overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar
+      class="absolute top-full mt-2 bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar
         {align === 'left' ? 'left-0' : 'right-0'}"
+      style="max-height: {menuMaxHeight}px"
     >
       <!-- Visible: currently-on columns in table order -->
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5">
