@@ -26,7 +26,7 @@
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
-  import type { PlaylistItem } from "../types";
+  import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -38,9 +38,45 @@
   import SortableHeader from "./SortableHeader.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import ColumnSelector from "./ColumnSelector.svelte";
+  import { Clock } from "lucide-svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import { portal } from "../utils/portal";
+  import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+
+  let gridColsStyle = $derived.by(() => {
+    const cols: string[] = ["48px"]; // position column always present
+    const vc = collectionStore.visibleColumns;
+
+    if (vc.title) cols.push("2fr");
+    if (vc.artist) cols.push("1.5fr");
+    if (vc.album) cols.push("1.5fr");
+
+    if (vc.composer) cols.push("1.5fr");
+    if (vc.album_artist) cols.push("1.5fr");
+    if (vc.format) cols.push("64px");
+    if (vc.year) cols.push("60px");
+    if (vc.genre) cols.push("1.2fr");
+    if (vc.grouping) cols.push("1.2fr");
+    if (vc.bpm) cols.push("60px");
+    if (vc.initial_key) cols.push("60px");
+    if (vc.bitrate) cols.push("70px");
+    if (vc.samplerate) cols.push("75px");
+    if (vc.bitdepth) cols.push("65px");
+    if (vc.channels) cols.push("70px");
+    if (vc.filesize) cols.push("75px");
+    if (vc.rating) cols.push("96px");
+    if (vc.playcount) cols.push("70px");
+    if (vc.skipcount) cols.push("70px");
+    if (vc.lastplayed) cols.push("90px");
+    if (vc.added) cols.push("90px");
+    if (vc.duration) cols.push("80px");
+    if (vc.path) cols.push("2fr");
+    if (vc.actions) cols.push("80px");
+
+    return `grid-template-columns: ${cols.join(" ")}`;
+  });
   import {
     COVER_STACK_OFFSET_X_PX,
     COVER_STACK_OFFSET_Y_PX,
@@ -176,7 +212,7 @@
     });
   }
 
-  type PlaylistSortField = "position" | "title" | "artist" | "album" | "rating" | "duration";
+  type PlaylistSortField = "position" | keyof Song;
   let sortField = $state<PlaylistSortField>("position");
   let sortAsc = $state(true);
 
@@ -189,43 +225,60 @@
     }
   }
 
+  // Build the searchable text for a song from whichever columns are currently
+  // visible, so the filter reflects what's actually shown in the table rather
+  // than a fixed title/artist/album set.
+  function searchableColumnValues(song: Song | undefined): string[] {
+    if (!song) return [];
+    const vc = collectionStore.visibleColumns;
+    const values: (string | number | undefined | null)[] = [];
+    if (vc.title) values.push(song.title);
+    if (vc.artist) values.push(song.artist);
+    if (vc.album) values.push(song.album);
+    if (vc.composer) values.push(song.composer);
+    if (vc.album_artist) values.push(song.album_artist);
+    if (vc.format) values.push(song.filetype);
+    if (vc.year) values.push(song.year);
+    if (vc.genre) values.push(song.genre);
+    if (vc.grouping) values.push(song.grouping);
+    if (vc.bpm) values.push(song.bpm);
+    if (vc.initial_key) values.push(song.initial_key);
+    if (vc.bitrate) values.push(song.bitrate);
+    if (vc.samplerate) values.push(formatSampleRate(song.samplerate));
+    if (vc.bitdepth) values.push(formatBitDepth(song.bitdepth));
+    if (vc.channels) values.push(formatChannels(song.channels));
+    if (vc.filesize) values.push(formatFileSize(song.filesize));
+    if (vc.rating) values.push(song.rating);
+    if (vc.playcount) values.push(song.playcount);
+    if (vc.skipcount) values.push(song.skipcount);
+    if (vc.lastplayed) values.push(formatDate(song.lastplayed));
+    if (vc.added) values.push(formatDate(song.added));
+    if (vc.duration) values.push(formatDuration(song.length_nanosec));
+    if (vc.path) values.push(song.path);
+    return values
+      .filter((v) => v !== undefined && v !== null && v !== "")
+      .map((v) => String(v).toLowerCase());
+  }
+
   // Derived filtered tracks based on filterQuery and sort selection
   let filteredTracks = $derived.by(() => {
     const q = filterQuery.trim().toLowerCase();
     let result = playlistsStore.activePlaylistTracks;
     if (q) {
-      result = result.filter((item) => {
-        const title = item.song?.title?.toLowerCase() ?? "";
-        const artist = item.song?.artist?.toLowerCase() ?? "";
-        const album = item.song?.album?.toLowerCase() ?? "";
-        return title.includes(q) || artist.includes(q) || album.includes(q);
-      });
+      result = result.filter((item) => searchableColumnValues(item.song).some((v) => v.includes(q)));
     }
 
     if (sortField === "position") {
       return sortAsc ? result : [...result].reverse();
     }
 
+    const fieldName = sortField as string;
     return [...result].sort((a, b) => {
-      let valA: string | number = "";
-      let valB: string | number = "";
+      let valA = a.song ? (a.song as Record<string, any>)[fieldName] : undefined;
+      let valB = b.song ? (b.song as Record<string, any>)[fieldName] : undefined;
 
-      if (sortField === "title") {
-        valA = a.song?.title?.toLowerCase() ?? "";
-        valB = b.song?.title?.toLowerCase() ?? "";
-      } else if (sortField === "artist") {
-        valA = a.song?.artist?.toLowerCase() ?? "";
-        valB = b.song?.artist?.toLowerCase() ?? "";
-      } else if (sortField === "album") {
-        valA = a.song?.album?.toLowerCase() ?? "";
-        valB = b.song?.album?.toLowerCase() ?? "";
-      } else if (sortField === "rating") {
-        valA = a.song?.rating ?? 0;
-        valB = b.song?.rating ?? 0;
-      } else if (sortField === "duration") {
-        valA = a.song?.length_nanosec ?? 0;
-        valB = b.song?.length_nanosec ?? 0;
-      }
+      if (valA === undefined || valA === null) return sortAsc ? 1 : -1;
+      if (valB === undefined || valB === null) return sortAsc ? -1 : 1;
 
       if (typeof valA === "string" && typeof valB === "string") {
         const cmp = valA.localeCompare(valB);
@@ -605,12 +658,12 @@
   {/if}
 
   {#if activePlaylist}
-    <div class="flex-1 overflow-y-auto relative z-10">
+    <div class="flex-1 flex flex-col min-h-0 relative z-10">
     <!-- Stacked Cover Art Hero & Summary Banner Header -->
-    <div class="relative w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
-      <div class="flex items-end justify-between gap-6 relative z-10">
+    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
+      <div class="flex items-start justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
-        <div class="flex flex-col justify-end gap-2 max-w-xl">
+        <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -691,6 +744,105 @@
               </Button>
             {/if}
           </div>
+
+          <!-- Secondary Control Buttons Row -->
+          <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
+            <!-- Search Filter Bar -->
+            <div class="relative w-full max-w-xs">
+              <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
+              <Input
+                type="text"
+                bind:value={filterQuery}
+                placeholder={i18n.t("playlists.filterPlaceholder")}
+                size="sm"
+                class="w-full"
+                style="padding-left: 2rem; padding-right: 1.75rem;"
+              />
+              {#if filterQuery}
+                <button
+                  onclick={() => { filterQuery = ""; }}
+                  class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                  title={i18n.t("playlists.clearFilter")}
+                >
+                  <X class="w-3 h-3" />
+                </button>
+              {/if}
+            </div>
+
+            <ColumnSelector size="sm" align="left" />
+
+            <div class="flex items-center gap-2 shrink-0">
+              <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
+                <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
+                <span>{i18n.t("playlists.undoBtn")}</span>
+              </Button>
+              <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
+                <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
+                <span>{i18n.t("playlists.redoBtn")}</span>
+              </Button>
+            </div>
+
+            {#if duplicateCount > 0}
+              <Button
+                onclick={removeDuplicates}
+                variant="info"
+                size="sm"
+                title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
+              >
+                <CopyPlus class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
+              </Button>
+            {/if}
+
+            <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
+              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t("playlists.importPlaylistBtn")}</span>
+            </Button>
+
+            <Button
+              onclick={() => { showExportOptionsModal = true; }}
+              variant="secondary"
+              size="sm"
+              title={i18n.t("playlists.exportPlaylistTooltip")}
+            >
+              <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
+            </Button>
+
+            {#if unavailableCount > 0}
+              <Button
+                onclick={removeUnavailableTracks}
+                variant="warning"
+                size="sm"
+                title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
+              >
+                <AlertTriangle class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
+              </Button>
+            {/if}
+
+            <Button
+              onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
+              variant="secondary"
+              size="sm"
+              title={i18n.t("playlists.clearPlaylistTooltip")}
+            >
+              {i18n.t("playlists.clearPlaylistBtn")}
+            </Button>
+
+            {#if !isQueue}
+              <Button
+                onclick={() => { showDeleteConfirm = true; }}
+                variant="secondary"
+                size="sm"
+                class="hover:bg-red-950/20 hover:text-red-400 hover:border-red-900/30"
+                title={i18n.t("playlists.deletePlaylistTooltip")}
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+                <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
+              </Button>
+            {/if}
+          </div>
         </div>
 
         <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue Banner -->
@@ -719,337 +871,521 @@
       </div>
     </div>
 
-    <!-- Toolbar: Search filter, actions, import/export, undo/redo -->
-    <div class="px-6 py-2.5 border-b border-brand-border/60 flex flex-col gap-2 relative z-10 bg-brand-main/40 backdrop-blur-md">
-      <!-- Line 1: Filter songs input, Undo & Redo (with labels), Remove duplicates -->
-      <div class="flex items-center justify-between gap-3 w-full">
-        <!-- Search Filter Bar -->
-        <div class="relative flex-1 max-w-xs">
-          <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
-          <Input
-            type="text"
-            bind:value={filterQuery}
-            placeholder={i18n.t("playlists.filterPlaceholder")}
-            size="sm"
-            class="w-full"
-            style="padding-left: 2rem; padding-right: 1.75rem;"
-          />
-          {#if filterQuery}
-            <button
-              onclick={() => { filterQuery = ""; }}
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
-              title={i18n.t("playlists.clearFilter")}
-            >
-              <X class="w-3 h-3" />
-            </button>
-          {/if}
-        </div>
-
-        <div class="flex items-center gap-2">
-          <!-- Undo/Redo controls with labels -->
-          <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
-            <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
-            <span>{i18n.t("playlists.undoBtn")}</span>
-          </Button>
-          <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
-            <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
-            <span>{i18n.t("playlists.redoBtn")}</span>
-          </Button>
-
-          <!-- Deduplicate Button -->
-          {#if duplicateCount > 0}
-            <Button
-              onclick={removeDuplicates}
-              variant="info"
-              size="sm"
-              title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
-            >
-              <CopyPlus class="w-3.5 h-3.5" />
-              <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
-            </Button>
-          {/if}
-        </div>
-      </div>
-
-      <!-- Line 2: Import, Export, Remove Unavailable, Clear Playlist, Delete -->
-      <div class="flex items-center justify-end gap-2 w-full">
-        <!-- Import / Export buttons -->
-        <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
-          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
-          <span>{i18n.t("playlists.importPlaylistBtn")}</span>
-        </Button>
-
-        <Button
-          onclick={() => { showExportOptionsModal = true; }}
-          variant="secondary"
-          size="sm"
-          title={i18n.t("playlists.exportPlaylistTooltip")}
-        >
-          <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
-          <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
-        </Button>
-
-        <!-- Remove Unavailable Button -->
-        {#if unavailableCount > 0}
-          <Button
-            onclick={removeUnavailableTracks}
-            variant="warning"
-            size="sm"
-            title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
-          >
-            <AlertTriangle class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
-          </Button>
-        {/if}
-
-        <Button
-          onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
-          variant="secondary"
-          size="sm"
-          title={i18n.t("playlists.clearPlaylistTooltip")}
-        >
-          {i18n.t("playlists.clearPlaylistBtn")}
-        </Button>
-
-        {#if !isQueue}
-          <Button
-            onclick={() => { showDeleteConfirm = true; }}
-            variant="destructive"
-            size="sm"
-            title={i18n.t("playlists.deletePlaylistTooltip")}
-          >
-            <Trash2 class="w-3.5 h-3.5" />
-            <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
-          </Button>
-        {/if}
-      </div>
-    </div>
-
     <!-- Tracks List Container -->
-    <div class="p-6" class:pb-28={!!playerStore.currentSong}>
-      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative">
-        <table class="w-full text-left text-sm border-collapse min-w-[800px]">
-          <thead>
-            <tr class="text-xs text-brand-text-secondary uppercase tracking-wider font-semibold">
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-12 text-center z-10">
-                <SortableHeader
-                  active={sortField === "position"}
-                  {sortAsc}
-                  onclick={() => toggleSort("position")}
-                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderTrack")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <SortableHeader
-                  active={sortField === "title"}
-                  {sortAsc}
-                  onclick={() => toggleSort("title")}
-                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderTitle")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <SortableHeader
-                  active={sortField === "artist"}
-                  {sortAsc}
-                  onclick={() => toggleSort("artist")}
-                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderArtist")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 z-10">
-                <SortableHeader
-                  active={sortField === "album"}
-                  {sortAsc}
-                  onclick={() => toggleSort("album")}
-                  class="flex items-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("collection.tableHeaderAlbum")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-28 text-center z-10">
-                <SortableHeader
-                  active={sortField === "rating"}
-                  {sortAsc}
-                  onclick={() => toggleSort("rating")}
-                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("collection.tableHeaderRating")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-24 text-center z-10">
-                <SortableHeader
-                  active={sortField === "duration"}
-                  {sortAsc}
-                  onclick={() => toggleSort("duration")}
-                  class="w-full flex items-center justify-center gap-1 hover:text-brand-text-primary transition-colors cursor-pointer uppercase tracking-wider font-semibold"
-                >
-                  {#snippet label(arrow)}{i18n.t("playlists.tableHeaderDuration")} {arrow}{/snippet}
-                </SortableHeader>
-              </th>
-              <th class="sticky top-0 bg-brand-sidebar border-b border-brand-border py-3 px-4 w-20 text-center z-10">{i18n.t("collection.tableHeaderActions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each filteredTracks as item, index}
-              {@const unavailable = isItemUnavailable(item)}
-              {@const isDuplicate = duplicateUuids.includes(item.uuid)}
-              {@const isSelected = selectedUuids.has(item.uuid)}
-              {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
-              <tr
-                data-playlist-row="true"
-                draggable={!unavailable ? "true" : "false"}
-                ondragstart={(e) => !unavailable && handleDragStart(e, actualIndex, item)}
-                ondragover={(e) => handleDragOver(e, actualIndex)}
-                ondragenter={(e) => handleDragEnter(e, actualIndex)}
-                ondragleave={(e) => handleDragLeave(e, actualIndex)}
-                ondragend={handleDragEnd}
-                ondrop={(e) => handleDrop(e, actualIndex)}
-                onclick={(e) => handleRowClick(e, item)}
-                oncontextmenu={(e) => handleContextMenu(e, item)}
-                ondblclick={() => !unavailable && handlePlayPlaylistItem(actualIndex)}
-                class="border-b border-brand-border/40 group transition-all duration-150 select-none
-                  {unavailable
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'cursor-grab active:cursor-grabbing'}
-                  {isSelected ? 'bg-brand-accent/20 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40'}
-                  {!unavailable && !isSelected && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
-                  {dragOverIndex === actualIndex && draggedIndex !== null && draggedIndex !== actualIndex
-                    ? (actualIndex < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
-                    : ''
-                  }"
-              >
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary font-medium w-12 relative cursor-grab active:cursor-grabbing">
-                  <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
-                    <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
-                    {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
-                      <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
-                        <NowPlayingBars />
-                      </div>
-                    {:else}
-                      <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
-                        {actualIndex + 1}
-                      </span>
-                    {/if}
-                    <button
-                      onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(actualIndex); }}
-                      class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
-                      disabled={unavailable}
-                      title={i18n.t("playlists.playTrack")}
-                    >
-                      <Play class="w-4 h-4 fill-current" />
-                    </button>
+    <div class="flex-1 min-h-0 p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+      <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto">
+      <!-- Header -->
+      <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
+        <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
+          <SortableHeader
+            active={sortField === "position"}
+            {sortAsc}
+            onclick={() => toggleSort("position")}
+            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+          >
+            {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderTrack")} {arrow}</span>{/snippet}
+          </SortableHeader>
+          {#if collectionStore.visibleColumns.title}
+            <SortableHeader
+              active={sortField === "title"}
+              {sortAsc}
+              onclick={() => toggleSort("title")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderTitle")} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.artist}
+            <SortableHeader
+              active={sortField === "artist"}
+              {sortAsc}
+              onclick={() => toggleSort("artist")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderArtist")} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.album}
+            <SortableHeader
+              active={sortField === "album"}
+              {sortAsc}
+              onclick={() => toggleSort("album")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("collection.tableHeaderAlbum")} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+
+          {#if collectionStore.visibleColumns.composer}
+            <SortableHeader
+              active={sortField === "composer"}
+              {sortAsc}
+              onclick={() => toggleSort("composer")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.album_artist}
+            <SortableHeader
+              active={sortField === "album_artist"}
+              {sortAsc}
+              onclick={() => toggleSort("album_artist")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.format}
+            <SortableHeader
+              active={sortField === "filetype"}
+              {sortAsc}
+              onclick={() => toggleSort("filetype")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.year}
+            <SortableHeader
+              active={sortField === "year"}
+              {sortAsc}
+              onclick={() => toggleSort("year")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.genre}
+            <SortableHeader
+              active={sortField === "genre"}
+              {sortAsc}
+              onclick={() => toggleSort("genre")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.grouping}
+            <SortableHeader
+              active={sortField === "grouping"}
+              {sortAsc}
+              onclick={() => toggleSort("grouping")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.bpm}
+            <SortableHeader
+              active={sortField === "bpm"}
+              {sortAsc}
+              onclick={() => toggleSort("bpm")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.initial_key}
+            <SortableHeader
+              active={sortField === "initial_key"}
+              {sortAsc}
+              onclick={() => toggleSort("initial_key")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.bitrate}
+            <SortableHeader
+              active={sortField === "bitrate"}
+              {sortAsc}
+              onclick={() => toggleSort("bitrate")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.samplerate}
+            <SortableHeader
+              active={sortField === "samplerate"}
+              {sortAsc}
+              onclick={() => toggleSort("samplerate")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.bitdepth}
+            <SortableHeader
+              active={sortField === "bitdepth"}
+              {sortAsc}
+              onclick={() => toggleSort("bitdepth")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.channels}
+            <SortableHeader
+              active={sortField === "channels"}
+              {sortAsc}
+              onclick={() => toggleSort("channels")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.filesize}
+            <SortableHeader
+              active={sortField === "filesize"}
+              {sortAsc}
+              onclick={() => toggleSort("filesize")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.rating}
+            <SortableHeader
+              active={sortField === "rating"}
+              {sortAsc}
+              onclick={() => toggleSort("rating")}
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.playcount}
+            <SortableHeader
+              active={sortField === "playcount"}
+              {sortAsc}
+              onclick={() => toggleSort("playcount")}
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.skipcount}
+            <SortableHeader
+              active={sortField === "skipcount"}
+              {sortAsc}
+              onclick={() => toggleSort("skipcount")}
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.lastplayed}
+            <SortableHeader
+              active={sortField === "lastplayed"}
+              {sortAsc}
+              onclick={() => toggleSort("lastplayed")}
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.added}
+            <SortableHeader
+              active={sortField === "added"}
+              {sortAsc}
+              onclick={() => toggleSort("added")}
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.duration}
+            <SortableHeader
+              active={sortField === "length_nanosec"}
+              {sortAsc}
+              onclick={() => toggleSort("length_nanosec")}
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<Clock class="w-4 h-4 shrink-0" /> {arrow}{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.path}
+            <SortableHeader
+              active={sortField === "path"}
+              {sortAsc}
+              onclick={() => toggleSort("path")}
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            >
+              {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
+            </SortableHeader>
+          {/if}
+          {#if collectionStore.visibleColumns.actions}
+            <div class="text-center">{i18n.t("collection.tableHeaderActions")}</div>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Rows -->
+      <div class="divide-y divide-brand-border/40">
+        {#each filteredTracks as item, index}
+          {@const unavailable = isItemUnavailable(item)}
+          {@const isDuplicate = duplicateUuids.includes(item.uuid)}
+          {@const isSelected = selectedUuids.has(item.uuid)}
+          {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
+          <div
+            role="row"
+            data-playlist-row="true"
+            draggable={!unavailable ? "true" : "false"}
+            ondragstart={(e) => !unavailable && handleDragStart(e, actualIndex, item)}
+            ondragover={(e) => handleDragOver(e, actualIndex)}
+            ondragenter={(e) => handleDragEnter(e, actualIndex)}
+            ondragleave={(e) => handleDragLeave(e, actualIndex)}
+            ondragend={handleDragEnd}
+            ondrop={(e) => handleDrop(e, actualIndex)}
+            onclick={(e) => handleRowClick(e, item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
+            ondblclick={() => !unavailable && handlePlayPlaylistItem(actualIndex)}
+            class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
+              {unavailable
+                ? 'opacity-50 cursor-not-allowed'
+                : 'cursor-grab active:cursor-grabbing'}
+              {isSelected ? 'bg-brand-accent/20 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40'}
+              {!unavailable && !isSelected && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
+              {dragOverIndex === actualIndex && draggedIndex !== null && draggedIndex !== actualIndex
+                ? (actualIndex < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
+                : ''
+              }"
+            style={gridColsStyle}
+          >
+            <div class="text-center text-brand-text-secondary font-medium relative min-w-0 cursor-grab active:cursor-grabbing">
+              <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
+                <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
+                {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
+                  <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
+                    <NowPlayingBars />
                   </div>
-                </td>
-                <td class="py-2.5 px-4 font-medium truncate max-w-xs {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary' : 'text-brand-text-primary'}">
-                  <div class="flex items-center gap-2 max-w-full">
-                    {#if unavailable}
-                      <span title={i18n.t("playlists.fileNotFoundTooltip")}>
-                        <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
-                      </span>
-                      <span class="truncate line-through decoration-brand-text-secondary/40">
-                        {item.song?.title ?? i18n.t("collection.unknownSong")}
-                      </span>
-                    {:else if item.song?.title}
-                      {#if isDuplicate}
-                        <span
-                          class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0"
-                          title={i18n.t("playlists.duplicateTrackFlag")}
-                        >
-                          {i18n.t("playlists.duplicateTrackFlag")}
-                        </span>
-                      {/if}
+                {:else}
+                  <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
+                    {actualIndex + 1}
+                  </span>
+                {/if}
+                <button
+                  onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(actualIndex); }}
+                  class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                  disabled={unavailable}
+                  title={i18n.t("playlists.playTrack")}
+                >
+                  <Play class="w-4 h-4 fill-current" />
+                </button>
+              </div>
+            </div>
+
+            {#if collectionStore.visibleColumns.title}
+              <div class="font-medium truncate pr-4 min-w-0 {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary' : 'text-brand-text-primary'}">
+                <div class="flex items-center gap-2 max-w-full">
+                  {#if unavailable}
+                    <span title={i18n.t("playlists.fileNotFoundTooltip")}>
+                      <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
+                    </span>
+                    <span class="truncate line-through decoration-brand-text-secondary/40">
+                      {item.song?.title ?? i18n.t("collection.unknownSong")}
+                    </span>
+                  {:else if item.song?.title}
+                    {#if isDuplicate}
                       <span
-                        class="truncate font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                        title={item.song.title}
+                        class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0"
+                        title={i18n.t("playlists.duplicateTrackFlag")}
                       >
-                        {item.song.title}
+                        {i18n.t("playlists.duplicateTrackFlag")}
                       </span>
-                    {:else}
-                      <span class="truncate">{i18n.t("collection.unknownSong")}</span>
                     {/if}
-                  </div>
-                </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
-                  {#if unavailable}
-                    <span class="text-brand-text-secondary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
-                  {:else if item.song?.artist}
-                    <LinkButton
-                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
-                      class="text-brand-text-secondary truncate"
-                      title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
+                    <span
+                      class="truncate font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                      title={item.song.title}
                     >
-                      {item.song.artist}
-                    </LinkButton>
+                      {item.song.title}
+                    </span>
                   {:else}
-                    <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownArtist")}</span>
+                    <span class="truncate">{i18n.t("collection.unknownSong")}</span>
                   {/if}
-                </td>
-                <td class="py-2.5 px-4 text-brand-text-secondary truncate max-w-xs">
-                  {#if unavailable}
-                    <span class="text-brand-text-secondary italic text-xs">{item.song?.album ?? ""}</span>
-                  {:else if item.song?.album}
-                    <LinkButton
-                      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
-                      class="text-brand-text-secondary truncate"
-                      title={i18n.t("collection.filterByAlbum", { album: item.song.album })}
-                    >
-                      {item.song.album}
-                    </LinkButton>
-                  {:else}
-                    <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownAlbum")}</span>
-                  {/if}
-                </td>
-                <td class="py-2.5 px-4 text-center">
-                  {#if item.song && !unavailable}
-                    <div class="flex justify-center" onclick={(e) => e.stopPropagation()} role="presentation">
-                      <SongRating rating={item.song.rating} onRate={(r) => rateItem(item, r)} />
-                    </div>
-                  {/if}
-                </td>
-                <td class="py-2.5 px-4 text-center text-brand-text-secondary/80">{formatDuration(item.song?.length_nanosec)}</td>
-                <td class="py-2.5 px-4 text-center">
-                  <div class="flex items-center justify-center gap-2.5">
-                    <button
-                      onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
-                      class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
-                      title={i18n.t("collection.editTagsTooltip")}
-                      disabled={!item.song || unavailable}
-                    >
-                      <Edit3 class="w-4 h-4" />
-                    </button>
-                    <button
-                      onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
-                      class="text-brand-text-secondary/60 hover:text-red-400 transition-colors cursor-pointer"
-                      title={i18n.t("playlists.removeFromPlaylist")}
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            {/each}
-            {#if filteredTracks.length === 0}
-              <tr>
-                <td colspan="7" class="py-12 text-center text-brand-text-secondary/45">
-                  <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
-                  {#if filterQuery}
-                    {i18n.t("playlists.noFilterResults", { query: filterQuery })}
-                  {:else}
-                    {i18n.t("playlists.emptyPlaylistTitle")}. {i18n.t("playlists.emptyPlaylistText")}
-                  {/if}
-                </td>
-              </tr>
+                </div>
+              </div>
             {/if}
-          </tbody>
-        </table>
+
+            {#if collectionStore.visibleColumns.artist}
+              <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+                {#if unavailable}
+                  <span class="text-brand-text-secondary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
+                {:else if item.song?.artist}
+                  <LinkButton
+                    onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
+                    class="text-brand-text-secondary truncate"
+                    title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
+                  >
+                    {item.song.artist}
+                  </LinkButton>
+                {:else}
+                  <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownArtist")}</span>
+                {/if}
+              </div>
+            {/if}
+
+            {#if collectionStore.visibleColumns.album}
+              <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+                {#if unavailable}
+                  <span class="text-brand-text-secondary italic text-xs">{item.song?.album ?? ""}</span>
+                {:else if item.song?.album}
+                  <LinkButton
+                    onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
+                    class="text-brand-text-secondary truncate"
+                    title={i18n.t("collection.filterByAlbum", { album: item.song.album })}
+                  >
+                    {item.song.album}
+                  </LinkButton>
+                {:else}
+                  <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownAlbum")}</span>
+                {/if}
+              </div>
+            {/if}
+
+            {#if collectionStore.visibleColumns.composer}
+              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.composer}>
+                {item.song?.composer || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.album_artist}
+              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.album_artist}>
+                {item.song?.album_artist || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.format}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+                {item.song?.filetype ? item.song.filetype.toUpperCase() : "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.year}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+                {item.song?.year || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.genre}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.genre}>
+                {item.song?.genre || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.grouping}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.grouping}>
+                {item.song?.grouping || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.bpm}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {item.song?.bpm || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.initial_key}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {item.song?.initial_key || "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.bitrate}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {item.song?.bitrate ? `${item.song.bitrate}k` : "—"}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.samplerate}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {formatSampleRate(item.song?.samplerate)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.bitdepth}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {formatBitDepth(item.song?.bitdepth)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.channels}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+                {formatChannels(item.song?.channels)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.filesize}
+              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                {formatFileSize(item.song?.filesize)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.rating}
+              <div class="flex justify-center min-w-0" onclick={(e) => e.stopPropagation()} role="presentation">
+                {#if item.song && !unavailable}
+                  <SongRating rating={item.song.rating} onRate={(r) => rateItem(item, r)} />
+                {/if}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.playcount}
+              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                {item.song?.playcount || 0}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.skipcount}
+              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                {item.song?.skipcount || 0}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.lastplayed}
+              <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+                {formatDate(item.song?.lastplayed)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.added}
+              <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+                {formatDate(item.song?.added)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.duration}
+              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                {formatDuration(item.song?.length_nanosec)}
+              </div>
+            {/if}
+            {#if collectionStore.visibleColumns.path}
+              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-mono" title={item.song?.path}>
+                {item.song?.path || "—"}
+              </div>
+            {/if}
+
+            {#if collectionStore.visibleColumns.actions}
+              <div class="text-center min-w-0">
+                <div class="flex items-center justify-center gap-2.5">
+                  <button
+                    onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
+                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
+                    title={i18n.t("collection.editTagsTooltip")}
+                    disabled={!item.song || unavailable}
+                  >
+                    <Edit3 class="w-4 h-4" />
+                  </button>
+                  <button
+                    onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
+                    class="text-brand-text-secondary/60 hover:text-red-400 transition-colors cursor-pointer"
+                    title={i18n.t("playlists.removeFromPlaylist")}
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/each}
+
+        {#if filteredTracks.length === 0}
+          <div class="py-12 text-center text-brand-text-secondary/45 select-none">
+            <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
+            {#if filterQuery}
+              {i18n.t("playlists.noFilterResults", { query: filterQuery })}
+            {:else}
+              {i18n.t("playlists.emptyPlaylistTitle")}. {i18n.t("playlists.emptyPlaylistText")}
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
-    </div>
+  </div>
+  </div>
 
     <!-- Floating Multi-Select Batch Toolbar -->
     {#if selectedUuids.size > 0}
