@@ -60,8 +60,8 @@
     if (vc.added) cols.push("90px");
     if (vc.duration) cols.push("80px");
     if (vc.path) cols.push("2fr");
+    if (vc.actions) cols.push("80px");
 
-    cols.push("80px");
     return `grid-template-columns: ${cols.join(" ")}`;
   });
   let genre = $derived(view.genre);
@@ -542,7 +542,7 @@
     </div>
   </div>
 
-  <div class="flex-1 min-h-0 px-6 md:px-8 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+  <div class="flex-1 min-h-0 px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
     <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto">
       <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
@@ -788,7 +788,9 @@
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
             </SortableHeader>
           {/if}
-          <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
+          {#if collectionStore.visibleColumns.actions}
+            <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
+          {/if}
         </div>
       </div>
 
@@ -820,10 +822,6 @@
                     <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                       <NowPlayingBars />
                     </div>
-                  {:else}
-                    <span class="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity whitespace-nowrap">
-                      {formatTrackNumber(song.track, song.disc, discCountFor(song), index)}
-                    </span>
                   {/if}
                   <button
                     onclick={(e) => { e.stopPropagation(); handlePlaySong(song); }}
@@ -834,6 +832,11 @@
                   </button>
                 </div>
               </div>
+              {#if collectionStore.visibleColumns.track}
+                <div class="text-brand-text-secondary truncate pr-4 min-w-0 font-medium">
+                  {formatTrackNumber(song.track, song.disc, discCountFor(song), index)}
+                </div>
+              {/if}
               {#if collectionStore.visibleColumns.title}
                 <div class="font-medium truncate pr-4 min-w-0 {selectedSongIds.has(song.id) || (playerStore.currentSong && playerStore.currentSong.id === song.id) ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
                   <span class="truncate" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
@@ -971,26 +974,28 @@
                 </div>
               {/if}
 
-              <div class="text-center min-w-0">
-                <div class="flex items-center justify-center gap-2.5">
-                  <button
-                    onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
-                    class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
-                    title={playlistsStore.activeCustomPlaylist
-                      ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
-                      : i18n.t('collection.addPlaylistTooltipDefault')}
-                  >
-                    <Plus class="w-4 h-4" />
-                  </button>
-                  <button
-                    onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
-                    class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
-                    title={i18n.t('collection.editTagsTooltip')}
-                  >
-                    <Edit3 class="w-4 h-4" />
-                  </button>
+              {#if collectionStore.visibleColumns.actions}
+                <div class="text-center min-w-0">
+                  <div class="flex items-center justify-center gap-2.5">
+                    <button
+                      onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
+                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      title={playlistsStore.activeCustomPlaylist
+                        ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
+                        : i18n.t('collection.addPlaylistTooltipDefault')}
+                    >
+                      <Plus class="w-4 h-4" />
+                    </button>
+                    <button
+                      onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
+                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      title={i18n.t('collection.editTagsTooltip')}
+                    >
+                      <Edit3 class="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              {/if}
             </div>
           {/each}
         {/if}

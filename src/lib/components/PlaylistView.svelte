@@ -73,8 +73,8 @@
     if (vc.added) cols.push("90px");
     if (vc.duration) cols.push("80px");
     if (vc.path) cols.push("2fr");
+    if (vc.actions) cols.push("80px");
 
-    cols.push("80px");
     return `grid-template-columns: ${cols.join(" ")}`;
   });
   import {
@@ -1095,7 +1095,9 @@
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
             </SortableHeader>
           {/if}
-          <div class="text-center">{i18n.t("collection.tableHeaderActions")}</div>
+          {#if collectionStore.visibleColumns.actions}
+            <div class="text-center">{i18n.t("collection.tableHeaderActions")}</div>
+          {/if}
         </div>
       </div>
 
@@ -1325,25 +1327,27 @@
               </div>
             {/if}
 
-            <div class="text-center min-w-0">
-              <div class="flex items-center justify-center gap-2.5">
-                <button
-                  onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
-                  class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
-                  title={i18n.t("collection.editTagsTooltip")}
-                  disabled={!item.song || unavailable}
-                >
-                  <Edit3 class="w-4 h-4" />
-                </button>
-                <button
-                  onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
-                  class="text-brand-text-secondary/60 hover:text-red-400 transition-colors cursor-pointer"
-                  title={i18n.t("playlists.removeFromPlaylist")}
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
+            {#if collectionStore.visibleColumns.actions}
+              <div class="text-center min-w-0">
+                <div class="flex items-center justify-center gap-2.5">
+                  <button
+                    onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
+                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
+                    title={i18n.t("collection.editTagsTooltip")}
+                    disabled={!item.song || unavailable}
+                  >
+                    <Edit3 class="w-4 h-4" />
+                  </button>
+                  <button
+                    onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
+                    class="text-brand-text-secondary/60 hover:text-red-400 transition-colors cursor-pointer"
+                    title={i18n.t("playlists.removeFromPlaylist")}
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            {/if}
           </div>
         {/each}
 
