@@ -26,6 +26,7 @@
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { getPopulationModeSuffix } from "../utils/playlist";
 
   let { view }: { view: AutoPlaylistRef } = $props();
 
@@ -160,8 +161,11 @@
   let displayName = $derived.by(() => {
     if (kind === "favourites") return i18n.t("playlists.autoFavourites");
     if (kind === "recently_added") return i18n.t("playlists.autoRecentlyAdded");
-    if (kind === "decade") return decade || i18n.t("artistDetail.unknownYear");
-    return genre || i18n.t("artistDetail.unknownGenre");
+    const base = kind === "decade"
+      ? (decade || i18n.t("artistDetail.unknownYear"))
+      : (genre || i18n.t("artistDetail.unknownGenre"));
+    const suffix = getPopulationModeSuffix(populationMode);
+    return suffix ? `${base} ${suffix}` : base;
   });
 
   let topCovers = $derived(songsToCoverStack(songs));
@@ -287,6 +291,21 @@
     if (playlistId === undefined) return "all";
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     return pl?.population_mode ?? "all";
+  });
+
+  let emptyStateMessage = $derived.by(() => {
+    switch (populationMode) {
+      case "favourites":
+        return i18n.t("playlists.populationModeEmptyFavourites");
+      case "familiar":
+        return i18n.t("playlists.populationModeEmptyFamiliar");
+      case "discover":
+        return i18n.t("playlists.populationModeEmptyDiscover");
+      case "deep_cuts":
+        return i18n.t("playlists.populationModeEmptyDeepCuts");
+      default:
+        return i18n.t("playlists.populationModeEmptyAll");
+    }
   });
 
   let isChangingMode = $state(false);
@@ -781,7 +800,7 @@
           </div>
         {:else if sortedSongs.length === 0}
           <div class="py-16 text-center select-none">
-            <EmptyState icon={Music} title={i18n.t('collection.noSongsTitle')} />
+            <EmptyState icon={Music} title={emptyStateMessage} />
           </div>
         {:else}
           {#each sortedSongs as song, index (song.id)}

@@ -18,6 +18,7 @@
   import Input from "./Input.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { getPlaylistDisplayName } from "../utils/playlist";
 
   interface AutoDef {
     id: string;
@@ -87,7 +88,7 @@
           id: `auto:decade:${p.id}`,
           kind: "decade",
           decade: dec,
-          label: dec,
+          label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
@@ -101,7 +102,7 @@
           id: `auto:genre:${p.id}`,
           kind: "genre",
           genre: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
-          label: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
+          label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,

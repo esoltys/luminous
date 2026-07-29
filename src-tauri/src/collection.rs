@@ -168,6 +168,21 @@ impl CollectionScanner {
             }
         }
 
+        // Identify duplicate songs (duplicate path case-insensitively or duplicate title+artist+album+length)
+        let mut stmt_dupes = conn.prepare(
+            "SELECT id FROM songs WHERE id NOT IN (
+                SELECT MIN(id) FROM songs
+                WHERE source IN (1, 2) AND unavailable = 0
+                GROUP BY LOWER(TRIM(path))
+             ) AND source IN (1, 2)",
+        )?;
+        let dupe_rows = stmt_dupes.query_map([], |row| row.get::<_, i64>(0))?;
+        for id in dupe_rows.flatten() {
+            if !to_delete.contains(&id) {
+                to_delete.push(id);
+            }
+        }
+
         let deleted_count = to_delete.len();
         if !to_delete.is_empty() {
             let tx = conn.unchecked_transaction()?;
@@ -1142,7 +1157,7 @@ fn group_songs_into_home_items(
                     .clone()
                     .or_else(|| song.artist.clone())
                     .unwrap_or_default();
-                let album_key = (album_name.clone(), artist_name.clone());
+                let album_key = album_name.trim().to_lowercase();
 
                 if !seen_albums.contains(&album_key) {
                     seen_albums.insert(album_key);
@@ -1177,7 +1192,7 @@ fn group_songs_into_home_items(
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum PlayContextKey {
     Playlist(i64),
-    Album(String, String),
+    Album(String),
     Song(i64),
 }
 
@@ -1198,12 +1213,7 @@ fn group_by_play_context(
         let key = match context_type.as_str() {
             "playlist" if playlist_id.is_some() => PlayContextKey::Playlist(playlist_id.unwrap()),
             "album" if song.album.as_deref().is_some_and(|a| !a.trim().is_empty()) => {
-                let artist_name = song
-                    .album_artist
-                    .clone()
-                    .or_else(|| song.artist.clone())
-                    .unwrap_or_default();
-                PlayContextKey::Album(song.album.clone().unwrap(), artist_name)
+                PlayContextKey::Album(song.album.clone().unwrap().trim().to_lowercase())
             }
             _ => PlayContextKey::Song(song.id),
         };
@@ -1687,10 +1697,10 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
     s.is_vbr, s.is_instrumental,
     (SELECT COUNT(*) FROM songs s2
-     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
-     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album AND COALESCE(s2.album_artist, s2.artist) = COALESCE(s.album_artist, s.artist)
+     WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_disc_count";
 
 const SONG_INSERT_COLS: &str = "
@@ -2821,6 +2831,75 @@ mod tests {
         match &frequent[0] {
             HomeItem::Song { song } => assert_eq!(song.id, standalone_id),
             other => panic!("expected most-played standalone Song first, got {other:?}"),
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_recently_added_collapses_album_with_varying_track_artists() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_rec_added_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = LibraryScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: &str| -> i64 {
+            let song = Song {
+                source: 1,
+                path: path.to_string(),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: Some(album.to_string()),
+                album_artist: None,
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+            conn.query_row("SELECT id FROM songs WHERE path = ?1", params![path], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap()
+        };
+
+        // 7 tracks with Artist A, 3 tracks with Artist B (total 10 tracks)
+        for i in 1..=7 {
+            insert_song(
+                &format!("path/track_{i}.mp3"),
+                &format!("Track {i}"),
+                "Artist A",
+                "Mixed Album",
+            );
+        }
+        for i in 8..=10 {
+            insert_song(
+                &format!("path/track_{i}.mp3"),
+                &format!("Track {i}"),
+                "Artist B",
+                "Mixed Album",
+            );
+        }
+
+        let items = scanner.get_recently_added(10).unwrap();
+        assert_eq!(
+            items.len(),
+            1,
+            "all 10 tracks should collapse into a single album card"
+        );
+        match &items[0] {
+            HomeItem::Album { album } => {
+                assert_eq!(album.album.as_deref(), Some("Mixed Album"));
+                assert_eq!(
+                    album.track_count, 10,
+                    "should count all 10 tracks, not split by artist"
+                );
+            }
+            other => panic!("expected Album item, got {other:?}"),
         }
 
         let _ = std::fs::remove_dir_all(temp_dir);

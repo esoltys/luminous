@@ -12,7 +12,11 @@
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import CoverStack from "./CoverStack.svelte";
 
+  import { getPlaylistDisplayName } from "../utils/playlist";
+
   let { playlist, onClick, widthClass = "w-full" }: { playlist: Playlist; onClick: () => void; widthClass?: string } = $props();
+
+  let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
   let tracks = $state<PlaylistItem[]>([]);
 
@@ -111,9 +115,9 @@
   <button
     onclick={(e) => { e.stopPropagation(); onClick(); }}
     class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
-    title={playlist.name}
+    title={cardTitle}
   >
-    {playlist.name}
+    {cardTitle}
   </button>
   {#if subtitleLabel}
     <div class="text-xs text-brand-text-secondary truncate w-full mt-0.5 font-medium">
