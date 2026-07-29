@@ -544,6 +544,7 @@ class CollectionStore {
   async addDirectory(path: string) {
     await invoke("add_directory", { path });
     await this.refreshDirectories();
+    this.startScan(false);
   }
 
   async addDirectoryDialog() {
@@ -564,6 +565,7 @@ class CollectionStore {
   async removeDirectory(path: string) {
     await invoke("remove_directory", { path });
     await this.refreshDirectories();
+    this.startScan(false);
   }
 
   async startScan(force: boolean = false) {

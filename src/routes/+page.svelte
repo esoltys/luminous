@@ -1,12 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import HomeView from "../lib/components/HomeView.svelte";
-  import CollectionView from "../lib/components/CollectionView.svelte";
-  import PlaylistsCollectionView from "../lib/components/PlaylistsCollectionView.svelte";
-  import FoldersView from "../lib/components/FoldersView.svelte";
-  import LyricsView from "../lib/components/LyricsView.svelte";
-  import HelpView from "../lib/components/HelpView.svelte";
   import { themeStore } from "../lib/stores/theme.svelte";
   import { collectionStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/collection.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
@@ -119,17 +113,29 @@
   <!-- Main View Content Area -->
   <div class="flex-1 min-w-0 overflow-hidden flex flex-col">
     {#if collectionStore.activeTab === "home"}
-      <HomeView />
+      {#await import("../lib/components/HomeView.svelte") then { default: HomeView }}
+        <HomeView />
+      {/await}
     {:else if collectionStore.activeTab === "collection"}
-      <CollectionView />
+      {#await import("../lib/components/CollectionView.svelte") then { default: CollectionView }}
+        <CollectionView />
+      {/await}
     {:else if collectionStore.activeTab === "playlists"}
-      <PlaylistsCollectionView />
+      {#await import("../lib/components/PlaylistsCollectionView.svelte") then { default: PlaylistsCollectionView }}
+        <PlaylistsCollectionView />
+      {/await}
     {:else if collectionStore.activeTab === "settings"}
-      <FoldersView />
+      {#await import("../lib/components/FoldersView.svelte") then { default: FoldersView }}
+        <FoldersView />
+      {/await}
     {:else if collectionStore.activeTab === "lyrics"}
-      <LyricsView />
+      {#await import("../lib/components/LyricsView.svelte") then { default: LyricsView }}
+        <LyricsView />
+      {/await}
     {:else if collectionStore.activeTab === "help"}
-      <HelpView />
+      {#await import("../lib/components/HelpView.svelte") then { default: HelpView }}
+        <HelpView />
+      {/await}
     {/if}
   </div>
 </div>

@@ -53,7 +53,36 @@ impl CollectionScanner {
     /// Remove a directory from the watched list (songs remain but are marked unavailable).
     pub fn remove_directory(&self, path: &str) -> Result<()> {
         let conn = self.db.pool.get()?;
-        conn.execute("DELETE FROM directories WHERE path = ?1", params![path])?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM directories WHERE path = ?1", params![path])?;
+
+        // Mark all songs under this directory as unavailable
+        let mut to_mark = Vec::new();
+        {
+            let mut stmt = tx
+                .prepare("SELECT id, path FROM songs WHERE source IN (1, 2) AND unavailable = 0")?;
+            let rows = stmt.query_map([], |row| {
+                let id: i64 = row.get(0)?;
+                let p: String = row.get(1)?;
+                Ok((id, p))
+            })?;
+
+            let target_dir = std::path::Path::new(path);
+            for (id, p) in rows.flatten() {
+                if std::path::Path::new(&p).starts_with(target_dir) {
+                    to_mark.push(id);
+                }
+            }
+        }
+
+        if !to_mark.is_empty() {
+            let mut upd_stmt = tx.prepare("UPDATE songs SET unavailable = 1 WHERE id = ?1")?;
+            for id in to_mark {
+                upd_stmt.execute(params![id])?;
+            }
+        }
+
+        tx.commit()?;
         Ok(())
     }
 
@@ -86,12 +115,18 @@ impl CollectionScanner {
         conn: &rusqlite::Connection,
         only_available: bool,
     ) -> Result<Vec<i64>> {
-        let unreachable_roots: Vec<PathBuf> = self
+        let all_roots: Vec<PathBuf> = self
             .get_directories()?
             .into_iter()
             .map(|d| PathBuf::from(d.path))
-            .filter(|root| std::fs::read_dir(root).is_err())
             .collect();
+
+        let unreachable_roots: Vec<PathBuf> = all_roots
+            .iter()
+            .filter(|root| std::fs::read_dir(root).is_err())
+            .cloned()
+            .collect();
+
         for root in &unreachable_roots {
             log::warn!(
                 "Watched directory '{}' is unreachable (disconnected drive or network share?); \
@@ -101,20 +136,31 @@ impl CollectionScanner {
         }
 
         let query = if only_available {
-            "SELECT id, path FROM songs WHERE path IS NOT NULL AND unavailable = 0"
+            "SELECT id, path, source FROM songs WHERE path IS NOT NULL AND unavailable = 0"
         } else {
-            "SELECT id, path FROM songs WHERE path IS NOT NULL"
+            "SELECT id, path, source FROM songs WHERE path IS NOT NULL"
         };
         let mut stmt = conn.prepare(query)?;
         let rows = stmt.query_map([], |row| {
             let id: i64 = row.get(0)?;
             let path: String = row.get(1)?;
-            Ok((id, path))
+            let source: i32 = row.get(2)?;
+            Ok((id, path, source))
         })?;
 
         let mut missing = Vec::new();
-        for (id, path) in rows.flatten() {
+        for (id, path, source) in rows.flatten() {
             let p = Path::new(&path);
+
+            // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.
+            if source == 1 || source == 2 {
+                let is_watched = all_roots.iter().any(|root| p.starts_with(root));
+                if !is_watched {
+                    missing.push(id);
+                    continue;
+                }
+            }
+
             if p.exists() {
                 continue;
             }
@@ -163,21 +209,6 @@ impl CollectionScanner {
         let mut stmt_unavail = conn.prepare("SELECT id FROM songs WHERE unavailable = 1")?;
         let unavail_rows = stmt_unavail.query_map([], |row| row.get::<_, i64>(0))?;
         for id in unavail_rows.flatten() {
-            if !to_delete.contains(&id) {
-                to_delete.push(id);
-            }
-        }
-
-        // Identify duplicate songs (duplicate path case-insensitively or duplicate title+artist+album+length)
-        let mut stmt_dupes = conn.prepare(
-            "SELECT id FROM songs WHERE id NOT IN (
-                SELECT MIN(id) FROM songs
-                WHERE source IN (1, 2) AND unavailable = 0
-                GROUP BY LOWER(TRIM(path))
-             ) AND source IN (1, 2)",
-        )?;
-        let dupe_rows = stmt_dupes.query_map([], |row| row.get::<_, i64>(0))?;
-        for id in dupe_rows.flatten() {
             if !to_delete.contains(&id) {
                 to_delete.push(id);
             }
@@ -244,8 +275,11 @@ impl CollectionScanner {
 
         let mut all_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
-            let walker = WalkDir::new(&dir.path).follow_links(true);
-            for entry in walker.into_iter().filter_map(|e| e.ok()) {
+            let walker = WalkDir::new(&dir.path)
+                .follow_links(true)
+                .into_iter()
+                .filter_entry(|e| e.file_name() != "Duplicates");
+            for entry in walker.filter_map(|e| e.ok()) {
                 let path = entry.path().to_path_buf();
                 if path.is_file() && is_audio_file(&path) {
                     all_paths.push(path);

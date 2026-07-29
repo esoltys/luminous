@@ -788,11 +788,16 @@
           {#each sortedSongs as song, index (song.id)}
             <div
               role="row"
+              tabindex="0"
+              onkeydown={(e) => {
+                if (e.key === 'Enter' && !song.unavailable) handlePlaySong(song);
+              }}
               data-song-row="true"
-              onclick={(e) => handleSongClick(e, song)}
-              ondblclick={() => handlePlaySong(song)}
+              onclick={(e) => !song.unavailable && handleSongClick(e, song)}
+              ondblclick={() => !song.unavailable && handlePlaySong(song)}
               oncontextmenu={(e) => handleContextMenu(e, song)}
-              class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none cursor-pointer text-sm border-b border-brand-border/40
+              class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
+                {song.unavailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               style={gridColsStyle}
             >

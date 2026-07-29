@@ -438,25 +438,166 @@ pub fn compute_preview(
 
     for (_target_path, indices) in target_paths_map {
         if indices.len() > 1 {
+            // Find the canonical item (prefer Unchanged)
+            let mut canonical_idx = indices[0];
             for &idx in &indices {
-                let status = preview_items[idx].status.clone();
-                if status != OrganizePreviewStatus::Unchanged
-                    && status != OrganizePreviewStatus::Error
-                {
-                    // Name the other file(s) sharing this target so the user
-                    // can actually act on it (e.g. spot a duplicate and
-                    // delete/retag one side) instead of just being told a
-                    // collision exists somewhere.
-                    let other_paths: Vec<String> = indices
-                        .iter()
-                        .filter(|&&other_idx| other_idx != idx)
-                        .map(|&other_idx| preview_items[other_idx].from_path.clone())
-                        .collect();
-
-                    preview_items[idx].status = OrganizePreviewStatus::Collision;
-                    preview_items[idx].error_message =
-                        Some(format!("Same target as: {}", other_paths.join(", ")));
+                if preview_items[idx].status == OrganizePreviewStatus::Unchanged {
+                    canonical_idx = idx;
+                    break;
                 }
+            }
+
+            let mut duplicate_counter = 1;
+
+            for &idx in &indices {
+                if idx == canonical_idx {
+                    continue; // Canonical item gets to keep its target, but it might still have an external collision (checked below)
+                }
+
+                if preview_items[idx].status == OrganizePreviewStatus::Error {
+                    continue;
+                }
+
+                let original_target = Path::new(&preview_items[idx].to_path);
+                let source_path = Path::new(&preview_items[idx].from_path);
+
+                let dest_folder: PathBuf = if let Some(ref dest) = options.destination_dir {
+                    PathBuf::from(dest)
+                } else {
+                    library_dirs
+                        .iter()
+                        .map(PathBuf::from)
+                        .find(|dir| source_path.starts_with(dir))
+                        .or_else(|| source_path.parent().map(|p| p.to_path_buf()))
+                        .unwrap_or_else(|| PathBuf::from("."))
+                };
+
+                let rel_path = original_target
+                    .strip_prefix(&dest_folder)
+                    .unwrap_or(original_target);
+
+                let mut dup_path = dest_folder.to_path_buf();
+                dup_path.push("Duplicates");
+                dup_path.push(rel_path);
+
+                let mut final_dup_path = dup_path.clone();
+                let mut is_unchanged = false;
+
+                while final_dup_path.exists() {
+                    if final_dup_path == source_path {
+                        is_unchanged = true;
+                        break;
+                    }
+                    if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
+                        if let Some(stem) = dup_path
+                            .file_stem()
+                            .map(|s| s.to_string_lossy().into_owned())
+                        {
+                            final_dup_path = dup_path.with_file_name(format!(
+                                "{} ({}).{}",
+                                stem,
+                                duplicate_counter,
+                                ext.to_string_lossy()
+                            ));
+                        }
+                    }
+                    duplicate_counter += 1;
+                }
+
+                preview_items[idx].to_path = final_dup_path.to_string_lossy().to_string();
+                if is_unchanged {
+                    preview_items[idx].status = OrganizePreviewStatus::Unchanged;
+                    preview_items[idx].error_message = None;
+                } else {
+                    preview_items[idx].status = OrganizePreviewStatus::Ok;
+                    preview_items[idx].error_message = Some(format!(
+                        "Routed to Duplicates (collision with {})",
+                        preview_items[canonical_idx].from_path
+                    ));
+                }
+            }
+        }
+    }
+
+    // Second pass: check for external collisions (where the target path already exists on disk)
+    for item in preview_items.iter_mut() {
+        if item.status == OrganizePreviewStatus::Error
+            || item.status == OrganizePreviewStatus::MissingTag
+        {
+            continue;
+        }
+
+        // If it's Unchanged, it means it already exists on disk at to_path because it IS the file at to_path.
+        if item.from_path == item.to_path {
+            continue;
+        }
+
+        let current_target = PathBuf::from(&item.to_path);
+        let source_path = Path::new(&item.from_path);
+
+        if current_target.exists() {
+            // Check if they are actually the exact same physical file (e.g. a case-only rename on Windows)
+            if let (Ok(canon_from), Ok(canon_to)) =
+                (source_path.canonicalize(), current_target.canonicalize())
+            {
+                if canon_from == canon_to {
+                    continue;
+                }
+            }
+
+            // External collision!
+            let dest_folder: PathBuf = if let Some(ref dest) = options.destination_dir {
+                PathBuf::from(dest)
+            } else {
+                library_dirs
+                    .iter()
+                    .map(PathBuf::from)
+                    .find(|dir| source_path.starts_with(dir))
+                    .or_else(|| source_path.parent().map(|p| p.to_path_buf()))
+                    .unwrap_or_else(|| PathBuf::from("."))
+            };
+
+            let rel_path = current_target
+                .strip_prefix(&dest_folder)
+                .unwrap_or(&current_target);
+
+            let mut dup_path = dest_folder.to_path_buf();
+            dup_path.push("Duplicates");
+            dup_path.push(rel_path);
+
+            let mut duplicate_counter = 1;
+            let mut final_dup_path = dup_path.clone();
+            let mut is_unchanged = false;
+
+            while final_dup_path.exists() {
+                if final_dup_path == source_path {
+                    is_unchanged = true;
+                    break;
+                }
+                if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
+                    if let Some(stem) = dup_path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().into_owned())
+                    {
+                        final_dup_path = dup_path.with_file_name(format!(
+                            "{} ({}).{}",
+                            stem,
+                            duplicate_counter,
+                            ext.to_string_lossy()
+                        ));
+                    }
+                }
+                duplicate_counter += 1;
+            }
+
+            item.to_path = final_dup_path.to_string_lossy().to_string();
+            if is_unchanged {
+                item.status = OrganizePreviewStatus::Unchanged;
+                item.error_message = None;
+            } else {
+                item.status = OrganizePreviewStatus::Ok;
+                item.error_message =
+                    Some("Routed to Duplicates (collision with canonical file)".to_string());
             }
         }
     }
@@ -594,6 +735,14 @@ pub fn execute_apply(
 
         match move_res {
             Ok(_) => {
+                // Clear any existing row that has this exact path to avoid UNIQUE constraint failure.
+                // This can happen if the target path was previously scanned into the DB, but the file
+                // was overwritten or replaced by this organize operation.
+                let _ = tx.execute(
+                    "DELETE FROM songs WHERE path = ?1 AND id != ?2",
+                    params![item.to_path, item.song_id],
+                );
+
                 if let Err(e) = tx.execute(
                     "UPDATE songs SET path = ?1 WHERE id = ?2",
                     params![item.to_path, item.song_id],

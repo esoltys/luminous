@@ -88,9 +88,10 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_no_noninteractive_tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
-  role="region"
+  role="group"
   aria-label={i18n.t('miniplayer.title')}
   onkeydown={handleKeyDown}
   tabindex="0"

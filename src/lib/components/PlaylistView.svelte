@@ -1131,6 +1131,10 @@
           {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
           <div
             role="row"
+            tabindex="0"
+            onkeydown={(e) => {
+              if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(actualIndex);
+            }}
             data-playlist-row="true"
             draggable={!unavailable ? "true" : "false"}
             ondragstart={(e) => !unavailable && handleDragStart(e, actualIndex, item)}
