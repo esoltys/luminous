@@ -225,17 +225,47 @@
     }
   }
 
+  // Build the searchable text for a song from whichever columns are currently
+  // visible, so the filter reflects what's actually shown in the table rather
+  // than a fixed title/artist/album set.
+  function searchableColumnValues(song: Song | undefined): string[] {
+    if (!song) return [];
+    const vc = collectionStore.visibleColumns;
+    const values: (string | number | undefined | null)[] = [];
+    if (vc.title) values.push(song.title);
+    if (vc.artist) values.push(song.artist);
+    if (vc.album) values.push(song.album);
+    if (vc.composer) values.push(song.composer);
+    if (vc.album_artist) values.push(song.album_artist);
+    if (vc.format) values.push(song.filetype);
+    if (vc.year) values.push(song.year);
+    if (vc.genre) values.push(song.genre);
+    if (vc.grouping) values.push(song.grouping);
+    if (vc.bpm) values.push(song.bpm);
+    if (vc.initial_key) values.push(song.initial_key);
+    if (vc.bitrate) values.push(song.bitrate);
+    if (vc.samplerate) values.push(formatSampleRate(song.samplerate));
+    if (vc.bitdepth) values.push(formatBitDepth(song.bitdepth));
+    if (vc.channels) values.push(formatChannels(song.channels));
+    if (vc.filesize) values.push(formatFileSize(song.filesize));
+    if (vc.rating) values.push(song.rating);
+    if (vc.playcount) values.push(song.playcount);
+    if (vc.skipcount) values.push(song.skipcount);
+    if (vc.lastplayed) values.push(formatDate(song.lastplayed));
+    if (vc.added) values.push(formatDate(song.added));
+    if (vc.duration) values.push(formatDuration(song.length_nanosec));
+    if (vc.path) values.push(song.path);
+    return values
+      .filter((v) => v !== undefined && v !== null && v !== "")
+      .map((v) => String(v).toLowerCase());
+  }
+
   // Derived filtered tracks based on filterQuery and sort selection
   let filteredTracks = $derived.by(() => {
     const q = filterQuery.trim().toLowerCase();
     let result = playlistsStore.activePlaylistTracks;
     if (q) {
-      result = result.filter((item) => {
-        const title = item.song?.title?.toLowerCase() ?? "";
-        const artist = item.song?.artist?.toLowerCase() ?? "";
-        const album = item.song?.album?.toLowerCase() ?? "";
-        return title.includes(q) || artist.includes(q) || album.includes(q);
-      });
+      result = result.filter((item) => searchableColumnValues(item.song).some((v) => v.includes(q)));
     }
 
     if (sortField === "position") {
