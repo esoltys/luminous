@@ -504,20 +504,6 @@
             </div>
           </div>
 
-          {#if errorMessage}
-            <div class="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center gap-2">
-              <AlertTriangle class="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          {/if}
-
-          {#if successMessage}
-            <div class="p-3 rounded-xl bg-brand-accent/15 border border-brand-accent/30 text-brand-accent-text flex items-center gap-2">
-              <Check class="w-4 h-4 shrink-0" />
-              <span>{successMessage}</span>
-            </div>
-          {/if}
-
           <!-- Virtualized table -->
           <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
             {#if items.length === 0}
@@ -678,6 +664,21 @@
   {/if}
 {/snippet}
 
+{#snippet actionMessages()}
+  {#if errorMessage}
+    <div class="px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center gap-2 font-medium">
+      <AlertTriangle class="w-4 h-4 shrink-0" />
+      <span>{errorMessage}</span>
+    </div>
+  {/if}
+  {#if successMessage}
+    <div class="px-3 py-1.5 rounded-lg bg-brand-accent/15 border border-brand-accent/30 text-brand-accent-text flex items-center gap-2 font-medium">
+      <Check class="w-4 h-4 shrink-0" />
+      <span>{successMessage}</span>
+    </div>
+  {/if}
+{/snippet}
+
 {#if effectiveOpen}
   {#if embedded}
     <!-- Inline panel — no backdrop/portal/close button, sits directly in the page -->
@@ -704,7 +705,10 @@
         <div class="text-xs text-brand-text-secondary">
           {@render collisionWarning()}
         </div>
-        {@render applyButton()}
+        <div class="flex items-center gap-3">
+          {@render actionMessages()}
+          {@render applyButton()}
+        </div>
       </div>
     </div>
   {:else}
@@ -754,6 +758,7 @@
           </div>
 
           <div class="flex items-center gap-3">
+            {@render actionMessages()}
             <button
               type="button"
               onclick={() => onClose?.()}
