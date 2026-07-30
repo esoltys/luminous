@@ -81,7 +81,7 @@ export const LUMINOUS_DARK_COLORS: ThemeColors = {
   "color-accent-hover": blendToward(LUMINOUS_DARK_ACCENT, 255, 0.2),
   "color-text-primary": "#f1f3f8",
   "color-text-secondary": "#a6adc4",
-  "color-border": "#2c2f3c"
+  "color-border": "#3d4255"
 };
 
 /**

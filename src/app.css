@@ -33,7 +33,7 @@
     --color-accent-hover: #8c98ba;
     --color-text-primary: #f1f3f8;
     --color-text-secondary: #a6adc4;
-    --color-border: #2c2f3c;
+    --color-border: #3d4255;
     --color-accent-contrast: #000000;
     /* #6f7ea9 already clears WCAG AA 4.5:1 against bg-main (~4.96:1), so no
        further clamping needed for this fallback — see clampForContrast(). */
