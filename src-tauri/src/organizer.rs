@@ -458,6 +458,20 @@ pub fn compute_preview(
                     continue;
                 }
 
+                // If these are duplicate database records pointing to the exact same physical file
+                // (e.g. case-only differences on Windows), ignore the collision for this extra record.
+                if let (Ok(canon_curr), Ok(canon_base)) = (
+                    Path::new(&preview_items[idx].from_path).canonicalize(),
+                    Path::new(&preview_items[canonical_idx].from_path).canonicalize(),
+                ) {
+                    if canon_curr == canon_base {
+                        preview_items[idx].status = OrganizePreviewStatus::Unchanged;
+                        preview_items[idx].to_path = preview_items[idx].from_path.clone();
+                        preview_items[idx].error_message = None;
+                        continue;
+                    }
+                }
+
                 let original_target = Path::new(&preview_items[idx].to_path);
                 let source_path = Path::new(&preview_items[idx].from_path);
 
