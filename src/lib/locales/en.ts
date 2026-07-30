@@ -319,7 +319,7 @@ export const en = {
     acoustidIntegration: "AcoustID Integration",
     acoustidDesc1: "Luminous relies on ",
     acoustidDesc2: " for audio fingerprinting.",
-    acoustidDesc3: "Provide a free API key to enable auto-tagging. See the ",
+    acoustidDesc3: "Provide a free API key to enable auto-tagging. See ",
     acoustidDesc4: " for instructions.",
     acoustidUserGuide: "Help",
     acoustidEnvKeyFound: "An API key was found in the {env} environment variable.",
