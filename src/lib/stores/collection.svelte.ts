@@ -78,6 +78,9 @@ interface NavigationView {
 
 const MAX_HISTORY = 50;
 
+/** Song-count milestones that trigger Milestone-tier celebrations. */
+const MILESTONE_THRESHOLDS = [100, 500, 1000, 2500, 5000, 10000];
+
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   stats = $state<LibraryStats>({
@@ -94,6 +97,11 @@ class CollectionStore {
   statsLoaded = $state<boolean>(false);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
+
+  /** Celebration moment states (issue #182) — consumed by Toast and layout. */
+  isFirstLaunch = $state<boolean>(false);
+  justAddedFirstFolder = $state<boolean>(false);
+  milestoneReached = $state<number | null>(null);
 
   // Cached collections
   songs = $state<Song[]>([]);
@@ -448,6 +456,36 @@ class CollectionStore {
         if (settings.last_scan_time) {
           this.lastScanTime = settings.last_scan_time;
         }
+
+        // First-launch / new-version detection (#182) — fires a Milestone-tier
+        // celebration toast when the app is launched for the first time or
+        // after a version upgrade. Stores the version string so the welcome
+        // replays on each new release, not just the very first launch.
+        let appVersion = "";
+        try {
+          appVersion = await invoke<string>("get_app_version");
+        } catch {
+          try {
+            const { getVersion } = await import("@tauri-apps/api/app");
+            appVersion = await getVersion();
+          } catch { /* not in Tauri context */ }
+        }
+        if (appVersion && settings.launched_version !== appVersion) {
+          this.isFirstLaunch = true;
+          invoke("set_app_setting", { key: "launched_version", value: appVersion }).catch((err) => {
+            console.error("Failed to persist launched_version:", err);
+          });
+          // Show the welcome toast after a short delay so the UI has time to
+          // render before the celebration.
+          const isFirstEver = !settings.launched_version;
+          setTimeout(() => {
+            const msg = isFirstEver
+              ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🎵`)
+              : i18n.t("celebrations.newVersion", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🆕`);
+            toastStore.show(msg, "milestone");
+            setTimeout(() => { this.isFirstLaunch = false; }, 700);
+          }, 1200);
+        }
       }
 
       // Listen to library scan progress events
@@ -465,6 +503,22 @@ class CollectionStore {
             const added = this.stats.total_songs - songCountBeforeRefresh;
             if (added > 0) {
               toastStore.show(i18n.t("settings.importFinishedToast", { count: added }), "success");
+            }
+
+            // Milestone detection (#182): check if total_songs just crossed a
+            // threshold. Only fire the first one crossed (don't stack multiple
+            // milestone toasts if an import jumps past several at once).
+            const newTotal = this.stats.total_songs;
+            for (const threshold of MILESTONE_THRESHOLDS) {
+              if (songCountBeforeRefresh < threshold && newTotal >= threshold) {
+                this.milestoneReached = threshold;
+                toastStore.show(
+                  i18n.t("celebrations.milestone", { count: threshold.toLocaleString() }, `🎉 ${threshold.toLocaleString()} songs in your library!`),
+                  "milestone"
+                );
+                setTimeout(() => { this.milestoneReached = null; }, 700);
+                break;
+              }
             }
           });
           this.refreshLibrary();
@@ -549,8 +603,17 @@ class CollectionStore {
   }
 
   async addDirectory(path: string) {
+    const wasEmpty = this.directories.length === 0;
     await invoke("add_directory", { path });
     await this.refreshDirectories();
+
+    // First watched folder celebration (#182, New tier).
+    if (wasEmpty && this.directories.length > 0) {
+      this.justAddedFirstFolder = true;
+      toastStore.show(i18n.t("celebrations.firstFolder", {}, "First music folder added! 📂"), "success");
+      setTimeout(() => { this.justAddedFirstFolder = false; }, 400);
+    }
+
     this.startScan(false);
   }
 

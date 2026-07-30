@@ -153,7 +153,7 @@
     if (selectedSongIds.size === 0) return;
     const selectedList = songs.filter((s) => selectedSongIds.has(s.id));
     if (selectedList.length > 0) {
-      playerStore.playSongs(selectedList.map((s) => s.id), 0, playlistId);
+      playerStore.playSongs(selectedList.map((s) => s.id), 0, playlistId, undefined, displayName);
     }
   }
 
@@ -223,13 +223,13 @@
   function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    playerStore.playSongs(songIds, index >= 0 ? index : 0, playlistId);
+    playerStore.playSongs(songIds, index >= 0 ? index : 0, playlistId, undefined, displayName);
   }
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, playlistId);
+    await playerStore.playSongs(songs.map((s) => s.id), 0, playlistId, undefined, displayName);
   }
 
   async function handleShufflePlay() {
@@ -237,7 +237,7 @@
     const ids = songs.map((s) => s.id);
     const randomIndex = Math.floor(Math.random() * ids.length);
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(ids, randomIndex, playlistId);
+    await playerStore.playSongs(ids, randomIndex, playlistId, undefined, displayName);
   }
 
   async function handleAddSongToPlaylist(songId: number) {

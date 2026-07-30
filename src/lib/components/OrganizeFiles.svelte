@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { portal } from "../utils/portal";
   import { X, Folder, Sparkles, Check, AlertTriangle, RefreshCw, Layers } from "lucide-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
@@ -315,8 +316,18 @@
 
       if (result.errors && result.errors.length > 0) {
         errorMessage = result.errors.join("; ");
+        toastStore.show(
+          i18n.t("organizer.toastErrors", { count: result.errors.length }, `${result.errors.length} file(s) couldn't be organized`),
+          "warning"
+        );
       } else {
         successMessage = result.moved_count === 1 ? i18n.t("organizer.applySuccessOne") : i18n.t("organizer.applySuccessMany", { count: result.moved_count });
+        toastStore.show(
+          result.moved_count === 1
+            ? i18n.t("organizer.toastSuccessOne", {}, "1 file organized successfully")
+            : i18n.t("organizer.toastSuccessMany", { count: result.moved_count }, `${result.moved_count} files organized successfully`),
+          "success"
+        );
         onSuccess?.();
         // Leave the modal open so the user can see the result — refresh the
         // preview to reflect the just-applied moves instead of auto-closing.
@@ -677,12 +688,6 @@
     <div class="text-rose-400 flex items-center gap-2 font-medium text-xs">
       <AlertTriangle class="w-4 h-4 shrink-0" />
       <span>{errorMessage}</span>
-    </div>
-  {/if}
-  {#if successMessage}
-    <div class="text-brand-accent-text flex items-center gap-2 font-medium text-xs">
-      <Check class="w-4 h-4 shrink-0" />
-      <span>{successMessage}</span>
     </div>
   {/if}
 {/snippet}

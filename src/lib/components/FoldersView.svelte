@@ -357,7 +357,7 @@
         </div>
 
         <!-- Rating style row -->
-        <div class="flex items-center justify-between gap-4 pt-4">
+        <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
@@ -371,6 +371,20 @@
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
           </Select>
+        </div>
+
+        <!-- Audio sound cues row -->
+        <div class="flex items-center justify-between gap-4 pt-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <label for="sound-cues-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.soundCuesLabel', {}, 'Celebration Sound Cues')}</label>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.soundCuesHint', {}, 'Play soft synthesized audio cues for celebration moments and confirmations.')}</p>
+          </div>
+          <Toggle
+            id="sound-cues-toggle"
+            checked={prefs.soundCuesEnabled}
+            onchange={(v) => prefs.setSoundCuesEnabled(v)}
+            label={i18n.t('settings.soundCuesLabel', {}, 'Celebration Sound Cues')}
+          />
         </div>
       </div>
 

@@ -4,10 +4,13 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
+import { toastStore } from "./toast.svelte";
+import { playlistsStore } from "./playlists.svelte";
 import { i18n } from "./i18n.svelte";
 
 /** Minimum remaining tracks before the auto-refill is triggered (#26). */
 const AUTO_PLAY_REFILL_THRESHOLD = 3;
+
 
 export class PlayerStore {
   // Reactive state using Svelte 5 Runes
@@ -26,6 +29,13 @@ export class PlayerStore {
   remainingPlaylistItems = $state<number>(0);
   /** Set of playlist IDs whose library auto-refill pool has been exhausted. */
   exhaustedPlaylistIds = $state<number[]>([]);
+
+  /** Celebration: queue just finished naturally (#182, Milestone tier). */
+  queueJustCompleted = $state<boolean>(false);
+  /** The name of the active playlist, album, or source context being played. */
+  activeContextName = $state<string | undefined>(undefined);
+  /** Previous playback state for detecting playing→stopped transitions. */
+  private _previousState: PlayState = "stopped";
 
   isAutoPlayExhausted(playlistId: number): boolean {
     return this.exhaustedPlaylistIds.includes(playlistId);
@@ -57,10 +67,30 @@ export class PlayerStore {
       // Listen for playback state changes
       await listen<PlaybackState>("playback-state", async (event) => {
         const oldSongId = this.currentSong?.id;
+        const oldSongAlbum = this.currentSong?.album;
+        const wasPlaying = this._previousState === "playing";
         this.updateState(event.payload);
+        this._previousState = this.state;
         if (this.currentSong?.id !== oldSongId) {
           themeStore.updateArtworkColors(this.currentSong);
         }
+
+        // Queue completion celebration (#182, Milestone tier): fires when
+        // playback stops naturally after the last track with nothing left.
+        if (wasPlaying && this.state === "stopped" && this.remainingPlaylistItems === 0 && !this.currentSong) {
+          this.queueJustCompleted = true;
+
+          // Resolve context name (Playlist name, Album name, or fallback to Queue)
+          const plName = this.playlistId ? playlistsStore.playlists.find((p) => p.id === this.playlistId)?.name : undefined;
+          const contextName = this.activeContextName || plName || oldSongAlbum;
+          const toastText = contextName
+            ? i18n.t("celebrations.contextComplete", { name: contextName }, `${contextName} complete`)
+            : i18n.t("celebrations.queueComplete", {}, "Queue complete");
+
+          toastStore.show(toastText, "milestone");
+          setTimeout(() => { this.queueJustCompleted = false; }, 650);
+        }
+
         // Auto-Play refill: checked on every state change so we react when
         // remaining drops below threshold after each track advance (#26).
         await this.maybeRefillAutoPlaylist();
@@ -201,11 +231,26 @@ export class PlayerStore {
     }
   }
 
-  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext) {
+  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
+    if (contextName) {
+      this.activeContextName = contextName;
+    } else if (context?.type === "album" && context.album) {
+      this.activeContextName = context.album;
+    } else if (context?.type === "playlist" && context.playlistId) {
+      const pl = playlistsStore.playlists.find((p) => p.id === context.playlistId);
+      if (pl) this.activeContextName = pl.name;
+    } else if (playlistId) {
+      const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+      if (pl) this.activeContextName = pl.name;
+    } else {
+      this.activeContextName = undefined;
+    }
     await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number) {
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    if (pl) this.activeContextName = pl.name;
     await invoke("play_playlist_item", { playlistId, itemIndex });
   }
 

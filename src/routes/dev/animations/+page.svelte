@@ -12,6 +12,8 @@
   import { goto } from "$app/navigation";
   import HeartToggle from "../../../lib/components/HeartToggle.svelte";
   import { toastStore } from "../../../lib/stores/toast.svelte";
+  import { prefs } from "../../../lib/stores/prefs.svelte";
+  import { soundCues } from "../../../lib/utils/soundCues";
   import { Folder, ListMusic, ArrowUp, AlertTriangle } from "lucide-svelte";
 
   // Most dev machines with Windows "Animation effects" turned off (or any
@@ -47,6 +49,22 @@
 
   function replayToast() {
     toastStore.show("128 tracks added", "success");
+  }
+
+  function replayMilestoneToast() {
+    toastStore.show("\ud83c\udf89 1,000 songs in your library!", "milestone");
+  }
+
+  function replayWarningToast() {
+    toastStore.show("3 files couldn\u2019t be read", "warning");
+  }
+
+  function replayQueueToast() {
+    toastStore.show("Golden Hour complete", "milestone");
+  }
+
+  function replayWelcomeToast() {
+    toastStore.show("Welcome to Luminous v1.0.0! \ud83c\udfb5", "milestone");
   }
 
   let replayCounters = $state<Record<string, number>>({
@@ -222,7 +240,7 @@
           <span class="text-lg font-black text-brand-gold anim-milestone-bounce">1,000 songs</span>
         {/key}
       </div>
-      <button onclick={() => replay('milestone')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('milestone'); replayMilestoneToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 9. Completing a queue -->
@@ -239,7 +257,7 @@
           >Queue complete — nice listening</span>
         {/key}
       </div>
-      <button onclick={() => replay('queue')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('queue'); replayQueueToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 10. First launch -->
@@ -257,7 +275,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('firstLaunch')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('firstLaunch'); replayWelcomeToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 11. Import needs attention -->
@@ -274,7 +292,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('warning')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('warning'); replayWarningToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
   </div>
