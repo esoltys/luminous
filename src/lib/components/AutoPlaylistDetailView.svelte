@@ -823,7 +823,7 @@
               </div>
               {#if collectionStore.visibleColumns.title}
                 <div class="font-medium truncate pr-4 min-w-0 {selectedSongIds.has(song.id) || (playerStore.currentSong && playerStore.currentSong.id === song.id) ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}">
-                  <span class="truncate" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
+                  <span class="truncate min-w-0" title={song.title}>{song.title || i18n.t('collection.unknownSong')}</span>
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.artist}
@@ -831,13 +831,13 @@
                   {#if song.artist}
                     <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="text-brand-text-secondary truncate"
+                      class="text-brand-text-secondary truncate min-w-0"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
                     </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
               {/if}
@@ -846,13 +846,13 @@
                   {#if song.album}
                     <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      class="text-brand-text-secondary truncate"
+                      class="text-brand-text-secondary truncate min-w-0"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
                     </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary truncate">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
               {/if}

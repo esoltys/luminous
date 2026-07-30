@@ -146,6 +146,19 @@ export class PlayerStore {
     }
   }
 
+  /** Force a refresh of the playback state from the backend (e.g., after tags are edited) */
+  async refreshPlaybackState() {
+    try {
+      const state = await invoke<PlaybackState>("get_playback_state");
+      this.updateState(state);
+      if (this.currentSong) {
+        themeStore.updateArtworkColors(this.currentSong);
+      }
+    } catch (err) {
+      console.error("[PlayerStore] Failed to refresh playback state:", err);
+    }
+  }
+
   // Playback Control Actions
   async playSong(songId: number) {
     await invoke("play_song", { songId });

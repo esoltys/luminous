@@ -2,7 +2,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download, Eye, EyeOff } from "lucide-svelte";
+  import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, ExternalLink, Info, Shield, Sun, Moon, ArrowUp, Download, Eye, EyeOff, AlertTriangle } from "lucide-svelte";
   import { i18n, type Locale } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type RatingStyle } from "../stores/prefs.svelte";
@@ -278,7 +278,7 @@
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Top Header bar -->
-  <div class="h-16 px-6 border-b border-brand-border flex items-center justify-between">
+  <div class="h-16 pl-6 pr-8 border-b border-brand-border flex items-center justify-between shrink-0">
     <div class="flex items-center gap-3">
       <Settings class="w-5 h-5 text-brand-accent-text" />
       <h2 class="text-base font-bold text-brand-text-primary">{i18n.t('settings.title')}</h2>
@@ -326,11 +326,21 @@
   </div>
 
   <!-- Content Area -->
-  <div bind:this={contentEl} class="flex-1 overflow-y-auto p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
-        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.generalTitle')}</h3>
+        <div class="pb-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <Settings class="w-5 h-5" />
+            </div>
+            <div class="space-y-1 min-w-0">
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.generalTitle')}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.generalSubtitle', {}, 'Configure application language and formatting preferences.')}</p>
+            </div>
+          </div>
+        </div>
 
         <!-- Language row -->
         <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
@@ -366,8 +376,16 @@
 
       <!-- Application & Updates Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.appAndUpdatesTitle')}</h3>
+        <div class="pb-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <Download class="w-5 h-5" />
+            </div>
+            <div class="space-y-1 min-w-0">
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.appAndUpdatesTitle')}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.appAndUpdatesSubtitle', {}, 'Manage Luminous version updates and view installation details.')}</p>
+            </div>
+          </div>
           <div class="flex items-center gap-3">
             {#if updaterStore.checkStatus === 'up-to-date'}
               <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5">
@@ -482,8 +500,16 @@
     {:else if settingsTab === "folders"}
       <!-- Watched Folders Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-        <div class="flex justify-between items-center">
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.watchedFoldersTitle')}</h3>
+        <div class="pb-3 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <Folder class="w-5 h-5" />
+            </div>
+            <div class="space-y-1 min-w-0">
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.watchedFoldersTitle')}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
+            </div>
+          </div>
           <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
             <Plus class="w-4 h-4" /> {i18n.t('settings.addFolder')}
           </Button>
@@ -503,10 +529,17 @@
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-                  <p class="text-xs text-brand-text-secondary mt-0.5">
-                    {collectionStore.watchFoldersRealtime
-                      ? i18n.t('settings.folderItemRecursive')
-                      : i18n.t('settings.folderItemRecursiveWatchOff')}
+                  <p class="text-xs mt-0.5" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
+                    {#if dir.is_available === false}
+                      <span class="flex items-center gap-1">
+                        <AlertTriangle class="w-3 h-3" />
+                        {i18n.t('settings.folderItemUnavailable', {}, 'Unavailable (Drive disconnected?)')}
+                      </span>
+                    {:else}
+                      {collectionStore.watchFoldersRealtime
+                        ? i18n.t('settings.folderItemRecursive')
+                        : i18n.t('settings.folderItemRecursiveWatchOff')}
+                    {/if}
                   </p>
                 </div>
               </div>
@@ -532,11 +565,13 @@
 
       <!-- Library Scanning & Maintenance Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-        <div class="pb-3">
-          <div class="flex items-start gap-3">
-            <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0" />
+        <div class="pb-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <RefreshCw class="w-5 h-5" />
+            </div>
             <div class="space-y-1 min-w-0">
-              <h4 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h4>
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h3>
               <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
             </div>
           </div>
@@ -667,14 +702,23 @@
 
       <!-- AcoustID Integration Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-        <div>
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-1">{i18n.t('settings.acoustidIntegration')}</h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed mb-4">
-            {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline cursor-pointer">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
-            <br />
-            {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline cursor-pointer">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
-          </p>
+        <div class="pb-3 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <Sparkles class="w-5 h-5" />
+            </div>
+            <div class="space-y-1 min-w-0">
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.acoustidIntegration')}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">
+                {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline cursor-pointer">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
+                <br />
+                {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline cursor-pointer">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
+              </p>
+            </div>
+          </div>
+        </div>
           
+        <div>
           {#if hasEnvKey}
             <div class="mb-4 text-xs font-medium text-brand-accent-text flex items-center gap-2">
               <Check class="w-3.5 h-3.5" />
@@ -711,8 +755,19 @@
       <!-- UI Themes Section -->
       <div class="space-y-6">
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-6">
+        <div class="pb-1 flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+              <Palette class="w-5 h-5" />
+            </div>
+            <div class="space-y-1 min-w-0">
+              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.tabThemes')}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.themesSubtitle', {}, 'Customize the visual appearance and colours of Luminous.')}</p>
+            </div>
+          </div>
+        </div>
         <div>
-          <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes')}</h3>
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes')}</h4>
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {#each PREDEFINED_THEMES as theme}
               {@const previewColors = getPreviewColors(theme)}
@@ -799,8 +854,10 @@
         <!-- Custom Theme Builder Form -->
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
           <div class="flex items-center justify-between border-b border-brand-border pb-3">
-            <div class="flex items-center gap-2">
-              <Palette class="w-5 h-5 text-brand-accent-text" />
+            <div class="flex items-center gap-3">
+              <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+                <Palette class="w-5 h-5" />
+              </div>
               <h4 class="font-bold text-sm text-brand-text-primary">
                 {editingTheme ? i18n.t('settings.editingThemeTitle', { name: editingTheme.name }) : i18n.t('settings.customThemeBuilderTitle')}
               </h4>
@@ -914,9 +971,7 @@
       </div>
     {:else if settingsTab === "equalizer"}
       <!-- Equalizer Section -->
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
-        <Equalizer />
-      </div>
+      <Equalizer />
     {:else if settingsTab === "about"}
       <!-- About & Credits Section -->
       <div class="space-y-6 max-w-4xl">

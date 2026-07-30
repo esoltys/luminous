@@ -690,26 +690,28 @@
 {#if effectiveOpen}
   {#if embedded}
     <!-- Inline panel — no backdrop/portal/close button, sits directly in the page -->
-    <div class="w-full bg-brand-sidebar border border-brand-border rounded-2xl overflow-hidden text-brand-text-primary">
-      <div class="px-6 py-4 border-b border-brand-border/40 flex items-center gap-3">
-        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
-          <Folder class="w-5 h-5" />
-        </div>
-        <div>
-          <h2 class="text-base font-bold text-brand-text-primary">
-            {i18n.t("organizer.title")}
-          </h2>
-          <p class="text-xs text-brand-text-secondary">
-            {i18n.t("organizer.subtitle")}
-          </p>
+    <div class="w-full bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4 text-brand-text-primary">
+      <div class="pb-3 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+            <Folder class="w-5 h-5" />
+          </div>
+          <div class="space-y-1 min-w-0">
+            <h3 class="font-bold text-sm text-brand-text-primary">
+              {i18n.t("organizer.title")}
+            </h3>
+            <p class="text-xs text-brand-text-secondary leading-relaxed">
+              {i18n.t("organizer.subtitle")}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div class="p-6 space-y-4 text-xs">
+      <div class="space-y-4 text-xs">
         {@render body()}
       </div>
 
-      <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between bg-brand-sidebar/50">
+      <div class="pt-4 border-t border-brand-border/40 flex items-center justify-between">
         <div class="text-xs text-brand-text-secondary">
           {@render collisionWarning()}
         </div>

@@ -112,7 +112,7 @@ describe("Miniplayer.svelte", () => {
 
     expect(exitSpy).toHaveBeenCalled();
 
-    const region = getByRole("region");
+    const region = getByRole("group");
     await fireEvent.keyDown(region, { key: "Escape" });
     expect(exitSpy).toHaveBeenCalledTimes(2);
   });

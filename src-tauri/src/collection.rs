@@ -47,6 +47,7 @@ impl CollectionScanner {
             id,
             path: path.to_string(),
             subdirs: true,
+            is_available: std::path::Path::new(path).exists(),
         })
     }
 
@@ -92,10 +93,13 @@ impl CollectionScanner {
         let mut stmt = conn.prepare("SELECT id, path, subdirs FROM directories ORDER BY path")?;
         let dirs = stmt
             .query_map([], |row| {
+                let path: String = row.get(1)?;
+                let is_available = std::path::Path::new(&path).exists();
                 Ok(MusicDirectory {
                     id: row.get(0)?,
-                    path: row.get(1)?,
+                    path,
                     subdirs: row.get(2)?,
+                    is_available,
                 })
             })?
             .filter_map(|r| r.ok())
