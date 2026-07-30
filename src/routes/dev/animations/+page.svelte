@@ -60,7 +60,7 @@
   }
 
   function replayQueueToast() {
-    toastStore.show("Queue complete \u2014 nice listening \ud83c\udf1f", "milestone");
+    toastStore.show("Golden Hour complete", "milestone");
   }
 
   function replayWelcomeToast() {
