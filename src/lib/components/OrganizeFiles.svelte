@@ -423,34 +423,37 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-            <span>{i18n.t("organizer.replaceSpaces")}</span>
-            <Toggle
-              checked={replaceSpaces}
-              onchange={(v) => { replaceSpaces = v; }}
-              label={i18n.t("organizer.replaceSpaces")}
-              showOnOffLabel={false}
-            />
-          </div>
+          <!-- Toggles Column -->
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+              <span>{i18n.t("organizer.replaceSpaces")}</span>
+              <Toggle
+                checked={replaceSpaces}
+                onchange={(v) => { replaceSpaces = v; }}
+                label={i18n.t("organizer.replaceSpaces")}
+                showOnOffLabel={false}
+              />
+            </div>
 
-          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-            <span>{i18n.t("organizer.moveExtraFiles")}</span>
-            <Toggle
-              checked={moveExtraFiles}
-              onchange={(v) => { moveExtraFiles = v; }}
-              label={i18n.t("organizer.moveExtraFiles")}
-              showOnOffLabel={false}
-            />
-          </div>
+            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+              <span>{i18n.t("organizer.asciiOnly")}</span>
+              <Toggle
+                checked={asciiOnly}
+                onchange={(v) => { asciiOnly = v; }}
+                label={i18n.t("organizer.asciiOnly")}
+                showOnOffLabel={false}
+              />
+            </div>
 
-          <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
-            <span>{i18n.t("organizer.asciiOnly")}</span>
-            <Toggle
-              checked={asciiOnly}
-              onchange={(v) => { asciiOnly = v; }}
-              label={i18n.t("organizer.asciiOnly")}
-              showOnOffLabel={false}
-            />
+            <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+              <span>{i18n.t("organizer.moveExtraFiles")}</span>
+              <Toggle
+                checked={moveExtraFiles}
+                onchange={(v) => { moveExtraFiles = v; }}
+                label={i18n.t("organizer.moveExtraFiles")}
+                showOnOffLabel={false}
+              />
+            </div>
           </div>
         </div>
 
@@ -470,13 +473,16 @@
             </h3>
 
             <!-- Summary badges & filter toggle -->
-            <div class="flex items-center gap-4 text-xs">
-              <Toggle
-                checked={showOnlyChanging}
-                onchange={(v) => { showOnlyChanging = v; }}
-                label={i18n.t("organizer.onlyChanging")}
-                showOnOffLabel={false}
-              />
+            <div class="flex flex-col gap-2 text-xs">
+              <div class="flex items-center gap-3 text-brand-text-secondary">
+                <span>{i18n.t("organizer.onlyChanging")}</span>
+                <Toggle
+                  checked={showOnlyChanging}
+                  onchange={(v) => { showOnlyChanging = v; }}
+                  label={i18n.t("organizer.onlyChanging")}
+                  showOnOffLabel={false}
+                />
+              </div>
               <div class="flex items-center gap-3">
                 <span class="text-brand-accent-text font-medium">
                   {i18n.t("organizer.summaryReady", { count: readyCount })}
