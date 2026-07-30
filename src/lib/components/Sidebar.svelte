@@ -18,6 +18,18 @@
 
   let isCollapsed = $derived(width < SIDEBAR_MIN_WIDTH_PX);
 
+  function selectCollectionTab() {
+    collectionStore.activeTab = "collection";
+    collectionStore.selectedArtistName = null;
+    collectionStore.selectedAlbumName = null;
+  }
+
+  function selectPlaylistsTab() {
+    collectionStore.activeTab = "playlists";
+    collectionStore.selectedPlaylistId = null;
+    collectionStore.selectedAutoPlaylist = null;
+  }
+
   function navigateToFoldersSettings() {
     collectionStore.activeTab = "settings";
     invoke("set_app_setting", { key: "active_settings_tab", value: "folders" }).catch((err) => {
@@ -66,21 +78,29 @@
     {#if !collectionStore.statsLoaded || collectionStore.stats.total_songs > 0}
     <div class="w-full flex flex-col {isCollapsed ? 'items-center' : ''}">
       <button
-        onclick={() => { collectionStore.activeTab = "collection"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
-        class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+        onclick={selectCollectionTab}
+        class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'collection' && isCollapsed ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
         title={i18n.t('sidebar.collection')}
       >
-        <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+        {#if isCollapsed && collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'artists'}
+          <Mic2 class="w-5 h-5" />
+        {:else if isCollapsed && collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'albums'}
+          <DiscAlbum class="w-5 h-5" />
+        {:else if isCollapsed && collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'songs'}
+          <Music class="w-5 h-5" />
+        {:else}
+          <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+        {/if}
         {#if !isCollapsed}
           <span class="truncate whitespace-nowrap">{i18n.t('sidebar.collection')}</span>
         {/if}
       </button>
 
-      {#if collectionStore.activeTab === 'collection' && !isCollapsed}
+      {#if !isCollapsed}
         <div class="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-brand-accent/30 ml-4 my-1">
           <button
             onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "artists"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'artists' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'artists' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <Mic2 class="w-3.5 h-3.5" />
@@ -93,7 +113,7 @@
 
           <button
             onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "albums"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'albums' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'albums' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <DiscAlbum class="w-3.5 h-3.5" />
@@ -106,7 +126,7 @@
 
           <button
             onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "songs"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
-            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeSubTab === 'songs' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'songs' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <Music class="w-3.5 h-3.5" />
@@ -122,21 +142,25 @@
 
     <div class="w-full flex flex-col {isCollapsed ? 'items-center' : ''}">
       <button
-        onclick={() => { collectionStore.activeTab = "playlists"; collectionStore.selectedPlaylistId = null; collectionStore.selectedAutoPlaylist = null; }}
-        class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'playlists' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
+        onclick={selectPlaylistsTab}
+        class="flex items-center gap-3 transition-all duration-150 {collectionStore.activeTab === 'playlists' && isCollapsed ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-2 rounded-lg text-sm font-medium'}"
         title={i18n.t('sidebar.playlists')}
       >
-        <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+        {#if isCollapsed && collectionStore.activeTab === 'playlists' && collectionStore.playlistsSubTab === 'auto'}
+          <Sparkles class="w-5 h-5" />
+        {:else}
+          <ListMusic class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
+        {/if}
         {#if !isCollapsed}
           <span class="truncate whitespace-nowrap">{i18n.t('sidebar.playlists')}</span>
         {/if}
       </button>
 
-      {#if collectionStore.activeTab === 'playlists' && !isCollapsed}
+      {#if !isCollapsed}
         <div class="pl-4 pr-1 py-1 space-y-0.5 border-l-2 border-brand-accent/30 ml-4 my-1">
           <button
             onclick={() => openPlaylistsSubTab("auto")}
-            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.playlistsSubTab === 'auto' && !collectionStore.selectedPlaylistId && !collectionStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'playlists' && collectionStore.playlistsSubTab === 'auto' && !collectionStore.selectedPlaylistId && !collectionStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <Sparkles class="w-3.5 h-3.5" />
@@ -149,7 +173,7 @@
 
           <button
             onclick={() => openPlaylistsSubTab("custom")}
-            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.playlistsSubTab === 'custom' && !collectionStore.selectedPlaylistId && !collectionStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'playlists' && collectionStore.playlistsSubTab === 'custom' && !collectionStore.selectedPlaylistId && !collectionStore.selectedAutoPlaylist ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >
             <div class="flex items-center gap-2 truncate">
               <ListMusic class="w-3.5 h-3.5" />

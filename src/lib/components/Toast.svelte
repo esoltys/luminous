@@ -1,22 +1,17 @@
 <script lang="ts">
   import { fly, fade } from "svelte/transition";
-  import { AlertTriangle, Info, X } from "lucide-svelte";
+  import { AlertTriangle, CheckCircle2, Info, X } from "lucide-svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import { portal } from "../utils/portal";
-  import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
-
-  let dockClearance = $derived(playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0);
 </script>
 
 <div
   use:portal
-  class="fixed inset-x-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4"
-  style="bottom: {dockClearance + 16}px"
+  class="fixed top-24 right-4 z-[100] flex flex-col items-end gap-2 pointer-events-none px-4"
 >
   {#each toastStore.messages as toast (toast.id)}
     <div
-      in:fly={{ y: 16, duration: 200 }}
+      in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
       class="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl text-sm font-medium max-w-md {toast.variant === 'error'
         ? 'bg-red-500/10 border-red-500/30 text-red-400'
@@ -24,6 +19,11 @@
     >
       {#if toast.variant === "error"}
         <AlertTriangle class="w-4 h-4 shrink-0" />
+      {:else if toast.variant === "success"}
+        <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
+          <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
+          <CheckCircle2 class="w-4 h-4 text-brand-accent-text anim-check-pop" />
+        </span>
       {:else}
         <Info class="w-4 h-4 shrink-0 text-brand-accent-text" />
       {/if}

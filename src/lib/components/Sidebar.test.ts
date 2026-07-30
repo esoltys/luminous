@@ -50,11 +50,22 @@ describe("Sidebar.svelte", () => {
     expect(collectionStore.activeSubTab).toBe("songs");
   });
 
-  it("hides Collection sub-items when a non-collection tab is active", () => {
+  it("keeps Collection sub-items expanded even when a non-collection tab is active", () => {
     collectionStore.activeTab = "home";
     const { queryByRole } = render(Sidebar, { props: { width: 256 } });
-    expect(queryByRole("button", { name: /artists/i })).toBeNull();
-    expect(queryByRole("button", { name: /albums/i })).toBeNull();
+    expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
+    expect(queryByRole("button", { name: /albums/i })).not.toBeNull();
+  });
+
+  it("keeps Collection sub-items visible after clicking the Collection header repeatedly", async () => {
+    const { getByTitle, queryByRole } = render(Sidebar, { props: { width: 256 } });
+    const collectionBtn = getByTitle("Collection");
+
+    await fireEvent.click(collectionBtn);
+    expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
+
+    await fireEvent.click(collectionBtn);
+    expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
   });
 
   it("centers Collection and Playlists wrapper containers when collapsed (width < 180)", () => {

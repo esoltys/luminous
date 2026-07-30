@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./lib/styles/animations.css";
 
 @theme {
   --color-brand-main: var(--bg-main);

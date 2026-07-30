@@ -20,6 +20,7 @@
     "test:run": "vitest run",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
+    "preview-animations": "bunx tsx scripts/preview-animations.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts"
   },
