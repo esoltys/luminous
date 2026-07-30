@@ -457,18 +457,22 @@
         <!-- Preview Table Section -->
         <div class="space-y-2 pt-2">
           <div class="flex flex-col gap-1.5">
-            <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
-              <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
+                <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
+              </h3>
               <Button
                 onclick={fetchPreview}
                 variant="secondary"
                 size="sm"
                 disabled={isLoading}
                 title={i18n.t("organizer.refreshPreviewTooltip")}
+                class="gap-1.5"
               >
                 <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
+                {i18n.t("organizer.refreshPreviewTooltip")}
               </Button>
-            </h3>
+            </div>
 
             <!-- Summary badges & filter toggle -->
             <div class="flex flex-col gap-2 text-xs">
