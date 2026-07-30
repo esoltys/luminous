@@ -13,11 +13,8 @@
 
   let buttonEl: HTMLButtonElement | undefined = $state();
 
-  // Only the moment the user actually favourites a song should pulse — not
-  // every render where `favorite` happens to already be true (e.g. scrolling
-  // a list of already-favourited songs into view). `previousFavorite` starts
-  // undefined so an already-favourited song never pulses on first mount.
-  let previousFavorite: boolean | undefined;
+  // Only the moment the user actually favourites a song should pulse — triggered
+  // directly on user click when favouriting.
   let justFavorited = $state(false);
 
   // HeartToggle renders inside all sorts of clipped containers (virtualized
@@ -45,26 +42,22 @@
     ring.addEventListener("animationend", () => ring.remove());
   }
 
-  $effect(() => {
-    const wasFavorite = previousFavorite;
-    previousFavorite = favorite;
-    if (favorite && wasFavorite === false) {
+  function handleClick(e: MouseEvent) {
+    e.stopPropagation();
+    if (!favorite) {
       justFavorited = true;
       burstRing();
       soundCues.playSuccess();
-      const timeout = setTimeout(() => { justFavorited = false; }, 320);
-      return () => clearTimeout(timeout);
+      setTimeout(() => { justFavorited = false; }, 320);
     }
-  });
+    onToggle();
+  }
 </script>
 
 <button
   bind:this={buttonEl}
   type="button"
-  onclick={(e) => {
-    e.stopPropagation();
-    onToggle();
-  }}
+  onclick={handleClick}
   class="inline-flex transition-colors cursor-pointer {favorite
     ? 'text-brand-accent-text'
     : 'text-brand-text-secondary/60 hover:text-brand-accent-text'}"
