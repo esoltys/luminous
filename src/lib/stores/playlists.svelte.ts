@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
@@ -153,6 +155,10 @@ class PlaylistsStore {
     const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
+    toastStore.show(
+      i18n.t("celebrations.playlistCreated", { name }, `Playlist "${name}" created`),
+      "success"
+    );
     return playlist;
   }
 

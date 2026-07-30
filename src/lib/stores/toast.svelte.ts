@@ -1,6 +1,6 @@
 import { TOAST_DURATION_MS } from "../constants";
 
-export type ToastVariant = "info" | "error" | "success";
+export type ToastVariant = "info" | "error" | "success" | "milestone" | "warning";
 
 export interface ToastMessage {
   id: number;
@@ -12,10 +12,10 @@ class ToastStore {
   messages = $state<ToastMessage[]>([]);
   private nextId = 0;
 
-  show(text: string, variant: ToastVariant = "info") {
+  show(text: string, variant: ToastVariant = "info", durationMs: number = TOAST_DURATION_MS) {
     const id = this.nextId++;
     this.messages.push({ id, text, variant });
-    setTimeout(() => this.dismiss(id), TOAST_DURATION_MS);
+    setTimeout(() => this.dismiss(id), durationMs);
   }
 
   dismiss(id: number) {
