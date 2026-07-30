@@ -100,7 +100,7 @@
   <!-- COMPONENTS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px;">
     <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Components</div>
-    <div style="font-size:14px; color:#a6adc4; margin-bottom:36px;">Core primitives, styled from the tokens above.</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:36px;">Core primitives, styled from the tokens above, plus controls for playback and audio settings.</div>
     <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:20px;">
       <button style="background:#6f7ea9; color:#000; font-weight:600; font-size:13px; border:none; border-radius:8px; padding:12px 20px; cursor:pointer;">Primary button</button>
       <button style="background:transparent; color:#f1f3f8; font-weight:600; font-size:13px; border:1px solid #2c2f3c; border-radius:9999px; padding:12px 20px; cursor:pointer;">Secondary button</button>
@@ -112,6 +112,45 @@
       <div style="background:#6f7ea9; color:#000; font-weight:600; font-size:13px; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#000;"></div>Nav item active</div>
       <div style="background:transparent; color:#a6adc4; font-weight:500; font-size:13px; border-radius:8px; padding:10px 16px;">Nav item</div>
       <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:16px; font-size:12.5px; color:#a6adc4; width:200px;">Card surface</div>
+    </div>
+
+    <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; margin-top:32px; padding-top:28px; border-top:1px solid #2c2f3c;">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:9999px; padding:10px 16px;">
+          <span style="font-size:13px; font-weight:600; color:#f1f3f8;">On</span>
+          <div style="width:36px; height:20px; border-radius:9999px; background:#6f7ea9; position:relative;"><div style="width:16px; height:16px; border-radius:50%; background:#000; position:absolute; top:2px; right:2px;"></div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:9999px; padding:10px 16px;">
+          <span style="font-size:13px; font-weight:500; color:#a6adc4;">Off</span>
+          <div style="width:36px; height:20px; border-radius:9999px; background:#2c2f3c; position:relative;"><div style="width:16px; height:16px; border-radius:50%; background:#6d7286; position:absolute; top:2px; left:2px;"></div></div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286;">Toggle</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="width:56px; height:56px; border-radius:50%; background:conic-gradient(#6f7ea9 0deg 135deg, #2c2f3c 135deg 360deg); display:flex; align-items:center; justify-content:center;">
+          <div style="width:44px; height:44px; border-radius:50%; background:#1c1f29; position:relative;">
+            <div style="width:2px; height:14px; background:#6f7ea9; position:absolute; top:4px; left:50%; transform:translateX(-50%) rotate(45deg); transform-origin:bottom center; border-radius:1px;"></div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286;">Knob</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="position:relative; width:4px; height:90px; background:#2c2f3c; border-radius:3px;">
+          <div style="position:absolute; bottom:0; left:0; width:4px; border-radius:3px; background:#6f7ea9; height:62%;"></div>
+          <div style="position:absolute; left:50%; transform:translateX(-50%); bottom:62%; width:14px; height:14px; border-radius:50%; background:#8c98ba; margin-bottom:-7px; box-shadow:0 0 0 1px #08090c;"></div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286;">Fader</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; width:160px;">
+          <span style="font-size:11.5px; color:#a6adc4; flex-shrink:0;">0.0 dB</span>
+          <div style="flex:1; height:4px; background:#2c2f3c; border-radius:3px; position:relative;"><div style="position:absolute; left:45%; top:-6px; width:16px; height:16px; border-radius:50%; background:#8c98ba;"></div></div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286;">Horizontal slider</div>
+      </div>
     </div>
   </div>
 

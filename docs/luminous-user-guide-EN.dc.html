@@ -7,10 +7,10 @@
 </head>
 <body>
 <x-dc>
-<template id="__bundler_thumbnail"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="200" fill="#08090c"/><circle cx="100" cy="100" r="60" fill="#0A0A0D" stroke="#626FE8" stroke-width="4"/><circle cx="100" cy="100" r="60" fill="none" stroke="#FFB648" stroke-width="2" opacity="0.5"/><circle cx="140" cy="66" r="7" fill="#fff"/></svg></template>
+<template id="__bundler_thumbnail"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="200" fill="#08090c"></rect><circle cx="100" cy="100" r="60" fill="#0A0A0D" stroke="#626FE8" stroke-width="4"></circle><circle cx="100" cy="100" r="60" fill="none" stroke="#FFB648" stroke-width="2" opacity="0.5"></circle><circle cx="140" cy="66" r="7" fill="#fff"></circle></svg></template>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <script src="./image-slot.js"></script>
   <style>
     body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
@@ -25,15 +25,15 @@
 
   <div style="position:sticky; top:0; z-index:10; background:rgba(25,27,35,0.85); backdrop-filter:blur(20px) saturate(180%); border-bottom:1px solid #2c2f3c; display:flex; align-items:center; justify-content:space-between; gap:24px; padding:16px 32px;">
     <div style="display:flex; align-items:center; gap:12px;">
-      <img src="./luminous-mark.svg" alt="Luminous" style="width:28px; height:28px;" />
+      <img src="./luminous-mark.svg" alt="Luminous" style="width:28px; height:28px;">
       <div style="display:flex; align-items:baseline; gap:9px;">
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; letter-spacing:-0.01em;">Luminous</div>
         <div style="font-size:12px; color:#a6adc4;">User Guide</div>
       </div>
     </div>
     <div style="position:relative; width:280px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#6d7286" stroke-width="2" style="width:14px; height:14px; position:absolute; left:13px; top:50%; transform:translateY(-50%);"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input value="{{ query }}" onChange="{{ onQueryChange }}" placeholder="Search topics" style="width:100%; box-sizing:border-box; background:#101218; border:1px solid #2c2f3c; border-radius:9999px; padding:9px 14px 9px 34px; font-size:13px; color:#f1f3f8; outline:none; font-family:'Inter',sans-serif;" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="#6d7286" stroke-width="2" style="width:14px; height:14px; position:absolute; left:13px; top:50%; transform:translateY(-50%);"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+      <input value="{{ query }}" onChange="{{ onQueryChange }}" placeholder="Search topics" style="width:100%; box-sizing:border-box; background:#101218; border:1px solid #2c2f3c; border-radius:9999px; padding:9px 14px 9px 34px; font-size:13px; color:#f1f3f8; outline:none; font-family:'Inter',sans-serif;">
     </div>
   </div>
 
@@ -356,15 +356,15 @@
       <sc-if value="{{ isEqualizer }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
         <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Equalizer</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Everything here lives under <b style="color:#f1f3f8;">Settings → Equalizer</b>. You don't need to know anything about audio engineering to use it — the defaults sound good, and every change applies instantly, even mid-song.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Everything here lives under <b style="color:#f1f3f8;">Settings → Equalizer</b>. You don't need to know anything about audio engineering to use it — the defaults sound good, and every change applies instantly, even mid-song. The panel is split into three parts: the EQ itself, loudness normalization, and playback fades — each can be tuned or left alone independently.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Flip <b style="color:#f1f3f8;">Enable EQ</b> on, then pick a preset from the dropdown — or switch to <b style="color:#f1f3f8;">20-band parametric</b> if the default 10 bands aren't precise enough. A <b style="color:#f1f3f8;">Reset Bands</b> button appears in that view to snap everything back to flat.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Loudness Normalization</b> evens out the volume jump between quiet and loud tracks, so you're not reaching for the volume knob every other song.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Fades &amp; crossfade</b> softens the pause/stop button and can blend the tail of one song into the start of the next.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Flip <b style="color:#f1f3f8;">Enable EQ</b> on, then pick a preset from the dropdown — Pop, Rock, Bass Boost, Vocal, and more — or dial in your own curve by dragging the band sliders. Switch to <b style="color:#f1f3f8;">20-band parametric</b> if the default 10 bands aren't precise enough; it gives every band its own frequency and Q (bandwidth) instead of the fixed 10-band ladder, so you can carve out a narrow problem frequency without touching anything around it. A <b style="color:#f1f3f8;">Reset Bands</b> button appears in that view to snap everything back to flat in one click. The <b style="color:#f1f3f8;">Preamp</b> slider at the top raises or lowers overall gain to compensate before it hits the bands, so boosting doesn't clip.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color: rgb(241, 243, 248);">Loudness Normalization</b> evens out the volume jump between quiet and loud tracks, so you're not reaching for the volume knob every other song. Set a <b style="color: rgb(241, 243, 248);">Target Level</b> in LUFS, and choose whether to <b style="color: rgb(241, 243, 248);">Normalize by</b> track (each song hits the target on its own) or album (the whole album is scaled together, preserving the mix's intended dynamics between tracks). Luminous analyzes your library in the background — a progress message shows how many tracks are left — and falls back to embedded <b>ReplayGain</b> tags, then a flat <b style="color: rgb(241, 243, 248);">Fallback Gain</b>, for anything it hasn't measured yet.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Fades &amp; crossfade</b> softens the pause/stop button with a short <b style="color:#f1f3f8;">Fade Duration</b> instead of an abrupt cut, and can automatically blend the tail of one song into the start of the next over a <b style="color:#f1f3f8;">Crossfade Duration</b> you set. <b style="color:#f1f3f8;">Preserve Gapless for Same Album</b> keeps crossfade from kicking in between tracks on the same album — useful for live sets, concept albums, or anything mixed to flow without a gap.</div></div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:900px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer" src="screenshots/equalizer-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="10-band graphic EQ"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">10-band graphic</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-parametric" src="screenshots/equalizer-parametric-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="20-band parametric EQ"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">20-band parametric</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer" src="screenshots/equalizer-EN.png?v=1785431900000" shape="rect" fit="contain" style="width:100%; height:auto; aspect-ratio:1280/1500;" placeholder="10-band graphic EQ"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">10-band graphic — one slider per fixed frequency, fastest way to shape a curve by ear.</div></div>
+          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="equalizer-parametric" src="screenshots/equalizer-parametric-EN.png?v=1785431500000" shape="rect" fit="contain" style="width:100%; height:auto; aspect-ratio:1280/1600;" placeholder="20-band parametric EQ"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">20-band parametric — free-placed bands with adjustable frequency and Q for surgical corrections.</div></div>
         </div>
       </sc-if>
 
@@ -402,7 +402,7 @@
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Source available on <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, alongside links to CREDITS.md and LICENSE for the full list of libraries Luminous is built on and the terms it's shared under.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Under the hood: a Rust and Tauri core, a Svelte 5 interface, and dedicated libraries for decoding and analyzing audio.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
-          <image-slot id="settings-about" src="screenshots/settings-about-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/950;" placeholder="About & Credits"></image-slot>
+          <image-slot id="settings-about" src="screenshots/settings-about-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/950;" placeholder="About &amp; Credits"></image-slot>
         </div>
       </sc-if>
 

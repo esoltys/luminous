@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
+    a { color: #8c98ba; }
+    a:hover { color: #a8b3d4; }
+
+    @keyframes heartPulse { 0%,60%{ transform:scale(1); } 68%{ transform:scale(1.35); } 78%{ transform:scale(0.94); } 88%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+    @keyframes heartRing { 0%,60%{ box-shadow:0 0 0 0 rgba(255,182,72,0); } 68%{ box-shadow:0 0 0 0 rgba(255,182,72,0.5); } 90%{ box-shadow:0 0 0 14px rgba(255,182,72,0); } 100%{ box-shadow:0 0 0 14px rgba(255,182,72,0); } }
+    @keyframes checkPop { 0%,55%{ transform:scale(0) rotate(-25deg); opacity:0; } 70%{ transform:scale(1.2) rotate(5deg); opacity:1; } 85%{ transform:scale(0.95) rotate(-2deg); } 100%{ transform:scale(1) rotate(0deg); opacity:1; } }
+    @keyframes glowRing { 0%,55%{ box-shadow:0 0 0 0 rgba(143,191,154,0.5); opacity:0; } 65%{ opacity:1; } 90%{ box-shadow:0 0 0 18px rgba(143,191,154,0); opacity:0; } 100%{ opacity:0; } }
+    @keyframes rowSweep { 0%,50%{ background-position:-120% 0; } 78%{ background-position:220% 0; } 100%{ background-position:220% 0; } }
+    @keyframes folderPop { 0%,55%{ transform:scale(1) rotate(0); } 65%{ transform:scale(1.12) rotate(-3deg); } 78%{ transform:scale(0.96) rotate(2deg); } 100%{ transform:scale(1) rotate(0); } }
+    @keyframes ringExpand { 0%,55%{ box-shadow:0 0 0 0 rgba(111,126,169,0.55); opacity:0; } 62%{ opacity:1; } 90%{ box-shadow:0 0 0 20px rgba(111,126,169,0); opacity:0; } 100%{ opacity:0; } }
+    @keyframes cardMaterialize { 0%,50%{ transform:scale(0.92); opacity:0; } 72%{ transform:scale(1.02); opacity:1; } 100%{ transform:scale(1); opacity:1; } }
+    @keyframes borderGlowPulse { 0%,50%{ box-shadow:0 0 0 0 rgba(111,126,169,0); } 72%{ box-shadow:0 0 0 3px rgba(111,126,169,0.35); } 100%{ box-shadow:0 0 0 0 rgba(111,126,169,0); } }
+    @keyframes slideInFade { 0%,50%{ transform:translateX(-14px); opacity:0; } 75%{ transform:translateX(0); opacity:1; } 100%{ transform:translateX(0); opacity:1; } }
+    @keyframes badgeGlow { 0%,50%{ opacity:0; } 60%{ opacity:1; } 75%{ box-shadow:0 0 0 0 rgba(255,182,72,0.5); } 90%{ box-shadow:0 0 0 10px rgba(255,182,72,0); } 100%{ opacity:1; box-shadow:0 0 0 10px rgba(255,182,72,0); } }
+    @keyframes milestoneBounce { 0%,50%{ transform:scale(1); } 62%{ transform:scale(1.22); } 76%{ transform:scale(0.95); } 88%{ transform:scale(1.05); } 100%{ transform:scale(1); } }
+    @keyframes shimmerSweep { 0%,50%{ background-position:-150% 0; } 85%{ background-position:150% 0; } 100%{ background-position:150% 0; } }
+    @keyframes goldRing { 0%,50%{ box-shadow:0 0 0 0 rgba(255,182,72,0.5); opacity:0; } 58%{ opacity:1; } 88%{ box-shadow:0 0 0 22px rgba(255,182,72,0); opacity:0; } 100%{ opacity:0; } }
+    @keyframes warnShake { 0%,55%{ transform:translateX(0); } 60%{ transform:translateX(-5px); } 65%{ transform:translateX(4px); } 70%{ transform:translateX(-3px); } 75%{ transform:translateX(2px); } 80%{ transform:translateX(0); } 100%{ transform:translateX(0); } }
+    @keyframes warnFlash { 0%,55%{ background:#1c1f29; } 62%{ background:rgba(224,160,160,0.22); } 100%{ background:#1c1f29; } }
+    @keyframes reducedFade { 0%,50%{ opacity:0.35; } 75%{ opacity:1; } 100%{ opacity:1; } }
+  </style>
+</helmet>
+
+<div style="background:#08090c; color:#f1f3f8; min-height:100vh; padding-bottom:120px;">
+
+  <div style="max-width:1200px; margin:0 auto; padding:88px 48px 40px; display:flex; align-items:center; gap:24px; border-bottom:1px solid #2c2f3c;">
+    <img src="./luminous-mark.svg" style="width:56px; height:56px;">
+    <div>
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Motion spec — celebration moments</div>
+      <div style="font-size:14px; color:#a6adc4; margin-top:2px; max-width:720px; line-height:1.6;">Small joyful animations for the moments Luminous should feel good about — favouriting, adding music, organizing, and playlists. Motion carries the same visual hierarchy as type: bigger, warmer moves for milestones; quieter pops for routine confirmations; sharp, brief moves for warnings. Demos below loop continuously.</div>
+    </div>
+  </div>
+
+  <!-- HIERARCHY -->
+  <div style="max-width:1200px; margin:0 auto; padding:56px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">The hierarchy</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:32px; max-width:700px; line-height:1.6;">Four tiers, same way type has display/heading/body weights. Reduce motion, size, and duration as the tier goes quieter; increase reach only for the moments that deserve it.</div>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-left:3px solid #FFB648; border-radius:12px; padding:22px 24px; display:grid; grid-template-columns:120px 1fr 220px 160px; align-items:center; gap:24px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#FFB648;">Milestone</div>
+        <div style="font-size:13px; color:#d5d9e6; line-height:1.6;">Rare, personal achievements. Biggest scale, warmest color, longest reach — but still one motion, not a shower of them.</div>
+        <div style="font-size:11.5px; color:#6d7286; display:flex; flex-direction:column; gap:3px;">
+          <div>Duration <b style="color:#a6adc4;">600–700ms</b> · Scale <b style="color:#a6adc4;">up to 1.22×</b></div>
+          <div>Easing <b style="color:#a6adc4;">overshoot spring</b></div>
+          <div>Sound <b style="color:#a6adc4;">3-note rising arpeggio, ~280ms</b></div>
+        </div>
+        <button onClick="{{ playMilestone }}" style="background:transparent; color:#FFB648; font-weight:600; font-size:12px; border:1px solid rgba(255,182,72,0.4); border-radius:9999px; padding:8px 14px; cursor:pointer; justify-self:end;">▸ Preview sound</button>
+      </div>
+
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-left:3px solid #6f7ea9; border-radius:12px; padding:22px 24px; display:grid; grid-template-columns:120px 1fr 220px 160px; align-items:center; gap:24px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8c98ba;">New</div>
+        <div style="font-size:13px; color:#d5d9e6; line-height:1.6;">Something appeared that wasn't there before — a playlist, a folder, a badge. Materializes gently; invites a look, doesn't demand one.</div>
+        <div style="font-size:11.5px; color:#6d7286; display:flex; flex-direction:column; gap:3px;">
+          <div>Duration <b style="color:#a6adc4;">350–450ms</b> · Scale <b style="color:#a6adc4;">0.92×→1×</b></div>
+          <div>Easing <b style="color:#a6adc4;">ease-out, slight overshoot</b></div>
+          <div>Sound <b style="color:#a6adc4;">single soft blip, ~100ms</b></div>
+        </div>
+        <button onClick="{{ playNew }}" style="background:transparent; color:#8c98ba; font-weight:600; font-size:12px; border:1px solid rgba(111,126,169,0.4); border-radius:9999px; padding:8px 14px; cursor:pointer; justify-self:end;">▸ Preview sound</button>
+      </div>
+
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-left:3px solid #8fbf9a; border-radius:12px; padding:22px 24px; display:grid; grid-template-columns:120px 1fr 220px 160px; align-items:center; gap:24px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8fbf9a;">Success</div>
+        <div style="font-size:13px; color:#d5d9e6; line-height:1.6;">Routine confirmations — a favourite, a finished import. Quick and light; it should read as "done," not as a celebration.</div>
+        <div style="font-size:11.5px; color:#6d7286; display:flex; flex-direction:column; gap:3px;">
+          <div>Duration <b style="color:#a6adc4;">250–350ms</b> · Scale <b style="color:#a6adc4;">up to 1.1×</b></div>
+          <div>Easing <b style="color:#a6adc4;">ease-out</b></div>
+          <div>Sound <b style="color:#a6adc4;">rising third, two notes, ~120ms</b></div>
+        </div>
+        <button onClick="{{ playSuccess }}" style="background:transparent; color:#8fbf9a; font-weight:600; font-size:12px; border:1px solid rgba(143,191,154,0.4); border-radius:9999px; padding:8px 14px; cursor:pointer; justify-self:end;">▸ Preview sound</button>
+      </div>
+
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-left:3px solid #e0a0a0; border-radius:12px; padding:22px 24px; display:grid; grid-template-columns:120px 1fr 220px 160px; align-items:center; gap:24px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#e0a0a0;">Warning / error</div>
+        <div style="font-size:13px; color:#d5d9e6; line-height:1.6;">Needs attention. Sharp and brief — no bounce, no overshoot. A nudge, not a celebration.</div>
+        <div style="font-size:11.5px; color:#6d7286; display:flex; flex-direction:column; gap:3px;">
+          <div>Duration <b style="color:#a6adc4;">180–220ms</b> · Scale <b style="color:#a6adc4;">none</b></div>
+          <div>Easing <b style="color:#a6adc4;">linear / ease-in-out</b></div>
+          <div>Sound <b style="color:#a6adc4;">single low blip, ~150ms</b></div>
+        </div>
+        <button onClick="{{ playWarning }}" style="background:transparent; color:#e0a0a0; font-weight:600; font-size:12px; border:1px solid rgba(224,160,160,0.4); border-radius:9999px; padding:8px 14px; cursor:pointer; justify-self:end;">▸ Preview sound</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MOMENTS -->
+  <div style="max-width:1200px; margin:0 auto; padding:56px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Moments</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:32px; max-width:700px; line-height:1.6;">Eleven moments across the four tiers. Each demo loops on a 3.4s cycle so you can watch it settle before it replays.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
+
+      <!-- 1. Favouriting -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Favouriting a song</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8fbf9a; background:rgba(143,191,154,0.14); border-radius:6px; padding:3px 8px;">Success</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="width:22px; height:20px; position:relative; animation:heartPulse 3.4s ease-in-out infinite;">
+            <svg viewBox="0 0 24 22" width="22" height="20" style="display:block; border-radius:50%; animation:heartRing 3.4s ease-in-out infinite;"><path d="M12 20 C4 14 1 9.5 1 6 C1 2.5 3.8 0.5 6.8 0.5 C9 0.5 10.8 1.8 12 3.6 C13.2 1.8 15 0.5 17.2 0.5 C20.2 0.5 23 2.5 23 6 C23 9.5 20 14 12 20 Z" fill="#FFB648"></path></svg>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Heart icon scales up past 1× then settles with a soft overshoot; a brief gold ring flashes behind it and fades. 300ms.</div>
+      </div>
+
+      <!-- 2. Adding new music -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Import finished</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8fbf9a; background:rgba(143,191,154,0.14); border-radius:6px; padding:3px 8px;">Success</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="display:flex; align-items:center; gap:8px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:9999px; padding:8px 14px;">
+            <div style="width:16px; height:16px; border-radius:50%; background:#8fbf9a; position:relative; animation:checkPop 3.4s ease-out infinite;"><div style="position:absolute; inset:0; box-shadow:0 0 0 0; animation:glowRing 3.4s ease-out infinite;"></div></div>
+            <div style="font-size:12px; font-weight:600;">128 tracks added</div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Checkmark dot pops in with a slight rotation settle; a green glow ring expands once behind the toast and dissolves. 320ms.</div>
+      </div>
+
+      <!-- 3. Organizing -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Organizing complete</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8fbf9a; background:rgba(143,191,154,0.14); border-radius:6px; padding:3px 8px;">Success</div></div>
+        <div style="height:64px; display:flex; flex-direction:column; gap:5px; justify-content:center; background:#08090c; border-radius:8px; padding:0 14px;">
+          <div style="height:8px; border-radius:3px; background:linear-gradient(90deg,#1c1f29 25%,#2f3a4d 50%,#1c1f29 75%); background-size:250% 100%; animation:rowSweep 3.4s ease-in-out infinite;"></div>
+          <div style="height:8px; border-radius:3px; background:linear-gradient(90deg,#1c1f29 25%,#2f3a4d 50%,#1c1f29 75%); background-size:250% 100%; animation:rowSweep 3.4s ease-in-out infinite; animation-delay:0.05s;"></div>
+          <div style="height:8px; border-radius:3px; background:linear-gradient(90deg,#1c1f29 25%,#2f3a4d 50%,#1c1f29 75%); background-size:250% 100%; animation:rowSweep 3.4s ease-in-out infinite; animation-delay:0.1s;"></div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">A quiet highlight sweeps down the cleaned-up rows once, left to right, then fades — tags/art resolved. 280ms.</div>
+      </div>
+
+      <!-- 4. First watched folder -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">First watched folder</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8c98ba; background:rgba(111,126,169,0.16); border-radius:6px; padding:3px 8px;">New</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="width:28px; height:24px; position:relative;">
+            <div style="position:absolute; inset:0; border-radius:6px; animation:ringExpand 3.4s ease-out infinite;"></div>
+            <svg viewBox="0 0 28 24" width="28" height="24" style="animation:folderPop 3.4s ease-out infinite; display:block;"><path d="M1 4 C1 2.3 2.3 1 4 1 H11 L14 4 H24 C25.7 4 27 5.3 27 7 V19 C27 20.7 25.7 22 24 22 H4 C2.3 22 1 20.7 1 19 Z" fill="#6f7ea9"></path></svg>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Folder icon bounces with a small tilt; a blue ring expands outward from behind it once to mark the new capability. 380ms.</div>
+      </div>
+
+      <!-- 5. Creating a new playlist -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Creating a new playlist</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8c98ba; background:rgba(111,126,169,0.16); border-radius:6px; padding:3px 8px;">New</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="width:96px; height:44px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:8px; padding:8px 10px; animation:cardMaterialize 3.4s cubic-bezier(0.34,1.56,0.64,1) infinite, borderGlowPulse 3.4s ease-out infinite;">
+            <div style="width:60%; height:6px; border-radius:3px; background:#6f7ea9; margin-bottom:6px;"></div>
+            <div style="width:80%; height:6px; border-radius:3px; background:#2c2f3c;"></div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Card scales in from 0.92× with a slight overshoot; border glows once and settles. 400ms.</div>
+      </div>
+
+      <!-- 6. New auto-playlist -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">New auto-playlist appears</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8c98ba; background:rgba(111,126,169,0.16); border-radius:6px; padding:3px 8px;">New</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="display:flex; align-items:center; gap:8px; animation:slideInFade 3.4s ease-out infinite;">
+            <div style="width:14px; height:14px; border-radius:4px; background:#6f7ea9;"></div>
+            <div style="font-size:12px; font-weight:600;">Deep Focus</div>
+            <div style="font-size:9.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#FFB648; background:rgba(255,182,72,0.14); border-radius:5px; padding:2px 6px; animation:badgeGlow 3.4s ease-out infinite;">Auto</div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Row slides in from the left edge of the sidebar as it fades in; the "Auto" badge gets a single soft gold pulse to flag it's system-made. 380ms.</div>
+      </div>
+
+      <!-- 7. New release available -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">New release available</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#8c98ba; background:rgba(111,126,169,0.16); border-radius:6px; padding:3px 8px;">New</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="width:34px; height:34px; border-radius:8px; background:#2c2f3c; position:relative; animation:cardMaterialize 3.4s cubic-bezier(0.34,1.56,0.64,1) infinite;">
+            <div style="position:absolute; top:-4px; right:-4px; width:12px; height:12px; border-radius:50%; background:#6f7ea9; animation:badgeGlow 3.4s ease-out infinite;"></div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Album art tile materializes in the "New releases" rail; a small blue dot pulses once at the corner. 400ms.</div>
+      </div>
+
+      <!-- 8. Milestone -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Reaching a milestone</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#FFB648; background:rgba(255,182,72,0.14); border-radius:6px; padding:3px 8px;">Milestone</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px; position:relative;">
+          <div style="position:absolute; width:60px; height:34px; border-radius:9999px; animation:goldRing 3.4s ease-out infinite;"></div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; animation:milestoneBounce 3.4s cubic-bezier(0.34,1.56,0.64,1) infinite; color:#FFB648;">1,000 songs</div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Number bounces up past 1.2× and settles with the widest overshoot in the system; a gold ring expands and fades behind it once. 650ms.</div>
+      </div>
+
+      <!-- 9. Queue complete -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Completing a queue</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#FFB648; background:rgba(255,182,72,0.14); border-radius:6px; padding:3px 8px;">Milestone</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="font-size:12.5px; font-weight:600; background:linear-gradient(90deg,#f1f3f8 40%,#FFB648 50%,#f1f3f8 60%); background-size:250% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:shimmerSweep 3.4s ease-in-out infinite;">Queue complete — nice listening</div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">A single gold shimmer sweeps once across the end-of-queue message, left to right. 600ms.</div>
+      </div>
+
+      <!-- 10. First launch -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">First launch</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#FFB648; background:rgba(255,182,72,0.14); border-radius:6px; padding:3px 8px;">Milestone</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px; position:relative;">
+          <div style="position:absolute; width:40px; height:40px; border-radius:50%; animation:goldRing 3.4s ease-out infinite;"></div>
+          <img src="./luminous-mark.svg" style="width:32px; height:32px; animation:milestoneBounce 3.4s cubic-bezier(0.34,1.56,0.64,1) infinite;">
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">Wordmark eases in with the milestone bounce and a wide gold ring — the one time the brand gold appears at full size. 650ms.</div>
+      </div>
+
+      <!-- 11. Warning -->
+      <div style="background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;"><div style="font-weight:600; font-size:14px;">Import needs attention</div><div style="font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#e0a0a0; background:rgba(224,160,160,0.14); border-radius:6px; padding:3px 8px;">Warning</div></div>
+        <div style="height:64px; display:flex; align-items:center; justify-content:center; background:#08090c; border-radius:8px;">
+          <div style="display:flex; align-items:center; gap:8px; border-radius:8px; padding:8px 14px; animation:warnShake 3.4s ease-in-out infinite, warnFlash 3.4s ease-in-out infinite;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#e0a0a0;"></div>
+            <div style="font-size:12px; font-weight:600;">3 files couldn't be read</div>
+          </div>
+        </div>
+        <div style="font-size:11.5px; color:#6d7286; line-height:1.6;">A tight, brief shake and a single red flash — no bounce, no scale. Reads as urgent, not as a celebration. 200ms.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- REDUCED MOTION -->
+  <div style="max-width:1200px; margin:0 auto; padding:56px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Reduced motion</div>
+    <div style="font-size:14px; color:#a6adc4; margin-bottom:28px; max-width:700px; line-height:1.6;">When the OS "reduce motion" setting is on, every animation above collapses to the same fallback: a plain opacity fade, no scale, no bounce, no rings. Toggle it to compare.</div>
+    <div style="display:flex; align-items:center; gap:24px; background:#1c1f29; border:1px solid #2c2f3c; border-radius:12px; padding:24px;">
+      <button onClick="{{ toggleReduced }}" style="background:{{ reducedBg }}; color:{{ reducedFg }}; font-weight:600; font-size:13px; border:1px solid #2c2f3c; border-radius:9999px; padding:10px 18px; cursor:pointer; flex-shrink:0;">{{ reducedLabel }}</button>
+      <div style="width:1px; height:32px; background:#2c2f3c;"></div>
+      <div style="width:22px; height:20px;">
+        <svg viewBox="0 0 24 22" width="22" height="20" style="display:block; animation:{{ heartAnim }};"><path d="M12 20 C4 14 1 9.5 1 6 C1 2.5 3.8 0.5 6.8 0.5 C9 0.5 10.8 1.8 12 3.6 C13.2 1.8 15 0.5 17.2 0.5 C20.2 0.5 23 2.5 23 6 C23 9.5 20 14 12 20 Z" fill="#FFB648"></path></svg>
+      </div>
+      <div style="font-size:12.5px; color:#6d7286;">{{ reducedNote }}</div>
+    </div>
+  </div>
+
+  <!-- SOUND CUES -->
+  <div style="max-width:1200px; margin:0 auto; padding:56px 48px; border-bottom:1px solid #2c2f3c;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Sound cues</div>
+    <div style="font-size:14px; color:#a6adc4; max-width:700px; line-height:1.7; margin-bottom:20px;">Optional, off by default, one toggle in Settings mutes all of them. Keep every cue under ~150ms and pitched from the same small set of tones so they feel like one instrument, not a pile of stock effects.</div>
+    
+  </div>
+
+  <!-- DOS DONTS -->
+  <div style="max-width:1200px; margin:0 auto; padding:64px 48px;">
+    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
+      <div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8fbf9a; margin-bottom:14px;">Do</div>
+        <sc-for list="{{ dos }}" as="d" hint-placeholder-count="4">
+          <div style="font-size:13.5px; color:#d5d9e6; line-height:1.7; padding-left:18px; position:relative;"><span style="position:absolute; left:0;">—</span>{{ d }}</div>
+        </sc-for>
+      </div>
+      <div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#e0a0a0; margin-bottom:14px;">Don't</div>
+        <sc-for list="{{ donts }}" as="d" hint-placeholder-count="4">
+          <div style="font-size:13.5px; color:#d5d9e6; line-height:1.7; padding-left:18px; position:relative;"><span style="position:absolute; left:0;">—</span>{{ d }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { reduced: false };
+
+  getCtx() {
+    if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return this.audioCtx;
+  }
+
+  playNote(freq, startTime, dur, gainPeak) {
+    const ctx = this.getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(gainPeak, startTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + dur + 0.02);
+  }
+
+  playSuccessTone() {
+    const ctx = this.getCtx(); const t = ctx.currentTime;
+    this.playNote(660, t, 0.12, 0.14);
+    this.playNote(830, t + 0.06, 0.12, 0.14);
+  }
+  playNewTone() {
+    const ctx = this.getCtx(); const t = ctx.currentTime;
+    this.playNote(740, t, 0.1, 0.12);
+  }
+  playMilestoneTone() {
+    const ctx = this.getCtx(); const t = ctx.currentTime;
+    this.playNote(523, t, 0.16, 0.15);
+    this.playNote(659, t + 0.09, 0.16, 0.15);
+    this.playNote(880, t + 0.18, 0.22, 0.16);
+  }
+  playWarningTone() {
+    const ctx = this.getCtx(); const t = ctx.currentTime;
+    this.playNote(220, t, 0.15, 0.14);
+  }
+
+  renderVals() {
+    const reduced = this.state.reduced;
+    return {
+      playSuccess: () => this.playSuccessTone(),
+      playNew: () => this.playNewTone(),
+      playMilestone: () => this.playMilestoneTone(),
+      playWarning: () => this.playWarningTone(),
+      toggleReduced: () => this.setState(s => ({ reduced: !s.reduced })),
+      reducedLabel: reduced ? 'Reduce motion: on' : 'Reduce motion: off',
+      reducedBg: reduced ? '#6f7ea9' : 'transparent',
+      reducedFg: reduced ? '#000' : '#f1f3f8',
+      heartAnim: reduced ? 'reducedFade 3.4s ease-out infinite' : 'heartPulse 3.4s ease-in-out infinite',
+      reducedNote: reduced ? 'Fallback: opacity fade only, 150ms, no scale.' : 'Full motion: scale pulse + gold ring.',
+      dos: [
+        'Match tier to stakes — a favourite is Success, a 1,000-song milestone is Milestone, never the reverse.',
+        'Keep one motion per event — a scale, a glow, or a slide, not several stacked at once.',
+        'Reuse the same easing curve within a tier so the whole app feels like one hand drew it.',
+        'Always ship the reduced-motion fallback alongside the full version, not as an afterthought.',
+      ],
+      donts: [
+        "Don't use bounce or overshoot on warnings and errors — sharp and brief only.",
+        "Don't animate on every list re-render — only on the moment the user actually caused.",
+        "Don't reach for confetti or particles — the brand's motion language is glow, pulse, and scale.",
+        "Don't ship sound cues without a mute toggle, or mix tones from unrelated sound packs.",
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
