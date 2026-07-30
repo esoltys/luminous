@@ -13,13 +13,13 @@
     <div
       in:fly={{ x: 24, duration: 200 }}
       out:fade={{ duration: 150 }}
-      class="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl text-sm font-medium max-w-md
+      class="pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-semibold max-w-md
         {toast.variant === 'error'
-          ? 'bg-red-500/10 border-red-500/30 text-red-400 anim-warn-shake'
+          ? 'bg-[#1f1013] border-red-500/50 text-red-400 anim-warn-shake'
           : toast.variant === 'warning'
-            ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 anim-warn-shake'
+            ? 'bg-[#1f1a10] border-amber-500/50 text-amber-400 anim-warn-shake'
             : toast.variant === 'milestone'
-              ? 'bg-[rgb(255_182_72_/_0.1)] border-[rgb(255_182_72_/_0.3)] text-brand-gold'
+              ? 'bg-[#1f1a12] border-brand-gold/50 text-brand-gold'
               : 'bg-brand-sidebar border-brand-border text-brand-text-primary'}"
     >
       {#if toast.variant === "error" || toast.variant === "warning"}
