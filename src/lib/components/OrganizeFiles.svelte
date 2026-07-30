@@ -674,13 +674,13 @@
 
 {#snippet actionMessages()}
   {#if errorMessage}
-    <div class="px-3 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center gap-2 font-medium">
+    <div class="text-rose-400 flex items-center gap-2 font-medium text-xs">
       <AlertTriangle class="w-4 h-4 shrink-0" />
       <span>{errorMessage}</span>
     </div>
   {/if}
   {#if successMessage}
-    <div class="px-3 py-1.5 rounded-lg bg-brand-accent/15 border border-brand-accent/30 text-brand-accent-text flex items-center gap-2 font-medium">
+    <div class="text-brand-accent-text flex items-center gap-2 font-medium text-xs">
       <Check class="w-4 h-4 shrink-0" />
       <span>{successMessage}</span>
     </div>
