@@ -15,7 +15,7 @@
   type="button"
   {onclick}
   {title}
-  class="text-left cursor-pointer hover:underline hover:text-brand-accent-text transition-colors {className}"
+  class="text-left cursor-pointer hover:underline hover:text-brand-accent-text transition-colors max-w-full {className}"
 >
   {@render children()}
 </button>

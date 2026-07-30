@@ -588,6 +588,8 @@ pub struct MusicDirectory {
     pub id: i64,
     pub path: String,
     pub subdirs: bool,
+    #[serde(default)]
+    pub is_available: bool,
 }
 
 /// Result of pruning missing/unavailable songs from the library.

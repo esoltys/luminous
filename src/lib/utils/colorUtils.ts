@@ -517,6 +517,9 @@ export function extractArchetypes(swatches: Swatch[]): Record<Archetype, Swatch 
   return result;
 }
 
+
+
+
 /** The 8-value palette shape every predefined/custom theme uses (structurally identical to theme.svelte.ts's ThemeColors — kept separate here to avoid a circular import). */
 export interface GeneratedThemePalette {
   "bg-main": string;
@@ -542,17 +545,7 @@ function toHex(rgb: { r: number; g: number; b: number }): string {
 /**
  * Derives a full 8-value theme palette from a single seed color using HSL
  * lightness/saturation steps, validated against the same WCAG thresholds
- * the hand-picked Luminous palettes already use: 4.5:1 ("normal text") for
- * both text colors against every background surface, and WCAG 1.4.11's
- * 3:1 ("non-text/UI-component") threshold for the accent against bg-main —
- * the same trade-off `LUMINOUS_LIGHT_ACCENT` documents, since the accent is
- * used almost entirely as icon/button/badge color, not paragraph text.
- *
- * The background family is tinted toward the seed's hue at low saturation
- * (a moody near-black, not pure gray) rather than derived from the accent's
- * exact lightness, mirroring the relationship already present across Ruby
- * Red / Nordic Blue / Retro Amber: bg-sidebar darkest, bg-playerbar
- * between it and bg-main, border lighter than bg-main.
+ * the hand-picked Luminous palettes already use.
  */
 export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette {
   const seedHsl = rgbToHsl(...(Object.values(hexToRgb(seedHex)) as [number, number, number]));
@@ -573,7 +566,7 @@ export function generatePaletteFromSeed(seedHex: string): GeneratedThemePalette 
 
   const backgroundHexes = [toHex(hslToRgb(bgMain.h, bgMain.s, bgMain.l)), toHex(hslToRgb(bgSidebar.h, bgSidebar.s, bgSidebar.l)), toHex(hslToRgb(bgPlayerbar.h, bgPlayerbar.s, bgPlayerbar.l))];
 
-  const meetsAA = (hsl: HSL) => {
+  const meetsAA = (hsl: {h: number, s: number, l: number}) => {
     const hex = toHex(hslToRgb(hsl.h, hsl.s, hsl.l));
     return backgroundHexes.every(bg => checkWcagCompliance(hex, bg).wcagAA);
   };

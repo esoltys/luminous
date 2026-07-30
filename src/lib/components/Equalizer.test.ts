@@ -76,10 +76,10 @@ describe("Equalizer.svelte", () => {
   it("switches between Graphic and Parametric modes", async () => {
     const { getByText } = render(Equalizer);
     await waitFor(() => {
-      expect(getByText(/parametric/i)).toBeInTheDocument();
+      expect(getByText(/20-band/i)).toBeInTheDocument();
     });
 
-    const parametricBtn = getByText(/20-band parametric/i);
+    const parametricBtn = getByText(/20-band/i);
     await fireEvent.click(parametricBtn);
 
     expect(invoke).toHaveBeenCalledWith("set_equalizer_mode", { mode: "parametric20" });

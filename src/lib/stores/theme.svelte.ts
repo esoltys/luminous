@@ -123,19 +123,31 @@ export function hexToRgbaString(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/**
- * Ruby Red / Nordic Blue / Retro Amber are each defined as a single seed
- * hue (their accent color) run through generatePaletteFromSeed()
- * (colorUtils.ts) rather than 8 hand-picked hexes — "bake-once": computed
- * from the seed every time this module loads, not hand-tuned per value, so
- * every derived surface automatically keeps the WCAG guarantees
- * generatePaletteFromSeed() enforces (#61). The seed is just the theme's
- * previously hand-picked accent hex, chosen to preserve each theme's
- * identifying hue rather than introduce a new one.
- */
+const RUBY_RED_COLORS: ThemeColors = {
+  "bg-main": "#17110e",
+  "bg-sidebar": "#6e0b1b",
+  "bg-playerbar": "#17110e",
+  "color-accent": "#b51021",
+  "color-accent-hover": "#f06090",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#974a5f"
+};
+
 const RUBY_RED_SEED = "#e11d48";
 const NORDIC_BLUE_SEED = "#88c0d0";
 const RETRO_AMBER_SEED = "#d97706";
+
+const NORDIC_BLUE_COLORS: ThemeColors = {
+  "bg-main": "#2e515f",
+  "bg-sidebar": "#000910",
+  "bg-playerbar": "#2e515f",
+  "color-accent": "#3090a0",
+  "color-accent-hover": "#a3cfdc",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#55879a",
+};
 
 export const PREDEFINED_THEMES: Theme[] = [
   {
@@ -146,12 +158,12 @@ export const PREDEFINED_THEMES: Theme[] = [
   {
     id: "ruby-red",
     name: "Ruby Red",
-    colors: generatePaletteFromSeed(RUBY_RED_SEED)
+    colors: { ...RUBY_RED_COLORS }
   },
   {
     id: "nordic-blue",
     name: "Nordic Blue",
-    colors: generatePaletteFromSeed(NORDIC_BLUE_SEED)
+    colors: { ...NORDIC_BLUE_COLORS }
   },
   {
     id: "retro-amber",

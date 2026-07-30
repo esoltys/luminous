@@ -1201,13 +1201,13 @@
                       </span>
                     {/if}
                     <span
-                      class="truncate font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
+                      class="truncate min-w-0 font-medium {playerStore.playlistItemUuid === item.uuid ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
                       title={item.song.title}
                     >
                       {item.song.title}
                     </span>
                   {:else}
-                    <span class="truncate">{i18n.t("collection.unknownSong")}</span>
+                    <span class="truncate min-w-0">{i18n.t("collection.unknownSong")}</span>
                   {/if}
                 </div>
               </div>
@@ -1220,13 +1220,13 @@
                 {:else if item.song?.artist}
                   <LinkButton
                     onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
-                    class="text-brand-text-secondary truncate"
+                    class="text-brand-text-secondary truncate min-w-0"
                     title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
                   >
                     {item.song.artist}
                   </LinkButton>
                 {:else}
-                  <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownArtist")}</span>
+                  <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
                 {/if}
               </div>
             {/if}
@@ -1234,17 +1234,17 @@
             {#if collectionStore.visibleColumns.album}
               <div class="text-brand-text-secondary truncate pr-4 min-w-0">
                 {#if unavailable}
-                  <span class="text-brand-text-secondary italic text-xs">{item.song?.album ?? ""}</span>
+                  <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{item.song?.album ?? ""}</span>
                 {:else if item.song?.album}
                   <LinkButton
                     onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
-                    class="text-brand-text-secondary truncate"
+                    class="text-brand-text-secondary truncate min-w-0"
                     title={i18n.t("collection.filterByAlbum", { album: item.song.album })}
                   >
                     {item.song.album}
                   </LinkButton>
                 {:else}
-                  <span class="text-brand-text-secondary truncate">{i18n.t("collection.unknownAlbum")}</span>
+                  <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
                 {/if}
               </div>
             {/if}

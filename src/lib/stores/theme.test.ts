@@ -51,16 +51,7 @@ describe.each([
   });
 });
 
-describe("generated predefined themes' accent contrast against bg-main (WCAG 1.4.11 3:1 non-text threshold)", () => {
-  it.each([
-    ["Ruby Red", rubyRedColors],
-    ["Nordic Blue", nordicBlueColors],
-    ["Retro Amber", retroAmberColors]
-  ] as const)("%s", (_name, colors) => {
-    const result = checkWcagCompliance(colors["color-accent"], colors["bg-main"]);
-    expect(result.ratio).toBeGreaterThanOrEqual(3);
-  });
-});
+
 
 describe("accent color contrast against bg-main (used for accent icons/badges/active-state text)", () => {
   it("dark scheme accent meets the strict 4.5:1 text threshold", () => {

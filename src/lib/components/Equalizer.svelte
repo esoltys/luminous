@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
+  import { Sliders, Activity, ArrowLeftRight } from "lucide-svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";
@@ -336,13 +337,18 @@
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 flex flex-col gap-6">
     <div class="flex flex-col gap-4">
     <div class="flex items-start justify-between">
-      <div>
-        <h3 class="text-base font-bold text-brand-text-primary">
-          {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
-        </h3>
-        <p class="text-xs text-brand-text-secondary mt-0.5">
-          {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
-        </p>
+      <div class="flex items-center gap-3">
+        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+          <Sliders class="w-5 h-5" />
+        </div>
+        <div class="space-y-1 min-w-0">
+          <h3 class="font-bold text-sm text-brand-text-primary">
+            {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
+          </h3>
+          <p class="text-xs text-brand-text-secondary leading-relaxed">
+            {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
+          </p>
+        </div>
       </div>
       
       <div class="flex items-center gap-2 shrink-0">
@@ -551,9 +557,14 @@
     <!-- Loudness Normalization (#77) -->
     <div class="flex flex-col gap-6 bg-brand-sidebar border border-brand-border rounded-xl p-6">
       <div class="flex items-center justify-between gap-4 flex-wrap mb-2">
-        <div class="flex flex-col gap-1">
-          <h3 class="text-base font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h3>
-          <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('loudness.subtitle')}</p>
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+            <Activity class="w-5 h-5" />
+          </div>
+          <div class="space-y-1 min-w-0">
+            <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('loudness.title')}</h3>
+            <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('loudness.subtitle')}</p>
+          </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <Toggle
@@ -630,9 +641,14 @@
 
     <!-- Playback Fades & Crossfade (#79) -->
     <div class="flex flex-col gap-6 bg-brand-sidebar border border-brand-border rounded-xl p-6">
-      <div class="flex flex-col gap-1 mb-2">
-        <h3 class="text-base font-bold text-brand-text-primary">{i18n.t('fades.title')}</h3>
-        <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('fades.subtitle')}</p>
+      <div class="flex items-center gap-3 mb-2">
+        <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+          <ArrowLeftRight class="w-5 h-5" />
+        </div>
+        <div class="space-y-1 min-w-0">
+          <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('fades.title')}</h3>
+          <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('fades.subtitle')}</p>
+        </div>
       </div>
 
       <!-- Fade on Pause/Stop -->

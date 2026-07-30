@@ -193,6 +193,7 @@ export interface MusicDirectory {
   id: number;
   path: string;
   subdirs: boolean;
+  is_available?: boolean;
 }
 
 export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";

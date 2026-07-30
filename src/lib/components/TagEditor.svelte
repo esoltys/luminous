@@ -10,6 +10,8 @@
   import FormField from "./FormField.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Modal from "./Modal.svelte";
+  import { playerStore } from "../stores/player.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
 
@@ -156,6 +158,12 @@
       // Refresh the database views and collection store stats
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
+
+      // Trigger UI updates for playlists and playback queue
+      if (playlistsStore.activePlaylistId !== null && playlistsStore.activePlaylistId !== undefined) {
+        await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+      }
+      await playerStore.refreshPlaybackState();
 
       if (onSave) onSave();
       onClose();
