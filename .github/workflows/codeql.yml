@@ -11,8 +11,7 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-22.04
-    timeout-minutes: 360
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
@@ -23,41 +22,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        - language: actions
+          build-mode: none
         - language: javascript-typescript
           build-mode: none
         - language: rust
-          build-mode: manual
+          build-mode: none
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Setup Bun
-      uses: oven-sh/setup-bun@v2
-      with:
-        bun-version: latest
-
-    - name: Install JS dependencies
-      run: bun install
-
-    - name: Install system dependencies (Linux)
-      if: matrix.language == 'rust'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev librsvg2-dev
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-
-    - name: Run manual build steps
-      if: matrix.build-mode == 'manual' && matrix.language == 'rust'
-      run: |
-        bun run build
-        cd src-tauri
-        cargo build
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
