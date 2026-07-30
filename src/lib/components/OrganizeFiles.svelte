@@ -474,14 +474,16 @@
 
             <!-- Summary badges & filter toggle -->
             <div class="flex flex-col gap-2 text-xs">
-              <div class="flex items-center gap-3 text-brand-text-secondary">
-                <span>{i18n.t("organizer.onlyChanging")}</span>
-                <Toggle
-                  checked={showOnlyChanging}
-                  onchange={(v) => { showOnlyChanging = v; }}
-                  label={i18n.t("organizer.onlyChanging")}
-                  showOnOffLabel={false}
-                />
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
+                  <span>{i18n.t("organizer.onlyChanging")}</span>
+                  <Toggle
+                    checked={showOnlyChanging}
+                    onchange={(v) => { showOnlyChanging = v; }}
+                    label={i18n.t("organizer.onlyChanging")}
+                    showOnOffLabel={false}
+                  />
+                </div>
               </div>
               <div class="flex items-center gap-3">
                 <span class="text-brand-accent-text font-medium">
