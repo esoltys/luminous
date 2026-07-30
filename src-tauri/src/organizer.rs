@@ -862,6 +862,28 @@ pub fn execute_apply(
     })
 }
 
+fn force_remove_file(path: &Path) -> std::io::Result<()> {
+    if let Ok(metadata) = fs::metadata(path) {
+        let mut perms = metadata.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+    fs::remove_file(path)
+}
+
+fn force_remove_dir(path: &Path) -> std::io::Result<()> {
+    if let Ok(metadata) = fs::metadata(path) {
+        let mut perms = metadata.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+    fs::remove_dir(path)
+}
+
 fn clean_if_effectively_empty(dir: &Path) -> std::io::Result<bool> {
     let mut junk_files = Vec::new();
 
@@ -893,7 +915,7 @@ fn clean_if_effectively_empty(dir: &Path) -> std::io::Result<bool> {
     }
 
     for junk in junk_files {
-        let _ = fs::remove_file(junk);
+        let _ = force_remove_file(&junk);
     }
 
     Ok(true)
@@ -907,7 +929,7 @@ pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> 
     }
 
     if clean_if_effectively_empty(dir).unwrap_or(false) {
-        fs::remove_dir(dir)?;
+        force_remove_dir(dir)?;
         let mut removed = 1;
         if let Some(parent) = dir.parent() {
             removed += remove_empty_dirs_recursive(parent).unwrap_or(0);
@@ -946,7 +968,7 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
         }
         let dir = entry.path();
         if clean_if_effectively_empty(dir).unwrap_or(false) {
-            if fs::remove_dir(dir).is_ok() {
+            if force_remove_dir(dir).is_ok() {
                 removed += 1;
             }
         }

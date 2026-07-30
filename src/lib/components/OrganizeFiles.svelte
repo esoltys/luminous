@@ -459,14 +459,15 @@
           <div class="flex flex-col gap-1.5">
             <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
               <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
-              <button
-                type="button"
+              <Button
                 onclick={fetchPreview}
-                class="p-1 rounded-md text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar cursor-pointer transition-colors"
+                variant="secondary"
+                size="sm"
+                disabled={isLoading}
                 title={i18n.t("organizer.refreshPreviewTooltip")}
               >
                 <RefreshCw class="w-3.5 h-3.5 {isLoading ? 'animate-spin text-brand-accent-text' : ''}" />
-              </button>
+              </Button>
             </h3>
 
             <!-- Summary badges & filter toggle -->
