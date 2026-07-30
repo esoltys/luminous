@@ -457,7 +457,7 @@
         <!-- Preview Table Section -->
         <div class="space-y-2 pt-2">
           <div class="flex flex-col gap-1.5">
-            <h3 class="font-bold text-brand-text-primary flex items-center gap-2">
+            <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
               <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
               <button
                 type="button"
