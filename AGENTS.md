@@ -78,6 +78,25 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - **State Preservation**: Luminous must always save and restore the state the user left/closed the application in. When reopened, the user should be returned exactly to where they were (e.g., same sidebar view/tab, same song selection, same player track/position/volume, same equalizer presets/enabled state).
 - See [DESIGN.md](../DESIGN.md)
 
+## UI/UX Design Conventions
+
+- **Toast persistence**: Toasts must never auto-dismiss unless an explicit `durationMs` is passed by the
+  caller. By default, toasts stay visible until the user clicks the `X` button.
+
+- **Explicit-action-only celebrations**: Micro-animations and sound cues (heart pulse, confetti, etc.)
+  must fire only in response to a deliberate user interaction (e.g., a click handler). Never trigger them
+  from a reactive `$effect` or a prop-change watcher — doing so causes false positives when the track
+  changes and a different (already-favourited) song loads.
+
+- **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
+  finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
+  carries this name; auto-playlists (Favourites, Recently Added, etc.) must pass their `displayName` to
+  `playerStore.playSongs()` so the context propagates correctly.
+
+- **Icon semantics**: Avoid icons that imply system-level tracking or achievement recording (e.g.,
+  `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
+  "special" without implying a leaderboard or achievement system.
+
 ## Development Workflow
 
 **Adding a frontend feature:**
