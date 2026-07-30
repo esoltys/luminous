@@ -594,8 +594,8 @@ export const fr = {
     titleParametric: "Égaliseur paramétrique à 20 bandes",
     subtitleParametric: "Sculptez des corrections précises sur 20 bandes fixes, à gain et Q réglables",
     modeLabel: "Mode",
-    modeGraphic: "Graphique 10 bandes",
-    modeParametric: "Paramétrique 20 bandes",
+    modeGraphic: "10 bandes",
+    modeParametric: "20 bandes",
     frequency: "Fréquence",
     qFactor: "Q",
     bandLabel: "Bande",
@@ -629,7 +629,7 @@ export const fr = {
     crossfadeAuto: "Fondu enchaîné automatique",
     crossfadeAutoHint: "Fondu enchaîné automatique à la fin d'un morceau",
     crossfadeDuration: "Durée du fondu enchaîné",
-    suppressSameAlbum: "Préserver l'enchaînement sans blanc (Même album)",
+    suppressSameAlbum: "Préserver l'enchaînement sans blanc (même album)",
     suppressSameAlbumHint: "Ignorer le fondu enchaîné entre les chansons d'un même album"
   },
   themes: {

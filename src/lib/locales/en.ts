@@ -626,8 +626,8 @@ export const en = {
     titleParametric: "20-Band Parametric Equalizer",
     subtitleParametric: "Sculpt precise corrections across 20 fixed bands with adjustable gain and Q",
     modeLabel: "Mode",
-    modeGraphic: "10-band graphic",
-    modeParametric: "20-band parametric",
+    modeGraphic: "10-band",
+    modeParametric: "20-band",
     frequency: "Frequency",
     qFactor: "Q",
     bandLabel: "Band",
@@ -661,7 +661,7 @@ export const en = {
     crossfadeAuto: "Automatic Song Crossfade",
     crossfadeAutoHint: "Crossfade automatically as a song reaches its end",
     crossfadeDuration: "Crossfade Duration",
-    suppressSameAlbum: "Preserve Gapless for Same Album",
+    suppressSameAlbum: "Preserve gapless for same album",
     suppressSameAlbumHint: "Skip auto-crossfade between consecutive songs from the same album"
   },
   themes: {
