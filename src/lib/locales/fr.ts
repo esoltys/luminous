@@ -275,6 +275,7 @@ export const fr = {
     rescanTitle: "Analyse & maintenance de la bibliothèque",
     rescanSubtitle: "Effectuez des rebalayages incrémentiels ou complets et configurez l'analyse automatique.",
     lastScanned: "Dernière analyse : {time}",
+    importFinishedToast: "{count} morceaux ajoutés",
     scanningPhase: "Phase : {phase}",
     phaseDiscovering: "Découverte des fichiers",
     phaseReadingTags: "Lecture des étiquettes",

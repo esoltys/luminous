@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
+import { toastStore } from "./toast.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
@@ -459,7 +460,13 @@ class CollectionStore {
           invoke("set_app_setting", { key: "last_scan_time", value: nowStr }).catch((err) => {
             console.error("Failed to save last_scan_time:", err);
           });
-          this.refreshStats();
+          const songCountBeforeRefresh = this.stats.total_songs;
+          this.refreshStats().then(() => {
+            const added = this.stats.total_songs - songCountBeforeRefresh;
+            if (added > 0) {
+              toastStore.show(i18n.t("settings.importFinishedToast", { count: added }), "success");
+            }
+          });
           this.refreshLibrary();
 
           // The active playback queue is a snapshot taken when it was built —

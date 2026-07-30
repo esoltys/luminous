@@ -305,6 +305,7 @@ export const en = {
     rescanTitle: "Library Scanning & Maintenance",
     rescanSubtitle: "Perform incremental or full rescans and configure automatic background scanning.",
     lastScanned: "Last scan: {time}",
+    importFinishedToast: "{count} tracks added",
     scanningPhase: "Phase: {phase}",
     phaseDiscovering: "Discovering Files",
     phaseReadingTags: "Reading Tags",

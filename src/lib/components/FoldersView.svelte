@@ -33,6 +33,21 @@
     if (contentEl) contentEl.scrollTop = 0;
   });
 
+  // "Import finished"-style success flash for a manual "Check Now" that
+  // comes back up-to-date — only on the checking -> up-to-date transition
+  // this view is mounted to watch, not on a silent background check.
+  let previousCheckStatus: typeof updaterStore.checkStatus | undefined;
+  let justConfirmedUpToDate = $state(false);
+  $effect(() => {
+    const wasChecking = previousCheckStatus === "checking";
+    previousCheckStatus = updaterStore.checkStatus;
+    if (updaterStore.checkStatus === "up-to-date" && wasChecking) {
+      justConfirmedUpToDate = true;
+      const timeout = setTimeout(() => { justConfirmedUpToDate = false; }, 320);
+      return () => clearTimeout(timeout);
+    }
+  });
+
   async function copyVersion() {
     try {
       await navigator.clipboard.writeText(appVersion);
@@ -353,10 +368,27 @@
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.appAndUpdatesTitle')}</h3>
-          <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm">
-            <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
-            {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
-          </Button>
+          <div class="flex items-center gap-3">
+            {#if updaterStore.checkStatus === 'up-to-date'}
+              <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5">
+                <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
+                  {#if justConfirmedUpToDate}
+                    <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
+                  {/if}
+                  <Check class="w-4 h-4 text-brand-accent {justConfirmedUpToDate ? 'anim-check-pop' : ''}" />
+                </span>
+                {i18n.t('settings.updateUpToDate')}
+              </div>
+            {:else if updaterStore.checkStatus === 'error'}
+              <div class="text-xs text-brand-text-secondary font-medium">
+                {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
+              </div>
+            {/if}
+            <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm">
+              <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
+              {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
+            </Button>
+          </div>
         </div>
 
         <!-- Version & Format Info Row -->
@@ -393,9 +425,10 @@
 
         <!-- Update Available Alert Banner (if available) -->
         {#if updaterStore.updateAvailable}
-          <div class="bg-brand-accent/10 border border-brand-accent/30 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div class="bg-brand-accent/10 border border-brand-accent/30 rounded-xl p-4 flex items-center justify-between gap-4 anim-card-materialize">
             <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-lg bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center shrink-0">
+              <div class="relative w-9 h-9 rounded-lg bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center shrink-0">
+                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand-accent anim-badge-glow"></span>
                 <ArrowUp class="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
@@ -413,15 +446,6 @@
               <Download class="w-4 h-4" />
               {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateDownloadBtn') : i18n.t('settings.updateDownloadGithubBtn')}
             </Button>
-          </div>
-        {:else if updaterStore.checkStatus === 'up-to-date'}
-          <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5 pt-1">
-            <Check class="w-4 h-4 text-brand-accent" />
-            {i18n.t('settings.updateUpToDate')}
-          </div>
-        {:else if updaterStore.checkStatus === 'error'}
-          <div class="text-xs text-brand-text-secondary font-medium flex items-center gap-1.5 pt-1">
-            {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
           </div>
         {/if}
 

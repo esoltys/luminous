@@ -1,0 +1,200 @@
+/*
+ * Micro-animation keyframes for celebration moments — see
+ * docs/luminous-micro-animations.dc.html (design spec) and issue #182.
+ *
+ * The spec doc's keyframes are written for its own continuously-looping
+ * preview (each holds flat for the first 50-60% of a 3.4s cycle, then plays).
+ * The keyframes below are rescaled from that source so each one plays once,
+ * start-to-finish, over its real spec'd duration when triggered by a state
+ * change — they are not loop-hold percentages.
+ *
+ * Every effect collapses to a plain opacity fade under prefers-reduced-motion
+ * (see "Reduced motion" in the spec) — no scale, bounce, or glow rings.
+ */
+
+@keyframes reduced-fade {
+  0% { opacity: 0.35; }
+  50% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Favouriting a song (Success, 300ms) */
+@keyframes heart-pulse {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.35); }
+  45% { transform: scale(0.94); }
+  70% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* HeartToggle renders inside all sorts of clipped containers (virtualized
+   table rows, the PlayerBar's `truncate` title column), which clip box-shadow
+   same as any other overflowing content — so the real HeartToggle doesn't
+   apply this class to itself. Instead it portals a span with this class to
+   document.body, positioned over its own screen coordinates (see
+   HeartToggle.svelte's burstRing()), escaping any ancestor's `overflow:
+   hidden` entirely. The gallery applies it directly since it has room. */
+/* Theme accent color, not the reserved brand gold (see app.css's
+   --color-accent-gold comment — gold is for rare Milestone moments only;
+   favouriting is a routine Success-tier action). color-mix() keeps this
+   correct across every user-selectable theme rather than a hardcoded hex. */
+@keyframes heart-ring {
+  0% { box-shadow: 0 0 0 0 transparent; }
+  20% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 50%, transparent); }
+  75% { box-shadow: 0 0 0 14px transparent; }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+
+/* Import finished (Success, 320ms) */
+@keyframes check-pop {
+  0% { transform: scale(0) rotate(-25deg); opacity: 0; }
+  33% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+  67% { transform: scale(0.95) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes glow-ring {
+  0% { box-shadow: 0 0 0 0 rgba(143, 191, 154, 0.5); opacity: 0; }
+  22% { opacity: 1; }
+  78% { box-shadow: 0 0 0 18px rgba(143, 191, 154, 0); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Organizing complete (Success, 280ms) */
+@keyframes row-sweep {
+  0% { background-position: -120% 0; }
+  56% { background-position: 220% 0; }
+  100% { background-position: 220% 0; }
+}
+
+/* First watched folder (New, 380ms) */
+@keyframes folder-pop {
+  0% { transform: scale(1) rotate(0); }
+  22% { transform: scale(1.12) rotate(-3deg); }
+  51% { transform: scale(0.96) rotate(2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes ring-expand {
+  0% { box-shadow: 0 0 0 0 rgba(111, 126, 169, 0.55); opacity: 0; }
+  16% { opacity: 1; }
+  78% { box-shadow: 0 0 0 20px rgba(111, 126, 169, 0); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Creating a new playlist / new release tile (New, 400ms) */
+@keyframes card-materialize {
+  0% { transform: scale(0.92); opacity: 0; }
+  44% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes border-glow-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(111, 126, 169, 0); }
+  44% { box-shadow: 0 0 0 3px rgba(111, 126, 169, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(111, 126, 169, 0); }
+}
+
+/* New auto-playlist appears (New, 380ms) */
+@keyframes slide-in-fade {
+  0% { transform: translateX(-14px); opacity: 0; }
+  50% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes badge-glow {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  50% { box-shadow: 0 0 0 0 rgba(255, 182, 72, 0.5); }
+  80% { box-shadow: 0 0 0 10px rgba(255, 182, 72, 0); }
+  100% { opacity: 1; box-shadow: 0 0 0 10px rgba(255, 182, 72, 0); }
+}
+
+/* Reaching a milestone / first launch (Milestone, 650ms) */
+@keyframes milestone-bounce {
+  0% { transform: scale(1); }
+  24% { transform: scale(1.22); }
+  52% { transform: scale(0.95); }
+  76% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes gold-ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 182, 72, 0.5); opacity: 0; }
+  16% { opacity: 1; }
+  76% { box-shadow: 0 0 0 22px rgba(255, 182, 72, 0); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Completing a queue (Milestone, 600ms) */
+@keyframes shimmer-sweep {
+  0% { background-position: -150% 0; }
+  70% { background-position: 150% 0; }
+  100% { background-position: 150% 0; }
+}
+
+/* Import needs attention (Warning/error, 200ms) */
+@keyframes warn-shake {
+  0% { transform: translateX(0); }
+  11% { transform: translateX(-5px); }
+  22% { transform: translateX(4px); }
+  33% { transform: translateX(-3px); }
+  44% { transform: translateX(2px); }
+  56% { transform: translateX(0); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes warn-flash {
+  0% { background: #1c1f29; }
+  16% { background: rgba(224, 160, 160, 0.22); }
+  100% { background: #1c1f29; }
+}
+
+/* Utility classes — apply on the triggering state change (e.g. class:anim-heart-pulse={justFavourited}) */
+.anim-heart-pulse { animation: heart-pulse 300ms ease-in-out; }
+.anim-heart-ring { animation: heart-ring 300ms ease-in-out; }
+.anim-check-pop { animation: check-pop 320ms ease-out; }
+.anim-glow-ring { animation: glow-ring 320ms ease-out; }
+.anim-row-sweep { animation: row-sweep 280ms ease-in-out; }
+.anim-folder-pop { animation: folder-pop 380ms ease-out; }
+.anim-ring-expand { animation: ring-expand 380ms ease-out; }
+.anim-card-materialize { animation: card-materialize 400ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.anim-border-glow-pulse { animation: border-glow-pulse 400ms ease-out; }
+.anim-slide-in-fade { animation: slide-in-fade 380ms ease-out; }
+.anim-badge-glow { animation: badge-glow 380ms ease-out; }
+.anim-milestone-bounce { animation: milestone-bounce 650ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.anim-gold-ring { animation: gold-ring 650ms ease-out; }
+.anim-shimmer-sweep { animation: shimmer-sweep 600ms ease-in-out; }
+.anim-warn-shake { animation: warn-shake 200ms ease-in-out; }
+.anim-warn-flash { animation: warn-flash 200ms ease-in-out; }
+.anim-reduced-fade { animation: reduced-fade 150ms ease-out; }
+
+/* Reduced-motion fallback — every tier collapses to the same opacity fade;
+   ring/glow/flash effects (no visible "shape" of their own beyond a shadow)
+   are dropped entirely rather than faded. Scoped to :not(.force-full-motion)
+   so the dev animation gallery (src/routes/dev/animations) can flip a class
+   on <html> to preview full motion regardless of the OS setting — see
+   issue #182. Never set that class anywhere in production UI. */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.force-full-motion) .anim-heart-pulse,
+  html:not(.force-full-motion) .anim-check-pop,
+  html:not(.force-full-motion) .anim-row-sweep,
+  html:not(.force-full-motion) .anim-folder-pop,
+  html:not(.force-full-motion) .anim-card-materialize,
+  html:not(.force-full-motion) .anim-slide-in-fade,
+  html:not(.force-full-motion) .anim-milestone-bounce,
+  html:not(.force-full-motion) .anim-shimmer-sweep,
+  html:not(.force-full-motion) .anim-warn-shake {
+    animation: reduced-fade 150ms ease-out;
+  }
+
+  html:not(.force-full-motion) .anim-heart-ring,
+  html:not(.force-full-motion) .anim-glow-ring,
+  html:not(.force-full-motion) .anim-ring-expand,
+  html:not(.force-full-motion) .anim-border-glow-pulse,
+  html:not(.force-full-motion) .anim-badge-glow,
+  html:not(.force-full-motion) .anim-gold-ring,
+  html:not(.force-full-motion) .anim-warn-flash {
+    animation: none;
+  }
+}
