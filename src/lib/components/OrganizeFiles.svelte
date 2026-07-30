@@ -431,7 +431,6 @@
                 checked={replaceSpaces}
                 onchange={(v) => { replaceSpaces = v; }}
                 label={i18n.t("organizer.replaceSpaces")}
-                showOnOffLabel={false}
               />
             </div>
 
@@ -441,7 +440,6 @@
                 checked={asciiOnly}
                 onchange={(v) => { asciiOnly = v; }}
                 label={i18n.t("organizer.asciiOnly")}
-                showOnOffLabel={false}
               />
             </div>
 
@@ -451,7 +449,6 @@
                 checked={moveExtraFiles}
                 onchange={(v) => { moveExtraFiles = v; }}
                 label={i18n.t("organizer.moveExtraFiles")}
-                showOnOffLabel={false}
               />
             </div>
           </div>
@@ -481,7 +478,6 @@
                     checked={showOnlyChanging}
                     onchange={(v) => { showOnlyChanging = v; }}
                     label={i18n.t("organizer.onlyChanging")}
-                    showOnOffLabel={false}
                   />
                 </div>
               </div>
