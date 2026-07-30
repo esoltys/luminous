@@ -736,7 +736,7 @@ export const en = {
     asciiOnly: "Change accented letters and punctuation",
     cleanEmptyDirs: "Clean up empty source folders",
     moveExtraFiles: "Move companion files (artwork, lyrics, logs, cue sheets)",
-    previewTitle: "Dry-Run Preview ({count} items)",
+    previewTitle: "Dry-Run Preview",
     colSource: "Original Path",
     colDestination: "Target Path",
     colStatus: "Status",

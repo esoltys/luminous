@@ -704,7 +704,7 @@ export const fr = {
     asciiOnly: "Changer les lettres accentuées et la ponctuation",
     cleanEmptyDirs: "Nettoyer les dossiers source vides",
     moveExtraFiles: "Déplacer les fichiers connexes (pochettes, paroles, logs, fiches CUE)",
-    previewTitle: "Aperçu avant application ({count} éléments)",
+    previewTitle: "Aperçu de la réorganisation",
     colSource: "Chemin d'origine",
     colDestination: "Chemin cible",
     colStatus: "Statut",

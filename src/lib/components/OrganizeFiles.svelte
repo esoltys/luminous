@@ -459,7 +459,7 @@
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-medium text-brand-text-primary flex items-center gap-2">
-                <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
+                <span>{i18n.t("organizer.previewTitle")}</span>
               </h3>
               <Button
                 onclick={fetchPreview}
