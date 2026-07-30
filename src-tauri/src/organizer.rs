@@ -862,6 +862,43 @@ pub fn execute_apply(
     })
 }
 
+fn clean_if_effectively_empty(dir: &Path) -> std::io::Result<bool> {
+    let mut junk_files = Vec::new();
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            return Ok(false); // contains a subdirectory, not empty
+        }
+
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            let lower = name.to_lowercase();
+            let is_junk = lower == ".ds_store"
+                || lower == "._.ds_store"
+                || lower == "desktop.ini"
+                || lower == "thumbs.db"
+                || lower == "ehthumbs.db"
+                || name.starts_with("._"); // AppleDouble resource forks
+
+            if is_junk {
+                junk_files.push(path);
+            } else {
+                return Ok(false); // Found a real file
+            }
+        } else {
+            return Ok(false); // Unparseable file name
+        }
+    }
+
+    for junk in junk_files {
+        let _ = fs::remove_file(junk);
+    }
+
+    Ok(true)
+}
+
 /// Removes `dir` if empty, then walks upward removing each newly-emptied
 /// ancestor in turn. Returns how many directories were actually removed.
 pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> {
@@ -869,8 +906,7 @@ pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> 
         return Ok(0);
     }
 
-    let mut entries = fs::read_dir(dir)?;
-    if entries.next().is_none() {
+    if clean_if_effectively_empty(dir).unwrap_or(false) {
         fs::remove_dir(dir)?;
         let mut removed = 1;
         if let Some(parent) = dir.parent() {
@@ -909,8 +945,8 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
             continue;
         }
         let dir = entry.path();
-        if let Ok(mut entries) = fs::read_dir(dir) {
-            if entries.next().is_none() && fs::remove_dir(dir).is_ok() {
+        if clean_if_effectively_empty(dir).unwrap_or(false) {
+            if fs::remove_dir(dir).is_ok() {
                 removed += 1;
             }
         }
