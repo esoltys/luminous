@@ -316,7 +316,7 @@
       if (result.errors && result.errors.length > 0) {
         errorMessage = result.errors.join("; ");
       } else {
-        successMessage = i18n.t("organizer.applySuccess", { count: result.moved_count });
+        successMessage = result.moved_count === 1 ? i18n.t("organizer.applySuccessOne") : i18n.t("organizer.applySuccessMany", { count: result.moved_count });
         onSuccess?.();
         // Leave the modal open so the user can see the result — refresh the
         // preview to reflect the just-applied moves instead of auto-closing.
@@ -456,7 +456,7 @@
 
         <!-- Preview Table Section -->
         <div class="space-y-2 pt-2">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-1.5">
             <h3 class="font-bold text-brand-text-primary flex items-center gap-2">
               <span>{i18n.t("organizer.previewTitle", { count: items.length })}</span>
               <button
@@ -470,37 +470,36 @@
             </h3>
 
             <!-- Summary badges & filter toggle -->
-            <div class="flex items-center gap-2 text-[11px]">
-              <label class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  bind:checked={showOnlyChanging}
-                  class="w-3 h-3 rounded border-brand-border accent-brand-accent cursor-pointer"
-                />
-                <span>{i18n.t("organizer.onlyChanging")}</span>
-              </label>
-
-              <span class="px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text font-semibold border border-brand-accent/30">
-                {i18n.t("organizer.summaryReady", { count: readyCount })}
-              </span>
-              <span class="px-2 py-0.5 rounded-full bg-brand-sidebar border border-brand-border/60 text-brand-text-secondary">
-                {i18n.t("organizer.summaryUnchanged", { count: unchangedCount })}
-              </span>
-              {#if missingTagCount > 0}
-                <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/40">
-                  {i18n.t("organizer.summaryMissingTags", { count: missingTagCount })}
+            <div class="flex items-center gap-4 text-xs">
+              <Toggle
+                checked={showOnlyChanging}
+                onchange={(v) => { showOnlyChanging = v; }}
+                label={i18n.t("organizer.onlyChanging")}
+                showOnOffLabel={false}
+              />
+              <div class="flex items-center gap-3">
+                <span class="text-brand-accent-text font-medium">
+                  {i18n.t("organizer.summaryReady", { count: readyCount })}
                 </span>
-              {/if}
-              {#if collisionCount > 0}
-                <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-semibold border border-rose-500/40">
-                  {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
+                <span class="text-brand-text-secondary">
+                  {i18n.t("organizer.summaryUnchanged", { count: unchangedCount })}
                 </span>
-              {/if}
-              {#if errorCount > 0}
-                <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-semibold border border-rose-500/40">
-                  {i18n.t("organizer.summaryErrors", { count: errorCount })}
-                </span>
-              {/if}
+                {#if missingTagCount > 0}
+                  <span class="text-amber-400 font-medium">
+                    {i18n.t("organizer.summaryMissingTags", { count: missingTagCount })}
+                  </span>
+                {/if}
+                {#if collisionCount > 0}
+                  <span class="text-rose-400 font-medium">
+                    {collisionCount === 1 ? i18n.t("organizer.summaryCollisionOne") : i18n.t("organizer.summaryCollisions", { count: collisionCount })}
+                  </span>
+                {/if}
+                {#if errorCount > 0}
+                  <span class="text-rose-400 font-medium">
+                    {i18n.t("organizer.summaryErrors", { count: errorCount })}
+                  </span>
+                {/if}
+              </div>
             </div>
           </div>
 
