@@ -508,7 +508,7 @@
 
       <!-- Library Scanning & Maintenance Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-        <div class="border-b border-brand-border pb-3">
+        <div class="pb-3">
           <div class="flex items-start gap-3">
             <RefreshCw class="w-5 h-5 text-brand-accent-text mt-0.5 shrink-0" />
             <div class="space-y-1 min-w-0">
@@ -564,7 +564,7 @@
         </div>
 
         <!-- Configuration Toggles -->
-        <div class="pt-3 border-t border-brand-border/50 space-y-4">
+        <div class="pt-3 space-y-4">
           <!-- Real-time Folder Watching -->
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">

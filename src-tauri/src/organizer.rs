@@ -458,6 +458,20 @@ pub fn compute_preview(
                     continue;
                 }
 
+                // If these are duplicate database records pointing to the exact same physical file
+                // (e.g. case-only differences on Windows), ignore the collision for this extra record.
+                if let (Ok(canon_curr), Ok(canon_base)) = (
+                    Path::new(&preview_items[idx].from_path).canonicalize(),
+                    Path::new(&preview_items[canonical_idx].from_path).canonicalize(),
+                ) {
+                    if canon_curr == canon_base {
+                        preview_items[idx].status = OrganizePreviewStatus::Unchanged;
+                        preview_items[idx].to_path = preview_items[idx].from_path.clone();
+                        preview_items[idx].error_message = None;
+                        continue;
+                    }
+                }
+
                 let original_target = Path::new(&preview_items[idx].to_path);
                 let source_path = Path::new(&preview_items[idx].from_path);
 
@@ -848,6 +862,65 @@ pub fn execute_apply(
     })
 }
 
+fn force_remove_file(path: &Path) -> std::io::Result<()> {
+    if let Ok(metadata) = fs::metadata(path) {
+        let mut perms = metadata.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+    fs::remove_file(path)
+}
+
+fn force_remove_dir(path: &Path) -> std::io::Result<()> {
+    if let Ok(metadata) = fs::metadata(path) {
+        let mut perms = metadata.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+    fs::remove_dir(path)
+}
+
+fn clean_if_effectively_empty(dir: &Path) -> std::io::Result<bool> {
+    let mut junk_files = Vec::new();
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            return Ok(false); // contains a subdirectory, not empty
+        }
+
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            let lower = name.to_lowercase();
+            let is_junk = lower == ".ds_store"
+                || lower == "._.ds_store"
+                || lower == "desktop.ini"
+                || lower == "thumbs.db"
+                || lower == "ehthumbs.db"
+                || name.starts_with("._"); // AppleDouble resource forks
+
+            if is_junk {
+                junk_files.push(path);
+            } else {
+                return Ok(false); // Found a real file
+            }
+        } else {
+            return Ok(false); // Unparseable file name
+        }
+    }
+
+    for junk in junk_files {
+        let _ = force_remove_file(&junk);
+    }
+
+    Ok(true)
+}
+
 /// Removes `dir` if empty, then walks upward removing each newly-emptied
 /// ancestor in turn. Returns how many directories were actually removed.
 pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> {
@@ -855,9 +928,8 @@ pub(crate) fn remove_empty_dirs_recursive(dir: &Path) -> std::io::Result<usize> 
         return Ok(0);
     }
 
-    let mut entries = fs::read_dir(dir)?;
-    if entries.next().is_none() {
-        fs::remove_dir(dir)?;
+    if clean_if_effectively_empty(dir).unwrap_or(false) {
+        force_remove_dir(dir)?;
         let mut removed = 1;
         if let Some(parent) = dir.parent() {
             removed += remove_empty_dirs_recursive(parent).unwrap_or(0);
@@ -895,8 +967,8 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
             continue;
         }
         let dir = entry.path();
-        if let Ok(mut entries) = fs::read_dir(dir) {
-            if entries.next().is_none() && fs::remove_dir(dir).is_ok() {
+        if clean_if_effectively_empty(dir).unwrap_or(false) {
+            if force_remove_dir(dir).is_ok() {
                 removed += 1;
             }
         }

@@ -5,6 +5,7 @@
   import { loudnessStore } from "../stores/loudness.svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
+  import Knob from "./Knob.svelte";
 
   type EqMode = "graphic10" | "parametric20";
   interface ParametricBand {
@@ -330,41 +331,43 @@
   });
 </script>
 
-<div class="flex flex-col text-brand-text-primary">
-  <div class="flex flex-col items-start gap-4 mb-6 pb-4 border-b border-brand-border">
-    <div>
-      <h3 class="text-sm font-bold text-brand-text-primary">
-        {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
-      </h3>
-      <p class="text-xs text-brand-text-secondary mt-0.5">
-        {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
-      </p>
-    </div>
-
-    <!-- Toggle, Mode & Presets controls -->
-    <div class="flex items-center gap-3 flex-wrap">
-      <div class="flex items-center gap-3 bg-brand-sidebar/40 border border-brand-border rounded-lg px-4 py-2">
-        <label for="eq-toggle" class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.enableEq')}</label>
+<div class="flex flex-col gap-6 text-brand-text-primary">
+  <!-- EQ Card -->
+  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 flex flex-col gap-6">
+    <div class="flex flex-col gap-4">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="text-base font-bold text-brand-text-primary">
+          {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
+        </h3>
+        <p class="text-xs text-brand-text-secondary mt-0.5">
+          {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
+        </p>
+      </div>
+      
+      <div class="flex items-center gap-2 shrink-0">
         <Toggle
           id="eq-toggle"
           checked={enabled}
           onchange={(v) => { enabled = v; handleToggle(); }}
           label={i18n.t('equalizer.enableEq')}
-          showOnOffLabel={false}
         />
       </div>
+    </div>
+    <!-- Mode, Presets & Preamp controls -->
+    <div class="flex items-center gap-4 flex-wrap">
 
       <!-- Mode segmented control -->
-      <div class="flex items-center bg-brand-sidebar/40 border border-brand-border rounded-lg p-1" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
+      <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
         <button
-          class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors cursor-pointer {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("graphic10")}
           aria-pressed={mode === "graphic10"}
         >
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="text-xs font-semibold px-3 py-1.5 rounded-md transition-colors cursor-pointer {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("parametric20")}
           aria-pressed={mode === "parametric20"}
         >
@@ -372,7 +375,7 @@
         </button>
       </div>
 
-      <div class="flex items-center gap-2 bg-brand-sidebar/40 border border-brand-border rounded-lg px-3 py-1.5">
+      <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">
         <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.presetLabel')}:</span>
         <Select
           value={activePreset}
@@ -391,202 +394,31 @@
         </Select>
       </div>
 
+      <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-[2rem] px-4 py-1.5">
+        <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('equalizer.preamp')}:</span>
+        <Knob
+          min={-12.0}
+          max={12.0}
+          step={0.25}
+          bind:value={preamp}
+          oninput={handlePreampChange}
+          showValue={false}
+          size={24}
+        />
+        <span class="text-xs font-mono font-medium {preamp > 0 ? 'text-green-400' : preamp < 0 ? 'text-red-400' : 'text-brand-text-primary'}">
+          {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
+        </span>
+      </div>
+
       {#if mode === "parametric20"}
         <button
-          class="text-xs font-semibold px-3 py-2 bg-brand-sidebar/40 border border-brand-border rounded-lg text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
           onclick={resetParametric}
         >
           {i18n.t('equalizer.resetBands')}
         </button>
       {/if}
     </div>
-  </div>
-
-  <!-- Rack Container -->
-  <div class="flex flex-col gap-8">
-    <!-- Preamp -->
-    <div class="flex flex-col gap-2 bg-brand-sidebar border border-brand-border rounded-xl p-4">
-      <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-        <span>{i18n.t('equalizer.preamp').toUpperCase()}</span>
-        <span class={preamp > 0 ? "text-green-400" : preamp < 0 ? "text-red-400" : "text-brand-text-secondary"}>
-          {preamp > 0 ? "+" : ""}{preamp.toFixed(1)} dB
-        </span>
-      </div>
-      <input
-        type="range"
-        min="-12.0"
-        max="12.0"
-        step="0.5"
-        bind:value={preamp}
-        oninput={handlePreampChange}
-        class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
-        style={rangeFillStyle(preamp, -12.0, 12.0)}
-      />
-    </div>
-
-    <!-- Loudness Normalization (#77) -->
-    <div class="flex flex-col gap-3 bg-brand-sidebar border border-brand-border rounded-xl p-4">
-      <div class="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h4>
-          <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('loudness.subtitle')}</p>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('loudness.enable')}</span>
-          <Toggle
-            checked={loudnessStore.enabled}
-            onchange={(v) => handleLoudnessToggle(v)}
-            label={i18n.t('loudness.title')}
-            showOnOffLabel={false}
-          />
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="flex flex-col gap-1.5">
-          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-            <span>{i18n.t('loudness.targetLevel')}</span>
-            <span class="text-brand-accent-text font-mono">{targetLufs.toFixed(1)} LUFS</span>
-          </div>
-          <input
-            type="range"
-            min="-24.0"
-            max="-14.0"
-            step="0.5"
-            bind:value={targetLufs}
-            oninput={handleTargetLufsChange}
-            disabled={!loudnessStore.enabled}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            style={rangeFillStyle(targetLufs, -24.0, -14.0)}
-          />
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <span class="text-xs font-bold text-brand-text-secondary">{i18n.t('loudness.mode')}</span>
-          <div class="flex items-center bg-brand-main border border-brand-border rounded-lg p-1" role="group" aria-label={i18n.t('loudness.mode')}>
-            <button
-              class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              onclick={() => handleLoudnessModeChange("track")}
-              aria-pressed={loudnessMode === "track"}
-              disabled={!loudnessStore.enabled}
-            >
-              {i18n.t('loudness.modeTrack')}
-            </button>
-            <button
-              class="flex-1 text-xs font-semibold px-3 py-1 rounded-md transition-colors cursor-pointer {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              onclick={() => handleLoudnessModeChange("album")}
-              aria-pressed={loudnessMode === "album"}
-              disabled={!loudnessStore.enabled}
-            >
-              {i18n.t('loudness.modeAlbum')}
-            </button>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <div class="flex justify-between items-center text-xs font-bold text-brand-text-secondary">
-            <span>{i18n.t('loudness.fallbackGain')}</span>
-            <span class="text-brand-accent-text font-mono">{fallbackGainDb.toFixed(1)} dB</span>
-          </div>
-          <input
-            type="range"
-            min="-24.0"
-            max="0.0"
-            step="0.5"
-            bind:value={fallbackGainDb}
-            oninput={handleFallbackGainChange}
-            disabled={!loudnessStore.enabled}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            style={rangeFillStyle(fallbackGainDb, -24.0, 0.0)}
-          />
-          <span class="text-xs text-brand-text-secondary">{i18n.t('loudness.fallbackGainHint')}</span>
-        </div>
-      </div>
-
-      <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
-        {#if loudnessStore.analysisRemaining === 0}
-          {i18n.t('loudness.analyzed')}
-        {:else if loudnessStore.enabled}
-          {i18n.t('loudness.analyzing', { remaining: loudnessStore.analysisRemaining })}
-        {:else}
-          {i18n.t('loudness.analysisPaused', { remaining: loudnessStore.analysisRemaining })}
-        {/if}
-      </p>
-    </div>
-
-    <!-- Playback Fades & Crossfade (#79) -->
-    <div class="bg-brand-sidebar border border-brand-border rounded-xl p-4 flex flex-col gap-3">
-      <div>
-        <h4 class="text-xs font-bold text-brand-text-primary">{i18n.t('fades.title')}</h4>
-        <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('fades.subtitle')}</p>
-      </div>
-
-      <!-- Fade on Pause/Stop -->
-      <div class="flex flex-col gap-1.5 pt-1">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.fadePause')}</span>
-          <Toggle
-            checked={fadePauseEnabled}
-            onchange={(v) => { fadePauseEnabled = v; saveFadeSettings(); }}
-            label={i18n.t('fades.fadePause')}
-            showOnOffLabel={false}
-          />
-        </div>
-        {#if fadePauseEnabled}
-          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
-            <span>{i18n.t('fades.fadeDuration')}</span>
-            <span class="font-mono text-brand-accent-text">{fadePauseDurationMs}ms</span>
-          </div>
-          <input
-            type="range"
-            min="100"
-            max="1000"
-            step="50"
-            bind:value={fadePauseDurationMs}
-            onchange={saveFadeSettings}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
-            style={rangeFillStyle(fadePauseDurationMs, 100, 1000)}
-          />
-        {/if}
-      </div>
-
-      <!-- Automatic Crossfade -->
-      <div class="flex flex-col gap-1.5 border-t border-brand-border/40 pt-2">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-brand-text-secondary">{i18n.t('fades.crossfadeAuto')}</span>
-          <Toggle
-            checked={crossfadeAutoEnabled}
-            onchange={(v) => { crossfadeAutoEnabled = v; saveFadeSettings(); }}
-            label={i18n.t('fades.crossfadeAuto')}
-            showOnOffLabel={false}
-          />
-        </div>
-        {#if crossfadeAutoEnabled}
-          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
-            <span>{i18n.t('fades.crossfadeDuration')}</span>
-            <span class="font-mono text-brand-accent-text">{crossfadeAutoDurationSecs.toFixed(1)}s</span>
-          </div>
-          <input
-            type="range"
-            min="0.5"
-            max="10.0"
-            step="0.5"
-            bind:value={crossfadeAutoDurationSecs}
-            onchange={saveFadeSettings}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
-            style={rangeFillStyle(crossfadeAutoDurationSecs, 0.5, 10.0)}
-          />
-          <div class="flex items-center justify-between pt-1">
-            <span class="text-xs text-brand-text-secondary">{i18n.t('fades.suppressSameAlbum')}</span>
-            <Toggle
-              checked={crossfadeSuppressSameAlbum}
-              onchange={(v) => { crossfadeSuppressSameAlbum = v; saveFadeSettings(); }}
-              label={i18n.t('fades.suppressSameAlbum')}
-              showOnOffLabel={false}
-            />
-          </div>
-        {/if}
-      </div>
     </div>
 
     {#if mode === "parametric20"}
@@ -621,11 +453,11 @@
 
     {#if mode === "graphic10"}
       <!-- Graphic Sliders Rack -->
-      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-4 md:p-6">
+      <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
             <!-- Gain display -->
-            <span class="text-[10px] font-bold w-full text-center transition-colors group-hover:text-brand-accent-text {gain > 0 ? 'text-green-400' : gain < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
+            <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
               {gain > 0 ? "+" : ""}{gain.toFixed(1)}
             </span>
 
@@ -635,7 +467,7 @@
                 type="range"
                 min="-12.0"
                 max="12.0"
-                step="0.5"
+                step="0.25"
                 use:verticalOrient
                 bind:value={gains[idx]}
                 oninput={() => handleBandChange(idx)}
@@ -653,7 +485,7 @@
       </div>
     {:else}
       <!-- Parametric Sliders Rack -->
-      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/40 border border-brand-border/60 rounded-xl p-3 md:p-4">
+      <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
         {#each parametric as band, idx}
           <div
             class="flex flex-col items-center justify-between h-full group rounded-md transition-colors cursor-pointer {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
@@ -664,7 +496,7 @@
             aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
           >
             <!-- Gain display -->
-            <span class="text-[9px] font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400' : band.gain_db < 0 ? 'text-red-400' : 'text-brand-text-secondary'}">
+            <span class="text-[9px] font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400/80' : band.gain_db < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
               {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
             </span>
 
@@ -674,7 +506,7 @@
                 type="range"
                 min="-12.0"
                 max="12.0"
-                step="0.5"
+                step="0.25"
                 use:verticalOrient
                 bind:value={parametric[idx].gain_db}
                 oninput={() => { selectedBand = idx; pushParametricBand(idx); }}
@@ -715,4 +547,176 @@
       {/if}
     {/if}
   </div>
+
+    <!-- Loudness Normalization (#77) -->
+    <div class="flex flex-col gap-6 bg-brand-sidebar border border-brand-border rounded-xl p-6">
+      <div class="flex items-center justify-between gap-4 flex-wrap mb-2">
+        <div class="flex flex-col gap-1">
+          <h3 class="text-base font-bold text-brand-text-primary">{i18n.t('loudness.title')}</h3>
+          <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('loudness.subtitle')}</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <Toggle
+            checked={loudnessStore.enabled}
+            onchange={(v) => handleLoudnessToggle(v)}
+            label={i18n.t('loudness.title')}
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div class="flex flex-col items-center justify-center gap-1.5 h-full">
+          <Knob
+            min={-36.0}
+            max={0.0}
+            step={0.25}
+            bind:value={targetLufs}
+            oninput={handleTargetLufsChange}
+            disabled={!loudnessStore.enabled}
+            label={i18n.t('loudness.targetLevel')}
+            suffix="LUFS"
+            size={80}
+          />
+        </div>
+
+        <div class="flex flex-col items-center justify-center gap-1.5 h-full">
+          <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider text-center">{i18n.t('loudness.mode')}</span>
+          <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
+            <button
+              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              onclick={() => handleLoudnessModeChange("track")}
+              aria-pressed={loudnessMode === "track"}
+              disabled={!loudnessStore.enabled}
+            >
+              {i18n.t('loudness.modeTrack')}
+            </button>
+            <button
+              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              onclick={() => handleLoudnessModeChange("album")}
+              aria-pressed={loudnessMode === "album"}
+              disabled={!loudnessStore.enabled}
+            >
+              {i18n.t('loudness.modeAlbum')}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center gap-1.5 h-full">
+          <Knob
+            min={-12.0}
+            max={0.0}
+            step={0.25}
+            bind:value={fallbackGainDb}
+            oninput={handleFallbackGainChange}
+            disabled={!loudnessStore.enabled}
+            label={i18n.t('loudness.fallbackGain')}
+            suffix="dB"
+            size={80}
+          />
+          <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4">{i18n.t('loudness.fallbackGainHint')}</span>
+        </div>
+      </div>
+
+      <p class="text-xs text-brand-text-secondary border-t border-brand-border/60 pt-2">
+        {#if loudnessStore.analysisRemaining === 0}
+          {i18n.t('loudness.analyzed')}
+        {:else if loudnessStore.enabled}
+          {i18n.t('loudness.analyzing', { remaining: loudnessStore.analysisRemaining })}
+        {:else}
+          {i18n.t('loudness.analysisPaused', { remaining: loudnessStore.analysisRemaining })}
+        {/if}
+      </p>
+    </div>
+
+    <!-- Playback Fades & Crossfade (#79) -->
+    <div class="flex flex-col gap-6 bg-brand-sidebar border border-brand-border rounded-xl p-6">
+      <div class="flex flex-col gap-1 mb-2">
+        <h3 class="text-base font-bold text-brand-text-primary">{i18n.t('fades.title')}</h3>
+        <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('fades.subtitle')}</p>
+      </div>
+
+      <!-- Fade on Pause/Stop -->
+      <div class="flex flex-col gap-1.5 pt-1">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm font-bold text-brand-text-primary">{i18n.t('fades.fadePause')}</span>
+          <Toggle
+            checked={fadePauseEnabled}
+            onchange={(v) => { fadePauseEnabled = v; saveFadeSettings(); }}
+            label={i18n.t('fades.fadePause')}
+          />
+        </div>
+        {#if fadePauseEnabled}
+          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
+            <span>{i18n.t('fades.fadeDuration')}</span>
+            <span class="font-mono font-bold text-brand-text-primary">{fadePauseDurationMs}ms</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1000"
+            step="100"
+            bind:value={fadePauseDurationMs}
+            onchange={saveFadeSettings}
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            style={rangeFillStyle(fadePauseDurationMs, 0, 1000)}
+          />
+          <div class="px-[7px]">
+            <div class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5">
+              {#each [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000] as val}
+                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {(val / 1000) * 100}%">
+                  <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
+                  <span>{val}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Automatic Crossfade -->
+      <div class="flex flex-col gap-1.5 border-t border-brand-border pt-6">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm font-bold text-brand-text-primary">{i18n.t('fades.crossfadeAuto')}</span>
+          <Toggle
+            checked={crossfadeAutoEnabled}
+            onchange={(v) => { crossfadeAutoEnabled = v; saveFadeSettings(); }}
+            label={i18n.t('fades.crossfadeAuto')}
+          />
+        </div>
+        {#if crossfadeAutoEnabled}
+          <div class="flex items-center justify-between text-xs text-brand-text-secondary">
+            <span>{i18n.t('fades.crossfadeDuration')}</span>
+            <span class="font-mono font-bold text-brand-text-primary">{crossfadeAutoDurationSecs.toFixed(1)}s</span>
+          </div>
+          <input
+            type="range"
+            min="0.0"
+            max="8.0"
+            step="0.25"
+            bind:value={crossfadeAutoDurationSecs}
+            onchange={saveFadeSettings}
+            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            style={rangeFillStyle(crossfadeAutoDurationSecs, 0.0, 8.0)}
+          />
+          <div class="px-[7px]">
+            <div class="relative w-full h-4 text-[9px] text-brand-text-secondary/60 font-medium mt-0.5">
+              {#each [0, 1, 2, 3, 4, 5, 6, 7, 8] as val}
+                <div class="absolute top-0 flex flex-col items-center -translate-x-1/2" style="left: {(val / 8) * 100}%">
+                  <div class="h-1 w-[1px] bg-brand-border mb-0.5"></div>
+                  <span>{val}.0s</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-4 md:w-1/2 text-xs text-brand-text-secondary">
+            <span>{i18n.t('fades.suppressSameAlbum')}</span>
+            <Toggle
+              checked={crossfadeSuppressSameAlbum}
+              onchange={(v) => { crossfadeSuppressSameAlbum = v; saveFadeSettings(); }}
+              label={i18n.t('fades.suppressSameAlbum')}
+            />
+          </div>
+        {/if}
+      </div>
+    </div>
 </div>

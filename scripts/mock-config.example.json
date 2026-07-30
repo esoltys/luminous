@@ -61,14 +61,16 @@
       "filename": "equalizer-parametric.png",
       "tab": "settings",
       "action": "click-equalizer-parametric",
-      "positionSeconds": 79
+      "positionSeconds": 79,
+      "viewportHeight": 1600
     },
     {
       "name": "equalizer",
       "filename": "equalizer.png",
       "tab": "settings",
       "action": "click-equalizer",
-      "positionSeconds": 79
+      "positionSeconds": 79,
+      "viewportHeight": 1500
     },
     {
       "name": "home-welcome",
