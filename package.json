@@ -51,6 +51,10 @@
     "vite": "^6.4.3",
     "vitest": "^4.1.10"
   },
+  "overrides": {
+    "postcss": "^8.5.18",
+    "cookie": "^0.7.0"
+  },
   "resolutions": {
     "postcss": "^8.5.18",
     "cookie": "^0.7.0"
