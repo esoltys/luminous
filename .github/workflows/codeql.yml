@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: "CodeQL Advanced"
 
 on:
   push:
@@ -6,56 +6,40 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '37 20 * * 1'
+    - cron: '43 21 * * 6'
 
 jobs:
   analyze:
-    name: Analyze
-    runs-on: ubuntu-22.04
-    timeout-minutes: 360
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
+      packages: read
+      actions: read
+      contents: read
 
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript', 'rust' ]
+        include:
+        - language: actions
+          build-mode: none
+        - language: javascript-typescript
+          build-mode: none
+        - language: rust
+          build-mode: none
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup Bun
-      uses: oven-sh/setup-bun@v2
-      with:
-        bun-version: latest
-
-    - name: Install dependencies
-      run: bun install
-
-    - name: Install system dependencies (Linux)
-      if: matrix.language == 'rust'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev librsvg2-dev
-
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
-
-    - name: Build JS
-      if: matrix.language == 'javascript-typescript'
-      run: bun run build
-
-    - name: Build Rust
-      if: matrix.language == 'rust'
-      run: |
-        bun run build
-        cd src-tauri
-        cargo build
+        build-mode: ${{ matrix.build-mode }}
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"
