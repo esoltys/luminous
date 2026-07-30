@@ -52,7 +52,7 @@
   }
 
   function replayMilestoneToast() {
-    toastStore.show("\ud83c\udf89 1,000 songs in your library!", "milestone", 5000);
+    toastStore.show("\ud83c\udf89 1,000 songs in your library!", "milestone");
   }
 
   function replayWarningToast() {
@@ -60,11 +60,11 @@
   }
 
   function replayQueueToast() {
-    toastStore.show("Queue complete \u2014 nice listening \ud83c\udf1f", "milestone", 5000);
+    toastStore.show("Queue complete \u2014 nice listening \ud83c\udf1f", "milestone");
   }
 
   function replayWelcomeToast() {
-    toastStore.show("Welcome to Luminous v1.0.0! \ud83c\udfb5", "milestone", 5000);
+    toastStore.show("Welcome to Luminous v1.0.0! \ud83c\udfb5", "milestone");
   }
 
   let replayCounters = $state<Record<string, number>>({

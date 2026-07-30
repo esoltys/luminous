@@ -77,8 +77,7 @@ export class PlayerStore {
           this.queueJustCompleted = true;
           toastStore.show(
             i18n.t("celebrations.queueComplete", {}, "Queue complete \u2014 nice listening \ud83c\udf1f"),
-            "milestone",
-            5000
+            "milestone"
           );
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
         }

@@ -690,12 +690,6 @@
       <span>{errorMessage}</span>
     </div>
   {/if}
-  {#if successMessage}
-    <div class="text-brand-accent-text flex items-center gap-2 font-medium text-xs">
-      <Check class="w-4 h-4 shrink-0" />
-      <span>{successMessage}</span>
-    </div>
-  {/if}
 {/snippet}
 
 {#if effectiveOpen}

@@ -482,7 +482,7 @@ class CollectionStore {
             const msg = isFirstEver
               ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🎵`)
               : i18n.t("celebrations.newVersion", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🆕`);
-            toastStore.show(msg, "milestone", 6000);
+            toastStore.show(msg, "milestone");
             setTimeout(() => { this.isFirstLaunch = false; }, 700);
           }, 1200);
         }
@@ -514,8 +514,7 @@ class CollectionStore {
                 this.milestoneReached = threshold;
                 toastStore.show(
                   i18n.t("celebrations.milestone", { count: threshold.toLocaleString() }, `🎉 ${threshold.toLocaleString()} songs in your library!`),
-                  "milestone",
-                  6000
+                  "milestone"
                 );
                 setTimeout(() => { this.milestoneReached = null; }, 700);
                 break;

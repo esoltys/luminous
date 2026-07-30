@@ -13,7 +13,7 @@ class ToastStore {
   messages = $state<ToastMessage[]>([]);
   private nextId = 0;
 
-  show(text: string, variant: ToastVariant = "info", durationMs: number = TOAST_DURATION_MS) {
+  show(text: string, variant: ToastVariant = "info", durationMs?: number) {
     const id = this.nextId++;
     this.messages.push({ id, text, variant });
 
@@ -28,7 +28,9 @@ class ToastStore {
       soundCues.playNew();
     }
 
-    setTimeout(() => this.dismiss(id), durationMs);
+    if (durationMs && durationMs > 0) {
+      setTimeout(() => this.dismiss(id), durationMs);
+    }
   }
 
   dismiss(id: number) {
