@@ -92,7 +92,7 @@
   function handlePlayButtonClick(e: MouseEvent) {
     e.stopPropagation();
     if (songs.length > 0) {
-      playerStore.playSongs(songs.map((s) => s.id), 0, playlistId);
+      playerStore.playSongs(songs.map((s) => s.id), 0, playlistId, undefined, displayLabel);
     }
     onClick();
   }

@@ -231,8 +231,10 @@ export class PlayerStore {
     }
   }
 
-  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext) {
-    if (context?.type === "album" && context.album) {
+  async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
+    if (contextName) {
+      this.activeContextName = contextName;
+    } else if (context?.type === "album" && context.album) {
       this.activeContextName = context.album;
     } else if (context?.type === "playlist" && context.playlistId) {
       const pl = playlistsStore.playlists.find((p) => p.id === context.playlistId);
