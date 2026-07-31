@@ -199,6 +199,11 @@ export class PlayerStore {
       if (newSongs.length > 0) {
         const songIds = newSongs.map((s) => s.id);
         await invoke("append_songs_to_player_playlist", { songIds });
+        // The backend emits a playback-state event after appending, but
+        // refresh explicitly too so remainingPlaylistItems is guaranteed
+        // to be current before _refillInFlight resets — otherwise a stale
+        // count keeps re-triggering this refill in a runaway loop (#194).
+        await this.refreshPlaybackState();
         const { playlistsStore } = await import("./playlists.svelte");
         if (playlistsStore.activePlaylistId === pid) {
           await playlistsStore.selectPlaylist(pid);
