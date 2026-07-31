@@ -198,7 +198,7 @@
     <div class="flex items-start justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 max-w-xl">
-        <h1 class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <!-- Summary Metadata Line -->
         <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">

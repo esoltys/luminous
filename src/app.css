@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "./lib/styles/animations.css";
+@import "@fontsource/space-grotesk/700.css";
 
 @theme {
+  --font-heading: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   --color-brand-main: var(--bg-main);
   --color-brand-sidebar: var(--bg-sidebar);
   --color-brand-playerbar: var(--bg-playerbar);

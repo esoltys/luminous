@@ -683,7 +683,7 @@
             <div class="flex items-center gap-3 group/title">
               <h1
                 ondblclick={startRename}
-                class="text-3xl sm:text-4xl font-extrabold text-brand-text-primary cursor-pointer hover:text-brand-accent-text transition-colors truncate py-0.5 leading-snug"
+                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary cursor-pointer hover:text-brand-accent-text transition-colors truncate py-0.5 leading-snug"
                 title={i18n.t("playlists.renamePlaylistTooltip")}
               >
                 {activePlaylist.name}

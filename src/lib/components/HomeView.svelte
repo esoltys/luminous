@@ -52,7 +52,7 @@
   <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
     <!-- Header -->
     <div class="px-6 pt-8">
-      <h1 class="text-3xl font-bold text-brand-text-primary">
+      <h1 class="text-3xl font-heading font-bold text-brand-text-primary">
         {getTimeOfDayGreeting()}
       </h1>
       <p class="text-sm text-brand-text-secondary mt-1">
