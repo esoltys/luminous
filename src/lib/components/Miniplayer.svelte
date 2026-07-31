@@ -67,6 +67,11 @@
     invoke("start_window_drag").catch(() => {});
   }
 
+  function handleStartResize(direction: string, e: PointerEvent) {
+    e.stopPropagation();
+    invoke("start_window_resize", { direction }).catch(() => {});
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
     // Ctrl/Cmd+M is handled globally by +layout.svelte's toggleMiniplayerMode
     // listener. Handling it here too would double-fire on every press (this
@@ -97,6 +102,23 @@
   tabindex="0"
   class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
+  <!-- Edge and Corner Resize Handles for Frameless Window -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-50" onpointerdown={(e) => handleStartResize("north", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-50" onpointerdown={(e) => handleStartResize("south", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 bottom-0 left-0 w-2 cursor-w-resize z-50" onpointerdown={(e) => handleStartResize("west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 bottom-0 right-0 w-2 cursor-e-resize z-50" onpointerdown={(e) => handleStartResize("east", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" onpointerdown={(e) => handleStartResize("north-west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" onpointerdown={(e) => handleStartResize("north-east", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" onpointerdown={(e) => handleStartResize("south-west", e)}></div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
     <div class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none scale-125">

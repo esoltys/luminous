@@ -203,7 +203,10 @@ describe("PlaylistView.svelte", () => {
     ];
 
     const dedupeSpy = vi.spyOn(playlistsStore, "deduplicatePlaylist");
-    const { getByText } = render(PlaylistView);
+    const { getByText, getByTitle } = render(PlaylistView);
+
+    const overflowBtn = getByTitle("More actions");
+    await fireEvent.click(overflowBtn);
 
     expect(getByText(/Remove 1 duplicate/)).toBeInTheDocument();
     const btn = getByText(/Remove 1 duplicate/).closest("button")!;

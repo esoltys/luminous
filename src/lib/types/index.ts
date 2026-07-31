@@ -223,6 +223,7 @@ export interface AlbumItem {
   art_automatic: string | null;
   art_manual: string | null;
   genre?: string | null;
+  sample_song_id?: number | null;
 }
 
 export interface ArtistItem {

@@ -167,7 +167,7 @@
             />
           {:else if item.type === "album"}
             <CoverArt
-              songId={undefined}
+              songId={item.album.sample_song_id ?? undefined}
               artEmbedded={item.album.art_embedded}
               artAutomatic={item.album.art_automatic}
               artManual={item.album.art_manual}

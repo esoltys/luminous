@@ -81,9 +81,11 @@ pub async fn start_window_drag(window: WebviewWindow) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn start_window_resize(window: WebviewWindow) -> Result<(), String> {
-    let _ = window;
-    Ok(())
+pub async fn start_window_resize(
+    window: WebviewWindow,
+    _direction: Option<String>,
+) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

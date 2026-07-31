@@ -481,76 +481,79 @@ pub fn run() {
                 "AudioVolumeDown",
                 "AudioVolumeMute",
             ];
-            if let Err(err) =
-                app.global_shortcut()
-                    .on_shortcuts(media_shortcuts, |app, shortcut, event| {
-                        if event.state != ShortcutState::Pressed {
-                            return;
-                        }
-
-                        let key = shortcut.key;
-                        let app_handle = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let state = app_handle.state::<AppState>();
-                            let mut player = state.player.lock().await;
-                            let result = match key {
-                                Code::MediaPlayPause => {
-                                    let playback_state = player.get_state().await.state;
-                                    if playback_state == crate::models::PlayState::Playing {
-                                        player.pause().await
-                                    } else {
-                                        player.resume().await
-                                    }
-                                }
-                                Code::MediaTrackNext => {
-                                    if let Some(stats) = player.note_manual_skip() {
-                                        let _ = app_handle.emit("song-stats-changed", stats);
-                                    }
-                                    player.next_track().await
-                                }
-                                Code::MediaTrackPrevious => player.previous_track().await,
-                                Code::AudioVolumeUp => {
-                                    let volume = player.get_state().await.volume;
-                                    player.set_volume((volume + 0.05).min(1.0)).await
-                                }
-                                Code::AudioVolumeDown => {
-                                    let volume = player.get_state().await.volume;
-                                    player.set_volume((volume - 0.05).max(0.0)).await
-                                }
-                                Code::AudioVolumeMute => {
-                                    let volume = player.get_state().await.volume;
-                                    if volume > 0.0 {
-                                        let mut volume_before_mute =
-                                            state.volume_before_mute.lock().await;
-                                        *volume_before_mute = volume;
-                                        player.set_volume(0.0).await
-                                    } else {
-                                        let volume_before_mute =
-                                            *state.volume_before_mute.lock().await;
-                                        player.set_volume(volume_before_mute.max(0.05)).await
-                                    }
-                                }
-                                _ => Ok(()),
-                            };
-
-                            if let Err(err) = result {
-                                eprintln!(
-                                    "[Luminous Backend] Failed to handle media key {:?}: {}",
-                                    key, err
-                                );
-                            } else {
-                                let playback_state = player.get_state().await;
-                                crate::media_session::mirror_state(&app_handle, &playback_state)
-                                    .await;
-                                let _ = app_handle.emit("playback-state", playback_state);
+            for shortcut_str in media_shortcuts {
+                if let Err(err) =
+                    app.global_shortcut()
+                        .on_shortcut(shortcut_str, |app, shortcut, event| {
+                            if event.state != ShortcutState::Pressed {
+                                return;
                             }
-                        });
-                    })
-            {
-                eprintln!(
-                    "[Luminous Backend] Failed to register media key shortcuts: {}",
-                    err
-                );
+
+                            let key = shortcut.key;
+                            let app_handle = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let state = app_handle.state::<AppState>();
+                                let mut player = state.player.lock().await;
+                                let result = match key {
+                                    Code::MediaPlayPause => {
+                                        let playback_state = player.get_state().await.state;
+                                        if playback_state == crate::models::PlayState::Playing {
+                                            player.pause().await
+                                        } else {
+                                            player.resume().await
+                                        }
+                                    }
+                                    Code::MediaTrackNext => {
+                                        if let Some(stats) = player.note_manual_skip() {
+                                            let _ = app_handle.emit("song-stats-changed", stats);
+                                        }
+                                        player.next_track().await
+                                    }
+                                    Code::MediaTrackPrevious => player.previous_track().await,
+                                    Code::AudioVolumeUp => {
+                                        let volume = player.get_state().await.volume;
+                                        player.set_volume((volume + 0.05).min(1.0)).await
+                                    }
+                                    Code::AudioVolumeDown => {
+                                        let volume = player.get_state().await.volume;
+                                        player.set_volume((volume - 0.05).max(0.0)).await
+                                    }
+                                    Code::AudioVolumeMute => {
+                                        let volume = player.get_state().await.volume;
+                                        if volume > 0.0 {
+                                            let mut volume_before_mute =
+                                                state.volume_before_mute.lock().await;
+                                            *volume_before_mute = volume;
+                                            player.set_volume(0.0).await
+                                        } else {
+                                            let volume_before_mute =
+                                                *state.volume_before_mute.lock().await;
+                                            player.set_volume(volume_before_mute.max(0.05)).await
+                                        }
+                                    }
+                                    _ => Ok(()),
+                                };
+
+                                if let Err(err) = result {
+                                    eprintln!(
+                                        "[Luminous Backend] Failed to handle media key {:?}: {}",
+                                        key, err
+                                    );
+                                } else {
+                                    let playback_state = player.get_state().await;
+                                    crate::media_session::mirror_state(&app_handle, &playback_state)
+                                        .await;
+                                    let _ = app_handle.emit("playback-state", playback_state);
+                                }
+                            });
+                        })
+                {
+                    log::debug!(
+                        "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
+                        shortcut_str,
+                        err
+                    );
+                }
             }
 
             Ok(())
