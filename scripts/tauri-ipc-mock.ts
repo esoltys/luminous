@@ -110,6 +110,11 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     active_tab: "collection",
     active_sub_tab: "songs",
     language: "en",
+    // Pre-seeded to match get_app_version's mock return value below, so the
+    // first-launch/new-version celebration toast (collection.svelte.ts) never
+    // fires during automated screenshot capture — it showed up as a hang once
+    // get_app_version stopped being an unhandled (silently no-op) command.
+    launched_version: "0.90.0",
   };
 
   if (!isScreenshotMode) {
@@ -662,6 +667,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       crossfade_suppress_same_album: true,
     }),
 
+    get_app_version: () => "0.90.0",
     "plugin:app|version": () => "0.90.0",
 
     "plugin:event|listen": (args) => {

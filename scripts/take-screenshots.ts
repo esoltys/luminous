@@ -204,9 +204,14 @@ async function main() {
     `);
     await page.addInitScript(mockCode);
 
-    // Pre-configure the mock settings on mount
+    // Pre-configure the mock settings on mount. Spread over whatever mockCode's
+    // own default already set (e.g. launched_version, seeded so the first-launch
+    // celebration toast never fires during capture) instead of replacing the
+    // object outright — a prior version of this script clobbered that default
+    // and reintroduced the celebration-toast hang.
     await page.addInitScript(`
       window.mockSettings = {
+        ...(window.mockSettings || {}),
         active_theme_id: "${theme}",
         custom_themes: "[]",
         active_tab: "${tab}",

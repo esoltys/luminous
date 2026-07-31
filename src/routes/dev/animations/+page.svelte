@@ -52,7 +52,7 @@
   }
 
   function replayMilestoneToast() {
-    toastStore.show("\ud83c\udf89 1,000 songs in your library!", "milestone");
+    toastStore.show("1,000 songs in your library!", "milestone");
   }
 
   function replayWarningToast() {
@@ -64,7 +64,7 @@
   }
 
   function replayWelcomeToast() {
-    toastStore.show("Welcome to Luminous v1.0.0! \ud83c\udfb5", "milestone");
+    toastStore.show("Welcome to Luminous v1.0.0!", "milestone");
   }
 
   let replayCounters = $state<Record<string, number>>({
