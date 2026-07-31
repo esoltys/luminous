@@ -3028,6 +3028,7 @@ mod tests {
         ));
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
+        conn.execute("INSERT INTO directories (path) VALUES (?1)", params![temp_dir.to_string_lossy()]).unwrap();
 
         let real_file = temp_dir.join("real.mp3");
         std::fs::write(&real_file, b"audio").unwrap();
