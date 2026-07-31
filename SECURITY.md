@@ -4,7 +4,7 @@ First off, thanks for helping keep Luminous safe! As an open-source project, I r
 
 ## Supported Versions
 
-If you're using an older version, we recommend upgrading to the [latest release](https://github.com/esoltys/luminous/releases/latest) get fixes.
+If you're using an older version, we recommend upgrading to the [latest release](https://github.com/esoltys/luminous/releases/latest) to get fixes.
 
 ## Reporting a Vulnerability
 
@@ -19,8 +19,7 @@ If you think you've found a security bug in Luminous, **please don't create a pu
 
 To help me fix things quickly, try to share:
 - A quick overview of what the bug is and where it lives.
-- Steps or a small example code snippet to reproduce it.
-- Any ideas you have for a patch (contributions are always welcome!).
+- Steps to reproduce it or what you were doing when you experienced the problem.
 
 ## What happens next?
 
