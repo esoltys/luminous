@@ -479,11 +479,13 @@
               {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
             </IconActionButton>
           {/if}
+          <ColumnSelector align="left" iconOnly />
         </div>
 
-        <!-- Secondary Control Buttons Row -->
-        <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
-          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+        <!-- Secondary Control Buttons Row: only rendered for genre/decade playlists, which are the
+             only kinds with auto-play/population-mode controls to show here. -->
+        {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+          <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
             <div
               id="auto-play-toggle-{playlistId}"
@@ -503,14 +505,12 @@
               disabled={loading || isChangingMode}
               onChange={handleChangePopulationMode}
             />
-          {/if}
-
-          <ColumnSelector align="left" iconOnly />
-        </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Right: Cover Stack -->
-      <div class="relative self-stretch aspect-[4/3] hidden sm:block shrink-0">
+      <div class="relative w-40 h-40 hidden sm:block shrink-0">
         {#if topCovers.length > 0}
           <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : 'from-[#059669] to-[#34D399]'} flex items-center justify-center overflow-hidden border border-brand-border/60 relative shadow-2xl">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />

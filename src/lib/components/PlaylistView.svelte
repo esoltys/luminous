@@ -768,6 +768,7 @@
                 <span>{i18n.t("playlists.makeActiveBtn")}</span>
               </Button>
             {/if}
+            <ColumnSelector align="left" iconOnly />
           </div>
 
           <!-- Secondary Control Buttons Row -->
@@ -802,7 +803,6 @@
               <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
                 {#snippet icon()}<RotateCw class="w-4 h-4 text-brand-accent-text" />{/snippet}
               </IconActionButton>
-              <ColumnSelector align="left" iconOnly />
               <button
                 bind:this={overflowButtonEl}
                 onclick={toggleOverflowMenu}
@@ -821,10 +821,10 @@
             <Layers class="w-14 h-14 text-white/90" />
           </div>
         {:else if topAlbums.length > 0}
-          <div class="relative self-stretch aspect-[4/3] hidden sm:block shrink-0">
+          <div class="relative self-stretch w-48 hidden sm:block shrink-0">
             {#each topAlbums.slice(0, 6) as album, i (i)}
               <div
-                class="absolute bottom-0 right-0 h-[75%] aspect-square overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+                class="absolute bottom-0 right-0 w-32 h-32 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
                 style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
               >
                 <CoverArt
