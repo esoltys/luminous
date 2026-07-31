@@ -424,7 +424,7 @@
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Auto-Playlist Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
-    <div class="flex items-start justify-between gap-6 relative z-10">
+    <div class="flex items-stretch justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
@@ -479,11 +479,13 @@
               {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
             </IconActionButton>
           {/if}
+          <ColumnSelector align="left" iconOnly />
         </div>
 
-        <!-- Secondary Control Buttons Row -->
-        <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
-          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+        <!-- Secondary Control Buttons Row: only rendered for genre/decade playlists, which are the
+             only kinds with auto-play/population-mode controls to show here. -->
+        {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+          <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
             <div
               id="auto-play-toggle-{playlistId}"
@@ -503,10 +505,8 @@
               disabled={loading || isChangingMode}
               onChange={handleChangePopulationMode}
             />
-          {/if}
-
-          <ColumnSelector size="sm" align="left" />
-        </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Right: Cover Stack -->

@@ -16,6 +16,8 @@
     surface?: InputSurface;
     /** Swaps the border/ring to the accent color, e.g. to flag a field that was just auto-filled. */
     highlighted?: boolean;
+    /** Rounds the field fully, matching the rounded-full buttons in compact toolbars. */
+    pill?: boolean;
     class?: string;
     style?: string;
     oninput?: (e: Event & { currentTarget: HTMLInputElement }) => void;
@@ -35,6 +37,7 @@
     size = "md",
     surface = "main",
     highlighted = false,
+    pill = false,
     class: className = "",
     style,
     oninput,
@@ -44,8 +47,13 @@
   }: Props = $props();
 
   const sizeClasses: Record<InputSize, string> = {
-    md: "rounded-xl px-3.5 py-2 text-sm font-medium",
-    sm: "rounded-lg px-2.5 py-1.5 text-xs",
+    md: "px-3.5 py-2 text-sm font-medium",
+    sm: "px-2.5 py-1.5 text-xs",
+  };
+
+  const radiusClasses: Record<InputSize, string> = {
+    md: "rounded-xl",
+    sm: "rounded-lg",
   };
 
   const surfaceClasses: Record<InputSurface, string> = {
@@ -67,5 +75,5 @@
   {onkeydown}
   {onfocus}
   {style}
-  class="border text-brand-text-primary outline-none focus:border-brand-accent disabled:opacity-50 transition-colors {surfaceClasses[surface]} {sizeClasses[size]} {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {className}"
+  class="border text-brand-text-primary outline-none focus:border-brand-accent disabled:opacity-50 transition-colors {pill ? 'rounded-full' : radiusClasses[size]} {surfaceClasses[surface]} {sizeClasses[size]} {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {className}"
 />

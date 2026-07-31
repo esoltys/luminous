@@ -440,7 +440,7 @@
           >
             {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
           </IconActionButton>
-          <ColumnSelector size="sm" align="left" />
+          <ColumnSelector align="left" iconOnly />
         </div>
       </div>
 

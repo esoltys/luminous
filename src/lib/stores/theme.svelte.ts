@@ -100,7 +100,11 @@ export const LUMINOUS_LIGHT_COLORS: ThemeColors = {
   "color-accent-hover": blendToward(LUMINOUS_LIGHT_ACCENT, 255, 0.2),
   "color-text-primary": "#16181d",
   "color-text-secondary": "#5a6072",
-  "color-border": "#dcdce4"
+  // #dcdce4 measured ~1.8:1 against the white sidebar/card surfaces here —
+  // well under WCAG 1.4.11's 3:1 non-text contrast floor, so borders (e.g.
+  // the playlist toolbar's icon buttons) were nearly invisible. This slate,
+  // hue-matched to LUMINOUS_LIGHT_ACCENT, clears ~3.7:1.
+  "color-border": "#7f84a0"
 };
 
 /** Blends a hex color toward white (factor > 0) or black (factor < 0). */

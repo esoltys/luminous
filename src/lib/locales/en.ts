@@ -383,6 +383,7 @@ export const en = {
     undoBtn: "Undo",
     redoTooltip: "Redo last playlist operation",
     redoBtn: "Redo",
+    moreActionsTooltip: "More actions",
     removeUnavailableTooltip: "Remove all {count} unavailable songs from playlist",
     removeUnavailableBtn: "Remove {count} unavailable",
     fileNotFoundTooltip: "File not found on disk",
@@ -677,7 +678,7 @@ export const en = {
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {albums} • {songs} • {duration} total",
     playAll: "Play all",
-    shuffleAndPlay: "Shuffle and play",
+    shuffleAndPlay: "Shuffle",
     discography: "Discography",
     showLess: "Show less",
     showAll: "Show all",
@@ -840,5 +841,14 @@ export const en = {
     openSettings: "Open Settings",
     showShortcuts: "Show this list",
     footnote: "Mouse side buttons and dedicated browser back/forward keys also navigate history. Media buttons on your keyboard or device also control playback."
+  },
+  celebrations: {
+    firstLaunch: "Welcome to Luminous v{version}!",
+    newVersion: "Updated to Luminous v{version}",
+    milestone: "{count} songs in your library!",
+    firstFolder: "First music folder added!",
+    contextComplete: "{name} complete",
+    queueComplete: "Queue complete",
+    playlistCreated: "Playlist \"{name}\" created"
   }
 };

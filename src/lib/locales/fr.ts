@@ -353,6 +353,7 @@ export const fr = {
     undoBtn: "Annuler",
     redoTooltip: "Rétablir la dernière opération",
     redoBtn: "Rétablir",
+    moreActionsTooltip: "Plus d'actions",
     removeUnavailableTooltip: "Retirer les {count} chansons indisponibles de la liste",
     removeUnavailableBtn: "Retirer {count} indisponibles",
     fileNotFoundTooltip: "Fichier introuvable sur le disque",
@@ -645,7 +646,7 @@ export const fr = {
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {albums} • {songs} • {duration} au total",
     playAll: "Tout lire",
-    shuffleAndPlay: "Lecture aléatoire",
+    shuffleAndPlay: "Aléatoire",
     discography: "Discographie",
     showLess: "Afficher moins",
     showAll: "Afficher tout",
@@ -808,5 +809,14 @@ export const fr = {
     openSettings: "Ouvrir les paramètres",
     showShortcuts: "Afficher cette liste",
     footnote: "Les boutons latéraux de la souris et les touches dédiées de navigation du navigateur permettent aussi de naviguer dans l'historique. Les boutons multimédias de votre clavier ou de votre appareil permettent aussi de contrôler la lecture."
+  },
+  celebrations: {
+    firstLaunch: "Bienvenue dans Luminous v{version} !",
+    newVersion: "Mise à jour vers Luminous v{version}",
+    milestone: "{count} chansons dans votre bibliothèque !",
+    firstFolder: "Premier dossier de musique ajouté !",
+    contextComplete: "{name} terminé",
+    queueComplete: "File d'attente terminée",
+    playlistCreated: "Liste de lecture « {name} » créée"
   }
 };

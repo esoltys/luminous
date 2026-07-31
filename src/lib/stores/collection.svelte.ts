@@ -480,8 +480,8 @@ class CollectionStore {
           const isFirstEver = !settings.launched_version;
           setTimeout(() => {
             const msg = isFirstEver
-              ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🎵`)
-              : i18n.t("celebrations.newVersion", { version: appVersion }, `Welcome to Luminous v${appVersion}! 🆕`);
+              ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}!`)
+              : i18n.t("celebrations.newVersion", { version: appVersion }, `Updated to Luminous v${appVersion}`);
             toastStore.show(msg, "milestone");
             setTimeout(() => { this.isFirstLaunch = false; }, 700);
           }, 1200);
@@ -513,7 +513,7 @@ class CollectionStore {
               if (songCountBeforeRefresh < threshold && newTotal >= threshold) {
                 this.milestoneReached = threshold;
                 toastStore.show(
-                  i18n.t("celebrations.milestone", { count: threshold.toLocaleString() }, `🎉 ${threshold.toLocaleString()} songs in your library!`),
+                  i18n.t("celebrations.milestone", { count: threshold.toLocaleString() }, `${threshold.toLocaleString()} songs in your library!`),
                   "milestone"
                 );
                 setTimeout(() => { this.milestoneReached = null; }, 700);
@@ -610,7 +610,7 @@ class CollectionStore {
     // First watched folder celebration (#182, New tier).
     if (wasEmpty && this.directories.length > 0) {
       this.justAddedFirstFolder = true;
-      toastStore.show(i18n.t("celebrations.firstFolder", {}, "First music folder added! 📂"), "success");
+      toastStore.show(i18n.t("celebrations.firstFolder", {}, "First music folder added!"), "success");
       setTimeout(() => { this.justAddedFirstFolder = false; }, 400);
     }
 

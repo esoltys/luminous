@@ -9,9 +9,11 @@
   interface Props {
     align?: "left" | "right";
     size?: "sm" | "md";
+    /** Renders just the icon in a round button, dropping the "Columns" label — for compact toolbars. */
+    iconOnly?: boolean;
   }
 
-  let { align = "right", size = "md" }: Props = $props();
+  let { align = "right", size = "md", iconOnly = false }: Props = $props();
 
   let showMenu = $state(false);
   let buttonEl = $state<HTMLButtonElement | undefined>(undefined);
@@ -133,12 +135,14 @@
   <button
     bind:this={buttonEl}
     onclick={toggleMenu}
-    class="flex items-center gap-1.5 bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary focus:outline-none transition-all cursor-pointer font-semibold rounded-full
-      {size === 'sm' ? 'px-2.5 h-7 text-[11px]' : 'px-3 py-1.5 text-xs'}"
+    class="flex items-center justify-center gap-1.5 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
+      {iconOnly
+        ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
+        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px]' : 'px-3 py-1.5 text-xs')}"
     title={i18n.t("collection.columnsBtn")}
   >
     <Columns class="w-3.5 h-3.5 text-brand-accent-text" />
-    <span>{i18n.t("collection.columnsBtn")}</span>
+    {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
   </button>
 
   {#if showMenu}
