@@ -16,6 +16,30 @@ use rand::seq::SliceRandom;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// After this many consecutive playback failures with no successful
+/// `Playing` event in between, the player gives up and stops instead of
+/// continuing to advance. Every song under a watched root that's currently
+/// unreachable (disconnected drive, sleeping network share) still reads as
+/// "available" to the DB — see `find_missing_song_ids` — so without this
+/// ceiling, advancing past a failed track (`next_track`) can keep failing
+/// forever, and under `RepeatMode::Playlist` specifically has no other
+/// terminating condition at all.
+pub(crate) const MAX_CONSECUTIVE_PLAYBACK_ERRORS: u32 = 5;
+
+/// Outcome of a single playback failure, returned by `Player::note_playback_error`.
+pub struct PlaybackErrorOutcome {
+    /// The song that failed to play, for a user-facing toast.
+    pub failed_song: Option<Song>,
+    /// True once `MAX_CONSECUTIVE_PLAYBACK_ERRORS` consecutive failures have
+    /// happened with no successful play in between — the caller should stop
+    /// instead of advancing further.
+    pub should_stop: bool,
+    /// True if the failed song was flagged `unavailable` in the DB as a
+    /// result (its file was confirmed gone at the moment of failure) — the
+    /// caller should let the frontend know its cached library data is stale.
+    pub flagged_unavailable: bool,
+}
+
 /// A candidate for the gapless "next track" — resolved by peeking at the
 /// playback context without mutating it.
 struct GaplessTarget {
@@ -74,6 +98,10 @@ pub struct Player {
     /// Position at which we trigger the scrobble (50% of track length).
     scrobble_point_nanosec: Option<u64>,
     scrobbled: bool,
+
+    /// Consecutive playback failures since the last successful `Playing`
+    /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
+    consecutive_playback_errors: u32,
 }
 
 impl Player {
@@ -284,6 +312,7 @@ impl Player {
             queue: std::collections::VecDeque::new(),
             scrobble_point_nanosec,
             scrobbled: false,
+            consecutive_playback_errors: 0,
         };
 
         player.rebuild_shuffle_order();
@@ -642,6 +671,49 @@ impl Player {
         } else {
             self.audio.lock().await.resume()
         }
+    }
+
+    /// Called by the audio-event loop when the engine reports it couldn't
+    /// open/decode the current track. Flags the failed song `unavailable` if
+    /// its file is confirmed gone right now (a live single-file check, not
+    /// the directory-unreachable heuristic `find_missing_song_ids` uses —
+    /// so it's safe even when the drive as a whole is still being treated as
+    /// "can't currently verify" rather than "confirmed missing").
+    pub fn note_playback_error(&mut self) -> PlaybackErrorOutcome {
+        self.consecutive_playback_errors += 1;
+        let should_stop = self.consecutive_playback_errors >= MAX_CONSECUTIVE_PLAYBACK_ERRORS;
+
+        let mut flagged_unavailable = false;
+        if let Some(song) = &self.current_song {
+            let missing_on_disk = song
+                .path
+                .as_deref()
+                .map(|p| !std::path::Path::new(p).exists())
+                .unwrap_or(false);
+            if missing_on_disk {
+                if let Ok(conn) = self._db.pool.get() {
+                    flagged_unavailable = conn
+                        .execute(
+                            "UPDATE songs SET unavailable = 1 WHERE id = ?1 AND unavailable = 0",
+                            rusqlite::params![song.id],
+                        )
+                        .map(|n| n > 0)
+                        .unwrap_or(false);
+                }
+            }
+        }
+
+        PlaybackErrorOutcome {
+            failed_song: self.current_song.clone(),
+            should_stop,
+            flagged_unavailable,
+        }
+    }
+
+    /// Clears the consecutive-failure counter — called whenever the engine
+    /// confirms a track actually started playing.
+    pub fn reset_playback_errors(&mut self) {
+        self.consecutive_playback_errors = 0;
     }
 
     pub async fn stop(&mut self) -> Result<()> {

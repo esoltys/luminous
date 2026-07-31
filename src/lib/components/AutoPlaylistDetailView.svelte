@@ -786,18 +786,21 @@
           </div>
         {:else}
           {#each sortedSongs as song, index (song.id)}
+            {@const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path)}
+            {@const disabled = song.unavailable || disconnected}
             <div
               role="row"
               tabindex="0"
               onkeydown={(e) => {
-                if (e.key === 'Enter' && !song.unavailable) handlePlaySong(song);
+                if (e.key === 'Enter' && !disabled) handlePlaySong(song);
               }}
               data-song-row="true"
-              onclick={(e) => !song.unavailable && handleSongClick(e, song)}
-              ondblclick={() => !song.unavailable && handlePlaySong(song)}
+              onclick={(e) => !disabled && handleSongClick(e, song)}
+              ondblclick={() => !disabled && handlePlaySong(song)}
               oncontextmenu={(e) => handleContextMenu(e, song)}
+              title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : undefined}
               class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
-                {song.unavailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                 {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               style={gridColsStyle}
             >
@@ -813,9 +816,10 @@
                     </span>
                   {/if}
                   <button
-                    onclick={(e) => { e.stopPropagation(); handlePlaySong(song); }}
-                    class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer"
-                    title={i18n.t('collection.playSong')}
+                    onclick={(e) => { e.stopPropagation(); if (!disabled) handlePlaySong(song); }}
+                    class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                    disabled={disabled}
+                    title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : i18n.t('collection.playSong')}
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>

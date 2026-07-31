@@ -323,6 +323,7 @@ pub fn run() {
                             let mut p = player.lock().await;
                             match event {
                                 crate::audio::AudioEvent::Playing { .. } => {
+                                    p.reset_playback_errors();
                                     let _ = app.emit(
                                         "track-changed",
                                         serde_json::json!({
@@ -373,7 +374,32 @@ pub fn run() {
                                         "[Luminous Backend] ERROR from audio engine: {}",
                                         message
                                     );
-                                    let _ = p.next_track().await;
+                                    let outcome = p.note_playback_error();
+
+                                    if let Some(song) = &outcome.failed_song {
+                                        let _ = app.emit(
+                                            "playback-error",
+                                            serde_json::json!({
+                                                "songId": song.id,
+                                                "title": song.title,
+                                                "path": song.path,
+                                            }),
+                                        );
+                                    }
+                                    if outcome.flagged_unavailable {
+                                        let _ = app.emit("library-changed", ());
+                                    }
+
+                                    if outcome.should_stop {
+                                        log::error!(
+                                            "Stopping playback after {} consecutive audio errors \
+                                             — likely a disconnected drive or dead playlist",
+                                            crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
+                                        );
+                                        let _ = p.stop().await;
+                                    } else {
+                                        let _ = p.next_track().await;
+                                    }
                                     let state = p.get_state().await;
                                     let _ = app.emit("playback-state", state);
                                 }

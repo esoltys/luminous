@@ -92,6 +92,8 @@ export const fr = {
     unknownSong: "Chanson inconnue",
     unknownArtist: "Artiste inconnu",
     unknownAlbum: "Album inconnu",
+    driveDisconnectedTooltip: "Lecteur déconnecté — reconnectez-le pour lire",
+    driveDisconnectedText: "Lecteur déconnecté",
     noAlbumsTitle: "Aucun album trouvé",
     noAlbumsMatchQuery: "Aucun album ne correspond à votre recherche :",
     noArtistsTitle: "Aucun artiste trouvé",
@@ -528,7 +530,9 @@ export const fr = {
     lyricsStatusLabel: "Paroles",
     lyricsSynced: "Synchronisées (LRC)",
     lyricsPlain: "Texte brut",
-    lyricsNone: "Non téléchargées"
+    lyricsNone: "Non téléchargées",
+    trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
+    tracksSkippedToast: "{count} morceaux indisponibles ignorés."
   },
   miniplayer: {
     title: "Mini-lecteur",

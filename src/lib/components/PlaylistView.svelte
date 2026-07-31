@@ -1095,7 +1095,9 @@
       <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
         {#each filteredTracks as item, index}
-          {@const unavailable = isItemUnavailable(item)}
+          {@const trueUnavailable = isItemUnavailable(item)}
+          {@const disconnected = !trueUnavailable && collectionStore.isPathOnDisconnectedDrive(item.song?.path)}
+          {@const unavailable = trueUnavailable || disconnected}
           {@const isDuplicate = duplicateUuids.includes(item.uuid)}
           {@const isSelected = selectedUuids.has(item.uuid)}
           {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
@@ -1154,11 +1156,18 @@
             {#if collectionStore.visibleColumns.title}
               <div class="font-medium truncate pr-4 min-w-0 {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary' : 'text-brand-text-primary'}">
                 <div class="flex items-center gap-2 max-w-full">
-                  {#if unavailable}
+                  {#if trueUnavailable}
                     <span title={i18n.t("playlists.fileNotFoundTooltip")}>
                       <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
                     </span>
                     <span class="truncate line-through decoration-brand-text-secondary/40">
+                      {item.song?.title ?? i18n.t("collection.unknownSong")}
+                    </span>
+                  {:else if disconnected}
+                    <span title={i18n.t("collection.driveDisconnectedTooltip")}>
+                      <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
+                    </span>
+                    <span class="truncate">
                       {item.song?.title ?? i18n.t("collection.unknownSong")}
                     </span>
                   {:else if item.song?.title}
@@ -1185,8 +1194,10 @@
 
             {#if collectionStore.visibleColumns.artist}
               <div class="text-brand-text-secondary truncate pr-4 min-w-0">
-                {#if unavailable}
+                {#if trueUnavailable}
                   <span class="text-brand-text-secondary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
+                {:else if disconnected}
+                  <span class="text-brand-text-secondary italic text-xs">{i18n.t("collection.driveDisconnectedText")}</span>
                 {:else if item.song?.artist}
                   <LinkButton
                     onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}

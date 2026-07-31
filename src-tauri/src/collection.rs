@@ -125,11 +125,7 @@ impl CollectionScanner {
             .map(|d| PathBuf::from(d.path))
             .collect();
 
-        let unreachable_roots: Vec<PathBuf> = all_roots
-            .iter()
-            .filter(|root| std::fs::read_dir(root).is_err())
-            .cloned()
-            .collect();
+        let unreachable_roots = unreachable_watched_roots(conn);
 
         for root in &unreachable_roots {
             log::warn!(
@@ -2021,6 +2017,50 @@ pub fn delete_path_and_subpaths(db: &Database, path_str: &str) -> Result<usize> 
     Ok(deleted)
 }
 
+/// Soft-delete counterpart to `delete_path_and_subpaths`, used when `path_str`
+/// falls under a watched root that's currently unreachable (see
+/// `unreachable_watched_roots`) — flags matching songs `unavailable` instead
+/// of removing them, so a disconnected drive observed by the realtime watcher
+/// can't be mistaken for a bulk deletion the way a plain hard-delete would.
+fn mark_path_and_subpaths_unavailable(db: &Database, path_str: &str) -> Result<usize> {
+    let conn = db.pool.get()?;
+    let path_fw = path_str.replace('\\', "/");
+    let path_bw = path_str.replace('/', "\\");
+
+    let marked = conn.execute(
+        "UPDATE songs SET unavailable = 1
+         WHERE unavailable = 0 AND (
+            path = ?1 OR path = ?2
+            OR path LIKE ?1 || '/%'
+            OR path LIKE ?1 || '\\%'
+            OR path LIKE ?2 || '/%'
+            OR path LIKE ?2 || '\\%'
+         )",
+        params![path_fw, path_bw],
+    )?;
+    Ok(marked)
+}
+
+/// Watched directory roots that can't currently be read (disconnected drive,
+/// sleeping network share, etc). Shared by the scanner's missing-file check
+/// (`CollectionScanner::find_missing_song_ids`) and the realtime watcher below
+/// so a temporary disconnect is never treated as a bulk deletion by either
+/// path.
+fn unreachable_watched_roots(conn: &rusqlite::Connection) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(mut stmt) = conn.prepare("SELECT path FROM directories") {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            for path in rows.flatten() {
+                let p = PathBuf::from(&path);
+                if std::fs::read_dir(&p).is_err() {
+                    roots.push(p);
+                }
+            }
+        }
+    }
+    roots
+}
+
 /// Message delivered from the notify callback to the watcher thread. A plain
 /// `notify::Event` channel would silently lose whatever changes happened
 /// during an `Err` (e.g. the OS's change-journal buffer overflowing during a
@@ -2196,8 +2236,41 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         let _ = app_clone.emit("library-changed", ());
                     }
 
+                    // A disconnected drive makes `notify` report every path under it as
+                    // "removed" the same as an actual deletion would. Songs under a root
+                    // that's currently unreachable get soft-flagged instead of
+                    // hard-deleted here, mirroring the scan-time protection in
+                    // `find_missing_song_ids` — otherwise unplugging a watched USB drive
+                    // mid-session would permanently wipe every song on it from the library.
+                    let unreachable_roots = unreachable_watched_roots(&conn);
+
                     for path in &still_removed {
                         let path_str = path.to_string_lossy().to_string();
+
+                        if unreachable_roots.iter().any(|root| path.starts_with(root)) {
+                            log::warn!(
+                                "Watcher saw '{}' disappear, but its watched root is currently \
+                                 unreachable (disconnected drive or network share?) — marking \
+                                 unavailable instead of deleting",
+                                path_str
+                            );
+                            match mark_path_and_subpaths_unavailable(&db_for_thread, &path_str) {
+                                Ok(marked) => {
+                                    if marked > 0 {
+                                        log::info!(
+                                            "Marked {} song(s) unavailable under unreachable root",
+                                            marked
+                                        );
+                                        let _ = app_clone.emit("library-changed", ());
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to mark path unavailable in db: {e}");
+                                }
+                            }
+                            continue;
+                        }
+
                         log::info!("Watcher detected deletion: {}", path_str);
                         match delete_path_and_subpaths(&db_for_thread, &path_str) {
                             Ok(deleted) => {

@@ -92,6 +92,8 @@ export const en = {
     unknownSong: "Unknown Song",
     unknownArtist: "Unknown Artist",
     unknownAlbum: "Unknown Album",
+    driveDisconnectedTooltip: "Drive disconnected — reconnect to play",
+    driveDisconnectedText: "Drive disconnected",
     noAlbumsTitle: "No albums found",
     noAlbumsMatchQuery: "No albums match your query:",
     noArtistsTitle: "No artists found",
@@ -559,7 +561,9 @@ export const en = {
     lyricsStatusLabel: "Lyrics",
     lyricsSynced: "Synced (LRC)",
     lyricsPlain: "Plain text",
-    lyricsNone: "Not downloaded"
+    lyricsNone: "Not downloaded",
+    trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
+    tracksSkippedToast: "Skipped {count} unavailable tracks."
   },
   miniplayer: {
     title: "Miniplayer",

@@ -498,6 +498,7 @@ class CollectionStore {
           invoke("set_app_setting", { key: "last_scan_time", value: nowStr }).catch((err) => {
             console.error("Failed to save last_scan_time:", err);
           });
+          this.refreshDirectories();
           const songCountBeforeRefresh = this.stats.total_songs;
           this.refreshStats().then(() => {
             const added = this.stats.total_songs - songCountBeforeRefresh;
@@ -547,10 +548,12 @@ class CollectionStore {
         }
       });
 
-      // Listen to library changed events (e.g. from background directory watcher)
+      // Listen to library changed events (e.g. from background directory watcher,
+      // or a song getting flagged unavailable after a failed play)
       await listen("library-changed", () => {
         this.refreshStats();
         this.refreshLibrary();
+        this.refreshDirectories();
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
         });
@@ -589,6 +592,21 @@ class CollectionStore {
 
   async refreshDirectories() {
     this.directories = await invoke("get_directories");
+  }
+
+  /**
+   * True when `path` lives under a watched directory that's currently
+   * unreachable (disconnected USB drive, sleeping network share, etc).
+   * Distinct from `song.unavailable`, which only flips once the backend has
+   * confirmed the file is actually gone — a song on a merely-disconnected
+   * drive still reads as "available" there (see collection.rs's
+   * find_missing_song_ids doc comment) until a play is attempted or the
+   * user un-watches the folder. This lets the UI show a "disconnected"
+   * state proactively instead of waiting for a failed play.
+   */
+  isPathOnDisconnectedDrive(path: string | null | undefined): boolean {
+    if (!path) return false;
+    return this.directories.some((d) => d.is_available === false && path.startsWith(d.path));
   }
 
   async refreshStats() {
