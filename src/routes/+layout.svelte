@@ -232,7 +232,7 @@
                   aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
                   aria-label={i18n.t('topNav.resizeSidebar')}
                   tabindex="0"
-                  class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
+                  class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
                   onpointerdown={startResizeSidebar}
                   onkeydown={handleSidebarKeyDown}
                 >
@@ -260,7 +260,7 @@
                   aria-valuemax={RIGHT_PANEL_MAX_WIDTH_PX}
                   aria-label={i18n.t('topNav.resizeRightPanel')}
                   tabindex="0"
-                  class="relative w-1 hover:w-1.5 active:w-1.5 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-all self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent focus:w-1.5"
+                  class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
                   onpointerdown={startResizeRightPanel}
                   onkeydown={handleRightPanelKeyDown}
                 >
