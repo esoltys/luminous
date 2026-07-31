@@ -14,6 +14,8 @@
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
 
+  const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+
 
   import {
     Play,
@@ -169,7 +171,7 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
   <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
     <button
@@ -374,6 +376,12 @@
     background-color: var(--glass-bg-playerbar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
+  }
+
+  :global(footer.opaque-linux) {
+    background-color: var(--bg-playerbar, #191b23) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the
