@@ -390,7 +390,7 @@ export const en = {
     removeUnavailableBtn: "Remove {count} unavailable",
     fileNotFoundTooltip: "File not found on disk",
     fileNotFoundText: "File not found",
-    importPlaylistBtn: "Import Playlist",
+    importPlaylistBtn: "Import",
     exportPlaylistBtn: "Export Playlist",
     importPlaylistTooltip: "Import playlist file (*.m3u, *.m3u8, *.pls, *.xspf)",
     exportPlaylistTooltip: "Export active playlist to file",
