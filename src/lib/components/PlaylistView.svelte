@@ -22,7 +22,9 @@
     Shuffle,
     Search,
     Radio,
-    Layers
+    Layers,
+    MoreHorizontal,
+    Eraser
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -42,8 +44,13 @@
   import { Clock } from "lucide-svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { portal } from "../utils/portal";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { CONTEXT_MENU_WIDTH_PX } from "../constants";
 
   let gridColsStyle = $derived.by(() => {
     const cols: string[] = ["48px"]; // position column always present
@@ -102,6 +109,24 @@
 
   // Right-click context menu state
   let contextMenuState = $state<{ x: number; y: number; item: PlaylistItem } | null>(null);
+
+  // Overflow ("more actions") menu state — houses the lower-frequency playlist
+  // actions (import/export/duplicate-cleanup/clear/delete) so the toolbar
+  // isn't a wall of always-visible buttons.
+  let showOverflowMenu = $state(false);
+  let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+  let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+
+  function toggleOverflowMenu() {
+    if (showOverflowMenu) {
+      showOverflowMenu = false;
+      return;
+    }
+    if (!overflowButtonEl) return;
+    const rect = overflowButtonEl.getBoundingClientRect();
+    overflowMenuPos = { x: rect.right - CONTEXT_MENU_WIDTH_PX, y: rect.bottom + 8 };
+    showOverflowMenu = true;
+  }
 
   // Focuses and selects an input's text on mount, without the a11y-flagged
   // `autofocus` attribute (the rename input only appears after an explicit
@@ -661,7 +686,7 @@
     <div class="flex-1 flex flex-col min-h-0 relative z-10">
     <!-- Stacked Cover Art Hero & Summary Banner Header -->
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
-      <div class="flex items-start justify-between gap-6 relative z-10">
+      <div class="flex items-stretch justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
         <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
           {#if isEditingTitle}
@@ -749,99 +774,44 @@
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
             <!-- Search Filter Bar -->
             <div class="relative w-full max-w-xs">
-              <Search class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
+              <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
               <Input
                 type="text"
                 bind:value={filterQuery}
                 placeholder={i18n.t("playlists.filterPlaceholder")}
-                size="sm"
+                size="md"
+                pill
                 class="w-full"
-                style="padding-left: 2rem; padding-right: 1.75rem;"
+                style="padding-left: 2.25rem; padding-right: 2rem;"
               />
               {#if filterQuery}
                 <button
                   onclick={() => { filterQuery = ""; }}
-                  class="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
                   title={i18n.t("playlists.clearFilter")}
                 >
-                  <X class="w-3 h-3" />
+                  <X class="w-3.5 h-3.5" />
                 </button>
               {/if}
             </div>
 
-            <ColumnSelector size="sm" align="left" />
-
             <div class="flex items-center gap-2 shrink-0">
-              <Button onclick={() => playlistsStore.undo()} variant="secondary" size="sm" title={i18n.t("playlists.undoTooltip")}>
-                <RotateCcw class="w-3.5 h-3.5 text-brand-accent-text" />
-                <span>{i18n.t("playlists.undoBtn")}</span>
-              </Button>
-              <Button onclick={() => playlistsStore.redo()} variant="secondary" size="sm" title={i18n.t("playlists.redoTooltip")}>
-                <RotateCw class="w-3.5 h-3.5 text-brand-accent-text" />
-                <span>{i18n.t("playlists.redoBtn")}</span>
-              </Button>
+              <IconActionButton onclick={() => playlistsStore.undo()} title={i18n.t("playlists.undoTooltip")}>
+                {#snippet icon()}<RotateCcw class="w-4 h-4 text-brand-accent-text" />{/snippet}
+              </IconActionButton>
+              <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
+                {#snippet icon()}<RotateCw class="w-4 h-4 text-brand-accent-text" />{/snippet}
+              </IconActionButton>
+              <ColumnSelector align="left" iconOnly />
+              <button
+                bind:this={overflowButtonEl}
+                onclick={toggleOverflowMenu}
+                title={i18n.t("playlists.moreActionsTooltip")}
+                class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer shadow-xs"
+              >
+                <MoreHorizontal class="w-4 h-4" />
+              </button>
             </div>
-
-            {#if duplicateCount > 0}
-              <Button
-                onclick={removeDuplicates}
-                variant="info"
-                size="sm"
-                title={i18n.t("playlists.removeDuplicatesTooltip", { count: duplicateCount })}
-              >
-                <CopyPlus class="w-3.5 h-3.5" />
-                <span>{i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}</span>
-              </Button>
-            {/if}
-
-            <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t("playlists.importPlaylistTooltip")}>
-              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
-              <span>{i18n.t("playlists.importPlaylistBtn")}</span>
-            </Button>
-
-            <Button
-              onclick={() => { showExportOptionsModal = true; }}
-              variant="secondary"
-              size="sm"
-              title={i18n.t("playlists.exportPlaylistTooltip")}
-            >
-              <FileOutput class="w-3.5 h-3.5 text-brand-accent-text" />
-              <span>{i18n.t("playlists.exportPlaylistBtn")}</span>
-            </Button>
-
-            {#if unavailableCount > 0}
-              <Button
-                onclick={removeUnavailableTracks}
-                variant="warning"
-                size="sm"
-                title={i18n.t("playlists.removeUnavailableTooltip", { count: unavailableCount })}
-              >
-                <AlertTriangle class="w-3.5 h-3.5" />
-                <span>{i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}</span>
-              </Button>
-            {/if}
-
-            <Button
-              onclick={() => playlistsStore.clearPlaylist(activePlaylist.id)}
-              variant="secondary"
-              size="sm"
-              title={i18n.t("playlists.clearPlaylistTooltip")}
-            >
-              {i18n.t("playlists.clearPlaylistBtn")}
-            </Button>
-
-            {#if !isQueue}
-              <Button
-                onclick={() => { showDeleteConfirm = true; }}
-                variant="secondary"
-                size="sm"
-                class="hover:bg-red-950/20 hover:text-red-400 hover:border-red-900/30"
-                title={i18n.t("playlists.deletePlaylistTooltip")}
-              >
-                <Trash2 class="w-3.5 h-3.5" />
-                <span>{i18n.t("playlists.deletePlaylistBtn")}</span>
-              </Button>
-            {/if}
           </div>
         </div>
 
@@ -851,10 +821,10 @@
             <Layers class="w-14 h-14 text-white/90" />
           </div>
         {:else if topAlbums.length > 0}
-          <div class="relative w-48 h-36 hidden sm:block shrink-0">
+          <div class="relative self-stretch aspect-[4/3] hidden sm:block shrink-0">
             {#each topAlbums.slice(0, 6) as album, i (i)}
               <div
-                class="absolute bottom-0 right-0 w-28 h-28 overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
+                class="absolute bottom-0 right-0 h-[75%] aspect-square overflow-hidden border border-brand-border/60 shadow-xl transition-all duration-300"
                 style="z-index: {10 - i}; transform: translate({i * COVER_STACK_OFFSET_X_PX}px, {i * COVER_STACK_OFFSET_Y_PX}px) rotate({i * COVER_STACK_ROTATION_DEG}deg) scale({1 - i * COVER_STACK_SCALE_STEP}); opacity: {1 - i * COVER_STACK_OPACITY_STEP};"
               >
                 <CoverArt
@@ -1444,6 +1414,59 @@
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
     onClose={() => { contextMenuState = null; }}
   />
+{/if}
+
+{#if showOverflowMenu && overflowMenuPos && activePlaylist}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    estimatedHeight={280}
+    onClose={() => { showOverflowMenu = false; }}
+  >
+    <ContextMenuItem
+      icon={FolderInput}
+      label={i18n.t("playlists.importPlaylistBtn")}
+      onclick={() => { handleImportPlaylist(); showOverflowMenu = false; }}
+    />
+    <ContextMenuItem
+      icon={FileOutput}
+      label={i18n.t("playlists.exportPlaylistBtn")}
+      onclick={() => { showExportOptionsModal = true; showOverflowMenu = false; }}
+    />
+
+    {#if duplicateCount > 0 || unavailableCount > 0}
+      <ContextMenuDivider />
+      {#if duplicateCount > 0}
+        <ContextMenuItem
+          icon={CopyPlus}
+          label={i18n.t("playlists.removeDuplicatesBtn", { count: duplicateCount })}
+          onclick={() => { removeDuplicates(); showOverflowMenu = false; }}
+        />
+      {/if}
+      {#if unavailableCount > 0}
+        <ContextMenuItem
+          icon={AlertTriangle}
+          label={i18n.t("playlists.removeUnavailableBtn", { count: unavailableCount })}
+          onclick={() => { removeUnavailableTracks(); showOverflowMenu = false; }}
+        />
+      {/if}
+    {/if}
+
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={Eraser}
+      label={i18n.t("playlists.clearPlaylistBtn")}
+      onclick={() => { playlistsStore.clearPlaylist(activePlaylist.id); showOverflowMenu = false; }}
+    />
+    {#if !isQueue}
+      <ContextMenuItem
+        icon={Trash2}
+        destructive
+        label={i18n.t("playlists.deletePlaylistBtn")}
+        onclick={() => { showDeleteConfirm = true; showOverflowMenu = false; }}
+      />
+    {/if}
+  </ContextMenu>
 {/if}
 
 {#if editingSongId !== null}
