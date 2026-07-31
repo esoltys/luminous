@@ -639,6 +639,7 @@ pub struct AlbumItem {
     pub art_automatic: Option<String>,
     pub art_manual: Option<String>,
     pub genre: Option<String>,
+    pub sample_song_id: Option<i64>,
 }
 
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).

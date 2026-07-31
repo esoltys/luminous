@@ -1206,6 +1206,7 @@ fn group_songs_into_home_items(
                             art_automatic: song.art_automatic.clone(),
                             art_manual: song.art_manual.clone(),
                             genre: song.genre.clone(),
+                            sample_song_id: Some(song.id),
                         },
                     });
                 }
@@ -1307,6 +1308,7 @@ fn home_item_for_context(
                     art_automatic: song.art_automatic.clone(),
                     art_manual: song.art_manual.clone(),
                     genre: song.genre.clone(),
+                    sample_song_id: Some(song.id),
                 },
             }
         }

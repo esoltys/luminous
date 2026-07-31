@@ -382,7 +382,7 @@
     background-color: var(--bg-playerbar, #191b23) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    box-shadow: var(--glass-shadow, none), var(--glass-glow, none) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 35px 4px var(--color-accent), 0 0 90px 12px var(--color-accent) !important;
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the
