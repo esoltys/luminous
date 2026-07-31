@@ -37,6 +37,12 @@ export class PlayerStore {
   /** Previous playback state for detecting playing→stopped transitions. */
   private _previousState: PlayState = "stopped";
 
+  /** Titles pending a "couldn't play" toast — batched so a run of consecutive
+   *  unavailable tracks (e.g. a whole disconnected drive) shows one summary
+   *  toast instead of a notification per failed track. */
+  private _playbackErrorBatch: string[] = [];
+  private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
   isAutoPlayExhausted(playlistId: number): boolean {
     return this.exhaustedPlaylistIds.includes(playlistId);
   }
@@ -102,6 +108,22 @@ export class PlayerStore {
         themeStore.updateArtworkColors(this.currentSong);
       });
 
+      // A song couldn't be opened/decoded (e.g. its file just vanished —
+      // watched drive disconnected). The backend already skips past it; this
+      // just tells the user why playback jumped. Batched (see
+      // _playbackErrorBatch) because a disconnected drive mid-playlist can
+      // fail several consecutive tracks in a row before the backend's
+      // circuit breaker stops it — one toast per failure would be a
+      // notification avalanche.
+      await listen<{ songId: number; title: string | null; path: string | null }>(
+        "playback-error",
+        (event) => {
+          this._playbackErrorBatch.push(event.payload.title || i18n.t("collection.unknownSong"));
+          if (this._playbackErrorTimer) clearTimeout(this._playbackErrorTimer);
+          this._playbackErrorTimer = setTimeout(() => this.flushPlaybackErrorToast(), 400);
+        }
+      );
+
       // Keep the current song's stats in sync when they change elsewhere
       // (rating edits in list views, scrobble-point playcount bumps).
       await listen<SongStatsPayload>("song-stats-changed", (event) => {
@@ -117,6 +139,25 @@ export class PlayerStore {
       }
     } catch (err) {
       console.error("Failed to initialize PlayerStore:", err);
+    }
+  }
+
+  private flushPlaybackErrorToast() {
+    const titles = this._playbackErrorBatch;
+    this._playbackErrorBatch = [];
+    this._playbackErrorTimer = null;
+    if (titles.length === 0) return;
+
+    if (titles.length === 1) {
+      toastStore.show(
+        i18n.t("playerBar.trackSkippedToast", { title: titles[0] }, `Couldn't play "${titles[0]}" — file not found. Skipped.`),
+        "error"
+      );
+    } else {
+      toastStore.show(
+        i18n.t("playerBar.tracksSkippedToast", { count: titles.length }, `Skipped ${titles.length} unavailable tracks.`),
+        "error"
+      );
     }
   }
 

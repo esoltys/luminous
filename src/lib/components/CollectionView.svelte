@@ -679,16 +679,19 @@
           {:else}
             {#key gridColsStyle}
             <VirtualList items={filteredSongs} let:item={song}>
+              {@const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path)}
+              {@const disabled = song.unavailable || disconnected}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 data-song-row="true"
-                onclick={(e) => !song.unavailable && handleSongClick(e, song)}
-                ondblclick={() => !song.unavailable && handlePlaySong(song)}
-                oncontextmenu={(e) => !song.unavailable && handleContextMenu(e, song)}
+                onclick={(e) => !disabled && handleSongClick(e, song)}
+                ondblclick={() => !disabled && handlePlaySong(song)}
+                oncontextmenu={(e) => !disabled && handleContextMenu(e, song)}
                 style={gridColsStyle}
+                title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : undefined}
                 class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
-                  {song.unavailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                   {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -698,9 +701,10 @@
                     </div>
                   {/if}
                   <button
-                    onclick={() => handlePlaySong(song)}
-                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer"
-                    title={i18n.t('collection.playSong')}
+                    onclick={() => !disabled && handlePlaySong(song)}
+                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                    disabled={disabled}
+                    title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : i18n.t('collection.playSong')}
                   >
                     <Play class="w-4 h-4 fill-current" />
                   </button>
