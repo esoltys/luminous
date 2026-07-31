@@ -13,6 +13,22 @@ import type { FeaturedSelection } from "./mock-library";
 import { en } from "../src/lib/locales/en";
 import { fr } from "../src/lib/locales/fr";
 
+// Minimal ANSI coloring (no chalk dependency) so warnings/errors stand out
+// against the routine progress logs when scanning a long run's output.
+const color = {
+  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
+  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
+  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
+};
+function logWarn(...args: unknown[]) {
+  const [first, ...rest] = args;
+  console.warn(color.yellow(String(first)), ...rest);
+}
+function logError(...args: unknown[]) {
+  const [first, ...rest] = args;
+  console.error(color.red(String(first)), ...rest);
+}
+
 // The app renders all button/tooltip text in the active locale, so any UI
 // text used to find elements to click must be looked up per-language rather
 // than hardcoded in English.
@@ -36,30 +52,36 @@ function parseNameFilter(argv: string[]): string | undefined {
 
 async function main() {
   if (process.env.CI) {
-    console.log("[Screenshot Automation] Running in CI environment. Skipping screenshot generation.");
+    console.log("Running in CI environment. Skipping screenshot generation.");
     process.exit(0);
   }
 
   const nameFilter = parseNameFilter(process.argv.slice(2));
   if (nameFilter) {
-    console.log(`[Screenshot Automation] --name "${nameFilter}" given; only that screenshot will be captured.`);
+    console.log(`--name "${nameFilter}" given; only that screenshot will be captured.`);
   }
-  console.log("[Screenshot Automation] Starting screenshot generation...");
+  console.log("Starting screenshot generation...");
 
   // 1. Try dynamically importing playwright
   let playwright;
   try {
     playwright = await import("playwright");
   } catch (err) {
-    console.warn("\n[WARNING] Playwright is not installed. Skipping screenshot generation.");
-    console.warn("To install and run screenshots locally, run:\n");
-    console.warn("  bun add -D playwright && bunx playwright install chromium\n");
+    logWarn("\n[WARNING] Playwright is not installed. Skipping screenshot generation.");
+    logWarn("To install and run screenshots locally, run:\n");
+    logWarn("  bun add -D playwright && bunx playwright install chromium\n");
     process.exit(0);
   }
 
   // 2. Start Vite server in background
-  console.log("[Screenshot Automation] Starting Vite dev server on port 1420...");
-  const devServer = spawn("bun", ["run", "dev"], {
+  console.log("Starting Vite dev server on port 1420...");
+  // A single command string (rather than a separate args array) avoids
+  // Node's DEP0190 warning — passing an args array alongside shell: true is
+  // deprecated because the args get concatenated into the shell command
+  // unescaped. Not a real risk here (no untrusted input), but this form is
+  // the sanctioned way to invoke a shell built-in like `bun run dev` while
+  // still using shell: true (needed on Windows to resolve bun's .cmd shim).
+  const devServer = spawn("bun run dev", {
     stdio: "pipe",
     shell: true,
   });
@@ -90,7 +112,7 @@ async function main() {
   };
 
   const cleanup = () => {
-    console.log("[Screenshot Automation] Cleaning up Vite server process...");
+    console.log("Cleaning up Vite server process...");
     killDevServer();
   };
 
@@ -99,7 +121,7 @@ async function main() {
   process.on("SIGTERM", () => { process.exit(0); });
 
   // 3. Poll server until active
-  console.log("[Screenshot Automation] Waiting for Vite server on http://localhost:1420...");
+  console.log("Waiting for Vite server on http://localhost:1420...");
   let ready = false;
   for (let i = 0; i < 50; i++) {
     try {
@@ -113,12 +135,12 @@ async function main() {
   }
 
   if (!ready) {
-    console.error("[ERROR] Vite server failed to respond on port 1420.");
+    logError("[ERROR] Vite server failed to respond on port 1420.");
     killDevServer();
     process.exit(1);
   }
 
-  console.log("[Screenshot Automation] Vite server is ready. Launching headless browser...");
+  console.log("Vite server is ready. Launching headless browser...");
 
   // 4. Run Playwright automation
   const { chromium } = playwright;
@@ -132,7 +154,7 @@ async function main() {
     featuredAlbum: mockConfig.default?.featuredAlbum,
   });
   console.log(
-    `[Screenshot Automation] Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}. Featured album: ${defaultFeatured.album ?? "none"}.`
+    `Mock library: ${mockLibrary.source} (${mockLibrary.songs.length} songs, ${mockLibrary.artists.length} artists). Featured artist: ${defaultFeatured.artist ?? "none"}. Featured album: ${defaultFeatured.album ?? "none"}.`
   );
   // Library data (songs/albums/artists) is the same for every screenshot; only
   // the "featured" selection and UI settings vary per-screenshot.
@@ -155,6 +177,8 @@ async function main() {
     viewportWidth?: number;
     viewportHeight?: number;
     emptyLibrary?: boolean;
+    /** e.g. "[3/20]" — shown when running the full batch (no --name filter); omitted otherwise. */
+    progressLabel?: string;
   }
 
   async function capture({
@@ -173,8 +197,9 @@ async function main() {
     viewportWidth = 1280,
     viewportHeight = 800,
     emptyLibrary = false,
+    progressLabel,
   }: CaptureOptions) {
-    console.log(`[Screenshot Automation] Capturing ${filename} (Tab: ${tab}, SubTab: ${subTab}, Theme: ${theme}, Language: ${language}, Immersive: ${isImmersive})...`);
+    console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${filename}...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
     page.on("console", (msg) => {
@@ -183,7 +208,7 @@ async function main() {
         if (text.includes("Cannot read properties of undefined (reading 'offsetHeight')")) {
           return;
         }
-        console.warn(`[Page ${msg.type()}] ${text}`);
+        logWarn(`[Page ${msg.type()}] ${text}`);
       }
     });
     page.on("pageerror", (err) => {
@@ -191,7 +216,7 @@ async function main() {
       if (msg.includes("Cannot read properties of undefined (reading 'offsetHeight')")) {
         return;
       }
-      console.error(`[Page error] ${msg}`);
+      logError(`[Page error] ${msg}`);
     });
 
     // Inject the mock library data, then the mock Tauri IPC bridge that reads it.
@@ -249,11 +274,16 @@ async function main() {
     }
     // Let any rendering and async effects fire
     await page.waitForTimeout(600);
-    // Wait for all <img> tags to complete loading
+    // Wait for all <img> tags to complete loading. CoverArt.svelte sets
+    // loading="lazy" on cover art — in a long grid (e.g. Albums), most covers
+    // sit below the fold and Chromium never fetches them without a real
+    // scroll, so they'd never fire load/error and this would hang forever.
+    // Forcing eager loading makes every image actually fetch.
     await page.evaluate(async () => {
       const imgs = Array.from(document.querySelectorAll("img"));
       await Promise.all(
         imgs.map((img) => {
+          if (img.loading === "lazy") img.loading = "eager";
           if (img.complete) return;
           return new Promise((resolve) => {
             img.addEventListener("load", resolve);
@@ -282,11 +312,12 @@ async function main() {
       } catch (err) {
         attempts++;
         if (attempts >= 3) throw err;
-        console.warn(`[Screenshot Automation] Screenshot capture for ${filename} failed (attempt ${attempts}), retrying in 300ms...`, err);
+        logWarn(`Screenshot capture for ${filename} failed (attempt ${attempts}), retrying in 300ms...`, err);
         await page.waitForTimeout(300);
       }
     }
-    console.log(`[Screenshot Automation] Saved screenshot to ${screenshotPath}`);
+    const relativePath = path.relative(path.join(__dirname, ".."), screenshotPath);
+    console.log(color.green(`Saved screenshot to ${relativePath}`));
     await page.close();
   }
 
@@ -452,7 +483,7 @@ async function main() {
       await page.keyboard.press("Control+m");
       await page.waitForTimeout(400);
       const miniplayerLabel = t(language, "miniplayer.title");
-      const miniRegion = page.locator(`[role="region"][aria-label="${miniplayerLabel}"]`);
+      const miniRegion = page.locator(`[role="group"][aria-label="${miniplayerLabel}"]`);
       await miniRegion.hover();
       await page.waitForTimeout(400);
     }
@@ -474,8 +505,10 @@ async function main() {
         ? mockConfig.screenshots.filter((s) => s.name === nameFilter)
         : mockConfig.screenshots;
       if (nameFilter && screenshotsToRun.length === 0) {
-        console.warn(`[Screenshot Automation] No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
+        logWarn(`No screenshot named "${nameFilter}" found in mock-config.json. Available: ${mockConfig.screenshots.map((s) => s.name).join(", ")}`);
       }
+      const totalCaptures = screenshotsToRun.length * Object.keys(locales).length;
+      let captureIndex = 0;
       for (const s of screenshotsToRun) {
         const settings = resolveScreenshotSettings(mockConfig, s);
         const featured = resolveFeatured(mockLibrary, settings);
@@ -485,6 +518,7 @@ async function main() {
         // `locales` map above), so adding a language only requires adding its
         // locale file there — no changes needed here or in mock-config.json.
         for (const language of Object.keys(locales)) {
+          captureIndex++;
           await capture({
             tab: s.tab,
             subTab: s.subTab,
@@ -501,6 +535,7 @@ async function main() {
             viewportWidth: s.viewportWidth,
             viewportHeight: s.viewportHeight,
             emptyLibrary: s.emptyLibrary,
+            progressLabel: nameFilter ? undefined : `[${captureIndex}/${totalCaptures}]`,
           });
         }
       }
@@ -520,23 +555,26 @@ async function main() {
       ];
       const toRun = nameFilter ? fallbackCaptures.filter((c) => c.name === nameFilter) : fallbackCaptures;
       if (nameFilter && toRun.length === 0) {
-        console.warn(`[Screenshot Automation] No screenshot named "${nameFilter}". Available: ${fallbackCaptures.map((c) => c.name).join(", ")}`);
+        logWarn(`No screenshot named "${nameFilter}". Available: ${fallbackCaptures.map((c) => c.name).join(", ")}`);
       }
-      for (const c of toRun) {
-        await capture(c.opts);
+      for (const [i, c] of toRun.entries()) {
+        await capture({
+          ...c.opts,
+          progressLabel: nameFilter ? undefined : `[${i + 1}/${toRun.length}]`,
+        });
       }
     }
   } catch (err) {
-    console.error("[Screenshot Automation] Error capturing screenshots:", err);
+    logError("Error capturing screenshots:", err);
   } finally {
     await browser.close();
     killDevServer();
-    console.log("[Screenshot Automation] All screenshots captured successfully.");
+    console.log("Done.");
     process.exit(0);
   }
 }
 
 main().catch((err) => {
-  console.error("[Screenshot Automation] Fatal error in script runner:", err);
+  logError("Fatal error in script runner:", err);
   process.exit(1);
 });
