@@ -140,9 +140,9 @@ Theming is **not static**: users can switch between several built-in themes (Lum
 
 ## Typography
 
-Single typeface throughout: **Inter** (`src/app.css:51`), falling back to system UI sans. There is no secondary display face — hierarchy comes from size and weight.
+**Inter** (`src/app.css:58`) throughout, falling back to system UI sans. The only secondary face is **Space Grotesk** (700, `font-heading` utility), reserved for the Display tier — hierarchy elsewhere comes from size and weight, not typeface.
 
-- **Display (36px / 700):** Reserved for album/artist hero titles at the top of detail views.
+- **Display (36px / 700, Space Grotesk):** Album/artist/playlist hero titles and the home page time-of-day greeting.
 - **Headline (24px–20px / 700–600):** Section headers and dialog titles.
 - **Title (18px / 600):** Card and list-group headers.
 - **Body (14px / 12px, 400):** The workhorse sizes — the large majority of UI text in Luminous is `body-sm` (12px) for metadata-dense lists (folders, tags, playlists) and `body-md` (14px) for primary row labels and buttons.
@@ -264,7 +264,7 @@ These are the logo's own identity colors for marketing/social/app-icon-at-rest u
 
 ### Wordmark
 
-"Luminous" is set in **Space Grotesk** (600–700 weight) — a geometric sans whose circular counters echo the mark. It is the only place a second typeface appears; the tagline "Music Player" and all other UI text stay in Inter. Approved lockups: icon alone, icon + wordmark (horizontal), icon + wordmark (stacked), icon + wordmark + "Music Player" tagline (larger/marketing use only). Don't rearrange these relative to each other.
+"Luminous" is set in **Space Grotesk** (600–700 weight) — a geometric sans whose circular counters echo the mark. In-app, the same face (700) carries over to the Display typography tier (detail-view hero titles, home greeting); the tagline "Music Player" and all other UI text stay in Inter. Approved lockups: icon alone, icon + wordmark (horizontal), icon + wordmark (stacked), icon + wordmark + "Music Player" tagline (larger/marketing use only). Don't rearrange these relative to each other.
 
 ### Two artifacts
 
