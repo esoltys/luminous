@@ -236,27 +236,29 @@
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main pt-2">
-        <!-- Showing Count (Left) -->
-        <div class="text-xs text-brand-text-secondary font-medium">
-          {#if collectionStore.playlistsSubTab === "auto"}
-            {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
-          {:else}
-            {sortedPlaylists.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedPlaylists.length })}
-          {/if}
-        </div>
-
-        <!-- Actions + Sort Dropdown (Right) -->
+        <!-- Actions (Left) -->
         <div class="flex items-center gap-2">
           {#if collectionStore.playlistsSubTab === "custom"}
-            <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" size="sm" title={i18n.t('playlists.newPlaylistBtn')}>
-              <Plus class="w-3.5 h-3.5" />
+            <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
+              <Plus class="w-4 h-4" />
               <span>{i18n.t('playlists.newPlaylistBtn')}</span>
             </Button>
-            <Button onclick={handleImportPlaylist} variant="secondary" size="sm" title={i18n.t('playlists.importPlaylistTooltip')}>
-              <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" />
+            <Button onclick={handleImportPlaylist} variant="secondary" title={i18n.t('playlists.importPlaylistTooltip')}>
+              <FolderInput class="w-4 h-4 text-brand-accent-text" />
               <span>{i18n.t('playlists.importPlaylistBtn')}</span>
             </Button>
           {/if}
+        </div>
+
+        <!-- Showing Count + Sort Dropdown (Right) -->
+        <div class="flex items-center gap-3">
+          <div class="text-xs text-brand-text-secondary font-medium">
+            {#if collectionStore.playlistsSubTab === "auto"}
+              {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
+            {:else}
+              {sortedPlaylists.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedPlaylists.length })}
+            {/if}
+          </div>
 
           <div class="relative">
             {#if collectionStore.playlistsSubTab === "auto"}
