@@ -424,7 +424,7 @@
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   <!-- Auto-Playlist Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
-    <div class="flex items-start justify-between gap-6 relative z-10">
+    <div class="flex items-stretch justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
@@ -505,12 +505,12 @@
             />
           {/if}
 
-          <ColumnSelector size="sm" align="left" />
+          <ColumnSelector align="left" iconOnly />
         </div>
       </div>
 
       <!-- Right: Cover Stack -->
-      <div class="relative w-40 h-40 hidden sm:block shrink-0">
+      <div class="relative self-stretch aspect-[4/3] hidden sm:block shrink-0">
         {#if topCovers.length > 0}
           <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : 'from-[#059669] to-[#34D399]'} flex items-center justify-center overflow-hidden border border-brand-border/60 relative shadow-2xl">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
