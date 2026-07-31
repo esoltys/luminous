@@ -222,6 +222,15 @@
 
   function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
+    // For genre/decade views the list is backed by a persisted dynamic
+    // playlist (`songs` mirrors `get_playlist_tracks` order) — play by
+    // index against that playlist instead of shipping the whole id array
+    // through `playSongs`, which re-queries every song one at a time and
+    // can stall the UI once auto-refill has grown the list large (#194).
+    if ((kind === "genre" || kind === "decade") && playlistId !== undefined) {
+      playerStore.playPlaylistItem(playlistId, index >= 0 ? index : 0);
+      return;
+    }
     const songIds = songs.map((s) => s.id);
     playerStore.playSongs(songIds, index >= 0 ? index : 0, playlistId, undefined, displayName);
   }
