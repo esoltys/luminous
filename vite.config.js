@@ -52,6 +52,9 @@ function safeTailwindcss() {
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  css: {
+    devSourcemap: false,
+  },
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
