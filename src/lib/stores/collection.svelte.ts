@@ -358,8 +358,12 @@ class CollectionStore {
   private miniplayerTransitionInFlight = false;
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
+  savedWindowX = $state<number | null>(null);
+  savedWindowY = $state<number | null>(null);
   miniplayerWidth = $state<number>(300);
   miniplayerHeight = $state<number>(360);
+  miniplayerX = $state<number | null>(null);
+  miniplayerY = $state<number | null>(null);
 
 
   watchFoldersRealtime = $state<boolean>(true);
@@ -394,6 +398,31 @@ class CollectionStore {
 
         const savedMiniplayerHeight = localStorage.getItem("layout_miniplayerHeight");
         if (savedMiniplayerHeight) this.miniplayerHeight = parseInt(savedMiniplayerHeight, 10);
+
+        const savedSavedWidth = localStorage.getItem("layout_savedWindowWidth");
+        if (savedSavedWidth) this.savedWindowWidth = parseInt(savedSavedWidth, 10);
+
+        const savedSavedHeight = localStorage.getItem("layout_savedWindowHeight");
+        if (savedSavedHeight) this.savedWindowHeight = parseInt(savedSavedHeight, 10);
+
+        const savedWindowXStr = localStorage.getItem("layout_savedWindowX");
+        if (savedWindowXStr !== null) this.savedWindowX = parseFloat(savedWindowXStr);
+
+        const savedWindowYStr = localStorage.getItem("layout_savedWindowY");
+        if (savedWindowYStr !== null) this.savedWindowY = parseFloat(savedWindowYStr);
+
+        const savedMiniXStr = localStorage.getItem("layout_miniplayerX");
+        if (savedMiniXStr !== null) this.miniplayerX = parseFloat(savedMiniXStr);
+
+        const savedMiniYStr = localStorage.getItem("layout_miniplayerY");
+        if (savedMiniYStr !== null) this.miniplayerY = parseFloat(savedMiniYStr);
+
+        const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
+        if (savedIsMiniplayer === "true") {
+          setTimeout(() => {
+            this.enterMiniplayerMode();
+          }, 100);
+        }
 
         const savedTab = localStorage.getItem("navigation_activeTab");
         if (savedTab) this._activeTab = savedTab as ActiveTab;
@@ -795,15 +824,67 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode(width = this.miniplayerWidth, height = this.miniplayerHeight) {
+  setSavedWindowGeometry(width: number, height: number, x?: number | null, y?: number | null) {
+    this.savedWindowWidth = width;
+    this.savedWindowHeight = height;
+    if (x !== undefined && x !== null) this.savedWindowX = x;
+    if (y !== undefined && y !== null) this.savedWindowY = y;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_savedWindowWidth", width.toString());
+      localStorage.setItem("layout_savedWindowHeight", height.toString());
+      if (this.savedWindowX !== null) localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
+      if (this.savedWindowY !== null) localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
+    }
+  }
+
+  setMiniplayerGeometry(width: number, height: number, x?: number | null, y?: number | null) {
+    this.miniplayerWidth = width;
+    this.miniplayerHeight = height;
+    if (x !== undefined && x !== null) this.miniplayerX = x;
+    if (y !== undefined && y !== null) this.miniplayerY = y;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_miniplayerWidth", width.toString());
+      localStorage.setItem("layout_miniplayerHeight", height.toString());
+      if (this.miniplayerX !== null) localStorage.setItem("layout_miniplayerX", this.miniplayerX.toString());
+      if (this.miniplayerY !== null) localStorage.setItem("layout_miniplayerY", this.miniplayerY.toString());
+    }
+  }
+
+  setMiniplayerSize(width: number, height: number) {
+    this.setMiniplayerGeometry(width, height);
+  }
+
+  async enterMiniplayerMode(
+    width = this.miniplayerWidth,
+    height = this.miniplayerHeight,
+    x = this.miniplayerX,
+    y = this.miniplayerY
+  ) {
     if (this.isMiniplayer || this.miniplayerTransitionInFlight) return;
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_isMiniplayer", "true");
+    }
     try {
-      const res = await invoke<{ saved_width: number; saved_height: number }>("enter_miniplayer_mode", { width, height });
+      const payload: { width: number; height: number; x?: number; y?: number } = { width, height };
+      if (x !== null && x !== undefined) payload.x = x;
+      if (y !== null && y !== undefined) payload.y = y;
+
+      const res = await invoke<{
+        saved_width: number;
+        saved_height: number;
+        saved_x?: number | null;
+        saved_y?: number | null;
+      }>("enter_miniplayer_mode", payload);
+
       if (res && res.saved_width && res.saved_height) {
-        this.savedWindowWidth = res.saved_width;
-        this.savedWindowHeight = res.saved_height;
+        this.setSavedWindowGeometry(
+          res.saved_width,
+          res.saved_height,
+          res.saved_x,
+          res.saved_y
+        );
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
@@ -812,31 +893,53 @@ class CollectionStore {
     }
   }
 
-  setMiniplayerSize(width: number, height: number) {
-    this.miniplayerWidth = width;
-    this.miniplayerHeight = height;
-    if (typeof window !== "undefined") {
-      localStorage.setItem("layout_miniplayerWidth", width.toString());
-      localStorage.setItem("layout_miniplayerHeight", height.toString());
-    }
-  }
-
   async exitMiniplayerMode() {
     if (!this.isMiniplayer || this.miniplayerTransitionInFlight) return;
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = false;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("layout_isMiniplayer", "false");
+    }
     try {
-      const res = await invoke<{ mini_width: number; mini_height: number }>("exit_miniplayer_mode", {
+      const payload: {
+        savedWidth: number;
+        savedHeight: number;
+        savedX?: number;
+        savedY?: number;
+      } = {
         savedWidth: this.savedWindowWidth,
-        savedHeight: this.savedWindowHeight
-      });
+        savedHeight: this.savedWindowHeight,
+      };
+      if (this.savedWindowX !== null) payload.savedX = this.savedWindowX;
+      if (this.savedWindowY !== null) payload.savedY = this.savedWindowY;
+
+      const res = await invoke<{
+        mini_width: number;
+        mini_height: number;
+        mini_x?: number | null;
+        mini_y?: number | null;
+      }>("exit_miniplayer_mode", payload);
+
       if (res && res.mini_width && res.mini_height) {
-        this.setMiniplayerSize(res.mini_width, res.mini_height);
+        this.setMiniplayerGeometry(
+          res.mini_width,
+          res.mini_height,
+          res.mini_x,
+          res.mini_y
+        );
       }
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
     } finally {
       this.miniplayerTransitionInFlight = false;
+    }
+  }
+
+  async moveWindowToPreset(position: string) {
+    try {
+      await invoke("move_window_to_preset", { position });
+    } catch (e) {
+      console.warn("Failed to move window to preset:", e);
     }
   }
 

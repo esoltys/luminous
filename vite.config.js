@@ -19,7 +19,7 @@ export default defineConfig(async () => ({
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [tailwindcss(), sveltekit(), svelteTesting(), tauriIpcMockPlugin()],
+  plugins: [sveltekit(), tailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
 
   test: {
     globals: true,

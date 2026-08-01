@@ -140,6 +140,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
@@ -696,6 +698,8 @@ pub fn run() {
             // Window & Miniplayer commands
             commands::window::enter_miniplayer_mode,
             commands::window::exit_miniplayer_mode,
+            commands::window::move_window_to_preset,
+            commands::window::get_window_geometry,
             commands::window::start_window_drag,
             commands::window::start_window_resize,
         ])
