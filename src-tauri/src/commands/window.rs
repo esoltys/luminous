@@ -44,6 +44,8 @@ pub async fn enter_miniplayer_mode(
             x: target_x,
             y: target_y,
         }));
+    } else {
+        let _ = window.move_window(Position::TopRight);
     }
 
     Ok(serde_json::json!({
@@ -95,6 +97,8 @@ pub async fn exit_miniplayer_mode(
             x: rx,
             y: ry,
         }));
+    } else {
+        let _ = window.move_window(Position::Center);
     }
 
     Ok(serde_json::json!({
