@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { i18n } from "./i18n.svelte";
 import type {
@@ -351,11 +352,16 @@ class CollectionStore {
   immersiveMode = $state<boolean>(false);
   isMiniplayer = $state<boolean>(false);
   // Guards enter/exitMiniplayerMode against overlapping calls: isMiniplayer
-  // flips synchronously, but the window resize/decoration IPC round-trip it
-  // guards is async, so a second toggle fired before that round-trip
-  // resolves would read the window mid-transition and set a wrong "current
-  // size" baseline — compounding into runaway growth on rapid toggling.
+  // flips synchronously, but the window resize/decoration IPC call it
+  // guards is async, so a second toggle fired before that call resolves
+  // could apply a stale target size on top of an in-progress one.
   private miniplayerTransitionInFlight = false;
+  // Debounce for the settled-geometry capture below: only commit a size/
+  // position once resize/move events stop firing for this long, so a mode
+  // toggle's own programmatic resize/reposition never gets captured as "the
+  // user changed it" for the wrong mode.
+  private static readonly GEOMETRY_CAPTURE_DEBOUNCE_MS = 400;
+  private geometryCaptureTimer: ReturnType<typeof setTimeout> | null = null;
   savedWindowWidth = $state<number>(1280);
   savedWindowHeight = $state<number>(800);
   savedWindowX = $state<number | null>(null);
@@ -393,17 +399,11 @@ class CollectionStore {
         const savedImmersive = localStorage.getItem("layout_immersiveMode");
         if (savedImmersive !== null) this.immersiveMode = savedImmersive === "true";
 
-        const savedMiniplayerWidth = localStorage.getItem("layout_miniplayerWidth");
-        if (savedMiniplayerWidth) this.miniplayerWidth = parseInt(savedMiniplayerWidth, 10);
+        const savedWindowWidthStr = localStorage.getItem("layout_savedWindowWidth");
+        if (savedWindowWidthStr) this.savedWindowWidth = parseInt(savedWindowWidthStr, 10);
 
-        const savedMiniplayerHeight = localStorage.getItem("layout_miniplayerHeight");
-        if (savedMiniplayerHeight) this.miniplayerHeight = parseInt(savedMiniplayerHeight, 10);
-
-        const savedSavedWidth = localStorage.getItem("layout_savedWindowWidth");
-        if (savedSavedWidth) this.savedWindowWidth = parseInt(savedSavedWidth, 10);
-
-        const savedSavedHeight = localStorage.getItem("layout_savedWindowHeight");
-        if (savedSavedHeight) this.savedWindowHeight = parseInt(savedSavedHeight, 10);
+        const savedWindowHeightStr = localStorage.getItem("layout_savedWindowHeight");
+        if (savedWindowHeightStr) this.savedWindowHeight = parseInt(savedWindowHeightStr, 10);
 
         const savedWindowXStr = localStorage.getItem("layout_savedWindowX");
         if (savedWindowXStr !== null) this.savedWindowX = parseFloat(savedWindowXStr);
@@ -411,11 +411,23 @@ class CollectionStore {
         const savedWindowYStr = localStorage.getItem("layout_savedWindowY");
         if (savedWindowYStr !== null) this.savedWindowY = parseFloat(savedWindowYStr);
 
+        const savedMiniWidthStr = localStorage.getItem("layout_miniplayerWidth");
+        if (savedMiniWidthStr) this.miniplayerWidth = parseInt(savedMiniWidthStr, 10);
+
+        const savedMiniHeightStr = localStorage.getItem("layout_miniplayerHeight");
+        if (savedMiniHeightStr) this.miniplayerHeight = parseInt(savedMiniHeightStr, 10);
+
         const savedMiniXStr = localStorage.getItem("layout_miniplayerX");
         if (savedMiniXStr !== null) this.miniplayerX = parseFloat(savedMiniXStr);
 
         const savedMiniYStr = localStorage.getItem("layout_miniplayerY");
         if (savedMiniYStr !== null) this.miniplayerY = parseFloat(savedMiniYStr);
+
+        // Listeners are attached unconditionally — cheap either way, and the
+        // gate that actually matters is whether captured values get sent to
+        // the backend at all (see enter/exitMiniplayerMode, which check
+        // isGeometryCaptureSupported() fresh on each toggle).
+        this.initWindowGeometryTracking();
 
         const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
         if (savedIsMiniplayer === "true") {
@@ -825,41 +837,47 @@ class CollectionStore {
   }
 
   setSavedWindowGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.savedWindowWidth = width;
-    this.savedWindowHeight = height;
-    if (x !== undefined && x !== null) this.savedWindowX = x;
-    if (y !== undefined && y !== null) this.savedWindowY = y;
+    this.savedWindowWidth = Math.max(900, Math.round(width));
+    this.savedWindowHeight = Math.max(600, Math.round(height));
+    if (x !== undefined && x !== null) this.savedWindowX = Math.round(x);
+    if (y !== undefined && y !== null) this.savedWindowY = Math.round(y);
     if (typeof window !== "undefined") {
-      localStorage.setItem("layout_savedWindowWidth", width.toString());
-      localStorage.setItem("layout_savedWindowHeight", height.toString());
+      localStorage.setItem("layout_savedWindowWidth", this.savedWindowWidth.toString());
+      localStorage.setItem("layout_savedWindowHeight", this.savedWindowHeight.toString());
       if (this.savedWindowX !== null) localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
       if (this.savedWindowY !== null) localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
     }
   }
 
   setMiniplayerGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.miniplayerWidth = width;
-    this.miniplayerHeight = height;
-    if (x !== undefined && x !== null) this.miniplayerX = x;
-    if (y !== undefined && y !== null) this.miniplayerY = y;
+    this.miniplayerWidth = Math.max(300, Math.round(width));
+    this.miniplayerHeight = Math.max(360, Math.round(height));
+    if (x !== undefined && x !== null) this.miniplayerX = Math.round(x);
+    if (y !== undefined && y !== null) this.miniplayerY = Math.round(y);
     if (typeof window !== "undefined") {
-      localStorage.setItem("layout_miniplayerWidth", width.toString());
-      localStorage.setItem("layout_miniplayerHeight", height.toString());
+      localStorage.setItem("layout_miniplayerWidth", this.miniplayerWidth.toString());
+      localStorage.setItem("layout_miniplayerHeight", this.miniplayerHeight.toString());
       if (this.miniplayerX !== null) localStorage.setItem("layout_miniplayerX", this.miniplayerX.toString());
       if (this.miniplayerY !== null) localStorage.setItem("layout_miniplayerY", this.miniplayerY.toString());
     }
   }
 
-  setMiniplayerSize(width: number, height: number) {
-    this.setMiniplayerGeometry(width, height);
+  // Whether reading a window's geometry back is reliable on this platform —
+  // false only under Linux/Wayland, where the compositor never reports a
+  // window's absolute screen position to the client at all (confirmed via
+  // tao's GTK backend; the official tauri-plugin-window-state hits the same
+  // wall). Checked fresh via the backend each time rather than cached, since
+  // it's a cheap, synchronous, session-constant fact on the Rust side.
+  private async isGeometryCaptureSupported(): Promise<boolean> {
+    try {
+      return await invoke<boolean>("geometry_capture_supported");
+    } catch (e) {
+      console.warn("Failed to check geometry_capture_supported, assuming unsupported:", e);
+      return false;
+    }
   }
 
-  async enterMiniplayerMode(
-    width = this.miniplayerWidth,
-    height = this.miniplayerHeight,
-    x = this.miniplayerX,
-    y = this.miniplayerY
-  ) {
+  async enterMiniplayerMode() {
     if (this.isMiniplayer || this.miniplayerTransitionInFlight) return;
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
@@ -867,25 +885,19 @@ class CollectionStore {
       localStorage.setItem("layout_isMiniplayer", "true");
     }
     try {
-      const payload: { width: number; height: number; x?: number; y?: number } = { width, height };
-      if (x !== null && x !== undefined) payload.x = x;
-      if (y !== null && y !== undefined) payload.y = y;
-
-      const res = await invoke<{
-        saved_width: number;
-        saved_height: number;
-        saved_x?: number | null;
-        saved_y?: number | null;
-      }>("enter_miniplayer_mode", payload);
-
-      if (res && res.saved_width && res.saved_height) {
-        this.setSavedWindowGeometry(
-          res.saved_width,
-          res.saved_height,
-          res.saved_x,
-          res.saved_y
-        );
+      // Remembered width/height/x/y are only trustworthy where geometry
+      // capture is supported — elsewhere (Linux/Wayland) the backend falls
+      // back to its fixed default when these are omitted, since a
+      // remembered value there could never have been captured correctly in
+      // the first place.
+      const payload: { width?: number; height?: number; x?: number; y?: number } = {};
+      if (await this.isGeometryCaptureSupported()) {
+        payload.width = this.miniplayerWidth;
+        payload.height = this.miniplayerHeight;
+        if (this.miniplayerX !== null) payload.x = this.miniplayerX;
+        if (this.miniplayerY !== null) payload.y = this.miniplayerY;
       }
+      await invoke("enter_miniplayer_mode", payload);
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
     } finally {
@@ -901,37 +913,62 @@ class CollectionStore {
       localStorage.setItem("layout_isMiniplayer", "false");
     }
     try {
-      const payload: {
-        savedWidth: number;
-        savedHeight: number;
-        savedX?: number;
-        savedY?: number;
-      } = {
-        savedWidth: this.savedWindowWidth,
-        savedHeight: this.savedWindowHeight,
-      };
-      if (this.savedWindowX !== null) payload.savedX = this.savedWindowX;
-      if (this.savedWindowY !== null) payload.savedY = this.savedWindowY;
-
-      const res = await invoke<{
-        mini_width: number;
-        mini_height: number;
-        mini_x?: number | null;
-        mini_y?: number | null;
-      }>("exit_miniplayer_mode", payload);
-
-      if (res && res.mini_width && res.mini_height) {
-        this.setMiniplayerGeometry(
-          res.mini_width,
-          res.mini_height,
-          res.mini_x,
-          res.mini_y
-        );
+      const payload: { width?: number; height?: number; x?: number; y?: number } = {};
+      if (await this.isGeometryCaptureSupported()) {
+        payload.width = this.savedWindowWidth;
+        payload.height = this.savedWindowHeight;
+        if (this.savedWindowX !== null) payload.x = this.savedWindowX;
+        if (this.savedWindowY !== null) payload.y = this.savedWindowY;
       }
+      await invoke("exit_miniplayer_mode", payload);
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
     } finally {
       this.miniplayerTransitionInFlight = false;
+    }
+  }
+
+  // Captures the window's real OS-reported geometry into whichever mode is
+  // currently active (full player vs. miniplayer), but only from settled
+  // `resized`/`moved` events — never from a synchronous read taken around a
+  // mode-switch command, since that's unreliable immediately after
+  // `set_decorations()` (see window.rs). Only wired up when
+  // isGeometryCaptureSupported() resolves true (see init()). Debouncing
+  // until events stop, and skipping while a toggle is in flight, ensures
+  // only a genuine user
+  // resize/move (native title-bar drag/resize on the full player, or the
+  // drag/edge handles on the miniplayer) gets persisted.
+  private initWindowGeometryTracking() {
+    if (typeof window === "undefined") return;
+    const scheduleCapture = () => {
+      if (this.geometryCaptureTimer) clearTimeout(this.geometryCaptureTimer);
+      this.geometryCaptureTimer = setTimeout(() => {
+        void this.captureCurrentWindowGeometry();
+      }, CollectionStore.GEOMETRY_CAPTURE_DEBOUNCE_MS);
+    };
+    try {
+      const win = getCurrentWindow();
+      void win.onResized(scheduleCapture);
+      void win.onMoved(scheduleCapture);
+    } catch (e) {
+      console.warn("Failed to attach window geometry listeners:", e);
+    }
+  }
+
+  private async captureCurrentWindowGeometry() {
+    if (this.miniplayerTransitionInFlight) return;
+    try {
+      const geo = await invoke<{ width: number; height: number; x: number | null; y: number | null }>(
+        "get_window_geometry"
+      );
+      if (!geo) return;
+      if (this.isMiniplayer) {
+        this.setMiniplayerGeometry(geo.width, geo.height, geo.x, geo.y);
+      } else {
+        this.setSavedWindowGeometry(geo.width, geo.height, geo.x, geo.y);
+      }
+    } catch (e) {
+      console.warn("Failed to capture window geometry:", e);
     }
   }
 

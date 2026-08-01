@@ -30,7 +30,6 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-positioner": "^2.3.3",
-    "@tauri-apps/plugin-window-state": "^2.4.1",
     "lucide-svelte": "^1.0.1",
     "luminous": ".",
     "svelte-virtual-list-ts": "^0.0.3",

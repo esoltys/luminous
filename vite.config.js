@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -14,12 +15,50 @@ try {
   commitHash = "";
 }
 
+/** @type {any} */
+function safeTailwindcss() {
+  const plugins = tailwindcss();
+  const pluginArray = Array.isArray(plugins) ? plugins : [plugins];
+  return pluginArray.map((plugin) => {
+    if (!plugin || !plugin.transform) return plugin;
+    const rawTransform = plugin.transform;
+    const transformFn =
+      typeof rawTransform === "function" ? rawTransform : rawTransform.handler;
+    if (typeof transformFn !== "function") return plugin;
+
+    const wrappedTransform = async function (code, id, options) {
+      if (id.includes("?svelte&type=style") || id.includes("&type=style")) {
+        return null;
+      }
+      return transformFn.call(this, code, id, options);
+    };
+
+    if (typeof rawTransform === "object") {
+      return {
+        ...plugin,
+        transform: {
+          ...rawTransform,
+          handler: wrappedTransform,
+        },
+      };
+    }
+
+    return {
+      ...plugin,
+      transform: wrappedTransform,
+    };
+  });
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  css: {
+    devSourcemap: false,
+  },
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [sveltekit(), tailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
+  plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
 
   test: {
     globals: true,
@@ -37,6 +76,9 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
+    fs: {
+      allow: ["..", "../.."],
+    },
     hmr: host
       ? {
           protocol: "ws",

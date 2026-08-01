@@ -3,6 +3,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
+const windowGeometryCallbacks = vi.hoisted(() => [] as Array<() => void>);
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: vi.fn(() => ({
+    onResized: vi.fn((cb: () => void) => {
+      windowGeometryCallbacks.push(cb);
+      return Promise.resolve(() => {});
+    }),
+    onMoved: vi.fn((cb: () => void) => {
+      windowGeometryCallbacks.push(cb);
+      return Promise.resolve(() => {});
+    }),
+  })),
+}));
+
 import { collectionStore } from "./collection.svelte";
 
 describe("CollectionStore", () => {
@@ -11,6 +26,10 @@ describe("CollectionStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     eventCallbacks = {};
+    // windowGeometryCallbacks is populated once, when the collectionStore
+    // singleton's constructor calls initWindowGeometryTracking() at module
+    // import time — it must not be cleared per-test, there's no later call
+    // that would repopulate it.
 
     vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
       eventCallbacks[event] = callback;
@@ -19,6 +38,8 @@ describe("CollectionStore", () => {
 
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       switch (cmd) {
+        case "geometry_capture_supported":
+          return true;
         case "get_directories":
           return [{ id: 1, path: "/music/rock", created_at: "2026-01-01" }];
         case "get_library_stats":
@@ -247,69 +268,101 @@ describe("CollectionStore", () => {
     expect(collectionStore.immersiveMode).toBe(false);
   });
 
-  it("captures the miniplayer's actual resized size on exit and reuses it on next enter", async () => {
-    // Simulates a resize done via the native OS resize handle, which the
-    // frontend can't observe through pointer events — exit_miniplayer_mode
-    // reports the real window size instead.
+  it("sends remembered size/position as the toggle target when geometry capture is supported, ignoring any command return value", async () => {
+    collectionStore.setMiniplayerGeometry(310, 370, 20, 30);
+    collectionStore.setSavedWindowGeometry(1400, 900, 50, 60);
+
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "enter_miniplayer_mode") return { saved_width: 1280, saved_height: 800 };
-      if (cmd === "exit_miniplayer_mode") return { mini_width: 500, mini_height: 540 };
-      return null;
+      if (cmd === "geometry_capture_supported") return true;
+      return { width: 9999, height: 9999 };
     });
 
     await collectionStore.enterMiniplayerMode();
+    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", { width: 310, height: 370, x: 20, y: 30 });
     expect(collectionStore.isMiniplayer).toBe(true);
+    expect(collectionStore.miniplayerWidth).toBe(310);
 
     await collectionStore.exitMiniplayerMode();
+    expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", { width: 1400, height: 900, x: 50, y: 60 });
     expect(collectionStore.isMiniplayer).toBe(false);
-    expect(collectionStore.miniplayerWidth).toBe(500);
-    expect(collectionStore.miniplayerHeight).toBe(540);
-    expect(localStorage.getItem("layout_miniplayerWidth")).toBe("500");
-    expect(localStorage.getItem("layout_miniplayerHeight")).toBe("540");
-
-    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
-      if (cmd === "enter_miniplayer_mode") {
-        expect(args.width).toBe(500);
-        expect(args.height).toBe(540);
-        return { saved_width: 1280, saved_height: 800 };
-      }
-      return null;
-    });
-
-    await collectionStore.enterMiniplayerMode();
-    expect(collectionStore.isMiniplayer).toBe(true);
-
-    await collectionStore.exitMiniplayerMode();
+    expect(collectionStore.savedWindowWidth).toBe(1400);
   });
 
-  it("saves and restores window coordinates and mode accurately", async () => {
+  it("sends no geometry at all when geometry capture is unsupported, letting the backend use its fixed defaults", async () => {
+    collectionStore.setMiniplayerGeometry(310, 370, 20, 30);
+
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "enter_miniplayer_mode") {
-        return { saved_width: 1400, saved_height: 900, saved_x: 100, saved_y: 150 };
-      }
-      if (cmd === "exit_miniplayer_mode") {
-        return { mini_width: 320, mini_height: 380, mini_x: 500, mini_y: 550 };
-      }
+      if (cmd === "geometry_capture_supported") return false;
       return null;
     });
 
     await collectionStore.enterMiniplayerMode();
+    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", {});
     expect(collectionStore.isMiniplayer).toBe(true);
-    expect(collectionStore.savedWindowWidth).toBe(1400);
-    expect(collectionStore.savedWindowHeight).toBe(900);
-    expect(collectionStore.savedWindowX).toBe(100);
-    expect(collectionStore.savedWindowY).toBe(150);
 
     await collectionStore.exitMiniplayerMode();
+    expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", {});
     expect(collectionStore.isMiniplayer).toBe(false);
-    expect(collectionStore.miniplayerWidth).toBe(320);
-    expect(collectionStore.miniplayerHeight).toBe(380);
-    expect(collectionStore.miniplayerX).toBe(500);
-    expect(collectionStore.miniplayerY).toBe(550);
+  });
 
-    expect(localStorage.getItem("layout_isMiniplayer")).toBe("false");
-    expect(localStorage.getItem("layout_miniplayerX")).toBe("500");
-    expect(localStorage.getItem("layout_miniplayerY")).toBe("550");
+  it("captures a settled resize/move into the full player's geometry", async () => {
+    vi.useFakeTimers();
+    try {
+      expect(collectionStore.isMiniplayer).toBe(false);
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "get_window_geometry") return { width: 1500, height: 950, x: 10, y: 20 };
+        return null;
+      });
+
+      windowGeometryCallbacks.forEach((cb) => cb());
+      await vi.advanceTimersByTimeAsync(400);
+
+      expect(collectionStore.savedWindowWidth).toBe(1500);
+      expect(collectionStore.savedWindowHeight).toBe(950);
+      expect(collectionStore.savedWindowX).toBe(10);
+      expect(collectionStore.savedWindowY).toBe(20);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("skips geometry capture while a mode toggle is in flight, then captures once settled", async () => {
+    // Regression guard for the growth/shrink-per-toggle bug: a resize/move
+    // event firing mid-transition (which includes the toggle's own
+    // programmatic resize/reposition) must not be captured as genuine.
+    vi.useFakeTimers();
+    try {
+      let resolveEnter: (value: unknown) => void = () => {};
+      const pendingEnter = new Promise((resolve) => {
+        resolveEnter = resolve;
+      });
+
+      vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+        if (cmd === "geometry_capture_supported") return true;
+        if (cmd === "enter_miniplayer_mode") return pendingEnter;
+        if (cmd === "get_window_geometry") return { width: 1500, height: 950, x: null, y: null };
+        return null;
+      });
+
+      collectionStore.setMiniplayerGeometry(300, 360);
+      const enterPromise = collectionStore.enterMiniplayerMode();
+
+      windowGeometryCallbacks.forEach((cb) => cb());
+      await vi.advanceTimersByTimeAsync(400);
+      expect(collectionStore.miniplayerWidth).toBe(300);
+
+      resolveEnter(undefined);
+      await enterPromise;
+
+      windowGeometryCallbacks.forEach((cb) => cb());
+      await vi.advanceTimersByTimeAsync(400);
+      expect(collectionStore.miniplayerWidth).toBe(1500);
+
+      await collectionStore.exitMiniplayerMode();
+      expect(collectionStore.isMiniplayer).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("blocks exitMiniplayerMode while a prior enterMiniplayerMode call is still in flight", async () => {
@@ -327,7 +380,7 @@ describe("CollectionStore", () => {
       if (cmd === "enter_miniplayer_mode") return pendingEnter;
       if (cmd === "exit_miniplayer_mode") {
         exitCallCount++;
-        return { mini_width: 300, mini_height: 360 };
+        return null;
       }
       return null;
     });
@@ -339,7 +392,7 @@ describe("CollectionStore", () => {
     expect(exitCallCount).toBe(0);
     expect(collectionStore.isMiniplayer).toBe(true);
 
-    resolveEnter({ saved_width: 1280, saved_height: 800 });
+    resolveEnter(undefined);
     await enterCall;
 
     await collectionStore.exitMiniplayerMode();
