@@ -141,11 +141,36 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+            }
+
+            // A file association (or `luminous <file>` invocation) launched a
+            // second instance; forward the opened paths to the running app.
+            let opened_paths: Vec<String> = args
+                .iter()
+                .skip(1)
+                .filter(|arg| {
+                    let path = std::path::Path::new(arg);
+                    if !path.is_file() {
+                        return false;
+                    }
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
+                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
+                })
+                .cloned()
+                .collect();
+
+            if !opened_paths.is_empty() {
+                let _ = app.emit("open-file-request", opened_paths);
             }
         }))
         .setup(|app| {
@@ -420,7 +445,9 @@ pub fn run() {
                         .and_then(|e| e.to_str())
                         .unwrap_or("")
                         .to_ascii_lowercase();
-                    if ext == "m3u" || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str()) {
+                    if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
+                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
+                    {
                         Some(p.clone())
                     } else {
                         None
