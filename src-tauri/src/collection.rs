@@ -1505,10 +1505,14 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         song.initial_key = tag.get_string(&ItemKey::InitialKey).map(|s| s.to_string());
         // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
         // store it as freeform text — check both generic keys to cover either.
+        // Some taggers write "0" as an "unknown tempo" sentinel rather than
+        // omitting the tag — treat that the same as absent, since 0 is never a
+        // real tempo.
         song.bpm = tag
             .get_string(&ItemKey::IntegerBpm)
             .or_else(|| tag.get_string(&ItemKey::Bpm))
-            .and_then(|s| s.trim().parse::<f32>().ok());
+            .and_then(|s| s.trim().parse::<f32>().ok())
+            .filter(|&b| b > 0.0);
 
         // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
         song.replaygain_track_gain = tag
