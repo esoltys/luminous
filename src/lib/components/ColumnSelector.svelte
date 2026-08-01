@@ -116,7 +116,7 @@
         : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
     title={i18n.t("collection.columnsBtn")}
   >
-    <Columns class="{iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'}" />
+    <Columns class={iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
     {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
   </button>
 
