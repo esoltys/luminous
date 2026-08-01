@@ -20,27 +20,32 @@ function safeTailwindcss() {
   const plugins = tailwindcss();
   const pluginArray = Array.isArray(plugins) ? plugins : [plugins];
   return pluginArray.map((plugin) => {
-    if (!plugin.transform) return plugin;
-    const origTransform = plugin.transform;
+    if (!plugin || !plugin.transform) return plugin;
+    const rawTransform = plugin.transform;
+    const transformFn =
+      typeof rawTransform === "function" ? rawTransform : rawTransform.handler;
+    if (typeof transformFn !== "function") return plugin;
+
+    const wrappedTransform = async function (code, id, options) {
+      if (id.includes("?svelte&type=style") || id.includes("&type=style")) {
+        return null;
+      }
+      return transformFn.call(this, code, id, options);
+    };
+
+    if (typeof rawTransform === "object") {
+      return {
+        ...plugin,
+        transform: {
+          ...rawTransform,
+          handler: wrappedTransform,
+        },
+      };
+    }
+
     return {
       ...plugin,
-      /**
-       * @param {string} code
-       * @param {string} id
-       * @param {any} [options]
-       */
-      async transform(code, id, options) {
-        if (id.includes('?svelte&type=style') || id.includes('&type=style')) {
-          return null;
-        }
-        if (typeof origTransform === 'function') {
-          return origTransform.call(this, code, id, options);
-        }
-        if (origTransform && typeof origTransform.handler === 'function') {
-          return origTransform.handler.call(this, code, id, options);
-        }
-        return null;
-      },
+      transform: wrappedTransform,
     };
   });
 }
