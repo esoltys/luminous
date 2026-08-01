@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -14,12 +15,42 @@ try {
   commitHash = "";
 }
 
+/** @type {any} */
+function safeTailwindcss() {
+  const plugins = tailwindcss();
+  const pluginArray = Array.isArray(plugins) ? plugins : [plugins];
+  return pluginArray.map((plugin) => {
+    if (!plugin.transform) return plugin;
+    const origTransform = plugin.transform;
+    return {
+      ...plugin,
+      /**
+       * @param {string} code
+       * @param {string} id
+       * @param {any} [options]
+       */
+      async transform(code, id, options) {
+        if (id.includes('?svelte&type=style') || id.includes('&type=style')) {
+          return null;
+        }
+        if (typeof origTransform === 'function') {
+          return origTransform.call(this, code, id, options);
+        }
+        if (origTransform && typeof origTransform.handler === 'function') {
+          return origTransform.handler.call(this, code, id, options);
+        }
+        return null;
+      },
+    };
+  });
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [sveltekit(), tailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
+  plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
 
   test: {
     globals: true,
