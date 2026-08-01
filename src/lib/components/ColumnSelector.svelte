@@ -110,13 +110,13 @@
   <button
     bind:this={buttonEl}
     onclick={toggleMenu}
-    class="flex items-center justify-center gap-1.5 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
+    class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
       {iconOnly
         ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
-        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px]' : 'px-3 py-1.5 text-xs')}"
+        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
     title={i18n.t("collection.columnsBtn")}
   >
-    <Columns class="w-3.5 h-3.5" />
+    <Columns class="{iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'}" />
     {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
   </button>
 
