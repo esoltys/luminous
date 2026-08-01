@@ -825,8 +825,14 @@ class CollectionStore {
   }
 
   setSavedWindowGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.savedWindowWidth = Math.round(width);
-    this.savedWindowHeight = Math.round(height);
+    const clampedW = Math.max(900, Math.round(width));
+    let clampedH = Math.max(600, Math.round(height));
+    // Filter GTK decoration inflation (+20px to +50px on every toggle) if full player was not manually resized
+    if (this.savedWindowHeight > 0 && clampedH > this.savedWindowHeight && clampedH - this.savedWindowHeight <= 50) {
+      clampedH = this.savedWindowHeight;
+    }
+    this.savedWindowWidth = clampedW;
+    this.savedWindowHeight = clampedH;
     if (x !== undefined && x !== null) this.savedWindowX = Math.round(x);
     if (y !== undefined && y !== null) this.savedWindowY = Math.round(y);
     console.log(`[CollectionStore] Saved Full Player Geometry: ${this.savedWindowWidth}x${this.savedWindowHeight} at (${this.savedWindowX}, ${this.savedWindowY})`);
@@ -839,8 +845,10 @@ class CollectionStore {
   }
 
   setMiniplayerGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.miniplayerWidth = Math.round(width);
-    this.miniplayerHeight = Math.round(height);
+    const clampedW = Math.max(300, Math.round(width));
+    const clampedH = Math.max(360, Math.round(height));
+    this.miniplayerWidth = clampedW;
+    this.miniplayerHeight = clampedH;
     if (x !== undefined && x !== null) this.miniplayerX = Math.round(x);
     if (y !== undefined && y !== null) this.miniplayerY = Math.round(y);
     console.log(`[CollectionStore] Saved Miniplayer Geometry: ${this.miniplayerWidth}x${this.miniplayerHeight} at (${this.miniplayerX}, ${this.miniplayerY})`);
