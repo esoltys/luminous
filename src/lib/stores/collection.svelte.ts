@@ -882,12 +882,10 @@ class CollectionStore {
       }>("enter_miniplayer_mode", payload);
 
       console.log(`[CollectionStore] enter_miniplayer_mode returned:`, res);
-      if (res) {
-        const targetW = this.savedWindowWidth > 0 ? this.savedWindowWidth : res.saved_width;
-        const targetH = this.savedWindowHeight > 0 ? this.savedWindowHeight : res.saved_height;
+      if (res && res.saved_width && res.saved_height) {
         this.setSavedWindowGeometry(
-          targetW,
-          targetH,
+          res.saved_width,
+          res.saved_height,
           res.saved_x,
           res.saved_y
         );

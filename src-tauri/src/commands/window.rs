@@ -13,14 +13,9 @@ pub async fn enter_miniplayer_mode(
     y: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let current_pos = window.outer_position().ok();
 
-    // Toggle decorations off FIRST so inner_size() measures the exact un-decorated canvas
-    // preventing GTK decoration/shadow margin inflation on Linux
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_decorations(false);
-
-    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let logical_width = (current_size.width as f64 / scale_factor).round();
     let logical_height = (current_size.height as f64 / scale_factor).round();
     let (saved_x, saved_y) = match current_pos {
@@ -40,6 +35,8 @@ pub async fn enter_miniplayer_mode(
     );
     let _ = std::io::stdout().flush();
 
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_decorations(false);
     let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
         width: 200.0,
         height: 200.0,
@@ -97,17 +94,16 @@ pub async fn exit_miniplayer_mode(
     );
     let _ = std::io::stdout().flush();
 
-    // Resize while un-decorated FIRST, then restore decorations
-    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-        width: restore_w,
-        height: restore_h,
-    }));
     let _ = window.set_decorations(true);
     let _ = window.set_always_on_top(false);
     let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
         width: 900.0,
         height: 600.0,
     })));
+    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: restore_w,
+        height: restore_h,
+    }));
 
     if let (Some(rx), Some(ry)) = (saved_x, saved_y) {
         let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
