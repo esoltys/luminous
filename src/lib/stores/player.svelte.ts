@@ -132,6 +132,13 @@ export class PlayerStore {
         }
       });
 
+      // A file association (or `luminous <file>`) launched a second instance
+      // while this one was already running; the backend forwards the paths
+      // here instead of spawning a separate window.
+      await listen<string[]>("open-file-request", (event) => {
+        this.openAndPlay(event.payload);
+      });
+
       // Check for startup file argument
       const startupFile = await invoke<string | null>("get_startup_file");
       if (startupFile) {
@@ -253,7 +260,7 @@ export class PlayerStore {
         filters: [
           {
             name: "Supported Files",
-            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u"]
+            extensions: ["mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav", "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b", "m3u", "m3u8", "pls", "xspf"]
           },
           {
             name: "Audio Files",
@@ -261,7 +268,7 @@ export class PlayerStore {
           },
           {
             name: "Playlists",
-            extensions: ["m3u"]
+            extensions: ["m3u", "m3u8", "pls", "xspf"]
           }
         ]
       });

@@ -36,6 +36,23 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "mp3", "flac", "ogg", "opus", "m4a", "aac", "alac", "wav",
+          "aiff", "aif", "wv", "mpc", "ape", "tta", "dsf", "dff", "asf", "wma", "m4b"
+        ],
+        "name": "Audio File",
+        "description": "Music file supported by Luminous",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["m3u", "m3u8", "pls", "xspf"],
+        "name": "Playlist File",
+        "description": "Playlist supported by Luminous",
+        "role": "Viewer"
+      }
     ]
   },
   "plugins": {

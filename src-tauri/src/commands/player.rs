@@ -225,25 +225,14 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
         }
 
         if path.is_file() {
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_ascii_lowercase();
-
-            if ext == "m3u" {
-                // Parse M3U playlist file
-                let content = std::fs::read_to_string(path)
-                    .map_err(|e| format!("Failed to read M3U file '{}': {}", path_str, e))?;
+            if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some() {
+                // Parse M3U/M3U8/PLS/XSPF playlist file
+                let parsed = crate::playlist_parsers::parse_playlist(path)
+                    .map_err(|e| format!("Failed to read playlist file '{}': {}", path_str, e))?;
                 let parent_dir = path.parent();
 
-                for line in content.lines() {
-                    let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') {
-                        continue;
-                    }
-
-                    let mut item_path = std::path::PathBuf::from(line);
+                for track in parsed.tracks {
+                    let mut item_path = std::path::PathBuf::from(&track.path_or_url);
                     if item_path.is_relative() {
                         if let Some(parent) = parent_dir {
                             item_path = parent.join(item_path);
