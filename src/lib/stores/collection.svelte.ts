@@ -825,26 +825,28 @@ class CollectionStore {
   }
 
   setSavedWindowGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.savedWindowWidth = width;
-    this.savedWindowHeight = height;
-    if (x !== undefined && x !== null) this.savedWindowX = x;
-    if (y !== undefined && y !== null) this.savedWindowY = y;
+    this.savedWindowWidth = Math.round(width);
+    this.savedWindowHeight = Math.round(height);
+    if (x !== undefined && x !== null) this.savedWindowX = Math.round(x);
+    if (y !== undefined && y !== null) this.savedWindowY = Math.round(y);
+    console.log(`[CollectionStore] Saved Full Player Geometry: ${this.savedWindowWidth}x${this.savedWindowHeight} at (${this.savedWindowX}, ${this.savedWindowY})`);
     if (typeof window !== "undefined") {
-      localStorage.setItem("layout_savedWindowWidth", width.toString());
-      localStorage.setItem("layout_savedWindowHeight", height.toString());
+      localStorage.setItem("layout_savedWindowWidth", this.savedWindowWidth.toString());
+      localStorage.setItem("layout_savedWindowHeight", this.savedWindowHeight.toString());
       if (this.savedWindowX !== null) localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
       if (this.savedWindowY !== null) localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
     }
   }
 
   setMiniplayerGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    this.miniplayerWidth = width;
-    this.miniplayerHeight = height;
-    if (x !== undefined && x !== null) this.miniplayerX = x;
-    if (y !== undefined && y !== null) this.miniplayerY = y;
+    this.miniplayerWidth = Math.round(width);
+    this.miniplayerHeight = Math.round(height);
+    if (x !== undefined && x !== null) this.miniplayerX = Math.round(x);
+    if (y !== undefined && y !== null) this.miniplayerY = Math.round(y);
+    console.log(`[CollectionStore] Saved Miniplayer Geometry: ${this.miniplayerWidth}x${this.miniplayerHeight} at (${this.miniplayerX}, ${this.miniplayerY})`);
     if (typeof window !== "undefined") {
-      localStorage.setItem("layout_miniplayerWidth", width.toString());
-      localStorage.setItem("layout_miniplayerHeight", height.toString());
+      localStorage.setItem("layout_miniplayerWidth", this.miniplayerWidth.toString());
+      localStorage.setItem("layout_miniplayerHeight", this.miniplayerHeight.toString());
       if (this.miniplayerX !== null) localStorage.setItem("layout_miniplayerX", this.miniplayerX.toString());
       if (this.miniplayerY !== null) localStorage.setItem("layout_miniplayerY", this.miniplayerY.toString());
     }
@@ -866,6 +868,7 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_isMiniplayer", "true");
     }
+    console.log(`[CollectionStore] Entering Miniplayer Mode target: ${width}x${height} at (${x}, ${y})`);
     try {
       const payload: { width: number; height: number; x?: number; y?: number } = { width, height };
       if (x !== null && x !== undefined) payload.x = x;
@@ -878,6 +881,7 @@ class CollectionStore {
         saved_y?: number | null;
       }>("enter_miniplayer_mode", payload);
 
+      console.log(`[CollectionStore] enter_miniplayer_mode returned:`, res);
       if (res && res.saved_width && res.saved_height) {
         this.setSavedWindowGeometry(
           res.saved_width,
@@ -900,6 +904,7 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_isMiniplayer", "false");
     }
+    console.log(`[CollectionStore] Exiting Miniplayer Mode, restoring Full Player: ${this.savedWindowWidth}x${this.savedWindowHeight} at (${this.savedWindowX}, ${this.savedWindowY})`);
     try {
       const payload: {
         savedWidth: number;
@@ -920,6 +925,7 @@ class CollectionStore {
         mini_y?: number | null;
       }>("exit_miniplayer_mode", payload);
 
+      console.log(`[CollectionStore] exit_miniplayer_mode returned:`, res);
       if (res && res.mini_width && res.mini_height) {
         this.setMiniplayerGeometry(
           res.mini_width,

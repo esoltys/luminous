@@ -15,18 +15,23 @@ pub async fn enter_miniplayer_mode(
     let current_pos = window.outer_position().ok();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
-    let logical_width = current_size.width as f64 / scale_factor;
-    let logical_height = current_size.height as f64 / scale_factor;
+    let logical_width = (current_size.width as f64 / scale_factor).round();
+    let logical_height = (current_size.height as f64 / scale_factor).round();
     let (saved_x, saved_y) = match current_pos {
         Some(pos) => (
-            Some(pos.x as f64 / scale_factor),
-            Some(pos.y as f64 / scale_factor),
+            Some((pos.x as f64 / scale_factor).round()),
+            Some((pos.y as f64 / scale_factor).round()),
         ),
         None => (None, None),
     };
 
-    let target_width = width.unwrap_or(300.0);
-    let target_height = height.unwrap_or(360.0);
+    let target_width = width.unwrap_or(300.0).round().max(200.0);
+    let target_height = height.unwrap_or(360.0).round().max(200.0);
+
+    eprintln!(
+        "[Luminous Window IPC] enter_miniplayer_mode -> Saving Full Player: (w: {}, h: {}, x: {:?}, y: {:?}), Target Miniplayer: (w: {}, h: {}, x: {:?}, y: {:?}), scale: {}",
+        logical_width, logical_height, saved_x, saved_y, target_width, target_height, x, y, scale_factor
+    );
 
     let _ = window.set_always_on_top(true);
     let _ = window.set_decorations(false);
@@ -68,18 +73,23 @@ pub async fn exit_miniplayer_mode(
     let current_pos = window.outer_position().ok();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
-    let mini_width = current_size.width as f64 / scale_factor;
-    let mini_height = current_size.height as f64 / scale_factor;
+    let mini_width = (current_size.width as f64 / scale_factor).round();
+    let mini_height = (current_size.height as f64 / scale_factor).round();
     let (mini_x, mini_y) = match current_pos {
         Some(pos) => (
-            Some(pos.x as f64 / scale_factor),
-            Some(pos.y as f64 / scale_factor),
+            Some((pos.x as f64 / scale_factor).round()),
+            Some((pos.y as f64 / scale_factor).round()),
         ),
         None => (None, None),
     };
 
-    let restore_w = saved_width.unwrap_or(1280.0);
-    let restore_h = saved_height.unwrap_or(800.0);
+    let restore_w = saved_width.unwrap_or(1280.0).round().max(900.0);
+    let restore_h = saved_height.unwrap_or(800.0).round().max(600.0);
+
+    eprintln!(
+        "[Luminous Window IPC] exit_miniplayer_mode -> Saving Miniplayer: (w: {}, h: {}, x: {:?}, y: {:?}), Restoring Full Player: (w: {}, h: {}, x: {:?}, y: {:?}), scale: {}",
+        mini_width, mini_height, mini_x, mini_y, restore_w, restore_h, saved_x, saved_y, scale_factor
+    );
 
     let _ = window.set_decorations(true);
     let _ = window.set_always_on_top(false);
@@ -137,10 +147,13 @@ pub async fn get_window_geometry(
     let pos = window.outer_position().ok();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
 
-    let width = size.width as f64 / scale_factor;
-    let height = size.height as f64 / scale_factor;
+    let width = (size.width as f64 / scale_factor).round();
+    let height = (size.height as f64 / scale_factor).round();
     let (x, y) = match pos {
-        Some(p) => (Some(p.x as f64 / scale_factor), Some(p.y as f64 / scale_factor)),
+        Some(p) => (
+            Some((p.x as f64 / scale_factor).round()),
+            Some((p.y as f64 / scale_factor).round()),
+        ),
         None => (None, None),
     };
 
