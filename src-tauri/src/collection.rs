@@ -1499,6 +1499,17 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
         song.lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
 
+        song.grouping = tag
+            .get_string(&ItemKey::ContentGroup)
+            .map(|s| s.to_string());
+        song.initial_key = tag.get_string(&ItemKey::InitialKey).map(|s| s.to_string());
+        // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
+        // store it as freeform text — check both generic keys to cover either.
+        song.bpm = tag
+            .get_string(&ItemKey::IntegerBpm)
+            .or_else(|| tag.get_string(&ItemKey::Bpm))
+            .and_then(|s| s.trim().parse::<f32>().ok());
+
         // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
         song.replaygain_track_gain = tag
             .get_string(&ItemKey::ReplayGainTrackGain)
@@ -1613,6 +1624,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     track=excluded.track, disc=excluded.disc,
                     year=excluded.year, originalyear=excluded.originalyear, genre=excluded.genre,
                     composer=excluded.composer, lyrics=excluded.lyrics,
+                    grouping=excluded.grouping, bpm=excluded.bpm, initial_key=excluded.initial_key,
                     comment=excluded.comment, length_nanosec=excluded.length_nanosec,
                     bitrate=excluded.bitrate, samplerate=excluded.samplerate,
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
@@ -1643,6 +1655,9 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.year,
             song.originalyear,
             song.genre,
+            song.grouping,
+            song.bpm,
+            song.initial_key,
             song.length_nanosec,
             song.bitrate,
             song.samplerate,
@@ -1742,13 +1757,14 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
     composer, lyrics, comment, track, disc, year, originalyear, genre,
+    grouping, bpm, initial_key,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
     replaygain_track_gain, replaygain_album_gain, is_vbr
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -3030,7 +3046,11 @@ mod tests {
         ));
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
-        conn.execute("INSERT INTO directories (path) VALUES (?1)", params![temp_dir.to_string_lossy()]).unwrap();
+        conn.execute(
+            "INSERT INTO directories (path) VALUES (?1)",
+            params![temp_dir.to_string_lossy()],
+        )
+        .unwrap();
 
         let real_file = temp_dir.join("real.mp3");
         std::fs::write(&real_file, b"audio").unwrap();

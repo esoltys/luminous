@@ -33,6 +33,9 @@ describe("TagEditor.svelte", () => {
     track: 3,
     disc: 1,
     year: 2020,
+    grouping: "Original Grouping",
+    bpm: 120,
+    initial_key: "Cmaj",
     rating: 3,
   };
 

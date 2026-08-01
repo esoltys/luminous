@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Plus, User } from "lucide-svelte";
+  import { Play, Plus, Mic2 } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -52,7 +52,7 @@
   {#if onGoToArtist && artistName}
     <ContextMenuDivider />
     <ContextMenuItem
-      icon={User}
+      icon={Mic2}
       label={i18n.t("playlists.contextMenuGoArtist")}
       onclick={() => { onGoToArtist?.(); onClose(); }}
     />

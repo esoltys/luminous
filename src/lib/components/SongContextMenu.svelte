@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Plus, User, Disc, Edit3, Folder } from "lucide-svelte";
+  import { Play, Plus, Mic2, DiscAlbum, Edit3, Folder } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import type { Song } from "../types";
@@ -67,7 +67,7 @@
 
     {#if onGoToArtist && song.artist}
       <ContextMenuItem
-        icon={User}
+        icon={Mic2}
         label={i18n.t("playlists.contextMenuGoArtist")}
         onclick={() => { onGoToArtist?.(); onClose(); }}
       />
@@ -75,7 +75,7 @@
 
     {#if onGoToAlbum && song.album}
       <ContextMenuItem
-        icon={Disc}
+        icon={DiscAlbum}
         label={i18n.t("playlists.contextMenuGoAlbum")}
         onclick={() => { onGoToAlbum?.(); onClose(); }}
       />

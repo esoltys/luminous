@@ -349,7 +349,7 @@
             id="language-select"
             value={i18n.currentLocale}
             onchange={(e) => i18n.setLocale(e.currentTarget.value as Locale)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="en">{i18n.t('settings.languageEnglish')}</option>
             <option value="fr">{i18n.t('settings.languageFrench')}</option>
@@ -366,7 +366,7 @@
             id="rating-style-select"
             value={prefs.ratingStyle}
             onchange={(e) => prefs.setRatingStyle(e.currentTarget.value as RatingStyle)}
-            class="shrink-0 bg-brand-main hover:bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
             <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>

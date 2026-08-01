@@ -72,6 +72,7 @@ struct AcoustIdResponse {
 // ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub fn write_tags(
     path: &Path,
     title: &str,
@@ -83,6 +84,9 @@ pub fn write_tags(
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
+    grouping: &str,
+    bpm: Option<f32>,
+    initial_key: &str,
 ) -> Result<()> {
     let mut tagged_file = Probe::open(path)
         .context("failed to open audio file for tag writing")?
@@ -112,6 +116,23 @@ pub fn write_tags(
 
     tag.insert_text(lofty::tag::ItemKey::AlbumArtist, album_artist.to_string());
     tag.insert_text(lofty::tag::ItemKey::Composer, composer.to_string());
+    tag.insert_text(lofty::tag::ItemKey::ContentGroup, grouping.to_string());
+    tag.insert_text(lofty::tag::ItemKey::InitialKey, initial_key.to_string());
+
+    if let Some(b) = bpm {
+        // ID3v2 (TBPM) and MP4 (tmpo) map from IntegerBpm; Vorbis/APE's freeform
+        // "BPM" field maps from Bpm — write both so every format picks up its own.
+        let bpm_str = if b.fract() == 0.0 {
+            (b as i64).to_string()
+        } else {
+            b.to_string()
+        };
+        tag.insert_text(lofty::tag::ItemKey::IntegerBpm, bpm_str.clone());
+        tag.insert_text(lofty::tag::ItemKey::Bpm, bpm_str);
+    } else {
+        tag.remove_key(&lofty::tag::ItemKey::IntegerBpm);
+        tag.remove_key(&lofty::tag::ItemKey::Bpm);
+    }
 
     if let Some(t) = track {
         tag.set_track(t);

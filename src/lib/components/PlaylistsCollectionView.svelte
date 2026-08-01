@@ -235,9 +235,9 @@
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
-      <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main pt-2">
+      <div class="sticky top-0 z-20 bg-brand-main pt-3 pb-2">
         <!-- Actions (Left) -->
-        <div class="flex items-center gap-2">
+        <div class="h-10 flex items-center gap-2 mb-2">
           {#if collectionStore.playlistsSubTab === "custom"}
             <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-4 h-4" />
@@ -250,8 +250,8 @@
           {/if}
         </div>
 
-        <!-- Showing Count + Sort Dropdown (Right) -->
-        <div class="flex items-center gap-3">
+        <div class="h-9 flex items-center justify-between">
+          <!-- Showing Count (Left) -->
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if collectionStore.playlistsSubTab === "auto"}
               {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
@@ -260,6 +260,7 @@
             {/if}
           </div>
 
+          <!-- Sort Dropdown (Right) -->
           <div class="relative">
             {#if collectionStore.playlistsSubTab === "auto"}
               <Select
@@ -269,7 +270,7 @@
                   autoSortField = field as "name" | "track_count" | "updated";
                   autoSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
                 <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
@@ -286,7 +287,7 @@
                   customSortField = field as "name" | "track_count" | "updated";
                   customSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
                 <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>

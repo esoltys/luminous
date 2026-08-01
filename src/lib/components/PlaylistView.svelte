@@ -471,6 +471,9 @@
       }
       selectedUuids = nextSet;
       lastSelectedIndex = actualIndex;
+    } else if (selectedUuids.size === 1 && selectedUuids.has(item.uuid)) {
+      selectedUuids = new Set();
+      lastSelectedIndex = null;
     } else {
       selectedUuids = new Set([item.uuid]);
       lastSelectedIndex = actualIndex;
@@ -798,10 +801,10 @@
 
             <div class="flex items-center gap-2 shrink-0">
               <IconActionButton onclick={() => playlistsStore.undo()} title={i18n.t("playlists.undoTooltip")}>
-                {#snippet icon()}<RotateCcw class="w-4 h-4 text-brand-accent-text" />{/snippet}
+                {#snippet icon()}<RotateCcw class="w-4 h-4" />{/snippet}
               </IconActionButton>
               <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
-                {#snippet icon()}<RotateCw class="w-4 h-4 text-brand-accent-text" />{/snippet}
+                {#snippet icon()}<RotateCw class="w-4 h-4" />{/snippet}
               </IconActionButton>
               <button
                 bind:this={overflowButtonEl}

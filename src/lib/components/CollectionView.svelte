@@ -26,6 +26,7 @@
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -73,6 +74,9 @@
       }
       selectedSongIds = newSet;
       lastSelectedSongId = song.id;
+    } else if (selectedSongIds.size === 1 && selectedSongIds.has(song.id)) {
+      selectedSongIds = new Set();
+      lastSelectedSongId = null;
     } else {
       selectedSongIds = new Set([song.id]);
       lastSelectedSongId = song.id;
@@ -148,6 +152,11 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_song_asc") !== "false" : true
   );
 
+  // Sort dropdown options: only sortable columns currently visible via ColumnSelector.
+  let sortableColumns = $derived(
+    SONG_TABLE_COLUMNS.filter((col) => col.field && collectionStore.visibleColumns[col.key])
+  );
+
   // Trigger search on collectionStore when query changes
   $effect(() => {
     collectionStore.search(collectionStore.searchQuery);
@@ -162,8 +171,18 @@
       let valA = a[sortField];
       let valB = b[sortField];
 
-      if (valA === undefined) return sortAsc ? 1 : -1;
-      if (valB === undefined) return sortAsc ? -1 : 1;
+      // Missing tags come back as `null` — but some tags (composer especially)
+      // are commonly present-but-blank in files rather than absent entirely, which
+      // reads as an empty string, not null. Treat both as "no value" so they always
+      // sort to the end, regardless of direction, instead of an empty string sorting
+      // first (it's lexicographically smaller than everything) or a real `null`
+      // flipping to the top when descending.
+      const isBlank = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
+      const blankA = isBlank(valA);
+      const blankB = isBlank(valB);
+      if (blankA && blankB) return 0;
+      if (blankA) return 1;
+      if (blankB) return -1;
 
       if (typeof valA === "string" && typeof valB === "string") {
         return sortAsc
@@ -371,16 +390,19 @@
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   {#if collectionStore.activeSubTab === "songs"}
     <!-- Top bar for Songs View -->
-    <div class="h-12 px-6 flex items-center justify-between flex-shrink-0">
-      <!-- Showing Count (Left) -->
-      <div class="text-xs text-brand-text-secondary font-medium">
-        {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
+    <div class="px-6 pt-3 flex-shrink-0">
+      <!-- Column Controls (Left) -->
+      <div class="h-10 flex items-center mb-2">
+        <ColumnSelector align="left" />
       </div>
 
-      <!-- Sort Dropdown & Column Controls (Right) -->
-      <div class="flex items-center gap-3">
-        <ColumnSelector />
+      <div class="h-9 flex items-center justify-between">
+        <!-- Showing Count (Left) -->
+        <div class="text-xs text-brand-text-secondary font-medium">
+          {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
+        </div>
 
+        <!-- Sort Dropdown (Right) -->
         <div class="relative">
           <Select
             value={`${sortField}-${sortAsc}`}
@@ -389,18 +411,12 @@
               sortField = field as keyof Song;
               sortAsc = asc === "true";
             }}
-            class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
           >
-            <option value="title-true">{i18n.t('collection.sortTitleAsc')}</option>
-            <option value="title-false">{i18n.t('collection.sortTitleDesc')}</option>
-            <option value="artist-true">{i18n.t('collection.sortArtistAsc')}</option>
-            <option value="artist-false">{i18n.t('collection.sortArtistDesc')}</option>
-            <option value="album-true">{i18n.t('collection.sortAlbumAsc')}</option>
-            <option value="album-false">{i18n.t('collection.sortAlbumDesc')}</option>
-            <option value="track-true">{i18n.t('collection.sortTrackAsc')}</option>
-            <option value="track-false">{i18n.t('collection.sortTrackDesc')}</option>
-            <option value="length_nanosec-true">{i18n.t('collection.sortDurationAsc')}</option>
-            <option value="length_nanosec-false">{i18n.t('collection.sortDurationDesc')}</option>
+            {#each sortableColumns as col (col.key)}
+              <option value="{col.field}-true">{i18n.t(col.label)} ▲</option>
+              <option value="{col.field}-false">{i18n.t(col.label)} ▼</option>
+            {/each}
           </Select>
         </div>
       </div>
@@ -905,7 +921,7 @@
                   albumSortField = field as "album" | "artist" | "year" | "track_count";
                   albumSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
                 <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
@@ -926,7 +942,7 @@
                   artistSortField = field as "name" | "genre" | "song_count";
                   artistSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar hover:bg-brand-main border border-brand-border text-brand-text-secondary hover:text-brand-text-primary text-xs rounded-lg pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
                 <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>

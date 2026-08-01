@@ -15,6 +15,9 @@ pub struct SongDetails {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
+    pub grouping: String,
+    pub bpm: Option<f32>,
+    pub initial_key: String,
     pub rating: f32,
 }
 
@@ -25,7 +28,8 @@ pub async fn get_song_details(
 ) -> Result<SongDetails, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year, rating
+        "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year,
+                grouping, bpm, initial_key, rating
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -41,7 +45,10 @@ pub async fn get_song_details(
                 track: row.get(8).ok(),
                 disc: row.get(9).ok(),
                 year: row.get(10).ok(),
-                rating: row.get(11).unwrap_or(crate::stats::RATING_UNRATED),
+                grouping: row.get(11).unwrap_or_default(),
+                bpm: row.get(12).ok(),
+                initial_key: row.get(13).unwrap_or_default(),
+                rating: row.get(14).unwrap_or(crate::stats::RATING_UNRATED),
             })
         },
     )
@@ -108,6 +115,9 @@ pub async fn save_song_tags(
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
+    grouping: String,
+    bpm: Option<f32>,
+    initial_key: String,
 ) -> Result<(), String> {
     // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
@@ -129,6 +139,8 @@ pub async fn save_song_tags(
     let album_artist_c = album_artist.clone();
     let composer_c = composer.clone();
     let genre_c = genre.clone();
+    let grouping_c = grouping.clone();
+    let initial_key_c = initial_key.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
         crate::tageditor::write_tags(
@@ -142,6 +154,9 @@ pub async fn save_song_tags(
             track,
             disc,
             year,
+            &grouping_c,
+            bpm,
+            &initial_key_c,
         )
     })
     .await
@@ -159,8 +174,11 @@ pub async fn save_song_tags(
             genre = ?6,
             track = ?7,
             disc = ?8,
-            year = ?9
-         WHERE id = ?10",
+            year = ?9,
+            grouping = ?10,
+            bpm = ?11,
+            initial_key = ?12
+         WHERE id = ?13",
         rusqlite::params![
             title,
             artist,
@@ -171,6 +189,9 @@ pub async fn save_song_tags(
             track,
             disc,
             year,
+            grouping,
+            bpm,
+            initial_key,
             song_id
         ],
     )
@@ -201,12 +222,16 @@ pub async fn save_album_tags(
         composer: String,
         track: Option<u32>,
         disc: Option<u32>,
+        grouping: String,
+        bpm: Option<f32>,
+        initial_key: String,
     }
 
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, artist, composer, track, disc FROM songs WHERE id = ?1",
+            "SELECT path, title, artist, composer, track, disc, grouping, bpm, initial_key
+             FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
                 Ok(SongMetadata {
@@ -216,6 +241,9 @@ pub async fn save_album_tags(
                     composer: row.get(3).unwrap_or_default(),
                     track: row.get(4).ok(),
                     disc: row.get(5).ok(),
+                    grouping: row.get(6).unwrap_or_default(),
+                    bpm: row.get(7).ok(),
+                    initial_key: row.get(8).unwrap_or_default(),
                 })
             },
         );
@@ -243,6 +271,9 @@ pub async fn save_album_tags(
                 item.track,
                 item.disc,
                 year,
+                &item.grouping,
+                item.bpm,
+                &item.initial_key,
             );
             if write_res.is_ok() {
                 count += 1;
