@@ -3070,6 +3070,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tauri-runtime",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",

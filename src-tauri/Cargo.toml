@@ -14,7 +14,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # --- Tauri ---
-tauri = { version = "2", features = [] }
+# "unstable" gates `Manager::get_window`, needed to reach the lower-level
+# `Window::start_resize_dragging` from a `WebviewWindow` command handler.
+tauri = { version = "2", features = ["unstable"] }
+tauri-runtime = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
@@ -23,6 +26,9 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
+# Cross-restart window geometry persistence (Windows/macOS/X11-Linux — see
+# geometry_capture_supported() in commands/window.rs for why this can't help
+# on Wayland).
 tauri-plugin-window-state = "2"
 tauri-plugin-positioner = "2"
 

@@ -696,6 +696,7 @@ pub fn run() {
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
             // Window & Miniplayer commands
+            commands::window::geometry_capture_supported,
             commands::window::enter_miniplayer_mode,
             commands::window::exit_miniplayer_mode,
             commands::window::move_window_to_preset,
