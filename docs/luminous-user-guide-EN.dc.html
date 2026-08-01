@@ -10,7 +10,16 @@
 <template id="__bundler_thumbnail"><svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="200" fill="#08090c"></rect><circle cx="100" cy="100" r="60" fill="#0A0A0D" stroke="#626FE8" stroke-width="4"></circle><circle cx="100" cy="100" r="60" fill="none" stroke="#FFB648" stroke-width="2" opacity="0.5"></circle><circle cx="140" cy="66" r="7" fill="#fff"></circle></svg></template>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'Expose';
+      src: url('expose-700.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <script src="./image-slot.js"></script>
   <style>
     body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
@@ -27,7 +36,7 @@
     <div style="display:flex; align-items:center; gap:12px;">
       <img src="./luminous-mark.svg" alt="Luminous" style="width:28px; height:28px;">
       <div style="display:flex; align-items:baseline; gap:9px;">
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; letter-spacing:-0.01em;">Luminous</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:17px; letter-spacing:-0.01em;">Luminous</div>
         <div style="font-size:12px; color:#a6adc4;">User Guide</div>
       </div>
     </div>
@@ -73,7 +82,7 @@
 
       <sc-if value="{{ isGettingStarted }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Getting started</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Getting started</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Luminous plays the music already on your computer. Just point it at a folder once, and it keeps watching for new files from then on.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">1</div><div>Open <b style="color:#f1f3f8;">Settings → Folders</b> and add the folder your music lives in.</div></div>
@@ -89,7 +98,7 @@
 
       <sc-if value="{{ isHome }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Home</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Home</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Home is the first thing you see when you open Luminous — a running snapshot of your library that updates itself as you listen. The greeting up top changes with the time of day.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Top Artists</b> — who you reach for most.</div></div>
@@ -107,7 +116,7 @@
 
       <sc-if value="{{ isCollection }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Your collection</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Your collection</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:8px;"><b style="color:#f1f3f8;">Collection</b> in the sidebar expands into three views — Artists, Albums, and Songs — each showing a running count and a Sort control in the top-right:</div>
         <div style="display:flex; flex-direction:column; gap:8px; max-width:640px; margin-bottom:20px;">
           <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Albums:</b> album name, artist name, year, number of songs.</div>
@@ -138,7 +147,7 @@
 
       <sc-if value="{{ isSearch }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Search &amp; browsing</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Search &amp; browsing</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">The search bar at the top of the window looks across songs, albums, and artists at once — you never have to think about where something is filed before you go looking for it.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
           <image-slot id="searchbar" src="assets/searchbar-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1339/120;" placeholder="Search bar"></image-slot>
@@ -158,7 +167,7 @@
 
       <sc-if value="{{ isNowPlaying }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Now Playing &amp; the mini player</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Now Playing &amp; the mini player</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">A player bar sits at the bottom of the window when you're playing a song, with the waveform, transport controls, volume, and a shortcut into the full Now Playing view.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
           <image-slot id="playbar" src="assets/playbar-EN.png?v=1785342377472" shape="rect" fit="contain" style="height:auto; aspect-ratio:1324/144;" placeholder="Player bar"></image-slot>
@@ -206,7 +215,7 @@
 
       <sc-if value="{{ isPlaylists }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Playlists</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Playlists</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">There are three kinds: the ones you build by hand, smart ones Luminous keeps filled from a rule you set, and Auto Playlists it builds and refreshes on its own.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Custom:</b> create a playlist, name it, then drag songs in from anywhere in your collection.</div></div>
@@ -249,7 +258,7 @@
 
       <sc-if value="{{ isLyrics }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Lyrics</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Lyrics</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Open <b style="color:#f1f3f8;">Lyrics</b> in the sidebar to follow along with whatever's playing — the current line highlights in sync with the music, with the rest dimmed above and below it. Luminous automatically looks up lyrics for the currently playing song; if it's an instrumental, you can mark it as such so Luminous stops looking.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>If lyrics haven't been found yet, click <b style="color:#f1f3f8;">Refetch</b> to look them up again.</div></div>
@@ -267,7 +276,7 @@
 
       <sc-if value="{{ isGeneral }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">General</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">General</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">App-wide preferences — things like startup behavior and other everyday defaults live here.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Language:</b> switch the interface between English and French.</div></div>
@@ -281,7 +290,7 @@
 
       <sc-if value="{{ isFolders }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Folders</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Folders</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Add or remove the folders Luminous watches for music. Once a folder's added, it stays watched — new files show up on their own, no rescan needed.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Watch folders in real time</b> toggles whether Luminous watches live for changes, or only checks when you ask it to.</div></div>
@@ -296,7 +305,7 @@
 
       <sc-if value="{{ isOrganize }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Organize</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Organize</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Bulk tools for tidying up your library — cleaning up tags and files across many tracks at once, rather than one at a time. <b style="color:#f1f3f8;">Prune Missing Songs</b> clears out entries for files that no longer exist on disk, in one click.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">The file-renaming tool works against your current <b style="color:#f1f3f8;">Selection</b> or the whole <b style="color:#f1f3f8;">Library</b>. Click <b style="color:#f1f3f8;">Preview</b> before anything moves: a From → To table lists every file with a status — <b style="color:#f1f3f8;">OK</b>, <b style="color:#f1f3f8;">Unchanged</b>, <b style="color:#f1f3f8;">Collision</b>, <b style="color:#f1f3f8;">Missing Tag</b>, or <b style="color:#f1f3f8;">Error</b> — with a filter to show only files that are actually changing, resizable columns, and a summary line totaling what will happen before you commit with <b style="color:#f1f3f8;">Apply</b>. A destination override sends the results to a different folder than the one you scanned, if you'd rather not reorganize in place. Extra toggles let you replace spaces with underscores, keep filenames ASCII-only, and move along extra files like cover art so they land in the new location too.</div>
         <div style="max-width:900px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
@@ -355,7 +364,7 @@
 
       <sc-if value="{{ isEqualizer }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Equalizer</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Equalizer</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Everything here lives under <b style="color:#f1f3f8;">Settings → Equalizer</b>. You don't need to know anything about audio engineering to use it — the defaults sound good, and every change applies instantly, even mid-song. The panel is split into three parts: the EQ itself, loudness normalization, and playback fades — each can be tuned or left alone independently.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Flip <b style="color:#f1f3f8;">Enable EQ</b> on, then pick a preset from the dropdown — Pop, Rock, Bass Boost, Vocal, and more — or dial in your own curve by dragging the band sliders. Switch to <b style="color:#f1f3f8;">20-band parametric</b> if the default 10 bands aren't precise enough; it gives every band its own frequency and Q (bandwidth) instead of the fixed 10-band ladder, so you can carve out a narrow problem frequency without touching anything around it. A <b style="color:#f1f3f8;">Reset Bands</b> button appears in that view to snap everything back to flat in one click. The <b style="color:#f1f3f8;">Preamp</b> slider at the top raises or lowers overall gain to compensate before it hits the bands, so boosting doesn't clip.</div></div>
@@ -370,7 +379,7 @@
 
       <sc-if value="{{ isThemes }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">UI Themes</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">UI Themes</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Pick between several built-in themes, match your system's light/dark setting, or turn on <b style="color:#f1f3f8;">Dynamic Artwork</b> so the whole app — including Now Playing and the mini player — pulls its color from whatever album art is currently playing. The whole app updates immediately, no restart needed.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Dynamic Artwork doubles as a great way to discover new themes — when a song's artwork lands on a combination you like, save it as a Custom Theme to keep it around.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Want full control? The Custom Theme Builder lets you set your own colors from scratch.</div>
@@ -381,7 +390,7 @@
 
       <sc-if value="{{ isShortcuts }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Tips &amp; tricks</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Keyboard shortcuts</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Keyboard shortcuts</div>
         <sc-for list="{{ shortcutGroups }}" as="grp" hint-placeholder-count="3">
           <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6d7286; margin-bottom:10px; margin-top:24px;">{{ grp.label }}</div>
           <div style="border:1px solid #2c2f3c; border-radius:12px; overflow:hidden; max-width:520px;">
@@ -398,7 +407,7 @@
 
       <sc-if value="{{ isAbout }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">About &amp; Credits</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">About &amp; Credits</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Source available on <a href="https://github.com/esoltys/luminous" target="_blank" rel="noopener">GitHub</a>, alongside links to CREDITS.md and LICENSE for the full list of libraries Luminous is built on and the terms it's shared under.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Under the hood: a Rust and Tauri core, a Svelte 5 interface, and dedicated libraries for decoding and analyzing audio.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
@@ -408,7 +417,7 @@
 
       <sc-if value="{{ isContextMenus }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Tips &amp; tricks</div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Context menus &amp; multi-select</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Context menus &amp; multi-select</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Most lists in Luminous support right-click menus and multi-select, so you can act on many tracks at once instead of one at a time.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Right-click a song, album, or playlist row for quick actions — Play, Add to Playlist, Go to Artist/Album, Organize Files, Edit Tags, Remove.</div></div>

@@ -269,7 +269,8 @@ describe("CollectionStore", () => {
 
     vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "enter_miniplayer_mode") {
-        expect(args).toEqual({ width: 500, height: 540 });
+        expect(args.width).toBe(500);
+        expect(args.height).toBe(540);
         return { saved_width: 1280, saved_height: 800 };
       }
       return null;
@@ -279,6 +280,36 @@ describe("CollectionStore", () => {
     expect(collectionStore.isMiniplayer).toBe(true);
 
     await collectionStore.exitMiniplayerMode();
+  });
+
+  it("saves and restores window coordinates and mode accurately", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "enter_miniplayer_mode") {
+        return { saved_width: 1400, saved_height: 900, saved_x: 100, saved_y: 150 };
+      }
+      if (cmd === "exit_miniplayer_mode") {
+        return { mini_width: 320, mini_height: 380, mini_x: 500, mini_y: 550 };
+      }
+      return null;
+    });
+
+    await collectionStore.enterMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(true);
+    expect(collectionStore.savedWindowWidth).toBe(1400);
+    expect(collectionStore.savedWindowHeight).toBe(900);
+    expect(collectionStore.savedWindowX).toBe(100);
+    expect(collectionStore.savedWindowY).toBe(150);
+
+    await collectionStore.exitMiniplayerMode();
+    expect(collectionStore.isMiniplayer).toBe(false);
+    expect(collectionStore.miniplayerWidth).toBe(320);
+    expect(collectionStore.miniplayerHeight).toBe(380);
+    expect(collectionStore.miniplayerX).toBe(500);
+    expect(collectionStore.miniplayerY).toBe(550);
+
+    expect(localStorage.getItem("layout_isMiniplayer")).toBe("false");
+    expect(localStorage.getItem("layout_miniplayerX")).toBe("500");
+    expect(localStorage.getItem("layout_miniplayerY")).toBe("550");
   });
 
   it("blocks exitMiniplayerMode while a prior enterMiniplayerMode call is still in flight", async () => {
