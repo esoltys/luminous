@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=expose@700&display=swap" rel="stylesheet" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
     a { color: #8c98ba; }
@@ -22,14 +22,14 @@
   <div style="max-width:1200px; margin:0 auto; padding:88px 48px 56px; display:flex; align-items:center; gap:24px; border-bottom:1px solid #2c2f3c;">
     <img src="./luminous-mark.svg" style="width:56px; height:56px;" />
     <div>
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Luminous</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Luminous</div>
       <div style="font-size:14px; color:#a6adc4; margin-top:2px;">Visual design system — desktop app UI. See also the <a href="./Luminous%20Logo%20System.dc.html">logo system</a>.</div>
     </div>
   </div>
 
   <!-- COLORS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Color — Luminous theme (default)</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Color — Luminous theme (default)</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">The shipped default. Users can swap the whole set at runtime (Ruby Red, Nordic Blue, Retro Amber, system light/dark, or colors derived live from album art) — treat structure and contrast rules as normative, not these exact hex values. <b style="color:#f1f3f8;">accent-gold</b> is the one exception — borrowed from the logo's eclipse ring, it's a fixed brand color (not theme-swappable), reserved for rare highlight moments (e.g. a "featured" or premium marker) — never a primary interactive color.</div>
     <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px;">
       <sc-for list="{{ colors }}" as="c" hint-placeholder-count="10">
@@ -46,7 +46,7 @@
 
   <!-- TYPOGRAPHY -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Typography</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Typography</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Inter, single typeface throughout the UI. Hierarchy comes from size and weight, never a second face — that's reserved for the wordmark alone.</div>
     <div style="display:flex; flex-direction:column;">
       <sc-for list="{{ type }}" as="ty" hint-placeholder-count="8">
@@ -62,7 +62,7 @@
   <!-- SPACING + RADII -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c; display:grid; grid-template-columns:1fr 1fr; gap:64px;">
     <div>
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin-bottom:24px;">Spacing</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:22px; margin-bottom:24px;">Spacing</div>
       <div style="display:flex; flex-direction:column; gap:14px;">
         <sc-for list="{{ spacing }}" as="s" hint-placeholder-count="6">
           <div style="display:flex; align-items:center; gap:16px;">
@@ -74,7 +74,7 @@
       </div>
     </div>
     <div>
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin-bottom:24px;">Radii</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:22px; margin-bottom:24px;">Radii</div>
       <div style="display:flex; align-items:flex-end; gap:20px;">
         <sc-for list="{{ radii }}" as="r" hint-placeholder-count="5">
           <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
@@ -88,7 +88,7 @@
 
   <!-- ELEVATION -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Elevation</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Elevation</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:32px; max-width:680px; line-height:1.6;">Flat by default. Hierarchy comes from background-tone steps and low-opacity borders, not shadow depth — chrome panels add a glass blur on top of all themes.</div>
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
       <div style="background:#08090c; border:1px solid #2c2f3c; border-radius:12px; padding:22px; font-size:12.5px; color:#a6adc4;">bg-main — base canvas</div>
@@ -99,7 +99,7 @@
 
   <!-- COMPONENTS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Components</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Components</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px;">Core primitives, styled from the tokens above, plus controls for playback and audio settings.</div>
     <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-bottom:20px;">
       <button style="background:#6f7ea9; color:#000; font-weight:600; font-size:13px; border:none; border-radius:8px; padding:12px 20px; cursor:pointer;">Primary button</button>
@@ -156,7 +156,7 @@
 
   <!-- DOS DONTS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
       <div>
         <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8fbf9a; margin-bottom:14px;">Do</div>
