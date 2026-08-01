@@ -902,7 +902,9 @@ class CollectionStore {
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
     } finally {
-      this.miniplayerTransitionInFlight = false;
+      setTimeout(() => {
+        this.miniplayerTransitionInFlight = false;
+      }, 500);
     }
   }
 
@@ -946,7 +948,9 @@ class CollectionStore {
     } catch (e) {
       console.warn("Failed to exit miniplayer backend window mode:", e);
     } finally {
-      this.miniplayerTransitionInFlight = false;
+      setTimeout(() => {
+        this.miniplayerTransitionInFlight = false;
+      }, 500);
     }
   }
 

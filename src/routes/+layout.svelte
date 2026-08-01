@@ -79,9 +79,10 @@
     }
     let resizeTimer: ReturnType<typeof setTimeout>;
     function handleResize() {
+      if (collectionStore.miniplayerTransitionInFlight) return;
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined' || collectionStore.miniplayerTransitionInFlight) return;
         if (!collectionStore.isMiniplayer) {
           if (window.innerWidth >= 900 && window.innerHeight >= 600) {
             collectionStore.setSavedWindowGeometry(
