@@ -870,9 +870,18 @@ class CollectionStore {
     }
     console.log(`[CollectionStore] Entering Miniplayer Mode target: ${width}x${height} at (${x}, ${y})`);
     try {
-      const payload: { width: number; height: number; x?: number; y?: number } = { width, height };
+      const payload: {
+        width: number;
+        height: number;
+        x?: number;
+        y?: number;
+        savedFullWidth?: number;
+        savedFullHeight?: number;
+      } = { width, height };
       if (x !== null && x !== undefined) payload.x = x;
       if (y !== null && y !== undefined) payload.y = y;
+      if (this.savedWindowWidth > 0) payload.savedFullWidth = this.savedWindowWidth;
+      if (this.savedWindowHeight > 0) payload.savedFullHeight = this.savedWindowHeight;
 
       const res = await invoke<{
         saved_width: number;

@@ -11,13 +11,19 @@ pub async fn enter_miniplayer_mode(
     height: Option<f64>,
     x: Option<f64>,
     y: Option<f64>,
+    saved_full_width: Option<f64>,
+    saved_full_height: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
     let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let current_pos = window.outer_position().ok();
 
-    let logical_width = (current_size.width as f64 / scale_factor).round();
-    let logical_height = (current_size.height as f64 / scale_factor).round();
+    let measured_w = (current_size.width as f64 / scale_factor).round();
+    let measured_h = (current_size.height as f64 / scale_factor).round();
+
+    let logical_width = saved_full_width.unwrap_or(measured_w);
+    let logical_height = saved_full_height.unwrap_or(measured_h);
+
     let (saved_x, saved_y) = match current_pos {
         Some(pos) => (
             Some((pos.x as f64 / scale_factor).round()),
