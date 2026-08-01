@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=expose@700&display=swap" rel="stylesheet" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
     ::selection { background: #4F5BD5; color: #fff; }
@@ -22,7 +22,7 @@
   <div style="max-width:1200px; margin:0 auto; padding:96px 48px 64px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:28px;">
     <img src="./luminous-mark-reactive.svg" alt="Luminous mark" style="width:120px; height:120px;" />
     <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:56px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:56px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
       <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:#9aa0b4;">Music Player</div>
     </div>
     <div style="font-size:15px; color:#9aa0b4; max-width:560px; line-height:1.6;">Logo &amp; identity system — two artifacts, one mark. A crisp, blur-free version for app icons and avatars, and a lush, glow-heavy version for reactive and hero contexts.</div>
@@ -30,16 +30,16 @@
 
   <!-- ANATOMY -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Anatomy</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Anatomy</div>
     <div style="font-size:14px; color:#9aa0b4; margin-bottom:24px; max-width:640px; line-height:1.6;">Four layers, back to front. Two are fixed; two are themeable.</div>
     <div style="display:flex; gap:24px; margin-bottom:40px; max-width:640px;">
       <div style="flex:1; background:#101218; border:1px solid #23262f; border-radius:12px; padding:16px; display:flex; align-items:center; gap:14px;">
         <img src="./luminous-mark.svg" style="width:44px; height:44px; flex-shrink:0;" />
-        <div><div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px;">Static — crisp</div><div style="font-size:12px; color:#9aa0b4; margin-top:2px;">No blur/fade. App icons, avatars, favicons.</div></div>
+        <div><div style="font-family:'Expose',sans-serif; font-weight:700; font-size:13.5px;">Static — crisp</div><div style="font-size:12px; color:#9aa0b4; margin-top:2px;">No blur/fade. App icons, avatars, favicons.</div></div>
       </div>
       <div style="flex:1; background:#101218; border:1px solid #23262f; border-radius:12px; padding:16px; display:flex; align-items:center; gap:14px;">
         <img src="./luminous-mark-reactive.svg" style="width:44px; height:44px; flex-shrink:0;" />
-        <div><div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px;">Reactive — lush</div><div style="font-size:12px; color:#9aa0b4; margin-top:2px;">Heavier blur/glow. Hero, marketing, in-app reactive states.</div></div>
+        <div><div style="font-family:'Expose',sans-serif; font-weight:700; font-size:13.5px;">Reactive — lush</div><div style="font-size:12px; color:#9aa0b4; margin-top:2px;">Heavier blur/glow. Hero, marketing, in-app reactive states.</div></div>
       </div>
     </div>
     <div style="display:grid; grid-template-columns:280px 1fr; gap:56px; align-items:center;">
@@ -50,7 +50,7 @@
         <sc-for list="{{ anatomyRows }}" as="row" hint-placeholder-count="4">
           <div style="display:flex; align-items:center; gap:20px; padding:18px 0; border-bottom:1px solid #1a1c24;">
             <div style="width:14px; height:14px; border-radius:50%; flex-shrink:0; background:{{ row.swatch }}; border:{{ row.swatchBorder }};"></div>
-            <div style="width:150px; flex-shrink:0; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px;">{{ row.name }}</div>
+            <div style="width:150px; flex-shrink:0; font-family:'Expose',sans-serif; font-weight:700; font-size:16px;">{{ row.name }}</div>
             <div style="flex:1; font-size:13.5px; color:#9aa0b4; line-height:1.6;">{{ row.desc }}</div>
             <div style="width:110px; flex-shrink:0; text-align:right; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{{ row.tagColor }};">{{ row.tag }}</div>
           </div>
@@ -61,7 +61,7 @@
 
   <!-- REACTIVE DEMO -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Reactive behavior</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Reactive behavior</div>
     <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">In the app, the mark isn't static — it's an audio-reactive element. Each frequency band drives one layer. Try it below.</div>
 
     <div style="display:grid; grid-template-columns:340px 1fr; gap:64px; align-items:center; background:#101218; border:1px solid #23262f; border-radius:20px; padding:48px;">
@@ -83,7 +83,7 @@
 
       <div style="display:flex; flex-direction:column; gap:28px;">
         <div style="display:flex; align-items:center; justify-content:space-between;">
-          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">Live preview</div>
+          <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:15px;">Live preview</div>
           <button onClick="{{ toggleAutoPlay }}" style="background:{{ autoPlayBg }}; color:{{ autoPlayColor }}; border:1px solid #3a3d4a; border-radius:9999px; padding:8px 18px; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; cursor:pointer;">{{ autoPlayLabel }}</button>
         </div>
 
@@ -105,7 +105,7 @@
 
   <!-- LOCKUPS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Lockups</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Lockups</div>
     <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">Four approved combinations. Never rearrange the mark, wordmark, or tagline relative to each other outside of these.</div>
 
     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:20px;">
@@ -115,7 +115,7 @@
             <img src="./luminous-mark.svg" style="width:{{ lk.markSize }}px; height:{{ lk.markSize }}px;" />
             <sc-if value="{{ lk.showText }}" hint-placeholder-val="{{ true }}">
               <div style="{{ lk.textWrapStyle }}">
-                <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:{{ lk.wordSize }}px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
+                <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:{{ lk.wordSize }}px; letter-spacing:-0.02em; color:#f1f3f8;">Luminous</div>
                 <sc-if value="{{ lk.showTagline }}" hint-placeholder-val="{{ false }}">
                   <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:#9aa0b4; margin-top:4px;">Music Player</div>
                 </sc-if>
@@ -130,7 +130,7 @@
 
   <!-- CLEARSPACE & SIZE -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Clearspace &amp; minimum size</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Clearspace &amp; minimum size</div>
     <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:640px; line-height:1.6;">Keep a margin of at least a quarter of the mark's diameter clear on every side. Below 24px, drop the ring and glow — the silhouette and burst alone still read.</div>
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
@@ -161,7 +161,7 @@
 
   <!-- COLOR SYSTEM -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Brand color system</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Brand color system</div>
     <div style="font-size:14px; color:#9aa0b4; margin-bottom:40px; max-width:680px; line-height:1.6;">Two fixed brand colors carry the identity outside the app (marketing, social, app icon at rest). Inside the app, the glow and ring re-target to whichever UI theme is active.</div>
 
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:44px;">
@@ -169,14 +169,14 @@
         <div style="display:flex; flex-direction:column; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <div style="height:88px; background:{{ sw.hex }};"></div>
           <div style="padding:14px 16px; background:#101218;">
-            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px;">{{ sw.name }}</div>
+            <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:14px;">{{ sw.name }}</div>
             <div style="font-size:12px; color:#9aa0b4; margin-top:2px;">{{ sw.hex }}</div>
           </div>
         </div>
       </sc-for>
     </div>
 
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; margin-bottom:16px;">Per-theme mapping (in-app)</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:17px; margin-bottom:16px;">Per-theme mapping (in-app)</div>
     <div style="border:1px solid #23262f; border-radius:14px; overflow:hidden;">
       <sc-for list="{{ themeRows }}" as="th" hint-placeholder-count="5">
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; align-items:center; padding:16px 20px; border-bottom:1px solid #1a1c24; background:#101218;">
@@ -190,18 +190,18 @@
 
   <!-- TYPOGRAPHY -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:8px;">Wordmark type</div>
-    <div style="font-size:14px; color:#9aa0b4; margin-bottom:32px; max-width:640px; line-height:1.6;">Space Grotesk carries the wordmark — its circular counters echo the mark. Inter (the app's UI face) sets the tagline and every supporting label, never the word "Luminous" itself.</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:8px;">Wordmark type</div>
+    <div style="font-size:14px; color:#9aa0b4; margin-bottom:32px; max-width:640px; line-height:1.6;">Expose carries the wordmark — its circular counters echo the mark. Inter (the app's UI face) sets the tagline and every supporting label, never the word "Luminous" itself.</div>
     <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:44px; display:flex; flex-direction:column; gap:22px;">
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:64px; letter-spacing:-0.02em;">Luminous</div>
-      <div style="font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:64px; letter-spacing:-0.02em; color:#6d7286;">Luminous</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:64px; letter-spacing:-0.02em;">Luminous</div>
+      <div style="font-family:'Expose',sans-serif; font-weight:500; font-size:64px; letter-spacing:-0.02em; color:#6d7286;">Luminous</div>
       <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.24em; text-transform:uppercase; color:#9aa0b4;">Music Player · Inter 600 · +24em tracking</div>
     </div>
   </div>
 
   <!-- DO / DONT -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px 96px; border-top:1px solid #23262f;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:28px; margin-bottom:40px;">Do &amp; don't</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:28px; margin-bottom:40px;">Do &amp; don't</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
       <sc-for list="{{ dontCards }}" as="d" hint-placeholder-count="3">
         <div style="background:#101218; border:1px solid #23262f; border-radius:14px; padding:28px; display:flex; flex-direction:column; align-items:center; gap:16px;">

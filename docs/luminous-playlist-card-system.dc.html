@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=expose@700&display=swap" rel="stylesheet" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="./image-slot.js"></script>
   <style>
     body { margin: 0; background: #08090c; font-family: 'Inter', sans-serif; }
@@ -21,19 +21,19 @@
 <div style="background:#08090c; color:#f1f3f8; min-height:100vh; padding-bottom:120px;">
 
   <div style="max-width:1200px; margin:0 auto; padding:88px 48px 56px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Playlist card system</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:34px; letter-spacing:-0.02em;">Playlist card system</div>
     <div style="font-size:14px; color:#a6adc4; margin-top:8px; max-width:680px; line-height:1.6;">Special playlist categories carry a colored gradient identity — a frame around real album art, or a full gradient tile when there's no art to show. See also the <a href="./Luminous%20Design%20System.dc.html">design system</a> and <a href="./Luminous%20Logo%20System.dc.html">logo system</a>.</div>
   </div>
 
   <!-- CATEGORY MAP -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Category colors</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Category colors</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Three families. The gradient shows up as a frame around real album art, or carries the whole tile when a playlist has none.</div>
     <div style="border:1px solid #2c2f3c; border-radius:14px; overflow:hidden;">
       <sc-for list="{{ categories }}" as="cat" hint-placeholder-count="3">
         <div style="display:grid; grid-template-columns:56px 1fr 2fr; align-items:center; gap:20px; padding:18px 20px; border-bottom:1px solid #1c1f29; background:#101218;">
           <div style="width:36px; height:36px; border-radius:10px; background:{{ cat.gradient }};"></div>
-          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">{{ cat.name }}</div>
+          <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:15px;">{{ cat.name }}</div>
           <div style="font-size:13px; color:#a6adc4;">{{ cat.members }}</div>
         </div>
       </sc-for>
@@ -42,7 +42,7 @@
 
   <!-- ICON TILE CARDS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Icon-tile cards</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Icon-tile cards</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Auto-collections without stable album art (Favourites, Recently Added, Queue) get a full-bleed gradient tile with a single glyph — each with its own distinct signature gradient, independent of the frame color families below.</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:20px;">
       <sc-for list="{{ iconTiles }}" as="t" hint-placeholder-count="3">
@@ -51,7 +51,7 @@
             <div style="width:56px; height:56px; color:#fff; display:flex; align-items:center; justify-content:center;" dangerouslySetInnerHTML="{{ t.icon }}"></div>
           </div>
           <div>
-            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">{{ t.name }}</div>
+            <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:15px;">{{ t.name }}</div>
             <div style="font-size:12px; color:#a6adc4; margin-top:2px;">{{ t.subtitle }}</div>
           </div>
         </div>
@@ -61,7 +61,7 @@
 
   <!-- FRAMED ART CARDS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Framed-art cards</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Framed-art cards</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Decades, Genres, and Smart Rule playlists have real album art — the category gradient becomes a thin frame around the stacked artwork, plus a matching badge pill.</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:20px;">
       <sc-for list="{{ framedCards }}" as="c" hint-placeholder-count="3">
@@ -71,7 +71,7 @@
             <image-slot id="{{ c.slotId }}" shape="rect" placeholder="{{ c.placeholder }}" style="width:100%; height:100%;"></image-slot>
           </div>
           <div>
-            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">{{ c.name }}</div>
+            <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:15px;">{{ c.name }}</div>
             <div style="font-size:12px; color:#a6adc4; margin-top:2px;">{{ c.subtitle }}</div>
           </div>
         </div>
@@ -81,7 +81,7 @@
 
   <!-- CUSTOM PLAYLISTS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Custom playlists</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Custom playlists</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">Gradient is the signal for "the app built this for you." Custom playlists are the one thing a person builds themselves — they get no frame and no gradient, just plain album art and the standard card border, so the distinction reads at a glance.</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:20px;">
       <div style="background:#101218; border:1px solid #23262f; border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:14px;">
@@ -89,7 +89,7 @@
           <image-slot id="card-custom" shape="rect" placeholder="Album art" style="width:100%; height:100%;"></image-slot>
         </div>
         <div>
-          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;">Road Trip Mix</div>
+          <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:15px;">Road Trip Mix</div>
           <div style="font-size:12px; color:#a6adc4; margin-top:2px;">Custom · 18 songs</div>
         </div>
       </div>
@@ -98,7 +98,7 @@
 
   <!-- GRADIENT SPECS -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px; border-bottom:1px solid #2c2f3c;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:6px;">Gradient specs</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:6px;">Gradient specs</div>
     <div style="font-size:14px; color:#a6adc4; margin-bottom:36px; max-width:680px; line-height:1.6;">All gradients run 135° (top-left to bottom-right).</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
       <sc-for list="{{ gradientSpecs }}" as="g" hint-placeholder-count="6">
@@ -115,7 +115,7 @@
 
   <!-- DO / DONT -->
   <div style="max-width:1200px; margin:0 auto; padding:64px 48px;">
-    <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
+    <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:26px; margin-bottom:24px;">Do &amp; don't</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
       <div>
         <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#8fbf9a; margin-bottom:14px;">Do</div>

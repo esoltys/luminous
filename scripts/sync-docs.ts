@@ -29,7 +29,7 @@ const HTML_COPIES: Array<[string, string]> = [
   ["luminous-user-guide-FR.dc.html", "luminous-user-guide-FR.html"],
 ];
 
-const ASSET_COPIES = ["support.js", "image-slot.js", "luminous-mark.svg"];
+const ASSET_COPIES = ["support.js", "image-slot.js", "luminous-mark.svg", "expose-700.woff2"];
 
 for (const [src, dest] of HTML_COPIES) {
   fs.copyFileSync(path.join(docsDir, src), path.join(staticDir, dest));

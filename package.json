@@ -25,7 +25,6 @@
     "bump-version": "bun run scripts/bump-version.ts"
   },
   "dependencies": {
-    "@fontsource/space-grotesk": "^5.3.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
