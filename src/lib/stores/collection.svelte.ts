@@ -890,13 +890,15 @@ class CollectionStore {
       }>("enter_miniplayer_mode", payload);
 
       console.log(`[CollectionStore] enter_miniplayer_mode returned:`, res);
-      if (res && res.saved_width && res.saved_height) {
-        this.setSavedWindowGeometry(
-          res.saved_width,
-          res.saved_height,
-          res.saved_x,
-          res.saved_y
-        );
+      if (res && res.saved_x !== undefined && res.saved_y !== undefined) {
+        if (res.saved_x !== null && res.saved_y !== null) {
+          this.savedWindowX = Math.round(res.saved_x);
+          this.savedWindowY = Math.round(res.saved_y);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
+            localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
+          }
+        }
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
@@ -934,10 +936,10 @@ class CollectionStore {
       }>("exit_miniplayer_mode", payload);
 
       console.log(`[CollectionStore] exit_miniplayer_mode returned:`, res);
-      if (res && res.mini_width && res.mini_height) {
+      if (res) {
         this.setMiniplayerGeometry(
-          res.mini_width,
-          res.mini_height,
+          this.miniplayerWidth || 300,
+          this.miniplayerHeight || 360,
           res.mini_x,
           res.mini_y
         );
