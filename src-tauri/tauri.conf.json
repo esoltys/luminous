@@ -191,6 +191,23 @@
       "nsis": {
         "installerHooks": "windows/installer-hooks.nsh"
       }
+    },
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/icons/hicolor": "icons/hicolor"
+        }
+      },
+      "rpm": {
+        "files": {
+          "/usr/share/icons/hicolor": "icons/hicolor"
+        }
+      },
+      "appimage": {
+        "files": {
+          "/usr/share/icons/hicolor": "icons/hicolor"
+        }
+      }
     }
   },
   "plugins": {
