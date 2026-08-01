@@ -77,37 +77,9 @@
           break;
       }
     }
-    let resizeTimer: ReturnType<typeof setTimeout>;
-    function handleResize() {
-      if (collectionStore.miniplayerTransitionInFlight) return;
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (typeof window === 'undefined' || collectionStore.miniplayerTransitionInFlight) return;
-        if (!collectionStore.isMiniplayer) {
-          if (window.innerWidth >= 900 && window.innerHeight >= 600) {
-            collectionStore.setSavedWindowGeometry(
-              window.innerWidth,
-              window.innerHeight,
-              collectionStore.savedWindowX,
-              collectionStore.savedWindowY
-            );
-          }
-        } else {
-          collectionStore.setMiniplayerGeometry(
-            window.innerWidth,
-            window.innerHeight,
-            collectionStore.miniplayerX,
-            collectionStore.miniplayerY
-          );
-        }
-      }, 150);
-    }
-
     window.addEventListener('keydown', handleGlobalHotkeys);
-    window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
-      window.removeEventListener('resize', handleResize);
     };
   });
 
