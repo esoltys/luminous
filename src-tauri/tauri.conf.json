@@ -60,9 +60,16 @@
         "role": "Viewer"
       },
       {
-        "ext": ["m4a", "alac"],
-        "name": "MPEG-4 Audio",
-        "description": "AAC/ALAC audio in an MPEG-4 container",
+        "ext": ["m4a"],
+        "name": "M4A Audio",
+        "description": "AAC audio in an MPEG-4 container",
+        "mimeType": "audio/mp4",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["alac"],
+        "name": "ALAC Audio",
+        "description": "Apple Lossless audio in an MPEG-4 container",
         "mimeType": "audio/mp4",
         "role": "Viewer"
       },
@@ -151,10 +158,17 @@
         "role": "Viewer"
       },
       {
-        "ext": ["m3u", "m3u8"],
+        "ext": ["m3u"],
         "name": "M3U Playlist",
-        "description": "M3U/M3U8 playlist file",
+        "description": "M3U playlist file",
         "mimeType": "audio/x-mpegurl",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["m3u8"],
+        "name": "M3U8 Playlist",
+        "description": "M3U8 playlist file",
+        "mimeType": "application/vnd.apple.mpegurl",
         "role": "Viewer"
       },
       {
@@ -171,7 +185,13 @@
         "mimeType": "application/xspf+xml",
         "role": "Viewer"
       }
-    ]
+    ],
+    "resources": ["icons/filetypes/"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/installer-hooks.nsh"
+      }
+    }
   },
   "plugins": {
     "updater": {
