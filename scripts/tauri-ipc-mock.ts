@@ -712,6 +712,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
+    "move_window_to_preset", "get_window_geometry",
     "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;
