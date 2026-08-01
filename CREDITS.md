@@ -40,6 +40,12 @@ The following 3rd-party services are planned for implementation in the **v2.0 We
 
 ---
 
+## Display Typeface
+
+- [Expose](https://www.fontshare.com/fonts/expose) by Indian Type Foundry
+
+---
+
 ## Influences & Recommended Music Players
 
 Inspired by open-source and indie media players:
