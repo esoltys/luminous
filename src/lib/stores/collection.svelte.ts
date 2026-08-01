@@ -825,14 +825,8 @@ class CollectionStore {
   }
 
   setSavedWindowGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    const clampedW = Math.max(900, Math.round(width));
-    let clampedH = Math.max(600, Math.round(height));
-    // Filter GTK decoration inflation (+20px to +50px on every toggle) if full player was not manually resized
-    if (this.savedWindowHeight > 0 && clampedH > this.savedWindowHeight && clampedH - this.savedWindowHeight <= 50) {
-      clampedH = this.savedWindowHeight;
-    }
-    this.savedWindowWidth = clampedW;
-    this.savedWindowHeight = clampedH;
+    this.savedWindowWidth = Math.max(900, Math.round(width));
+    this.savedWindowHeight = Math.max(600, Math.round(height));
     if (x !== undefined && x !== null) this.savedWindowX = Math.round(x);
     if (y !== undefined && y !== null) this.savedWindowY = Math.round(y);
     console.log(`[CollectionStore] Saved Full Player Geometry: ${this.savedWindowWidth}x${this.savedWindowHeight} at (${this.savedWindowX}, ${this.savedWindowY})`);
@@ -845,10 +839,8 @@ class CollectionStore {
   }
 
   setMiniplayerGeometry(width: number, height: number, x?: number | null, y?: number | null) {
-    const clampedW = Math.max(300, Math.round(width));
-    const clampedH = Math.max(360, Math.round(height));
-    this.miniplayerWidth = clampedW;
-    this.miniplayerHeight = clampedH;
+    this.miniplayerWidth = Math.max(300, Math.round(width));
+    this.miniplayerHeight = Math.max(360, Math.round(height));
     if (x !== undefined && x !== null) this.miniplayerX = Math.round(x);
     if (y !== undefined && y !== null) this.miniplayerY = Math.round(y);
     console.log(`[CollectionStore] Saved Miniplayer Geometry: ${this.miniplayerWidth}x${this.miniplayerHeight} at (${this.miniplayerX}, ${this.miniplayerY})`);
@@ -890,15 +882,13 @@ class CollectionStore {
       }>("enter_miniplayer_mode", payload);
 
       console.log(`[CollectionStore] enter_miniplayer_mode returned:`, res);
-      if (res && res.saved_x !== undefined && res.saved_y !== undefined) {
-        if (res.saved_x !== null && res.saved_y !== null) {
-          this.savedWindowX = Math.round(res.saved_x);
-          this.savedWindowY = Math.round(res.saved_y);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("layout_savedWindowX", this.savedWindowX.toString());
-            localStorage.setItem("layout_savedWindowY", this.savedWindowY.toString());
-          }
-        }
+      if (res && res.saved_width && res.saved_height) {
+        this.setSavedWindowGeometry(
+          res.saved_width,
+          res.saved_height,
+          res.saved_x,
+          res.saved_y
+        );
       }
     } catch (e) {
       console.warn("Failed to enter miniplayer backend window mode:", e);
@@ -936,10 +926,10 @@ class CollectionStore {
       }>("exit_miniplayer_mode", payload);
 
       console.log(`[CollectionStore] exit_miniplayer_mode returned:`, res);
-      if (res) {
+      if (res && res.mini_width && res.mini_height) {
         this.setMiniplayerGeometry(
-          this.miniplayerWidth || 300,
-          this.miniplayerHeight || 360,
+          res.mini_width,
+          res.mini_height,
           res.mini_x,
           res.mini_y
         );

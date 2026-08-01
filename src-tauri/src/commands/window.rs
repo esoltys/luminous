@@ -13,10 +13,14 @@ pub async fn enter_miniplayer_mode(
     y: Option<f64>,
 ) -> Result<serde_json::Value, String> {
     let scale_factor = window.scale_factor().unwrap_or(1.0);
-    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let current_pos = window.outer_position().ok();
 
-    // Logical dimensions for frontend storage
+    // Toggle decorations off FIRST so inner_size() measures the exact un-decorated canvas
+    // preventing GTK decoration/shadow margin inflation on Linux
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_decorations(false);
+
+    let current_size = window.inner_size().map_err(|e| e.to_string())?;
     let logical_width = (current_size.width as f64 / scale_factor).round();
     let logical_height = (current_size.height as f64 / scale_factor).round();
     let (saved_x, saved_y) = match current_pos {
@@ -27,35 +31,28 @@ pub async fn enter_miniplayer_mode(
         None => (None, None),
     };
 
-    let target_logical_w = width.unwrap_or(300.0).round().max(300.0);
-    let target_logical_h = height.unwrap_or(360.0).round().max(360.0);
-
-    let target_phys_w = (target_logical_w * scale_factor).round() as u32;
-    let target_phys_h = (target_logical_h * scale_factor).round() as u32;
+    let target_w = width.unwrap_or(300.0).round().max(300.0);
+    let target_h = height.unwrap_or(360.0).round().max(360.0);
 
     println!(
-        "[Luminous Window IPC] enter_miniplayer_mode -> Full Player: (w: {}, h: {}, phys_w: {}, phys_h: {}), Target Mini: (w: {}, h: {}, phys_w: {}, phys_h: {}), scale: {}",
-        logical_width, logical_height, current_size.width, current_size.height, target_logical_w, target_logical_h, target_phys_w, target_phys_h, scale_factor
+        "[Luminous Window IPC] enter_miniplayer_mode -> Saving Full Player: (w: {}, h: {}, x: {:?}, y: {:?}), Target Mini: (w: {}, h: {}, x: {:?}, y: {:?}), scale: {}",
+        logical_width, logical_height, saved_x, saved_y, target_w, target_h, x, y, scale_factor
     );
     let _ = std::io::stdout().flush();
 
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_decorations(false);
-    let _ = window.set_min_size(Some(tauri::Size::Physical(tauri::PhysicalSize {
-        width: (200.0 * scale_factor).round() as u32,
-        height: (200.0 * scale_factor).round() as u32,
+    let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
+        width: 200.0,
+        height: 200.0,
     })));
-    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-        width: target_phys_w,
-        height: target_phys_h,
+    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: target_w,
+        height: target_h,
     }));
 
     if let (Some(target_x), Some(target_y)) = (x, y) {
-        let phys_x = (target_x * scale_factor).round() as i32;
-        let phys_y = (target_y * scale_factor).round() as i32;
-        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-            x: phys_x,
-            y: phys_y,
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: target_x,
+            y: target_y,
         }));
     } else {
         let _ = window.move_window(Position::TopRight);
@@ -91,35 +88,31 @@ pub async fn exit_miniplayer_mode(
         None => (None, None),
     };
 
-    let restore_logical_w = saved_width.unwrap_or(1280.0).round().max(900.0);
-    let restore_logical_h = saved_height.unwrap_or(800.0).round().max(600.0);
-
-    let restore_phys_w = (restore_logical_w * scale_factor).round() as u32;
-    let restore_phys_h = (restore_logical_h * scale_factor).round() as u32;
+    let restore_w = saved_width.unwrap_or(1280.0).round().max(900.0);
+    let restore_h = saved_height.unwrap_or(800.0).round().max(600.0);
 
     println!(
-        "[Luminous Window IPC] exit_miniplayer_mode -> Miniplayer: (w: {}, h: {}), Restoring Full: (w: {}, h: {}, phys_w: {}, phys_h: {}), scale: {}",
-        mini_width, mini_height, restore_logical_w, restore_logical_h, restore_phys_w, restore_phys_h, scale_factor
+        "[Luminous Window IPC] exit_miniplayer_mode -> Miniplayer: (w: {}, h: {}), Restoring Full: (w: {}, h: {}), scale: {}",
+        mini_width, mini_height, restore_w, restore_h, scale_factor
     );
     let _ = std::io::stdout().flush();
 
+    // Resize while un-decorated FIRST, then restore decorations
+    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: restore_w,
+        height: restore_h,
+    }));
     let _ = window.set_decorations(true);
     let _ = window.set_always_on_top(false);
-    let _ = window.set_min_size(Some(tauri::Size::Physical(tauri::PhysicalSize {
-        width: (900.0 * scale_factor).round() as u32,
-        height: (600.0 * scale_factor).round() as u32,
+    let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
+        width: 900.0,
+        height: 600.0,
     })));
-    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
-        width: restore_phys_w,
-        height: restore_phys_h,
-    }));
 
     if let (Some(rx), Some(ry)) = (saved_x, saved_y) {
-        let phys_x = (rx * scale_factor).round() as i32;
-        let phys_y = (ry * scale_factor).round() as i32;
-        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-            x: phys_x,
-            y: phys_y,
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: rx,
+            y: ry,
         }));
     } else {
         let _ = window.move_window(Position::Center);
