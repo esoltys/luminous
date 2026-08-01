@@ -21,7 +21,7 @@
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, RotateCw, CheckCircle2 } from "lucide-svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, CheckCircle2 } from "lucide-svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -107,6 +107,9 @@
       }
       selectedSongIds = newSet;
       lastSelectedSongId = song.id;
+    } else if (selectedSongIds.size === 1 && selectedSongIds.has(song.id)) {
+      selectedSongIds = new Set();
+      lastSelectedSongId = null;
     } else {
       selectedSongIds = new Set([song.id]);
       lastSelectedSongId = song.id;
@@ -485,7 +488,7 @@
               title={i18n.t('playlists.refreshAutoPlaylistTooltip')}
               class="shrink-0"
             >
-              {#snippet icon()}<RotateCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
+              {#snippet icon()}<RefreshCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
             </IconActionButton>
           {/if}
           <ColumnSelector align="left" iconOnly />

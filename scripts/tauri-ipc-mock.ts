@@ -525,6 +525,9 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         track: song.track ?? null,
         disc: song.disc ?? null,
         year: song.year ?? null,
+        grouping: song.grouping ?? "",
+        bpm: song.bpm ?? null,
+        initial_key: song.initial_key ?? "",
         rating: song.rating ?? -1,
       };
     },

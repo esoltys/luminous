@@ -90,12 +90,6 @@
     <!-- Body -->
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       <div class="flex flex-col gap-4">
-        <!-- Tracks badge -->
-        <div class="flex items-center gap-2 bg-brand-main border border-brand-border rounded-lg px-3 py-2.5 text-xs font-medium text-brand-text-secondary">
-          <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-          <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
-        </div>
-
         <!-- Form fields -->
         <div class="grid grid-cols-2 gap-4">
           <!-- Album Title -->
@@ -122,18 +116,25 @@
     </div>
 
     <!-- Footer -->
-    <div class="h-16 flex items-center justify-end px-6 border-t border-brand-border gap-3 bg-brand-main shrink-0">
-      <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
-        {i18n.t('albumTagEditor.cancelBtn')}
-      </Button>
-      <Button onclick={handleSave} disabled={isSaving} variant="primary" size="sm">
-        {#if isSaving}
-          <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-          <span>{i18n.t('albumTagEditor.saving')}</span>
-        {:else}
-          <Save class="w-3.5 h-3.5" />
-          <span>{i18n.t('albumTagEditor.saveBtn')}</span>
-        {/if}
-      </Button>
+    <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border bg-brand-main shrink-0">
+      <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
+        <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+        <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">
+          {i18n.t('albumTagEditor.cancelBtn')}
+        </Button>
+        <Button onclick={handleSave} disabled={isSaving} variant="primary" size="sm">
+          {#if isSaving}
+            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+            <span>{i18n.t('albumTagEditor.saving')}</span>
+          {:else}
+            <Save class="w-3.5 h-3.5" />
+            <span>{i18n.t('albumTagEditor.saveBtn')}</span>
+          {/if}
+        </Button>
+      </div>
     </div>
 </Modal>

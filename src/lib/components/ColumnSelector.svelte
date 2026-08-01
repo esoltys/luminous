@@ -4,6 +4,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { portal } from "../utils/portal";
+  import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { Columns } from "lucide-svelte";
 
   interface Props {
@@ -62,33 +63,7 @@
   }
 
   // Ordered list of all columns as they appear in the table (left-to-right)
-  const TABLE_ORDER: { key: keyof VisibleColumns; label: string }[] = [
-    { key: "track",       label: "collection.columnTrack" },
-    { key: "title",       label: "collection.columnTitle" },
-    { key: "artist",      label: "collection.columnArtist" },
-    { key: "album",       label: "collection.columnAlbum" },
-    { key: "composer",    label: "collection.columnComposer" },
-    { key: "album_artist",label: "collection.columnAlbumArtist" },
-    { key: "format",      label: "collection.columnFormat" },
-    { key: "year",        label: "collection.columnYear" },
-    { key: "genre",       label: "collection.columnGenre" },
-    { key: "grouping",    label: "collection.columnGrouping" },
-    { key: "bpm",         label: "collection.columnBpm" },
-    { key: "initial_key", label: "collection.columnInitialKey" },
-    { key: "bitrate",     label: "collection.columnBitrate" },
-    { key: "samplerate",  label: "collection.columnSampleRate" },
-    { key: "bitdepth",    label: "collection.columnBitDepth" },
-    { key: "channels",    label: "collection.columnChannels" },
-    { key: "filesize",    label: "collection.columnFileSize" },
-    { key: "rating",      label: "collection.columnRating" },
-    { key: "playcount",   label: "collection.columnPlayCount" },
-    { key: "skipcount",   label: "collection.columnSkipCount" },
-    { key: "lastplayed",  label: "collection.columnLastPlayed" },
-    { key: "added",       label: "collection.columnAdded" },
-    { key: "duration",    label: "collection.columnDuration" },
-    { key: "path",        label: "collection.columnPath" },
-    { key: "actions",     label: "collection.columnActions" },
-  ];
+  const TABLE_ORDER: { key: keyof VisibleColumns; label: string }[] = SONG_TABLE_COLUMNS;
 
   // Metatag columns (embedded in audio file), alphabetical
   const METATAG_COLS: { key: keyof VisibleColumns; label: string }[] = [
@@ -135,13 +110,13 @@
   <button
     bind:this={buttonEl}
     onclick={toggleMenu}
-    class="flex items-center justify-center gap-1.5 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
+    class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
       {iconOnly
         ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
-        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px]' : 'px-3 py-1.5 text-xs')}"
+        : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
     title={i18n.t("collection.columnsBtn")}
   >
-    <Columns class="w-3.5 h-3.5 text-brand-accent-text" />
+    <Columns class={iconOnly || size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
     {#if !iconOnly}<span>{i18n.t("collection.columnsBtn")}</span>{/if}
   </button>
 

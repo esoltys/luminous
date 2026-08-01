@@ -67,6 +67,9 @@
       }
       selectedSongIds = newSet;
       lastSelectedSongId = song.id;
+    } else if (selectedSongIds.size === 1 && selectedSongIds.has(song.id)) {
+      selectedSongIds = new Set();
+      lastSelectedSongId = null;
     } else {
       selectedSongIds = new Set([song.id]);
       lastSelectedSongId = song.id;

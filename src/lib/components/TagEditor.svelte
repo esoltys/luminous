@@ -32,6 +32,9 @@
   let track = $state<number | null>(null);
   let disc = $state<number | null>(null);
   let year = $state<number | null>(null);
+  let grouping = $state("");
+  let bpm = $state<number | null>(null);
+  let initialKey = $state("");
   let path = $state("");
   let rating = $state(-1);
 
@@ -61,6 +64,9 @@
         track: number | null;
         disc: number | null;
         year: number | null;
+        grouping: string;
+        bpm: number | null;
+        initial_key: string;
         rating: number;
       }>("get_song_details", { songId });
 
@@ -73,6 +79,9 @@
       track = details.track;
       disc = details.disc;
       year = details.year;
+      grouping = details.grouping;
+      bpm = details.bpm;
+      initialKey = details.initial_key;
       path = details.path;
       rating = details.rating;
     } catch (e: any) {
@@ -153,6 +162,9 @@
         track,
         disc,
         year,
+        grouping,
+        bpm,
+        initialKey,
       });
 
       // Refresh the database views and collection store stats
@@ -238,8 +250,42 @@
             </div>
           {/if}
 
-          <!-- Grid form -->
+          <!-- Grid form: field order mirrors the collection table's column order (track, title, artist,
+               album, composer, album artist, year, genre, grouping, bpm, initial key), with Disc paired
+               alongside Track (Disc first) since it has no column of its own in the table. -->
           <div class="grid grid-cols-2 gap-4">
+            <!-- Disc Number -->
+            <FormField label={i18n.t('tagEditor.discField')} for="tag-disc">
+              <Input
+                id="tag-disc"
+                type="number"
+                value={disc ?? ""}
+                disabled={isSaving}
+                oninput={(e) => {
+                  const val = parseInt(e.currentTarget.value, 10);
+                  disc = isNaN(val) ? null : val;
+                }}
+                size="sm"
+                class="w-full"
+              />
+            </FormField>
+
+            <!-- Track Number -->
+            <FormField label={i18n.t('tagEditor.trackField')} for="tag-track">
+              <Input
+                id="tag-track"
+                type="number"
+                value={track ?? ""}
+                disabled={isSaving}
+                oninput={(e) => {
+                  const val = parseInt(e.currentTarget.value, 10);
+                  track = isNaN(val) ? null : val;
+                }}
+                size="sm"
+                class="w-full"
+              />
+            </FormField>
+
             <!-- Title -->
             <FormField label={i18n.t('tagEditor.titleField')} for="tag-title" span2>
               <Input
@@ -279,26 +325,15 @@
               />
             </FormField>
 
-            <!-- Album Artist -->
-            <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist">
-              <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
-            </FormField>
-
             <!-- Composer -->
             <FormField label={i18n.t('tagEditor.composerField')} for="tag-composer">
               <Input id="tag-composer" bind:value={composer} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
-            <!-- Genre -->
-            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2>
-              <Input id="tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
+            <!-- Album Artist -->
+            <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist" tooltip={i18n.t('tagEditor.albumArtistTooltip')}>
+              <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
-
-            <!-- Rating (library-only, saves immediately) -->
-            <div class="flex flex-col gap-1.5 col-span-2">
-              <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
-              <SongRating {rating} onRate={handleRate} size="md" />
-            </div>
 
             <!-- Year -->
             <FormField label={i18n.t('tagEditor.yearField')} for="tag-year">
@@ -318,37 +353,42 @@
               />
             </FormField>
 
-            <!-- Track Number -->
-            <FormField label={i18n.t('tagEditor.trackField')} for="tag-track">
+            <!-- Genre -->
+            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre">
+              <Input id="tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
+            </FormField>
+
+            <!-- Grouping -->
+            <FormField label={i18n.t('tagEditor.groupingField')} for="tag-grouping" tooltip={i18n.t('tagEditor.groupingTooltip')}>
+              <Input id="tag-grouping" bind:value={grouping} disabled={isSaving} size="sm" class="w-full" />
+            </FormField>
+
+            <!-- BPM -->
+            <FormField label={i18n.t('tagEditor.bpmField')} for="tag-bpm" tooltip={i18n.t('tagEditor.bpmTooltip')}>
               <Input
-                id="tag-track"
+                id="tag-bpm"
                 type="number"
-                value={track ?? ""}
+                value={bpm ?? ""}
                 disabled={isSaving}
                 oninput={(e) => {
-                  const val = parseInt(e.currentTarget.value, 10);
-                  track = isNaN(val) ? null : val;
+                  const val = parseFloat(e.currentTarget.value);
+                  bpm = isNaN(val) ? null : val;
                 }}
                 size="sm"
                 class="w-full"
               />
             </FormField>
 
-            <!-- Disc Number -->
-            <FormField label={i18n.t('tagEditor.discField')} for="tag-disc" span2>
-              <Input
-                id="tag-disc"
-                type="number"
-                value={disc ?? ""}
-                disabled={isSaving}
-                oninput={(e) => {
-                  const val = parseInt(e.currentTarget.value, 10);
-                  disc = isNaN(val) ? null : val;
-                }}
-                size="sm"
-                class="w-full"
-              />
+            <!-- Initial Key -->
+            <FormField label={i18n.t('tagEditor.initialKeyField')} for="tag-initialkey" tooltip={i18n.t('tagEditor.initialKeyTooltip')}>
+              <Input id="tag-initialkey" bind:value={initialKey} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
+
+            <!-- Rating (library-only, saves immediately) -->
+            <div class="flex flex-col gap-1.5">
+              <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
+              <SongRating {rating} onRate={handleRate} size="md" />
+            </div>
           </div>
         </div>
       {/if}
