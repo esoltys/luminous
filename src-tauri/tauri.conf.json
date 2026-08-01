@@ -30,6 +30,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Eric James Soltys (https://esoltys.dev/luminous/)",
+    "copyright": "Copyright © 2026 Eric James Soltys",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "category": "Music",
+    "shortDescription": "Luminous Music Player — A modern, elegant music player",
+    "longDescription": "Luminous is a modern, fast, and feature-rich desktop music player featuring gapless playback, 10-band and 20-band DSP equalizer, synchronized LRCLIB lyrics, automatic cover art extraction, and advanced music library management.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -195,17 +202,20 @@
     "linux": {
       "deb": {
         "files": {
-          "/usr/share/icons/hicolor": "icons/hicolor"
+          "/usr/share/icons/hicolor": "icons/hicolor",
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
         }
       },
       "rpm": {
         "files": {
-          "/usr/share/icons/hicolor": "icons/hicolor"
+          "/usr/share/icons/hicolor": "icons/hicolor",
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
         }
       },
       "appimage": {
         "files": {
-          "/usr/share/icons/hicolor": "icons/hicolor"
+          "/usr/share/icons/hicolor": "icons/hicolor",
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
         }
       }
     }
