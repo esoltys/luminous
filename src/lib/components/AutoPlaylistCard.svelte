@@ -82,6 +82,15 @@
   // than representative (unlike a genre, decade, or user playlist).
   let topCovers = $derived(kind === "genre" || kind === "decade" ? songsToCoverStack(songs) : []);
 
+  let badgeColorClass = $derived.by(() => {
+    switch (kind) {
+      case "decade": return "bg-[#2563EB] text-white";
+      case "genre": return "bg-[#059669] text-white";
+      case "favourites": return "bg-[#DB2777] text-white";
+      case "recently_added": return "bg-[#CA8A04] text-white";
+    }
+  });
+
   let updatedLabel = $derived.by(() => {
     if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
     return formatRelativeDate(updated);
@@ -96,33 +105,33 @@
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-lg shadow-[#38BDF8]/30' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-lg shadow-[#34D399]/30'} flex items-center justify-center overflow-hidden border relative">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
         <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DB2777]/25 to-[#F43F5E]/15 flex items-center justify-center overflow-hidden border border-[#F43F5E]/30 shadow-lg shadow-[#F43F5E]/30">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DB2777]/25 to-[#F43F5E]/15 flex items-center justify-center overflow-hidden border border-[#F43F5E]/30 shadow-[0_0_20px_2px_rgba(244,63,94,0.35)]">
         <Heart class="w-10 h-10 text-[#F43F5E] fill-current" />
       </div>
     {:else if kind === "recently_added"}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-lg shadow-[#FACC15]/30">
-        <Clock class="w-10 h-10 text-[#FACC15]" />
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_20px_2px_rgba(250,204,21,0.35)]">
+        <Clock class="w-10 h-10 text-[#CA8A04]" />
       </div>
     {:else if kind === "decade"}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-lg shadow-[#38BDF8]/30">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]">
         <Calendar class="w-10 h-10 text-[#38BDF8]" />
       </div>
     {:else if kind === "genre"}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-lg shadow-[#34D399]/30">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]">
         <Music class="w-10 h-10 text-[#34D399]" />
       </div>
     {:else}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-lg shadow-slate-500/20">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">
         <ListMusic class="w-10 h-10 text-slate-300" />
       </div>
     {/if}
 
     {#if autoPlay}
-      <CardBadge icon={RefreshCw} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} spin />
+      <CardBadge icon={RefreshCw} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} colorClass={badgeColorClass} spin />
     {/if}
   </div>
 

@@ -24,7 +24,8 @@
     Radio,
     Layers,
     MoreHorizontal,
-    Eraser
+    Eraser,
+    Sparkles
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -35,6 +36,7 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import SortableHeader from "./SortableHeader.svelte";
@@ -818,10 +820,18 @@
           </div>
         </div>
 
-        <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue Banner -->
+        <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue/Smart Banner -->
         {#if isQueue}
-          <div class="w-32 h-32 hidden sm:flex shrink-0 bg-gradient-to-br from-[#4338CA] to-[#7C3AED] items-center justify-center overflow-hidden border border-brand-border/60 shadow-xl">
-            <Layers class="w-14 h-14 text-white/90" />
+          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#4338CA]/25 to-[#7C3AED]/15 items-center justify-center overflow-hidden border border-[#7C3AED]/30 shadow-[0_0_28px_3px_rgba(124,58,237,0.4)]">
+            <Layers class="w-16 h-16 text-[#7C3AED]" />
+          </div>
+        {:else if isSmartPlaylist && topAlbums.length > 0}
+          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
+            <CoverStack covers={topAlbums} sizeClass="w-[82%] h-[82%]" />
+          </div>
+        {:else if isSmartPlaylist}
+          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
+            <Sparkles class="w-16 h-16 text-[#F59E0B]" />
           </div>
         {:else if topAlbums.length > 0}
           <div class="relative self-stretch w-48 hidden sm:block shrink-0">
