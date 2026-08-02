@@ -63,11 +63,14 @@
     playerStore.setRepeatMode(modes[nextIdx]);
   }
 
+  const isLinux = typeof navigator !== "undefined" && (/linux/i.test(navigator.userAgent) || /linux/i.test(navigator.platform));
+
   function handleStartDrag(e: PointerEvent) {
     invoke("start_window_drag").catch(() => {});
   }
 
   function handleStartResize(direction: string, e: PointerEvent) {
+    if (isLinux) return;
     e.stopPropagation();
     invoke("start_window_resize", { direction }).catch(() => {});
   }
@@ -84,6 +87,49 @@
     }
   }
 
+  let isHovered = $state(false);
+
+  function showHover(e?: MouseEvent | PointerEvent) {
+    if (e) {
+      const margin = 4;
+      if (
+        e.clientX <= margin ||
+        e.clientY <= margin ||
+        e.clientX >= window.innerWidth - margin ||
+        e.clientY >= window.innerHeight - margin
+      ) {
+        hideHover();
+        return;
+      }
+    }
+
+    isHovered = true;
+  }
+
+  function hideHover() {
+    isHovered = false;
+  }
+
+  $effect(() => {
+    const handleBlur = () => hideHover();
+    const handleMouseLeave = () => hideHover();
+    const handleMouseOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) {
+        hideHover();
+      }
+    };
+
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("mouseleave", handleMouseLeave);
+    window.addEventListener("mouseout", handleMouseOut);
+
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("mouseleave", handleMouseLeave);
+      window.removeEventListener("mouseout", handleMouseOut);
+    };
+  });
+
   function formatTime(nanosec: number | undefined): string {
     if (nanosec === undefined) return "0:00";
     const sec = Math.floor(nanosec / 1_000_000_000);
@@ -99,26 +145,32 @@
   role="group"
   aria-label={i18n.t('miniplayer.title')}
   onkeydown={handleKeyDown}
+  onpointerenter={showHover}
+  onpointermove={showHover}
+  onpointerleave={hideHover}
+  onmouseleave={hideHover}
   tabindex="0"
   class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  <!-- Edge and Corner Resize Handles for Frameless Window -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-50" onpointerdown={(e) => handleStartResize("north", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-50" onpointerdown={(e) => handleStartResize("south", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute top-0 bottom-0 left-0 w-2 cursor-w-resize z-50" onpointerdown={(e) => handleStartResize("west", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute top-0 bottom-0 right-0 w-2 cursor-e-resize z-50" onpointerdown={(e) => handleStartResize("east", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" onpointerdown={(e) => handleStartResize("north-west", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" onpointerdown={(e) => handleStartResize("north-east", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" onpointerdown={(e) => handleStartResize("south-west", e)}></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
+  <!-- Edge and Corner Resize Handles for Frameless Window (non-Linux platforms) -->
+  {#if !isLinux}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute top-0 left-0 right-0 h-2 cursor-n-resize z-50" onpointerdown={(e) => handleStartResize("north", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize z-50" onpointerdown={(e) => handleStartResize("south", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute top-0 bottom-0 left-0 w-2 cursor-w-resize z-50" onpointerdown={(e) => handleStartResize("west", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute top-0 bottom-0 right-0 w-2 cursor-e-resize z-50" onpointerdown={(e) => handleStartResize("east", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50" onpointerdown={(e) => handleStartResize("north-west", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-50" onpointerdown={(e) => handleStartResize("north-east", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-50" onpointerdown={(e) => handleStartResize("south-west", e)}></div>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
+  {/if}
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
     <div class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none scale-125">
@@ -136,7 +188,7 @@
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
     <!-- Centered Sharp Active Album Art Card -->
     <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
-      <div class="relative aspect-square max-h-full max-w-[240px] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center group-hover:scale-[0.98] transition-transform duration-300">
+      <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
         <CoverArt
           songId={playerStore.currentSong?.id}
           artEmbedded={playerStore.currentSong?.art_embedded}
@@ -159,8 +211,12 @@
   </div>
 
   <!-- FOCUSED HOVER CONTROL MASK (Revealed on mouse hover) -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="absolute inset-0 z-30 bg-brand-main/85 backdrop-blur-md flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto"
+    onpointerenter={showHover}
+    onpointermove={showHover}
+    onpointerleave={hideHover}
+    class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {isLinux ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
   >
     <!-- Full-width Window Drag Region spanning the top edge, textured with a grabber dot pattern -->
     <div

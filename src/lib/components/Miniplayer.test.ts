@@ -134,4 +134,36 @@ describe("Miniplayer.svelte", () => {
     await fireEvent.click(muteBtn);
     expect(setVolumeSpy).toHaveBeenLastCalledWith(0.4);
   });
+
+  it("handles mouse enter/leave and applies opaque background on Linux", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByRole, container } = render(Miniplayer);
+
+    const group = getByRole("group");
+    const hoverMask = container.querySelector(".absolute.inset-0.z-30") as HTMLElement;
+    expect(hoverMask).toBeInTheDocument();
+
+    // Initially pointer events none and hidden
+    expect(hoverMask.className).toContain("opacity-0");
+
+    window.innerWidth = 1000;
+    window.innerHeight = 800;
+
+    // Pointer enter inside window bounds activates hover mask
+    await fireEvent.pointerEnter(group, { clientX: 100, clientY: 100 });
+    expect(hoverMask.className).toContain("opacity-100");
+
+    // Pointer leave deactivates hover mask
+    await fireEvent.pointerLeave(group);
+    expect(hoverMask.className).toContain("opacity-0");
+
+    // Opaque background class bg-brand-main is used on Linux, acrylic blur on other platforms
+    if (/linux/i.test(navigator.userAgent) || /linux/i.test(navigator.platform)) {
+      expect(hoverMask.className).toContain("bg-brand-main");
+    } else {
+      expect(hoverMask.className).toContain("bg-brand-main/85");
+      expect(hoverMask.className).toContain("backdrop-blur-md");
+    }
+  });
 });
+
