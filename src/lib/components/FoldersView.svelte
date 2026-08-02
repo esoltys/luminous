@@ -357,7 +357,7 @@
         </div>
 
         <!-- Rating style row -->
-        <div class="flex items-center justify-between gap-4 py-4">
+        <div class="flex items-center justify-between gap-4 pt-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
