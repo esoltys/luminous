@@ -1,0 +1,86 @@
+<script lang="ts">
+  import { Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
+  import { i18n } from "../stores/i18n.svelte";
+  import { formatRelativeDate } from "../utils/date";
+  import { playlistsStore } from "../stores/playlists.svelte";
+  import { getPlaylistDisplayName } from "../utils/playlist";
+
+  interface Props {
+    label: string;
+    kind: "favourites" | "recently_added" | "genre" | "decade";
+    genre?: string;
+    decade?: string;
+    playlistId?: number;
+    updated?: number;
+    trackCount: number;
+    autoPlay?: boolean;
+    onClick: () => void;
+  }
+
+  let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick }: Props = $props();
+
+  let displayLabel = $derived.by(() => {
+    if ((kind === "genre" || kind === "decade") && playlistId !== undefined) {
+      const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+      if (pl) return getPlaylistDisplayName(pl);
+    }
+    return label;
+  });
+
+  let subtitleLabel = $derived.by(() => {
+    if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
+    if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
+    if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
+    if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    return i18n.t("playlists.genreAutoPlaylist");
+  });
+
+  let updatedLabel = $derived.by(() => {
+    if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
+    return formatRelativeDate(updated);
+  });
+</script>
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div
+  onclick={onClick}
+  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/40 hover:shadow-md hover:shadow-brand-accent/10 transition-all duration-200 cursor-pointer select-none"
+>
+  <div
+    class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {kind === 'decade'
+      ? 'bg-[#38BDF8]/15 border-[#38BDF8]/30'
+      : kind === 'genre'
+        ? 'bg-[#34D399]/15 border-[#34D399]/30'
+        : kind === 'favourites'
+          ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
+          : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+  >
+    {#if kind === "favourites"}
+      <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
+    {:else if kind === "recently_added"}
+      <Clock class="w-5 h-5 text-[#CA8A04]" />
+    {:else if kind === "decade"}
+      <Calendar class="w-5 h-5 text-[#38BDF8]" />
+    {:else}
+      <Music class="w-5 h-5 text-[#34D399]" />
+    {/if}
+    {#if autoPlay}
+      <RefreshCw class="w-3 h-3 absolute bottom-0.5 right-0.5 opacity-70 animate-spin [animation-duration:3s]" />
+    {/if}
+  </div>
+
+  <div class="min-w-0 flex-1">
+    <p class="truncate text-sm font-semibold text-brand-text-primary" title={displayLabel}>{displayLabel}</p>
+    <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleLabel}</p>
+  </div>
+
+  <div class="shrink-0 max-w-40 text-right">
+    <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">
+      {trackCount === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: trackCount })}
+    </p>
+    {#if updatedLabel}
+      <p class="text-xs text-brand-text-secondary truncate">{updatedLabel}</p>
+    {/if}
+  </div>
+</div>

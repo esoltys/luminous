@@ -171,9 +171,9 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
   <!-- Track Metadata & Art -->
-  <div class="flex items-center gap-3 w-1/3 min-w-[200px]">
+  <div class="flex items-center gap-3 w-1/3 min-w-[200px] max-w-xs">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -316,7 +316,7 @@
   </div>
 
   <!-- Auxiliary (Volume & Visualizers) -->
-  <div class="flex items-center justify-end gap-3 w-1/3 min-w-[200px]">
+  <div class="flex items-center justify-end gap-3 w-1/3 min-w-[200px] max-w-xs">
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>

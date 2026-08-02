@@ -6,9 +6,12 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import type { Playlist } from "../types";
   import PlaylistCard from "./PlaylistCard.svelte";
+  import PlaylistRowCard from "./PlaylistRowCard.svelte";
   import AutoPlaylistCard from "./AutoPlaylistCard.svelte";
+  import AutoPlaylistRowCard from "./AutoPlaylistRowCard.svelte";
   import PlaylistView from "./PlaylistView.svelte";
   import AutoPlaylistDetailView from "./AutoPlaylistDetailView.svelte";
   import SmartPlaylistBuilderModal from "./SmartPlaylistBuilderModal.svelte";
@@ -16,7 +19,7 @@
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { FolderInput, Plus, ListMusic, Sparkles } from "lucide-svelte";
+  import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3 } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
@@ -178,6 +181,18 @@
     return queue ? [queue, ...rest] : rest;
   });
 
+  let activeViewMode = $derived(
+    collectionStore.playlistsSubTab === "auto" ? prefs.playlistsAutoViewMode : prefs.playlistsCustomViewMode
+  );
+
+  function setActiveViewMode(mode: CollectionViewMode) {
+    if (collectionStore.playlistsSubTab === "auto") {
+      prefs.setPlaylistsAutoViewMode(mode);
+    } else {
+      prefs.setPlaylistsCustomViewMode(mode);
+    }
+  }
+
   function openAuto(def: AutoDef) {
     collectionStore.viewAutoPlaylist(
       def.kind === "genre"
@@ -235,10 +250,10 @@
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
-      <div class="sticky top-0 z-20 bg-brand-main pt-3 pb-2">
-        <!-- Actions (Left) -->
-        <div class="h-10 flex items-center gap-2 mb-2">
-          {#if collectionStore.playlistsSubTab === "custom"}
+      <div class="sticky top-0 z-20 bg-brand-main pt-3">
+        {#if collectionStore.playlistsSubTab === "custom"}
+          <!-- Actions (Left) -->
+          <div class="h-10 flex items-center gap-2 mb-2">
             <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-4 h-4" />
               <span>{i18n.t('playlists.newPlaylistBtn')}</span>
@@ -247,8 +262,8 @@
               <FolderInput class="w-4 h-4 text-brand-accent-text" />
               <span>{i18n.t('playlists.importPlaylistBtn')}</span>
             </Button>
-          {/if}
-        </div>
+          </div>
+        {/if}
 
         <div class="h-9 flex items-center justify-between">
           <!-- Showing Count (Left) -->
@@ -260,8 +275,29 @@
             {/if}
           </div>
 
-          <!-- Sort Dropdown (Right) -->
-          <div class="relative">
+          <!-- View Mode Toggle + Sort Dropdown (Right) -->
+          <div class="flex items-center gap-2">
+            <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+              <button
+                onclick={() => setActiveViewMode("cards")}
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                title={i18n.t('collection.viewCards')}
+                aria-label={i18n.t('collection.viewCards')}
+                aria-pressed={activeViewMode === "cards"}
+              >
+                <LayoutGrid class="w-4 h-4" />
+              </button>
+              <button
+                onclick={() => setActiveViewMode("rows")}
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                title={i18n.t('collection.viewRows')}
+                aria-label={i18n.t('collection.viewRows')}
+                aria-pressed={activeViewMode === "rows"}
+              >
+                <Rows3 class="w-4 h-4" />
+              </button>
+            </div>
+            <div class="relative">
             {#if collectionStore.playlistsSubTab === "auto"}
               <Select
                 value={`${autoSortField}-${autoSortAsc}`}
@@ -297,6 +333,7 @@
                 <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
               </Select>
             {/if}
+            </div>
           </div>
         </div>
       </div>
@@ -316,19 +353,33 @@
 
       <div class="pt-2 pb-8">
         {#if collectionStore.playlistsSubTab === "auto"}
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+          <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
             {#each sortedAutoDefs as def (def.id)}
-              <AutoPlaylistCard
-                label={def.label}
-                kind={def.kind}
-                genre={def.genre}
-                decade={def.decade}
-                playlistId={def.playlistId}
-                updated={def.updated}
-                trackCount={def.trackCount}
-                autoPlay={def.autoPlay}
-                onClick={() => openAuto(def)}
-              />
+              {#if activeViewMode === "rows"}
+                <AutoPlaylistRowCard
+                  label={def.label}
+                  kind={def.kind}
+                  genre={def.genre}
+                  decade={def.decade}
+                  playlistId={def.playlistId}
+                  updated={def.updated}
+                  trackCount={def.trackCount}
+                  autoPlay={def.autoPlay}
+                  onClick={() => openAuto(def)}
+                />
+              {:else}
+                <AutoPlaylistCard
+                  label={def.label}
+                  kind={def.kind}
+                  genre={def.genre}
+                  decade={def.decade}
+                  playlistId={def.playlistId}
+                  updated={def.updated}
+                  trackCount={def.trackCount}
+                  autoPlay={def.autoPlay}
+                  onClick={() => openAuto(def)}
+                />
+              {/if}
             {/each}
           </div>
         {:else}
@@ -343,9 +394,13 @@
               />
             </div>
           {:else}
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+            <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
               {#each sortedPlaylists as pl (pl.id)}
-                <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
+                {#if activeViewMode === "rows"}
+                  <PlaylistRowCard playlist={pl} onClick={() => openPlaylist(pl)} />
+                {:else}
+                  <PlaylistCard playlist={pl} onClick={() => openPlaylist(pl)} />
+                {/if}
               {/each}
             </div>
           {/if}

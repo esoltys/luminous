@@ -5,7 +5,6 @@
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
-  import { getArtistGradient } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
@@ -21,7 +20,7 @@
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, ListMusic, RefreshCw, CheckCircle2 } from "lucide-svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, Music, RefreshCw, CheckCircle2, Heart, Calendar } from "lucide-svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -170,7 +169,7 @@
     return suffix ? `${base} ${suffix}` : base;
   });
 
-  let topCovers = $derived(songsToCoverStack(songs));
+  let topCovers = $derived((kind === "genre" || kind === "decade") ? songsToCoverStack(songs) : []);
 
   let updatedLabel = $derived.by(() => {
     if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
@@ -523,13 +522,25 @@
 
       <!-- Right: Cover Stack -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
-        {#if topCovers.length > 0}
-          <div class="w-full h-full bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : 'from-[#059669] to-[#34D399]'} flex items-center justify-center overflow-hidden border border-brand-border/60 relative shadow-2xl">
+        {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
+        {:else if kind === "favourites"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DB2777]/25 to-[#F43F5E]/15 flex items-center justify-center overflow-hidden border border-[#F43F5E]/30 shadow-[0_0_28px_3px_rgba(244,63,94,0.4)]">
+            <Heart class="w-16 h-16 text-[#F43F5E] fill-current" />
+          </div>
+        {:else if kind === "recently_added"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_28px_3px_rgba(250,204,21,0.4)]">
+            <Clock class="w-16 h-16 text-[#CA8A04]" />
+          </div>
+        {:else if kind === "decade"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]">
+            <Calendar class="w-16 h-16 text-[#38BDF8]" />
+          </div>
         {:else}
-          <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl bg-gradient-to-br {getArtistGradient(displayName)} flex items-center justify-center">
-            <ListMusic class="w-16 h-16 text-white/80" />
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]">
+            <Music class="w-16 h-16 text-[#34D399]" />
           </div>
         {/if}
       </div>

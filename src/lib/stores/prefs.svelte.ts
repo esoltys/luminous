@@ -10,6 +10,8 @@ class PrefsStore {
   acoustidApiKey = $state<string>("");
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
+  playlistsAutoViewMode = $state<CollectionViewMode>("cards");
+  playlistsCustomViewMode = $state<CollectionViewMode>("cards");
 
   async init() {
     try {
@@ -28,6 +30,12 @@ class PrefsStore {
       }
       if (settings?.artists_view_mode === "cards" || settings?.artists_view_mode === "rows") {
         this.artistsViewMode = settings.artists_view_mode;
+      }
+      if (settings?.playlists_auto_view_mode === "cards" || settings?.playlists_auto_view_mode === "rows") {
+        this.playlistsAutoViewMode = settings.playlists_auto_view_mode;
+      }
+      if (settings?.playlists_custom_view_mode === "cards" || settings?.playlists_custom_view_mode === "rows") {
+        this.playlistsCustomViewMode = settings.playlists_custom_view_mode;
       }
     } catch (e) {
       console.error("Failed to load preference settings:", e);
@@ -76,6 +84,24 @@ class PrefsStore {
       await invoke("set_app_setting", { key: "artists_view_mode", value: mode });
     } catch (e) {
       console.error("Failed to save artists view mode:", e);
+    }
+  }
+
+  async setPlaylistsAutoViewMode(mode: CollectionViewMode) {
+    this.playlistsAutoViewMode = mode;
+    try {
+      await invoke("set_app_setting", { key: "playlists_auto_view_mode", value: mode });
+    } catch (e) {
+      console.error("Failed to save playlists auto view mode:", e);
+    }
+  }
+
+  async setPlaylistsCustomViewMode(mode: CollectionViewMode) {
+    this.playlistsCustomViewMode = mode;
+    try {
+      await invoke("set_app_setting", { key: "playlists_custom_view_mode", value: mode });
+    } catch (e) {
+      console.error("Failed to save playlists custom view mode:", e);
     }
   }
 }

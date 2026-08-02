@@ -56,6 +56,15 @@
   let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);
 
   let updatedLabel = $derived(formatRelativeDate(playlist.updated));
+
+  let badgeColorClass = $derived.by(() => {
+    switch (autoKind) {
+      case "decade": return "bg-[#2563EB] text-white";
+      case "genre": return "bg-[#059669] text-white";
+      case "smart": return "bg-[#C2410C] text-white";
+      default: return "bg-brand-accent text-brand-accent-contrast";
+    }
+  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -66,23 +75,23 @@
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
     {#if isQueue}
-      <div class="w-full h-full bg-gradient-to-br from-[#4338CA] to-[#7C3AED] flex items-center justify-center overflow-hidden border border-brand-border/60">
-        <Layers class="w-10 h-10 text-white/90" />
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#4338CA]/25 to-[#7C3AED]/15 flex items-center justify-center overflow-hidden border border-[#7C3AED]/30 shadow-[0_0_20px_2px_rgba(124,58,237,0.35)]">
+        <Layers class="w-10 h-10 text-[#7C3AED]" />
       </div>
     {:else if topAlbums.length > 0 && autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : autoKind === 'genre' ? 'from-[#059669] to-[#34D399]' : 'from-[#C2410C] to-[#F59E0B]'} flex items-center justify-center overflow-hidden border border-brand-border/60">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : autoKind === 'genre' ? 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]' : 'from-[#C2410C]/25 to-[#F59E0B]/15 border-[#F59E0B]/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]'} flex items-center justify-center overflow-hidden border">
         <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if topAlbums.length > 0}
       <CoverStack covers={topAlbums} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
     {:else if autoKind}
-      <div class="w-full h-full bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB] to-[#38BDF8]' : autoKind === 'genre' ? 'from-[#059669] to-[#34D399]' : 'from-[#C2410C] to-[#F59E0B]'} flex items-center justify-center overflow-hidden border border-brand-border/60">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {autoKind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : autoKind === 'genre' ? 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]' : 'from-[#C2410C]/25 to-[#F59E0B]/15 border-[#F59E0B]/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]'} flex items-center justify-center overflow-hidden border">
         {#if autoKind === "decade"}
-          <Calendar class="w-10 h-10 text-white/90" />
+          <Calendar class="w-10 h-10 text-[#38BDF8]" />
         {:else if autoKind === "genre"}
-          <Music class="w-10 h-10 text-white/90" />
+          <Music class="w-10 h-10 text-[#34D399]" />
         {:else}
-          <Sparkles class="w-10 h-10 text-white/90" />
+          <Sparkles class="w-10 h-10 text-[#F59E0B]" />
         {/if}
       </div>
     {:else}
@@ -93,9 +102,9 @@
     {/if}
 
     {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}
-      <CardBadge icon={Radio} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} />
+      <CardBadge icon={Radio} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} colorClass={badgeColorClass} />
     {:else if autoKind === "smart"}
-      <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} />
+      <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} colorClass={badgeColorClass} />
     {/if}
   </div>
 
