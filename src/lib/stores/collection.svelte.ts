@@ -7,6 +7,7 @@ import type {
   Song,
   MusicDirectory,
   LibraryStats,
+  DbSchemaStatus,
   ScanProgress,
   AlbumItem,
   ArtistItem,
@@ -96,6 +97,11 @@ class CollectionStore {
    *  treating "not loaded yet" as "confirmed empty" (e.g. flashing the sidebar/tab
    *  to an empty-library state on every launch before real stats arrive). */
   statsLoaded = $state<boolean>(false);
+  /** Set once at startup. When `db_newer_than_app` is true, the library looking
+   *  empty isn't real emptiness — this build can't read data written by whatever
+   *  newer build last touched the database. LibraryWelcome swaps its message
+   *  based on this instead of the normal "add a folder" copy. */
+  dbSchemaStatus = $state<DbSchemaStatus | null>(null);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
 
@@ -482,6 +488,7 @@ class CollectionStore {
       this.recordHistory();
 
       await this.refreshDirectories();
+      await this.refreshDbSchemaStatus();
       await this.refreshStats();
       await this.refreshLibrary();
 
@@ -653,6 +660,14 @@ class CollectionStore {
   async refreshStats() {
     this.stats = await invoke("get_library_stats");
     this.statsLoaded = true;
+  }
+
+  async refreshDbSchemaStatus() {
+    try {
+      this.dbSchemaStatus = await invoke<DbSchemaStatus>("get_db_schema_status");
+    } catch (err) {
+      console.error("Failed to load db schema status:", err);
+    }
   }
 
   async refreshLibrary() {

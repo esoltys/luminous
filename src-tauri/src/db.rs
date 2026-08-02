@@ -9,14 +9,27 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 13;
+pub const CURRENT_SCHEMA_VERSION: i32 = 13;
 
 #[derive(Debug)]
 pub struct Database {
     pub pool: DbPool,
+    /// Schema version found in `schema_version` on open, after any migrations this
+    /// build knows how to run. Normally equal to `CURRENT_SCHEMA_VERSION`, but can be
+    /// higher if this database was last opened by a newer build of the app (older
+    /// builds only ever migrate upward, never down) — see `is_newer_than_app`.
+    pub schema_version: i32,
 }
 
 impl Database {
+    /// True when this database's schema is ahead of what this build knows how to
+    /// read/write — e.g. a newer build ran migrations this older binary has never
+    /// seen. Queries that name columns added/removed by those migrations will fail
+    /// even though the app otherwise starts fine.
+    pub fn is_newer_than_app(&self) -> bool {
+        self.schema_version > CURRENT_SCHEMA_VERSION
+    }
+
     /// Create (or open) the Luminous database in `app_data_dir/luminous.db`.
     pub fn new(app_data_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&app_data_dir).context("failed to create app data directory")?;
@@ -40,13 +53,24 @@ impl Database {
             .build(manager)
             .context("failed to create connection pool")?;
 
-        let db = Self { pool };
-        db.run_migrations()?;
+        let db = Self {
+            pool,
+            schema_version: 0,
+        };
+        let schema_version = db.run_migrations()?;
 
-        Ok(db)
+        Ok(Self {
+            schema_version,
+            ..db
+        })
     }
 
-    fn run_migrations(&self) -> Result<()> {
+    /// Runs any migrations this build knows about and returns the resulting schema
+    /// version. If the database is already ahead of `CURRENT_SCHEMA_VERSION` (opened
+    /// by a newer build previously), every `version < N` check below is false, so no
+    /// migration runs and the on-disk version is returned unchanged — see
+    /// `is_newer_than_app`.
+    fn run_migrations(&self) -> Result<i32> {
         let conn = self.pool.get().context("failed to get db connection")?;
 
         // Create schema_version table if it doesn't exist
@@ -183,7 +207,17 @@ impl Database {
             )?;
         }
 
-        Ok(())
+        if version > CURRENT_SCHEMA_VERSION {
+            log::warn!(
+                "Database schema version {version} is newer than this app supports (max {CURRENT_SCHEMA_VERSION}) — was this database last opened by a newer version of Luminous? Skipping migrations; some data may not load until you update the app."
+            );
+            // No migration above ran (every `version < N` check was false), so the
+            // on-disk version is unchanged.
+            return Ok(version);
+        }
+
+        // Every migration up to CURRENT_SCHEMA_VERSION ran above.
+        Ok(CURRENT_SCHEMA_VERSION)
     }
 }
 
@@ -516,6 +550,43 @@ mod tests {
             |r| r.get(0)
         ).unwrap();
         assert_eq!(tables_count, 3);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_schema_newer_than_app_detected_without_running_migrations_backward() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+        assert!(!db.is_newer_than_app());
+        drop(db);
+
+        // Simulate a newer build having stamped a future schema version onto
+        // this database, as if it were opened by that build previously.
+        {
+            let manager = SqliteConnectionManager::file(temp_dir.join("luminous.db"));
+            let pool = r2d2::Pool::builder().max_size(1).build(manager).unwrap();
+            let conn = pool.get().unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![CURRENT_SCHEMA_VERSION + 1],
+            )
+            .unwrap();
+        }
+
+        // Reopening with this (older) build must not error and must not try
+        // to run migrations backward — it should just surface the mismatch.
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION + 1);
+        assert!(db.is_newer_than_app());
 
         // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);

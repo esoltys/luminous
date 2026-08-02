@@ -687,6 +687,7 @@ pub fn run() {
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
             commands::settings::get_commit_hash,
+            commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,
             commands::settings::set_fade_settings,
             install_format::get_install_format,

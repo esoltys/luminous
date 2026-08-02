@@ -212,6 +212,16 @@ export interface LibraryStats {
   total_filesize_bytes: number;
 }
 
+/** Whether the on-disk database's schema is ahead of what this build understands —
+ *  e.g. a newer build of Luminous opened it previously. When true, song queries that
+ *  name a since-added/removed column fail, making the library look empty even though
+ *  it isn't; see LibraryWelcome.svelte. */
+export interface DbSchemaStatus {
+  db_version: number;
+  app_version: number;
+  db_newer_than_app: boolean;
+}
+
 export interface AlbumItem {
   artist: string | null;
   album: string | null;

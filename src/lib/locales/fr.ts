@@ -61,6 +61,10 @@ export const fr = {
     title: "Bienvenue dans Luminous",
     text: "Votre bibliothèque musicale est actuellement vide. Consultez l'Aide dans la barre latérale pour commencer, ou ajoutez un dossier pour analyser votre musique."
   },
+  dbNewerThanApp: {
+    title: "Base de données d'une version plus récente",
+    text: "Cette bibliothèque a été ouverte pour la dernière fois par une version plus récente de Luminous (base de données v{dbVersion}, cette application prend en charge la v{appVersion}). Vos dossiers et vos morceaux sont toujours là — mettez à jour Luminous pour les retrouver."
+  },
   collection: {
     artists: "Artistes ({count})",
     albums: "Albums ({count})",
