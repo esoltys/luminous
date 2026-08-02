@@ -43,6 +43,26 @@ pub fn get_commit_hash() -> String {
     option_env!("BUILD_COMMIT_HASH").unwrap_or("").to_string()
 }
 
+#[derive(serde::Serialize)]
+pub struct DbSchemaStatus {
+    pub db_version: i32,
+    pub app_version: i32,
+    pub db_newer_than_app: bool,
+}
+
+/// Lets the frontend distinguish "library is genuinely empty" from "this
+/// database was last opened by a newer build and this one can't read its
+/// current schema" — the latter looks identical to an empty library (queries
+/// naming a since-added/removed column just fail) without this check.
+#[tauri::command]
+pub fn get_db_schema_status(state: State<'_, crate::AppState>) -> DbSchemaStatus {
+    DbSchemaStatus {
+        db_version: state.db.schema_version,
+        app_version: crate::db::CURRENT_SCHEMA_VERSION,
+        db_newer_than_app: state.db.is_newer_than_app(),
+    }
+}
+
 pub fn get_fade_settings_from_db(
     db: &crate::db::Database,
 ) -> Result<crate::models::FadeSettings, String> {

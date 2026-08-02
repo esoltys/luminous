@@ -103,7 +103,10 @@ pub async fn enter_miniplayer_mode(
         height: target_h,
     }));
     if let (Some(px), Some(py)) = (x, y) {
-        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: px, y: py }));
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: px,
+            y: py,
+        }));
     } else {
         let _ = window.move_window(Position::TopRight);
     }
@@ -135,7 +138,10 @@ pub async fn exit_miniplayer_mode(
         height: target_h,
     }));
     if let (Some(px), Some(py)) = (x, y) {
-        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition { x: px, y: py }));
+        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+            x: px,
+            y: py,
+        }));
     } else {
         let _ = window.move_window(Position::Center);
     }
@@ -146,10 +152,7 @@ pub async fn exit_miniplayer_mode(
 }
 
 #[tauri::command]
-pub async fn move_window_to_preset(
-    window: WebviewWindow,
-    position: String,
-) -> Result<(), String> {
+pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> Result<(), String> {
     let pos = match position.as_str() {
         "TopLeft" => Position::TopLeft,
         "TopRight" => Position::TopRight,
@@ -166,9 +169,7 @@ pub async fn move_window_to_preset(
 }
 
 #[tauri::command]
-pub async fn get_window_geometry(
-    window: WebviewWindow,
-) -> Result<serde_json::Value, String> {
+pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Value, String> {
     let size = window.inner_size().map_err(|e| e.to_string())?;
     let pos = window.outer_position().ok();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
