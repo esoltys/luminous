@@ -88,7 +88,6 @@
   }
 
   let isHovered = $state(false);
-  let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 
   function showHover(e?: MouseEvent | PointerEvent) {
     if (e) {
@@ -105,18 +104,10 @@
     }
 
     isHovered = true;
-    if (hoverTimeout) clearTimeout(hoverTimeout);
-    hoverTimeout = setTimeout(() => {
-      isHovered = false;
-    }, 800);
   }
 
   function hideHover() {
     isHovered = false;
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-      hoverTimeout = null;
-    }
   }
 
   $effect(() => {
@@ -136,7 +127,6 @@
       window.removeEventListener("blur", handleBlur);
       document.removeEventListener("mouseleave", handleMouseLeave);
       window.removeEventListener("mouseout", handleMouseOut);
-      if (hoverTimeout) clearTimeout(hoverTimeout);
     };
   });
 
