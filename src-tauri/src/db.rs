@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-const CURRENT_SCHEMA_VERSION: i32 = 12;
+const CURRENT_SCHEMA_VERSION: i32 = 13;
 
 #[derive(Debug)]
 pub struct Database {
@@ -171,6 +171,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![12],
+            )?;
+        }
+
+        if version < 13 {
+            log::info!("Running migration 13: drop unused songs.mood column");
+            conn.execute_batch(MIGRATION_13)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![13],
             )?;
         }
 
@@ -472,6 +481,16 @@ DELETE FROM app_state WHERE key = 'excluded_formats';
 
 const MIGRATION_12: &str = "
 ALTER TABLE playlists ADD COLUMN population_mode TEXT NOT NULL DEFAULT 'all';
+";
+
+// ---------------------------------------------------------------------------
+// Migration 13: drop songs.mood — never populated from file tags (no read or
+// write path existed) and unreachable from search/Smart Playlists; orphaned
+// column.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_13: &str = "
+ALTER TABLE songs DROP COLUMN mood;
 ";
 
 #[cfg(test)]

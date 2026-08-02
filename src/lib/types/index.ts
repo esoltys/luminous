@@ -71,7 +71,6 @@ export interface Song {
 
   // Extended tags
   bpm?: number;
-  mood?: string;
   initial_key?: string;
 
   // Audio properties

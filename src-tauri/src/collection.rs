@@ -1035,10 +1035,10 @@ impl CollectionScanner {
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let album_track_count: i64 = row.get(57)?;
-                let album_disc_count: i64 = row.get(58)?;
-                let context_type: String = row.get(59)?;
-                let playlist_id: Option<i64> = row.get(60)?;
+                let album_track_count: i64 = row.get(56)?;
+                let album_disc_count: i64 = row.get(57)?;
+                let context_type: String = row.get(58)?;
+                let playlist_id: Option<i64> = row.get(59)?;
                 Ok((
                     song,
                     album_track_count,
@@ -1158,8 +1158,8 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(57)?;
-                let disc_count: i64 = row.get(58)?;
+                let count: i64 = row.get(56)?;
+                let disc_count: i64 = row.get(57)?;
                 Ok((song, count, disc_count))
             })?
             .filter_map(|r| r.ok())
@@ -1371,8 +1371,8 @@ fn get_songs_by_ids(
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
             let song = row_to_song(row)?;
-            let album_track_count: i64 = row.get(57)?;
-            let album_disc_count: i64 = row.get(58)?;
+            let album_track_count: i64 = row.get(56)?;
+            let album_disc_count: i64 = row.get(57)?;
             Ok((song.id, (song, album_track_count, album_disc_count)))
         })?
         .filter_map(|r| r.ok())
@@ -1721,7 +1721,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     composer, composersort, performer, performersort,
     grouping, comment, lyrics,
     track, disc, year, originalyear, genre, compilation,
-    bpm, mood, initial_key,
+    bpm, initial_key,
     length_nanosec, beginning_nanosec, end_nanosec,
     bitrate, samplerate, bitdepth, channels, filesize, mtime,
     rating, playcount, skipcount, lastplayed, lastseen,
@@ -1742,7 +1742,7 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.composer, s.composersort, s.performer, s.performersort,
     s.grouping, s.comment, s.lyrics,
     s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-    s.bpm, s.mood, s.initial_key,
+    s.bpm, s.initial_key,
     s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
     s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
     s.rating, s.playcount, s.skipcount, s.lastplayed, s.lastseen,
@@ -1800,35 +1800,34 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
         genre: row.get(25)?,
         compilation: row.get(26)?,
         bpm: row.get(27)?,
-        mood: row.get(28)?,
-        initial_key: row.get(29)?,
-        length_nanosec: row.get(30)?,
-        beginning_nanosec: row.get::<_, Option<i64>>(31)?.unwrap_or(0),
-        end_nanosec: row.get::<_, Option<i64>>(32)?.unwrap_or(0),
-        bitrate: row.get(33)?,
-        samplerate: row.get(34)?,
-        bitdepth: row.get(35)?,
-        channels: row.get(36)?,
-        filesize: row.get(37)?,
-        mtime: row.get(38)?,
-        rating: row.get::<_, Option<f32>>(39)?.unwrap_or(-1.0),
-        playcount: row.get::<_, Option<i32>>(40)?.unwrap_or(0),
-        skipcount: row.get::<_, Option<i32>>(41)?.unwrap_or(0),
-        lastplayed: row.get(42)?,
-        lastseen: row.get(43)?,
-        art_embedded: row.get(44)?,
-        art_automatic: row.get(45)?,
-        art_manual: row.get(46)?,
-        art_unset: row.get(47)?,
-        cue_path: row.get(48)?,
-        ebur128_integrated_loudness_lufs: row.get(49)?,
-        ebur128_loudness_range_lu: row.get(50)?,
-        unavailable: row.get::<_, Option<bool>>(51)?.unwrap_or(false),
-        replaygain_track_gain: row.get(52)?,
-        replaygain_album_gain: row.get(53)?,
-        is_vbr: row.get(54)?,
-        is_instrumental: row.get::<_, Option<bool>>(55)?.unwrap_or(false),
-        added: row.get(56)?,
+        initial_key: row.get(28)?,
+        length_nanosec: row.get(29)?,
+        beginning_nanosec: row.get::<_, Option<i64>>(30)?.unwrap_or(0),
+        end_nanosec: row.get::<_, Option<i64>>(31)?.unwrap_or(0),
+        bitrate: row.get(32)?,
+        samplerate: row.get(33)?,
+        bitdepth: row.get(34)?,
+        channels: row.get(35)?,
+        filesize: row.get(36)?,
+        mtime: row.get(37)?,
+        rating: row.get::<_, Option<f32>>(38)?.unwrap_or(-1.0),
+        playcount: row.get::<_, Option<i32>>(39)?.unwrap_or(0),
+        skipcount: row.get::<_, Option<i32>>(40)?.unwrap_or(0),
+        lastplayed: row.get(41)?,
+        lastseen: row.get(42)?,
+        art_embedded: row.get(43)?,
+        art_automatic: row.get(44)?,
+        art_manual: row.get(45)?,
+        art_unset: row.get(46)?,
+        cue_path: row.get(47)?,
+        ebur128_integrated_loudness_lufs: row.get(48)?,
+        ebur128_loudness_range_lu: row.get(49)?,
+        unavailable: row.get::<_, Option<bool>>(50)?.unwrap_or(false),
+        replaygain_track_gain: row.get(51)?,
+        replaygain_album_gain: row.get(52)?,
+        is_vbr: row.get(53)?,
+        is_instrumental: row.get::<_, Option<bool>>(54)?.unwrap_or(false),
+        added: row.get(55)?,
         ..Default::default()
     })
 }

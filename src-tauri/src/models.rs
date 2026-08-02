@@ -153,7 +153,6 @@ pub struct Song {
 
     // Extended tags
     pub bpm: Option<f32>,
-    pub mood: Option<String>,
     pub initial_key: Option<String>,
 
     // Audio properties (durations in nanoseconds)
