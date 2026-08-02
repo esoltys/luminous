@@ -97,6 +97,13 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
   `<Trophy>`). For milestone/completion moments, prefer neutral icons like `<Star>` that convey
   "special" without implying a leaderboard or achievement system.
 
+- **Instructive, not descriptive, copy voice**: Hint/help text under a toggle, button, or tab should
+  tell the user what to do or what happens when they act ("Scan watched folders for new files"), not
+  describe the feature in third person ("Scans watched folders for new files") or lead with an adverb
+  ("Automatically scans..."). Match the imperative voice of the control's own label. This applies to
+  `src/lib/locales/en.ts` hint/tooltip strings specifically — section headings and status/value labels
+  are fine as descriptive text.
+
 ## Development Workflow
 
 **Adding a frontend feature:**
