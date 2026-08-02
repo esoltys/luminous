@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Heart } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { soundCues } from "../utils/soundCues";
 
   interface Props {
     favorite: boolean;
@@ -47,7 +46,6 @@
     if (!favorite) {
       justFavorited = true;
       burstRing();
-      soundCues.playSuccess();
       setTimeout(() => { justFavorited = false; }, 320);
     }
     onToggle();

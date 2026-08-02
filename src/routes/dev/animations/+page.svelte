@@ -12,8 +12,6 @@
   import { goto } from "$app/navigation";
   import HeartToggle from "../../../lib/components/HeartToggle.svelte";
   import { toastStore } from "../../../lib/stores/toast.svelte";
-  import { prefs } from "../../../lib/stores/prefs.svelte";
-  import { soundCues } from "../../../lib/utils/soundCues";
   import { Folder, ListMusic, ArrowUp, AlertTriangle } from "lucide-svelte";
 
   // Most dev machines with Windows "Animation effects" turned off (or any

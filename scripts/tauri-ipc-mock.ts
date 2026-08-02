@@ -764,6 +764,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   };
 
   (internals as any).metadata = {
+    // getCurrentWindow() (src/lib/stores/collection.svelte.ts) reads
+    // metadata.currentWindow.label directly — without it every mocked page
+    // load logs "Failed to attach window geometry listeners".
+    currentWindow: { label: "main" },
     unregisterListener: (event: string, eventId: number) => internals.unregisterListener(event, eventId),
   };
   (internals as any).listeners = {
