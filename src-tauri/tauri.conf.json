@@ -35,8 +35,8 @@
     "license": "MIT",
     "licenseFile": "../LICENSE",
     "category": "Music",
-    "shortDescription": "Luminous Music Player — A modern, elegant music player",
-    "longDescription": "Luminous is a modern, fast, and feature-rich desktop music player featuring gapless playback, 10-band and 20-band DSP equalizer, synchronized LRCLIB lyrics, automatic cover art extraction, and advanced music library management.",
+    "shortDescription": "A high-performance home for the music you already own",
+    "longDescription": "Luminous is a fast, local-first player for your own audio library — no streaming, no subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

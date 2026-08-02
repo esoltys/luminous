@@ -4,11 +4,11 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Luminous</name>
-  <summary>A modern, elegant music player</summary>
+  <summary>A high-performance home for the music you already own</summary>
   <description>
     <p>
-      Luminous is a fast, beautifully designed desktop music player featuring gapless playback, 
-      10-band and 20-band DSP equalizer, synchronized LRCLIB lyrics, automatic cover art extraction, 
+      Luminous is a fast, beautifully designed desktop music player featuring gapless playback,
+      10-band and 20-band DSP equalizer, synchronized LRCLIB lyrics, automatic cover art extraction,
       and advanced music library management.
     </p>
   </description>

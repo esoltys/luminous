@@ -1,7 +1,7 @@
 {
   "name": "luminous",
   "version": "0.96.0",
-  "description": "Luminous Music Player — A modern, elegant music player",
+  "description": "A high-performance home for the music you already own",
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
   "type": "module",
