@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { prefs } from "../stores/prefs.svelte";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
 vi.mock("svelte-virtual-list-ts", async () => {
@@ -118,6 +119,8 @@ describe("CollectionView.svelte", () => {
     collectionStore.selectedAlbumName = null;
     collectionStore.selectedArtistName = null;
     collectionStore.searchQuery = "";
+    prefs.albumsViewMode = "cards";
+    prefs.artistsViewMode = "cards";
   });
 
   it("does not render top category filter pills in CollectionView", () => {
@@ -178,5 +181,33 @@ describe("CollectionView.svelte", () => {
 
     expect(getByText("Play Song")).toBeInTheDocument();
     expect(getAllByText("Add to Active Playlist")[0]).toBeInTheDocument();
+  });
+
+  it("defaults to Cards view in Albums sub-tab", () => {
+    collectionStore.activeSubTab = "albums";
+    const { getByText } = render(CollectionView);
+
+    // AlbumCard renders the title as a clickable LinkButton; the row view doesn't.
+    expect(getByText("Album 1").closest("button")).not.toBeNull();
+  });
+
+  it("switches Albums sub-tab to the compact Rows view when the Rows toggle is clicked", async () => {
+    collectionStore.activeSubTab = "albums";
+    const { getByText, getByTitle } = render(CollectionView);
+
+    await fireEvent.click(getByTitle("Row view"));
+
+    expect(prefs.albumsViewMode).toBe("rows");
+    expect(getByText("Album 1").closest("button")).toBeNull();
+  });
+
+  it("switches Artists sub-tab to the compact Rows view independently of Albums", async () => {
+    collectionStore.activeSubTab = "artists";
+    const { getByTitle } = render(CollectionView);
+
+    await fireEvent.click(getByTitle("Row view"));
+
+    expect(prefs.artistsViewMode).toBe("rows");
+    expect(prefs.albumsViewMode).toBe("cards");
   });
 });

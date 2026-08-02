@@ -98,6 +98,8 @@ export const fr = {
     noAlbumsMatchQuery: "Aucun album ne correspond à votre recherche :",
     noArtistsTitle: "Aucun artiste trouvé",
     noArtistsMatchQuery: "Aucun artiste ne correspond à votre recherche :",
+    viewCards: "Vue en cartes",
+    viewRows: "Vue en lignes",
     sortAlbumNameAsc: "Trier : Nom d'album (A-Z)",
     sortAlbumNameDesc: "Trier : Nom d'album (Z-A)",
     sortArtistNameAsc: "Trier : Nom d'artiste (A-Z)",
