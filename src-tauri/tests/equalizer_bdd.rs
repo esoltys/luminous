@@ -157,5 +157,8 @@ fn all_coefficients_recalculate(w: &mut EqualizerWorld) {
 
 #[tokio::main]
 async fn main() {
-    EqualizerWorld::run("../features/equalizer.feature").await;
+    EqualizerWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/equalizer.feature")
+        .await;
 }

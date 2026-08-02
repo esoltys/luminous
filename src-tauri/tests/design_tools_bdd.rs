@@ -195,5 +195,8 @@ fn switched_to_default_theme(w: &mut DesignToolsWorld) {
 
 #[tokio::main]
 async fn main() {
-    DesignToolsWorld::run("../features/design_tools.feature").await;
+    DesignToolsWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/design_tools.feature")
+        .await;
 }

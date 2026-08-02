@@ -130,5 +130,8 @@ fn check_gain_scale(w: &mut PlaybackControlsWorld, expected_gain: f32) {
 
 #[tokio::main]
 async fn main() {
-    PlaybackControlsWorld::run("../features/playback_controls.feature").await;
+    PlaybackControlsWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/playback_controls.feature")
+        .await;
 }

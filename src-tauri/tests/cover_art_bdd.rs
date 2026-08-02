@@ -183,5 +183,8 @@ fn update_db_art_automatic(w: &mut CoverArtWorld) {
 
 #[tokio::main]
 async fn main() {
-    CoverArtWorld::run("../features/cover_art.feature").await;
+    CoverArtWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/cover_art.feature")
+        .await;
 }
