@@ -11,7 +11,6 @@
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import { Play } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
@@ -103,25 +102,6 @@
     }
   }
 
-  async function playItem(item: HomeItem) {
-    if (item.type === "song") {
-      await playerStore.playSong(item.song.id);
-      return;
-    }
-    if (item.type === "album") {
-      const songs = await invoke<Song[]>("get_songs_by_album", { album: item.album.album || "" });
-      if (songs.length > 0) {
-        playerStore.playSongs(songs.map((s) => s.id), 0, undefined, {
-          type: "album",
-          album: item.album.album || "",
-          albumArtist: item.album.artist ?? undefined,
-        });
-      }
-      return;
-    }
-    await playerStore.playPlaylistItem(item.playlist.id, 0);
-  }
-
   function handleContextMenu(e: MouseEvent, item: HomeItem) {
     if (item.type !== "song") return;
     e.preventDefault();
@@ -176,13 +156,6 @@
           {:else}
             <PlaylistCoverThumb playlist={item.playlist} sizeClass="w-11 h-11" />
           {/if}
-          <button
-            onclick={(e) => { e.stopPropagation(); playItem(item); }}
-            class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            title={i18n.t('playerBar.play')}
-          >
-            <Play class="w-4 h-4 text-white fill-current" />
-          </button>
         </div>
 
         <div class="min-w-0 flex-1">

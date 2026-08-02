@@ -1,11 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { ListMusic, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
-  import PlayOverlayButton from "./PlayOverlayButton.svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { songsToCoverStack } from "../utils/covers";
-  import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
@@ -58,15 +56,6 @@
   let isActive = $derived(playlistsStore.effectivePinnedPlaylistId === playlist.id);
 
   let updatedLabel = $derived(formatRelativeDate(playlist.updated));
-
-  function handlePlayButtonClick(e: MouseEvent) {
-    e.stopPropagation();
-    const songIds = tracks.filter((t) => t.song && !t.song.unavailable).map((t) => t.song!.id);
-    if (songIds.length > 0) {
-      playerStore.playSongs(songIds, 0, playlist.id);
-    }
-    onClick();
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -108,8 +97,6 @@
     {:else if autoKind === "smart"}
       <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} />
     {/if}
-
-    <PlayOverlayButton onPlay={handlePlayButtonClick} />
   </div>
 
   <button

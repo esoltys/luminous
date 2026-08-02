@@ -4,7 +4,6 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
-  import PlayOverlayButton from "./PlayOverlayButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -18,7 +17,6 @@
     onclick?: (e: MouseEvent) => void;
     ondblclick?: (e: MouseEvent) => void;
     oncontextmenu?: (e: MouseEvent) => void;
-    onPlay?: (e: MouseEvent) => void;
   }
 
   let {
@@ -29,34 +27,13 @@
     onclick: customClick,
     ondblclick: customDblClick,
     oncontextmenu: customContextMenu,
-    onPlay: customPlay,
   }: Props = $props();
 
-  async function defaultPlayAlbum(e?: MouseEvent) {
-    if (e) e.stopPropagation();
-    collectionStore.viewAlbum(album.album || "");
-    try {
-      let songs = await invoke<Song[]>("get_songs_by_album", {
-        album: album.album || "",
-      });
-      if (songs.length > 0) {
-        const songIds = songs.map((s) => s.id);
-        playerStore.playSongs(songIds, 0, undefined, {
-          type: "album",
-          album: album.album || "",
-          albumArtist: album.artist ?? undefined,
-        });
-      }
-    } catch (err) {
-      console.error("Failed to play album:", err);
-    }
-  }
-
-  async function handleCardClick(e: MouseEvent) {
+  function handleCardClick(e: MouseEvent) {
     if (customClick) {
       customClick(e);
     } else {
-      await defaultPlayAlbum(e);
+      collectionStore.viewAlbum(album.album || "");
     }
   }
 
@@ -94,13 +71,6 @@
     }
   }
 
-  async function handlePlayButtonClick(e: MouseEvent) {
-    if (customPlay) {
-      customPlay(e);
-    } else {
-      await defaultPlayAlbum(e);
-    }
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -118,7 +88,6 @@
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
-    <PlayOverlayButton onPlay={handlePlayButtonClick} />
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton

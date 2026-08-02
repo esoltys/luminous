@@ -1,11 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { ListMusic, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
-  import PlayOverlayButton from "./PlayOverlayButton.svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
-  import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import CoverStack from "./CoverStack.svelte";
@@ -88,14 +86,6 @@
     if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
-
-  function handlePlayButtonClick(e: MouseEvent) {
-    e.stopPropagation();
-    if (songs.length > 0) {
-      playerStore.playSongs(songs.map((s) => s.id), 0, playlistId, undefined, displayLabel);
-    }
-    onClick();
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -130,7 +120,6 @@
         <ListMusic class="w-10 h-10 text-white/90" />
       </div>
     {/if}
-    <PlayOverlayButton onPlay={handlePlayButtonClick} />
 
     {#if autoPlay}
       <CardBadge icon={RefreshCw} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} spin />
