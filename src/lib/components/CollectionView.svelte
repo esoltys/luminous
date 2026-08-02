@@ -406,34 +406,32 @@
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   {#if collectionStore.activeSubTab === "songs"}
     <!-- Top bar for Songs View -->
-    <div class="px-6 pt-3 flex-shrink-0">
-      <!-- Column Controls (Left) -->
-      <div class="h-10 flex items-center mb-2">
-        <ColumnSelector align="left" />
-      </div>
-
+    <div class="px-6 pt-4 pb-2 flex-shrink-0">
       <div class="h-9 flex items-center justify-between">
         <!-- Showing Count (Left) -->
         <div class="text-xs text-brand-text-secondary font-medium">
           {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
         </div>
 
-        <!-- Sort Dropdown (Right) -->
-        <div class="relative">
-          <Select
-            value={`${sortField}-${sortAsc}`}
-            onchange={(e) => {
-              const [field, asc] = e.currentTarget.value.split("-");
-              sortField = field as keyof Song;
-              sortAsc = asc === "true";
-            }}
-            class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-          >
-            {#each sortableColumns as col (col.key)}
-              <option value="{col.field}-true">{i18n.t(col.label)} ▲</option>
-              <option value="{col.field}-false">{i18n.t(col.label)} ▼</option>
-            {/each}
-          </Select>
+        <!-- Columns + Sort Dropdown (Right) -->
+        <div class="flex items-center gap-2">
+          <ColumnSelector align="right" iconOnly />
+          <div class="relative">
+            <Select
+              value={`${sortField}-${sortAsc}`}
+              onchange={(e) => {
+                const [field, asc] = e.currentTarget.value.split("-");
+                sortField = field as keyof Song;
+                sortAsc = asc === "true";
+              }}
+              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            >
+              {#each sortableColumns as col (col.key)}
+                <option value="{col.field}-true">{i18n.t(col.label)} ▲</option>
+                <option value="{col.field}-false">{i18n.t(col.label)} ▼</option>
+              {/each}
+            </Select>
+          </div>
         </div>
       </div>
     </div>
@@ -915,32 +913,8 @@
   {:else}
     <!-- Scrollable Container for Albums / Artists Views -->
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <!-- Sticky header: View Mode Toggle above Filter Info / Sort controls -->
-      <div class="sticky top-0 z-20 bg-brand-main">
-        <!-- View Mode Toggle (Cards / Rows) -->
-        <div class="h-10 flex items-center justify-end">
-          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
-            <button
-              onclick={() => setActiveViewMode("cards")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              title={i18n.t('collection.viewCards')}
-              aria-label={i18n.t('collection.viewCards')}
-              aria-pressed={activeViewMode === "cards"}
-            >
-              <LayoutGrid class="w-4 h-4" />
-            </button>
-            <button
-              onclick={() => setActiveViewMode("rows")}
-              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-              title={i18n.t('collection.viewRows')}
-              aria-label={i18n.t('collection.viewRows')}
-              aria-pressed={activeViewMode === "rows"}
-            >
-              <Rows3 class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
+      <!-- Sticky header: Filter Info / View Mode Toggle / Sort controls -->
+      <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">
           <!-- Showing Count (Left) -->
           <div class="text-xs text-brand-text-secondary font-medium">
@@ -951,8 +925,28 @@
             {/if}
           </div>
 
-          <!-- Sort Dropdown (Right) -->
-          <div class="flex items-center gap-4">
+          <!-- View Mode Toggle + Sort Dropdown (Right) -->
+          <div class="flex items-center gap-2">
+            <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+              <button
+                onclick={() => setActiveViewMode("cards")}
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                title={i18n.t('collection.viewCards')}
+                aria-label={i18n.t('collection.viewCards')}
+                aria-pressed={activeViewMode === "cards"}
+              >
+                <LayoutGrid class="w-4 h-4" />
+              </button>
+              <button
+                onclick={() => setActiveViewMode("rows")}
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                title={i18n.t('collection.viewRows')}
+                aria-label={i18n.t('collection.viewRows')}
+                aria-pressed={activeViewMode === "rows"}
+              >
+                <Rows3 class="w-4 h-4" />
+              </button>
+            </div>
             {#if collectionStore.activeSubTab === "albums"}
               <div class="relative">
                 <Select
