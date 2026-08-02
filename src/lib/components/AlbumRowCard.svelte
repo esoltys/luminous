@@ -1,10 +1,7 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import type { AlbumItem, Song } from "../types";
+  import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import CoverArt from "./CoverArt.svelte";
-  import { Play } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getAlbumCategoryLabel } from "../utils/artist";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
@@ -38,18 +35,6 @@
       await queueAlbumAsPlaylist(album);
     }
   }
-
-  async function playAlbum(e: MouseEvent) {
-    e.stopPropagation();
-    const songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-    if (songs.length > 0) {
-      playerStore.playSongs(songs.map((s) => s.id), 0, undefined, {
-        type: "album",
-        album: album.album || "",
-        albumArtist: album.artist ?? undefined,
-      });
-    }
-  }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -71,13 +56,6 @@
       artManual={album.art_manual}
       sizeClass="w-11 h-11"
     />
-    <button
-      onclick={playAlbum}
-      class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-      title={i18n.t('playerBar.play')}
-    >
-      <Play class="w-4 h-4 text-white fill-current" />
-    </button>
   </div>
 
   <div class="min-w-0 flex-1">
