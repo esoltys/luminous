@@ -161,5 +161,8 @@ fn track_order_reapplies(w: &mut PlaylistsWorld, step: &Step) {
 
 #[tokio::main]
 async fn main() {
-    PlaylistsWorld::run("../features/playlists.feature").await;
+    PlaylistsWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/playlists.feature")
+        .await;
 }

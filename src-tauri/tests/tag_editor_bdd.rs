@@ -156,5 +156,8 @@ fn form_fields_populated(w: &mut TagEditorWorld) {
 
 #[tokio::main]
 async fn main() {
-    TagEditorWorld::run("../features/tag_editor.feature").await;
+    TagEditorWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/tag_editor.feature")
+        .await;
 }

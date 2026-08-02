@@ -210,5 +210,8 @@ fn panel_scrolled(w: &mut LyricsWorld) {
 
 #[tokio::main]
 async fn main() {
-    LyricsWorld::run("../features/lyrics.feature").await;
+    LyricsWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/lyrics.feature")
+        .await;
 }

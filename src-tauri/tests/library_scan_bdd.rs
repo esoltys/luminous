@@ -190,5 +190,8 @@ fn skip_reparsing(w: &mut LibraryScanWorld, path: String) {
 
 #[tokio::main]
 async fn main() {
-    LibraryScanWorld::run("../features/library_scan.feature").await;
+    LibraryScanWorld::cucumber()
+        .max_concurrent_scenarios(4)
+        .run_and_exit("../features/library_scan.feature")
+        .await;
 }
