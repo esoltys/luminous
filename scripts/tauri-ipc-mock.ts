@@ -416,6 +416,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
     has_acoustid_env_key: () => true,
+    geometry_capture_supported: () => true,
 
     preview_organize: (args) => {
       const songIds = (args.songIds as number[] | undefined) ?? [];
@@ -449,6 +450,12 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
             { id: 2, path: "C:\\Users\\ericj\\Music\\Studio Masters", subdirs: true },
           ]
         : [],
+
+    get_db_schema_status: () => ({
+      db_version: 1,
+      app_version: 1,
+      db_newer_than_app: false,
+    }),
 
     get_library_stats: () => ({
       total_songs: library.songs.length,
