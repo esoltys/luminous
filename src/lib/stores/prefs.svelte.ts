@@ -7,7 +7,6 @@ class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
   acoustidApiKey = $state<string>("");
-  soundCuesEnabled = $state<boolean>(false);
 
   async init() {
     try {
@@ -20,9 +19,6 @@ class PrefsStore {
       }
       if (settings?.acoustid_api_key) {
         this.acoustidApiKey = settings.acoustid_api_key;
-      }
-      if (settings?.sound_cues_enabled !== undefined) {
-        this.soundCuesEnabled = settings.sound_cues_enabled === "true";
       }
     } catch (e) {
       console.error("Failed to load preference settings:", e);
@@ -53,15 +49,6 @@ class PrefsStore {
       await invoke("set_app_setting", { key: "acoustid_api_key", value: key });
     } catch (e) {
       console.error("Failed to save AcoustID API key:", e);
-    }
-  }
-
-  async setSoundCuesEnabled(enabled: boolean) {
-    this.soundCuesEnabled = enabled;
-    try {
-      await invoke("set_app_setting", { key: "sound_cues_enabled", value: enabled ? "true" : "false" });
-    } catch (e) {
-      console.error("Failed to save sound cues setting:", e);
     }
   }
 }

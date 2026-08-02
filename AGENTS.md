@@ -83,10 +83,10 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - **Toast persistence**: Toasts must never auto-dismiss unless an explicit `durationMs` is passed by the
   caller. By default, toasts stay visible until the user clicks the `X` button.
 
-- **Explicit-action-only celebrations**: Micro-animations and sound cues (heart pulse, confetti, etc.)
-  must fire only in response to a deliberate user interaction (e.g., a click handler). Never trigger them
-  from a reactive `$effect` or a prop-change watcher — doing so causes false positives when the track
-  changes and a different (already-favourited) song loads.
+- **Explicit-action-only celebrations**: Micro-animations (heart pulse, confetti, etc.) must fire only in
+  response to a deliberate user interaction (e.g., a click handler). Never trigger them from a reactive
+  `$effect` or a prop-change watcher — doing so causes false positives when the track changes and a
+  different (already-favourited) song loads.
 
 - **Context-aware completion messages**: End-of-queue or completion toasts must include the name of what
   finished (e.g., "Jazz Classics complete"), not generic text. The `playerStore.activeContextName` field
