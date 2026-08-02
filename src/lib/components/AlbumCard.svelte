@@ -1,13 +1,11 @@
 <script lang="ts">
-  import type { AlbumItem, Song } from "../types";
+  import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
-  import { playlistsStore } from "../stores/playlists.svelte";
-  import { playerStore } from "../stores/player.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import LinkButton from "./LinkButton.svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { getAlbumCategoryLabel } from "../utils/artist";
+  import { queueAlbumAsPlaylist } from "../utils/playlist";
 
   interface Props {
     album: AlbumItem;
@@ -41,33 +39,7 @@
     if (customDblClick) {
       customDblClick(e);
     } else {
-      const albumName = album.album || i18n.t('collection.unknownAlbum');
-      const playlistName = i18n.t('collection.albumPlaylistName', { name: albumName });
-      let existingPlaylist = playlistsStore.playlists.find(p => p.name === playlistName);
-
-      if (existingPlaylist) {
-        await playlistsStore.selectPlaylist(existingPlaylist.id);
-        await playlistsStore.clearPlaylist(existingPlaylist.id);
-      } else {
-        await playlistsStore.createPlaylist(playlistName);
-      }
-
-      try {
-        let songs = await invoke<Song[]>("get_songs_by_album", {
-          album: album.album || "",
-        });
-
-        if (songs.length > 0) {
-          const songIds = songs.map((s) => s.id);
-          if (playlistsStore.activeCustomPlaylist) {
-            await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
-            collectionStore.activeTab = "playlists";
-            await playerStore.playPlaylistItem(playlistsStore.activeCustomPlaylist.id, 0);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to add album to playlist:", err);
-      }
+      await queueAlbumAsPlaylist(album);
     }
   }
 

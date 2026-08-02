@@ -2,7 +2,7 @@
   import type { ArtistItem, AlbumItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverStack from "./CoverStack.svelte";
-  import { songsToCoverStack } from "../utils/covers";
+  import { getArtistCoverStack } from "../utils/covers";
 
   interface Props {
     artist: ArtistItem;
@@ -20,25 +20,7 @@
     onclick: customClick,
   }: Props = $props();
 
-  let covers = $derived.by(() => {
-    const albumCovers = artistAlbums
-      .map((album) => ({
-        artEmbedded: album.art_embedded,
-        artAutomatic: album.art_automatic,
-        artManual: album.art_manual,
-      }))
-      .filter((c) => c.artManual || c.artAutomatic || c.artEmbedded);
-
-    if (albumCovers.length > 0) {
-      return albumCovers;
-    }
-
-    if (artistSongs.length > 0) {
-      return songsToCoverStack(artistSongs);
-    }
-
-    return [];
-  });
+  let covers = $derived(getArtistCoverStack(artistAlbums, artistSongs));
 
   let genreLabel = $derived(artist.genre?.trim() || i18n.t('artistDetail.unknownGenre'));
 </script>

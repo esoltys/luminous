@@ -2,11 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type RatingStyle = "heart" | "stars";
 export type SeekBarMode = "waveform" | "moodbar";
+export type CollectionViewMode = "cards" | "rows";
 
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
   acoustidApiKey = $state<string>("");
+  albumsViewMode = $state<CollectionViewMode>("cards");
+  artistsViewMode = $state<CollectionViewMode>("cards");
 
   async init() {
     try {
@@ -19,6 +22,12 @@ class PrefsStore {
       }
       if (settings?.acoustid_api_key) {
         this.acoustidApiKey = settings.acoustid_api_key;
+      }
+      if (settings?.albums_view_mode === "cards" || settings?.albums_view_mode === "rows") {
+        this.albumsViewMode = settings.albums_view_mode;
+      }
+      if (settings?.artists_view_mode === "cards" || settings?.artists_view_mode === "rows") {
+        this.artistsViewMode = settings.artists_view_mode;
       }
     } catch (e) {
       console.error("Failed to load preference settings:", e);
@@ -49,6 +58,24 @@ class PrefsStore {
       await invoke("set_app_setting", { key: "acoustid_api_key", value: key });
     } catch (e) {
       console.error("Failed to save AcoustID API key:", e);
+    }
+  }
+
+  async setAlbumsViewMode(mode: CollectionViewMode) {
+    this.albumsViewMode = mode;
+    try {
+      await invoke("set_app_setting", { key: "albums_view_mode", value: mode });
+    } catch (e) {
+      console.error("Failed to save albums view mode:", e);
+    }
+  }
+
+  async setArtistsViewMode(mode: CollectionViewMode) {
+    this.artistsViewMode = mode;
+    try {
+      await invoke("set_app_setting", { key: "artists_view_mode", value: mode });
+    } catch (e) {
+      console.error("Failed to save artists view mode:", e);
     }
   }
 }

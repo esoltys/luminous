@@ -6,10 +6,11 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Clock, FileText, Music, DiscAlbum, Mic2, Edit3, Columns } from "lucide-svelte";
+  import { Play, Plus, Clock, FileText, Music, DiscAlbum, Mic2, Edit3, Columns, LayoutGrid, Rows3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
   import ArtistDetailView from "./ArtistDetailView.svelte";
@@ -18,6 +19,8 @@
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
+  import AlbumRowCard from "./AlbumRowCard.svelte";
+  import ArtistRowCard from "./ArtistRowCard.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import Select from "./Select.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
@@ -143,6 +146,19 @@
 
   function getArtistSongsFor(name: string | null): Song[] {
     return getArtistSongs(collectionStore.songs, name);
+  }
+
+  // Albums and Artists each remember their own Cards/Rows view mode.
+  let activeViewMode = $derived(
+    collectionStore.activeSubTab === "albums" ? prefs.albumsViewMode : prefs.artistsViewMode
+  );
+
+  function setActiveViewMode(mode: CollectionViewMode) {
+    if (collectionStore.activeSubTab === "albums") {
+      prefs.setAlbumsViewMode(mode);
+    } else {
+      prefs.setArtistsViewMode(mode);
+    }
   }
 
   let sortField = $state<keyof Song>(
@@ -899,65 +915,139 @@
   {:else}
     <!-- Scrollable Container for Albums / Artists Views -->
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <!-- Top bar with Filter Info / Sort controls (sticky) -->
-      <div class="h-12 flex items-center justify-between sticky top-0 z-20 bg-brand-main">
-        <!-- Showing Count (Left) -->
-        <div class="text-xs text-brand-text-secondary font-medium">
-          {#if collectionStore.activeSubTab === "albums"}
-            {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
-          {:else}
-            {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
-          {/if}
+      <!-- Sticky header: View Mode Toggle above Filter Info / Sort controls -->
+      <div class="sticky top-0 z-20 bg-brand-main">
+        <!-- View Mode Toggle (Cards / Rows) -->
+        <div class="h-10 flex items-center justify-end">
+          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <button
+              onclick={() => setActiveViewMode("cards")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t('collection.viewCards')}
+              aria-label={i18n.t('collection.viewCards')}
+              aria-pressed={activeViewMode === "cards"}
+            >
+              <LayoutGrid class="w-4 h-4" />
+            </button>
+            <button
+              onclick={() => setActiveViewMode("rows")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t('collection.viewRows')}
+              aria-label={i18n.t('collection.viewRows')}
+              aria-pressed={activeViewMode === "rows"}
+            >
+              <Rows3 class="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <!-- Sort Dropdown (Right) -->
-        <div class="flex items-center gap-4">
-          {#if collectionStore.activeSubTab === "albums"}
-            <div class="relative">
-              <Select
-                value={`${albumSortField}-${albumSortAsc}`}
-                onchange={(e) => {
-                  const [field, asc] = e.currentTarget.value.split("-");
-                  albumSortField = field as "album" | "artist" | "year" | "track_count";
-                  albumSortAsc = asc === "true";
-                }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-              >
-                <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
-                <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
-                <option value="artist-true">{i18n.t('collection.sortArtistNameAsc')}</option>
-                <option value="artist-false">{i18n.t('collection.sortArtistNameDesc')}</option>
-                <option value="year-false">{i18n.t('collection.sortYearDesc')}</option>
-                <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
-                <option value="track_count-false">{i18n.t('collection.sortTracksDesc')}</option>
-                <option value="track_count-true">{i18n.t('collection.sortTracksAsc')}</option>
-              </Select>
-            </div>
-          {:else if collectionStore.activeSubTab === "artists"}
-            <div class="relative">
-              <Select
-                value={`${artistSortField}-${artistSortAsc}`}
-                onchange={(e) => {
-                  const [field, asc] = e.currentTarget.value.split("-");
-                  artistSortField = field as "name" | "genre" | "song_count";
-                  artistSortAsc = asc === "true";
-                }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-              >
-                <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
-                <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
-                <option value="genre-true">{i18n.t('collection.sortGenreAsc')}</option>
-                <option value="genre-false">{i18n.t('collection.sortGenreDesc')}</option>
-                <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
-                <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
-              </Select>
-            </div>
-          {/if}
+        <div class="h-12 flex items-center justify-between">
+          <!-- Showing Count (Left) -->
+          <div class="text-xs text-brand-text-secondary font-medium">
+            {#if collectionStore.activeSubTab === "albums"}
+              {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
+            {:else}
+              {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
+            {/if}
+          </div>
+
+          <!-- Sort Dropdown (Right) -->
+          <div class="flex items-center gap-4">
+            {#if collectionStore.activeSubTab === "albums"}
+              <div class="relative">
+                <Select
+                  value={`${albumSortField}-${albumSortAsc}`}
+                  onchange={(e) => {
+                    const [field, asc] = e.currentTarget.value.split("-");
+                    albumSortField = field as "album" | "artist" | "year" | "track_count";
+                    albumSortAsc = asc === "true";
+                  }}
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                >
+                  <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
+                  <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
+                  <option value="artist-true">{i18n.t('collection.sortArtistNameAsc')}</option>
+                  <option value="artist-false">{i18n.t('collection.sortArtistNameDesc')}</option>
+                  <option value="year-false">{i18n.t('collection.sortYearDesc')}</option>
+                  <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
+                  <option value="track_count-false">{i18n.t('collection.sortTracksDesc')}</option>
+                  <option value="track_count-true">{i18n.t('collection.sortTracksAsc')}</option>
+                </Select>
+              </div>
+            {:else if collectionStore.activeSubTab === "artists"}
+              <div class="relative">
+                <Select
+                  value={`${artistSortField}-${artistSortAsc}`}
+                  onchange={(e) => {
+                    const [field, asc] = e.currentTarget.value.split("-");
+                    artistSortField = field as "name" | "genre" | "song_count";
+                    artistSortAsc = asc === "true";
+                  }}
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                >
+                  <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
+                  <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
+                  <option value="genre-true">{i18n.t('collection.sortGenreAsc')}</option>
+                  <option value="genre-false">{i18n.t('collection.sortGenreDesc')}</option>
+                  <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
+                  <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
+                </Select>
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
 
+      {#snippet albumEmptyState()}
+        {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
+          <div class="col-span-full py-16 text-center">
+            <SearchEmptyState
+              icon={DiscAlbum}
+              title={i18n.t('collection.noAlbumsTitle')}
+              matchQueryText={i18n.t('collection.noAlbumsMatchQuery')}
+              query={collectionStore.searchQuery}
+              onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+            />
+          </div>
+        {:else if sortedAlbums.length === 0}
+          <div class="col-span-full py-16 text-center">
+            <LibraryWelcome />
+          </div>
+        {/if}
+      {/snippet}
+
+      {#snippet artistEmptyState()}
+        {#if sortedArtists.length === 0 && collectionStore.searchQuery}
+          <div class="col-span-full py-16 text-center">
+            <SearchEmptyState
+              icon={Mic2}
+              title={i18n.t('collection.noArtistsTitle')}
+              matchQueryText={i18n.t('collection.noArtistsMatchQuery')}
+              query={collectionStore.searchQuery}
+              onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+            />
+          </div>
+        {:else if sortedArtists.length === 0}
+          <div class="col-span-full py-16 text-center">
+            <LibraryWelcome />
+          </div>
+        {/if}
+      {/snippet}
+
       <div class="pt-2">
         {#if collectionStore.activeSubTab === "albums"}
+        {#if activeViewMode === "rows"}
+          <!-- Albums Row List View -->
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+            {#each sortedAlbums as album}
+              <AlbumRowCard
+                {album}
+                oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+              />
+            {/each}
+            {@render albumEmptyState()}
+          </div>
+        {:else}
           <!-- Albums Card Grid View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedAlbums as album}
@@ -967,23 +1057,26 @@
                 oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
               />
             {/each}
-            {#if sortedAlbums.length === 0 && collectionStore.searchQuery}
-              <div class="col-span-full py-16 text-center">
-                <SearchEmptyState
-                  icon={DiscAlbum}
-                  title={i18n.t('collection.noAlbumsTitle')}
-                  matchQueryText={i18n.t('collection.noAlbumsMatchQuery')}
-                  query={collectionStore.searchQuery}
-                  onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-                />
-              </div>
-            {:else if sortedAlbums.length === 0}
-              <div class="col-span-full py-16 text-center">
-                <LibraryWelcome />
-              </div>
-            {/if}
+            {@render albumEmptyState()}
           </div>
+        {/if}
         {:else if collectionStore.activeSubTab === "artists"}
+        {#if activeViewMode === "rows"}
+          <!-- Artists Row List View -->
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+            {#each sortedArtists as artist}
+              {@const artistAlbums = getArtistAlbumsFor(artist.name)}
+              {@const artistSongs = getArtistSongsFor(artist.name)}
+              <ArtistRowCard
+                {artist}
+                {artistAlbums}
+                {artistSongs}
+                onclick={() => collectionStore.viewArtist(artist.name || "")}
+              />
+            {/each}
+            {@render artistEmptyState()}
+          </div>
+        {:else}
           <!-- Artists List Grid View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedArtists as artist}
@@ -996,22 +1089,9 @@
                 onclick={() => collectionStore.viewArtist(artist.name || "")}
               />
             {/each}
-            {#if sortedArtists.length === 0 && collectionStore.searchQuery}
-              <div class="col-span-full py-16 text-center">
-                <SearchEmptyState
-                  icon={Mic2}
-                  title={i18n.t('collection.noArtistsTitle')}
-                  matchQueryText={i18n.t('collection.noArtistsMatchQuery')}
-                  query={collectionStore.searchQuery}
-                  onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-                />
-              </div>
-            {:else if sortedArtists.length === 0}
-              <div class="col-span-full py-16 text-center">
-                <LibraryWelcome />
-              </div>
-            {/if}
+            {@render artistEmptyState()}
           </div>
+        {/if}
         {/if}
       </div>
     </div>
