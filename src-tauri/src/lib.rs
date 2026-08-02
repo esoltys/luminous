@@ -59,6 +59,42 @@ pub struct AppState {
     pub media_session: Option<media_session::MediaSessionHandle>,
 }
 
+/// Suppresses stock webview browser chrome — reload/find/print keybindings and
+/// the native right-click menu — so Luminous reads as a native app rather than
+/// a webview (#212). The only carve-out is `DEV_TOOLS` in debug builds, so
+/// `Ctrl+Shift+I` still opens devtools under `cargo tauri dev`; everything
+/// else (including the context menu and reload) is suppressed in both debug
+/// and release builds.
+///
+/// Zoom (`Ctrl+Plus/Minus`, `Ctrl+MouseWheel`, pinch-to-zoom) isn't covered by
+/// the plugin's cross-platform JS flags, so on Windows it's additionally
+/// killed at the WebView2 settings level via the `platform-windows` feature.
+/// `browser_accelerator_keys` is WebView2's blanket switch for the same
+/// shortcuts `Flags` targets (plus zoom, plus devtools) — only flipped off in
+/// release so it doesn't fight the devtools carve-out above.
+fn build_prevent_default_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    use tauri_plugin_prevent_default::Flags;
+
+    let flags = if cfg!(debug_assertions) {
+        Flags::all().difference(Flags::DEV_TOOLS)
+    } else {
+        Flags::all()
+    };
+    let builder = tauri_plugin_prevent_default::Builder::new().with_flags(flags);
+
+    #[cfg(target_os = "windows")]
+    let builder = {
+        use tauri_plugin_prevent_default::PlatformOptions;
+        let mut platform = PlatformOptions::new().pinch_zoom(false).zoom_control(false);
+        if !cfg!(debug_assertions) {
+            platform = platform.browser_accelerator_keys(false);
+        }
+        builder.platform(platform)
+    };
+
+    builder.build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "linux")]
@@ -143,6 +179,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();

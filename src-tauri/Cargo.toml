@@ -31,6 +31,12 @@ tauri-plugin-updater = "2"
 # on Wayland).
 tauri-plugin-window-state = "2"
 tauri-plugin-positioner = "2"
+# Suppress stock webview browser chrome (reload, find, print, zoom, native
+# context menu, devtools in release builds) so the app reads as native
+# rather than a browser tab (#212). `platform-windows` unlocks WebView2-only
+# settings (accelerator keys, pinch/ctrl-wheel zoom) not covered by the
+# cross-platform JS-injection flags, so it's only pulled in on Windows.
+tauri-plugin-prevent-default = "5"
 
 
 # --- Serialization ---
@@ -96,6 +102,12 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 rand = "0.8"
 percent-encoding = "2"
+
+# WebView2-only settings for tauri-plugin-prevent-default (zoom control,
+# browser accelerator keys) — the feature links webview2-com/windows, so it's
+# gated to the Windows target only.
+[target.'cfg(windows)'.dependencies]
+tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
 
 [dev-dependencies]
 cucumber = { version = "0.20", features = ["macros"] }
