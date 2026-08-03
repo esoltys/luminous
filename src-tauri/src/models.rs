@@ -434,7 +434,6 @@ pub enum RepeatMode {
     Track,
     Album,
     Playlist,
-    OneByOne,
     Intro,
 }
 

@@ -73,22 +73,38 @@ describe("Miniplayer.svelte", () => {
     expect(resumeSpy).toHaveBeenCalled();
   });
 
-  it("cycles shuffle and repeat modes displaying badges", async () => {
+  it("cycles shuffle and repeat modes pairing a mode-type icon beside the transport icon", async () => {
     playerStore.currentSong = mockSong;
-    const { getByTitle, getByText } = render(Miniplayer);
+    const { getByTitle } = render(Miniplayer);
 
     const shuffleBtn = getByTitle(/Shuffle:/i);
     const repeatBtn = getByTitle(/Repeat:/i);
 
-    // Click shuffle -> all (no badge) -> inside_album (IA badge)
-    await fireEvent.click(shuffleBtn); // all
-    await fireEvent.click(shuffleBtn); // inside_album
-    expect(getByText("IA")).toBeInTheDocument();
+    // off / off: only the base transport icon
+    expect(shuffleBtn.querySelectorAll("svg").length).toBe(1);
+    expect(repeatBtn.querySelectorAll("svg").length).toBe(1);
 
-    // Click repeat -> track (Repeat1 icon) -> album (AL badge)
+    // Click shuffle -> all (still no type icon) -> inside_album (DiscAlbum pairs with Shuffle)
+    await fireEvent.click(shuffleBtn); // all
+    expect(shuffleBtn.querySelectorAll("svg").length).toBe(1);
+    await fireEvent.click(shuffleBtn); // inside_album
+    expect(shuffleBtn.querySelectorAll("svg").length).toBe(2);
+
+    // Click repeat -> track (Music pairs with Repeat) -> album (DiscAlbum pairs with Repeat)
     await fireEvent.click(repeatBtn); // track
+    expect(repeatBtn.querySelectorAll("svg").length).toBe(2);
     await fireEvent.click(repeatBtn); // album
-    expect(getByText("AL")).toBeInTheDocument();
+    expect(repeatBtn.querySelectorAll("svg").length).toBe(2);
+  });
+
+  it("shows the user-guide description for the active shuffle/repeat mode in the tooltip", () => {
+    playerStore.currentSong = mockSong;
+    playerStore.shuffleMode = "artists";
+    playerStore.repeatMode = "playlist";
+    const { getByTitle } = render(Miniplayer);
+
+    expect(getByTitle(/before moving to a new, randomly selected artist/i)).toBeInTheDocument();
+    expect(getByTitle(/loop the current queue or playlist indefinitely/i)).toBeInTheDocument();
   });
 
   it("renders the song rating widget and rates the current song", async () => {

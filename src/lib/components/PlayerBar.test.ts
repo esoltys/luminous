@@ -76,7 +76,7 @@ describe("PlayerBar.svelte", () => {
     const resumeSpy = vi.spyOn(playerStore, "resume").mockImplementation(async () => {});
 
     const { getByTitle } = render(PlayerBar);
-    const playBtn = getByTitle(/play/i);
+    const playBtn = getByTitle("Play");
     await fireEvent.click(playBtn);
 
     expect(resumeSpy).toHaveBeenCalled();
@@ -125,6 +125,38 @@ describe("PlayerBar.svelte", () => {
     await fireEvent.click(repeatBtn);
 
     expect(repeatSpy).toHaveBeenCalledWith("track");
+  });
+
+  it("pairs a mode-type icon beside the Shuffle/Repeat icon for disambiguated modes", () => {
+    playerStore.shuffleMode = "all";
+    playerStore.repeatMode = "off";
+    const { getByTitle, rerender } = render(PlayerBar);
+
+    const shuffleBtn = getByTitle(/shuffle/i);
+    const repeatBtn = getByTitle(/repeat/i);
+
+    // "all" shuffle and "off" repeat show only the base transport icon
+    expect(shuffleBtn.querySelectorAll("svg").length).toBe(1);
+    expect(repeatBtn.querySelectorAll("svg").length).toBe(1);
+
+    playerStore.shuffleMode = "inside_album";
+    playerStore.repeatMode = "track";
+    rerender({});
+
+    // Disambiguated modes pair a full-size type icon next to the base icon
+    expect(shuffleBtn.querySelectorAll("svg").length).toBe(2);
+    expect(shuffleBtn.textContent).not.toContain("IA");
+    expect(repeatBtn.querySelectorAll("svg").length).toBe(2);
+    expect(repeatBtn.textContent).not.toContain("AL");
+  });
+
+  it("shows the user-guide description for the active shuffle/repeat mode in the tooltip", () => {
+    playerStore.shuffleMode = "artists";
+    playerStore.repeatMode = "playlist";
+    const { getByTitle } = render(PlayerBar);
+
+    expect(getByTitle(/before moving to a new, randomly selected artist/i)).toBeInTheDocument();
+    expect(getByTitle(/loop the current queue or playlist indefinitely/i)).toBeInTheDocument();
   });
 
   it("handles mute toggle correctly", async () => {

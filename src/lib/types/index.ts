@@ -169,7 +169,7 @@ export interface Playlist {
 export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover" | "deep_cuts";
 
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
-export type RepeatMode = "off" | "track" | "album" | "playlist" | "one_by_one" | "intro";
+export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
 export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "fallback";
 
