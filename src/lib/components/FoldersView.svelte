@@ -89,10 +89,16 @@
   let hasEnvKey = $state(false);
 
   async function handlePruneMissing() {
-    const { deletedSongs, removedFolders } = await collectionStore.pruneMissing();
-    pruneMsg = removedFolders > 0
-      ? i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders })
-      : i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+    const { deletedSongs, removedFolders, mergedDuplicates } = await collectionStore.pruneMissing();
+    if (removedFolders > 0 && mergedDuplicates > 0) {
+      pruneMsg = i18n.t('settings.pruneCompleteMsgWithFoldersAndDuplicates', { count: deletedSongs, folders: removedFolders, duplicates: mergedDuplicates });
+    } else if (mergedDuplicates > 0) {
+      pruneMsg = i18n.t('settings.pruneCompleteMsgWithDuplicates', { count: deletedSongs, duplicates: mergedDuplicates });
+    } else if (removedFolders > 0) {
+      pruneMsg = i18n.t('settings.pruneCompleteMsgWithFolders', { count: deletedSongs, folders: removedFolders });
+    } else {
+      pruneMsg = i18n.t('settings.pruneCompleteMsg', { count: deletedSongs });
+    }
     organizeRefreshKey++;
     setTimeout(() => { pruneMsg = null; }, PRUNE_MESSAGE_DURATION_MS);
   }

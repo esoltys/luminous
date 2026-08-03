@@ -595,6 +595,7 @@ pub struct MusicDirectory {
 pub struct PruneResult {
     pub deleted_songs: usize,
     pub removed_folders: usize,
+    pub merged_duplicates: usize,
 }
 
 /// Scan progress event payload.
