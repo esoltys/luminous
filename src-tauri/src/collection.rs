@@ -2225,15 +2225,27 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 // instead of being handled independently as a delete + a fresh
                 // insert (which would reset rating/playcount/added-date on the
                 // "new" row).
+                //
+                // The window slides: it resets on every new event instead of
+                // expiring 400ms after the *first* one. A real folder copy or
+                // extraction can spread its filesystem events over several
+                // seconds (disk I/O, antivirus scanning, etc), and a fixed
+                // deadline would chop that single logical operation into many
+                // separate batches — each emitting its own "batch-processing-*"
+                // events and its own "songs added" toast instead of one (#233).
+                // `max_batch_duration` bounds the worst case so a folder that's
+                // never quiet (e.g. continuously written to) still flushes
+                // periodically instead of buffering forever.
                 let mut batch = vec![msg];
-                let deadline = std::time::Instant::now() + std::time::Duration::from_millis(400);
-                while let Some(remaining) =
-                    deadline.checked_duration_since(std::time::Instant::now())
-                {
-                    if remaining.is_zero() {
+                let debounce = std::time::Duration::from_millis(400);
+                let max_batch_duration = std::time::Duration::from_secs(20);
+                let batch_started_at = std::time::Instant::now();
+                loop {
+                    let elapsed = batch_started_at.elapsed();
+                    if elapsed >= max_batch_duration {
                         break;
                     }
-                    match rx.recv_timeout(remaining) {
+                    match rx.recv_timeout(debounce.min(max_batch_duration - elapsed)) {
                         Ok(next) => batch.push(next),
                         Err(_) => break,
                     }

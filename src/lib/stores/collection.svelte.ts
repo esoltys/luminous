@@ -557,7 +557,10 @@ class CollectionStore {
           this.refreshStats().then(() => {
             const added = this.stats.total_songs - songCountBeforeRefresh;
             if (added > 0) {
-              toastStore.show(i18n.t("settings.importFinishedToast", { count: added }), "success");
+              const text = added === 1
+                ? i18n.t("settings.importFinishedToastOne")
+                : i18n.t("settings.importFinishedToastMany", { count: added });
+              toastStore.show(text, "success");
             }
 
             // Milestone detection (#182): check if total_songs just crossed a
@@ -635,9 +638,12 @@ class CollectionStore {
       await listen<BatchProgress>("batch-processing-completed", (event) => {
         const { batch_id, total_count } = event.payload;
         if (this.activeBatchToast?.batchId !== batch_id) return;
+        const text = total_count === 1
+          ? i18n.t("settings.batchProcessingDoneToastOne")
+          : i18n.t("settings.batchProcessingDoneToastMany", { count: total_count });
         toastStore.finishBatch(
           this.activeBatchToast.toastId,
-          i18n.t("settings.batchProcessingDoneToast", { count: total_count }),
+          text,
           "success"
         );
         this.activeBatchToast = null;
