@@ -303,7 +303,7 @@ export const en = {
     rescanTitle: "Library Scanning & Maintenance",
     rescanSubtitle: "Perform incremental or full rescans and configure automatic background scanning.",
     lastScanned: "Last scan: {time}",
-    importFinishedToast: "{count} tracks added",
+    importFinishedToast: "{count} songs added",
     batchProcessingToast: "Processing songs ({current}/{total})...",
     batchProcessingDoneToast: "{count} song(s) updated",
     scanningPhase: "Phase: {phase}",

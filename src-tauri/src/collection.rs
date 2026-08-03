@@ -20,13 +20,35 @@ use rusqlite::{params, ToSql};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
     time::UNIX_EPOCH,
 };
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
+
+/// Pauses the realtime file watcher for as long as it's alive. `scan_all`'s own
+/// tag reads and cover-art writes can touch file metadata; without this, the
+/// (already-running) watcher misreads that self-inflicted activity as an
+/// external change and re-reports it through its own batch-processing events,
+/// producing a second "songs added" toast for the same import (#233).
+struct WatcherPauseGuard {
+    flag: Arc<AtomicBool>,
+}
+
+impl WatcherPauseGuard {
+    fn new(flag: Arc<AtomicBool>) -> Self {
+        flag.store(true, Ordering::Relaxed);
+        Self { flag }
+    }
+}
+
+impl Drop for WatcherPauseGuard {
+    fn drop(&mut self) {
+        self.flag.store(false, Ordering::Relaxed);
+    }
+}
 
 #[derive(Debug)]
 pub struct CollectionScanner {
@@ -248,6 +270,10 @@ impl CollectionScanner {
     /// Scan all watched directories, emitting progress events to the frontend.
     /// If `force` is true, skips mtime checks and re-reads metadata for all files.
     pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
+        let _watcher_pause_guard = app
+            .try_state::<crate::AppState>()
+            .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
+
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
             // Still tell the frontend we're done — otherwise the isScanning
