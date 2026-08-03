@@ -16,6 +16,7 @@
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
   const PRUNE_MESSAGE_DURATION_MS = 8000;
@@ -24,14 +25,6 @@
   let appVersion = $state("");
   let versionCopied = $state(false);
   let contentEl = $state<HTMLDivElement | null>(null);
-
-  // The content area is a single scrollable div shared by every tab (only its
-  // children swap via the {#if} chain below), so switching tabs doesn't
-  // naturally reset scroll position the way navigating to a new view would.
-  $effect(() => {
-    void settingsTab;
-    if (contentEl) contentEl.scrollTop = 0;
-  });
 
   // "Import finished"-style success flash for a manual "Check Now" that
   // comes back up-to-date — only on the checking -> up-to-date transition
@@ -326,7 +319,7 @@
   </div>
 
   <!-- Content Area -->
-  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
     {#if settingsTab === "general"}
       <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">

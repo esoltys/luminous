@@ -10,6 +10,7 @@
   import HomeRowList from "./HomeRowList.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   let topArtists = $state<ArtistItem[]>([]);
   let frequentlyPlayed = $state<HomeItem[]>([]);
@@ -49,7 +50,7 @@
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
   <!-- Content Area -->
-  <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+  <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
     <!-- Header -->
     <div class="px-6 pt-8">
       <h1 class="text-3xl font-heading font-bold text-brand-text-primary">

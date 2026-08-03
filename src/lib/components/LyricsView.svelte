@@ -6,6 +6,7 @@
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   interface LyricLine {
     timeMs: number;
@@ -262,7 +263,7 @@
   </div>
 
   <!-- Lyrics Container Viewport -->
-  <div class="flex-1 overflow-y-auto px-6 py-12" class:pb-28={!!playerStore.currentSong} bind:this={containerEl}>
+  <div class="flex-1 overflow-y-auto px-6 py-12" class:pb-28={!!playerStore.currentSong} bind:this={containerEl} use:rememberScroll={"lyrics"}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
         <LoadingSpinner label={i18n.t('lyrics.fetching', {}, "Fetching lyrics...")} />
