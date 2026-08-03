@@ -767,15 +767,19 @@ class CollectionStore {
     });
   }
 
-  async pruneMissing(): Promise<{ deletedSongs: number; removedFolders: number }> {
+  async pruneMissing(): Promise<{ deletedSongs: number; removedFolders: number; mergedDuplicates: number }> {
     try {
-      const result = await invoke<{ deleted_songs: number; removed_folders: number }>("prune_missing_songs");
+      const result = await invoke<{ deleted_songs: number; removed_folders: number; merged_duplicates: number }>("prune_missing_songs");
       await this.refreshStats();
       await this.refreshLibrary();
-      return { deletedSongs: result.deleted_songs, removedFolders: result.removed_folders };
+      return {
+        deletedSongs: result.deleted_songs,
+        removedFolders: result.removed_folders,
+        mergedDuplicates: result.merged_duplicates,
+      };
     } catch (err) {
       console.error("Failed to prune missing songs:", err);
-      return { deletedSongs: 0, removedFolders: 0 };
+      return { deletedSongs: 0, removedFolders: 0, mergedDuplicates: 0 };
     }
   }
 

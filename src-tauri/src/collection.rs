@@ -241,12 +241,80 @@ impl CollectionScanner {
         Ok(marked)
     }
 
+    /// Merges `songs` rows that point to the same physical file (matched by
+    /// case-insensitive path) into one, keeping the row with the highest id
+    /// (the most recently upserted, reflecting current tags) and re-pointing
+    /// playlist membership and play history from the others before deleting
+    /// them. Rolls the discarded rows' rating/playcount/skipcount/lastplayed
+    /// into the survivor rather than just discarding them.
+    ///
+    /// These duplicates can only arise from a case-only rename on a
+    /// case-insensitive filesystem (Windows/macOS) slipping past
+    /// `reconcile_moved_songs` before that was fixed to compare against the
+    /// exact-cased paths a scan actually finds on disk — libraries scanned
+    /// before that fix can still carry the extra rows, hence this cleanup.
+    pub fn merge_duplicate_songs(&self) -> Result<usize> {
+        let conn = self.db.pool.get()?;
+
+        let mut stmt = conn.prepare("SELECT id, path FROM songs WHERE path IS NOT NULL")?;
+        let rows: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+
+        let mut groups: std::collections::HashMap<String, Vec<i64>> =
+            std::collections::HashMap::new();
+        for (id, path) in rows {
+            groups.entry(path.to_lowercase()).or_default().push(id);
+        }
+
+        let mut merged = 0usize;
+        let tx = conn.unchecked_transaction()?;
+        for mut ids in groups.into_values() {
+            if ids.len() < 2 {
+                continue;
+            }
+            ids.sort_unstable();
+            let survivor = ids.pop().expect("len >= 2 checked above");
+            for dup_id in ids {
+                tx.execute(
+                    "UPDATE playlist_items SET song_id = ?1 WHERE song_id = ?2",
+                    params![survivor, dup_id],
+                )?;
+                tx.execute(
+                    "UPDATE play_history SET song_id = ?1 WHERE song_id = ?2",
+                    params![survivor, dup_id],
+                )?;
+                tx.execute(
+                    "UPDATE songs SET
+                        rating = MAX(rating, (SELECT rating FROM songs WHERE id = ?2)),
+                        playcount = playcount + (SELECT playcount FROM songs WHERE id = ?2),
+                        skipcount = skipcount + (SELECT skipcount FROM songs WHERE id = ?2),
+                        lastplayed = MAX(IFNULL(lastplayed, 0), IFNULL((SELECT lastplayed FROM songs WHERE id = ?2), 0))
+                     WHERE id = ?1",
+                    params![survivor, dup_id],
+                )?;
+                tx.execute("DELETE FROM songs WHERE id = ?1", params![dup_id])?;
+                merged += 1;
+            }
+        }
+        tx.commit()?;
+
+        if merged > 0 {
+            log::info!("Merged {merged} duplicate song row(s) pointing to the same file");
+        }
+        Ok(merged)
+    }
+
     /// Hard-deletes songs from the database when their file no longer exists on disk or are marked unavailable.
     /// Also sweeps every watched directory for empty folders and removes them.
     ///
     /// This is only ever invoked explicitly (the "Clean Up Missing Songs" action) — automatic
     /// scans call `mark_missing_unavailable` instead, which never deletes.
     pub fn prune_missing_songs(&self) -> Result<PruneResult> {
+        let merged_duplicates = self.merge_duplicate_songs()?;
+
         let conn = self.db.pool.get()?;
 
         let mut to_delete = self.find_missing_song_ids(&conn, false)?;
@@ -284,6 +352,7 @@ impl CollectionScanner {
         Ok(PruneResult {
             deleted_songs: deleted_count,
             removed_folders,
+            merged_duplicates,
         })
     }
 
@@ -1913,6 +1982,18 @@ fn reconcile_moved_songs(conn: &rusqlite::Connection, all_paths: &[PathBuf]) -> 
         .collect();
     drop(existing_paths_stmt);
 
+    // Exact-cased paths this scan actually found on disk. Used below instead of
+    // `Path::exists()` — on a case-insensitive-but-case-preserving filesystem
+    // (Windows, macOS), `exists()` on a stale-cased stored path still resolves
+    // to the real file, so a case-only rename (e.g. an album folder renamed to
+    // match a retagged album name) would never be recognized as needing a
+    // repath, and the next scan would insert a second row for the same file
+    // instead of updating the first.
+    let disk_paths: std::collections::HashSet<String> = all_paths
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+
     let mut candidates: std::collections::HashMap<(String, i64), Vec<&PathBuf>> =
         std::collections::HashMap::new();
     for path in all_paths {
@@ -1949,7 +2030,7 @@ fn reconcile_moved_songs(conn: &rusqlite::Connection, all_paths: &[PathBuf]) -> 
     for (id, path, filesize) in rows.flatten() {
         let Some(filesize) = filesize else { continue };
         let p = Path::new(&path);
-        if p.exists() {
+        if disk_paths.contains(&path) {
             continue;
         }
         let Some(filename) = p.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
@@ -3410,6 +3491,149 @@ mod tests {
         assert_eq!(
             playcount, 7,
             "repath must not reset stats tied to the song id"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    #[cfg(any(windows, target_os = "macos"))]
+    fn test_reconcile_moved_songs_detects_case_only_rename() {
+        // Regression test for a duplicate-song bug: renaming an album folder's
+        // case only (e.g. "HERO" -> "Hero") on a case-insensitive-but-case-preserving
+        // filesystem used to leave the stale-cased DB row undetected as an orphan,
+        // because `Path::exists()` on the stale-cased path still resolved to the
+        // real (renamed) file. The next scan would then insert a second row for
+        // the same physical file instead of repathing the first.
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_case_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let album_dir = temp_dir.join("Hero");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let real_path = album_dir.join("track.mp3");
+        let content = b"pretend audio bytes";
+        std::fs::write(&real_path, content).unwrap();
+
+        // The stale, differently-cased path the DB still has recorded.
+        let stale_path = temp_dir.join("HERO").join("track.mp3");
+        assert!(
+            stale_path.exists(),
+            "sanity check: this test requires a case-insensitive filesystem"
+        );
+
+        let song = Song {
+            path: Some(stale_path.to_string_lossy().to_string()),
+            title: Some("Sugar".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let original_id: i64 = conn
+            .query_row("SELECT id FROM songs", [], |r| r.get(0))
+            .unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, &[real_path.clone()]).unwrap();
+        assert_eq!(
+            reconciled, 1,
+            "a case-only rename must be recognized as a repath, not left stale"
+        );
+
+        let (id, path): (i64, String) = conn
+            .query_row("SELECT id, path FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(id, original_id, "repath must preserve the song's id");
+        assert_eq!(path, real_path.to_string_lossy().to_string());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_merge_duplicate_songs_by_case_insensitive_path() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_merge_dup_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song_a = Song {
+            path: Some("C:/Music/HERO/track.mp3".to_string()),
+            title: Some("Sugar".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_a).unwrap();
+        let id_a: i64 = conn
+            .query_row("SELECT id FROM songs", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "UPDATE songs SET playcount = 3, rating = 0.8 WHERE id = ?1",
+            params![id_a],
+        )
+        .unwrap();
+
+        // Same physical file, re-scanned after the folder was renamed to "Hero" —
+        // differs only by case from song_a's path.
+        let song_b = Song {
+            path: Some("C:/Music/Hero/track.mp3".to_string()),
+            title: Some("Sugar".to_string()),
+            source: SongSource::LocalFile,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song_b).unwrap();
+        let id_b: i64 = conn
+            .query_row("SELECT id FROM songs WHERE id != ?1", params![id_a], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        conn.execute(
+            "UPDATE songs SET playcount = 2 WHERE id = ?1",
+            params![id_b],
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let merged = scanner.merge_duplicate_songs().unwrap();
+        assert_eq!(merged, 1);
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "duplicate rows for the same file must collapse into one"
+        );
+
+        let (remaining_id, playcount, rating): (i64, i32, f64) = conn
+            .query_row("SELECT id, playcount, rating FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(
+            remaining_id, id_b,
+            "the most recently upserted row (higher id) survives"
+        );
+        assert_eq!(
+            playcount, 5,
+            "playcounts from both rows must be summed, not discarded"
+        );
+        assert_eq!(
+            rating, 0.8,
+            "a real rating from the discarded row must not be lost to an unset -1"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
