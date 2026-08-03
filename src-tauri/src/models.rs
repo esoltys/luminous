@@ -605,6 +605,13 @@ pub struct ScanProgress {
     pub scanned: u64,
     pub total: u64,
     pub current_path: Option<String>,
+    /// True when this scan was triggered internally by the file watcher as a
+    /// catch-up/safety-net rescan (recovering from an overflow, or picking up
+    /// a newly-appeared directory) rather than an explicit user action. The
+    /// frontend skips the "songs added" completion toast in that case, since
+    /// the watcher's own batch-processing events already cover the same
+    /// filesystem activity with a per-file-accurate count (#233).
+    pub silent: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

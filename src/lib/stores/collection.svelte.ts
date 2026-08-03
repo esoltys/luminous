@@ -556,7 +556,12 @@ class CollectionStore {
           const songCountBeforeRefresh = this.stats.total_songs;
           this.refreshStats().then(() => {
             const added = this.stats.total_songs - songCountBeforeRefresh;
-            if (added > 0) {
+            // A `silent` scan is a watcher-triggered catch-up rescan (overflow
+            // recovery, or a newly-appeared directory), not an explicit user
+            // action — the watcher's own batch-processing toast already
+            // covers this same filesystem activity, so skip this toast to
+            // avoid a second, less-accurate "songs added" notification (#233).
+            if (added > 0 && !event.payload.silent) {
               const text = added === 1
                 ? i18n.t("settings.importFinishedToastOne")
                 : i18n.t("settings.importFinishedToastMany", { count: added });

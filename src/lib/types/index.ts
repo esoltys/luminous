@@ -202,6 +202,7 @@ export interface ScanProgress {
   scanned: number;
   total: number;
   current_path?: string;
+  silent: boolean;
 }
 
 export type BatchPhase = "removing" | "adding" | "done";

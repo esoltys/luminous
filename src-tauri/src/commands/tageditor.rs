@@ -1,5 +1,7 @@
+use crate::collection::WatcherPauseGuard;
 use crate::tageditor::SuggestedTags;
 use crate::AppState;
+use std::sync::Arc;
 use tauri::State;
 
 #[derive(serde::Serialize)]
@@ -119,6 +121,12 @@ pub async fn save_song_tags(
     bpm: Option<f32>,
     initial_key: String,
 ) -> Result<(), String> {
+    // Written tags are an app-driven change Luminous already knows about, not
+    // an external addition — without this, the realtime watcher would pick up
+    // its own write and fire a spurious "song updated" toast on top of
+    // whatever feedback the tag editor itself shows (#233).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
     // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: String = conn
@@ -212,6 +220,11 @@ pub async fn save_album_tags(
     if song_ids.is_empty() {
         return Ok(0);
     }
+
+    // See save_song_tags — pause the watcher for the whole batch write so it
+    // doesn't misread its own tag writes across the album as an external
+    // change and fire a spurious "songs updated" toast (#233).
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 

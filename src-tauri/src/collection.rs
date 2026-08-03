@@ -28,17 +28,20 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
-/// Pauses the realtime file watcher for as long as it's alive. `scan_all`'s own
-/// tag reads and cover-art writes can touch file metadata; without this, the
-/// (already-running) watcher misreads that self-inflicted activity as an
-/// external change and re-reports it through its own batch-processing events,
-/// producing a second "songs added" toast for the same import (#233).
-struct WatcherPauseGuard {
+/// Pauses the realtime file watcher for as long as it's alive. Any code that
+/// writes to a file Luminous itself already knows about — `scan_all`'s tag
+/// reads and cover-art writes, or an explicit tag-editor save — should hold
+/// one for the duration of the write. Without it, the (already-running)
+/// watcher misreads that self-inflicted activity as an external change and
+/// re-reports it through its own batch-processing events, producing a
+/// spurious "songs added"/"songs updated" toast for an action that already
+/// has (or doesn't need) its own feedback (#233).
+pub struct WatcherPauseGuard {
     flag: Arc<AtomicBool>,
 }
 
 impl WatcherPauseGuard {
-    fn new(flag: Arc<AtomicBool>) -> Self {
+    pub fn new(flag: Arc<AtomicBool>) -> Self {
         flag.store(true, Ordering::Relaxed);
         Self { flag }
     }
@@ -269,7 +272,9 @@ impl CollectionScanner {
 
     /// Scan all watched directories, emitting progress events to the frontend.
     /// If `force` is true, skips mtime checks and re-reads metadata for all files.
-    pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
+    /// `silent` marks this as a watcher-triggered catch-up scan rather than an
+    /// explicit user action — see `ScanProgress::silent` (#233).
+    pub async fn scan_all(&self, app: AppHandle, force: bool, silent: bool) -> Result<()> {
         let _watcher_pause_guard = app
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
@@ -286,6 +291,7 @@ impl CollectionScanner {
                     scanned: 0,
                     total: 0,
                     current_path: None,
+                    silent,
                 },
             );
             return Ok(());
@@ -299,6 +305,7 @@ impl CollectionScanner {
                 scanned: 0,
                 total: 0,
                 current_path: None,
+                silent,
             },
         );
 
@@ -327,6 +334,7 @@ impl CollectionScanner {
                 scanned: 0,
                 total,
                 current_path: None,
+                silent,
             },
         );
 
@@ -383,6 +391,7 @@ impl CollectionScanner {
                             scanned,
                             total,
                             current_path: Some(path_str),
+                            silent,
                         },
                     );
                 }
@@ -453,6 +462,7 @@ impl CollectionScanner {
                     scanned: total,
                     total,
                     current_path: None,
+                    silent,
                 },
             );
         }
@@ -480,6 +490,7 @@ impl CollectionScanner {
                     scanned: updating_scanned,
                     total: total_updating_items,
                     current_path: Some(display_desc),
+                    silent,
                 },
             );
 
@@ -540,6 +551,7 @@ impl CollectionScanner {
                 scanned: total,
                 total,
                 current_path: None,
+                silent,
             },
         );
 
@@ -2258,7 +2270,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                     continue;
@@ -2306,8 +2318,13 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     // Emit a single batch-lifecycle notification covering every file this
                     // debounce window collected, instead of one signal per file — a
                     // multi-file drag-and-drop or folder import would otherwise "avalanche"
-                    // the frontend toast queue (#233).
-                    let total_count = still_removed.len() + still_added.len();
+                    // the frontend toast queue (#233). `still_removed` can include
+                    // non-audio companion paths (cover art, playlists, Thumbs.db) and bare
+                    // directory paths swept up by a recursive move/delete — only count
+                    // actual audio files toward the "songs" total so those don't inflate
+                    // it (`still_added` is already audio-only, per `added_paths`' filter).
+                    let removed_song_count = still_removed.iter().filter(|p| is_audio_file(p)).count();
+                    let total_count = removed_song_count + still_added.len();
                     let batch_id = NEXT_BATCH_ID.fetch_add(1, Ordering::Relaxed);
                     let mut processed_count = 0usize;
                     if total_count > 0 {
@@ -2332,6 +2349,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
 
                     for path in &still_removed {
                         let path_str = path.to_string_lossy().to_string();
+                        let is_song = is_audio_file(path);
 
                         if unreachable_roots.iter().any(|root| path.starts_with(root)) {
                             log::warn!(
@@ -2354,16 +2372,18 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                     log::error!("Failed to mark path unavailable in db: {e}");
                                 }
                             }
-                            processed_count += 1;
-                            let _ = app_clone.emit(
-                                "batch-processing-progress",
-                                BatchProgress {
-                                    batch_id,
-                                    current_count: processed_count,
-                                    total_count,
-                                    phase: BatchPhase::Removing,
-                                },
-                            );
+                            if is_song {
+                                processed_count += 1;
+                                let _ = app_clone.emit(
+                                    "batch-processing-progress",
+                                    BatchProgress {
+                                        batch_id,
+                                        current_count: processed_count,
+                                        total_count,
+                                        phase: BatchPhase::Removing,
+                                    },
+                                );
+                            }
                             continue;
                         }
 
@@ -2378,6 +2398,9 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                             Err(e) => {
                                 log::error!("Failed to delete path from db: {e}");
                             }
+                        }
+                        if !is_song {
+                            continue;
                         }
                         processed_count += 1;
                         let _ = app_clone.emit(
@@ -2433,7 +2456,12 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 // of albums, each its own subdir) must trigger it only once — looping
                 // per-directory here re-scanned the whole library once per subfolder,
                 // each emitting its own `scan-progress` "done" phase and thus its own
-                // "X tracks added" toast (#233).
+                // "X tracks added" toast (#233). It's marked `silent` because the
+                // still_added/still_removed handling above (or the per-file watcher
+                // events feeding it) already produced its own batch-processing toast
+                // for this same directory change — this rescan is just a safety-net
+                // catch-up for files the granular per-file watcher may have missed,
+                // not a separate user-facing event.
                 if !dir_paths.is_empty() {
                     log::info!(
                         "Watcher detected {} director{} added/changed",
@@ -2443,7 +2471,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                 }
