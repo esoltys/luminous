@@ -616,6 +616,26 @@ pub enum ScanPhase {
     Done,
 }
 
+/// File-watcher batch lifecycle event payload (#233). The watcher debounces
+/// rapid-fire filesystem events into a single batch (see `start_watcher` in
+/// `collection.rs`); these events let the frontend collapse that batch into
+/// one progress toast instead of one per file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchProgress {
+    pub batch_id: u64,
+    pub current_count: usize,
+    pub total_count: usize,
+    pub phase: BatchPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchPhase {
+    Removing,
+    Adding,
+    Done,
+}
+
 /// Summary stats for the library.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LibraryStats {

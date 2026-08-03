@@ -304,6 +304,8 @@ export const en = {
     rescanSubtitle: "Perform incremental or full rescans and configure automatic background scanning.",
     lastScanned: "Last scan: {time}",
     importFinishedToast: "{count} tracks added",
+    batchProcessingToast: "Processing songs ({current}/{total})...",
+    batchProcessingDoneToast: "{count} song(s) updated",
     scanningPhase: "Phase: {phase}",
     phaseDiscovering: "Discovering Files",
     phaseReadingTags: "Reading Tags",

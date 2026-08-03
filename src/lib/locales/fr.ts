@@ -303,6 +303,8 @@ export const fr = {
     rescanSubtitle: "Effectuez des rebalayages incrémentiels ou complets et configurez l'analyse automatique.",
     lastScanned: "Dernière analyse : {time}",
     importFinishedToast: "{count} morceaux ajoutés",
+    batchProcessingToast: "Traitement des morceaux ({current}/{total})...",
+    batchProcessingDoneToast: "{count} morceau(x) mis à jour",
     scanningPhase: "Phase : {phase}",
     phaseDiscovering: "Découverte des fichiers",
     phaseReadingTags: "Lecture des étiquettes",

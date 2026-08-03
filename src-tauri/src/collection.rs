@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, PruneResult,
-        QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
+        AlbumItem, BatchPhase, BatchProgress, FileType, HomeItem, LibraryStats, MusicDirectory,
+        Playlist, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -19,7 +19,10 @@ use notify::Watcher;
 use rusqlite::{params, ToSql};
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::UNIX_EPOCH,
 };
 use tauri::{AppHandle, Emitter, Manager};
@@ -2091,6 +2094,11 @@ enum WatcherMsg {
     Overflow,
 }
 
+/// Monotonic id distinguishing one debounced watcher batch from the next, so
+/// the frontend can tell which `batch-processing-*` events belong together
+/// (see #233).
+static NEXT_BATCH_ID: AtomicU64 = AtomicU64::new(0);
+
 /// Start background directory watching using notify.
 pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
@@ -2257,6 +2265,25 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         let _ = app_clone.emit("library-changed", ());
                     }
 
+                    // Emit a single batch-lifecycle notification covering every file this
+                    // debounce window collected, instead of one signal per file — a
+                    // multi-file drag-and-drop or folder import would otherwise "avalanche"
+                    // the frontend toast queue (#233).
+                    let total_count = still_removed.len() + still_added.len();
+                    let batch_id = NEXT_BATCH_ID.fetch_add(1, Ordering::Relaxed);
+                    let mut processed_count = 0usize;
+                    if total_count > 0 {
+                        let _ = app_clone.emit(
+                            "batch-processing-started",
+                            BatchProgress {
+                                batch_id,
+                                current_count: 0,
+                                total_count,
+                                phase: BatchPhase::Removing,
+                            },
+                        );
+                    }
+
                     // A disconnected drive makes `notify` report every path under it as
                     // "removed" the same as an actual deletion would. Songs under a root
                     // that's currently unreachable get soft-flagged instead of
@@ -2289,6 +2316,16 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                     log::error!("Failed to mark path unavailable in db: {e}");
                                 }
                             }
+                            processed_count += 1;
+                            let _ = app_clone.emit(
+                                "batch-processing-progress",
+                                BatchProgress {
+                                    batch_id,
+                                    current_count: processed_count,
+                                    total_count,
+                                    phase: BatchPhase::Removing,
+                                },
+                            );
                             continue;
                         }
 
@@ -2304,6 +2341,16 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 log::error!("Failed to delete path from db: {e}");
                             }
                         }
+                        processed_count += 1;
+                        let _ = app_clone.emit(
+                            "batch-processing-progress",
+                            BatchProgress {
+                                batch_id,
+                                current_count: processed_count,
+                                total_count,
+                                phase: BatchPhase::Removing,
+                            },
+                        );
                     }
 
                     for path in &still_added {
@@ -2318,6 +2365,28 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         if result.is_ok() {
                             let _ = app_clone.emit("library-changed", ());
                         }
+                        processed_count += 1;
+                        let _ = app_clone.emit(
+                            "batch-processing-progress",
+                            BatchProgress {
+                                batch_id,
+                                current_count: processed_count,
+                                total_count,
+                                phase: BatchPhase::Adding,
+                            },
+                        );
+                    }
+
+                    if total_count > 0 {
+                        let _ = app_clone.emit(
+                            "batch-processing-completed",
+                            BatchProgress {
+                                batch_id,
+                                current_count: total_count,
+                                total_count,
+                                phase: BatchPhase::Done,
+                            },
+                        );
                     }
                 }
 
