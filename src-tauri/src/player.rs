@@ -153,7 +153,6 @@ impl Player {
                     "track" => RepeatMode::Track,
                     "album" => RepeatMode::Album,
                     "playlist" => RepeatMode::Playlist,
-                    "one_by_one" => RepeatMode::OneByOne,
                     "intro" => RepeatMode::Intro,
                     _ => RepeatMode::Off,
                 };
@@ -1140,7 +1139,6 @@ impl Player {
             RepeatMode::Track => "track",
             RepeatMode::Album => "album",
             RepeatMode::Playlist => "playlist",
-            RepeatMode::OneByOne => "one_by_one",
             RepeatMode::Intro => "intro",
         };
         if let Ok(conn) = self._db.pool.get() {
