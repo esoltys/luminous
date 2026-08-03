@@ -2390,10 +2390,17 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     }
                 }
 
-                for path in dir_paths {
+                // `scan_all` already walks every watched directory in one pass, so a
+                // batch with several new/changed subdirectories (e.g. dropping a folder
+                // of albums, each its own subdir) must trigger it only once — looping
+                // per-directory here re-scanned the whole library once per subfolder,
+                // each emitting its own `scan-progress` "done" phase and thus its own
+                // "X tracks added" toast (#233).
+                if !dir_paths.is_empty() {
                     log::info!(
-                        "Watcher detected directory addition/change: {}",
-                        path.to_string_lossy()
+                        "Watcher detected {} director{} added/changed",
+                        dir_paths.len(),
+                        if dir_paths.len() == 1 { "y" } else { "ies" }
                     );
                     let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
