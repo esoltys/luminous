@@ -30,6 +30,7 @@
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
+  import { rememberScroll, watchScrollMemory } from "../utils/scrollMemory";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -348,6 +349,15 @@
     const observer = new ResizeObserver(update);
     observer.observe(viewport);
     return () => observer.disconnect();
+  });
+
+  // VirtualList renders its own <svelte-virtual-list-viewport> scrolling element
+  // inside songsTableContainer, so it can't be reached with a template `use:` ref.
+  $effect(() => {
+    if (!songsTableContainer) return;
+    const viewport = songsTableContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
+    if (!viewport) return;
+    return watchScrollMemory(viewport, "collection:songs");
   });
 
   function toggleSort(field: keyof Song) {
@@ -912,7 +922,7 @@
 
   {:else}
     <!-- Scrollable Container for Albums / Artists Views -->
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${collectionStore.activeSubTab}`}>
       <!-- Sticky header: Filter Info / View Mode Toggle / Sort controls -->
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">

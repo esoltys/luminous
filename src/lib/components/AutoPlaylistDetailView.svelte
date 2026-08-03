@@ -26,6 +26,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { getPopulationModeSuffix } from "../utils/playlist";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   let { view }: { view: AutoPlaylistRef } = $props();
 
@@ -548,7 +549,7 @@
   </div>
 
   <div class="flex-1 min-h-0 px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-    <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto">
+    <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto" use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? ""}`}>
       <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>

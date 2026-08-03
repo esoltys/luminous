@@ -22,6 +22,7 @@
   import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3 } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   interface AutoDef {
     id: string;
@@ -248,7 +249,7 @@
   <AutoPlaylistDetailView view={collectionStore.selectedAutoPlaylist} />
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
+    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${collectionStore.playlistsSubTab}`}>
       <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         {#if collectionStore.playlistsSubTab === "custom"}
