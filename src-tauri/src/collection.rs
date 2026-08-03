@@ -20,7 +20,7 @@ use rusqlite::{params, ToSql};
 use std::{
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
     time::UNIX_EPOCH,
@@ -28,28 +28,45 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
-/// Pauses the realtime file watcher for as long as it's alive. Any code that
-/// writes to a file Luminous itself already knows about — `scan_all`'s tag
-/// reads and cover-art writes, or an explicit tag-editor save — should hold
-/// one for the duration of the write. Without it, the (already-running)
-/// watcher misreads that self-inflicted activity as an external change and
-/// re-reports it through its own batch-processing events, producing a
-/// spurious "songs added"/"songs updated" toast for an action that already
-/// has (or doesn't need) its own feedback (#233).
+/// How long to keep the watcher paused *after* a guard's write is done,
+/// before actually re-arming it. The OS delivers filesystem-change
+/// notifications asynchronously — on a network share or a busy disk, a
+/// "modified" event for a write that already returned can still land on the
+/// watcher's channel a few hundred ms later. Unpausing the instant the guard
+/// drops raced that delivery and let self-inflicted writes leak through as a
+/// spurious watcher batch anyway (#233).
+const WATCHER_UNPAUSE_GRACE: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// Pauses the realtime file watcher for as long as it (plus its grace period)
+/// is alive. Any code that writes to a file Luminous itself already knows
+/// about — `scan_all`'s tag reads and cover-art writes, or an explicit
+/// tag-editor save — should hold one for the duration of the write. Without
+/// it, the (already-running) watcher misreads that self-inflicted activity
+/// as an external change and re-reports it through its own batch-processing
+/// events, producing a spurious "songs added"/"songs updated" toast for an
+/// action that already has (or doesn't need) its own feedback (#233).
+///
+/// Backed by a depth counter rather than a bool so overlapping guards (e.g. a
+/// scan and a tag-editor save close together) don't let one's release
+/// re-arm the watcher while the other is still writing.
 pub struct WatcherPauseGuard {
-    flag: Arc<AtomicBool>,
+    flag: Arc<AtomicU32>,
 }
 
 impl WatcherPauseGuard {
-    pub fn new(flag: Arc<AtomicBool>) -> Self {
-        flag.store(true, Ordering::Relaxed);
+    pub fn new(flag: Arc<AtomicU32>) -> Self {
+        flag.fetch_add(1, Ordering::Relaxed);
         Self { flag }
     }
 }
 
 impl Drop for WatcherPauseGuard {
     fn drop(&mut self) {
-        self.flag.store(false, Ordering::Relaxed);
+        let flag = Arc::clone(&self.flag);
+        std::thread::spawn(move || {
+            std::thread::sleep(WATCHER_UNPAUSE_GRACE);
+            flag.fetch_sub(1, Ordering::Relaxed);
+        });
     }
 }
 
@@ -2208,7 +2225,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
 
             while let Ok(msg) = rx.recv() {
-                if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
+                if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) > 0 {
                     continue;
                 }
 

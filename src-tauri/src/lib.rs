@@ -51,7 +51,12 @@ pub struct AppState {
     pub playlists: Arc<Mutex<PlaylistManager>>,
     pub cover_manager: Arc<CoverManager>,
     pub watcher: Arc<parking_lot::Mutex<Option<notify::RecommendedWatcher>>>,
-    pub watcher_paused: Arc<std::sync::atomic::AtomicBool>,
+    /// Pause depth, not a bool — see `collection::WatcherPauseGuard`. A count
+    /// (rather than a flag) lets overlapping self-inflicted writes (e.g. a
+    /// scan and a tag-editor save close together) each hold their own pause
+    /// without one's release re-arming the watcher while the other is still
+    /// writing.
+    pub watcher_paused: Arc<std::sync::atomic::AtomicU32>,
     pub startup_file: Mutex<Option<String>>,
     /// OS "Now Playing" integration handle (#80) — `None` when the platform
     /// integration failed to initialize (unsupported desktop, no session
@@ -516,7 +521,7 @@ pub fn run() {
                 );
             }
 
-            let watcher_paused = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
 
             let state = AppState {
                 db,

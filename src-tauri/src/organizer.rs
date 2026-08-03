@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrganizeOptions {
@@ -694,13 +695,14 @@ fn move_companion_files(
 /// Execute batch file relocation and SQLite path updates.
 pub fn execute_apply(
     db: &Database,
-    watcher_paused: &AtomicBool,
+    watcher_paused: &Arc<AtomicU32>,
     items: &[OrganizeApplyItem],
     clean_empty_dirs: bool,
     move_extra_files: bool,
     cover_manager: Option<&CoverManager>,
 ) -> Result<OrganizeResult> {
-    watcher_paused.store(true, Ordering::Relaxed);
+    let _watcher_pause_guard =
+        crate::collection::WatcherPauseGuard::new(Arc::clone(watcher_paused));
 
     let mut moved_count = 0;
     let mut skipped_count = 0;
@@ -852,8 +854,6 @@ pub fn execute_apply(
             }
         }
     }
-
-    watcher_paused.store(false, Ordering::Relaxed);
 
     Ok(OrganizeResult {
         moved_count,
@@ -1181,8 +1181,6 @@ mod tests {
         use crate::collection::upsert_song;
         use crate::db::Database;
         use crate::models::{FileType, SongSource};
-        use std::sync::atomic::AtomicBool;
-        use std::sync::Arc;
 
         let base = std::env::temp_dir().join(format!(
             "luminous_organizer_apply_test_{}",
@@ -1229,7 +1227,7 @@ mod tests {
             to_path: dst_song_path.to_string_lossy().to_string(),
         }];
 
-        let watcher_paused = AtomicBool::new(false);
+        let watcher_paused = Arc::new(AtomicU32::new(0));
         let result = execute_apply(&db, &watcher_paused, &items, true, true, None).unwrap();
         assert_eq!(result.moved_count, 1);
         assert!(result.errors.is_empty());
