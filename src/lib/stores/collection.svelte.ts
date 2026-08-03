@@ -9,6 +9,7 @@ import type {
   LibraryStats,
   DbSchemaStatus,
   ScanProgress,
+  BatchProgress,
   AlbumItem,
   ArtistItem,
   RecentSearchItem,
@@ -104,6 +105,11 @@ class CollectionStore {
   dbSchemaStatus = $state<DbSchemaStatus | null>(null);
   isScanning = $state<boolean>(false);
   scanProgress = $state<ScanProgress | null>(null);
+
+  /** Tracks the single toast representing the currently in-flight file-watcher
+   *  batch (#233), so its progress collapses into one notification instead of
+   *  a toast per file. */
+  private activeBatchToast: { batchId: number; toastId: number } | null = null;
 
   /** Celebration moment states (issue #182) — consumed by Toast and layout. */
   isFirstLaunch = $state<boolean>(false);
@@ -550,8 +556,16 @@ class CollectionStore {
           const songCountBeforeRefresh = this.stats.total_songs;
           this.refreshStats().then(() => {
             const added = this.stats.total_songs - songCountBeforeRefresh;
-            if (added > 0) {
-              toastStore.show(i18n.t("settings.importFinishedToast", { count: added }), "success");
+            // A `silent` scan is a watcher-triggered catch-up rescan (overflow
+            // recovery, or a newly-appeared directory), not an explicit user
+            // action — the watcher's own batch-processing toast already
+            // covers this same filesystem activity, so skip this toast to
+            // avoid a second, less-accurate "songs added" notification (#233).
+            if (added > 0 && !event.payload.silent) {
+              const text = added === 1
+                ? i18n.t("settings.importFinishedToastOne")
+                : i18n.t("settings.importFinishedToastMany", { count: added });
+              toastStore.show(text, "success");
             }
 
             // Milestone detection (#182): check if total_songs just crossed a
@@ -605,6 +619,39 @@ class CollectionStore {
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
         });
+      });
+
+      // Collapse a whole debounced file-watcher batch (#233) into one toast
+      // that updates in place, instead of one toast per file it touches.
+      await listen<BatchProgress>("batch-processing-started", (event) => {
+        const { batch_id, total_count } = event.payload;
+        const toastId = toastStore.startBatch(
+          i18n.t("settings.batchProcessingToast", { current: 0, total: total_count })
+        );
+        this.activeBatchToast = { batchId: batch_id, toastId };
+      });
+
+      await listen<BatchProgress>("batch-processing-progress", (event) => {
+        const { batch_id, current_count, total_count } = event.payload;
+        if (this.activeBatchToast?.batchId !== batch_id) return;
+        toastStore.updateBatch(
+          this.activeBatchToast.toastId,
+          i18n.t("settings.batchProcessingToast", { current: current_count, total: total_count })
+        );
+      });
+
+      await listen<BatchProgress>("batch-processing-completed", (event) => {
+        const { batch_id, total_count } = event.payload;
+        if (this.activeBatchToast?.batchId !== batch_id) return;
+        const text = total_count === 1
+          ? i18n.t("settings.batchProcessingDoneToastOne")
+          : i18n.t("settings.batchProcessingDoneToastMany", { count: total_count });
+        toastStore.finishBatch(
+          this.activeBatchToast.toastId,
+          text,
+          "success"
+        );
+        this.activeBatchToast = null;
       });
 
       // Keep cached song rows in sync with rating/playcount changes made

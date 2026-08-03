@@ -4,8 +4,8 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, FileType, HomeItem, LibraryStats, MusicDirectory, Playlist, PruneResult,
-        QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
+        AlbumItem, BatchPhase, BatchProgress, FileType, HomeItem, LibraryStats, MusicDirectory,
+        Playlist, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -19,11 +19,56 @@ use notify::Watcher;
 use rusqlite::{params, ToSql};
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
     time::UNIX_EPOCH,
 };
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
+
+/// How long to keep the watcher paused *after* a guard's write is done,
+/// before actually re-arming it. The OS delivers filesystem-change
+/// notifications asynchronously — on a network share or a busy disk, a
+/// "modified" event for a write that already returned can still land on the
+/// watcher's channel a few hundred ms later. Unpausing the instant the guard
+/// drops raced that delivery and let self-inflicted writes leak through as a
+/// spurious watcher batch anyway (#233).
+const WATCHER_UNPAUSE_GRACE: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// Pauses the realtime file watcher for as long as it (plus its grace period)
+/// is alive. Any code that writes to a file Luminous itself already knows
+/// about — `scan_all`'s tag reads and cover-art writes, or an explicit
+/// tag-editor save — should hold one for the duration of the write. Without
+/// it, the (already-running) watcher misreads that self-inflicted activity
+/// as an external change and re-reports it through its own batch-processing
+/// events, producing a spurious "songs added"/"songs updated" toast for an
+/// action that already has (or doesn't need) its own feedback (#233).
+///
+/// Backed by a depth counter rather than a bool so overlapping guards (e.g. a
+/// scan and a tag-editor save close together) don't let one's release
+/// re-arm the watcher while the other is still writing.
+pub struct WatcherPauseGuard {
+    flag: Arc<AtomicU32>,
+}
+
+impl WatcherPauseGuard {
+    pub fn new(flag: Arc<AtomicU32>) -> Self {
+        flag.fetch_add(1, Ordering::Relaxed);
+        Self { flag }
+    }
+}
+
+impl Drop for WatcherPauseGuard {
+    fn drop(&mut self) {
+        let flag = Arc::clone(&self.flag);
+        std::thread::spawn(move || {
+            std::thread::sleep(WATCHER_UNPAUSE_GRACE);
+            flag.fetch_sub(1, Ordering::Relaxed);
+        });
+    }
+}
 
 #[derive(Debug)]
 pub struct CollectionScanner {
@@ -244,7 +289,13 @@ impl CollectionScanner {
 
     /// Scan all watched directories, emitting progress events to the frontend.
     /// If `force` is true, skips mtime checks and re-reads metadata for all files.
-    pub async fn scan_all(&self, app: AppHandle, force: bool) -> Result<()> {
+    /// `silent` marks this as a watcher-triggered catch-up scan rather than an
+    /// explicit user action — see `ScanProgress::silent` (#233).
+    pub async fn scan_all(&self, app: AppHandle, force: bool, silent: bool) -> Result<()> {
+        let _watcher_pause_guard = app
+            .try_state::<crate::AppState>()
+            .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
+
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
             // Still tell the frontend we're done — otherwise the isScanning
@@ -257,6 +308,7 @@ impl CollectionScanner {
                     scanned: 0,
                     total: 0,
                     current_path: None,
+                    silent,
                 },
             );
             return Ok(());
@@ -270,6 +322,7 @@ impl CollectionScanner {
                 scanned: 0,
                 total: 0,
                 current_path: None,
+                silent,
             },
         );
 
@@ -298,6 +351,7 @@ impl CollectionScanner {
                 scanned: 0,
                 total,
                 current_path: None,
+                silent,
             },
         );
 
@@ -354,6 +408,7 @@ impl CollectionScanner {
                             scanned,
                             total,
                             current_path: Some(path_str),
+                            silent,
                         },
                     );
                 }
@@ -424,6 +479,7 @@ impl CollectionScanner {
                     scanned: total,
                     total,
                     current_path: None,
+                    silent,
                 },
             );
         }
@@ -451,6 +507,7 @@ impl CollectionScanner {
                     scanned: updating_scanned,
                     total: total_updating_items,
                     current_path: Some(display_desc),
+                    silent,
                 },
             );
 
@@ -511,6 +568,7 @@ impl CollectionScanner {
                 scanned: total,
                 total,
                 current_path: None,
+                silent,
             },
         );
 
@@ -2091,6 +2149,11 @@ enum WatcherMsg {
     Overflow,
 }
 
+/// Monotonic id distinguishing one debounced watcher batch from the next, so
+/// the frontend can tell which `batch-processing-*` events belong together
+/// (see #233).
+static NEXT_BATCH_ID: AtomicU64 = AtomicU64::new(0);
+
 /// Start background directory watching using notify.
 pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
@@ -2162,7 +2225,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
 
             while let Ok(msg) = rx.recv() {
-                if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) {
+                if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) > 0 {
                     continue;
                 }
 
@@ -2191,15 +2254,27 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                 // instead of being handled independently as a delete + a fresh
                 // insert (which would reset rating/playcount/added-date on the
                 // "new" row).
+                //
+                // The window slides: it resets on every new event instead of
+                // expiring 400ms after the *first* one. A real folder copy or
+                // extraction can spread its filesystem events over several
+                // seconds (disk I/O, antivirus scanning, etc), and a fixed
+                // deadline would chop that single logical operation into many
+                // separate batches — each emitting its own "batch-processing-*"
+                // events and its own "songs added" toast instead of one (#233).
+                // `max_batch_duration` bounds the worst case so a folder that's
+                // never quiet (e.g. continuously written to) still flushes
+                // periodically instead of buffering forever.
                 let mut batch = vec![msg];
-                let deadline = std::time::Instant::now() + std::time::Duration::from_millis(400);
-                while let Some(remaining) =
-                    deadline.checked_duration_since(std::time::Instant::now())
-                {
-                    if remaining.is_zero() {
+                let debounce = std::time::Duration::from_millis(400);
+                let max_batch_duration = std::time::Duration::from_secs(20);
+                let batch_started_at = std::time::Instant::now();
+                loop {
+                    let elapsed = batch_started_at.elapsed();
+                    if elapsed >= max_batch_duration {
                         break;
                     }
-                    match rx.recv_timeout(remaining) {
+                    match rx.recv_timeout(debounce.min(max_batch_duration - elapsed)) {
                         Ok(next) => batch.push(next),
                         Err(_) => break,
                     }
@@ -2212,7 +2287,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                     continue;
@@ -2257,6 +2332,30 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         let _ = app_clone.emit("library-changed", ());
                     }
 
+                    // Emit a single batch-lifecycle notification covering every file this
+                    // debounce window collected, instead of one signal per file — a
+                    // multi-file drag-and-drop or folder import would otherwise "avalanche"
+                    // the frontend toast queue (#233). `still_removed` can include
+                    // non-audio companion paths (cover art, playlists, Thumbs.db) and bare
+                    // directory paths swept up by a recursive move/delete — only count
+                    // actual audio files toward the "songs" total so those don't inflate
+                    // it (`still_added` is already audio-only, per `added_paths`' filter).
+                    let removed_song_count = still_removed.iter().filter(|p| is_audio_file(p)).count();
+                    let total_count = removed_song_count + still_added.len();
+                    let batch_id = NEXT_BATCH_ID.fetch_add(1, Ordering::Relaxed);
+                    let mut processed_count = 0usize;
+                    if total_count > 0 {
+                        let _ = app_clone.emit(
+                            "batch-processing-started",
+                            BatchProgress {
+                                batch_id,
+                                current_count: 0,
+                                total_count,
+                                phase: BatchPhase::Removing,
+                            },
+                        );
+                    }
+
                     // A disconnected drive makes `notify` report every path under it as
                     // "removed" the same as an actual deletion would. Songs under a root
                     // that's currently unreachable get soft-flagged instead of
@@ -2267,6 +2366,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
 
                     for path in &still_removed {
                         let path_str = path.to_string_lossy().to_string();
+                        let is_song = is_audio_file(path);
 
                         if unreachable_roots.iter().any(|root| path.starts_with(root)) {
                             log::warn!(
@@ -2289,6 +2389,18 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                     log::error!("Failed to mark path unavailable in db: {e}");
                                 }
                             }
+                            if is_song {
+                                processed_count += 1;
+                                let _ = app_clone.emit(
+                                    "batch-processing-progress",
+                                    BatchProgress {
+                                        batch_id,
+                                        current_count: processed_count,
+                                        total_count,
+                                        phase: BatchPhase::Removing,
+                                    },
+                                );
+                            }
                             continue;
                         }
 
@@ -2304,6 +2416,19 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                                 log::error!("Failed to delete path from db: {e}");
                             }
                         }
+                        if !is_song {
+                            continue;
+                        }
+                        processed_count += 1;
+                        let _ = app_clone.emit(
+                            "batch-processing-progress",
+                            BatchProgress {
+                                batch_id,
+                                current_count: processed_count,
+                                total_count,
+                                phase: BatchPhase::Removing,
+                            },
+                        );
                     }
 
                     for path in &still_added {
@@ -2318,18 +2443,52 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         if result.is_ok() {
                             let _ = app_clone.emit("library-changed", ());
                         }
+                        processed_count += 1;
+                        let _ = app_clone.emit(
+                            "batch-processing-progress",
+                            BatchProgress {
+                                batch_id,
+                                current_count: processed_count,
+                                total_count,
+                                phase: BatchPhase::Adding,
+                            },
+                        );
+                    }
+
+                    if total_count > 0 {
+                        let _ = app_clone.emit(
+                            "batch-processing-completed",
+                            BatchProgress {
+                                batch_id,
+                                current_count: total_count,
+                                total_count,
+                                phase: BatchPhase::Done,
+                            },
+                        );
                     }
                 }
 
-                for path in dir_paths {
+                // `scan_all` already walks every watched directory in one pass, so a
+                // batch with several new/changed subdirectories (e.g. dropping a folder
+                // of albums, each its own subdir) must trigger it only once — looping
+                // per-directory here re-scanned the whole library once per subfolder,
+                // each emitting its own `scan-progress` "done" phase and thus its own
+                // "X tracks added" toast (#233). It's marked `silent` because the
+                // still_added/still_removed handling above (or the per-file watcher
+                // events feeding it) already produced its own batch-processing toast
+                // for this same directory change — this rescan is just a safety-net
+                // catch-up for files the granular per-file watcher may have missed,
+                // not a separate user-facing event.
+                if !dir_paths.is_empty() {
                     log::info!(
-                        "Watcher detected directory addition/change: {}",
-                        path.to_string_lossy()
+                        "Watcher detected {} director{} added/changed",
+                        dir_paths.len(),
+                        if dir_paths.len() == 1 { "y" } else { "ies" }
                     );
                     let scanner = CollectionScanner::new(Arc::clone(&db_for_thread));
                     let app_handle_scan = app_clone.clone();
                     tauri::async_runtime::block_on(async move {
-                        let _ = scanner.scan_all(app_handle_scan.clone(), false).await;
+                        let _ = scanner.scan_all(app_handle_scan.clone(), false, true).await;
                         let _ = app_handle_scan.emit("library-changed", ());
                     });
                 }

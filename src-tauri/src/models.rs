@@ -604,6 +604,13 @@ pub struct ScanProgress {
     pub scanned: u64,
     pub total: u64,
     pub current_path: Option<String>,
+    /// True when this scan was triggered internally by the file watcher as a
+    /// catch-up/safety-net rescan (recovering from an overflow, or picking up
+    /// a newly-appeared directory) rather than an explicit user action. The
+    /// frontend skips the "songs added" completion toast in that case, since
+    /// the watcher's own batch-processing events already cover the same
+    /// filesystem activity with a per-file-accurate count (#233).
+    pub silent: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -612,6 +619,26 @@ pub enum ScanPhase {
     Discovering,
     ReadingTags,
     Updating,
+    Done,
+}
+
+/// File-watcher batch lifecycle event payload (#233). The watcher debounces
+/// rapid-fire filesystem events into a single batch (see `start_watcher` in
+/// `collection.rs`); these events let the frontend collapse that batch into
+/// one progress toast instead of one per file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchProgress {
+    pub batch_id: u64,
+    pub current_count: usize,
+    pub total_count: usize,
+    pub phase: BatchPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchPhase {
+    Removing,
+    Adding,
     Done,
 }
 

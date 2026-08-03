@@ -202,6 +202,16 @@ export interface ScanProgress {
   scanned: number;
   total: number;
   current_path?: string;
+  silent: boolean;
+}
+
+export type BatchPhase = "removing" | "adding" | "done";
+
+export interface BatchProgress {
+  batch_id: number;
+  current_count: number;
+  total_count: number;
+  phase: BatchPhase;
 }
 
 export interface LibraryStats {
