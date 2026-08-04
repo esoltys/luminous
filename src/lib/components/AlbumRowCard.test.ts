@@ -3,11 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumRowCard from "./AlbumRowCard.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { prefs } from "../stores/prefs.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem } from "../types";
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
-}));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
@@ -24,19 +22,31 @@ describe("AlbumRowCard.svelte", () => {
     art_automatic: null,
     art_manual: null,
     genre: "Alternative",
+    rating: -1,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    prefs.ratingStyle = "stars";
   });
 
-  it("renders album title, artist, category, and year", () => {
+  it("renders album title/year on top and artist/rating on bottom", () => {
     const { getByText } = render(AlbumRowCard, { props: { album: mockAlbum } });
 
     expect(getByText("Fake Nudes")).toBeInTheDocument();
-    expect(getByText("Barenaked Ladies")).toBeInTheDocument();
-    expect(getByText("Album")).toBeInTheDocument();
     expect(getByText("2017")).toBeInTheDocument();
+    expect(getByText("Barenaked Ladies")).toBeInTheDocument();
+  });
+
+  it("rates the album via the rating widget without navigating to it", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(4);
+    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const { getByLabelText } = render(AlbumRowCard, { props: { album: mockAlbum } });
+
+    await fireEvent.click(getByLabelText("Rate 4 of 5"));
+
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", { album: "Fake Nudes", rating: 4 });
+    expect(viewAlbumSpy).not.toHaveBeenCalled();
   });
 
   it("shows Various Artists when the album has no artist", () => {

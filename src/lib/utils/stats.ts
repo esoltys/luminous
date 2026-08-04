@@ -1,4 +1,4 @@
-import type { Song } from "../types";
+import type { AlbumItem, Song } from "../types";
 
 /** Payload of the backend's `song-stats-changed` event. */
 export interface SongStatsPayload {
@@ -15,4 +15,15 @@ export function applySongStats(song: Song, payload: SongStatsPayload) {
   if (typeof payload.playcount === "number") song.playcount = payload.playcount;
   if (typeof payload.skipcount === "number") song.skipcount = payload.skipcount;
   if (payload.lastplayed !== undefined) song.lastplayed = payload.lastplayed ?? undefined;
+}
+
+/** Payload of the backend's `album-stats-changed` event. */
+export interface AlbumStatsPayload {
+  album: string;
+  rating?: number;
+}
+
+/** Apply an album rating event to an album item held in any view or store. */
+export function applyAlbumStats(album: AlbumItem, payload: AlbumStatsPayload) {
+  if (typeof payload.rating === "number") album.rating = payload.rating;
 }

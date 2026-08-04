@@ -215,10 +215,13 @@
     });
   });
 
-  let albumSortField = $state<"album" | "artist" | "year" | "track_count">(
-    (typeof window !== "undefined" &&
-      (localStorage.getItem("sort_album_field") as "album" | "artist" | "year" | "track_count")) ||
-      "album"
+  let albumSortField = $state<"album" | "artist" | "year" | "rating">(
+    (() => {
+      if (typeof window === "undefined") return "album";
+      const saved = localStorage.getItem("sort_album_field");
+      if (saved === "track_count") return "album";
+      return (saved as "album" | "artist" | "year" | "rating") || "album";
+    })()
   );
   let albumSortAsc = $state(
     typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
@@ -963,7 +966,7 @@
                   value={`${albumSortField}-${albumSortAsc}`}
                   onchange={(e) => {
                     const [field, asc] = e.currentTarget.value.split("-");
-                    albumSortField = field as "album" | "artist" | "year" | "track_count";
+                    albumSortField = field as "album" | "artist" | "year" | "rating";
                     albumSortAsc = asc === "true";
                   }}
                   class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
@@ -974,8 +977,8 @@
                   <option value="artist-false">{i18n.t('collection.sortArtistNameDesc')}</option>
                   <option value="year-false">{i18n.t('collection.sortYearDesc')}</option>
                   <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
-                  <option value="track_count-false">{i18n.t('collection.sortTracksDesc')}</option>
-                  <option value="track_count-true">{i18n.t('collection.sortTracksAsc')}</option>
+                  <option value="rating-false">{i18n.t('collection.sortRatingDesc')}</option>
+                  <option value="rating-true">{i18n.t('collection.sortRatingAsc')}</option>
                 </Select>
               </div>
             {:else if collectionStore.activeSubTab === "artists"}

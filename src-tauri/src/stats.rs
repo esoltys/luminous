@@ -93,6 +93,31 @@ pub fn normalize_rating(rating: f32) -> f32 {
     snapped.clamp(0.5, 5.0)
 }
 
+/// Persist a rating for an album, keyed by album title (matching how
+/// `CollectionScanner::get_albums` groups albums), returning the normalized
+/// value actually stored. Independent of any song rating on that album.
+pub fn set_album_rating(conn: &Connection, album: &str, rating: f32) -> Result<f32> {
+    let normalized = normalize_rating(rating);
+    conn.execute(
+        "INSERT INTO album_ratings (album_key, rating) VALUES (?1, ?2)
+         ON CONFLICT(album_key) DO UPDATE SET rating = excluded.rating",
+        params![album, normalized],
+    )?;
+    Ok(normalized)
+}
+
+/// Look up an album's rating, defaulting to unrated when no row exists yet.
+pub fn get_album_rating(conn: &Connection, album: &str) -> Result<f32> {
+    let rating = conn
+        .query_row(
+            "SELECT rating FROM album_ratings WHERE album_key = ?1",
+            params![album],
+            |r| r.get::<_, f32>(0),
+        )
+        .unwrap_or(RATING_UNRATED);
+    Ok(rating)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +246,41 @@ mod tests {
         assert_eq!(cleared, RATING_UNRATED);
         let (_, _, _, rating) = stats_row(&conn, id);
         assert_eq!(rating, RATING_UNRATED);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_set_album_rating_persists_normalized_value_independent_of_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let id = insert_song(&conn, "/tmp/album_song.flac");
+        set_rating(&conn, id, 2.0).unwrap();
+
+        let stored = set_album_rating(&conn, "Test Album", 4.3).unwrap();
+        assert_eq!(stored, 4.5);
+        assert_eq!(get_album_rating(&conn, "Test Album").unwrap(), 4.5);
+
+        // Song rating on an unrelated song is untouched by the album rating.
+        let (_, _, _, song_rating) = stats_row(&conn, id);
+        assert_eq!(song_rating, 2.0);
+
+        let updated = set_album_rating(&conn, "Test Album", 1.0).unwrap();
+        assert_eq!(updated, 1.0);
+        assert_eq!(get_album_rating(&conn, "Test Album").unwrap(), 1.0);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_album_rating_defaults_to_unrated() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+
+        assert_eq!(
+            get_album_rating(&conn, "Never Rated").unwrap(),
+            RATING_UNRATED
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }

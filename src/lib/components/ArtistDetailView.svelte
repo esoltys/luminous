@@ -281,7 +281,7 @@
         {#each discographyItems as album (album.album)}
           <AlbumCard
             {album}
-            widthClass="w-40 shrink-0"
+            widthClass="w-48 shrink-0"
             showArtist={false}
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
@@ -304,7 +304,7 @@
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>
         {#each playlists as playlist (playlist.id)}
-          <PlaylistCard {playlist} widthClass="w-44 shrink-0" onClick={() => openPlaylist(playlist)} />
+          <PlaylistCard {playlist} widthClass="w-48 shrink-0" onClick={() => openPlaylist(playlist)} />
         {/each}
       </HorizontalScrollRow>
     </div>

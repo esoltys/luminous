@@ -3,11 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumCard from "./AlbumCard.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { prefs } from "../stores/prefs.svelte";
+import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem } from "../types";
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
-}));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
@@ -24,42 +22,32 @@ describe("AlbumCard.svelte", () => {
     art_automatic: null,
     art_manual: null,
     genre: "Alternative",
+    rating: -1,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    prefs.ratingStyle = "stars";
   });
 
-  it("renders album title, artist, year, genre, and category", () => {
+  it("renders album title, artist, year, and genre", () => {
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
 
     expect(getByText("Fake Nudes")).toBeInTheDocument();
     expect(getByText("Barenaked Ladies")).toBeInTheDocument();
     expect(getByText("2017")).toBeInTheDocument();
     expect(getByText("Alternative")).toBeInTheDocument();
-    expect(getByText("Album")).toBeInTheDocument();
   });
 
-  it("shows Single for a one-track release", () => {
-    const { getByText } = render(AlbumCard, {
-      props: { album: { ...mockAlbum, track_count: 1 } },
-    });
-    expect(getByText("Single")).toBeInTheDocument();
-  });
+  it("rates the album via the rating widget without navigating to it", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(4);
+    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const { getByLabelText } = render(AlbumCard, { props: { album: mockAlbum } });
 
-  it("shows EP for a 2-6 track release", () => {
-    const { getByText } = render(AlbumCard, {
-      props: { album: { ...mockAlbum, track_count: 5 } },
-    });
-    expect(getByText("EP")).toBeInTheDocument();
-  });
+    await fireEvent.click(getByLabelText("Rate 4 of 5"));
 
-  it("shows an N-Disc Set label instead of Album when multi-disc, never both", () => {
-    const { getByText, queryByText } = render(AlbumCard, {
-      props: { album: { ...mockAlbum, track_count: 20, disc_count: 2 } },
-    });
-    expect(getByText("2-Disc Set")).toBeInTheDocument();
-    expect(queryByText("Album")).not.toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("set_album_rating", { album: "Fake Nudes", rating: 4 });
+    expect(viewAlbumSpy).not.toHaveBeenCalled();
   });
 
   it("navigates to album when album title is clicked", async () => {

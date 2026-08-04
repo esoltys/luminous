@@ -190,6 +190,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
         art_automatic: song.art_automatic ?? null,
         art_manual: song.art_manual ?? null,
         genre: song.genre ?? null,
+        rating: -1,
       });
     }
   }

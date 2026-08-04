@@ -110,8 +110,8 @@ export const en = {
     sortArtistNameDesc: "Sort: Artist Name (Z-A)",
     sortYearDesc: "Sort: Year (Newest)",
     sortYearAsc: "Sort: Year (Oldest)",
-    sortTracksDesc: "Sort: Songs (Most)",
-    sortTracksAsc: "Sort: Songs (Least)",
+    sortRatingDesc: "Sort: Rating (Highest)",
+    sortRatingAsc: "Sort: Rating (Lowest)",
     sortSongsDesc: "Sort: Songs (Most)",
     sortSongsAsc: "Sort: Songs (Least)",
     sortAlbumsDesc: "Sort: Albums (Most)",
@@ -732,7 +732,8 @@ export const en = {
     label: "Rating",
     setTooltip: "Rate {value} of 5",
     favoriteTooltip: "Add to favourites",
-    unfavoriteTooltip: "Remove from favourites"
+    unfavoriteTooltip: "Remove from favourites",
+    clearTooltip: "Clear rating"
   },
   common: {
     scrollLeft: "Scroll left",

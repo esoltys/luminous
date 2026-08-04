@@ -1003,7 +1003,11 @@ impl CollectionScanner {
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, genre ASC
                     LIMIT 1
-                ) AS genre
+                ) AS genre,
+                COALESCE(
+                    (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
+                    -1
+                ) AS rating
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
@@ -1021,6 +1025,7 @@ impl CollectionScanner {
                     "art_automatic": row.get::<_, Option<String>>(6)?,
                     "art_manual": row.get::<_, Option<String>>(7)?,
                     "genre": row.get::<_, Option<String>>(8)?,
+                    "rating": row.get::<_, f32>(9)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1253,7 +1258,7 @@ impl CollectionScanner {
         let song_ids: Vec<i64> = agg_rows.iter().map(|r| r.representative_song_id).collect();
         let songs_by_id = get_songs_by_ids(&conn, &song_ids)?;
 
-        let items = agg_rows
+        let mut items: Vec<HomeItem> = agg_rows
             .into_iter()
             .filter_map(|row| {
                 let (song, album_track_count, album_disc_count) =
@@ -1268,6 +1273,7 @@ impl CollectionScanner {
                 ))
             })
             .collect();
+        attach_album_ratings(&conn, &mut items)?;
         Ok(items)
     }
 
@@ -1291,10 +1297,9 @@ impl CollectionScanner {
             })?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(group_songs_into_home_items(
-            songs_with_counts,
-            limit as usize,
-        ))
+        let mut items = group_songs_into_home_items(songs_with_counts, limit as usize);
+        attach_album_ratings(&conn, &mut items)?;
+        Ok(items)
     }
 }
 
@@ -1334,6 +1339,7 @@ fn group_songs_into_home_items(
                             art_manual: song.art_manual.clone(),
                             genre: song.genre.clone(),
                             sample_song_id: Some(song.id),
+                            rating: crate::stats::RATING_UNRATED,
                         },
                     });
                 }
@@ -1347,6 +1353,21 @@ fn group_songs_into_home_items(
     }
 
     items
+}
+
+/// Fill in the real rating for every `HomeItem::Album` in `items`, looked up
+/// from `album_ratings`. `group_songs_into_home_items`/`home_item_for_context`
+/// build `AlbumItem`s without a DB connection in scope, so they default to
+/// unrated — this backfills the actual value once a connection is available.
+fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> Result<()> {
+    for item in items.iter_mut() {
+        if let HomeItem::Album { album } = item {
+            if let Some(ref name) = album.album {
+                album.rating = crate::stats::get_album_rating(conn, name)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Dedup key for context-aware Recently Played — one entry per album,
@@ -1436,6 +1457,7 @@ fn home_item_for_context(
                     art_manual: song.art_manual.clone(),
                     genre: song.genre.clone(),
                     sample_song_id: Some(song.id),
+                    rating: crate::stats::RATING_UNRATED,
                 },
             }
         }
@@ -3270,6 +3292,52 @@ mod tests {
                 assert_eq!(
                     album.track_count, 10,
                     "should count all 10 tracks, not split by artist"
+                );
+            }
+            other => panic!("expected Album item, got {other:?}"),
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_recently_added_surfaces_existing_album_rating() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_rec_added_rating_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        // Needs 2+ tracks — a single-track "album" renders as a Song item, not
+        // an Album item (see group_songs_into_home_items's album_track_count > 1 check).
+        for i in 1..=2 {
+            let song = Song {
+                source: SongSource::LocalFile,
+                path: Some(format!("path/rated_{i}.mp3")),
+                title: Some(format!("Rated Track {i}")),
+                artist: Some("Artist A".to_string()),
+                album: Some("Rated Album".to_string()),
+                album_artist: None,
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        }
+
+        crate::stats::set_album_rating(&conn, "Rated Album", 4.5).unwrap();
+
+        let items = scanner.get_recently_added(10).unwrap();
+        match &items[0] {
+            HomeItem::Album { album } => {
+                assert_eq!(album.album.as_deref(), Some("Rated Album"));
+                assert_eq!(
+                    album.rating, 4.5,
+                    "should surface the rating set via set_album_rating, not default to unrated"
                 );
             }
             other => panic!("expected Album item, got {other:?}"),

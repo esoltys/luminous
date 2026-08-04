@@ -6,23 +6,40 @@ import StarRating from "./StarRating.svelte";
 // to the full-star value (the left-half/half-star branch requires real layout).
 
 describe("StarRating", () => {
-  it("renders five stars", () => {
+  it("renders five stars when read-only (no clear button without onRate)", () => {
     const { getAllByRole } = render(StarRating, { rating: 3 });
     expect(getAllByRole("button")).toHaveLength(5);
   });
 
+  it("renders five stars plus a clear button when interactive", () => {
+    const { getAllByRole } = render(StarRating, { rating: 3, onRate: vi.fn() });
+    expect(getAllByRole("button")).toHaveLength(6);
+  });
+
   it("calls onRate with the clicked star value", async () => {
     const onRate = vi.fn();
-    const { getAllByRole } = render(StarRating, { rating: -1, onRate });
-    await fireEvent.click(getAllByRole("button")[3]);
+    const { getByLabelText } = render(StarRating, { rating: -1, onRate });
+    await fireEvent.click(getByLabelText("Rate 4 of 5"));
     expect(onRate).toHaveBeenCalledWith(4);
   });
 
   it("clears the rating when the current value is clicked again", async () => {
     const onRate = vi.fn();
-    const { getAllByRole } = render(StarRating, { rating: 2, onRate });
-    await fireEvent.click(getAllByRole("button")[1]);
+    const { getByLabelText } = render(StarRating, { rating: 2, onRate });
+    await fireEvent.click(getByLabelText("Rate 2 of 5"));
     expect(onRate).toHaveBeenCalledWith(-1);
+  });
+
+  it("clears the rating via the clear button", async () => {
+    const onRate = vi.fn();
+    const { getByLabelText } = render(StarRating, { rating: 2, onRate });
+    await fireEvent.click(getByLabelText("Clear rating"));
+    expect(onRate).toHaveBeenCalledWith(-1);
+  });
+
+  it("disables the clear button when already unrated", () => {
+    const { getByLabelText } = render(StarRating, { rating: -1, onRate: vi.fn() });
+    expect(getByLabelText("Clear rating")).toBeDisabled();
   });
 
   it("is inert without an onRate handler", async () => {
