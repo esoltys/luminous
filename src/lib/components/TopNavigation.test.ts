@@ -34,15 +34,14 @@ describe("TopNavigation.svelte", () => {
     const { getByTitle } = render(TopNavigation);
     const immersiveBtn = getByTitle("Toggle Immersive Album Art Screen");
 
-    // When immersiveMode is false, button should NOT have active class 'bg-brand-border'
-    expect(immersiveBtn.className).not.toContain("bg-brand-border");
+    // When immersiveMode is false, button should NOT have the active class 'bg-brand-accent text-white'
+    expect(immersiveBtn.className).not.toContain("bg-brand-accent text-white");
     expect(immersiveBtn.className).toContain("text-brand-text-secondary");
 
     // Toggle immersiveMode to true
     await fireEvent.click(immersiveBtn);
 
     expect(collectionStore.immersiveMode).toBe(true);
-    expect(immersiveBtn.className).toContain("bg-brand-border");
-    expect(immersiveBtn.className).toContain("text-brand-accent-text");
+    expect(immersiveBtn.className).toContain("bg-brand-accent text-white");
   });
 });
