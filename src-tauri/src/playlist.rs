@@ -10,6 +10,16 @@ use rusqlite::{params, OptionalExtension};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// Minimum number of matching library songs required before a genre/decade
+/// auto-playlist is created. Once created, an auto-playlist is populated
+/// with every matching song (see [`NO_SONG_LIMIT`]), not just this many.
+const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
+
+/// SQLite treats a negative `LIMIT` as "no limit" — used when populating an
+/// auto-playlist so it includes every matching song, however large the
+/// library (e.g. 500+ songs in a single decade).
+const NO_SONG_LIMIT: i64 = -1;
+
 // ---------------------------------------------------------------------------
 // Undo/Redo stack operations
 // ---------------------------------------------------------------------------
@@ -257,10 +267,17 @@ impl PlaylistManager {
                 .unwrap_or_default();
 
             // Check library threshold first. Auto-playlists are created if the library
-            // has at least 25 total songs for this genre (QueuePopulationMode::All).
+            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this genre
+            // (QueuePopulationMode::All).
             // Once created, an auto-playlist is only pruned if all songs for this genre are removed (0 songs).
-            let total_songs = scanner.get_songs_by_genre(genre, 25, QueuePopulationMode::All)?;
-            if existing_row.is_none() && total_songs.len() < 25 {
+            let total_songs = scanner.get_songs_by_genre(
+                genre,
+                MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
+                QueuePopulationMode::All,
+            )?;
+            if existing_row.is_none()
+                && total_songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize
+            {
                 continue;
             }
             if existing_row.is_some() && total_songs.is_empty() {
@@ -274,7 +291,7 @@ impl PlaylistManager {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_genre(genre, 25, mode)?;
+            let songs = scanner.get_songs_by_genre(genre, NO_SONG_LIMIT, mode)?;
 
             let needs_generation = match existing_row {
                 None => true,
@@ -358,10 +375,17 @@ impl PlaylistManager {
                 .unwrap_or_default();
 
             // Check library threshold first. Auto-playlists are created if the library
-            // has at least 25 total songs for this decade (QueuePopulationMode::All).
+            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this decade
+            // (QueuePopulationMode::All).
             // Once created, an auto-playlist is only pruned if all songs for this decade are removed (0 songs).
-            let total_songs = scanner.get_songs_by_decade(decade, 25, QueuePopulationMode::All)?;
-            if existing_row.is_none() && total_songs.len() < 25 {
+            let total_songs = scanner.get_songs_by_decade(
+                decade,
+                MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
+                QueuePopulationMode::All,
+            )?;
+            if existing_row.is_none()
+                && total_songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize
+            {
                 continue;
             }
             if existing_row.is_some() && total_songs.is_empty() {
@@ -375,7 +399,7 @@ impl PlaylistManager {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_decade(decade, 25, mode)?;
+            let songs = scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?;
 
             let needs_generation = match existing_row {
                 None => true,
@@ -462,14 +486,14 @@ impl PlaylistManager {
 
         let scanner = CollectionScanner::new(self.db.clone());
         let songs = if let Some(decade) = spec.strip_prefix("decade:") {
-            scanner.get_songs_by_decade(decade, 100, mode)?
+            scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?
         } else if !spec.contains(':') {
             // Bare-name convention: a system genre auto-playlist, not a Smart
             // Playlist rule spec (which always contains a "field:" rule).
-            scanner.get_songs_by_genre(&spec, 100, mode)?
+            scanner.get_songs_by_genre(&spec, NO_SONG_LIMIT, mode)?
         } else {
             let query = spec.replace(';', " ");
-            scanner.search_songs_by_mode(&query, 100, mode)?
+            scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)?
         };
 
         let now = chrono::Utc::now().timestamp();
@@ -1557,6 +1581,45 @@ mod tests {
 
         let tracks = manager.get_playlist_tracks(decade_playlists[0].id).unwrap();
         assert_eq!(tracks.len(), 25);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_decade_auto_playlists_includes_every_matching_song() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Well above the old hardcoded 25-song population cap.
+            for i in 0..60 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, originalyear, source, unavailable) VALUES ('Track 80s {}', 1985, 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_decade_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let decade_playlist = playlists
+            .iter()
+            .find(|p| p.dynamic_enabled && p.dynamic_spec.as_deref() == Some("decade:1980s"))
+            .expect("expected 1980s auto-playlist to be created");
+
+        let tracks = manager.get_playlist_tracks(decade_playlist.id).unwrap();
+        assert_eq!(
+            tracks.len(),
+            60,
+            "auto-playlist should include every matching song, not just the first 25"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
