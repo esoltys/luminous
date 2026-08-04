@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly, fade } from "svelte/transition";
-  import { AlertTriangle, CheckCircle2, Info, Star, Sparkles, X } from "lucide-svelte";
+  import { AlertTriangle, CheckCircle2, Info, CheckCheck, Sparkles, X } from "lucide-svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { portal } from "../utils/portal";
 
@@ -41,7 +41,7 @@
       {:else if toast.variant === "milestone"}
         <span class="relative inline-flex w-5 h-5 shrink-0 items-center justify-center">
           <span class="absolute inset-0 rounded-full anim-gold-ring"></span>
-          <Star class="w-5 h-5 text-brand-gold fill-brand-gold/30 anim-milestone-bounce" />
+          <CheckCheck class="w-5 h-5 text-brand-gold anim-milestone-bounce" />
         </span>
       {:else}
         <Info class="w-4 h-4 shrink-0 text-brand-accent-text" />
