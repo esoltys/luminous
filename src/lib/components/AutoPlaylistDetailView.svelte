@@ -32,6 +32,8 @@ import { shuffleArray } from "../utils/shuffle";
   import { toastStore } from "../stores/toast.svelte";
   import { getPopulationModeSuffix } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";
+  import Modal from "./Modal.svelte";
+  import Button from "./Button.svelte";
 
   let { view }: { view: AutoPlaylistRef } = $props();
 
@@ -77,6 +79,10 @@ import { shuffleArray } from "../utils/shuffle";
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+
+  // Save auto-playlist as custom playlist modal state
+  let showSaveModal = $state(false);
+  let savePlaylistName = $state("");
 
   let selectedSongIds = $state<Set<number>>(new Set());
   let lastSelectedSongId = $state<number | null>(null);
@@ -281,15 +287,22 @@ import { shuffleArray } from "../utils/shuffle";
     }
   }
 
-  // "Save as Custom Playlist" always duplicates the currently-loaded songs into
-  // a brand-new custom playlist, rather than detaching this auto-playlist in
-  // place — the auto-playlist keeps existing/refreshing independently.
-  async function handleSaveAsCustomPlaylist() {
+  function handleSaveAsCustomPlaylist() {
     if (songs.length === 0) return;
-    await playlistsStore.createPlaylist(displayName);
-    if (playlistsStore.activePlaylistId !== null) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activePlaylistId, songs.map((s) => s.id));
-      collectionStore.viewPlaylist(playlistsStore.activePlaylistId);
+    savePlaylistName = displayName;
+    showSaveModal = true;
+  }
+
+  async function confirmSaveAsCustomPlaylist() {
+    if (!savePlaylistName || !savePlaylistName.trim()) return;
+    try {
+      const created = await playlistsStore.createPlaylist(savePlaylistName.trim());
+      await playlistsStore.addSongsToPlaylist(created.id, songs.map((s) => s.id));
+      playlistsStore.selectPlaylist(created.id);
+      collectionStore.viewPlaylist(created.id);
+      showSaveModal = false;
+    } catch (err) {
+      console.error("Failed to save auto-playlist as custom playlist:", err);
     }
   }
 
@@ -1193,4 +1206,44 @@ import { shuffleArray } from "../utils/shuffle";
       />
     {/if}
   </ContextMenu>
+{/if}
+
+{#if showSaveModal}
+  <Modal onClose={() => showSaveModal = false} maxWidth="max-w-sm">
+    <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+      <div class="flex items-center gap-2">
+        <FolderPlus class="w-4 h-4 text-brand-accent-text" />
+        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveAsCustomTitle", {}, "Save as Custom Playlist")}</h3>
+      </div>
+      <button onclick={() => showSaveModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+        <X class="w-4 h-4" />
+      </button>
+    </div>
+
+    <form onsubmit={(e) => { e.preventDefault(); confirmSaveAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
+      <div class="flex flex-col gap-1.5">
+        <label for="save-playlist-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
+        </label>
+        <Input
+          id="save-playlist-name-input"
+          type="text"
+          bind:value={savePlaylistName}
+          placeholder={i18n.t("playlists.saveQueueNamePlaceholder", {}, "My Playlist")}
+          class="w-full"
+          required
+          autofocus
+        />
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <Button onclick={() => showSaveModal = false} variant="secondary" size="sm">
+          {i18n.t("playlists.cancel", {}, "Cancel")}
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
+          {i18n.t("playlists.saveQueueConfirm", {}, "Save")}
+        </Button>
+      </div>
+    </form>
+  </Modal>
 {/if}
