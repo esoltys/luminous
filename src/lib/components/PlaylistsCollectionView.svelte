@@ -19,7 +19,7 @@
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3 } from "lucide-svelte";
+  import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3, RefreshCw } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -48,6 +48,32 @@
     }
     await playlistsStore.refreshAutoPlaylistCounts();
   });
+
+  let isRefreshingAll = $state(false);
+
+  async function handleRefreshAll() {
+    if (isRefreshingAll) return;
+    isRefreshingAll = true;
+    try {
+      // Pick up genres/decades that just crossed the auto-playlist threshold,
+      // and prune ones that no longer have any matching songs.
+      await invoke("sync_genre_auto_playlists");
+      await invoke("sync_decade_auto_playlists");
+      await playlistsStore.refreshPlaylists();
+
+      // Force-regenerate every dynamic playlist (genre/decade auto-playlists
+      // and user-created Smart Playlists) with the latest matching songs,
+      // bypassing the 24h staleness gate the background sync uses.
+      const dynamicIds = playlistsStore.playlists.filter((p) => p.dynamic_enabled).map((p) => p.id);
+      await Promise.all(dynamicIds.map((id) => invoke("refresh_auto_playlist", { playlistId: id })));
+
+      await playlistsStore.refreshAutoPlaylistCounts();
+    } catch (err) {
+      console.error("Failed to refresh playlists:", err);
+    } finally {
+      isRefreshingAll = false;
+    }
+  }
 
   // System genre auto-playlists are stored with a raw genre name as dynamic_spec (e.g. "Rock", "Jazz").
   // Smart playlists built via the Smart Playlist builder always contain a "field:value" rule (e.g. "genre:jazz rating:>=4").
@@ -278,6 +304,15 @@
 
           <!-- View Mode Toggle + Sort Dropdown (Right) -->
           <div class="flex items-center gap-2">
+            <button
+              onclick={handleRefreshAll}
+              disabled={isRefreshingAll}
+              class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+              title={i18n.t('playlists.refreshAllPlaylistsTooltip')}
+              aria-label={i18n.t('playlists.refreshAllPlaylistsTooltip')}
+            >
+              <RefreshCw class="w-4 h-4 {isRefreshingAll ? 'animate-spin' : ''}" />
+            </button>
             <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
               <button
                 onclick={() => setActiveViewMode("cards")}

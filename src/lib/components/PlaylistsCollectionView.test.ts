@@ -1,9 +1,10 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import PlaylistsCollectionView from "./PlaylistsCollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
@@ -34,6 +35,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "sync_genre_auto_playlists" || cmd === "sync_decade_auto_playlists") {
       return Promise.resolve(null);
     }
+    if (cmd === "refresh_auto_playlist") return Promise.resolve(null);
     return Promise.resolve([]);
   }),
 }));
@@ -75,5 +77,40 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
     const { getByText } = render(PlaylistsCollectionView);
     expect(getByText("1980s")).toBeInTheDocument();
     expect(getByText("Rock")).toBeInTheDocument();
+  });
+
+  it("refreshes auto-playlists and Smart Playlists when the refresh-all button is clicked", async () => {
+    playlistsStore.playlists = [
+      {
+        id: 1,
+        name: "1980s",
+        dynamic_enabled: true,
+        dynamic_spec: "decade:1980s",
+        track_count: 12,
+        created: 1700000000,
+        updated: 1700000000,
+      },
+      {
+        id: 2,
+        name: "Rock",
+        dynamic_enabled: true,
+        dynamic_spec: "Rock",
+        track_count: 8,
+        created: 1700000000,
+        updated: 1700000000,
+      },
+    ];
+
+    const { getByTitle } = render(PlaylistsCollectionView);
+    const refreshButton = getByTitle("Refresh all auto-playlists and Smart Playlists with the latest songs from your library");
+
+    await fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("sync_genre_auto_playlists");
+      expect(invoke).toHaveBeenCalledWith("sync_decade_auto_playlists");
+      expect(invoke).toHaveBeenCalledWith("refresh_auto_playlist", { playlistId: 1 });
+      expect(invoke).toHaveBeenCalledWith("refresh_auto_playlist", { playlistId: 2 });
+    });
   });
 });
