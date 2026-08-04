@@ -25,7 +25,7 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "genre" | "decade";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
     genre?: string;
     decade?: string;
     label: string;
@@ -110,6 +110,12 @@
         trackCount: playlistsStore.recentlyAddedCount,
       });
     }
+    defs.push({
+      id: "auto:history",
+      kind: "history",
+      label: i18n.t("playlists.autoHistory"),
+      trackCount: playlistsStore.historyCount,
+    });
     for (const p of decadeAutoPlaylists) {
       if (p.track_count > 0) {
         const dec = p.dynamic_spec?.replace(/^decade:/, "") ?? p.name;
@@ -193,8 +199,7 @@
   let sortedPlaylists = $derived.by(() => {
     const field = customSortField;
     const asc = customSortAsc;
-    const queue = customPlaylists.find((p) => p.name.toLowerCase() === "queue");
-    const rest = customPlaylists
+    return customPlaylists
       .filter((p) => p.name.toLowerCase() !== "queue")
       .sort((a, b) => {
         if (field === "name") {
@@ -204,7 +209,6 @@
         const valB = field === "track_count" ? b.track_count : b.updated;
         return asc ? valA - valB : valB - valA;
       });
-    return queue ? [queue, ...rest] : rest;
   });
 
   let activeViewMode = $derived(

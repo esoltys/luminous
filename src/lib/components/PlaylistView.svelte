@@ -3,6 +3,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { shuffleArray } from "../utils/shuffle";
   import {
     Trash2,
     ListMusic,
@@ -25,7 +26,9 @@
     Layers,
     MoreHorizontal,
     Eraser,
-    Sparkles
+    Sparkles,
+    Plus,
+    FolderPlus
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -40,6 +43,7 @@
   import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import Modal from "./Modal.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
@@ -119,6 +123,10 @@
   let showOverflowMenu = $state(false);
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+
+  // Save Queue as Custom Playlist modal state
+  let showSaveQueueModal = $state(false);
+  let saveQueueName = $state("Queue Playlist");
 
   function toggleOverflowMenu() {
     if (showOverflowMenu) {
@@ -221,6 +229,15 @@
 
   let isQueue = $derived(
     activePlaylist !== undefined && !activePlaylist.dynamic_enabled && activePlaylist.name.toLowerCase() === "queue"
+  );
+
+  let isSpecialPlaylist = $derived(
+    activePlaylist !== undefined &&
+      (isQueue ||
+       activePlaylist.name.toLowerCase() === "queue" ||
+       activePlaylist.name.toLowerCase() === "history" ||
+       activePlaylist.name.toLowerCase() === "favourites" ||
+       activePlaylist.name.toLowerCase() === "recently added")
   );
 
   let isSmartPlaylist = $derived(
@@ -361,6 +378,7 @@
       if (g !== "") counts.set(g, (counts.get(g) ?? 0) + 1);
     }
     if (counts.size === 0) return "";
+    if (counts.size > 2) return i18n.t("playlists.mixedGenre", {}, "Mixed");
     const top = [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([g]) => g);
@@ -639,15 +657,55 @@
 
   async function handlePlayAll() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
+    const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
+    if (availableTracks.length === 0) return;
+    const songIds = availableTracks.map((t) => t.song!.id);
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
-    await playerStore.playPlaylistItem(activePlaylist.id, 0);
+    await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handleShufflePlay() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * playlistsStore.activePlaylistTracks.length);
+    const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
+    if (availableTracks.length === 0) return;
+    const shuffledSongIds = shuffleArray(availableTracks.map((t) => t.song!.id));
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("all");
-    await playerStore.playPlaylistItem(activePlaylist.id, randomIndex);
+    await playerStore.playSongs(shuffledSongIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
+  }
+
+  function handleSaveQueueAsCustomPlaylist() {
+    if (playlistsStore.activePlaylistTracks.length === 0) return;
+    const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
+    if (songIds.length === 0) return;
+
+    saveQueueName = `Queue Playlist`;
+    showSaveQueueModal = true;
+  }
+
+  async function confirmSaveQueueAsCustomPlaylist() {
+    if (!saveQueueName || !saveQueueName.trim()) return;
+    const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
+    if (songIds.length === 0) return;
+
+    try {
+      const created = await playlistsStore.createPlaylist(saveQueueName.trim());
+      await playlistsStore.addSongsToPlaylist(created.id, songIds);
+      playlistsStore.selectPlaylist(created.id);
+      collectionStore.viewPlaylist(created.id);
+      showSaveQueueModal = false;
+    } catch (err) {
+      console.error("Failed to save Queue as custom playlist:", err);
+    }
   }
 
   function formatDuration(ns: number | undefined): string {
@@ -732,13 +790,20 @@
           <!-- Summary Metadata Line -->
           <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
             <span>
-              {i18n.t("playlists.statsLine", {
-                genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
-                songs: activePlaylist.track_count === 1
+              {#if isSpecialPlaylist}
+                {playlistsStore.activePlaylistTracks.length === 1
                   ? i18n.t("playlists.oneSong")
-                  : i18n.t("playlists.songsCount", { count: activePlaylist.track_count }),
-                duration: totalRuntimeLabel,
-              })}
+                  : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length })}
+                • {totalRuntimeLabel}
+              {:else}
+                {i18n.t("playlists.statsLine", {
+                  genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
+                  songs: playlistsStore.activePlaylistTracks.length === 1
+                    ? i18n.t("playlists.oneSong")
+                    : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length }),
+                  duration: totalRuntimeLabel,
+                })}
+              {/if}
             </span>
           </div>
 
@@ -758,6 +823,16 @@
             >
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </Button>
+            {#if isQueue}
+              <IconActionButton
+                onclick={handleSaveQueueAsCustomPlaylist}
+                disabled={playlistsStore.activePlaylistTracks.length === 0}
+                title={i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}
+                class="shrink-0"
+              >
+                {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
+              </IconActionButton>
+            {/if}
             {#if isSmartPlaylist}
               <Button onclick={handleEditSmartPlaylist} variant="secondary" title={i18n.t("playlists.editSmartPlaylistBtn")}>
                 <Pencil class="w-4 h-4" />
@@ -1115,6 +1190,7 @@
           {@const isDuplicate = duplicateUuids.includes(item.uuid)}
           {@const isSelected = selectedUuids.has(item.uuid)}
           {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
+          {@const isItemPlaying = (playerStore.playlistItemUuid && playerStore.playlistItemUuid === item.uuid) || (playerStore.currentSong && item.song && playerStore.currentSong.id === item.song.id)}
           <div
             role="row"
             tabindex="0"
@@ -1137,7 +1213,7 @@
                 ? 'opacity-50 cursor-not-allowed'
                 : 'cursor-grab active:cursor-grabbing'}
               {isSelected ? 'bg-brand-accent/20 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40'}
-              {!unavailable && !isSelected && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
+              {!unavailable && !isSelected && isItemPlaying ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
               {dragOverIndex === actualIndex && draggedIndex !== null && draggedIndex !== actualIndex
                 ? (actualIndex < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
                 : ''
@@ -1147,7 +1223,7 @@
             <div class="text-center text-brand-text-secondary font-medium relative min-w-0 cursor-grab active:cursor-grabbing">
               <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
                 <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
-                {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
+                {#if isItemPlaying && playerStore.state === "playing"}
                   <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                     <NowPlayingBars />
                   </div>
@@ -1546,4 +1622,44 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if showSaveQueueModal}
+  <Modal onClose={() => showSaveQueueModal = false} maxWidth="max-w-sm">
+    <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+      <div class="flex items-center gap-2">
+        <FolderPlus class="w-4 h-4 text-brand-accent-text" />
+        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}</h3>
+      </div>
+      <button onclick={() => showSaveQueueModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+        <X class="w-4 h-4" />
+      </button>
+    </div>
+
+    <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
+      <div class="flex flex-col gap-1.5">
+        <label for="save-queue-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
+        </label>
+        <Input
+          id="save-queue-name-input"
+          type="text"
+          bind:value={saveQueueName}
+          placeholder={i18n.t("playlists.saveQueueNamePlaceholder", {}, "My Queue Playlist")}
+          class="w-full"
+          required
+          autofocus
+        />
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <Button onclick={() => showSaveQueueModal = false} variant="secondary" size="sm">
+          {i18n.t("playlists.cancel", {}, "Cancel")}
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
+          {i18n.t("playlists.saveQueueConfirm", {}, "Save")}
+        </Button>
+      </div>
+    </form>
+  </Modal>
 {/if}

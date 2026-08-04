@@ -166,52 +166,18 @@
 
   let coverTitle = $derived.by(() => {
     if (!playerStore.currentSong) return "";
-    const pid = playerStore.playlistId;
-    if (pid && pid > 0) {
-      const pl = playlistsStore.playlists.find((p) => p.id === pid);
-      if (pl) {
-        return i18n.t('playerBar.goToPlaylist', { name: pl.name });
-      }
-    }
-    return playerStore.currentSong.album ? i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album }) : "";
+    return i18n.t('playerBar.queueTitle', {}, 'Queue');
   });
 
-  function handleCoverClick(e: MouseEvent) {
+  async function handleCoverClick(e: MouseEvent) {
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
-    const pid = playerStore.playlistId;
-    if (pid && pid > 0) {
-      const pl = playlistsStore.playlists.find((p) => p.id === pid);
-      if (pl) {
-        if (pl.dynamic_enabled && !isSmartPlaylistSpec(pl.dynamic_spec)) {
-          const spec = pl.dynamic_spec ?? "";
-          if (spec.startsWith("decade:")) {
-            const decade = spec.replace(/^decade:/, "");
-            collectionStore.viewAutoPlaylist({
-              kind: "decade",
-              decade,
-              playlistId: pl.id,
-              updated: pl.updated,
-            });
-          } else {
-            collectionStore.viewAutoPlaylist({
-              kind: "genre",
-              genre: spec || pl.name,
-              playlistId: pl.id,
-              updated: pl.updated,
-            });
-          }
-          return;
-        } else {
-          playlistsStore.selectPlaylist(pl.id);
-          collectionStore.viewPlaylist(pl.id);
-          return;
-        }
-      }
-    }
-
-    if (playerStore.currentSong.album) {
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    } else if (playerStore.currentSong.album) {
       collectionStore.viewAlbum(playerStore.currentSong.album);
     }
   }
@@ -268,7 +234,11 @@
     <div class="flex items-center gap-5">
       <div class="relative">
         {#if playerStore.shuffleMode !== 'off'}
-          <button onclick={cycleShuffle} class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer">
+          <button
+            onclick={cycleShuffle}
+            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+          >
             {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
           </button>
         {/if}
@@ -324,7 +294,11 @@
           {/if}
         </button>
         {#if playerStore.repeatMode !== 'off'}
-          <button onclick={cycleRepeat} class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer">
+          <button
+            onclick={cycleRepeat}
+            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+          >
             {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
           </button>
         {/if}

@@ -1106,12 +1106,180 @@ impl Player {
 
     fn rebuild_shuffle_order(&mut self) {
         let len = self.playlist_items.len();
-        let mut order: Vec<usize> = (0..len).collect();
-        if self.shuffle_mode != ShuffleMode::Off && len > 0 {
-            let mut rng = rand::thread_rng();
-            order.shuffle(&mut rng);
+        if len == 0 {
+            self.shuffle_order = Vec::new();
+            return;
         }
+
+        if self.shuffle_mode == ShuffleMode::Off {
+            self.shuffle_order = (0..len).collect();
+            return;
+        }
+
+        let mut rng = rand::thread_rng();
+
+        let current_real_idx = if let Some(pos) = self.current_index {
+            if self.shuffle_order.is_empty() {
+                pos
+            } else {
+                self.shuffle_order.get(pos).copied().unwrap_or(pos)
+            }
+        } else {
+            0
+        };
+
+        let get_album_key = |item: &PlaylistItem| -> String {
+            if let Some(ref song) = item.song {
+                if let Some(ref album) = song.album {
+                    if !album.trim().is_empty() {
+                        return album.to_lowercase();
+                    }
+                }
+            }
+            item.uuid.clone()
+        };
+
+        let get_artist_key = |item: &PlaylistItem| -> String {
+            if let Some(ref song) = item.song {
+                if let Some(ref artist) = song.artist {
+                    if !artist.trim().is_empty() {
+                        return artist.to_lowercase();
+                    }
+                }
+            }
+            item.uuid.clone()
+        };
+
+        let mut order = vec![current_real_idx];
+
+        match self.shuffle_mode {
+            ShuffleMode::Off => {
+                self.shuffle_order = (0..len).collect();
+                return;
+            }
+            ShuffleMode::All => {
+                let mut remaining_indices: Vec<usize> =
+                    (0..len).filter(|&i| i != current_real_idx).collect();
+                remaining_indices.shuffle(&mut rng);
+                order.extend(remaining_indices);
+            }
+            ShuffleMode::InsideAlbum => {
+                let current_album_key = get_album_key(&self.playlist_items[current_real_idx]);
+                let mut groups: std::collections::HashMap<String, Vec<usize>> =
+                    std::collections::HashMap::new();
+                let mut unique_keys = Vec::new();
+
+                for i in 0..len {
+                    if i == current_real_idx {
+                        continue;
+                    }
+                    let key = get_album_key(&self.playlist_items[i]);
+                    groups
+                        .entry(key.clone())
+                        .or_insert_with(|| {
+                            unique_keys.push(key.clone());
+                            Vec::new()
+                        })
+                        .push(i);
+                }
+
+                // Shuffle within each album group
+                for group_tracks in groups.values_mut() {
+                    group_tracks.shuffle(&mut rng);
+                }
+
+                // Add current album's remaining tracks first
+                if let Some(mut current_group) = groups.remove(&current_album_key) {
+                    order.append(&mut current_group);
+                }
+
+                // Add other albums in their normal order
+                for key in &unique_keys {
+                    if let Some(mut group) = groups.remove(key) {
+                        order.append(&mut group);
+                    }
+                }
+            }
+            ShuffleMode::Albums => {
+                let current_album_key = get_album_key(&self.playlist_items[current_real_idx]);
+                let mut groups: std::collections::HashMap<String, Vec<usize>> =
+                    std::collections::HashMap::new();
+                let mut other_keys = Vec::new();
+
+                for i in 0..len {
+                    if i == current_real_idx {
+                        continue;
+                    }
+                    let key = get_album_key(&self.playlist_items[i]);
+                    groups
+                        .entry(key.clone())
+                        .or_insert_with(|| {
+                            if key != current_album_key {
+                                other_keys.push(key.clone());
+                            }
+                            Vec::new()
+                        })
+                        .push(i);
+                }
+
+                // Shuffle the order of other albums
+                other_keys.shuffle(&mut rng);
+
+                // Add current album's remaining tracks first (keeps their original order)
+                if let Some(mut current_group) = groups.remove(&current_album_key) {
+                    order.append(&mut current_group);
+                }
+
+                // Add other albums in shuffled order (keeps their original order within each album)
+                for key in &other_keys {
+                    if let Some(mut group) = groups.remove(key) {
+                        order.append(&mut group);
+                    }
+                }
+            }
+            ShuffleMode::Artists => {
+                let current_artist_key = get_artist_key(&self.playlist_items[current_real_idx]);
+                let mut groups: std::collections::HashMap<String, Vec<usize>> =
+                    std::collections::HashMap::new();
+                let mut other_keys = Vec::new();
+
+                for i in 0..len {
+                    if i == current_real_idx {
+                        continue;
+                    }
+                    let key = get_artist_key(&self.playlist_items[i]);
+                    groups
+                        .entry(key.clone())
+                        .or_insert_with(|| {
+                            if key != current_artist_key {
+                                other_keys.push(key.clone());
+                            }
+                            Vec::new()
+                        })
+                        .push(i);
+                }
+
+                // Shuffle the order of other artists
+                other_keys.shuffle(&mut rng);
+
+                // Add current artist's remaining tracks first (keeps their original order)
+                if let Some(mut current_group) = groups.remove(&current_artist_key) {
+                    order.append(&mut current_group);
+                }
+
+                // Add other artists in shuffled order
+                for key in &other_keys {
+                    if let Some(mut group) = groups.remove(key) {
+                        order.append(&mut group);
+                    }
+                }
+            }
+        }
+
         self.shuffle_order = order;
+        if self.current_index.is_some() {
+            self.current_index = Some(0);
+        }
     }
 
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {
@@ -1130,6 +1298,32 @@ impl Player {
                 rusqlite::params![mode_str],
             );
         }
+    }
+
+    pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
+        let len = self.playlist_items.len();
+        if len == 0 {
+            return Vec::new();
+        }
+
+        let start_pos = self.current_index.unwrap_or(0);
+        let mut result = Vec::new();
+
+        if start_pos < self.shuffle_order.len() {
+            for &real_idx in &self.shuffle_order[start_pos..] {
+                if let Some(item) = self.playlist_items.get(real_idx) {
+                    result.push(item.clone());
+                }
+            }
+        } else {
+            for &real_idx in &self.shuffle_order {
+                if let Some(item) = self.playlist_items.get(real_idx) {
+                    result.push(item.clone());
+                }
+            }
+        }
+
+        result
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {

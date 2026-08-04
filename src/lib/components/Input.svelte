@@ -18,6 +18,7 @@
     highlighted?: boolean;
     /** Rounds the field fully, matching the rounded-full buttons in compact toolbars. */
     pill?: boolean;
+    autofocus?: boolean;
     class?: string;
     style?: string;
     oninput?: (e: Event & { currentTarget: HTMLInputElement }) => void;
@@ -38,6 +39,7 @@
     surface = "main",
     highlighted = false,
     pill = false,
+    autofocus = false,
     class: className = "",
     style,
     oninput,
@@ -62,6 +64,7 @@
   };
 </script>
 
+<!-- svelte-ignore a11y_autofocus -->
 <input
   {id}
   {name}
@@ -70,6 +73,7 @@
   {placeholder}
   {disabled}
   {required}
+  {autofocus}
   {oninput}
   {onchange}
   {onkeydown}

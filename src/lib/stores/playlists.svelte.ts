@@ -20,12 +20,18 @@ class PlaylistsStore {
   /** Live song counts for the virtual (non-materialized) auto-playlists. */
   favouritesCount = $state(0);
   recentlyAddedCount = $state(0);
+  historyCount = $state(0);
 
   /** Count of auto-playlists that currently have at least one song — used for
    * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
   get visibleAutoPlaylistCount(): number {
     const genreCount = this.playlists.filter((p) => p.dynamic_enabled && p.track_count > 0).length;
-    return genreCount + (this.favouritesCount > 0 ? 1 : 0) + (this.recentlyAddedCount > 0 ? 1 : 0);
+    return (
+      genreCount +
+      (this.favouritesCount > 0 ? 1 : 0) +
+      (this.recentlyAddedCount > 0 ? 1 : 0) +
+      (this.historyCount > 0 ? 1 : 0)
+    );
   }
 
   /** The special pinned Queue playlist, always present and never deletable. */
@@ -33,6 +39,15 @@ class PlaylistsStore {
     return (
       this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
     );
+  }
+
+  get queueTrackCount(): number {
+    const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
+    if (q === undefined) return 0;
+    if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
+      return this.activePlaylistTracks.length;
+    }
+    return q.track_count ?? 0;
   }
 
   /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
@@ -117,12 +132,14 @@ class PlaylistsStore {
 
   async refreshAutoPlaylistCounts() {
     try {
-      const [favourites, recentlyAdded] = await Promise.all([
+      const [favourites, recentlyAdded, history] = await Promise.all([
         invoke<Song[]>("get_favourite_songs"),
         invoke<Song[]>("get_recently_added_songs", { limit: 50 }),
+        invoke<Song[]>("get_recently_played_songs", { limit: 100 }),
       ]);
       this.favouritesCount = Array.isArray(favourites) ? favourites.length : 0;
       this.recentlyAddedCount = Array.isArray(recentlyAdded) ? recentlyAdded.length : 0;
+      this.historyCount = Array.isArray(history) ? history.length : 0;
       await this.refreshPlaylists();
     } catch (err) {
       console.error("Failed to refresh auto-playlist counts:", err);
@@ -155,6 +172,7 @@ class PlaylistsStore {
     const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
+    await this.pinPlaylist(playlist.id);
     toastStore.show(
       i18n.t("celebrations.playlistCreated", { name }, `Playlist "${name}" created`),
       "success"
@@ -210,6 +228,45 @@ class PlaylistsStore {
   async renamePlaylist(id: number, name: string) {
     await invoke("rename_playlist", { id, name });
     await this.refreshPlaylists();
+  }
+
+  async replaceQueueTracks(songIds: number[]) {
+    const queuePl = await this.ensureQueuePlaylist();
+    if (!queuePl) return;
+    try {
+      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
+      if (existingItems.length > 0) {
+        const uuids = existingItems.map((i) => i.uuid);
+        await invoke("remove_from_playlist", { playlistId: queuePl.id, uuids });
+      }
+      if (songIds.length > 0) {
+        await invoke("add_to_playlist", { playlistId: queuePl.id, songIds });
+      }
+      if (this.activePlaylistId === queuePl.id) {
+        await this.selectPlaylist(queuePl.id);
+      }
+      await this.refreshPlaylists();
+    } catch (err) {
+      console.error("Failed to sync Queue playlist tracks:", err);
+    }
+  }
+
+  async trimQueueBeforeIndex(index: number) {
+    const queuePl = await this.ensureQueuePlaylist();
+    if (!queuePl || index <= 0) return;
+    try {
+      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
+      if (existingItems.length > index) {
+        const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
+        await invoke("remove_from_playlist", { playlistId: queuePl.id, uuids: uuidsToRemove });
+        if (this.activePlaylistId === queuePl.id) {
+          await this.selectPlaylist(queuePl.id);
+        }
+        await this.refreshPlaylists();
+      }
+    } catch (err) {
+      console.error("Failed to trim Queue tracks before index:", err);
+    }
   }
 
   async addSongsToPlaylist(playlistId: number, songIds: number[]) {

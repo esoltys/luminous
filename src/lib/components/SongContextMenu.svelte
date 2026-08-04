@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { Play, Plus, Mic2, DiscAlbum, Edit3, Folder } from "lucide-svelte";
+  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
@@ -12,7 +13,9 @@
     y,
     song,
     selectedCount = 1,
+    selectedSongIds,
     onPlay,
+    onAddToQueue,
     onAddToPlaylist,
     onGoToArtist,
     onGoToAlbum,
@@ -24,7 +27,9 @@
     y: number;
     song: Song;
     selectedCount?: number;
+    selectedSongIds?: number[];
     onPlay: () => void;
+    onAddToQueue?: () => void;
     onAddToPlaylist?: () => void;
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
@@ -32,9 +37,17 @@
     onOrganizeFiles?: () => void;
     onClose: () => void;
   } = $props();
+
+  async function handleDefaultAddToQueue() {
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (!queuePl) return;
+    const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
+    await playlistsStore.addSongsToPlaylist(queuePl.id, ids);
+    toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, `Added to Queue`));
+  }
 </script>
 
-<ContextMenu {x} {y} {onClose} estimatedHeight={250}>
+<ContextMenu {x} {y} {onClose} estimatedHeight={280}>
   <div class="px-3 py-1 text-[11px] font-bold text-brand-text-primary border-b border-brand-border/40 mb-1 truncate">
     {#if selectedCount > 1}
       {i18n.t("playlists.selectedCount", { count: selectedCount })}
@@ -52,12 +65,23 @@
     onclick={() => { onPlay(); onClose(); }}
   />
 
-  {#if onAddToPlaylist}
+  <ContextMenuItem
+    icon={Layers}
+    label={i18n.t("playlists.contextMenuAddQueue", {}, "Add to Queue")}
+    onclick={async () => {
+      if (onAddToQueue) {
+        onAddToQueue();
+      } else {
+        await handleDefaultAddToQueue();
+      }
+      onClose();
+    }}
+  />
+
+  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && playlistsStore.activeCustomPlaylist.name?.toLowerCase() !== "queue"}
     <ContextMenuItem
       icon={Plus}
-      label={playlistsStore.activeCustomPlaylist
-        ? i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })
-        : i18n.t("playlists.contextMenuAddToPlaylistDefault")}
+      label={i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })}
       onclick={() => { onAddToPlaylist?.(); onClose(); }}
     />
   {/if}

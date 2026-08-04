@@ -5,7 +5,7 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
-  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp, HelpCircle } from "lucide-svelte";
+  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp, HelpCircle, Layers } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
@@ -181,7 +181,26 @@
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)).length})
+              ({playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && p.name?.toLowerCase() !== "queue").length})
+            </span>
+          </button>
+
+          <button
+            onclick={async () => {
+              const queuePl = await playlistsStore.ensureQueuePlaylist();
+              if (queuePl) {
+                playlistsStore.selectPlaylist(queuePl.id);
+                collectionStore.viewPlaylist(queuePl.id);
+              }
+            }}
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer {collectionStore.activeTab === 'playlists' && collectionStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === collectionStore.selectedPlaylistId)?.name?.toLowerCase() === 'queue' ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <div class="flex items-center gap-2 truncate">
+              <Layers class="w-3.5 h-3.5" />
+              <span class="truncate">{i18n.t('playerBar.queueTitle', {}, 'Queue')}</span>
+            </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({playlistsStore.queueTrackCount})
             </span>
           </button>
         </div>

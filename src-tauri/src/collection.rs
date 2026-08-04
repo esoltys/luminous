@@ -1148,6 +1148,34 @@ impl CollectionScanner {
         Ok(stats)
     }
 
+    pub fn get_recently_played_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {SONG_SELECT_COLS}
+             FROM songs s
+             JOIN (
+                 SELECT song_id, MAX(played_at) as last_played_at
+                 FROM play_history
+                 GROUP BY song_id
+             ) ph ON s.id = ph.song_id
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY ph.last_played_at DESC
+             LIMIT ?1"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    pub fn clear_play_history(&self) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute("DELETE FROM play_history", [])?;
+        Ok(())
+    }
+
     /// Recently played, grouped by what the user actually played from —
     /// an Album card if they were browsing an album, a Playlist card if
     /// they played from a playlist, or a Song card for a standalone pick.

@@ -109,9 +109,9 @@ describe("PlayerBar.svelte", () => {
 
   it("cycles shuffle modes on shuffle button click", async () => {
     const shuffleSpy = vi.spyOn(playerStore, "setShuffleMode").mockImplementation(async () => {});
-    const { getByTitle } = render(PlayerBar);
+    const { getAllByTitle } = render(PlayerBar);
 
-    const shuffleBtn = getByTitle(/shuffle/i);
+    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     await fireEvent.click(shuffleBtn);
 
     expect(shuffleSpy).toHaveBeenCalledWith("all");
@@ -119,9 +119,9 @@ describe("PlayerBar.svelte", () => {
 
   it("cycles repeat modes on repeat button click", async () => {
     const repeatSpy = vi.spyOn(playerStore, "setRepeatMode").mockImplementation(async () => {});
-    const { getByTitle } = render(PlayerBar);
+    const { getAllByTitle } = render(PlayerBar);
 
-    const repeatBtn = getByTitle(/repeat/i);
+    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
     await fireEvent.click(repeatBtn);
 
     expect(repeatSpy).toHaveBeenCalledWith("track");
@@ -130,10 +130,10 @@ describe("PlayerBar.svelte", () => {
   it("pairs a mode-type icon beside the Shuffle/Repeat icon for disambiguated modes", () => {
     playerStore.shuffleMode = "all";
     playerStore.repeatMode = "off";
-    const { getByTitle, rerender } = render(PlayerBar);
+    const { getAllByTitle, rerender } = render(PlayerBar);
 
-    const shuffleBtn = getByTitle(/shuffle/i);
-    const repeatBtn = getByTitle(/repeat/i);
+    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
 
     // "all" shuffle and "off" repeat show only the base transport icon
     expect(shuffleBtn.querySelectorAll("svg").length).toBe(1);
@@ -153,10 +153,10 @@ describe("PlayerBar.svelte", () => {
   it("shows the user-guide description for the active shuffle/repeat mode in the tooltip", () => {
     playerStore.shuffleMode = "artists";
     playerStore.repeatMode = "playlist";
-    const { getByTitle } = render(PlayerBar);
+    const { getAllByTitle } = render(PlayerBar);
 
-    expect(getByTitle(/before moving to a new, randomly selected artist/i)).toBeInTheDocument();
-    expect(getByTitle(/loop the current queue or playlist indefinitely/i)).toBeInTheDocument();
+    expect(getAllByTitle(/before moving to a new, randomly selected artist/i).length).toBeGreaterThan(0);
+    expect(getAllByTitle(/loop the current queue or playlist indefinitely/i).length).toBeGreaterThan(0);
   });
 
   it("handles mute toggle correctly", async () => {

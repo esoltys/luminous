@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { shuffleArray } from "../utils/shuffle";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import AlbumCard from "./AlbumCard.svelte";
@@ -180,16 +181,25 @@
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0);
+    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const ids = songs.map((s) => s.id);
-    const randomIndex = Math.floor(Math.random() * ids.length);
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(ids, randomIndex);
+    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 </script>
 

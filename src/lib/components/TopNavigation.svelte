@@ -51,10 +51,23 @@
       });
     }
 
+    // History auto-playlist
+    const histLabel = i18n.t("playlists.autoHistory", {}, "History");
+    if (histLabel.toLowerCase().includes(query) || "history".includes(query)) {
+      results.push({
+        type: "auto",
+        id: "auto:history",
+        label: histLabel,
+        subtitle: i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist"),
+        ref: { kind: "history" }
+      });
+    }
+
     // Materialized playlists (genre, decade, custom)
     for (const p of playlistsStore.playlists) {
       if (!p || !p.name) continue;
       const nameLower = p.name.toLowerCase();
+      if (nameLower === "queue") continue;
       const specLower = (p.dynamic_spec || "").toLowerCase();
       if (nameLower.includes(query) || specLower.includes(query)) {
         if (p.dynamic_enabled && !isSmartPlaylistSpec(p.dynamic_spec)) {

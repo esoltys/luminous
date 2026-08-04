@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { PlaybackState, Playlist, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
+import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
@@ -75,10 +75,15 @@ export class PlayerStore {
         const oldSongId = this.currentSong?.id;
         const oldSongAlbum = this.currentSong?.album;
         const wasPlaying = this._previousState === "playing";
+        const prevShuffle = this.shuffleMode;
         this.updateState(event.payload);
         this._previousState = this.state;
+        if (prevShuffle !== this.shuffleMode && playlistsStore.activePlaylistId !== null) {
+          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        }
         if (this.currentSong?.id !== oldSongId) {
           themeStore.updateArtworkColors(this.currentSong);
+          await this.syncQueueTrackPosition();
         }
 
         // Queue completion celebration (#182, Milestone tier): fires when
@@ -86,13 +91,7 @@ export class PlayerStore {
         if (wasPlaying && this.state === "stopped" && this.remainingPlaylistItems === 0 && !this.currentSong) {
           this.queueJustCompleted = true;
 
-          // Resolve context name (Playlist name, Album name, or fallback to Queue)
-          const plName = this.playlistId ? playlistsStore.playlists.find((p) => p.id === this.playlistId)?.name : undefined;
-          const contextName = this.activeContextName || plName || oldSongAlbum;
-          const toastText = contextName
-            ? i18n.t("celebrations.contextComplete", { name: contextName }, `${contextName} complete`)
-            : i18n.t("celebrations.queueComplete", {}, "Queue complete");
-
+          const toastText = i18n.t("celebrations.queueComplete", {}, "Your Queue is done");
           toastStore.show(toastText, "milestone");
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
         }
@@ -103,9 +102,10 @@ export class PlayerStore {
       });
 
       // Listen for track changes
-      await listen<{ song: Song | null }>("track-changed", (event) => {
+      await listen<{ song: Song | null }>("track-changed", async (event) => {
         this.currentSong = event.payload.song || undefined;
         themeStore.updateArtworkColors(this.currentSong);
+        await this.syncQueueTrackPosition();
       });
 
       // A song couldn't be opened/decoded (e.g. its file just vanished —
@@ -298,12 +298,37 @@ export class PlayerStore {
     } else {
       this.activeContextName = undefined;
     }
+    await playlistsStore.replaceQueueTracks(songIds);
     await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
+  }
+
+  private async syncQueueTrackPosition() {
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (!queuePl || !this.currentSong) return;
+    if (this.playlistId === queuePl.id || this.activeContextName === "Queue") {
+      const tracks = playlistsStore.activePlaylistId === queuePl.id
+        ? playlistsStore.activePlaylistTracks
+        : await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: queuePl.id });
+      if (tracks.length > 0) {
+        const activeIndex = tracks.findIndex((t: PlaylistItem) => t.song?.id === this.currentSong?.id);
+        if (activeIndex > 0) {
+          await playlistsStore.trimQueueBeforeIndex(activeIndex);
+        }
+      }
+    }
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number) {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (queuePl && (playlistId === queuePl.id || pl?.name?.toLowerCase() === "queue")) {
+      if (itemIndex > 0) {
+        await playlistsStore.trimQueueBeforeIndex(itemIndex);
+        await invoke("play_playlist_item", { playlistId: queuePl.id, itemIndex: 0 });
+        return;
+      }
+    }
     await invoke("play_playlist_item", { playlistId, itemIndex });
   }
 
@@ -362,6 +387,9 @@ export class PlayerStore {
   async setShuffleMode(mode: ShuffleMode) {
     this.shuffleMode = mode;
     await invoke("set_shuffle_mode", { mode });
+    if (playlistsStore.activePlaylistId !== null) {
+      await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+    }
   }
 
   async setRepeatMode(mode: RepeatMode) {
