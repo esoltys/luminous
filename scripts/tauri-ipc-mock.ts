@@ -470,6 +470,17 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     search_songs: (args) => {
       const q = ((args.query as string) || "").toLowerCase().trim();
       if (!q) return library.songs;
+
+      // Narrow support for the "key:"/"initial_key:" field filter used by the
+      // advanced-search docs screenshot — this mock doesn't reimplement the
+      // full backend filter grammar (see src-tauri/src/filter_parser.rs),
+      // just this one field, so the search results aren't empty/broken.
+      const keyMatch = q.match(/^(?:key|initial_key):(.+)$/);
+      if (keyMatch) {
+        const val = keyMatch[1].trim();
+        return library.songs.filter((s) => (s.initial_key || "").toLowerCase().includes(val));
+      }
+
       return library.songs.filter(
         (s) =>
           (s.title || "").toLowerCase().includes(q) ||

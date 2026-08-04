@@ -16,6 +16,14 @@
   },
   "screenshots": [
     {
+      "name": "advanced-search",
+      "filename": "advanced-search.png",
+      "tab": "collection",
+      "subTab": "songs",
+      "action": "type-search-key",
+      "sidebarWidth": 220
+    },
+    {
       "name": "album-detail",
       "filename": "album-detail.png",
       "tab": "collection",

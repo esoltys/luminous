@@ -425,15 +425,11 @@ async function main() {
       await page.waitForTimeout(400);
     },
     "click-smart-playlist": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "playlists.newPlaylistBtn"), exact: true }).click();
-      await page.waitForTimeout(300);
-      await page.getByRole("button", { name: t(language, "playlists.advancedBtn"), exact: true }).click();
+      await page.getByRole("button", { name: t(language, "playlists.newSmartPlaylistBtn"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-smart-playlist-edit": async (page, _featured, language) => {
-      await page.getByRole("button", { name: t(language, "playlists.newPlaylistBtn"), exact: true }).click();
-      await page.waitForTimeout(300);
-      await page.getByRole("button", { name: t(language, "playlists.advancedBtn"), exact: true }).click();
+      await page.getByRole("button", { name: t(language, "playlists.newSmartPlaylistBtn"), exact: true }).click();
       await page.waitForTimeout(400);
       const nameInput = page.locator("#smart-playlist-name-input");
       await nameInput.fill("1980s Rock Mix");
@@ -473,6 +469,22 @@ async function main() {
       const searchInput = page.locator(`input[placeholder="${searchPlaceholder}"]`);
       await searchInput.focus();
       await searchInput.fill("evan");
+      await page.waitForTimeout(400);
+    },
+    "type-search-key": async (page, _featured, language) => {
+      // Reveal the Key column so the table behind the search dropdown shows
+      // initial_key values matching the "key:d" query.
+      await page.getByTitle(t(language, "collection.columnsBtn")).click();
+      await page.waitForTimeout(200);
+      await page.getByRole("checkbox", { name: t(language, "collection.columnInitialKey"), exact: true }).click();
+      await page.waitForTimeout(150);
+
+      const searchPlaceholder = t(language, "topNav.searchPlaceholder");
+      const searchInput = page.locator(`input[placeholder="${searchPlaceholder}"]`);
+      // A real click (not .focus()) also serves as the outside-click that
+      // closes the column selector dropdown opened above.
+      await searchInput.click();
+      await searchInput.fill("key:d");
       await page.waitForTimeout(400);
     },
     "toggle-miniplayer": async (page) => {

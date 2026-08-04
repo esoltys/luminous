@@ -121,12 +121,14 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
     }
 
     let (sql_column, is_numeric) = match field_clean.as_str() {
-        "artist" | "album_artist" => ("COALESCE(NULLIF(album_artist, ''), artist)", false),
+        "artist" => ("COALESCE(NULLIF(album_artist, ''), artist)", false),
+        "album_artist" => ("album_artist", false),
         "album" => ("album", false),
         "title" => ("title", false),
         "genre" => ("genre", false),
         "composer" => ("composer", false),
         "year" => ("year", true),
+        "originalyear" | "original_year" => ("originalyear", true),
         "bitrate" => ("bitrate", true),
         "track" | "track_number" => ("track", true),
         "disc" | "disc_number" => ("disc", true),
@@ -134,7 +136,14 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         "playcount" | "plays" | "play_count" => ("playcount", true),
         "skipcount" | "skips" | "skip_count" => ("skipcount", true),
         "lastplayed" | "last_played" => ("lastplayed", true),
+        "added" => ("added", true),
         "duration" | "length" => ("length_nanosec", true),
+        "bpm" => ("bpm", true),
+        "key" | "initial_key" => ("initial_key", false),
+        "samplerate" | "sample_rate" => ("samplerate", true),
+        "bitdepth" | "bit_depth" => ("bitdepth", true),
+        "channels" => ("channels", true),
+        "compilation" => ("compilation", true),
         _ => return None,
     };
 
@@ -230,6 +239,33 @@ mod tests {
             q.field_filters[2].value,
             FilterValue::Text("%jazz%".to_string())
         );
+    }
+
+    #[test]
+    fn test_parse_extended_tag_fields() {
+        // Ranges aren't a single-token construct — the Smart Playlist builder
+        // composes them as two separate >=/<= filters on the same field.
+        let q = parse_query("bpm:>=120 bpm:<=130 key:Am album_artist:Various compilation:1");
+        assert_eq!(q.field_filters.len(), 5);
+        assert_eq!(q.field_filters[0].sql_column, "bpm");
+        assert_eq!(q.field_filters[0].op, Op::Gte);
+        assert_eq!(q.field_filters[0].value, FilterValue::Int(120));
+        assert_eq!(q.field_filters[1].sql_column, "bpm");
+        assert_eq!(q.field_filters[1].op, Op::Lte);
+
+        assert_eq!(q.field_filters[2].field, "key");
+        assert_eq!(q.field_filters[2].sql_column, "initial_key");
+        assert_eq!(q.field_filters[2].op, Op::Contains);
+        assert_eq!(
+            q.field_filters[2].value,
+            FilterValue::Text("%Am%".to_string())
+        );
+
+        assert_eq!(q.field_filters[3].field, "album_artist");
+        assert_eq!(q.field_filters[3].sql_column, "album_artist");
+
+        assert_eq!(q.field_filters[4].sql_column, "compilation");
+        assert_eq!(q.field_filters[4].value, FilterValue::Int(1));
     }
 
     #[test]

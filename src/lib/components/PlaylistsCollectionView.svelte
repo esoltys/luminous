@@ -18,7 +18,6 @@
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
-  import Input from "./Input.svelte";
   import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3, RefreshCw } from "lucide-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
@@ -235,18 +234,10 @@
     collectionStore.viewPlaylist(pl.id);
   }
 
-  let newPlaylistName = $state("");
-  let showCreateForm = $state(false);
-
-  async function handleCreatePlaylist(e: Event) {
-    e.preventDefault();
-    const name = newPlaylistName.trim();
-    if (name === "") return;
-    await playlistsStore.createPlaylist(name);
-    newPlaylistName = "";
-    showCreateForm = false;
-    if (playlistsStore.activePlaylistId !== null) {
-      collectionStore.viewPlaylist(playlistsStore.activePlaylistId);
+  async function handleCreateBlankPlaylist() {
+    const playlist = await playlistsStore.createPlaylist(i18n.t("playlists.untitledPlaylistName"));
+    if (playlist) {
+      collectionStore.viewPlaylist(playlist.id);
     }
   }
 
@@ -281,9 +272,13 @@
         {#if collectionStore.playlistsSubTab === "custom"}
           <!-- Actions (Left) -->
           <div class="h-10 flex items-center gap-2 mb-2">
-            <Button onclick={() => { showCreateForm = !showCreateForm; }} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
+            <Button onclick={handleCreateBlankPlaylist} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-4 h-4" />
               <span>{i18n.t('playlists.newPlaylistBtn')}</span>
+            </Button>
+            <Button onclick={() => collectionStore.openSmartBuilder()} variant="accent-soft" title={i18n.t('playlists.newSmartPlaylistBtn')}>
+              <Sparkles class="w-4 h-4" />
+              <span>{i18n.t('playlists.newSmartPlaylistBtn')}</span>
             </Button>
             <Button onclick={handleImportPlaylist} variant="secondary" title={i18n.t('playlists.importPlaylistTooltip')}>
               <FolderInput class="w-4 h-4 text-brand-accent-text" />
@@ -373,19 +368,6 @@
           </div>
         </div>
       </div>
-
-      {#if collectionStore.playlistsSubTab === "custom" && showCreateForm}
-        <form onsubmit={handleCreatePlaylist} class="flex items-center gap-2 mb-4">
-          <Input bind:value={newPlaylistName} placeholder={i18n.t('playlists.createPlaylistPlaceholder')} size="sm" surface="sidebar" class="w-64" />
-          <Button type="submit" variant="primary" size="sm">
-            {i18n.t('sidebar.create')}
-          </Button>
-          <Button type="button" onclick={() => collectionStore.openSmartBuilder()} variant="accent-soft" size="sm">
-            <Sparkles class="w-3.5 h-3.5" />
-            <span>{i18n.t('playlists.advancedBtn')}</span>
-          </Button>
-        </form>
-      {/if}
 
       <div class="pt-2 pb-8">
         {#if collectionStore.playlistsSubTab === "auto"}

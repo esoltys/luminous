@@ -60,7 +60,18 @@ export function parseSearchRules(query: string): Rule[] {
       } else if (rawVal.startsWith("=")) {
         op = "=";
         rawVal = rawVal.slice(1);
-      } else if (["artist", "album", "title", "genre", "composer"].includes(field)) {
+      } else if (
+        [
+          "artist",
+          "album_artist",
+          "album",
+          "title",
+          "genre",
+          "composer",
+          "key",
+          "initial_key",
+        ].includes(field)
+      ) {
         op = "contains";
       }
 
