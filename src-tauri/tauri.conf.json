@@ -223,7 +223,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDRDY5QzUxMjJGNjQ5Q0IKUldTWU0vQytnVG1tTXlWVnpPZm5zNkdFTHdCSU9ldGlDNG9ZUXZCVHR0dzVzK3FRTHJ0Vw==",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgzQzMzRURBMDI2QzhGQjIKUldTeWoyd0MyajdEZzNXUDd0UVFQeGlHS3RqQUNCcHhETTdHcUdPOHphN2Y5SFhHVnZnUFZFNmgK",
       "endpoints": [
         "https://github.com/esoltys/luminous/releases/latest/download/latest.json"
       ]

@@ -80,3 +80,19 @@ vi.mock("@tauri-apps/api/event", () => {
     }),
   };
 });
+
+// Mock Tauri updater plugin — defaults to "no update available"; tests override with
+// vi.mocked(check).mockResolvedValueOnce(...) to simulate an available update.
+vi.mock("@tauri-apps/plugin-updater", () => {
+  return {
+    check: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// Mock Tauri process plugin (used to restart the app after an in-place update install)
+vi.mock("@tauri-apps/plugin-process", () => {
+  return {
+    relaunch: vi.fn().mockResolvedValue(undefined),
+    exit: vi.fn().mockResolvedValue(undefined),
+  };
+});

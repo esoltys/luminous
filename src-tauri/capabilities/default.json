@@ -9,6 +9,8 @@
     "dialog:default",
     "window-state:default",
     "positioner:default",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "fs:allow-read",
       "allow": [

@@ -31,6 +31,11 @@
   // this view is mounted to watch, not on a silent background check.
   let previousCheckStatus: typeof updaterStore.checkStatus | undefined;
   let justConfirmedUpToDate = $state(false);
+  let downloadPercent = $derived(
+    updaterStore.downloadProgress?.total
+      ? Math.min(100, Math.round((updaterStore.downloadProgress.downloaded / updaterStore.downloadProgress.total) * 100))
+      : null
+  );
   $effect(() => {
     const wasChecking = previousCheckStatus === "checking";
     previousCheckStatus = updaterStore.checkStatus;
@@ -441,28 +446,69 @@
         </div>
 
         <!-- Update Available Alert Banner (if available) -->
-        {#if updaterStore.updateAvailable}
+        {#if updaterStore.updateAvailable || updaterStore.installStatus !== 'idle'}
           <div class="bg-brand-accent/10 border border-brand-accent/30 rounded-xl p-4 flex items-center justify-between gap-4 anim-card-materialize">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 min-w-0">
               <div class="relative w-9 h-9 rounded-lg bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 flex items-center justify-center shrink-0">
-                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand-accent anim-badge-glow"></span>
-                <ArrowUp class="w-5 h-5 stroke-[2.5]" />
+                {#if updaterStore.installStatus === 'ready-to-restart'}
+                  <Check class="w-5 h-5 stroke-[2.5]" />
+                {:else}
+                  <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-brand-accent anim-badge-glow"></span>
+                  <ArrowUp class="w-5 h-5 stroke-[2.5]" />
+                {/if}
               </div>
-              <div>
+              <div class="min-w-0 space-y-1">
                 <p class="text-sm font-bold text-brand-text-primary">
                   {i18n.t('settings.updateAvailableTitle', { version: updaterStore.latestVersion })}
                 </p>
-                <p class="text-xs text-brand-text-secondary/80">
-                  {updaterStore.installFormat.supports_self_update
-                    ? i18n.t('settings.updateDirectReady', {}, 'In-app update ready for direct installation.')
-                    : i18n.t('settings.updateGithubLink', {}, 'Download update payload directly from GitHub Releases.')}
-                </p>
+                {#if updaterStore.installStatus === 'downloading'}
+                  <p class="text-xs text-brand-text-secondary/80">
+                    {downloadPercent !== null
+                      ? i18n.t('settings.updateDownloadingProgress', { percent: downloadPercent }, 'Downloading update... {percent}%')
+                      : i18n.t('settings.updateDownloading', {}, 'Downloading update...')}
+                  </p>
+                  {#if downloadPercent !== null}
+                    <div class="w-40 h-1.5 rounded-full bg-brand-border/60 overflow-hidden">
+                      <div class="h-full bg-brand-accent transition-all duration-200" style="width: {downloadPercent}%"></div>
+                    </div>
+                  {/if}
+                {:else if updaterStore.installStatus === 'ready-to-restart'}
+                  <p class="text-xs text-brand-text-secondary/80">{i18n.t('settings.updateReadyToRestart', {}, 'Update downloaded — restart to finish installing.')}</p>
+                {:else if updaterStore.installStatus === 'error'}
+                  <p class="text-xs text-brand-text-secondary/80">{updaterStore.errorMessage || i18n.t('settings.updateInstallError', {}, 'Update failed.')}</p>
+                {:else}
+                  <p class="text-xs text-brand-text-secondary/80">
+                    {updaterStore.installFormat.supports_self_update
+                      ? i18n.t('settings.updateDirectReady', {}, 'In-app update ready for direct installation.')
+                      : i18n.t('settings.updateGithubLink', {}, 'Download update payload directly from GitHub Releases.')}
+                  </p>
+                {/if}
               </div>
             </div>
-            <Button onclick={() => openExternalUrl(updaterStore.downloadUrl || updaterStore.releaseUrl)} variant="primary" size="sm" class="shrink-0">
-              <Download class="w-4 h-4" />
-              {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateDownloadBtn') : i18n.t('settings.updateDownloadGithubBtn')}
-            </Button>
+
+            {#if updaterStore.installFormat.supports_self_update}
+              {#if updaterStore.installStatus === 'ready-to-restart'}
+                <Button onclick={() => updaterStore.restartNow()} variant="primary" size="sm" class="shrink-0">
+                  <RefreshCw class="w-4 h-4" />
+                  {i18n.t('settings.updateRestartBtn', {}, 'Restart to Update')}
+                </Button>
+              {:else if updaterStore.installStatus === 'downloading'}
+                <Button disabled variant="primary" size="sm" class="shrink-0">
+                  <RefreshCw class="w-4 h-4 animate-spin" />
+                  {i18n.t('settings.updateDownloadingBtn', {}, 'Downloading...')}
+                </Button>
+              {:else}
+                <Button onclick={() => updaterStore.downloadAndInstall()} variant="primary" size="sm" class="shrink-0">
+                  <Download class="w-4 h-4" />
+                  {updaterStore.installStatus === 'error' ? i18n.t('settings.updateRetryBtn', {}, 'Retry') : i18n.t('settings.updateDownloadBtn')}
+                </Button>
+              {/if}
+            {:else}
+              <Button onclick={() => openExternalUrl(updaterStore.releaseUrl)} variant="primary" size="sm" class="shrink-0">
+                <Download class="w-4 h-4" />
+                {i18n.t('settings.updateDownloadGithubBtn')}
+              </Button>
+            {/if}
           </div>
         {/if}
 

@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 export interface InstallFormatInfo {
   format: string;
@@ -7,13 +9,19 @@ export interface InstallFormatInfo {
 }
 
 export type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
+export type InstallStatus = "idle" | "downloading" | "ready-to-restart" | "error";
+export interface DownloadProgress {
+  downloaded: number;
+  total: number | null;
+}
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const RELEASES_URL = "https://github.com/esoltys/luminous/releases/latest";
 
 class UpdaterStore {
   updateCheckEnabled = $state(false);
   updateAutoInstall = $state(false);
-  
+
   installFormat = $state<InstallFormatInfo>({
     format: "unknown",
     human_name: "Desktop Application",
@@ -23,11 +31,14 @@ class UpdaterStore {
   checkStatus = $state<CheckStatus>("idle");
   updateAvailable = $state(false);
   latestVersion = $state("");
-  releaseUrl = $state("");
-  downloadUrl = $state("");
+  releaseUrl = $state(RELEASES_URL);
   errorMessage = $state<string | null>(null);
 
+  installStatus = $state<InstallStatus>("idle");
+  downloadProgress = $state<DownloadProgress | null>(null);
+
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
+  private pendingUpdate: Update | null = null;
 
   async init() {
     try {
@@ -84,6 +95,9 @@ class UpdaterStore {
     } catch (e) {
       console.error("Failed to save update_auto_install setting:", e);
     }
+    if (enabled && this.updateAvailable && this.installFormat.supports_self_update && this.installStatus === "idle") {
+      this.downloadAndInstall();
+    }
   }
 
   startPeriodicCheck() {
@@ -105,45 +119,27 @@ class UpdaterStore {
   async checkForUpdates() {
     this.checkStatus = "checking";
     this.errorMessage = null;
+    this.installStatus = "idle";
+    this.downloadProgress = null;
+
+    if (this.pendingUpdate) {
+      await this.pendingUpdate.close();
+      this.pendingUpdate = null;
+    }
 
     try {
-      // Fetch latest release info from GitHub API
-      const res = await fetch("https://api.github.com/repos/esoltys/luminous/releases/latest", {
-        headers: { Accept: "application/vnd.github.v3+json" }
-      });
+      const update = await checkForUpdate();
 
-      if (!res.ok) {
-        throw new Error(`GitHub API returned HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      const latestTag = (data.tag_name || "").replace(/^v/, "");
-      
-      let currentVersion = "";
-      try {
-        const { getVersion } = await import("@tauri-apps/api/app");
-        currentVersion = await getVersion();
-      } catch {
-        currentVersion = "0.90.0";
-      }
-
-      const isNewer = this.isVersionNewer(latestTag, currentVersion);
-
-      if (isNewer) {
+      if (update) {
+        this.pendingUpdate = update;
         this.updateAvailable = true;
-        this.latestVersion = data.tag_name || `v${latestTag}`;
-        this.releaseUrl = data.html_url || "https://github.com/esoltys/luminous/releases/latest";
-
-        // Find matching download asset URL based on install format
-        const assets: Array<{ name: string; browser_download_url: string }> = data.assets || [];
-        const matchingAsset = this.findMatchingAsset(assets, this.installFormat.format);
-        if (matchingAsset) {
-          this.downloadUrl = matchingAsset.browser_download_url;
-        } else {
-          this.downloadUrl = this.releaseUrl;
-        }
-
+        this.latestVersion = `v${update.version}`;
+        this.releaseUrl = `https://github.com/esoltys/luminous/releases/tag/v${update.version}`;
         this.checkStatus = "available";
+
+        if (this.updateAutoInstall && this.installFormat.supports_self_update) {
+          this.downloadAndInstall();
+        }
       } else {
         this.updateAvailable = false;
         this.checkStatus = "up-to-date";
@@ -155,37 +151,47 @@ class UpdaterStore {
     }
   }
 
-  private findMatchingAsset(
-    assets: Array<{ name: string; browser_download_url: string }>,
-    format: string
-  ): { name: string; browser_download_url: string } | undefined {
-    const extMap: Record<string, string[]> = {
-      deb: [".deb"],
-      rpm: [".rpm"],
-      appimage: [".appimage"],
-      windows_setup: ["-setup.exe", ".msi", ".exe"],
-    };
-
-    const exts = extMap[format] || [];
-    for (const ext of exts) {
-      const found = assets.find((a) => a.name.toLowerCase().endsWith(ext.toLowerCase()));
-      if (found) return found;
+  async downloadAndInstall() {
+    if (!this.pendingUpdate || !this.installFormat.supports_self_update || this.installStatus === "downloading") {
+      return;
     }
-    return undefined;
+
+    this.installStatus = "downloading";
+    this.downloadProgress = { downloaded: 0, total: null };
+    this.errorMessage = null;
+
+    try {
+      await this.pendingUpdate.downloadAndInstall((event) => {
+        switch (event.event) {
+          case "Started":
+            this.downloadProgress = { downloaded: 0, total: event.data.contentLength ?? null };
+            break;
+          case "Progress":
+            if (this.downloadProgress) {
+              this.downloadProgress = {
+                downloaded: this.downloadProgress.downloaded + event.data.chunkLength,
+                total: this.downloadProgress.total,
+              };
+            }
+            break;
+          case "Finished":
+            break;
+        }
+      });
+      this.installStatus = "ready-to-restart";
+    } catch (err: any) {
+      console.error("Failed to download and install update:", err);
+      this.installStatus = "error";
+      this.errorMessage = err?.message || "Failed to download update";
+    }
   }
 
-  private isVersionNewer(latest: string, current: string): boolean {
-    if (!latest || !current) return false;
-    const parse = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
-    const l = parse(latest);
-    const c = parse(current);
-    for (let i = 0; i < Math.max(l.length, c.length); i++) {
-      const numL = l[i] || 0;
-      const numC = c[i] || 0;
-      if (numL > numC) return true;
-      if (numL < numC) return false;
+  async restartNow() {
+    try {
+      await relaunch();
+    } catch (err) {
+      console.error("Failed to restart for update:", err);
     }
-    return false;
   }
 }
 
