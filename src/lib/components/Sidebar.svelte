@@ -199,6 +199,9 @@
               <Layers class="w-3.5 h-3.5" />
               <span class="truncate">{i18n.t('playerBar.queueTitle', {}, 'Queue')}</span>
             </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({playlistsStore.queueTrackCount})
+            </span>
           </button>
         </div>
       {/if}

@@ -41,6 +41,15 @@ class PlaylistsStore {
     );
   }
 
+  get queueTrackCount(): number {
+    const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
+    if (q === undefined) return 0;
+    if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
+      return this.activePlaylistTracks.length;
+    }
+    return q.track_count ?? 0;
+  }
+
   /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
    * falling back to the Queue playlist when nothing has been pinned yet. */
   get effectivePinnedPlaylistId(): number | null {
