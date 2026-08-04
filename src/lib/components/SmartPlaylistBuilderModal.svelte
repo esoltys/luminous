@@ -126,15 +126,27 @@
 
   const availableFields = [
     { key: "artist", label: i18n.t("smartPlaylistBuilder.fieldArtist", {}, "Artist"), type: "text" },
+    { key: "album_artist", label: i18n.t("smartPlaylistBuilder.fieldAlbumArtist", {}, "Album Artist"), type: "text" },
     { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
     { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },
     { key: "genre", label: i18n.t("smartPlaylistBuilder.fieldGenre", {}, "Genre"), type: "text" },
     { key: "composer", label: i18n.t("smartPlaylistBuilder.fieldComposer", {}, "Composer"), type: "text" },
+    { key: "key", label: i18n.t("smartPlaylistBuilder.fieldKey", {}, "Key"), type: "text" },
+    { key: "bpm", label: i18n.t("smartPlaylistBuilder.fieldBpm", {}, "BPM"), type: "number" },
     { key: "year", label: i18n.t("smartPlaylistBuilder.fieldYear", {}, "Year"), type: "number" },
+    { key: "originalyear", label: i18n.t("smartPlaylistBuilder.fieldOriginalYear", {}, "Original Year"), type: "number" },
     { key: "rating", label: i18n.t("smartPlaylistBuilder.fieldRating", {}, "Rating (Stars)"), type: "number" },
     { key: "playcount", label: i18n.t("smartPlaylistBuilder.fieldPlayCount", {}, "Play Count"), type: "number" },
     { key: "skipcount", label: i18n.t("smartPlaylistBuilder.fieldSkipCount", {}, "Skip Count"), type: "number" },
+    { key: "lastplayed", label: i18n.t("smartPlaylistBuilder.fieldLastPlayed", {}, "Last Played (Unix Timestamp)"), type: "number" },
+    { key: "added", label: i18n.t("smartPlaylistBuilder.fieldAdded", {}, "Date Added (Unix Timestamp)"), type: "number" },
+    { key: "track", label: i18n.t("smartPlaylistBuilder.fieldTrack", {}, "Track #"), type: "number" },
+    { key: "disc", label: i18n.t("smartPlaylistBuilder.fieldDisc", {}, "Disc #"), type: "number" },
     { key: "bitrate", label: i18n.t("smartPlaylistBuilder.fieldBitrate", {}, "Bitrate"), type: "number" },
+    { key: "samplerate", label: i18n.t("smartPlaylistBuilder.fieldSampleRate", {}, "Sample Rate (Hz)"), type: "number" },
+    { key: "bitdepth", label: i18n.t("smartPlaylistBuilder.fieldBitDepth", {}, "Bit Depth"), type: "number" },
+    { key: "channels", label: i18n.t("smartPlaylistBuilder.fieldChannels", {}, "Channels"), type: "number" },
+    { key: "compilation", label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation (1/0)"), type: "number" },
     { key: "duration", label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"), type: "text" },
   ];
 

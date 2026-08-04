@@ -259,14 +259,14 @@
               collectionStore.openSmartBuilder(rules);
               isSearchFocused = false;
             }}
-            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-indigo-600/20 border border-indigo-500/40 hover:bg-indigo-600/30 transition-all cursor-pointer text-left group"
+            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-brand-accent/10 border border-brand-accent/40 hover:bg-brand-accent/20 transition-all cursor-pointer text-left group"
           >
             <div class="flex items-center gap-2.5">
-              <div class="p-1.5 rounded-lg bg-indigo-600 text-white">
+              <div class="p-1.5 rounded-lg bg-brand-accent text-brand-accent-contrast">
                 <Sparkles class="w-4 h-4" />
               </div>
               <div>
-                <div class="text-xs font-bold text-brand-text-primary group-hover:text-indigo-300 transition-colors">
+                <div class="text-xs font-bold text-brand-text-primary group-hover:text-brand-accent-text transition-colors">
                   {i18n.t('topNav.createSmartPlaylistFromSearch')}
                 </div>
                 <div class="text-[11px] text-brand-text-secondary/80">
@@ -274,7 +274,7 @@
                 </div>
               </div>
             </div>
-            <span class="text-xs font-semibold text-indigo-400 group-hover:underline">{i18n.t('topNav.openBuilder')}</span>
+            <span class="text-xs font-semibold text-brand-accent-text group-hover:underline">{i18n.t('topNav.openBuilder')}</span>
           </button>
         {/if}
 

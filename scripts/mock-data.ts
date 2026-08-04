@@ -9,6 +9,7 @@ interface TrackSeed {
   lengthSec: number;
   lastplayed?: number;
   playcount?: number;
+  initialKey?: string;
 }
 
 interface AlbumSeed {
@@ -91,8 +92,8 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     bitrate: 900,
     samplerate: 44100,
     tracks: [
-      { title: "Free Fallin'", lengthSec: 259, lastplayed: 9500, playcount: 15 },
-      { title: "I Won't Back Down", lengthSec: 170 },
+      { title: "Free Fallin'", lengthSec: 259, lastplayed: 9500, playcount: 15, initialKey: "D" },
+      { title: "I Won't Back Down", lengthSec: 170, initialKey: "G" },
       { title: "Runnin' Down a Dream", lengthSec: 259 },
     ],
   },
@@ -183,6 +184,7 @@ function buildSong(seed: AlbumSeed, track: TrackSeed, index: number): Song {
     playcount: track.playcount ?? 0,
     skipcount: 0,
     lastplayed: track.lastplayed,
+    initial_key: track.initialKey,
     added: 1783727350,
     art_embedded: seed.artEmbedded ?? true,
     art_automatic: `/fixtures/${seed.art}`,
