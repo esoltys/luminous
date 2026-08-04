@@ -234,7 +234,11 @@
     <div class="flex items-center gap-5">
       <div class="relative">
         {#if playerStore.shuffleMode !== 'off'}
-          <button onclick={cycleShuffle} class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer">
+          <button
+            onclick={cycleShuffle}
+            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
+          >
             {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
           </button>
         {/if}
@@ -290,7 +294,11 @@
           {/if}
         </button>
         {#if playerStore.repeatMode !== 'off'}
-          <button onclick={cycleRepeat} class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer">
+          <button
+            onclick={cycleRepeat}
+            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
+          >
             {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
           </button>
         {/if}
