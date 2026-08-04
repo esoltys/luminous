@@ -791,16 +791,16 @@
           <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
             <span>
               {#if isSpecialPlaylist}
-                {activePlaylist.track_count === 1
+                {playlistsStore.activePlaylistTracks.length === 1
                   ? i18n.t("playlists.oneSong")
-                  : i18n.t("playlists.songsCount", { count: activePlaylist.track_count })}
+                  : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length })}
                 • {totalRuntimeLabel}
               {:else}
                 {i18n.t("playlists.statsLine", {
                   genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
-                  songs: activePlaylist.track_count === 1
+                  songs: playlistsStore.activePlaylistTracks.length === 1
                     ? i18n.t("playlists.oneSong")
-                    : i18n.t("playlists.songsCount", { count: activePlaylist.track_count }),
+                    : i18n.t("playlists.songsCount", { count: playlistsStore.activePlaylistTracks.length }),
                   duration: totalRuntimeLabel,
                 })}
               {/if}
