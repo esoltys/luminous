@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Star } from "lucide-svelte";
+  import { Star, CircleSlash } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -15,6 +15,7 @@
   let hoverValue = $state<number | null>(null);
 
   const starClass = $derived(size === "md" ? "w-4 h-4" : "w-3.5 h-3.5");
+  const clearClass = $derived(size === "md" ? "w-3.5 h-3.5" : "w-3 h-3");
   const shown = $derived(hoverValue ?? (rating > 0 ? rating : 0));
 
   // Left half of a star = half-star value, right half = full-star value.
@@ -32,6 +33,11 @@
     onRate(value === rating ? -1 : value);
   }
 
+  function handleClear(e: MouseEvent) {
+    e.stopPropagation();
+    onRate?.(-1);
+  }
+
   function fillFraction(star: number): number {
     return Math.max(0, Math.min(1, shown - (star - 1)));
   }
@@ -43,6 +49,18 @@
   aria-label={i18n.t('rating.label')}
   onmouseleave={() => (hoverValue = null)}
 >
+  {#if onRate}
+    <button
+      type="button"
+      disabled={rating <= 0}
+      onclick={handleClear}
+      class="block text-brand-text-secondary/50 hover:text-brand-text-secondary transition-colors cursor-pointer disabled:cursor-default disabled:pointer-events-none"
+      title={i18n.t('rating.clearTooltip')}
+      aria-label={i18n.t('rating.clearTooltip')}
+    >
+      <CircleSlash class={clearClass} />
+    </button>
+  {/if}
   {#each [1, 2, 3, 4, 5] as star}
     <button
       type="button"

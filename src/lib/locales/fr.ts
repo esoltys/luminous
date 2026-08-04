@@ -110,8 +110,8 @@ export const fr = {
     sortArtistNameDesc: "Trier : Nom d'artiste (Z-A)",
     sortYearDesc: "Trier : Année (Plus récente)",
     sortYearAsc: "Trier : Année (Plus ancienne)",
-    sortTracksDesc: "Trier : Chansons (Plus grand nombre)",
-    sortTracksAsc: "Trier : Chansons (Moins grand nombre)",
+    sortRatingDesc: "Trier : Note (Plus élevée)",
+    sortRatingAsc: "Trier : Note (Plus basse)",
     sortSongsDesc: "Trier : Chansons (Plus grand nombre)",
     sortSongsAsc: "Trier : Chansons (Moins grand nombre)",
     sortAlbumsDesc: "Trier : Albums (Plus grand nombre)",
@@ -729,7 +729,8 @@ export const fr = {
     label: "Note",
     setTooltip: "Noter {value} sur 5",
     favoriteTooltip: "Ajouter aux favoris",
-    unfavoriteTooltip: "Retirer des favoris"
+    unfavoriteTooltip: "Retirer des favoris",
+    clearTooltip: "Effacer la note"
   },
   common: {
     scrollLeft: "Défiler vers la gauche",

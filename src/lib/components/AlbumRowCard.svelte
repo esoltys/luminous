@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { getAlbumCategoryLabel } from "../utils/artist";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
 
   interface Props {
@@ -35,6 +36,11 @@
       await queueAlbumAsPlaylist(album);
     }
   }
+
+  async function rateAlbum(rating: number) {
+    if (!album.album) return;
+    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
+  }
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -58,15 +64,14 @@
     />
   </div>
 
-  <div class="min-w-0 flex-1">
-    <p class="truncate text-sm font-semibold text-brand-text-primary">{album.album || i18n.t('collection.unknownAlbum')}</p>
-    <p class="truncate text-xs text-brand-text-secondary font-medium">{album.artist || i18n.t('collection.variousArtists')}</p>
-  </div>
-
-  <div class="shrink-0 max-w-40 text-right">
-    <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{getAlbumCategoryLabel(album.track_count, album.disc_count)}</p>
-    {#if album.year}
-      <p class="text-xs text-brand-text-secondary truncate">{album.year}</p>
-    {/if}
+  <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+    <div class="flex items-center justify-between gap-2">
+      <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{album.album || i18n.t('collection.unknownAlbum')}</p>
+      <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{album.year || ""}</span>
+    </div>
+    <div class="flex items-center justify-between gap-2">
+      <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{album.artist || i18n.t('collection.variousArtists')}</p>
+      <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
+    </div>
   </div>
 </div>

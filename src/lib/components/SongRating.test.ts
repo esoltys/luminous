@@ -28,17 +28,17 @@ describe("SongRating", () => {
     expect(onRate).toHaveBeenCalledWith(-1);
   });
 
-  it("renders five stars in stars mode", () => {
+  it("renders five stars plus a clear button in stars mode", () => {
     prefs.ratingStyle = "stars";
     const { getAllByRole } = render(SongRating, { rating: 3, onRate: vi.fn() });
-    expect(getAllByRole("button")).toHaveLength(5);
+    expect(getAllByRole("button")).toHaveLength(6);
   });
 
   it("star clicks pass through the star value", async () => {
     prefs.ratingStyle = "stars";
     const onRate = vi.fn();
-    const { getAllByRole } = render(SongRating, { rating: -1, onRate });
-    await fireEvent.click(getAllByRole("button")[2]);
+    const { getByLabelText } = render(SongRating, { rating: -1, onRate });
+    await fireEvent.click(getByLabelText("Rate 3 of 5"));
     expect(onRate).toHaveBeenCalledWith(3);
   });
 });

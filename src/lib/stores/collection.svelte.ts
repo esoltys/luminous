@@ -15,7 +15,7 @@ import type {
   RecentSearchItem,
   QueuePopulationMode,
 } from "../types";
-import { applySongStats, type SongStatsPayload } from "../utils/stats";
+import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
 import { MAX_RECENT_SEARCHES } from "../constants";
@@ -661,6 +661,13 @@ class CollectionStore {
           const song = list.find((s) => s.id === event.payload.song_id);
           if (song) applySongStats(song, event.payload);
         }
+      });
+
+      // Keep cached album rows in sync with ratings set from other views
+      // (Album Detail view, other Collection grid instances).
+      await listen<AlbumStatsPayload>("album-stats-changed", (event) => {
+        const album = this.albums.find((a) => a.album === event.payload.album);
+        if (album) applyAlbumStats(album, event.payload);
       });
 
       if (this.scanOnStartup) {
