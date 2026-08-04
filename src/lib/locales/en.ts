@@ -447,6 +447,7 @@ export const en = {
     makeActiveBtn: "Make Active",
     activeBadgeLabel: "Active",
     refreshAutoPlaylistTooltip: "Refresh auto-playlist with a new selection of songs from your library",
+    refreshAllPlaylistsTooltip: "Refresh all auto-playlists and Smart Playlists with the latest songs from your library",
     allMatchingTracksAdded: "All matching songs from your library have been added to this auto-playlist.",
     playSelected: "Play Selected",
     removeSelected: "Remove Selected",

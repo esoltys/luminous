@@ -446,6 +446,7 @@ export const fr = {
     makeActiveBtn: "Définir comme active",
     activeBadgeLabel: "Active",
     refreshAutoPlaylistTooltip: "Rafraîchir la playlist automatique avec une nouvelle sélection de titres de votre bibliothèque",
+    refreshAllPlaylistsTooltip: "Rafraîchir toutes les playlists automatiques et intelligentes avec les derniers titres de votre bibliothèque",
     allMatchingTracksAdded: "Tous les titres correspondants de votre bibliothèque ont été ajoutés à cette liste automatique.",
     playSelected: "Lire la sélection",
     removeSelected: "Retirer la sélection",
