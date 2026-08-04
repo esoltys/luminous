@@ -487,6 +487,10 @@ async function main() {
       await searchInput.fill("key:d");
       await page.waitForTimeout(400);
     },
+    "click-rows-view": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "collection.viewRows"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "toggle-miniplayer": async (page) => {
       await page.keyboard.press("Control+m");
       await page.waitForTimeout(400);

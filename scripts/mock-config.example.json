@@ -152,6 +152,7 @@
       "filename": "playlist-auto.png",
       "tab": "playlists",
       "subTab": "auto",
+      "action": "click-rows-view",
       "sidebarWidth": 220
     },
     {
