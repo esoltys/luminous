@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { applySongStats, type SongStatsPayload } from "../utils/stats";
+  import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -357,6 +357,12 @@
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
 
+  async function rateAlbum(rating: number) {
+    if (!albumItem?.album) return;
+    const normalized = await invoke<number>("set_album_rating", { album: albumItem.album, rating });
+    albumItem.rating = normalized;
+  }
+
   // Sync rating/playcount changes from other views and scrobble bumps into
   // this view's locally fetched song list.
   $effect(() => {
@@ -365,6 +371,22 @@
     listen<SongStatsPayload>("song-stats-changed", (event) => {
       const song = songs.find((s) => s.id === event.payload.song_id);
       if (song) applySongStats(song, event.payload);
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  });
+
+  // Sync album rating changes made from other views (e.g. the Collection grid).
+  $effect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    listen<AlbumStatsPayload>("album-stats-changed", (event) => {
+      if (albumItem && albumItem.album === event.payload.album) applyAlbumStats(albumItem, event.payload);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -419,6 +441,10 @@
           <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
+          {#if albumItem}
+            <span>•</span>
+            <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
+          {/if}
         </div>
 
         <!-- Control Buttons -->

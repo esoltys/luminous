@@ -29,6 +29,7 @@ describe("ArtistRowCard.svelte", () => {
     art_embedded: false,
     art_automatic: "covers/dave.jpg",
     art_manual: null,
+    rating: -1,
   };
 
   beforeEach(() => {

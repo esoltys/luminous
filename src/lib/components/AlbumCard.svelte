@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { getAlbumCategoryLabel } from "../utils/artist";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
 
   interface Props {
@@ -41,6 +42,11 @@
     } else {
       await queueAlbumAsPlaylist(album);
     }
+  }
+
+  async function rateAlbum(rating: number) {
+    if (!album.album) return;
+    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
   }
 
 </script>
@@ -89,7 +95,7 @@
     </div>
     <div class="flex items-center justify-between mt-0.5 text-xs text-brand-text-secondary font-medium gap-2">
       <span class="truncate min-w-0">{album.genre || ""}</span>
-      <span class="shrink-0">{getAlbumCategoryLabel(album.track_count, album.disc_count)}</span>
+      <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
 </div>

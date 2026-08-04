@@ -85,6 +85,7 @@ describe("CollectionView.svelte", () => {
       art_embedded: false,
       art_automatic: null,
       art_manual: null,
+      rating: -1,
     },
   ];
 

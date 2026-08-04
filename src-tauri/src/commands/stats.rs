@@ -30,3 +30,23 @@ pub async fn set_song_rating(
 
     Ok(normalized)
 }
+
+#[tauri::command]
+pub async fn set_album_rating(
+    album: String,
+    rating: f32,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<f32, String> {
+    let normalized = {
+        let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+        crate::stats::set_album_rating(&conn, &album, rating).map_err(|e| e.to_string())?
+    };
+
+    let _ = app.emit(
+        "album-stats-changed",
+        serde_json::json!({ "album": album, "rating": normalized }),
+    );
+
+    Ok(normalized)
+}

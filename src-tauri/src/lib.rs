@@ -735,6 +735,7 @@ pub fn run() {
             install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,
+            commands::stats::set_album_rating,
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,

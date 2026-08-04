@@ -37,6 +37,7 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
     art_automatic: null,
     art_manual: null,
     genre: "Rock",
+    rating: -1,
     ...overrides,
   };
 }
@@ -71,27 +72,23 @@ describe("HomeRowList.svelte", () => {
     expect(queryByText("01")).not.toBeInTheDocument();
   });
 
-  it("renders album rows using the album title, artist, and a category label, without a per-song rating", () => {
+  it("renders album rows with title/year on top and artist/rating on bottom, matching the Albums grid row layout", () => {
     const items: HomeItem[] = [{ type: "album", album: makeAlbum() }];
     const { getByText, container } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("Full Moon Fever")).toBeInTheDocument();
+    expect(getByText("1989")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    // 12 tracks, 1 disc -> "Album" category label fills the trailing slot,
-    // with the album's genre shown below it.
-    expect(getByText("Album")).toBeInTheDocument();
-    expect(getByText("Rock")).toBeInTheDocument();
-    // No song rating control (heart/star) for album-grouped rows.
-    expect(container.querySelector('[aria-pressed]')).not.toBeInTheDocument();
-    expect(container.querySelector('[aria-label="Rating"]')).not.toBeInTheDocument();
+    // Rating widget (heart/star, driven by prefs.ratingStyle) now renders for album rows too.
+    expect(container.querySelector('[aria-pressed]')).toBeInTheDocument();
   });
 
-  it("omits the genre line for albums with no genre", () => {
-    const items: HomeItem[] = [{ type: "album", album: makeAlbum({ genre: null }) }];
+  it("omits the year when the album has none", () => {
+    const items: HomeItem[] = [{ type: "album", album: makeAlbum({ year: null }) }];
     const { getByText, queryByText } = render(HomeRowList, { props: { items, variant: "rank" } });
 
-    expect(getByText("Album")).toBeInTheDocument();
-    expect(queryByText("Rock")).not.toBeInTheDocument();
+    expect(getByText("Full Moon Fever")).toBeInTheDocument();
+    expect(queryByText("1989")).not.toBeInTheDocument();
   });
 
   it("renders playlist rows with a 'Playlist' label, category, and track count", () => {

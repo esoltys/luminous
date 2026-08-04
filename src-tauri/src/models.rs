@@ -666,6 +666,10 @@ pub struct AlbumItem {
     pub art_manual: Option<String>,
     pub genre: Option<String>,
     pub sample_song_id: Option<i64>,
+    /// Independent album rating (-1 = unrated, else 0.5–5.0). Populated by callers
+    /// that have a DB connection handy (see `attach_album_ratings`); defaults to
+    /// unrated at construction time.
+    pub rating: f32,
 }
 
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).

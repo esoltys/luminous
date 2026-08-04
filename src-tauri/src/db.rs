@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 13;
+pub const CURRENT_SCHEMA_VERSION: i32 = 14;
 
 #[derive(Debug)]
 pub struct Database {
@@ -204,6 +204,17 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![13],
+            )?;
+        }
+
+        if version < 14 {
+            log::info!(
+                "Running migration 14: album_ratings table for independent album ratings (#242)"
+            );
+            conn.execute_batch(MIGRATION_14)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![14],
             )?;
         }
 
@@ -525,6 +536,19 @@ ALTER TABLE playlists ADD COLUMN population_mode TEXT NOT NULL DEFAULT 'all';
 
 const MIGRATION_13: &str = "
 ALTER TABLE songs DROP COLUMN mood;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 14: album_ratings — independent album-level ratings, separate
+// from song ratings. Keyed by album title, matching how CollectionScanner::
+// get_albums already groups albums (by title alone, not artist) (#242).
+// ---------------------------------------------------------------------------
+
+const MIGRATION_14: &str = "
+CREATE TABLE IF NOT EXISTS album_ratings (
+    album_key TEXT PRIMARY KEY,
+    rating REAL NOT NULL DEFAULT -1
+);
 ";
 
 #[cfg(test)]

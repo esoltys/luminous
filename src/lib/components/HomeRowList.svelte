@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type { HomeItem, Song, Playlist } from "../types";
+  import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { formatRelativeDate } from "../utils/date";
-  import { getAlbumCategoryLabel } from "../utils/artist";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
@@ -52,22 +51,23 @@
     return playlistCategoryFor(item.playlist);
   }
 
+  // Album items render their own title/year + artist/rating layout instead
+  // of this trailing block (see the template), so these only need to cover
+  // song and playlist.
   function trailingLabel(item: HomeItem): string {
-    if (item.type === "song") {
-      return i18n.t("playerBar.songLabel");
-    }
-    if (item.type === "album") {
-      return getAlbumCategoryLabel(item.album.track_count, item.album.disc_count);
-    }
-    return i18n.t("playlists.playlistTypeLabel");
+    if (item.type === "song") return i18n.t("playerBar.songLabel");
+    if (item.type === "playlist") return i18n.t("playlists.playlistTypeLabel");
+    return "";
   }
 
   function genreFor(item: HomeItem): string {
     if (item.type === "song") return item.song.genre || "";
-    if (item.type === "album") return item.album.genre || "";
-    return item.playlist.track_count === 1
-      ? i18n.t("playlists.oneSong")
-      : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
+    if (item.type === "playlist") {
+      return item.playlist.track_count === 1
+        ? i18n.t("playlists.oneSong")
+        : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
+    }
+    return "";
   }
 
   function addedDateFor(item: HomeItem): string {
@@ -110,6 +110,11 @@
 
   async function rateSong(song: Song, rating: number) {
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
+  }
+
+  async function rateAlbum(album: AlbumItem, rating: number) {
+    if (!album.album) return;
+    album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
   }
 </script>
 
@@ -158,27 +163,40 @@
           {/if}
         </div>
 
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
-            {#if item.type === "song"}
-              <span class="shrink-0">
-                <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
-              </span>
+        {#if item.type === "album"}
+          <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{item.album.year || ""}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
+              <span class="shrink-0"><SongRating rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" /></span>
+            </div>
+          </div>
+        {:else}
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
+              {#if item.type === "song"}
+                <span class="shrink-0">
+                  <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
+                </span>
+              {/if}
+            </div>
+            <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
+          </div>
+
+          <div class="shrink-0 max-w-40 text-right">
+            <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
+            {#if genreFor(item)}
+              <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
+            {/if}
+            {#if addedDateFor(item)}
+              <p class="text-xs text-brand-text-secondary/70 truncate">{addedDateFor(item)}</p>
             {/if}
           </div>
-          <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
-        </div>
-
-        <div class="shrink-0 max-w-40 text-right">
-          <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
-          {#if genreFor(item)}
-            <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
-          {/if}
-          {#if addedDateFor(item)}
-            <p class="text-xs text-brand-text-secondary/70 truncate">{addedDateFor(item)}</p>
-          {/if}
-        </div>
+        {/if}
       </div>
     {/each}
 

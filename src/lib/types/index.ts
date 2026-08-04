@@ -243,6 +243,8 @@ export interface AlbumItem {
   art_manual: string | null;
   genre?: string | null;
   sample_song_id?: number | null;
+  /** Independent album rating (-1 = unrated, else 0.5–5.0), separate from any song's rating. */
+  rating: number;
 }
 
 export interface ArtistItem {
