@@ -6,6 +6,7 @@ export interface ToastMessage {
   id: number;
   text: string;
   variant: ToastVariant;
+  url?: string;
 }
 
 class ToastStore {
@@ -13,9 +14,9 @@ class ToastStore {
   private nextId = 0;
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  show(text: string, variant: ToastVariant = "info", durationMs?: number) {
+  show(text: string, variant: ToastVariant = "info", durationMs?: number, url?: string) {
     const id = this.nextId++;
-    this.messages.push({ id, text, variant });
+    this.messages.push({ id, text, variant, url });
     this.scheduleDismiss(id, durationMs);
     return id;
   }
