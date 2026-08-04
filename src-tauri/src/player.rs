@@ -1106,12 +1106,38 @@ impl Player {
 
     fn rebuild_shuffle_order(&mut self) {
         let len = self.playlist_items.len();
-        let mut order: Vec<usize> = (0..len).collect();
-        if self.shuffle_mode != ShuffleMode::Off && len > 0 {
-            let mut rng = rand::thread_rng();
-            order.shuffle(&mut rng);
+        if len == 0 {
+            self.shuffle_order = Vec::new();
+            return;
         }
+
+        if self.shuffle_mode == ShuffleMode::Off {
+            self.shuffle_order = (0..len).collect();
+            return;
+        }
+
+        let mut rng = rand::thread_rng();
+
+        let current_real_idx = if let Some(pos) = self.current_index {
+            if self.shuffle_order.is_empty() {
+                pos
+            } else {
+                self.shuffle_order.get(pos).copied().unwrap_or(pos)
+            }
+        } else {
+            0
+        };
+
+        let mut remaining_indices: Vec<usize> =
+            (0..len).filter(|&i| i != current_real_idx).collect();
+        remaining_indices.shuffle(&mut rng);
+
+        let mut order = vec![current_real_idx];
+        order.extend(remaining_indices);
         self.shuffle_order = order;
+        if self.current_index.is_some() {
+            self.current_index = Some(0);
+        }
     }
 
     pub fn set_shuffle_mode(&mut self, mode: ShuffleMode) {

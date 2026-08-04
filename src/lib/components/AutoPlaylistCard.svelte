@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Calendar, Music, RefreshCw } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, RefreshCw } from "lucide-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
@@ -10,7 +10,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "genre" | "decade";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
     genre?: string;
     decade?: string;
     /** For kind "genre" or "decade": the materialized playlist row backing it (refreshed at most every 24h). */
@@ -41,6 +41,7 @@
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    if (kind === "history") return i18n.t("playlists.historyAutoPlaylist");
     return i18n.t("playlists.genreAutoPlaylist");
   });
 
@@ -61,9 +62,11 @@
           ? invoke<Song[]>("get_favourite_songs")
           : k === "recently_added"
             ? invoke<Song[]>("get_recently_added_songs", { limit: 50 })
-            : k === "decade"
-              ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
-              : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
+            : k === "history"
+              ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
+              : k === "decade"
+                ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
+                : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
 
     request
       .then((res) => {
@@ -76,7 +79,7 @@
       });
   });
 
-  // Favourites/Recently Added use a fixed icon cover instead of a CoverStack —
+  // Favourites/Recently Added/History use a fixed icon cover instead of a CoverStack —
   // they're rebuilt from the whole library on every load, so a coverstack of
   // whichever songs happen to be in them right now reads as arbitrary rather
   // than representative (unlike a genre, decade, or user playlist).
@@ -88,6 +91,7 @@
       case "genre": return "bg-[#059669] text-white";
       case "favourites": return "bg-[#DB2777] text-white";
       case "recently_added": return "bg-[#CA8A04] text-white";
+      case "history": return "bg-[#8B5CF6] text-white";
     }
   });
 
@@ -115,6 +119,10 @@
     {:else if kind === "recently_added"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_20px_2px_rgba(250,204,21,0.35)]">
         <Clock class="w-10 h-10 text-[#CA8A04]" />
+      </div>
+    {:else if kind === "history"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_20px_2px_rgba(167,139,250,0.35)]">
+        <Hourglass class="w-10 h-10 text-[#8B5CF6]" />
       </div>
     {:else if kind === "decade"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]">

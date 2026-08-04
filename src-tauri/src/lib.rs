@@ -649,6 +649,8 @@ pub fn run() {
             commands::collection::get_recently_added_songs,
             commands::collection::get_songs_by_genre,
             commands::collection::get_recently_played,
+            commands::collection::get_recently_played_songs,
+            commands::collection::clear_play_history,
             commands::collection::get_most_frequently_played,
             commands::collection::get_recently_added,
             // Playback commands

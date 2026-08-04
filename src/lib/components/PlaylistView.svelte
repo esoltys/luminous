@@ -3,6 +3,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { shuffleArray } from "../utils/shuffle";
   import {
     Trash2,
     ListMusic,
@@ -25,7 +26,9 @@
     Layers,
     MoreHorizontal,
     Eraser,
-    Sparkles
+    Sparkles,
+    Plus,
+    FolderPlus
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -223,6 +226,15 @@
     activePlaylist !== undefined && !activePlaylist.dynamic_enabled && activePlaylist.name.toLowerCase() === "queue"
   );
 
+  let isSpecialPlaylist = $derived(
+    activePlaylist !== undefined &&
+      (isQueue ||
+       activePlaylist.name.toLowerCase() === "queue" ||
+       activePlaylist.name.toLowerCase() === "history" ||
+       activePlaylist.name.toLowerCase() === "favourites" ||
+       activePlaylist.name.toLowerCase() === "recently added")
+  );
+
   let isSmartPlaylist = $derived(
     activePlaylist !== undefined &&
       activePlaylist.dynamic_enabled &&
@@ -361,6 +373,7 @@
       if (g !== "") counts.set(g, (counts.get(g) ?? 0) + 1);
     }
     if (counts.size === 0) return "";
+    if (counts.size > 2) return i18n.t("playlists.mixedGenre", {}, "Mixed");
     const top = [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([g]) => g);
@@ -639,15 +652,49 @@
 
   async function handlePlayAll() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
+    const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
+    if (availableTracks.length === 0) return;
+    const songIds = availableTracks.map((t) => t.song!.id);
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
-    await playerStore.playPlaylistItem(activePlaylist.id, 0);
+    await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handleShufflePlay() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * playlistsStore.activePlaylistTracks.length);
+    const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
+    if (availableTracks.length === 0) return;
+    const shuffledSongIds = shuffleArray(availableTracks.map((t) => t.song!.id));
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("all");
-    await playerStore.playPlaylistItem(activePlaylist.id, randomIndex);
+    await playerStore.playSongs(shuffledSongIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
+  }
+
+  async function handleSaveQueueAsCustomPlaylist() {
+    if (playlistsStore.activePlaylistTracks.length === 0) return;
+    const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
+    if (songIds.length === 0) return;
+
+    const defaultName = `Queue Playlist`;
+    const name = prompt(i18n.t("playlists.saveQueuePrompt", {}, "Enter a name for the new custom playlist:"), defaultName);
+    if (!name || !name.trim()) return;
+
+    try {
+      const created = await playlistsStore.createPlaylist(name.trim());
+      await playlistsStore.addSongsToPlaylist(created.id, songIds);
+      playlistsStore.selectPlaylist(created.id);
+      collectionStore.viewPlaylist(created.id);
+    } catch (err) {
+      console.error("Failed to save Queue as custom playlist:", err);
+    }
   }
 
   function formatDuration(ns: number | undefined): string {
@@ -732,13 +779,20 @@
           <!-- Summary Metadata Line -->
           <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
             <span>
-              {i18n.t("playlists.statsLine", {
-                genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
-                songs: activePlaylist.track_count === 1
+              {#if isSpecialPlaylist}
+                {activePlaylist.track_count === 1
                   ? i18n.t("playlists.oneSong")
-                  : i18n.t("playlists.songsCount", { count: activePlaylist.track_count }),
-                duration: totalRuntimeLabel,
-              })}
+                  : i18n.t("playlists.songsCount", { count: activePlaylist.track_count })}
+                • {totalRuntimeLabel}
+              {:else}
+                {i18n.t("playlists.statsLine", {
+                  genre: genreSummaryLabel || i18n.t("playlists.unknownGenre"),
+                  songs: activePlaylist.track_count === 1
+                    ? i18n.t("playlists.oneSong")
+                    : i18n.t("playlists.songsCount", { count: activePlaylist.track_count }),
+                  duration: totalRuntimeLabel,
+                })}
+              {/if}
             </span>
           </div>
 
@@ -758,6 +812,16 @@
             >
               <Shuffle class="w-4 h-4" /> {i18n.t("artistDetail.shuffleAndPlay")}
             </Button>
+            {#if isQueue}
+              <IconActionButton
+                onclick={handleSaveQueueAsCustomPlaylist}
+                disabled={playlistsStore.activePlaylistTracks.length === 0}
+                title={i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}
+                class="shrink-0"
+              >
+                {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
+              </IconActionButton>
+            {/if}
             {#if isSmartPlaylist}
               <Button onclick={handleEditSmartPlaylist} variant="secondary" title={i18n.t("playlists.editSmartPlaylistBtn")}>
                 <Pencil class="w-4 h-4" />
@@ -1115,6 +1179,7 @@
           {@const isDuplicate = duplicateUuids.includes(item.uuid)}
           {@const isSelected = selectedUuids.has(item.uuid)}
           {@const actualIndex = playlistsStore.activePlaylistTracks.findIndex(t => t.uuid === item.uuid)}
+          {@const isItemPlaying = (playerStore.playlistItemUuid && playerStore.playlistItemUuid === item.uuid) || (playerStore.currentSong && item.song && playerStore.currentSong.id === item.song.id)}
           <div
             role="row"
             tabindex="0"
@@ -1137,7 +1202,7 @@
                 ? 'opacity-50 cursor-not-allowed'
                 : 'cursor-grab active:cursor-grabbing'}
               {isSelected ? 'bg-brand-accent/20 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40'}
-              {!unavailable && !isSelected && playerStore.playlistItemUuid === item.uuid ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
+              {!unavailable && !isSelected && isItemPlaying ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}
               {dragOverIndex === actualIndex && draggedIndex !== null && draggedIndex !== actualIndex
                 ? (actualIndex < draggedIndex ? 'border-t-2! border-t-brand-accent bg-brand-accent/5' : 'border-b-2! border-b-brand-accent bg-brand-accent/5')
                 : ''
@@ -1147,7 +1212,7 @@
             <div class="text-center text-brand-text-secondary font-medium relative min-w-0 cursor-grab active:cursor-grabbing">
               <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
                 <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
-                {#if playerStore.playlistItemUuid === item.uuid && playerStore.state === "playing"}
+                {#if isItemPlaying && playerStore.state === "playing"}
                   <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                     <NowPlayingBars />
                   </div>

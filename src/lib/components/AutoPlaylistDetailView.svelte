@@ -20,7 +20,12 @@
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, RefreshCw, CheckCircle2, Heart, Calendar } from "lucide-svelte";
+  import Input from "./Input.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
+  import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, Music, RefreshCw, CheckCircle2, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
+import { shuffleArray } from "../utils/shuffle";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -163,6 +168,7 @@
   let displayName = $derived.by(() => {
     if (kind === "favourites") return i18n.t("playlists.autoFavourites");
     if (kind === "recently_added") return i18n.t("playlists.autoRecentlyAdded");
+    if (kind === "history") return i18n.t("playlists.autoHistory");
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
       : (genre || i18n.t("artistDetail.unknownGenre"));
@@ -192,6 +198,7 @@
     }
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
+    if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
     if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
     return invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
   }
@@ -223,33 +230,38 @@
       });
   });
 
-  function handlePlaySong(song: Song) {
+  async function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
-    // For genre/decade views the list is backed by a persisted dynamic
-    // playlist (`songs` mirrors `get_playlist_tracks` order) — play by
-    // index against that playlist instead of shipping the whole id array
-    // through `playSongs`, which re-queries every song one at a time and
-    // can stall the UI once auto-refill has grown the list large (#194).
-    if ((kind === "genre" || kind === "decade") && playlistId !== undefined) {
-      playerStore.playPlaylistItem(playlistId, index >= 0 ? index : 0);
-      return;
-    }
     const songIds = songs.map((s) => s.id);
-    playerStore.playSongs(songIds, index >= 0 ? index : 0, playlistId, undefined, displayName);
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, playlistId, undefined, displayName);
+    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const ids = songs.map((s) => s.id);
-    const randomIndex = Math.floor(Math.random() * ids.length);
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(ids, randomIndex, playlistId, undefined, displayName);
+    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
+    if (queuePl) {
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    }
   }
 
   async function handleAddSongToPlaylist(songId: number) {
@@ -383,9 +395,18 @@
   $effect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    listen<SongStatsPayload>("song-stats-changed", (event) => {
+    listen<SongStatsPayload>("song-stats-changed", async (event) => {
       const song = songs.find((s) => s.id === event.payload.song_id);
-      if (song) applySongStats(song, event.payload);
+      if (song) {
+        applySongStats(song, event.payload);
+      }
+      if (kind === "history" || kind === "favourites" || kind === "recently_added") {
+        try {
+          songs = await fetchSongs(kind, genre, decade, playlistId);
+        } catch (err) {
+          console.error("Failed to re-fetch songs on stats change:", err);
+        }
+      }
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -409,12 +430,49 @@
     }
   }
 
+  let filterQuery = $state("");
+  let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+
+  function toggleOverflowMenu(event: MouseEvent) {
+    const btn = event.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    if (overflowMenuPos) {
+      overflowMenuPos = null;
+    } else {
+      overflowMenuPos = { x: rect.left, y: rect.bottom + 4 };
+    }
+  }
+
+  async function handleClearHistory() {
+    overflowMenuPos = null;
+    try {
+      await invoke("clear_play_history");
+      songs = [];
+      toastStore.show(i18n.t("playlists.historyCleared", {}, "Play history cleared"));
+    } catch (err) {
+      console.error("Failed to clear play history:", err);
+    }
+  }
+
+  let filteredSongs = $derived.by(() => {
+    if (!filterQuery.trim()) return songs;
+    const q = filterQuery.toLowerCase().trim();
+    return songs.filter((s) => {
+      const titleMatch = s.title?.toLowerCase().includes(q);
+      const artistMatch = s.artist?.toLowerCase().includes(q) || s.album_artist?.toLowerCase().includes(q);
+      const albumMatch = s.album?.toLowerCase().includes(q);
+      const genreMatch = s.genre?.toLowerCase().includes(q);
+      return titleMatch || artistMatch || albumMatch || genreMatch;
+    });
+  });
+
   let sortedSongs = $derived.by(() => {
+    const list = filteredSongs;
     if (sortField === "default") {
-      return sortAsc ? songs : [...songs].reverse();
+      return sortAsc ? list : [...list].reverse();
     }
     const field = sortField as keyof Song;
-    return [...songs].sort((a, b) => {
+    return [...list].sort((a, b) => {
       let valA = a[field];
       let valB = b[field];
 
@@ -438,7 +496,7 @@
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
-      <div class="flex flex-col justify-end gap-2 min-w-0 max-w-xl">
+      <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
           {displayName}
         </h1>
@@ -494,8 +552,49 @@
           <ColumnSelector align="left" iconOnly />
         </div>
 
-        <!-- Secondary Control Buttons Row: only rendered for genre/decade playlists, which are the
-             only kinds with auto-play/population-mode controls to show here. -->
+        <!-- Secondary Control Buttons Row: Search Filter Bar, Undo, Redo, More -->
+        <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
+          <!-- Search Filter Bar -->
+          <div class="relative w-full max-w-xs">
+            <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
+            <Input
+              type="text"
+              bind:value={filterQuery}
+              placeholder={i18n.t("playlists.filterPlaceholder")}
+              size="md"
+              pill
+              class="w-full"
+              style="padding-left: 2.25rem; padding-right: 2rem;"
+            />
+            {#if filterQuery}
+              <button
+                onclick={() => { filterQuery = ""; }}
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                title={i18n.t("playlists.clearFilter")}
+              >
+                <X class="w-3.5 h-3.5" />
+              </button>
+            {/if}
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <IconActionButton onclick={() => playlistsStore.undo()} title={i18n.t("playlists.undoTooltip")}>
+              {#snippet icon()}<RotateCcw class="w-4 h-4" />{/snippet}
+            </IconActionButton>
+            <IconActionButton onclick={() => playlistsStore.redo()} title={i18n.t("playlists.redoTooltip")}>
+              {#snippet icon()}<RotateCw class="w-4 h-4" />{/snippet}
+            </IconActionButton>
+            <button
+              onclick={toggleOverflowMenu}
+              title={i18n.t("playlists.moreActionsTooltip")}
+              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer shadow-xs"
+            >
+              <MoreHorizontal class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Additional controls for genre/decade playlists: auto-play and population-mode -->
         {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
@@ -534,6 +633,10 @@
         {:else if kind === "recently_added"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_28px_3px_rgba(250,204,21,0.4)]">
             <Clock class="w-16 h-16 text-[#CA8A04]" />
+          </div>
+        {:else if kind === "history"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_28px_3px_rgba(167,139,250,0.4)]">
+            <Hourglass class="w-16 h-16 text-[#8B5CF6]" />
           </div>
         {:else if kind === "decade"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]">
@@ -1068,4 +1171,26 @@
     onAddToPlaylist={handleBulkAddToPlaylist}
     onClear={() => { selectedSongIds = new Set(); }}
   />
+{/if}
+
+{#if overflowMenuPos}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    onClose={() => { overflowMenuPos = null; }}
+  >
+    {#if kind === "history"}
+      <ContextMenuItem
+        icon={Eraser}
+        label={i18n.t("playlists.clearHistoryBtn", {}, "Clear History")}
+        onclick={handleClearHistory}
+      />
+    {:else}
+      <ContextMenuItem
+        icon={FolderPlus}
+        label={i18n.t("playlists.saveAsCustomTooltip")}
+        onclick={() => { handleSaveAsCustomPlaylist(); overflowMenuPos = null; }}
+      />
+    {/if}
+  </ContextMenu>
 {/if}

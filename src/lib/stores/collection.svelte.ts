@@ -59,7 +59,7 @@ export interface VisibleColumns {
 
 /** An auto-playlist reference (Favourites, Recently Added, genre, or decade), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "genre" | "decade";
+  kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
   genre?: string;
   decade?: string;
   /** For kind "genre" or "decade": the materialized (dynamic_enabled) playlist row backing it. */
