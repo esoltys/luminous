@@ -380,7 +380,7 @@
 
       <!-- Application & Updates Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-        <div class="pb-3 flex items-center justify-between">
+        <div class="pb-3 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div class="flex items-center gap-3">
             <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
               <Download class="w-5 h-5" />
@@ -390,7 +390,7 @@
               <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.appAndUpdatesSubtitle', {}, 'Manage Luminous version updates and view installation details.')}</p>
             </div>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center justify-end gap-3">
             {#if updaterStore.checkStatus === 'up-to-date'}
               <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5">
                 <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
@@ -402,7 +402,7 @@
                 {i18n.t('settings.updateUpToDate')}
               </div>
             {:else if updaterStore.checkStatus === 'error'}
-              <div class="text-xs text-brand-text-secondary font-medium">
+              <div class="text-xs text-brand-text-secondary font-medium text-right max-w-xs">
                 {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
               </div>
             {/if}

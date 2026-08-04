@@ -18,6 +18,14 @@ export interface DownloadProgress {
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const RELEASES_URL = "https://github.com/esoltys/luminous/releases/latest";
 
+// Tauri command rejections often surface as a raw string (from a Rust `Err(String)`),
+// not an `Error` instance — `err.message` on a string is always `undefined`.
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "string" && err.trim()) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 class UpdaterStore {
   updateCheckEnabled = $state(false);
   updateAutoInstall = $state(false);
@@ -144,10 +152,10 @@ class UpdaterStore {
         this.updateAvailable = false;
         this.checkStatus = "up-to-date";
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Update check failed:", err);
       this.checkStatus = "error";
-      this.errorMessage = err?.message || "Failed to check for updates";
+      this.errorMessage = extractErrorMessage(err, "No response from the update server");
     }
   }
 
@@ -179,10 +187,10 @@ class UpdaterStore {
         }
       });
       this.installStatus = "ready-to-restart";
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to download and install update:", err);
       this.installStatus = "error";
-      this.errorMessage = err?.message || "Failed to download update";
+      this.errorMessage = extractErrorMessage(err, "Download failed");
     }
   }
 

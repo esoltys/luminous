@@ -71,6 +71,18 @@ describe("UpdaterStore", () => {
     expect(updaterStore.updateAvailable).toBe(false);
   });
 
+  it("surfaces a raw string rejection (as Tauri command errors arrive) as errorMessage, not a generic fallback", async () => {
+    // Tauri command failures reject with the raw Rust `Err(String)`, not an `Error` instance —
+    // `err.message` on a string is `undefined`, so a naive `err?.message || fallback` always
+    // produced the same fallback text, regardless of the real reason.
+    vi.mocked(check).mockRejectedValueOnce("Could not fetch a valid release JSON");
+
+    await updaterStore.checkForUpdates();
+
+    expect(updaterStore.checkStatus).toBe("error");
+    expect(updaterStore.errorMessage).toBe("Could not fetch a valid release JSON");
+  });
+
   it("auto-installs when updateAutoInstall is on and the format supports self-update", async () => {
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
