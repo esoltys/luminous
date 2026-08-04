@@ -11,7 +11,7 @@ including the first feature request filed by an outside user.
   for album/playlist cards to stop starting playback on a plain click. Fixed below.
 - **More requests, shipped**: independent album ratings (#242), grouped batch notifications
   for folder imports (#233), and scroll position preservation across views (#232) all came
-  out of user feedback and GitHub Discussions — thank you to everyone filing issues and
+  out of user feedback — thank you to everyone filing issues and
   requests; keep them coming.
 
 ### 🌟 New Features
