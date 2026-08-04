@@ -99,6 +99,15 @@ pub async fn get_playlist_tracks(
     playlist_id: i64,
     state: State<'_, AppState>,
 ) -> Result<Vec<PlaylistItem>, String> {
+    let player = state.player.lock().await;
+    if player.current_playlist_id == Some(playlist_id) {
+        let items = player.get_playlist_tracks_in_playback_order();
+        if !items.is_empty() {
+            return Ok(items);
+        }
+    }
+    drop(player);
+
     state
         .playlists
         .lock()

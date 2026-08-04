@@ -75,8 +75,12 @@ export class PlayerStore {
         const oldSongId = this.currentSong?.id;
         const oldSongAlbum = this.currentSong?.album;
         const wasPlaying = this._previousState === "playing";
+        const prevShuffle = this.shuffleMode;
         this.updateState(event.payload);
         this._previousState = this.state;
+        if (prevShuffle !== this.shuffleMode && playlistsStore.activePlaylistId !== null) {
+          await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+        }
         if (this.currentSong?.id !== oldSongId) {
           themeStore.updateArtworkColors(this.currentSong);
           await this.syncQueueTrackPosition();
@@ -383,6 +387,9 @@ export class PlayerStore {
   async setShuffleMode(mode: ShuffleMode) {
     this.shuffleMode = mode;
     await invoke("set_shuffle_mode", { mode });
+    if (playlistsStore.activePlaylistId !== null) {
+      await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+    }
   }
 
   async setRepeatMode(mode: RepeatMode) {

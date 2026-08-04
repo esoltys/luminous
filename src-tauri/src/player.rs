@@ -1158,6 +1158,32 @@ impl Player {
         }
     }
 
+    pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
+        let len = self.playlist_items.len();
+        if len == 0 {
+            return Vec::new();
+        }
+
+        let start_pos = self.current_index.unwrap_or(0);
+        let mut result = Vec::new();
+
+        if start_pos < self.shuffle_order.len() {
+            for &real_idx in &self.shuffle_order[start_pos..] {
+                if let Some(item) = self.playlist_items.get(real_idx) {
+                    result.push(item.clone());
+                }
+            }
+        } else {
+            for &real_idx in &self.shuffle_order {
+                if let Some(item) = self.playlist_items.get(real_idx) {
+                    result.push(item.clone());
+                }
+            }
+        }
+
+        result
+    }
+
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
         let mode_str = match mode {
