@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Luminous",
-  "version": "0.97.0",
+  "version": "0.98.0",
   "identifier": "org.luminous.music",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -47,154 +47,200 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["mp3"],
+        "ext": [
+          "mp3"
+        ],
         "name": "MP3 Audio",
         "description": "MPEG Layer-3 audio file",
         "mimeType": "audio/mpeg",
         "role": "Viewer"
       },
       {
-        "ext": ["flac"],
+        "ext": [
+          "flac"
+        ],
         "name": "FLAC Audio",
         "description": "Free Lossless Audio Codec file",
         "mimeType": "audio/flac",
         "role": "Viewer"
       },
       {
-        "ext": ["ogg", "opus"],
+        "ext": [
+          "ogg",
+          "opus"
+        ],
         "name": "Ogg Audio",
         "description": "Ogg Vorbis/Opus audio file",
         "mimeType": "audio/ogg",
         "role": "Viewer"
       },
       {
-        "ext": ["m4a"],
+        "ext": [
+          "m4a"
+        ],
         "name": "M4A Audio",
         "description": "AAC audio in an MPEG-4 container",
         "mimeType": "audio/mp4",
         "role": "Viewer"
       },
       {
-        "ext": ["alac"],
+        "ext": [
+          "alac"
+        ],
         "name": "ALAC Audio",
         "description": "Apple Lossless audio in an MPEG-4 container",
         "mimeType": "audio/mp4",
         "role": "Viewer"
       },
       {
-        "ext": ["aac"],
+        "ext": [
+          "aac"
+        ],
         "name": "AAC Audio",
         "description": "Advanced Audio Coding file",
         "mimeType": "audio/aac",
         "role": "Viewer"
       },
       {
-        "ext": ["wav"],
+        "ext": [
+          "wav"
+        ],
         "name": "WAV Audio",
         "description": "Waveform audio file",
         "mimeType": "audio/vnd.wave",
         "role": "Viewer"
       },
       {
-        "ext": ["aiff", "aif"],
+        "ext": [
+          "aiff",
+          "aif"
+        ],
         "name": "AIFF Audio",
         "description": "Audio Interchange File Format",
         "mimeType": "audio/x-aiff",
         "role": "Viewer"
       },
       {
-        "ext": ["wv"],
+        "ext": [
+          "wv"
+        ],
         "name": "WavPack Audio",
         "description": "WavPack compressed audio file",
         "mimeType": "audio/x-wavpack",
         "role": "Viewer"
       },
       {
-        "ext": ["mpc"],
+        "ext": [
+          "mpc"
+        ],
         "name": "Musepack Audio",
         "description": "Musepack compressed audio file",
         "mimeType": "audio/x-musepack",
         "role": "Viewer"
       },
       {
-        "ext": ["ape"],
+        "ext": [
+          "ape"
+        ],
         "name": "Monkey's Audio",
         "description": "Monkey's Audio lossless file",
         "mimeType": "audio/x-ape",
         "role": "Viewer"
       },
       {
-        "ext": ["tta"],
+        "ext": [
+          "tta"
+        ],
         "name": "True Audio",
         "description": "True Audio lossless file",
         "mimeType": "audio/x-tta",
         "role": "Viewer"
       },
       {
-        "ext": ["dsf"],
+        "ext": [
+          "dsf"
+        ],
         "name": "DSD Stream File",
         "description": "DSD audio stream file",
         "mimeType": "audio/x-dsf",
         "role": "Viewer"
       },
       {
-        "ext": ["dff"],
+        "ext": [
+          "dff"
+        ],
         "name": "DSDIFF Audio",
         "description": "Philips DSDIFF audio file",
         "mimeType": "audio/x-dff",
         "role": "Viewer"
       },
       {
-        "ext": ["asf"],
+        "ext": [
+          "asf"
+        ],
         "name": "Advanced Systems Format",
         "description": "Windows Media container file",
         "mimeType": "application/vnd.ms-asf",
         "role": "Viewer"
       },
       {
-        "ext": ["wma"],
+        "ext": [
+          "wma"
+        ],
         "name": "Windows Media Audio",
         "description": "Windows Media Audio file",
         "mimeType": "audio/x-ms-wma",
         "role": "Viewer"
       },
       {
-        "ext": ["m4b"],
+        "ext": [
+          "m4b"
+        ],
         "name": "AAC Audiobook",
         "description": "AAC audiobook file",
         "mimeType": "audio/x-m4b",
         "role": "Viewer"
       },
       {
-        "ext": ["m3u"],
+        "ext": [
+          "m3u"
+        ],
         "name": "M3U Playlist",
         "description": "M3U playlist file",
         "mimeType": "audio/x-mpegurl",
         "role": "Viewer"
       },
       {
-        "ext": ["m3u8"],
+        "ext": [
+          "m3u8"
+        ],
         "name": "M3U8 Playlist",
         "description": "M3U8 playlist file",
         "mimeType": "application/vnd.apple.mpegurl",
         "role": "Viewer"
       },
       {
-        "ext": ["pls"],
+        "ext": [
+          "pls"
+        ],
         "name": "PLS Playlist",
         "description": "PLS playlist file",
         "mimeType": "audio/x-scpls",
         "role": "Viewer"
       },
       {
-        "ext": ["xspf"],
+        "ext": [
+          "xspf"
+        ],
         "name": "XSPF Playlist",
         "description": "XML Shareable Playlist Format file",
         "mimeType": "application/xspf+xml",
         "role": "Viewer"
       }
     ],
-    "resources": ["icons/filetypes/"],
+    "resources": [
+      "icons/filetypes/"
+    ],
     "windows": {
       "nsis": {
         "installerHooks": "windows/installer-hooks.nsh"
