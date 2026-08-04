@@ -3,6 +3,15 @@
   import { AlertTriangle, CheckCircle2, Info, Star, Sparkles, X } from "lucide-svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { portal } from "../utils/portal";
+
+  async function openExternalUrl(url: string) {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+    } catch {
+      window.open(url, "_blank");
+    }
+  }
 </script>
 
 <div
@@ -37,7 +46,17 @@
       {:else}
         <Info class="w-4 h-4 shrink-0 text-brand-accent-text" />
       {/if}
-      <span class="flex-1">{toast.text}</span>
+      {#if toast.url}
+        <button
+          type="button"
+          onclick={() => openExternalUrl(toast.url!)}
+          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer"
+        >
+          {toast.text}
+        </button>
+      {:else}
+        <span class="flex-1">{toast.text}</span>
+      {/if}
       <button
         onclick={() => toastStore.dismiss(toast.id)}
         class="shrink-0 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"

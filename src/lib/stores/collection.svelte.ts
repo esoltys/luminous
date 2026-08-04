@@ -536,7 +536,10 @@ class CollectionStore {
             const msg = isFirstEver
               ? i18n.t("celebrations.firstLaunch", { version: appVersion }, `Welcome to Luminous v${appVersion}!`)
               : i18n.t("celebrations.newVersion", { version: appVersion }, `Updated to Luminous v${appVersion}`);
-            toastStore.show(msg, "milestone");
+            const releaseUrl = isFirstEver
+              ? undefined
+              : "https://github.com/esoltys/luminous/releases";
+            toastStore.show(msg, "milestone", undefined, releaseUrl);
             setTimeout(() => { this.isFirstLaunch = false; }, 700);
           }, 1200);
         }
