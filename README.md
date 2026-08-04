@@ -114,6 +114,7 @@ bun run install:git-hooks # sets core.hooksPath to use the repository's tracked 
 bun run tauri dev
 ```
 #### 4. Build Production Bundle
+Production bundles include updater artifacts, which must be signed. If you haven't generated a signing keypair yet, see [Generating an Updater Signing Key](#generating-an-updater-signing-key) below first.
 ```bash
 bun run tauri build
 ```
@@ -140,9 +141,33 @@ bun run tauri dev
 ```
 
 #### 4. Build Production Bundle
+Production bundles include updater artifacts, which must be signed. If you haven't generated a signing keypair yet, see [Generating an Updater Signing Key](#generating-an-updater-signing-key) below first.
 ```powershell
 bun run tauri build
 ```
+
+---
+
+### Generating an Updater Signing Key
+
+Luminous's `tauri.conf.json` has `bundle.createUpdaterArtifacts` set to `true`, so `bun run tauri build` signs every bundle it produces. Without a signing key in the environment, the build fails. Official releases are signed with a repository secret (see [`.github/workflows/release.yml`](.github/workflows/release.yml)), but for local builds you need your own keypair:
+
+1. Generate a keypair (you'll be prompted to set a password, or pass `--ci` to skip it):
+    ```bash
+    bunx tauri signer generate -w ~/.tauri/luminous.key
+    ```
+    This writes the private key to `~/.tauri/luminous.key` and prints the corresponding public key.
+2. Set the private key and its password as environment variables before building:
+    ```bash
+    export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/luminous.key)"
+    export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="your-password"
+    ```
+    On Windows (PowerShell):
+    ```powershell
+    $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw "$HOME\.tauri\luminous.key"
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "your-password"
+    ```
+3. Run `bun run tauri build` as usual. Your own key won't match the `updater.pubkey` baked into `tauri.conf.json`, so a locally-built app can't verify updates signed by the official release key (and vice versa) — that's expected for local builds and only matters if you're testing the updater flow itself.
 
 ---
 
