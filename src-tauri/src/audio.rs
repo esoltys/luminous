@@ -485,6 +485,15 @@ struct AudioOutput {
     played_samples: Arc<AtomicU64>,
     sample_rate: u32,
     channels: u16,
+    device_name: Option<String>,
+    stream_error_flag: Arc<std::sync::atomic::AtomicBool>,
+}
+
+fn get_default_device_name() -> Option<String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    let device = host.default_output_device()?;
+    device.name().ok()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -503,6 +512,7 @@ fn build_output(
     let device = host
         .default_output_device()
         .ok_or_else(|| "No audio output device".to_string())?;
+    let device_name = device.name().ok();
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -548,6 +558,9 @@ fn build_output(
     // callback must never allocate. Sized for the whole ring buffer, far
     // larger than any single callback burst.
     let mut mono_scratch: Vec<f32> = Vec::with_capacity(buffer_capacity);
+
+    let stream_error_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let err_flag_cpal = Arc::clone(&stream_error_flag);
 
     let stream = device
         .build_output_stream(
@@ -622,7 +635,10 @@ fn build_output(
                     as u64;
                 position_cpal.store(pos_ns, Ordering::Relaxed);
             },
-            |err| log::error!("CPAL stream error: {err}"),
+            move |err| {
+                log::error!("CPAL stream error: {err}");
+                err_flag_cpal.store(true, Ordering::Relaxed);
+            },
             None,
         )
         .map_err(|e| format!("CPAL stream build failed: {e}"))?;
@@ -642,6 +658,8 @@ fn build_output(
         played_samples,
         sample_rate: target_sample_rate,
         channels: target_channels,
+        device_name,
+        stream_error_flag,
     })
 }
 
@@ -820,8 +838,8 @@ fn decode_thread(
             }
         }
         let out = output.as_mut().unwrap();
-        let target_sample_rate = out.sample_rate;
-        let target_channels = out.channels;
+        let mut target_sample_rate = out.sample_rate;
+        let mut target_channels = out.channels;
 
         let mut current = match ActiveTrack::open(
             req.song,
@@ -865,9 +883,106 @@ fn decode_thread(
         // is exhausted) the pending handover to it.
         let mut next: Option<ActiveTrack> = None;
         let mut transition: Option<PendingTransition> = None;
+        let mut last_device_check = std::time::Instant::now();
 
         // Decode loop
         'decode: loop {
+            // Periodic default output device change / error check (~500ms throttle)
+            let now = std::time::Instant::now();
+            let check_due =
+                now.duration_since(last_device_check) >= std::time::Duration::from_millis(500);
+            let stream_errored = output
+                .as_ref()
+                .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
+                .unwrap_or(false);
+
+            if stream_errored || check_due {
+                last_device_check = now;
+                let current_dev_name = get_default_device_name();
+                let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
+                let device_changed = current_dev_name != old_dev_name;
+
+                if stream_errored || device_changed {
+                    log::info!(
+                        "Audio output device change/error detected (old: {:?}, new: {:?}, errored: {}). Rebuilding audio stream...",
+                        old_dev_name,
+                        current_dev_name,
+                        stream_errored
+                    );
+
+                    let cur_pos = position.load(Ordering::Relaxed);
+                    if let Some(old_out) = output.as_ref() {
+                        let _ = old_out.stream.pause();
+                    }
+                    output = None;
+
+                    match build_output(
+                        &event_tx,
+                        &position,
+                        &volume,
+                        &visualizer_buf,
+                        &equalizer,
+                        &loudness_gain,
+                        &fade_gain,
+                    ) {
+                        Ok(new_out) => {
+                            output_sample_rate.store(new_out.sample_rate, Ordering::Relaxed);
+                            target_sample_rate = new_out.sample_rate;
+                            target_channels = new_out.channels;
+
+                            let target_time = symphonia::core::units::Time::from(
+                                std::time::Duration::from_nanos(cur_pos),
+                            );
+                            let _ = current.format.seek(
+                                symphonia::core::formats::SeekMode::Accurate,
+                                symphonia::core::formats::SeekTo::Time {
+                                    time: target_time,
+                                    track_id: Some(current.track_id),
+                                },
+                            );
+                            current.decoder.reset();
+                            current.decoded_pos_ns = cur_pos;
+                            current.eof = false;
+                            current.resampler = Resampler::new(
+                                current.src_rate,
+                                target_sample_rate,
+                                target_channels as usize,
+                            );
+
+                            if let Some(n) = next.as_mut() {
+                                n.resampler = Resampler::new(
+                                    n.src_rate,
+                                    target_sample_rate,
+                                    target_channels as usize,
+                                );
+                            }
+
+                            if let Ok(mut consumer) = new_out.consumer.lock() {
+                                while consumer.try_pop().is_some() {}
+                            }
+                            let start_samples =
+                                samples_for_ns(cur_pos, target_sample_rate, target_channels);
+                            new_out
+                                .played_samples
+                                .store(start_samples, Ordering::Relaxed);
+                            pushed_samples = start_samples;
+                            transition = None;
+
+                            if let Err(e) = new_out.stream.play() {
+                                let _ = event_tx.send(AudioEvent::Error {
+                                    message: format!("CPAL stream play failed: {e}"),
+                                });
+                            }
+                            output = Some(new_out);
+                        }
+                        Err(message) => {
+                            let _ = event_tx.send(AudioEvent::Error { message });
+                            break 'decode;
+                        }
+                    }
+                }
+            }
+
             let out = output.as_mut().unwrap();
 
             // Non-blocking command check
@@ -1344,5 +1459,10 @@ mod tests {
     fn convert_channels_mono_to_stereo_duplicates() {
         let out = convert_channels(&[0.5, -0.5], 1, 2);
         assert_eq!(out, vec![0.5, 0.5, -0.5, -0.5]);
+    }
+
+    #[test]
+    fn test_get_default_device_name_does_not_panic() {
+        let _ = get_default_device_name();
     }
 }
