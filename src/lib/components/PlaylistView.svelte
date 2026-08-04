@@ -43,6 +43,7 @@
   import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import Modal from "./Modal.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
@@ -122,6 +123,10 @@
   let showOverflowMenu = $state(false);
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+
+  // Save Queue as Custom Playlist modal state
+  let showSaveQueueModal = $state(false);
+  let saveQueueName = $state("Queue Playlist");
 
   function toggleOverflowMenu() {
     if (showOverflowMenu) {
@@ -678,20 +683,26 @@
     }
   }
 
-  async function handleSaveQueueAsCustomPlaylist() {
+  function handleSaveQueueAsCustomPlaylist() {
     if (playlistsStore.activePlaylistTracks.length === 0) return;
     const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
     if (songIds.length === 0) return;
 
-    const defaultName = `Queue Playlist`;
-    const name = prompt(i18n.t("playlists.saveQueuePrompt", {}, "Enter a name for the new custom playlist:"), defaultName);
-    if (!name || !name.trim()) return;
+    saveQueueName = `Queue Playlist`;
+    showSaveQueueModal = true;
+  }
+
+  async function confirmSaveQueueAsCustomPlaylist() {
+    if (!saveQueueName || !saveQueueName.trim()) return;
+    const songIds = playlistsStore.activePlaylistTracks.filter((t) => t.song).map((t) => t.song!.id);
+    if (songIds.length === 0) return;
 
     try {
-      const created = await playlistsStore.createPlaylist(name.trim());
+      const created = await playlistsStore.createPlaylist(saveQueueName.trim());
       await playlistsStore.addSongsToPlaylist(created.id, songIds);
       playlistsStore.selectPlaylist(created.id);
       collectionStore.viewPlaylist(created.id);
+      showSaveQueueModal = false;
     } catch (err) {
       console.error("Failed to save Queue as custom playlist:", err);
     }
@@ -1611,4 +1622,44 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if showSaveQueueModal}
+  <Modal onClose={() => showSaveQueueModal = false} maxWidth="max-w-sm">
+    <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
+      <div class="flex items-center gap-2">
+        <FolderPlus class="w-4 h-4 text-brand-accent-text" />
+        <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}</h3>
+      </div>
+      <button onclick={() => showSaveQueueModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+        <X class="w-4 h-4" />
+      </button>
+    </div>
+
+    <form onsubmit={(e) => { e.preventDefault(); confirmSaveQueueAsCustomPlaylist(); }} class="flex flex-col gap-4 p-6 bg-brand-sidebar">
+      <div class="flex flex-col gap-1.5">
+        <label for="save-queue-name-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t("playlists.saveQueueNameLabel", {}, "Playlist Name")}
+        </label>
+        <Input
+          id="save-queue-name-input"
+          type="text"
+          bind:value={saveQueueName}
+          placeholder={i18n.t("playlists.saveQueueNamePlaceholder", {}, "My Queue Playlist")}
+          class="w-full"
+          required
+          autofocus
+        />
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <Button onclick={() => showSaveQueueModal = false} variant="secondary" size="sm">
+          {i18n.t("playlists.cancel", {}, "Cancel")}
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
+          {i18n.t("playlists.saveQueueConfirm", {}, "Save")}
+        </Button>
+      </div>
+    </form>
+  </Modal>
 {/if}
