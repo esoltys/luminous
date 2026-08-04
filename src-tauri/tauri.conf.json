@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "deb", "rpm", "appimage", "app", "dmg"],
     "createUpdaterArtifacts": true,
     "publisher": "Eric James Soltys (https://esoltys.dev/luminous/)",
     "copyright": "Copyright © 2026 Eric James Soltys",
