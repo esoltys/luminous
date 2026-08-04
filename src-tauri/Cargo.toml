@@ -26,6 +26,7 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 # Cross-restart window geometry persistence (Windows/macOS/X11-Linux — see
 # geometry_capture_supported() in commands/window.rs for why this can't help
 # on Wayland).
