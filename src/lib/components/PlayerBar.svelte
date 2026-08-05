@@ -308,10 +308,14 @@
 
     <!-- Scrubber -->
     <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
+      <!-- Invisible spacer matching the mode-toggle button's footprint, so the
+           waveform + timers stay centered instead of skewing left toward it. -->
+      <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
       <span>{formatTime(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
       </div>
+      <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
       <button
         onclick={() => prefs.toggleSeekBarMode()}
         class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
@@ -325,7 +329,6 @@
           <Palette class="w-3 h-3" />
         {/if}
       </button>
-      <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
     </div>
   </div>
 
