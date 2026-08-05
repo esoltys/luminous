@@ -1123,6 +1123,7 @@
     y={contextMenuState.y}
     {song}
     selectedCount={selectedSongIds.size}
+    selectedSongIds={Array.from(selectedSongIds)}
     onPlay={() => {
       if (selectedSongIds.size > 1) {
         handlePlaySelected();

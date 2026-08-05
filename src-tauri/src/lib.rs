@@ -660,6 +660,7 @@ pub fn run() {
             commands::player::open_and_play,
             commands::player::get_startup_file,
             commands::player::append_songs_to_player_playlist,
+            commands::player::remove_songs_from_player_playlist,
             commands::player::pause,
             commands::player::resume,
             commands::player::stop,

@@ -427,12 +427,24 @@
     collectionStore.selectedPlaylistId = null;
   }
 
-  function handlePlayPlaylistItem(index: number) {
-    const item = playlistsStore.activePlaylistTracks[index];
-    if (!item || isItemUnavailable(item)) return;
-    if (playlistsStore.activePlaylistId !== null) {
-      playerStore.playPlaylistItem(playlistsStore.activePlaylistId, index);
-    }
+  /** Plays the clicked row the same way `playSelected`/`handlePlayAll` do:
+   * resolve songIds + a start index entirely from in-memory reactive state
+   * and hand the whole batch to `playSongs` in one shot. Earlier this went
+   * through a uuid lookup (`playPlaylistItemByUuid`) resolved fresh on the
+   * backend, which turned out to still occasionally fail to find a uuid
+   * that demonstrably existed in the DB a moment later — an unresolved
+   * server-side race. Since there's nothing to race against when the whole
+   * request is built synchronously from state already in hand, this path
+   * sidesteps it rather than chasing it further. */
+  function handlePlayPlaylistItem(item: PlaylistItem) {
+    if (!item || isItemUnavailable(item) || !activePlaylist) return;
+    const availableTracks = playlistsStore.activePlaylistTracks.filter(
+      (t) => t.song && !isItemUnavailable(t)
+    );
+    const startIndex = availableTracks.findIndex((t) => t.uuid === item.uuid);
+    if (startIndex === -1) return;
+    const songIds = availableTracks.map((t) => t.song!.id);
+    playerStore.playSongs(songIds, startIndex, activePlaylist.id);
   }
 
   /** Returns true if the item's song is missing from disk or has no song data. */
@@ -1183,7 +1195,7 @@
 
       <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
-        {#each filteredTracks as item, index}
+        {#each filteredTracks as item, index (item.uuid)}
           {@const trueUnavailable = isItemUnavailable(item)}
           {@const disconnected = !trueUnavailable && collectionStore.isPathOnDisconnectedDrive(item.song?.path)}
           {@const unavailable = trueUnavailable || disconnected}
@@ -1195,7 +1207,7 @@
             role="row"
             tabindex="0"
             onkeydown={(e) => {
-              if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(actualIndex);
+              if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(item);
             }}
             data-playlist-row="true"
             draggable={!unavailable ? "true" : "false"}
@@ -1207,7 +1219,7 @@
             ondrop={(e) => handleDrop(e, actualIndex)}
             onclick={(e) => handleRowClick(e, item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
-            ondblclick={() => !unavailable && handlePlayPlaylistItem(actualIndex)}
+            ondblclick={() => !unavailable && handlePlayPlaylistItem(item)}
             class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
               {unavailable
                 ? 'opacity-50 cursor-not-allowed'
@@ -1233,7 +1245,7 @@
                   </span>
                 {/if}
                 <button
-                  onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(actualIndex); }}
+                  onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(item); }}
                   class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
                   disabled={unavailable}
                   title={i18n.t("playlists.playTrack")}

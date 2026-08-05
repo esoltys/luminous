@@ -302,33 +302,23 @@ export class PlayerStore {
     await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
   }
 
+  /** Background cleanup only — never a precondition for playback. Trims
+   * already-played Queue rows behind the now-playing track so the Queue
+   * view visually shrinks as you play through it. Runs *after* a track
+   * change has already succeeded, using the backend's own authoritative
+   * `this.playlistId`/`playlistItemUuid`, so it can never race with (or
+   * block on) the act of starting playback itself. */
   private async syncQueueTrackPosition() {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (!queuePl || !this.currentSong) return;
-    if (this.playlistId === queuePl.id || this.activeContextName === "Queue") {
-      const tracks = playlistsStore.activePlaylistId === queuePl.id
-        ? playlistsStore.activePlaylistTracks
-        : await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: queuePl.id });
-      if (tracks.length > 0) {
-        const activeIndex = tracks.findIndex((t: PlaylistItem) => t.song?.id === this.currentSong?.id);
-        if (activeIndex > 0) {
-          await playlistsStore.trimQueueBeforeIndex(activeIndex);
-        }
-      }
+    if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
+    const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
+    if (pl?.name?.toLowerCase() === "queue" || this.activeContextName === "Queue") {
+      await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
     }
   }
 
   async playPlaylistItem(playlistId: number, itemIndex: number) {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl && (playlistId === queuePl.id || pl?.name?.toLowerCase() === "queue")) {
-      if (itemIndex > 0) {
-        await playlistsStore.trimQueueBeforeIndex(itemIndex);
-        await invoke("play_playlist_item", { playlistId: queuePl.id, itemIndex: 0 });
-        return;
-      }
-    }
     await invoke("play_playlist_item", { playlistId, itemIndex });
   }
 
