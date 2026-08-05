@@ -5,6 +5,9 @@ use anyhow::{Context, Result};
 use rusqlite::params;
 use std::path::Path;
 
+/// Point resolution for the cached waveform peak envelope.
+pub const WAVEFORM_POINTS: usize = 150;
+
 /// Compute peak waveform amplitudes (0..255) for a sample buffer, normalized relative to overall peak.
 pub fn compute_waveform_peaks(samples: &[f32], points: usize) -> Vec<u8> {
     if samples.is_empty() {
@@ -77,9 +80,11 @@ pub fn generate_visualizer_data(
         )
     })?;
 
-    let points = 150;
-    let waveform_peaks = compute_waveform_peaks(&samples, points);
-    let moodbar_rgb = compute_moodbar_data(&samples, sample_rate, points);
+    let waveform_peaks = compute_waveform_peaks(&samples, WAVEFORM_POINTS);
+    // Higher point resolution than the waveform: transient (hi-hat/percussion)
+    // detail in the layered band waveform benefits from finer time resolution
+    // than the waveform's coarser peak envelope needs (#217).
+    let moodbar_rgb = compute_moodbar_data(&samples, sample_rate, crate::moodbar::MOODBAR_POINTS);
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;

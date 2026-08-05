@@ -9,15 +9,26 @@ use std::path::Path;
 /// each cached blob in `moodbars.style`. Bump this whenever the byte layout or
 /// semantics of the output changes so stale cached blobs (written by an older
 /// build) are treated as a cache miss and regenerated, rather than being handed
-/// to the frontend under a new interpretation they were never computed for.
+/// to the frontend under a new interpretation (or point count) they were never
+/// computed for.
 ///
 /// Version 1: three independent per-band amplitude layers (low/mid/high), each
 /// channel-normalized 0-255, rendered by the frontend as a fixed blue/amber/white
-/// layered waveform (#217). Version 0 (legacy) was the same byte layout but
-/// rendered/interpreted as a single blended mood color.
-pub const MOODBAR_STYLE_VERSION: i64 = 1;
+/// layered waveform (#217), at `WAVEFORM_POINTS` (150) resolution. Version 0
+/// (legacy) was the same byte layout but rendered/interpreted as a single
+/// blended mood color.
+///
+/// Version 2: same layered format, raised to `MOODBAR_POINTS` (300) resolution
+/// for finer transient (hi-hat/percussion) detail.
+pub const MOODBAR_STYLE_VERSION: i64 = 2;
 
-/// Compute 150 spectral colors (RGB sequence) representing song mood from decoded samples.
+/// Point resolution for the cached layered low/mid/high band waveform. Higher
+/// than `WAVEFORM_POINTS` — transient detail benefits from finer time
+/// resolution than the waveform's coarser peak envelope needs.
+pub const MOODBAR_POINTS: usize = 300;
+
+/// Compute per-point low/mid/high band amplitudes (RGB-flavored byte triples)
+/// representing the song's frequency-band structure from decoded samples.
 pub fn compute_moodbar_data(samples: &[f32], sample_rate: u32, points: usize) -> Vec<u8> {
     if samples.is_empty() {
         return vec![0; points * 3];
@@ -121,7 +132,7 @@ pub fn compute_moodbar_data(samples: &[f32], sample_rate: u32, points: usize) ->
     data
 }
 
-/// Generate 150 spectral colors (RGB sequence) representing the song mood, save to SQLite, and return.
+/// Generate the layered low/mid/high band waveform data, save to SQLite, and return it.
 pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<u8>> {
     match generate_visualizer_data(db, song_id, path) {
         Ok((_, moodbar)) => Ok(moodbar),
