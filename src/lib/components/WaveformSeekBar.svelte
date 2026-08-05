@@ -230,7 +230,24 @@
     const segCount = Math.ceil(totalPoints / groupSize);
     const segWidth = width / segCount;
 
+    // Still decoding/generating (or nothing loaded yet for this track): show
+    // the same pulsing scan animation as drawWaveform's placeholder, instead
+    // of silently rendering nothing (all-zero bands) while data is in flight.
+    const isPlaceholder = isLoadingMoodbar || moodbarData.length === 0;
+
     for (let s = 0; s < segCount; s++) {
+      const x = s * segWidth;
+      const w = segWidth + 0.5;
+
+      if (isPlaceholder) {
+        const sine = Math.sin(pulseAngle + (s / segCount) * Math.PI * 4);
+        const barH = Math.max(2, (0.25 + 0.2 * sine) * height * 0.85);
+        ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (s / segCount) * Math.PI * 3);
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(x, (height - barH) / 2, w, barH);
+        continue;
+      }
+
       const start = s * groupSize;
       const end = Math.min(start + groupSize, totalPoints);
 
@@ -250,8 +267,6 @@
         high /= n;
       }
 
-      const x = s * segWidth;
-      const w = segWidth + 0.5;
       const segPct = s / segCount;
       const played = segPct <= progressPct;
       // Unplayed columns are dimmed as a whole (not blended toward a
