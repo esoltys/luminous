@@ -316,8 +316,8 @@
         onclick={() => prefs.toggleSeekBarMode()}
         class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
         title={prefs.seekBarMode === 'waveform'
-          ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to moodbar')
-          : i18n.t('playerBar.seekbarModeMoodbar', {}, 'Moodbar mode — click to switch to waveform')}
+          ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
+          : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
       >
         {#if prefs.seekBarMode === 'waveform'}
           <AudioWaveform class="w-3 h-3" />

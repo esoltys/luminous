@@ -8,7 +8,7 @@ import { prefs } from "../stores/prefs.svelte";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "get_waveform_data") return Promise.resolve([10, 50, 100, 200, 150]);
-    if (cmd === "get_moodbar_data") return Promise.resolve([100, 150, 200, 50, 80, 120]);
+    if (cmd === "get_band_waveform_data") return Promise.resolve([100, 150, 200, 50, 80, 120]);
     return Promise.resolve(null);
   }),
 }));

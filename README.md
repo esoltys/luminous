@@ -66,6 +66,7 @@ luminous/
     ├── src/
     │   ├── analyzer.rs       # Real-time FFT spectrum processing
     │   ├── audio.rs          # Symphonia decoding thread & CPAL playback loop with gapless double-buffering
+    │   ├── band_waveform.rs  # Layered low/mid/high frequency-band waveform analysis scanner
     │   ├── collection.rs     # Lofty scanner & folder watcher
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
@@ -78,7 +79,6 @@ luminous/
     │   ├── main.rs           # Binary entry point invoking luminous_lib::run()
     │   ├── media_session.rs  # OS media transport integration (SMTC, MPRIS2, Now Playing)
     │   ├── models.rs         # Shared structs and types
-    │   ├── moodbar.rs        # Spectral audio analysis scanner
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
     │   ├── playlist.rs       # Playlist manager & undo/redo command stack

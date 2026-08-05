@@ -19,7 +19,7 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 - **Audio Output**: [CPAL (Cross-Platform Audio Layer)](https://github.com/RustAudio/cpal)
 - **Audio Resampling**: [rubato](https://github.com/HEnquist/rubato)
 - **Loudness Analysis**: `bs1770` (EBU R128 / ITU BS.1770 loudness measurement)
-- **Spectrum Analysis & Moodbars**: [rustfft](https://github.com/ejmahler/RustFFT)
+- **Spectrum Analysis & Band Waveforms**: [rustfft](https://github.com/ejmahler/RustFFT)
 
 ### Metadata & Tagging
 - **Tag Reading & Writing**: [lofty](https://github.com/Serial-Scanner/lofty-rs) (FLAC, ID3, MP4, Ogg Vorbis, WAV metadata)

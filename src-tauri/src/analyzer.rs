@@ -91,7 +91,7 @@ pub fn calculate_spectrum(
     // frequency (not raw FFT index) so each output bin corresponds to a
     // consistent, real Hz range regardless of sample rate. The 62.5 Hz -
     // 16 kHz window is chosen so bin 8 lands exactly on 250 Hz and bin 20
-    // on 2 kHz — the same bass/mid/treble cutoffs `moodbar.rs` uses — which
+    // on 2 kHz — the same bass/mid/treble cutoffs `band_waveform.rs` uses — which
     // is what the frontend's slice(0,8)/slice(8,20)/slice(20,32) split
     // assumes.
     const LOW_FREQ: f32 = 62.5;

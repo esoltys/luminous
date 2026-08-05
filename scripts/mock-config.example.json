@@ -121,11 +121,11 @@
       "viewportHeight": 420
     },
     {
-      "name": "moodbar",
-      "filename": "moodbar.png",
+      "name": "band-waveform",
+      "filename": "band-waveform.png",
       "tab": "collection",
       "subTab": "songs",
-      "action": "click-moodbar-toggle",
+      "action": "click-bands-toggle",
       "sidebarWidth": 220,
       "positionSeconds": 79
     },

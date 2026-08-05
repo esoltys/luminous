@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 14;
+pub const CURRENT_SCHEMA_VERSION: i32 = 16;
 
 #[derive(Debug)]
 pub struct Database {
@@ -215,6 +215,26 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![14],
+            )?;
+        }
+
+        if version < 15 {
+            log::info!("Running migration 15: waveforms style column for cache invalidation");
+            conn.execute_batch(MIGRATION_15)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![15],
+            )?;
+        }
+
+        if version < 16 {
+            log::info!(
+                "Running migration 16: rename moodbars table to band_waveforms (#217, pre-1.0 rename)"
+            );
+            conn.execute_batch(MIGRATION_16)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![16],
             )?;
         }
 
@@ -549,6 +569,17 @@ CREATE TABLE IF NOT EXISTS album_ratings (
     album_key TEXT PRIMARY KEY,
     rating REAL NOT NULL DEFAULT -1
 );
+";
+
+const MIGRATION_15: &str = "
+ALTER TABLE waveforms ADD COLUMN style INTEGER NOT NULL DEFAULT 0;
+";
+
+// Pre-1.0 rename: the table originally stored a single blended mood color per
+// point (#217 replaced that with independent low/mid/high band layers), so
+// "moodbars" no longer describes what it holds.
+const MIGRATION_16: &str = "
+ALTER TABLE moodbars RENAME TO band_waveforms;
 ";
 
 #[cfg(test)]

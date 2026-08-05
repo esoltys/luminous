@@ -7,29 +7,38 @@
 
   const CANVAS_BAR_HEIGHT_PX = 28;
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
-  const MOODBAR_SEGMENT_COUNT = 40;
+
+  // Fixed layer colors for the low/mid/high band waveform (bands mode). These
+  // are a deliberate exception to DESIGN.md's "accent is the only
+  // interactive-emphasis hue" rule — like the mood colors they replace, they
+  // encode frequency-band data rather than interactive state, so they're kept
+  // visually distinct from accentColor (the progress cap below still uses
+  // accentColor so "this is progress" stays legible against these bands).
+  const LOW_BAND_COLOR = "#3b82f6"; // blue — bass/sub-bass
+  const MID_BAND_COLOR = "#f59e0b"; // amber — vocals/snares/mid instruments
+  const HIGH_BAND_COLOR = "#f9fafb"; // white — hi-hats/cymbals/transients
 
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
-  let moodbarData = $state<number[]>([]);
+  let bandData = $state<number[]>([]);
   let isDragging = $state(false);
 
   // Guards a slow, still-in-flight request from a previously-skipped-past
   // track from overwriting waveformData after a newer track has already
   // taken over (e.g. the in-flight request settles just after another skip).
   let waveformRequestId = 0;
-  let moodbarRequestId = 0;
+  let bandRequestId = 0;
 
   let isLoadingWaveform = $state(false);
-  let isLoadingMoodbar = $state(false);
+  let isLoadingBands = $state(false);
   let pulseAngle = $state(0);
   let animFrameId: number | null = null;
 
   function startLoadingAnimation() {
     if (animFrameId !== null) return;
     function step() {
-      if (isLoadingWaveform || isLoadingMoodbar) {
+      if (isLoadingWaveform || isLoadingBands) {
         pulseAngle = (pulseAngle + 0.08) % (Math.PI * 2);
         draw();
         animFrameId = requestAnimationFrame(step);
@@ -79,62 +88,34 @@
 
   // Same cache-miss-triggers-full-decode cost as loadWaveform above, so it
   // gets the same request-id guard and debounce treatment.
-  async function loadMoodbar(songId: number | undefined) {
-    const requestId = ++moodbarRequestId;
+  async function loadBands(songId: number | undefined) {
+    const requestId = ++bandRequestId;
     if (songId === undefined) {
-      moodbarData = [];
-      isLoadingMoodbar = false;
+      bandData = [];
+      isLoadingBands = false;
       draw();
       return;
     }
-    isLoadingMoodbar = true;
-    moodbarData = [];
+    isLoadingBands = true;
+    bandData = [];
     startLoadingAnimation();
     try {
-      const data = await invoke<number[] | null>("get_moodbar_data", { song_id: songId, songId });
-      if (requestId !== moodbarRequestId) return;
-      moodbarData = data ?? [];
+      const data = await invoke<number[] | null>("get_band_waveform_data", { song_id: songId, songId });
+      if (requestId !== bandRequestId) return;
+      bandData = data ?? [];
     } catch (e) {
-      if (requestId !== moodbarRequestId) return;
-      console.error("Failed to load moodbar:", e);
-      moodbarData = [];
+      if (requestId !== bandRequestId) return;
+      console.error("Failed to load band waveform:", e);
+      bandData = [];
     } finally {
-      if (requestId === moodbarRequestId) {
-        isLoadingMoodbar = false;
+      if (requestId === bandRequestId) {
+        isLoadingBands = false;
         draw();
       }
     }
   }
 
-  // Blends a mood color toward a neutral anchor at the given strength
-  // (0 = pure anchor, 1 = pure mood color) — used to keep raw FFT-derived
-  // RGB from looking neon/harsh, without fighting the moodbar's own color
-  // coding (DESIGN.md: accent is the only interactive-emphasis hue, so
-  // moodbar colors are presented as muted content, not competing chrome).
-  function blend(mood: [number, number, number], anchor: [number, number, number], strength: number): string {
-    const r = Math.round(anchor[0] + (mood[0] - anchor[0]) * strength);
-    const g = Math.round(anchor[1] + (mood[1] - anchor[1]) * strength);
-    const b = Math.round(anchor[2] + (mood[2] - anchor[2]) * strength);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  function hexToRgb(hex: string): [number, number, number] {
-    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})/i.exec(hex);
-    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [55, 65, 81];
-  }
-
-  // Desaturates a color to its luminance-equivalent gray. The border color
-  // isn't always neutral — the album-art-adaptive theme derives it from the
-  // current track's cover art, so blending moodbar colors toward its raw
-  // hue means the theme's color fights the moodbar's own bass/mid/treble
-  // color coding. Blending toward this gray keeps the theme's brightness
-  // (dark/light contrast) without injecting a competing hue.
-  function toGray(rgb: [number, number, number]): [number, number, number] {
-    const l = Math.round(0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]);
-    return [l, l, l];
-  }
-
-  // Draw waveform or moodbar, depending on prefs.seekBarMode
+  // Draw waveform or bands, depending on prefs.seekBarMode
   function draw() {
     if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
@@ -162,8 +143,8 @@
     const hoverColor = colors["color-accent-hover"] || '#a78bfa';
     const borderCol = colors["color-border"] || '#374151';
 
-    if (prefs.seekBarMode === "moodbar") {
-      drawMoodbar(ctx, width, height, progressPct, accentColor, borderCol);
+    if (prefs.seekBarMode === "bands") {
+      drawBands(ctx, width, height, progressPct, accentColor);
     } else {
       drawWaveform(ctx, width, height, progressPct, accentColor, hoverColor, borderCol);
     }
@@ -228,68 +209,90 @@
     ctx.globalAlpha = 1.0;
   }
 
-  function drawMoodbar(
+  function drawBands(
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
     progressPct: number,
     accentColor: string,
-    borderCol: string,
   ) {
-    const totalPoints = moodbarData.length > 0 ? Math.floor(moodbarData.length / 3) : 150;
-    const borderRgb = hexToRgb(borderCol);
-    const grayAnchor = toGray(borderRgb);
+    const totalPoints = bandData.length > 0 ? Math.floor(bandData.length / 3) : 150;
+    const segWidth = width / totalPoints;
 
-    // Downsample the 150 raw points into broad, averaged regions instead of
-    // drawing one bar per point. 150 individually-colored 1-2px bars read
-    // as visual noise/a barcode; averaging groups of adjacent points into
-    // ~40 wider contiguous blocks reveals the track's actual color
-    // structure (verse/chorus-scale regions) the way a real moodbar strip
-    // is meant to read at a glance.
-    const segmentCount = Math.min(MOODBAR_SEGMENT_COUNT, totalPoints);
-    const groupSize = Math.max(1, Math.ceil(totalPoints / segmentCount));
-    const segCount = Math.ceil(totalPoints / groupSize);
-    const segWidth = width / segCount;
+    // Still decoding/generating (or nothing loaded yet for this track): show
+    // the same pulsing scan animation as drawWaveform's placeholder, instead
+    // of silently rendering nothing (all-zero bands) while data is in flight.
+    const isPlaceholder = isLoadingBands || bandData.length === 0;
 
-    for (let s = 0; s < segCount; s++) {
-      const start = s * groupSize;
-      const end = Math.min(start + groupSize, totalPoints);
+    for (let s = 0; s < totalPoints; s++) {
+      const x = s * segWidth;
+      const w = segWidth + 0.5;
 
-      let mood: [number, number, number] = grayAnchor;
-      if (moodbarData.length > 0) {
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let n = 0;
-        for (let i = start; i < end; i++) {
-          r += moodbarData[i * 3];
-          g += moodbarData[i * 3 + 1];
-          b += moodbarData[i * 3 + 2];
-          n++;
-        }
-        mood = [r / n, g / n, b / n];
+      if (isPlaceholder) {
+        const sine = Math.sin(pulseAngle + (s / totalPoints) * Math.PI * 4);
+        const barH = Math.max(2, (0.25 + 0.2 * sine) * height * 0.85);
+        ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (s / totalPoints) * Math.PI * 3);
+        ctx.fillStyle = accentColor;
+        ctx.fillRect(x, (height - barH) / 2, w, barH);
+        continue;
       }
 
-      const x = s * segWidth;
-      const segPct = s / segCount;
-      const played = segPct <= progressPct;
+      // Full per-point resolution (no downsampling/averaging) — unlike a
+      // single blended mood color, the layered low/mid/high bands benefit
+      // from the finer time resolution: exactly what makes transient hits
+      // (hi-hats, drum spikes) precisely locatable rather than smeared
+      // across an averaged region.
+      const low = bandData[s * 3];
+      const mid = bandData[s * 3 + 1];
+      const high = bandData[s * 3 + 2];
 
-      // Unplayed: desaturated/low-opacity, blended toward a neutral gray
-      // (not the theme's raw border hue — see toGray() above). Played: full
-      // mood color, with a thin accent-colored cap on top so the accent hue
-      // still carries the "this is progress" signal instead of the mood
-      // colors alone (accent stays the only interactive-emphasis hue per
-      // DESIGN.md). Segments are drawn contiguous (a hair of overlap, no
-      // gap) so adjacent same-colored regions blend into one visual block
-      // rather than a striped bar.
-      ctx.fillStyle = blend(mood, grayAnchor, played ? 0.85 : 0.5);
-      ctx.fillRect(x, 0, segWidth + 0.5, height);
+      const segPct = s / totalPoints;
+      const played = segPct <= progressPct;
+      // Unplayed columns are dimmed as a whole (not blended toward a
+      // per-theme gray — these are fixed structural colors, not mood-derived
+      // ones) so the progress line remains the only cue that changes hue.
+      const alpha = played ? 1.0 : 0.4;
+      const center = height / 2;
+
+      // Blue low-band layer: the outer envelope, centered and symmetric
+      // top/bottom like a standard audio waveform — this is the layer
+      // expected to be present almost continuously (bassline), so it reads
+      // as the strip's base shape.
+      const lowH = Math.max(2, (low / 255) * height * 0.9);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = LOW_BAND_COLOR;
+      ctx.fillRect(x, center - lowH / 2, w, lowH);
+
+      // Amber mid-band layer: overlaid on top of the blue envelope, same
+      // center line, narrower. Appearing/disappearing here is what makes
+      // vocal entrances and instrumental (vocal-free) sections legible,
+      // independent of the bassline underneath.
+      const midH = (mid / 255) * height * 0.75;
+      if (midH > 1.5) {
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = MID_BAND_COLOR;
+        ctx.fillRect(x, center - midH / 2, w, midH);
+      }
+
+      // White high-band layer: thin spike markers at the top and bottom
+      // tips of the treble envelope, not a filled bar — this is what reads
+      // as a sharp transient (hi-hat/cymbal hit) rather than competing with
+      // the amber layer's area underneath it.
+      const highH = (high / 255) * height;
+      if (highH > 1.5) {
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.fillStyle = HIGH_BAND_COLOR;
+        ctx.fillRect(x, center - highH / 2 - 1, w, 2);
+        ctx.fillRect(x, center + highH / 2 - 1, w, 2);
+      }
 
       if (played) {
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = accentColor;
-        ctx.fillRect(x, 0, segWidth + 0.5, 1.5);
+        ctx.fillRect(x, 0, w, 1.5);
       }
     }
+    ctx.globalAlpha = 1.0;
   }
 
   // React to changes in currentSong (or a mode toggle) using Svelte 5
@@ -299,7 +302,7 @@
   let loadedSongId: number | undefined = undefined;
   let loadedMode: string | undefined = undefined;
 
-  // Fetch waveform or moodbar when song or mode actually changes.
+  // Fetch waveform or bands when song or mode actually changes.
   $effect(() => {
     const songId = playerStore.currentSong?.id;
     const mode = prefs.seekBarMode;
@@ -307,9 +310,9 @@
     if (songId !== loadedSongId || mode !== loadedMode) {
       loadedSongId = songId;
       loadedMode = mode;
-      if (mode === "moodbar") {
-        moodbarData = [];
-        loadMoodbar(songId);
+      if (mode === "bands") {
+        bandData = [];
+        loadBands(songId);
       } else {
         waveformData = [];
         loadWaveform(songId);
@@ -325,7 +328,7 @@
     const _art = themeStore.artworkColors;
     const _mode = prefs.seekBarMode;
     const _wave = waveformData;
-    const _mood = moodbarData;
+    const _bands = bandData;
     draw();
   });
 
@@ -363,8 +366,8 @@
   bind:this={containerEl}
   onmousedown={handleMouseDown}
   class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
-  title={prefs.seekBarMode === 'moodbar'
-    ? i18n.t('playerBar.moodbarLegend', {}, 'Moodbar — color reflects the song\'s frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band')
+  title={prefs.seekBarMode === 'bands'
+    ? i18n.t('playerBar.bandsLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
     : undefined}
 >
   <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>

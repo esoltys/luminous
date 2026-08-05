@@ -197,14 +197,16 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   }
 
   // Mirrors the contrast-boosted, per-channel-normalized output of
-  // generate_moodbar() in src-tauri/src/moodbar.rs: three independent bands
-  // (bass/mid/treble) each spanning the full 0-255 range, so the mock
-  // exercises the same "distinct, highly contrasting" visual the real
-  // per-track histogram stretch produces, rather than a flat/uniform strip.
-  function makeMoodbar(): number[] {
+  // generate_band_waveform() in src-tauri/src/band_waveform.rs: three
+  // independent bands (bass/mid/treble) each spanning the full 0-255 range,
+  // so the mock exercises the same "distinct, highly contrasting" visual the
+  // real per-track histogram stretch produces, rather than a flat/uniform
+  // strip. Point count matches BAND_WAVEFORM_POINTS.
+  function makeBandWaveform(): number[] {
+    const points = 512;
     const data: number[] = [];
-    for (let i = 0; i < 150; i++) {
-      const t = i / 150;
+    for (let i = 0; i < points; i++) {
+      const t = i / points;
       const r = (Math.sin(t * Math.PI * 4) * 0.5 + 0.5) ** 1.5;
       const g = (Math.sin(t * Math.PI * 5.7 + 1.5) * 0.5 + 0.5) ** 1.5;
       const b = (Math.sin(t * Math.PI * 3.1 + 3.0) * 0.5 + 0.5) ** 1.5;
@@ -598,7 +600,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
 
     get_waveform_data: () => makeWaveform(),
-    get_moodbar_data: () => makeMoodbar(),
+    get_band_waveform_data: () => makeBandWaveform(),
 
     get_lyrics: (args) => {
       const songId = args?.songId as number | undefined;

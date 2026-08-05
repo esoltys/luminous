@@ -3,7 +3,7 @@
 //!
 //! A low-priority background thread (`spawn_background_analyzer`) decodes
 //! each not-yet-analyzed local track once (reusing the offline Symphonia
-//! decode path, same pattern as the moodbar/waveform analyzers) and writes
+//! decode path, same pattern as the band_waveform/waveform analyzers) and writes
 //! `songs.ebur128_integrated_loudness_lufs`. Playback consults, in order:
 //! measured R128 loudness -> ReplayGain tag (track or album, per settings) ->
 //! a fixed fallback gain. The resulting linear multiplier is written to

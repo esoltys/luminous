@@ -415,7 +415,7 @@ async function main() {
       await page.getByRole("button", { name: t(language, "settings.tabAbout"), exact: true }).click();
       await page.waitForTimeout(400);
     },
-    "click-moodbar-toggle": async (page, _featured, language) => {
+    "click-bands-toggle": async (page, _featured, language) => {
       await page.getByTitle(t(language, "playerBar.seekbarModeWaveform")).click();
       await page.waitForTimeout(400);
     },
