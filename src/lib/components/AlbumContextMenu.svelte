@@ -37,7 +37,9 @@
       if (songs.length > 0) {
         const queuePl = await playlistsStore.ensureQueuePlaylist();
         if (queuePl) {
-          await playlistsStore.addSongsToPlaylist(queuePl.id, songs.map((s) => s.id));
+          const songIds = songs.map((s) => s.id);
+          await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
+          await invoke("append_songs_to_player_playlist", { songIds });
           toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, `Added to Queue`));
         }
       }

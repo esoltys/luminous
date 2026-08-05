@@ -414,3 +414,21 @@ pub async fn append_songs_to_player_playlist(
 
     Ok(())
 }
+
+/// Remove items from the live in-memory player playlist by uuid, so songs
+/// removed from the Queue's DB playlist stop being up-next during playback.
+/// Called by the frontend after `remove_from_playlist` has deleted the rows
+/// from the DB (see #262).
+#[tauri::command]
+pub async fn remove_songs_from_player_playlist(
+    uuids: Vec<String>,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player.remove_songs_from_playlist_items(&uuids);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(())
+}

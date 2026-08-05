@@ -279,6 +279,9 @@ class PlaylistsStore {
 
   async removeItemsFromPlaylist(playlistId: number, uuids: string[]) {
     await invoke("remove_from_playlist", { playlistId, uuids });
+    // Keep the live playback queue in sync — a no-op if these uuids aren't
+    // part of the currently loaded queue (see #262).
+    await invoke("remove_songs_from_player_playlist", { uuids });
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }

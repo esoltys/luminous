@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers } from "lucide-svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -43,6 +44,7 @@
     if (!queuePl) return;
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
     await playlistsStore.addSongsToPlaylist(queuePl.id, ids);
+    await invoke("append_songs_to_player_playlist", { songIds: ids });
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, `Added to Queue`));
   }
 </script>
