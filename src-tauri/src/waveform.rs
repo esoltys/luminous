@@ -90,8 +90,8 @@ pub fn generate_visualizer_data(
     )?;
 
     tx.execute(
-        "INSERT OR REPLACE INTO moodbars (song_id, data, style) VALUES (?1, ?2, 0)",
-        params![song_id, moodbar_rgb],
+        "INSERT OR REPLACE INTO moodbars (song_id, data, style) VALUES (?1, ?2, ?3)",
+        params![song_id, moodbar_rgb, crate::moodbar::MOODBAR_STYLE_VERSION],
     )?;
 
     tx.commit()?;
@@ -128,18 +128,23 @@ pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>
     Ok(data)
 }
 
-/// Queries database for songs missing either waveform or moodbar cache.
+/// Queries database for songs missing either waveform or moodbar cache, or whose
+/// cached moodbar was written by an older `MOODBAR_STYLE_VERSION` and needs
+/// regenerating under the current format.
 pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
     let mut stmt = conn.prepare(
         "SELECT s.id, s.path FROM songs s
          LEFT JOIN waveforms w ON s.id = w.song_id
          LEFT JOIN moodbars m ON s.id = m.song_id
-         WHERE s.unavailable = 0 AND s.path IS NOT NULL AND (w.song_id IS NULL OR m.song_id IS NULL)",
+         WHERE s.unavailable = 0 AND s.path IS NOT NULL
+           AND (w.song_id IS NULL OR m.song_id IS NULL OR m.style != ?1)",
     )?;
 
     let missing_songs: Vec<(i64, String)> = stmt
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .query_map(params![crate::moodbar::MOODBAR_STYLE_VERSION], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
         .filter_map(|r| r.ok())
         .collect();
     Ok(missing_songs)
@@ -231,5 +236,41 @@ mod tests {
         let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
         let backfilled = backfill_missing_visualizers(&db).unwrap();
         assert_eq!(backfilled, 0);
+    }
+
+    #[test]
+    fn test_stale_moodbar_style_is_treated_as_missing() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO waveforms (song_id, data) VALUES (?1, ?2)",
+            params![song_id, vec![0u8; 150]],
+        )
+        .unwrap();
+        // Cached under a stale style (pre-#217 blended-color format).
+        conn.execute(
+            "INSERT INTO moodbars (song_id, data, style) VALUES (?1, ?2, 0)",
+            params![song_id, vec![0u8; 450]],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(
+            crate::moodbar::get_cached_moodbar(&db, song_id).unwrap(),
+            None
+        );
+
+        let missing = get_missing_visualizer_songs(&db).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, song_id);
     }
 }

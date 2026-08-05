@@ -9,6 +9,16 @@
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
   const MOODBAR_SEGMENT_COUNT = 40;
 
+  // Fixed layer colors for the low/mid/high band waveform (moodbar mode). These
+  // are a deliberate exception to DESIGN.md's "accent is the only
+  // interactive-emphasis hue" rule — like the mood colors they replace, they
+  // encode frequency-band data rather than interactive state, so they're kept
+  // visually distinct from accentColor (the progress cap below still uses
+  // accentColor so "this is progress" stays legible against these bands).
+  const LOW_BAND_COLOR = "#3b82f6"; // blue — bass/sub-bass
+  const MID_BAND_COLOR = "#f59e0b"; // amber — vocals/snares/mid instruments
+  const HIGH_BAND_COLOR = "#f9fafb"; // white — hi-hats/cymbals/transients
+
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
@@ -106,34 +116,6 @@
     }
   }
 
-  // Blends a mood color toward a neutral anchor at the given strength
-  // (0 = pure anchor, 1 = pure mood color) — used to keep raw FFT-derived
-  // RGB from looking neon/harsh, without fighting the moodbar's own color
-  // coding (DESIGN.md: accent is the only interactive-emphasis hue, so
-  // moodbar colors are presented as muted content, not competing chrome).
-  function blend(mood: [number, number, number], anchor: [number, number, number], strength: number): string {
-    const r = Math.round(anchor[0] + (mood[0] - anchor[0]) * strength);
-    const g = Math.round(anchor[1] + (mood[1] - anchor[1]) * strength);
-    const b = Math.round(anchor[2] + (mood[2] - anchor[2]) * strength);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-
-  function hexToRgb(hex: string): [number, number, number] {
-    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})/i.exec(hex);
-    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [55, 65, 81];
-  }
-
-  // Desaturates a color to its luminance-equivalent gray. The border color
-  // isn't always neutral — the album-art-adaptive theme derives it from the
-  // current track's cover art, so blending moodbar colors toward its raw
-  // hue means the theme's color fights the moodbar's own bass/mid/treble
-  // color coding. Blending toward this gray keeps the theme's brightness
-  // (dark/light contrast) without injecting a competing hue.
-  function toGray(rgb: [number, number, number]): [number, number, number] {
-    const l = Math.round(0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]);
-    return [l, l, l];
-  }
-
   // Draw waveform or moodbar, depending on prefs.seekBarMode
   function draw() {
     if (!canvas || !containerEl) return;
@@ -163,7 +145,7 @@
     const borderCol = colors["color-border"] || '#374151';
 
     if (prefs.seekBarMode === "moodbar") {
-      drawMoodbar(ctx, width, height, progressPct, accentColor, borderCol);
+      drawMoodbar(ctx, width, height, progressPct, accentColor);
     } else {
       drawWaveform(ctx, width, height, progressPct, accentColor, hoverColor, borderCol);
     }
@@ -234,18 +216,15 @@
     height: number,
     progressPct: number,
     accentColor: string,
-    borderCol: string,
   ) {
     const totalPoints = moodbarData.length > 0 ? Math.floor(moodbarData.length / 3) : 150;
-    const borderRgb = hexToRgb(borderCol);
-    const grayAnchor = toGray(borderRgb);
 
-    // Downsample the 150 raw points into broad, averaged regions instead of
-    // drawing one bar per point. 150 individually-colored 1-2px bars read
-    // as visual noise/a barcode; averaging groups of adjacent points into
-    // ~40 wider contiguous blocks reveals the track's actual color
-    // structure (verse/chorus-scale regions) the way a real moodbar strip
-    // is meant to read at a glance.
+    // Downsample the raw points into broad, averaged regions instead of
+    // drawing one bar per point. Individually-colored 1-2px bars read as
+    // visual noise/a barcode; averaging groups of adjacent points into ~40
+    // wider contiguous columns still preserves the layered low/mid/high
+    // structure at a glance (verse/chorus-scale bass, vocal entrances, drum
+    // transients) without the strip looking like static.
     const segmentCount = Math.min(MOODBAR_SEGMENT_COUNT, totalPoints);
     const groupSize = Math.max(1, Math.ceil(totalPoints / segmentCount));
     const segCount = Math.ceil(totalPoints / groupSize);
@@ -255,41 +234,71 @@
       const start = s * groupSize;
       const end = Math.min(start + groupSize, totalPoints);
 
-      let mood: [number, number, number] = grayAnchor;
+      let low = 0;
+      let mid = 0;
+      let high = 0;
       if (moodbarData.length > 0) {
-        let r = 0;
-        let g = 0;
-        let b = 0;
         let n = 0;
         for (let i = start; i < end; i++) {
-          r += moodbarData[i * 3];
-          g += moodbarData[i * 3 + 1];
-          b += moodbarData[i * 3 + 2];
+          low += moodbarData[i * 3];
+          mid += moodbarData[i * 3 + 1];
+          high += moodbarData[i * 3 + 2];
           n++;
         }
-        mood = [r / n, g / n, b / n];
+        low /= n;
+        mid /= n;
+        high /= n;
       }
 
       const x = s * segWidth;
+      const w = segWidth + 0.5;
       const segPct = s / segCount;
       const played = segPct <= progressPct;
+      // Unplayed columns are dimmed as a whole (not blended toward a
+      // per-theme gray — these are fixed structural colors, not mood-derived
+      // ones) so the progress line remains the only cue that changes hue.
+      const alpha = played ? 1.0 : 0.4;
+      const center = height / 2;
 
-      // Unplayed: desaturated/low-opacity, blended toward a neutral gray
-      // (not the theme's raw border hue — see toGray() above). Played: full
-      // mood color, with a thin accent-colored cap on top so the accent hue
-      // still carries the "this is progress" signal instead of the mood
-      // colors alone (accent stays the only interactive-emphasis hue per
-      // DESIGN.md). Segments are drawn contiguous (a hair of overlap, no
-      // gap) so adjacent same-colored regions blend into one visual block
-      // rather than a striped bar.
-      ctx.fillStyle = blend(mood, grayAnchor, played ? 0.85 : 0.5);
-      ctx.fillRect(x, 0, segWidth + 0.5, height);
+      // Blue low-band layer: the outer envelope, centered and symmetric
+      // top/bottom like a standard audio waveform — this is the layer
+      // expected to be present almost continuously (bassline), so it reads
+      // as the strip's base shape.
+      const lowH = Math.max(2, (low / 255) * height * 0.9);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = LOW_BAND_COLOR;
+      ctx.fillRect(x, center - lowH / 2, w, lowH);
+
+      // Amber mid-band layer: overlaid on top of the blue envelope, same
+      // center line, narrower. Appearing/disappearing here is what makes
+      // vocal entrances and instrumental (vocal-free) sections legible,
+      // independent of the bassline underneath.
+      const midH = (mid / 255) * height * 0.75;
+      if (midH > 1.5) {
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = MID_BAND_COLOR;
+        ctx.fillRect(x, center - midH / 2, w, midH);
+      }
+
+      // White high-band layer: thin spike markers at the top and bottom
+      // tips of the treble envelope, not a filled bar — this is what reads
+      // as a sharp transient (hi-hat/cymbal hit) rather than competing with
+      // the amber layer's area underneath it.
+      const highH = (high / 255) * height;
+      if (highH > 1.5) {
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.fillStyle = HIGH_BAND_COLOR;
+        ctx.fillRect(x, center - highH / 2 - 1, w, 2);
+        ctx.fillRect(x, center + highH / 2 - 1, w, 2);
+      }
 
       if (played) {
+        ctx.globalAlpha = 1.0;
         ctx.fillStyle = accentColor;
-        ctx.fillRect(x, 0, segWidth + 0.5, 1.5);
+        ctx.fillRect(x, 0, w, 1.5);
       }
     }
+    ctx.globalAlpha = 1.0;
   }
 
   // React to changes in currentSong (or a mode toggle) using Svelte 5
@@ -364,7 +373,7 @@
   onmousedown={handleMouseDown}
   class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
   title={prefs.seekBarMode === 'moodbar'
-    ? i18n.t('playerBar.moodbarLegend', {}, 'Moodbar — color reflects the song\'s frequency balance: red = bass, green = mids, blue = treble; brighter regions carry more energy in that band')
+    ? i18n.t('playerBar.moodbarLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
     : undefined}
 >
   <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>

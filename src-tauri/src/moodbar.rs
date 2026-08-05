@@ -5,6 +5,18 @@ use rusqlite::params;
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::path::Path;
 
+/// Format version of the data produced by `compute_moodbar_data`, stored alongside
+/// each cached blob in `moodbars.style`. Bump this whenever the byte layout or
+/// semantics of the output changes so stale cached blobs (written by an older
+/// build) are treated as a cache miss and regenerated, rather than being handed
+/// to the frontend under a new interpretation they were never computed for.
+///
+/// Version 1: three independent per-band amplitude layers (low/mid/high), each
+/// channel-normalized 0-255, rendered by the frontend as a fixed blue/amber/white
+/// layered waveform (#217). Version 0 (legacy) was the same byte layout but
+/// rendered/interpreted as a single blended mood color.
+pub const MOODBAR_STYLE_VERSION: i64 = 1;
+
 /// Compute 150 spectral colors (RGB sequence) representing song mood from decoded samples.
 pub fn compute_moodbar_data(samples: &[f32], sample_rate: u32, points: usize) -> Vec<u8> {
     if samples.is_empty() {
@@ -125,17 +137,25 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
     }
 }
 
-/// Retrieve the cached moodbar RGB data from the database.
+/// Retrieve the cached moodbar data from the database, if it was written by the
+/// current `MOODBAR_STYLE_VERSION`. A blob cached under an older style is
+/// treated as a cache miss so callers regenerate it rather than misinterpret it.
 pub fn get_cached_moodbar(db: &Database, song_id: i64) -> Result<Option<Vec<u8>>> {
     let conn = db.pool.get()?;
-    let data: Option<Vec<u8>> = conn
+    let row: Option<(Vec<u8>, i64)> = conn
         .query_row(
-            "SELECT data FROM moodbars WHERE song_id = ?1",
+            "SELECT data, style FROM moodbars WHERE song_id = ?1",
             params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .ok();
-    Ok(data)
+    Ok(row.and_then(|(data, style)| {
+        if style == MOODBAR_STYLE_VERSION {
+            Some(data)
+        } else {
+            None
+        }
+    }))
 }
 
 #[cfg(test)]
