@@ -32,6 +32,7 @@
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -427,10 +428,18 @@
     collectionStore.selectedPlaylistId = null;
   }
 
-  function handlePlayPlaylistItem(item: PlaylistItem) {
+  async function handlePlayPlaylistItem(item: PlaylistItem) {
     if (!item || isItemUnavailable(item)) return;
-    if (playlistsStore.activePlaylistId !== null) {
-      playerStore.playPlaylistItemByUuid(playlistsStore.activePlaylistId, item.uuid);
+    if (playlistsStore.activePlaylistId === null) return;
+    try {
+      await playerStore.playPlaylistItemByUuid(playlistsStore.activePlaylistId, item.uuid);
+    } catch (err) {
+      // The clicked row can go stale if the list changed underneath it
+      // (e.g. this component held an older snapshot) — resync from the DB
+      // so the next click has current data instead of failing the same way.
+      console.error("Failed to play playlist item:", err);
+      await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
+      toastStore.show(i18n.t("playlists.playTrackFailed", {}, "Couldn't play that track — try again"), "error");
     }
   }
 
@@ -1182,7 +1191,7 @@
 
       <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
-        {#each filteredTracks as item, index}
+        {#each filteredTracks as item, index (item.uuid)}
           {@const trueUnavailable = isItemUnavailable(item)}
           {@const disconnected = !trueUnavailable && collectionStore.isPathOnDisconnectedDrive(item.song?.path)}
           {@const unavailable = trueUnavailable || disconnected}

@@ -388,6 +388,7 @@ export const fr = {
     confirmDeletePlaylistTitle: "Supprimer la liste de lecture",
     cancel: "Annuler",
     playTrack: "Lire la chanson",
+    playTrackFailed: "Impossible de lire ce titre — réessayez",
     removeFromPlaylist: "Retirer de la liste de lecture",
     songsCount: "{count} chansons",
     oneSong: "1 chanson",
