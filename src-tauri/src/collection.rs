@@ -1188,6 +1188,12 @@ impl CollectionScanner {
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
              WHERE s.source IN (1, 2) AND s.unavailable = 0
+               AND NOT (
+                   ph.context_type = 'playlist'
+                   AND ph.playlist_id IN (
+                       SELECT id FROM playlists WHERE dynamic_enabled = 0 AND LOWER(name) = 'queue'
+                   )
+               )
              ORDER BY ph.played_at DESC
              LIMIT ?1"
         );
@@ -1245,6 +1251,12 @@ impl CollectionScanner {
             FROM play_history ph
             JOIN songs s ON s.id = ph.song_id
             WHERE s.source IN (1, 2) AND s.unavailable = 0
+              AND NOT (
+                  ph.context_type = 'playlist'
+                  AND ph.playlist_id IN (
+                      SELECT id FROM playlists WHERE dynamic_enabled = 0 AND LOWER(name) = 'queue'
+                  )
+              )
             GROUP BY
                 ph.context_type,
                 CASE ph.context_type WHEN 'playlist' THEN ph.playlist_id END,
@@ -3254,6 +3266,41 @@ mod tests {
         match &frequent[0] {
             HomeItem::Song { song } => assert_eq!(song.id, standalone_id),
             other => panic!("expected most-played standalone Song first, got {other:?}"),
+        }
+
+        // Test exclusion of internal 'Queue' playlist from recently played & most frequently played
+        conn.execute(
+            "INSERT INTO playlists (name, dynamic_enabled) VALUES ('Queue', 0)",
+            params![],
+        )
+        .unwrap();
+        let queue_playlist_id = conn.last_insert_rowid();
+
+        // Play from Queue playlist with high played_at, and many times
+        for i in 0..10 {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, playlist_id, played_at) VALUES ('playlist', ?1, ?2, ?3)",
+                params![playlist_track, queue_playlist_id, 1000 + i],
+            )
+            .unwrap();
+        }
+
+        // Verify that 'Queue' does not show up in recently played (still length 3)
+        let recent_after_queue = scanner.get_recently_played(10).unwrap();
+        assert_eq!(recent_after_queue.len(), 3);
+        for item in &recent_after_queue {
+            if let HomeItem::Playlist { playlist } = item {
+                assert_ne!(playlist.id, queue_playlist_id);
+            }
+        }
+
+        // Verify that 'Queue' does not show up in most frequently played (still length 3)
+        let frequent_after_queue = scanner.get_most_frequently_played(10).unwrap();
+        assert_eq!(frequent_after_queue.len(), 3);
+        for item in &frequent_after_queue {
+            if let HomeItem::Playlist { playlist } = item {
+                assert_ne!(playlist.id, queue_playlist_id);
+            }
         }
 
         let _ = std::fs::remove_dir_all(temp_dir);
