@@ -438,13 +438,7 @@
    * sidesteps it rather than chasing it further. */
   function handlePlayPlaylistItem(item: PlaylistItem) {
     if (!item || isItemUnavailable(item) || !activePlaylist) return;
-    const availableTracks = playlistsStore.activePlaylistTracks.filter(
-      (t) => t.song && !isItemUnavailable(t)
-    );
-    const startIndex = availableTracks.findIndex((t) => t.uuid === item.uuid);
-    if (startIndex === -1) return;
-    const songIds = availableTracks.map((t) => t.song!.id);
-    playerStore.playSongs(songIds, startIndex, activePlaylist.id);
+    playerStore.playPlaylistItemByUuid(activePlaylist.id, item.uuid);
   }
 
   /** Returns true if the item's song is missing from disk or has no song data. */
@@ -637,6 +631,9 @@
     event.preventDefault();
     if (!activePlaylist) return;
 
+    const targetTrack = playlistsStore.activePlaylistTracks[targetIndex];
+    if (!targetTrack) return;
+
     if (selectedUuids.size > 1) {
       const selectedIndices = playlistsStore.activePlaylistTracks
         .map((t, idx) => ({ uuid: t.uuid, idx }))
@@ -647,19 +644,21 @@
         playlistsStore.reorderItemsBatch(activePlaylist.id, selectedIndices, targetIndex);
       }
     } else {
-      let sourceIndex = draggedIndex;
-      if (sourceIndex === null && event.dataTransfer) {
+      let sourceUuid: string | null = null;
+      if (draggedIndex !== null && playlistsStore.activePlaylistTracks[draggedIndex]) {
+        sourceUuid = playlistsStore.activePlaylistTracks[draggedIndex].uuid;
+      } else if (event.dataTransfer) {
         const data = event.dataTransfer.getData("text/plain");
         if (data) {
           const parsed = parseInt(data, 10);
-          if (!isNaN(parsed)) {
-            sourceIndex = parsed;
+          if (!isNaN(parsed) && playlistsStore.activePlaylistTracks[parsed]) {
+            sourceUuid = playlistsStore.activePlaylistTracks[parsed].uuid;
           }
         }
       }
 
-      if (sourceIndex !== null && sourceIndex !== targetIndex) {
-        playlistsStore.reorderItem(activePlaylist.id, sourceIndex, targetIndex);
+      if (sourceUuid && sourceUuid !== targetTrack.uuid) {
+        playlistsStore.reorderItemByUuid(activePlaylist.id, sourceUuid, targetTrack.uuid);
       }
     }
 
@@ -1275,7 +1274,7 @@
                   {:else if item.song?.title}
                     {#if isDuplicate}
                       <span
-                        class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0"
+                        class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 shrink-0"
                         title={i18n.t("playlists.duplicateTrackFlag")}
                       >
                         {i18n.t("playlists.duplicateTrackFlag")}
@@ -1464,8 +1463,10 @@
             <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
             {#if filterQuery}
               {i18n.t("playlists.noFilterResults", { query: filterQuery })}
+            {:else if isQueue}
+              {i18n.t("playlists.emptyQueueText")}
             {:else}
-              {i18n.t("playlists.emptyPlaylistTitle")}. {i18n.t("playlists.emptyPlaylistText")}
+              {i18n.t("playlists.emptyPlaylistTitle")}
             {/if}
           </div>
         {/if}

@@ -1065,6 +1065,35 @@ impl PlaylistManager {
         Ok(())
     }
 
+    pub fn reorder_playlist_item_by_uuid(
+        &mut self,
+        playlist_id: i64,
+        source_uuid: &str,
+        target_uuid: &str,
+    ) -> Result<()> {
+        if source_uuid == target_uuid {
+            return Ok(());
+        }
+
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT uuid, position FROM playlist_items WHERE playlist_id = ?1 ORDER BY position",
+        )?;
+        let items: Vec<(String, i32)> = stmt
+            .query_map(params![playlist_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let from_idx = items.iter().position(|(u, _)| u == source_uuid);
+        let to_idx = items.iter().position(|(u, _)| u == target_uuid);
+
+        if let (Some(from), Some(to)) = (from_idx, to_idx) {
+            self.reorder_playlist_item(playlist_id, from as i32, to as i32)?;
+        }
+
+        Ok(())
+    }
+
     pub fn reorder_playlist_items_batch(
         &mut self,
         playlist_id: i64,
@@ -1477,6 +1506,43 @@ mod tests {
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("Song One")
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reorder_playlist_item_by_uuid() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (1, 'Song 1')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (2, 'Song 2')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (3, 'Song 3')", [])
+                .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Test UUID Reorder").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[2]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[3]).unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let uuid0 = tracks[0].uuid.clone();
+        let uuid2 = tracks[2].uuid.clone();
+
+        manager
+            .reorder_playlist_item_by_uuid(pl.id, &uuid0, &uuid2)
+            .unwrap();
+
+        let reordered = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(reordered[0].song.as_ref().unwrap().id, 2);
+        assert_eq!(reordered[1].song.as_ref().unwrap().id, 3);
+        assert_eq!(reordered[2].song.as_ref().unwrap().id, 1);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

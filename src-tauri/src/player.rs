@@ -359,6 +359,47 @@ impl Player {
         self.play_at_index(play_index).await
     }
 
+    /// Play a playlist item identified by its unique item UUID.
+    pub async fn play_item_by_uuid(
+        &mut self,
+        playlist_id: i64,
+        uuid: &str,
+        db_playlists: &crate::playlist::PlaylistManager,
+    ) -> Result<()> {
+        let is_same_playlist = self.current_playlist_id == Some(playlist_id);
+        let has_uuid = is_same_playlist && self.playlist_items.iter().any(|i| i.uuid == uuid);
+
+        if !has_uuid {
+            let items = db_playlists.get_playlist_tracks(playlist_id)?;
+            self.playlist_items = items;
+            self.current_playlist_id = Some(playlist_id);
+            self.current_play_context =
+                (playlist_id > 0).then_some(PlayContext::Playlist { playlist_id });
+            self.played_indices.clear();
+            self.queue.clear();
+            self.scrobbled = false;
+            self.persist_adhoc_queue();
+            self.rebuild_shuffle_order();
+        }
+
+        let real_idx = self
+            .playlist_items
+            .iter()
+            .position(|i| i.uuid == uuid)
+            .ok_or_else(|| anyhow!("Playlist item with uuid '{uuid}' not found"))?;
+
+        let play_index = if self.shuffle_mode != ShuffleMode::Off {
+            self.shuffle_order
+                .iter()
+                .position(|&i| i == real_idx)
+                .unwrap_or(0)
+        } else {
+            real_idx
+        };
+
+        self.play_at_index(play_index).await
+    }
+
     /// Append songs directly to the in-memory `playlist_items` so the player
     /// can continue playing them seamlessly.  Called by the Auto-Play refill
     /// path after the backend has already persisted the new items to the DB.
@@ -426,6 +467,61 @@ impl Player {
         if let Some(idx) = self.current_index {
             self.played_indices.push(idx);
         }
+    }
+
+    /// Reorder items in the in-memory `playlist_items` so the live player
+    /// respects track reordering performed in the Queue UI.
+    pub fn reorder_playlist_items(&mut self, from: usize, to: usize) {
+        if from >= self.playlist_items.len() || to >= self.playlist_items.len() || from == to {
+            return;
+        }
+
+        let moved = self.playlist_items.remove(from);
+        self.playlist_items.insert(to, moved);
+
+        // Update current_index if the playing track was affected by reordering
+        let current_uuid = self.current_item_uuid.clone();
+        let new_real_idx = current_uuid
+            .as_ref()
+            .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
+
+        if self.shuffle_mode == ShuffleMode::Off {
+            self.current_index = new_real_idx;
+            self.shuffle_order = (0..self.playlist_items.len()).collect();
+        } else if let Some(real_idx) = new_real_idx {
+            self.shuffle_order = vec![real_idx];
+            self.current_index = Some(0);
+            self.rebuild_shuffle_order();
+        }
+    }
+
+    /// Reorder item in in-memory playlist_items targeted by item UUIDs.
+    pub fn reorder_playlist_item_by_uuid(&mut self, source_uuid: &str, target_uuid: &str) {
+        if source_uuid == target_uuid {
+            return;
+        }
+
+        let from_idx = self
+            .playlist_items
+            .iter()
+            .position(|i| i.uuid == source_uuid);
+        let to_idx = self
+            .playlist_items
+            .iter()
+            .position(|i| i.uuid == target_uuid);
+
+        if let (Some(from), Some(to)) = (from_idx, to_idx) {
+            self.reorder_playlist_items(from, to);
+        }
+    }
+
+    /// Clear all in-memory playlist items and queue state when the Queue is cleared.
+    pub fn clear_playlist_items(&mut self) {
+        self.playlist_items.clear();
+        self.shuffle_order.clear();
+        self.queue.clear();
+        self.current_index = None;
+        self.played_indices.clear();
     }
 
     /// Number of playlist items that have not yet been played (ahead of current index).

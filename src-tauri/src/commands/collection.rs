@@ -79,9 +79,9 @@ pub async fn get_songs(
     state: State<'_, AppState>,
 ) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_songs(limit.unwrap_or(1000), offset.unwrap_or(0))
-        .map_err(|e| e.to_string())
+    let lim = limit.unwrap_or(-1);
+    let off = offset.unwrap_or(0);
+    scanner.get_songs(lim, off).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

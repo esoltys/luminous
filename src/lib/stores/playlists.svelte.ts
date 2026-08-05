@@ -268,6 +268,7 @@ class PlaylistsStore {
       if (index > 0) {
         const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
         await invoke("remove_from_playlist", { playlistId, uuids: uuidsToRemove });
+        await invoke("remove_songs_from_player_playlist", { uuids: uuidsToRemove });
         if (this.activePlaylistId === playlistId) {
           await this.selectPlaylist(playlistId);
         }
@@ -297,6 +298,26 @@ class PlaylistsStore {
     await this.refreshPlaylists(); // update track counts
   }
 
+  async reorderItemByUuid(playlistId: number, sourceUuid: string, targetUuid: string) {
+    if (sourceUuid === targetUuid) return;
+    const fromIdx = this.activePlaylistTracks.findIndex((t) => t.uuid === sourceUuid);
+    const toIdx = this.activePlaylistTracks.findIndex((t) => t.uuid === targetUuid);
+    if (this.activePlaylistId === playlistId && fromIdx !== -1 && toIdx !== -1) {
+      const updated = [...this.activePlaylistTracks];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      this.activePlaylistTracks = updated;
+    }
+    await invoke("reorder_playlist_item_by_uuid", { playlistId, sourceUuid, targetUuid });
+    const queuePl = this.queuePlaylist;
+    if (queuePl && playlistId === queuePl.id) {
+      await invoke("reorder_player_item_by_uuid", { sourceUuid, targetUuid });
+    }
+    if (this.activePlaylistId === playlistId) {
+      await this.selectPlaylist(playlistId);
+    }
+  }
+
   async reorderItem(playlistId: number, fromIndex: number, toIndex: number) {
     if (this.activePlaylistId === playlistId && fromIndex >= 0 && toIndex >= 0 && fromIndex < this.activePlaylistTracks.length && toIndex < this.activePlaylistTracks.length) {
       const updated = [...this.activePlaylistTracks];
@@ -305,6 +326,10 @@ class PlaylistsStore {
       this.activePlaylistTracks = updated;
     }
     await invoke("reorder_playlist_item", { playlistId, from: fromIndex, to: toIndex });
+    const queuePl = this.queuePlaylist;
+    if (queuePl && playlistId === queuePl.id) {
+      await invoke("reorder_player_playlist_items", { fromIndex, toIndex });
+    }
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
@@ -355,6 +380,10 @@ class PlaylistsStore {
 
   async clearPlaylist(playlistId: number) {
     await invoke("clear_playlist", { playlistId });
+    const queuePl = this.queuePlaylist;
+    if (queuePl && playlistId === queuePl.id) {
+      await invoke("clear_player_playlist");
+    }
     if (this.activePlaylistId === playlistId) {
       this.activePlaylistTracks = [];
     }
