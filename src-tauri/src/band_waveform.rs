@@ -5,37 +5,37 @@ use rusqlite::params;
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::path::Path;
 
-/// Format version of the data produced by `compute_moodbar_data`, stored alongside
-/// each cached blob in `moodbars.style`. Bump this whenever the byte layout or
-/// semantics of the output changes so stale cached blobs (written by an older
-/// build) are treated as a cache miss and regenerated, rather than being handed
-/// to the frontend under a new interpretation (or point count) they were never
-/// computed for.
+/// Format version of the data produced by `compute_band_waveform_data`, stored
+/// alongside each cached blob in `band_waveforms.style`. Bump this whenever the
+/// byte layout or semantics of the output changes so stale cached blobs
+/// (written by an older build) are treated as a cache miss and regenerated,
+/// rather than being handed to the frontend under a new interpretation (or
+/// point count) they were never computed for.
 ///
 /// Version 1: three independent per-band amplitude layers (low/mid/high), each
 /// channel-normalized 0-255, rendered by the frontend as a fixed blue/amber/white
 /// layered waveform (#217), at `WAVEFORM_POINTS` (150) resolution. Version 0
 /// (legacy) was the same byte layout but rendered/interpreted as a single
-/// blended mood color.
+/// blended mood color, under the table's original name (`moodbars`).
 ///
 /// Version 2: same layered format, raised to 300-point resolution for finer
 /// transient (hi-hat/percussion) detail.
 ///
-/// Version 3: raised to `MOODBAR_POINTS` (512) resolution — the seek bar's
-/// rendered width is capped by PlayerBar's layout (max-w-[1200px] footer, 1/3
-/// column) at ~285 CSS px regardless of window/monitor size, so 512 points
-/// covers up to ~200% OS display scaling (dpr 2, ~570 physical px) before
-/// additional resolution stops being visually distinguishable.
-pub const MOODBAR_STYLE_VERSION: i64 = 3;
+/// Version 3: raised to `BAND_WAVEFORM_POINTS` (512) resolution — the seek
+/// bar's rendered width is capped by PlayerBar's layout (max-w-[1200px]
+/// footer, 1/3 column) at ~285 CSS px regardless of window/monitor size, so
+/// 512 points covers up to ~200% OS display scaling (dpr 2, ~570 physical px)
+/// before additional resolution stops being visually distinguishable.
+pub const BAND_WAVEFORM_STYLE_VERSION: i64 = 3;
 
 /// Point resolution for the cached layered low/mid/high band waveform. Higher
 /// than `WAVEFORM_POINTS` — transient detail benefits from finer time
 /// resolution than the waveform's coarser peak envelope needs.
-pub const MOODBAR_POINTS: usize = 512;
+pub const BAND_WAVEFORM_POINTS: usize = 512;
 
 /// Compute per-point low/mid/high band amplitudes (RGB-flavored byte triples)
 /// representing the song's frequency-band structure from decoded samples.
-pub fn compute_moodbar_data(samples: &[f32], sample_rate: u32, points: usize) -> Vec<u8> {
+pub fn compute_band_waveform_data(samples: &[f32], sample_rate: u32, points: usize) -> Vec<u8> {
     if samples.is_empty() {
         return vec![0; points * 3];
     }
@@ -139,12 +139,12 @@ pub fn compute_moodbar_data(samples: &[f32], sample_rate: u32, points: usize) ->
 }
 
 /// Generate the layered low/mid/high band waveform data, save to SQLite, and return it.
-pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<u8>> {
+pub fn generate_band_waveform(db: &Database, song_id: i64, path: &Path) -> Result<Vec<u8>> {
     match generate_visualizer_data(db, song_id, path) {
-        Ok((_, moodbar)) => Ok(moodbar),
+        Ok((_, band_waveform)) => Ok(band_waveform),
         Err(e) => {
             log::error!(
-                "Failed to generate moodbar for song_id {} at {:?}: {:?}",
+                "Failed to generate band waveform for song_id {} at {:?}: {:?}",
                 song_id,
                 path,
                 e
@@ -154,20 +154,21 @@ pub fn generate_moodbar(db: &Database, song_id: i64, path: &Path) -> Result<Vec<
     }
 }
 
-/// Retrieve the cached moodbar data from the database, if it was written by the
-/// current `MOODBAR_STYLE_VERSION`. A blob cached under an older style is
-/// treated as a cache miss so callers regenerate it rather than misinterpret it.
-pub fn get_cached_moodbar(db: &Database, song_id: i64) -> Result<Option<Vec<u8>>> {
+/// Retrieve the cached band waveform data from the database, if it was written
+/// by the current `BAND_WAVEFORM_STYLE_VERSION`. A blob cached under an older
+/// style is treated as a cache miss so callers regenerate it rather than
+/// misinterpret it.
+pub fn get_cached_band_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>>> {
     let conn = db.pool.get()?;
     let row: Option<(Vec<u8>, i64)> = conn
         .query_row(
-            "SELECT data, style FROM moodbars WHERE song_id = ?1",
+            "SELECT data, style FROM band_waveforms WHERE song_id = ?1",
             params![song_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .ok();
     Ok(row.and_then(|(data, style)| {
-        if style == MOODBAR_STYLE_VERSION {
+        if style == BAND_WAVEFORM_STYLE_VERSION {
             Some(data)
         } else {
             None
@@ -180,9 +181,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compute_moodbar_data_empty() {
-        let moodbar = compute_moodbar_data(&[], 44100, 150);
-        assert_eq!(moodbar.len(), 450);
-        assert!(moodbar.iter().all(|&v| v == 0));
+    fn test_compute_band_waveform_data_empty() {
+        let band_waveform = compute_band_waveform_data(&[], 44100, 150);
+        assert_eq!(band_waveform.len(), 450);
+        assert!(band_waveform.iter().all(|&v| v == 0));
     }
 }

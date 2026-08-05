@@ -68,7 +68,7 @@ rubato = "0.16"
 # --- Tag reading/writing ---
 lofty = "0.21"
 
-# --- FFT (spectrum analyzer, moodbar) ---
+# --- FFT (spectrum analyzer, band waveform) ---
 rustfft = "6"
 
 # --- EBU R128 / BS.1770 loudness measurement (#77) ---

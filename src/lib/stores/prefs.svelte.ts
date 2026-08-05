@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type RatingStyle = "heart" | "stars";
-export type SeekBarMode = "waveform" | "moodbar";
+export type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 
 class PrefsStore {
@@ -19,7 +19,7 @@ class PrefsStore {
       if (settings?.rating_style === "stars" || settings?.rating_style === "heart") {
         this.ratingStyle = settings.rating_style;
       }
-      if (settings?.seekbar_mode === "waveform" || settings?.seekbar_mode === "moodbar") {
+      if (settings?.seekbar_mode === "waveform" || settings?.seekbar_mode === "bands") {
         this.seekBarMode = settings.seekbar_mode;
       }
       if (settings?.acoustid_api_key) {
@@ -52,7 +52,7 @@ class PrefsStore {
   }
 
   async toggleSeekBarMode() {
-    this.seekBarMode = this.seekBarMode === "waveform" ? "moodbar" : "waveform";
+    this.seekBarMode = this.seekBarMode === "waveform" ? "bands" : "waveform";
     try {
       await invoke("set_app_setting", { key: "seekbar_mode", value: this.seekBarMode });
     } catch (e) {

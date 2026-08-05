@@ -1,6 +1,6 @@
 use crate::analyzer::decode_all_samples;
+use crate::band_waveform::compute_band_waveform_data;
 use crate::db::Database;
-use crate::moodbar::compute_moodbar_data;
 use anyhow::{Context, Result};
 use rusqlite::params;
 use std::path::Path;
@@ -67,7 +67,7 @@ use parking_lot::Mutex;
 
 static VISUALIZER_GEN_LOCK: Mutex<()> = Mutex::new(());
 
-/// Decodes audio file once and generates/caches both waveform and moodbar data.
+/// Decodes audio file once and generates/caches both waveform and band waveform data.
 pub fn generate_visualizer_data(
     db: &Database,
     song_id: i64,
@@ -75,7 +75,7 @@ pub fn generate_visualizer_data(
 ) -> Result<(Vec<u8>, Vec<u8>)> {
     if let (Ok(Some(w)), Ok(Some(m))) = (
         get_cached_waveform(db, song_id),
-        crate::moodbar::get_cached_moodbar(db, song_id),
+        crate::band_waveform::get_cached_band_waveform(db, song_id),
     ) {
         return Ok((w, m));
     }
@@ -84,7 +84,7 @@ pub fn generate_visualizer_data(
 
     if let (Ok(Some(w)), Ok(Some(m))) = (
         get_cached_waveform(db, song_id),
-        crate::moodbar::get_cached_moodbar(db, song_id),
+        crate::band_waveform::get_cached_band_waveform(db, song_id),
     ) {
         return Ok((w, m));
     }
@@ -100,7 +100,11 @@ pub fn generate_visualizer_data(
     // Higher point resolution than the waveform: transient (hi-hat/percussion)
     // detail in the layered band waveform benefits from finer time resolution
     // than the waveform's coarser peak envelope needs (#217).
-    let moodbar_rgb = compute_moodbar_data(&samples, sample_rate, crate::moodbar::MOODBAR_POINTS);
+    let band_waveform_data = compute_band_waveform_data(
+        &samples,
+        sample_rate,
+        crate::band_waveform::BAND_WAVEFORM_POINTS,
+    );
 
     let mut conn = db.pool.get()?;
     let tx = conn.transaction()?;
@@ -111,13 +115,17 @@ pub fn generate_visualizer_data(
     )?;
 
     tx.execute(
-        "INSERT OR REPLACE INTO moodbars (song_id, data, style) VALUES (?1, ?2, ?3)",
-        params![song_id, moodbar_rgb, crate::moodbar::MOODBAR_STYLE_VERSION],
+        "INSERT OR REPLACE INTO band_waveforms (song_id, data, style) VALUES (?1, ?2, ?3)",
+        params![
+            song_id,
+            band_waveform_data,
+            crate::band_waveform::BAND_WAVEFORM_STYLE_VERSION
+        ],
     )?;
 
     tx.commit()?;
 
-    Ok((waveform_peaks, moodbar_rgb))
+    Ok((waveform_peaks, band_waveform_data))
 }
 
 /// Generate peak waveform amplitudes for a song, save to SQLite, and return them.
@@ -157,15 +165,15 @@ pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>
     }))
 }
 
-/// Queries database for songs missing either waveform or moodbar cache, or whose
-/// cached waveform/moodbar was written by an older style version and needs
+/// Queries database for songs missing either waveform or band waveform cache, or whose
+/// cached waveform/band waveform was written by an older style version and needs
 /// regenerating under the current format.
 pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
     let mut stmt = conn.prepare(
         "SELECT s.id, s.path FROM songs s
          LEFT JOIN waveforms w ON s.id = w.song_id
-         LEFT JOIN moodbars m ON s.id = m.song_id
+         LEFT JOIN band_waveforms m ON s.id = m.song_id
          WHERE s.unavailable = 0 AND s.path IS NOT NULL
            AND (w.song_id IS NULL OR m.song_id IS NULL OR w.style != ?1 OR m.style != ?2)",
     )?;
@@ -174,7 +182,7 @@ pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>>
         .query_map(
             params![
                 WAVEFORM_STYLE_VERSION,
-                crate::moodbar::MOODBAR_STYLE_VERSION
+                crate::band_waveform::BAND_WAVEFORM_STYLE_VERSION
             ],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?
@@ -229,7 +237,7 @@ where
     Ok(count)
 }
 
-/// Scans database for songs that are missing either waveform or moodbar cache and generates them.
+/// Scans database for songs that are missing either waveform or band waveform cache and generates them.
 pub fn backfill_missing_visualizers(db: &Database) -> Result<usize> {
     backfill_missing_visualizers_with_progress(db, |_, _, _| {})
 }
@@ -304,11 +312,11 @@ mod tests {
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO moodbars (song_id, data, style) VALUES (?1, ?2, ?3)",
+            "INSERT INTO band_waveforms (song_id, data, style) VALUES (?1, ?2, ?3)",
             params![
                 song_id,
-                vec![0u8; crate::moodbar::MOODBAR_POINTS * 3],
-                crate::moodbar::MOODBAR_STYLE_VERSION
+                vec![0u8; crate::band_waveform::BAND_WAVEFORM_POINTS * 3],
+                crate::band_waveform::BAND_WAVEFORM_STYLE_VERSION
             ],
         )
         .unwrap();
@@ -330,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stale_moodbar_style_is_treated_as_missing() {
+    fn test_stale_band_waveform_style_is_treated_as_missing() {
         let temp_dir = tempfile::tempdir().unwrap();
         let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
         let conn = db.pool.get().unwrap();
@@ -349,14 +357,14 @@ mod tests {
         .unwrap();
         // Cached under a stale style (pre-#217 blended-color format).
         conn.execute(
-            "INSERT INTO moodbars (song_id, data, style) VALUES (?1, ?2, 0)",
+            "INSERT INTO band_waveforms (song_id, data, style) VALUES (?1, ?2, 0)",
             params![song_id, vec![0u8; 450]],
         )
         .unwrap();
         drop(conn);
 
         assert_eq!(
-            crate::moodbar::get_cached_moodbar(&db, song_id).unwrap(),
+            crate::band_waveform::get_cached_band_waveform(&db, song_id).unwrap(),
             None
         );
 

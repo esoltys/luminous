@@ -8,7 +8,7 @@
   const CANVAS_BAR_HEIGHT_PX = 28;
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
 
-  // Fixed layer colors for the low/mid/high band waveform (moodbar mode). These
+  // Fixed layer colors for the low/mid/high band waveform (bands mode). These
   // are a deliberate exception to DESIGN.md's "accent is the only
   // interactive-emphasis hue" rule — like the mood colors they replace, they
   // encode frequency-band data rather than interactive state, so they're kept
@@ -21,24 +21,24 @@
   let containerEl = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let waveformData = $state<number[]>([]);
-  let moodbarData = $state<number[]>([]);
+  let bandData = $state<number[]>([]);
   let isDragging = $state(false);
 
   // Guards a slow, still-in-flight request from a previously-skipped-past
   // track from overwriting waveformData after a newer track has already
   // taken over (e.g. the in-flight request settles just after another skip).
   let waveformRequestId = 0;
-  let moodbarRequestId = 0;
+  let bandRequestId = 0;
 
   let isLoadingWaveform = $state(false);
-  let isLoadingMoodbar = $state(false);
+  let isLoadingBands = $state(false);
   let pulseAngle = $state(0);
   let animFrameId: number | null = null;
 
   function startLoadingAnimation() {
     if (animFrameId !== null) return;
     function step() {
-      if (isLoadingWaveform || isLoadingMoodbar) {
+      if (isLoadingWaveform || isLoadingBands) {
         pulseAngle = (pulseAngle + 0.08) % (Math.PI * 2);
         draw();
         animFrameId = requestAnimationFrame(step);
@@ -88,34 +88,34 @@
 
   // Same cache-miss-triggers-full-decode cost as loadWaveform above, so it
   // gets the same request-id guard and debounce treatment.
-  async function loadMoodbar(songId: number | undefined) {
-    const requestId = ++moodbarRequestId;
+  async function loadBands(songId: number | undefined) {
+    const requestId = ++bandRequestId;
     if (songId === undefined) {
-      moodbarData = [];
-      isLoadingMoodbar = false;
+      bandData = [];
+      isLoadingBands = false;
       draw();
       return;
     }
-    isLoadingMoodbar = true;
-    moodbarData = [];
+    isLoadingBands = true;
+    bandData = [];
     startLoadingAnimation();
     try {
-      const data = await invoke<number[] | null>("get_moodbar_data", { song_id: songId, songId });
-      if (requestId !== moodbarRequestId) return;
-      moodbarData = data ?? [];
+      const data = await invoke<number[] | null>("get_band_waveform_data", { song_id: songId, songId });
+      if (requestId !== bandRequestId) return;
+      bandData = data ?? [];
     } catch (e) {
-      if (requestId !== moodbarRequestId) return;
-      console.error("Failed to load moodbar:", e);
-      moodbarData = [];
+      if (requestId !== bandRequestId) return;
+      console.error("Failed to load band waveform:", e);
+      bandData = [];
     } finally {
-      if (requestId === moodbarRequestId) {
-        isLoadingMoodbar = false;
+      if (requestId === bandRequestId) {
+        isLoadingBands = false;
         draw();
       }
     }
   }
 
-  // Draw waveform or moodbar, depending on prefs.seekBarMode
+  // Draw waveform or bands, depending on prefs.seekBarMode
   function draw() {
     if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
@@ -143,8 +143,8 @@
     const hoverColor = colors["color-accent-hover"] || '#a78bfa';
     const borderCol = colors["color-border"] || '#374151';
 
-    if (prefs.seekBarMode === "moodbar") {
-      drawMoodbar(ctx, width, height, progressPct, accentColor);
+    if (prefs.seekBarMode === "bands") {
+      drawBands(ctx, width, height, progressPct, accentColor);
     } else {
       drawWaveform(ctx, width, height, progressPct, accentColor, hoverColor, borderCol);
     }
@@ -209,20 +209,20 @@
     ctx.globalAlpha = 1.0;
   }
 
-  function drawMoodbar(
+  function drawBands(
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
     progressPct: number,
     accentColor: string,
   ) {
-    const totalPoints = moodbarData.length > 0 ? Math.floor(moodbarData.length / 3) : 150;
+    const totalPoints = bandData.length > 0 ? Math.floor(bandData.length / 3) : 150;
     const segWidth = width / totalPoints;
 
     // Still decoding/generating (or nothing loaded yet for this track): show
     // the same pulsing scan animation as drawWaveform's placeholder, instead
     // of silently rendering nothing (all-zero bands) while data is in flight.
-    const isPlaceholder = isLoadingMoodbar || moodbarData.length === 0;
+    const isPlaceholder = isLoadingBands || bandData.length === 0;
 
     for (let s = 0; s < totalPoints; s++) {
       const x = s * segWidth;
@@ -242,9 +242,9 @@
       // from the finer time resolution: exactly what makes transient hits
       // (hi-hats, drum spikes) precisely locatable rather than smeared
       // across an averaged region.
-      const low = moodbarData[s * 3];
-      const mid = moodbarData[s * 3 + 1];
-      const high = moodbarData[s * 3 + 2];
+      const low = bandData[s * 3];
+      const mid = bandData[s * 3 + 1];
+      const high = bandData[s * 3 + 2];
 
       const segPct = s / totalPoints;
       const played = segPct <= progressPct;
@@ -302,7 +302,7 @@
   let loadedSongId: number | undefined = undefined;
   let loadedMode: string | undefined = undefined;
 
-  // Fetch waveform or moodbar when song or mode actually changes.
+  // Fetch waveform or bands when song or mode actually changes.
   $effect(() => {
     const songId = playerStore.currentSong?.id;
     const mode = prefs.seekBarMode;
@@ -310,9 +310,9 @@
     if (songId !== loadedSongId || mode !== loadedMode) {
       loadedSongId = songId;
       loadedMode = mode;
-      if (mode === "moodbar") {
-        moodbarData = [];
-        loadMoodbar(songId);
+      if (mode === "bands") {
+        bandData = [];
+        loadBands(songId);
       } else {
         waveformData = [];
         loadWaveform(songId);
@@ -328,7 +328,7 @@
     const _art = themeStore.artworkColors;
     const _mode = prefs.seekBarMode;
     const _wave = waveformData;
-    const _mood = moodbarData;
+    const _bands = bandData;
     draw();
   });
 
@@ -366,8 +366,8 @@
   bind:this={containerEl}
   onmousedown={handleMouseDown}
   class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
-  title={prefs.seekBarMode === 'moodbar'
-    ? i18n.t('playerBar.moodbarLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
+  title={prefs.seekBarMode === 'bands'
+    ? i18n.t('playerBar.bandsLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
     : undefined}
 >
   <canvas bind:this={canvas} class="block w-full h-7 opacity-100"></canvas>

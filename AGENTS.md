@@ -132,7 +132,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Virtualize large lists (collections, playlists) with `svelte-virtual-list-ts`.
 - Library scanning is incremental (checks file mod times) and doesn't re-scan unchanged files.
 - Database access uses indices, FTS5 for track/album search, and prepared statements.
-- Moodbar/FFT analysis runs on a background thread and must not block playback.
+- Band waveform/FFT analysis runs on a background thread and must not block playback.
 
 ## Version Control
 

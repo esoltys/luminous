@@ -174,7 +174,7 @@ The application uses a fixed viewport shell:
 - **TopNavigation**: Fixed 80px header housing navigation buttons, universal search, density toggles, and view options.
 - **Content Canvas**: Scrollable central viewport (Personalized Home Hub, Category Explorer, Album Parallax Hero, Artist Hub).
 - **RightPanel**: Collapsible side drawer for `.LRC` Synced Lyrics, Queue Drawer (Playing Next / History), and Liner Notes.
-- **PlayerBar**: Fixed 80px bottom dock housing media transport, volume, visualizer toggles (FFT / Moodbar / Waveform), and miniplayer detachment controls.
+- **PlayerBar**: Fixed 80px bottom dock housing media transport, volume, visualizer toggles (FFT / Frequency Bands / Waveform), and miniplayer detachment controls.
 
 ## Elevation & Depth
 

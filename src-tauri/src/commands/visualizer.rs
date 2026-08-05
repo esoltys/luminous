@@ -40,12 +40,12 @@ pub async fn get_waveform_data(
 }
 
 #[tauri::command]
-pub async fn get_moodbar_data(
+pub async fn get_band_waveform_data(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<Option<Vec<u8>>, String> {
     // 1. Check cache in SQLite
-    if let Ok(Some(cached)) = crate::moodbar::get_cached_moodbar(&state.db, song_id) {
+    if let Ok(Some(cached)) = crate::band_waveform::get_cached_band_waveform(&state.db, song_id) {
         return Ok(Some(cached));
     }
 
@@ -64,16 +64,16 @@ pub async fn get_moodbar_data(
         None => return Ok(None),
     };
 
-    // 3. Generate moodbar in a blocking threadpool task
+    // 3. Generate band waveform in a blocking threadpool task
     let db_clone = Arc::clone(&state.db);
-    let moodbar_data = tauri::async_runtime::spawn_blocking(move || {
-        crate::moodbar::generate_moodbar(&db_clone, song_id, &path)
+    let band_waveform_data = tauri::async_runtime::spawn_blocking(move || {
+        crate::band_waveform::generate_band_waveform(&db_clone, song_id, &path)
     })
     .await
     .map_err(|e| e.to_string())?
     .map_err(|e| e.to_string())?;
 
-    Ok(Some(moodbar_data))
+    Ok(Some(band_waveform_data))
 }
 
 #[tauri::command]

@@ -11,6 +11,7 @@
 
 pub mod analyzer;
 pub mod audio;
+pub mod band_waveform;
 pub mod collection;
 pub mod commands;
 pub mod covermanager;
@@ -22,7 +23,6 @@ pub mod loudness;
 pub mod lyrics;
 pub mod media_session;
 pub mod models;
-pub mod moodbar;
 pub mod organizer;
 pub mod player;
 pub mod playlist;
@@ -700,7 +700,7 @@ pub fn run() {
             commands::cover::fetch_remote_cover,
             // Visualizer commands
             commands::visualizer::get_waveform_data,
-            commands::visualizer::get_moodbar_data,
+            commands::visualizer::get_band_waveform_data,
             commands::visualizer::set_spectrum_enabled,
             // Equalizer commands
             commands::equalizer::get_equalizer_state,
