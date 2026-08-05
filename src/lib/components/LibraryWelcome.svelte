@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Music, FolderClosed, RefreshCw } from "lucide-svelte";
+  import { FolderClosed, RefreshCw } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import Button from "./Button.svelte";
@@ -15,11 +15,13 @@
      watched folder has been added yet — distinct from the "your search/filters
      matched nothing" empty states, which keep their own dashed-border treatment. -->
 <div class="flex flex-col items-center justify-center max-w-sm mx-auto text-center p-8 bg-brand-sidebar/40 rounded-xl border border-brand-border select-none">
-  <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center mb-4">
+  <div class="w-14 h-14 flex items-center justify-center mb-4">
     {#if dbNewer}
-      <RefreshCw class="w-7 h-7 text-brand-accent-text" />
+      <div class="w-14 h-14 rounded-full bg-brand-accent/15 border border-brand-accent/30 flex items-center justify-center">
+        <RefreshCw class="w-7 h-7 text-brand-accent-text" />
+      </div>
     {:else}
-      <Music class="w-7 h-7 text-brand-accent-text" />
+      <img src="/luminous-mark.svg" alt="" class="w-14 h-14" />
     {/if}
   </div>
   {#if dbNewer}
