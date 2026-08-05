@@ -945,7 +945,7 @@
     <div class="flex-1 min-h-0 p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
       <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto" use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}>
       <!-- Header -->
-      <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
+      <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
           <SortableHeader
             active={sortField === "position"}
@@ -1231,9 +1231,9 @@
               }"
             style={gridColsStyle}
           >
-            <div class="text-center text-brand-text-secondary font-medium relative min-w-0 cursor-grab active:cursor-grabbing">
+            <div class="text-center text-brand-text-primary font-medium relative min-w-0 cursor-grab active:cursor-grabbing">
               <div class="relative w-5 h-4 mx-auto flex items-center justify-center">
-                <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-secondary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
+                <GripVertical class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 text-brand-text-primary transition-opacity shrink-0 absolute -left-3 top-0.5 pointer-events-none" />
                 {#if isItemPlaying && playerStore.state === "playing"}
                   <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
                     <NowPlayingBars />
@@ -1255,7 +1255,7 @@
             </div>
 
             {#if collectionStore.visibleColumns.title}
-              <div class="font-medium truncate pr-4 min-w-0 {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-secondary' : 'text-brand-text-primary'}">
+              <div class="font-medium truncate pr-4 min-w-0 {isSelected || (!unavailable && playerStore.playlistItemUuid === item.uuid) ? 'text-brand-accent-text-hover' : unavailable ? 'text-brand-text-primary' : 'text-brand-text-primary'}">
                 <div class="flex items-center gap-2 max-w-full">
                   {#if trueUnavailable}
                     <span title={i18n.t("playlists.fileNotFoundTooltip")}>
@@ -1294,105 +1294,105 @@
             {/if}
 
             {#if collectionStore.visibleColumns.artist}
-              <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+              <div class="text-brand-text-primary truncate pr-4 min-w-0">
                 {#if trueUnavailable}
-                  <span class="text-brand-text-secondary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
+                  <span class="text-brand-text-primary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
                 {:else if disconnected}
-                  <span class="text-brand-text-secondary italic text-xs">{i18n.t("collection.driveDisconnectedText")}</span>
+                  <span class="text-brand-text-primary italic text-xs">{i18n.t("collection.driveDisconnectedText")}</span>
                 {:else if item.song?.artist}
                   <LinkButton
                     onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
-                    class="text-brand-text-secondary truncate min-w-0"
+                    class="text-brand-text-primary truncate min-w-0"
                     title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
                   >
                     {item.song.artist}
                   </LinkButton>
                 {:else}
-                  <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
+                  <span class="text-brand-text-primary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
                 {/if}
               </div>
             {/if}
 
             {#if collectionStore.visibleColumns.album}
-              <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+              <div class="text-brand-text-primary truncate pr-4 min-w-0">
                 {#if unavailable}
-                  <span class="text-brand-text-secondary italic text-xs truncate min-w-0">{item.song?.album ?? ""}</span>
+                  <span class="text-brand-text-primary italic text-xs truncate min-w-0">{item.song?.album ?? ""}</span>
                 {:else if item.song?.album}
                   <LinkButton
                     onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(item.song?.album || ""); }}
-                    class="text-brand-text-secondary truncate min-w-0"
+                    class="text-brand-text-primary truncate min-w-0"
                     title={i18n.t("collection.filterByAlbum", { album: item.song.album })}
                   >
                     {item.song.album}
                   </LinkButton>
                 {:else}
-                  <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
+                  <span class="text-brand-text-primary truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
                 {/if}
               </div>
             {/if}
 
             {#if collectionStore.visibleColumns.composer}
-              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.composer}>
+              <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.composer}>
                 {item.song?.composer || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.album_artist}
-              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.album_artist}>
+              <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.album_artist}>
                 {item.song?.album_artist || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.format}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
                 {item.song?.filetype ? item.song.filetype.toUpperCase() : "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.year}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {item.song?.year || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.genre}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.genre}>
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.genre}>
                 {item.song?.genre || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.grouping}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.grouping}>
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.grouping}>
                 {item.song?.grouping || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bpm}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {item.song?.bpm || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.initial_key}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {item.song?.initial_key || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {item.song?.bitrate ? `${item.song.bitrate}k` : "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.samplerate}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {formatSampleRate(item.song?.samplerate)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bitdepth}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {formatBitDepth(item.song?.bitdepth)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.channels}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {formatChannels(item.song?.channels)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.filesize}
-              <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                 {formatFileSize(item.song?.filesize)}
               </div>
             {/if}
@@ -1404,32 +1404,32 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.playcount}
-              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+              <div class="text-center text-brand-text-primary text-xs min-w-0">
                 {item.song?.playcount || 0}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.skipcount}
-              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+              <div class="text-center text-brand-text-primary text-xs min-w-0">
                 {item.song?.skipcount || 0}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.lastplayed}
-              <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+              <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
                 {formatDate(item.song?.lastplayed)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.added}
-              <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+              <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
                 {formatDate(item.song?.added)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.duration}
-              <div class="text-center text-brand-text-secondary text-xs min-w-0">
+              <div class="text-center text-brand-text-primary text-xs min-w-0">
                 {formatDuration(item.song?.length_nanosec)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.path}
-              <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-mono" title={item.song?.path}>
+              <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-mono" title={item.song?.path}>
                 {item.song?.path || "—"}
               </div>
             {/if}
@@ -1439,7 +1439,7 @@
                 <div class="flex items-center justify-center gap-2.5">
                   <button
                     onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
-                    class="text-brand-text-secondary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
+                    class="text-brand-text-primary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
                     title={i18n.t("collection.editTagsTooltip")}
                     disabled={!item.song || unavailable}
                   >
@@ -1447,7 +1447,7 @@
                   </button>
                   <button
                     onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
-                    class="text-brand-text-secondary/60 hover:text-red-400 transition-colors cursor-pointer"
+                    class="text-brand-text-primary/60 hover:text-red-400 transition-colors cursor-pointer"
                     title={i18n.t("playlists.removeFromPlaylist")}
                   >
                     <Trash2 class="w-4 h-4" />
@@ -1459,8 +1459,8 @@
         {/each}
 
         {#if filteredTracks.length === 0}
-          <div class="py-12 text-center text-brand-text-secondary/45 select-none">
-            <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/30" />
+          <div class="py-12 text-center text-brand-text-primary/45 select-none">
+            <ListMusic class="w-12 h-12 mx-auto mb-2 text-brand-text-primary/30" />
             {#if filterQuery}
               {i18n.t("playlists.noFilterResults", { query: filterQuery })}
             {:else if isQueue}
@@ -1499,7 +1499,7 @@
         <div class="h-4 w-px bg-brand-border/60"></div>
         <button
           onclick={() => { selectedUuids = new Set(); lastSelectedIndex = null; }}
-          class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="text-brand-text-primary hover:text-brand-text-primary transition-colors cursor-pointer"
         >
           {i18n.t("playlists.clearSelection")}
         </button>
@@ -1507,9 +1507,9 @@
     {/if}
   {:else}
     <!-- No playlist selected -->
-    <div class="flex-1 flex flex-col items-center justify-center text-brand-text-secondary/60">
-      <ListMusic class="w-16 h-16 mb-4 text-brand-text-secondary/30" />
-      <h2 class="text-lg font-bold text-brand-text-secondary/80 mb-1">{i18n.t("playlists.noPlaylistsTitle")}</h2>
+    <div class="flex-1 flex flex-col items-center justify-center text-brand-text-primary/60">
+      <ListMusic class="w-16 h-16 mb-4 text-brand-text-primary/30" />
+      <h2 class="text-lg font-bold text-brand-text-primary/80 mb-1">{i18n.t("playlists.noPlaylistsTitle")}</h2>
       <p class="text-sm">{i18n.t("playlists.noPlaylistsText")}</p>
     </div>
   {/if}

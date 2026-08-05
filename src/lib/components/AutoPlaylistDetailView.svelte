@@ -637,7 +637,7 @@ import { shuffleArray } from "../utils/shuffle";
   <div class="flex-1 min-h-0 px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
     <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto" use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? ""}`}>
       <!-- Header -->
-      <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
+      <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
           <SortableHeader
             active={sortField === "track" || sortField === "default"}
@@ -887,7 +887,7 @@ import { shuffleArray } from "../utils/shuffle";
       <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
         {#if loading}
-          <div class="py-16 text-center text-brand-text-secondary text-sm">
+          <div class="py-16 text-center text-brand-text-primary text-sm">
             {i18n.t('home.loading')}
           </div>
         {:else if sortedSongs.length === 0}
@@ -914,7 +914,7 @@ import { shuffleArray } from "../utils/shuffle";
                 {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               style={gridColsStyle}
             >
-              <div class="text-center text-brand-text-secondary font-medium relative min-w-0">
+              <div class="text-center text-brand-text-primary font-medium relative min-w-0">
                 <div class="relative w-9 h-4 mx-auto flex items-center justify-center">
                   {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
                     <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute inset-0 group-hover:opacity-0 transition-opacity">
@@ -941,98 +941,98 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.artist}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+                <div class="text-brand-text-primary truncate pr-4 min-w-0">
                   {#if song.artist}
                     <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="text-brand-text-secondary truncate min-w-0"
+                      class="text-brand-text-primary truncate min-w-0"
                       title={i18n.t('collection.filterByArtist', { artist: song.artist })}
                     >
                       {song.artist}
                     </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
+                    <span class="text-brand-text-primary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.album}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0">
+                <div class="text-brand-text-primary truncate pr-4 min-w-0">
                   {#if song.album}
                     <LinkButton
                       onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                      class="text-brand-text-secondary truncate min-w-0"
+                      class="text-brand-text-primary truncate min-w-0"
                       title={i18n.t('collection.filterByAlbum', { album: song.album })}
                     >
                       {song.album}
                     </LinkButton>
                   {:else}
-                    <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownAlbum')}</span>
+                    <span class="text-brand-text-primary truncate min-w-0">{i18n.t('collection.unknownAlbum')}</span>
                   {/if}
                 </div>
               {/if}
 
               {#if collectionStore.visibleColumns.composer}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.composer}>
+                <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={song.composer}>
                   {song.composer || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.album_artist}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.album_artist}>
+                <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={song.album_artist}>
                   {song.album_artist || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.format}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
                   {song.filetype ? song.filetype.toUpperCase() : "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.year}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {song.year || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.genre}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
                   {song.genre || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.grouping}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
                   {song.grouping || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bpm}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {song.bpm || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.initial_key}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {song.initial_key || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bitrate}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {song.bitrate ? `${song.bitrate}k` : "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.samplerate}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {formatSampleRate(song.samplerate)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bitdepth}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {formatBitDepth(song.bitdepth)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.channels}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatChannels(song.channels)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.filesize}
-                <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
                   {formatFileSize(song.filesize)}
                 </div>
               {/if}
@@ -1042,32 +1042,32 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.playcount}
-                <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                <div class="text-center text-brand-text-primary text-xs min-w-0">
                   {song.playcount || 0}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.skipcount}
-                <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                <div class="text-center text-brand-text-primary text-xs min-w-0">
                   {song.skipcount || 0}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.lastplayed}
-                <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+                <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
                   {formatDate(song.lastplayed)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.added}
-                <div class="text-center text-brand-text-secondary font-mono text-xs whitespace-nowrap">
+                <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
                   {formatDate(song.added)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.duration}
-                <div class="text-center text-brand-text-secondary text-xs min-w-0">
+                <div class="text-center text-brand-text-primary text-xs min-w-0">
                   {formatDuration(song.length_nanosec)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.path}
-                <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-mono" title={song.path}>
+                <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-mono" title={song.path}>
                   {song.path || "—"}
                 </div>
               {/if}
@@ -1077,7 +1077,7 @@ import { shuffleArray } from "../utils/shuffle";
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
-                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
                       title={playlistsStore.activeCustomPlaylist
                         ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                         : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -1086,7 +1086,7 @@ import { shuffleArray } from "../utils/shuffle";
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
-                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
                       title={i18n.t('collection.editTagsTooltip')}
                     >
                       <Edit3 class="w-4 h-4" />
@@ -1101,7 +1101,7 @@ import { shuffleArray } from "../utils/shuffle";
     </div>
 
     {#if autoPlay && (kind === "genre" || kind === "decade") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
-      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-secondary flex items-center justify-center gap-2 select-none">
+      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-primary flex items-center justify-center gap-2 select-none">
         <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
         <span>{i18n.t('playlists.allMatchingTracksAdded')}</span>
       </div>
