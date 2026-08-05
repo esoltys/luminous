@@ -27,6 +27,12 @@
   let midIntensity = $state(0);
   let coronalIntensity = $state(0);
   let unlisten: (() => void) | null = null;
+  // Recomputing the SVG saturate() filter over the already-blurred glow
+  // circles is expensive; the backend streams spectrum-data at 30fps, but
+  // updating this component that often causes visible jank elsewhere on
+  // the page (e.g. flicker in other views' blurred backdrops). Halving the
+  // update rate keeps the pulse looking reactive at a much lower cost.
+  let frameSkip = 0;
 
   onMount(async () => {
     const stored = localStorage.getItem("logo_pulsing");
@@ -49,6 +55,9 @@
           coronalIntensity = 0;
           return;
         }
+        frameSkip = (frameSkip + 1) % 2;
+        if (frameSkip !== 0) return;
+
         const data = event.payload;
         if (data && data.length > 0) {
           // Segment and average the 32 spectrum bins into Bass, Mids, and Coronal/Treble
@@ -142,13 +151,13 @@
     <defs>
       <!-- Filters mirror docs/luminous-mark-reactive.svg's three distinct
            blur passes — one per layer, not a single shared filter -->
-      <filter id="glowBlurOuter" x="-80%" y="-80%" width="260%" height="260%">
+      <filter id="glowBlurOuter" x="-30%" y="-30%" width="160%" height="160%">
         <feGaussianBlur stdDeviation="22" />
       </filter>
-      <filter id="ringBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <filter id="ringBlur" x="-15%" y="-15%" width="130%" height="130%">
         <feGaussianBlur stdDeviation="3" />
       </filter>
-      <filter id="burstBlur" x="-120%" y="-120%" width="340%" height="340%">
+      <filter id="burstBlur" x="-40%" y="-40%" width="180%" height="180%">
         <feGaussianBlur stdDeviation="10" />
       </filter>
     </defs>
