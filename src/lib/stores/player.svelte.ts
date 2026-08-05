@@ -322,20 +322,6 @@ export class PlayerStore {
     await invoke("play_playlist_item", { playlistId, itemIndex });
   }
 
-  /** Same as `playPlaylistItem`, but identifies the target row by uuid
-   * instead of a numeric index — use this wherever the index was captured
-   * from UI state that could go stale before this call actually runs (e.g.
-   * clicking a Queue row, since the Queue auto-trims in the background on
-   * every track change). Plays directly with no DB mutation beforehand —
-   * any resulting Queue trim happens afterward via `syncQueueTrackPosition`
-   * once the track change is confirmed, not as a blocking pre-step that
-   * could itself race and leave the target row missing. */
-  async playPlaylistItemByUuid(playlistId: number, uuid: string) {
-    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-    if (pl) this.activeContextName = pl.name;
-    await invoke("play_playlist_item_by_uuid", { playlistId, uuid });
-  }
-
   async pause() {
     await invoke("pause");
   }

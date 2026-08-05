@@ -32,7 +32,6 @@
   } from "lucide-svelte";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
-  import { toastStore } from "../stores/toast.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -428,19 +427,24 @@
     collectionStore.selectedPlaylistId = null;
   }
 
-  async function handlePlayPlaylistItem(item: PlaylistItem) {
-    if (!item || isItemUnavailable(item)) return;
-    if (playlistsStore.activePlaylistId === null) return;
-    try {
-      await playerStore.playPlaylistItemByUuid(playlistsStore.activePlaylistId, item.uuid);
-    } catch (err) {
-      // The clicked row can go stale if the list changed underneath it
-      // (e.g. this component held an older snapshot) — resync from the DB
-      // so the next click has current data instead of failing the same way.
-      console.error("Failed to play playlist item:", err);
-      await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
-      toastStore.show(i18n.t("playlists.playTrackFailed", {}, "Couldn't play that track — try again"), "error");
-    }
+  /** Plays the clicked row the same way `playSelected`/`handlePlayAll` do:
+   * resolve songIds + a start index entirely from in-memory reactive state
+   * and hand the whole batch to `playSongs` in one shot. Earlier this went
+   * through a uuid lookup (`playPlaylistItemByUuid`) resolved fresh on the
+   * backend, which turned out to still occasionally fail to find a uuid
+   * that demonstrably existed in the DB a moment later — an unresolved
+   * server-side race. Since there's nothing to race against when the whole
+   * request is built synchronously from state already in hand, this path
+   * sidesteps it rather than chasing it further. */
+  function handlePlayPlaylistItem(item: PlaylistItem) {
+    if (!item || isItemUnavailable(item) || !activePlaylist) return;
+    const availableTracks = playlistsStore.activePlaylistTracks.filter(
+      (t) => t.song && !isItemUnavailable(t)
+    );
+    const startIndex = availableTracks.findIndex((t) => t.uuid === item.uuid);
+    if (startIndex === -1) return;
+    const songIds = availableTracks.map((t) => t.song!.id);
+    playerStore.playSongs(songIds, startIndex, activePlaylist.id);
   }
 
   /** Returns true if the item's song is missing from disk or has no song data. */

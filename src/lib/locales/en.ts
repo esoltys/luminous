@@ -389,7 +389,6 @@ export const en = {
     confirmDeletePlaylistTitle: "Delete Playlist",
     cancel: "Cancel",
     playTrack: "Play song",
-    playTrackFailed: "Couldn't play that track — try again",
     removeFromPlaylist: "Remove from playlist",
     songsCount: "{count} songs",
     oneSong: "1 song",
