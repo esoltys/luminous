@@ -129,7 +129,7 @@
 <button
   type="button"
   onclick={togglePulsing}
-  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate transition-shadow duration-300"
+  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate"
   title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
   aria-label={i18n.t('common.toggleLogoPulsing')}
 >
@@ -142,13 +142,13 @@
     <defs>
       <!-- Filters mirror docs/luminous-mark-reactive.svg's three distinct
            blur passes — one per layer, not a single shared filter -->
-      <filter id="glowBlurOuter" x="-80%" y="-80%" width="260%" height="260%">
+      <filter id="glowBlurOuter" x="-30%" y="-30%" width="160%" height="160%">
         <feGaussianBlur stdDeviation="22" />
       </filter>
-      <filter id="ringBlur" x="-60%" y="-60%" width="220%" height="220%">
+      <filter id="ringBlur" x="-15%" y="-15%" width="130%" height="130%">
         <feGaussianBlur stdDeviation="3" />
       </filter>
-      <filter id="burstBlur" x="-120%" y="-120%" width="340%" height="340%">
+      <filter id="burstBlur" x="-40%" y="-40%" width="180%" height="180%">
         <feGaussianBlur stdDeviation="10" />
       </filter>
     </defs>
@@ -222,10 +222,5 @@
   svg {
     overflow: hidden;
     isolation: isolate;
-    transition: filter 0.3s ease;
-  }
-
-  svg:hover {
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
   }
 </style>
