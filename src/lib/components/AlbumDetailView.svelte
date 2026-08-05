@@ -21,6 +21,7 @@
   import ColumnSelector from "./ColumnSelector.svelte";
   import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
+  import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
@@ -134,6 +135,48 @@
     if (albumItem?.artist) return albumItem.artist;
     if (songs.length > 0) return songs[0].album_artist || songs[0].artist || "";
     return "";
+  });
+
+  // Resolves the same art_manual/art_automatic/art_embedded precedence as
+  // CoverArt.svelte and themeStore.updateArtworkColors, but at album level —
+  // embedded art has no album-wide URI, so it falls back to a representative song.
+  let backdropUrl = $state<string | null>(null);
+
+  $effect(() => {
+    const item = albumItem;
+    const fallbackSongId = item?.sample_song_id ?? songs[0]?.id;
+    let cancelled = false;
+
+    async function resolve() {
+      let url: string | null = null;
+      if (item?.art_manual) {
+        url =
+          item.art_manual.startsWith("http://") || item.art_manual.startsWith("https://") || item.art_manual.startsWith("/")
+            ? item.art_manual
+            : getCoverArtUrl(`luminous-art://${item.art_manual}`);
+      } else if (item?.art_automatic) {
+        if (item.art_automatic.startsWith("http://") || item.art_automatic.startsWith("https://") || item.art_automatic.startsWith("/")) {
+          url = item.art_automatic;
+        } else if (item.art_automatic.startsWith("album-")) {
+          url = getCoverArtUrl(`luminous-art://${item.art_automatic}`);
+        } else {
+          url = getCoverArtUrl(`luminous-art://local/${item.art_automatic}`);
+        }
+      } else if (item?.art_embedded && fallbackSongId !== undefined) {
+        try {
+          const uri = await invoke<string | null>("get_cover_art_uri", { songId: fallbackSongId });
+          if (uri) url = getCoverArtUrl(uri);
+        } catch (e) {
+          console.error("Failed to load album backdrop art:", e);
+        }
+      }
+      if (!cancelled) backdropUrl = url;
+    }
+
+    resolve();
+    return () => {
+      cancelled = true;
+    };
   });
 
   // Whether *any* track carries a disc > 1 decides whether every row
@@ -413,7 +456,17 @@
   });
 </script>
 
-<div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`album-detail:${albumName}`}>
+<div
+  class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full carousel-scroll {backdropUrl ? '' : 'bg-brand-main'}"
+  use:rememberScroll={`album-detail:${albumName}`}
+>
+  {#if backdropUrl}
+    <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <img src={backdropUrl} alt="" class="w-full h-full object-cover scale-110 blur-2xl" />
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
+    </div>
+  {/if}
+
   <!-- Album Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
     <div class="flex items-start justify-between gap-6 relative z-10">
@@ -505,10 +558,10 @@
   </div>
 
   <!-- Songs Table Section -->
-  <div class="px-6 py-6" class:pb-28={!!playerStore.currentSong}>
-    <div class="border border-brand-border rounded-lg bg-brand-sidebar/30">
+  <div class="relative z-10 px-6 py-6" class:pb-28={!!playerStore.currentSong}>
+    <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden">
       <!-- Table Header -->
-      <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
+      <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar/80 backdrop-blur-md border-b border-brand-border text-[10px] text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
         <div class="grid items-center py-2.5 px-4" style={gridColsStyle}>
           <div class="text-center w-9"></div>
           {#if collectionStore.visibleColumns.track}
