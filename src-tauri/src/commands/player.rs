@@ -7,20 +7,62 @@ use tauri::State;
 #[tauri::command]
 pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     use rusqlite::params;
-    let c = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     // Use a direct query to get by ID
     let sql = format!(
         "SELECT {} FROM songs WHERE id = ?1",
         crate::collection::SONG_SELECT_COLS
     );
-    let song = c
+    let _song = conn
         .query_row(&sql, params![song_id], crate::collection::row_to_song)
         .map_err(|e| e.to_string())?;
 
-    let item = PlaylistItem::new_song(0, 0, song);
+    let queue_id = {
+        let playlists = state.playlists.lock().await;
+        let queue_pl = playlists
+            .get_playlists()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
+
+        match queue_pl {
+            Some(pl) => pl.id,
+            None => {
+                let created = playlists
+                    .create_playlist("Queue")
+                    .map_err(|e| e.to_string())?;
+                created.id
+            }
+        }
+    };
+
+    // Replace Queue in DB with this single song
+    {
+        let mut playlists = state.playlists.lock().await;
+        let existing = playlists
+            .get_playlist_tracks(queue_id)
+            .map_err(|e| e.to_string())?;
+        if !existing.is_empty() {
+            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
+            playlists
+                .remove_from_playlist(queue_id, &uuids)
+                .map_err(|e| e.to_string())?;
+        }
+        playlists
+            .add_songs_to_playlist(queue_id, &[song_id])
+            .map_err(|e| e.to_string())?;
+    }
+
+    let items = {
+        let playlists = state.playlists.lock().await;
+        playlists
+            .get_playlist_tracks(queue_id)
+            .map_err(|e| e.to_string())?
+    };
+
     let mut player = state.player.lock().await;
     player
-        .play_playlist(vec![item], 0, 0, Some(PlayContext::Song))
+        .play_playlist(items, 0, queue_id, Some(PlayContext::Song))
         .await
         .map_err(|e| e.to_string())
 }
@@ -93,6 +135,20 @@ pub async fn play_playlist_item(
     let mut player = state.player.lock().await;
     player
         .play_playlist(items, item_index, playlist_id, None)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn play_playlist_item_by_uuid(
+    playlist_id: i64,
+    uuid: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let playlists = state.playlists.lock().await;
+    let mut player = state.player.lock().await;
+    player
+        .play_item_by_uuid(playlist_id, &uuid, &playlists)
         .await
         .map_err(|e| e.to_string())
 }
@@ -211,10 +267,15 @@ pub async fn set_repeat_mode(mode: RepeatMode, state: State<'_, AppState>) -> Re
 }
 
 #[tauri::command]
-pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn open_and_play(
+    paths: Vec<String>,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     use rusqlite::params;
     use rusqlite::OptionalExtension;
     use std::path::Path;
+    use tauri::Emitter;
 
     let mut resolved_paths = Vec::new();
 
@@ -232,10 +293,15 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
                 let parent_dir = path.parent();
 
                 for track in parsed.tracks {
-                    let mut item_path = std::path::PathBuf::from(&track.path_or_url);
+                    let raw_path = track.path_or_url.trim();
+                    let clean_rel = raw_path
+                        .trim_start_matches("./")
+                        .trim_start_matches(".\\")
+                        .trim();
+                    let mut item_path = std::path::PathBuf::from(clean_rel);
                     if item_path.is_relative() {
                         if let Some(parent) = parent_dir {
-                            item_path = parent.join(item_path);
+                            item_path = parent.join(&item_path);
                         }
                     }
 
@@ -252,6 +318,11 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
                         if is_audio {
                             resolved_paths.push(item_path);
                         }
+                    } else {
+                        log::warn!(
+                            "Playlist track path could not be resolved or does not exist: {}",
+                            item_path.display()
+                        );
                     }
                 }
             } else {
@@ -280,21 +351,30 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
 
     for item_path in resolved_paths {
         let item_path_str = item_path.to_string_lossy().to_string();
+        let norm_path_1 = item_path_str.replace('/', "\\");
+        let norm_path_2 = item_path_str.replace('\\', "/");
 
-        // Check if exists in db
+        // Check if exists in db (handling slash normalization and case variations)
         let existing: Option<crate::models::Song> = conn
             .query_row(
                 &format!(
-                    "SELECT {} FROM songs WHERE path = ?1",
+                    "SELECT {} FROM songs WHERE path = ?1 OR path = ?2 OR path = ?3 OR LOWER(path) = LOWER(?1)",
                     crate::collection::SONG_SELECT_COLS
                 ),
-                params![item_path_str],
+                params![item_path_str, norm_path_1, norm_path_2],
                 crate::collection::row_to_song,
             )
             .optional()
             .map_err(|e| e.to_string())?;
 
-        if let Some(s) = existing {
+        if let Some(mut s) = existing {
+            if s.unavailable {
+                let _ = conn.execute(
+                    "UPDATE songs SET unavailable = 0 WHERE id = ?1",
+                    params![s.id],
+                );
+                s.unavailable = false;
+            }
             songs.push(s);
         } else {
             // Read tags and upsert
@@ -358,17 +438,65 @@ pub async fn open_and_play(paths: Vec<String>, state: State<'_, AppState>) -> Re
         return Err("Failed to load any of the selected tracks.".to_string());
     }
 
-    let items = songs
-        .into_iter()
-        .enumerate()
-        .map(|(i, s)| crate::models::PlaylistItem::new_song(0, i as i32, s))
-        .collect::<Vec<_>>();
+    let song_ids: Vec<i64> = songs.iter().map(|s| s.id).collect();
+
+    let queue_id = {
+        let playlists = state.playlists.lock().await;
+        let queue_pl = playlists
+            .get_playlists()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
+
+        match queue_pl {
+            Some(pl) => pl.id,
+            None => {
+                let created = playlists
+                    .create_playlist("Queue")
+                    .map_err(|e| e.to_string())?;
+                created.id
+            }
+        }
+    };
+
+    // Replace tracks in DB Queue playlist so open file(s) replace the Queue
+    {
+        let mut playlists = state.playlists.lock().await;
+        let existing = playlists
+            .get_playlist_tracks(queue_id)
+            .map_err(|e| e.to_string())?;
+        if !existing.is_empty() {
+            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
+            playlists
+                .remove_from_playlist(queue_id, &uuids)
+                .map_err(|e| e.to_string())?;
+        }
+        playlists
+            .add_songs_to_playlist(queue_id, &song_ids)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let items = {
+        let playlists = state.playlists.lock().await;
+        playlists
+            .get_playlist_tracks(queue_id)
+            .map_err(|e| e.to_string())?
+    };
 
     let mut player = state.player.lock().await;
-    player
-        .play_playlist(items, 0, 0, Some(PlayContext::Song))
+    let res = player
+        .play_playlist(
+            items,
+            0,
+            queue_id,
+            Some(PlayContext::Playlist {
+                playlist_id: queue_id,
+            }),
+        )
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    let _ = app.emit("library-changed", ());
+    res
 }
 
 #[tauri::command]
@@ -428,6 +556,49 @@ pub async fn remove_songs_from_player_playlist(
     use tauri::Emitter;
     let mut player = state.player.lock().await;
     player.remove_songs_from_playlist_items(&uuids);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reorder_player_playlist_items(
+    from_index: usize,
+    to_index: usize,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player.reorder_playlist_items(from_index, to_index);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reorder_player_item_by_uuid(
+    source_uuid: String,
+    target_uuid: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player.reorder_playlist_item_by_uuid(&source_uuid, &target_uuid);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_player_playlist(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    let mut player = state.player.lock().await;
+    player.clear_playlist_items();
     let playback_state = player.get_state().await;
     let _ = app.emit("playback-state", playback_state);
     Ok(())

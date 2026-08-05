@@ -728,7 +728,7 @@ class CollectionStore {
   }
 
   async refreshLibrary() {
-    this.songs = await invoke("get_songs", { limit: 1000, offset: 0 });
+    this.songs = await invoke("get_songs", { limit: -1, offset: 0 });
     this.albums = await invoke("get_albums");
     this.artists = await invoke("get_artists");
   }

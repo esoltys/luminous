@@ -38,24 +38,91 @@ pub struct ParsedPlaylist {
     pub tracks: Vec<ParsedTrack>,
 }
 
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(val) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            {
+                decoded.push(val);
+                i += 3;
+                continue;
+            }
+        }
+        decoded.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&decoded).to_string()
+}
+
+pub fn clean_track_path(raw: &str) -> String {
+    let unquoted = raw
+        .trim()
+        .trim_matches('\0')
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim();
+    let mut s = unquoted;
+    if let Some(stripped) = s.strip_prefix("file:///") {
+        s = stripped;
+    } else if let Some(stripped) = s.strip_prefix("file://") {
+        s = stripped;
+    }
+    percent_decode(s)
+}
+
 pub fn parse_playlist<P: AsRef<Path>>(file_path: P) -> Result<ParsedPlaylist> {
     let path = file_path.as_ref();
     let format = PlaylistFormat::from_path(path)
         .ok_or_else(|| anyhow!("Unsupported playlist format for file: {}", path.display()))?;
 
-    let content = std::fs::read_to_string(path)
+    let bytes = std::fs::read(path)
         .map_err(|e| anyhow!("Failed to read playlist file '{}': {}", path.display(), e))?;
+
+    let raw_content = if bytes.starts_with(&[0xFF, 0xFE]) {
+        // UTF-16LE with BOM
+        let u16_units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16_lossy(&u16_units)
+    } else if bytes.starts_with(&[0xFE, 0xFF]) {
+        // UTF-16BE with BOM
+        let u16_units: Vec<u16> = bytes[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16_lossy(&u16_units)
+    } else if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        // UTF-8 with BOM
+        String::from_utf8_lossy(&bytes[3..]).into_owned()
+    } else if bytes.len() >= 4 && bytes.iter().step_by(2).skip(1).all(|&b| b == 0) {
+        // UTF-16LE without BOM
+        let u16_units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16_lossy(&u16_units)
+    } else {
+        // Standard UTF-8 / ANSI / ISO-8859-1
+        String::from_utf8_lossy(&bytes).into_owned()
+    };
+
+    let content = raw_content.strip_prefix('\u{feff}').unwrap_or(&raw_content);
 
     match format {
         PlaylistFormat::M3u | PlaylistFormat::M3u8 => Ok(ParsedPlaylist {
             title: None,
-            tracks: parse_m3u(&content),
+            tracks: parse_m3u(content),
         }),
         PlaylistFormat::Pls => Ok(ParsedPlaylist {
             title: None,
-            tracks: parse_pls(&content),
+            tracks: parse_pls(content),
         }),
-        PlaylistFormat::Xspf => parse_xspf(&content),
+        PlaylistFormat::Xspf => parse_xspf(content),
     }
 }
 
@@ -94,14 +161,16 @@ pub fn parse_m3u(content: &str) -> Vec<ParsedTrack> {
             continue;
         }
 
-        // It's a track path or URL
-        tracks.push(ParsedTrack {
-            path_or_url: trimmed.to_string(),
-            title: current_title.take(),
-            artist: current_artist.take(),
-            album: None,
-            duration_sec: current_duration.take(),
-        });
+        let cleaned = clean_track_path(trimmed);
+        if !cleaned.is_empty() {
+            tracks.push(ParsedTrack {
+                path_or_url: cleaned,
+                title: current_title.take(),
+                artist: current_artist.take(),
+                album: None,
+                duration_sec: current_duration.take(),
+            });
+        }
     }
 
     tracks

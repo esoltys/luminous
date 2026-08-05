@@ -73,6 +73,7 @@ export class PlayerStore {
       // Listen for playback state changes
       await listen<PlaybackState>("playback-state", async (event) => {
         const oldSongId = this.currentSong?.id;
+        const oldItemUuid = this.playlistItemUuid;
         const oldSongAlbum = this.currentSong?.album;
         const wasPlaying = this._previousState === "playing";
         const prevShuffle = this.shuffleMode;
@@ -81,7 +82,7 @@ export class PlayerStore {
         if (prevShuffle !== this.shuffleMode && playlistsStore.activePlaylistId !== null) {
           await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
         }
-        if (this.currentSong?.id !== oldSongId) {
+        if (this.currentSong?.id !== oldSongId || this.playlistItemUuid !== oldItemUuid) {
           themeStore.updateArtworkColors(this.currentSong);
           await this.syncQueueTrackPosition();
         }
@@ -245,10 +246,24 @@ export class PlayerStore {
   // Playback Control Actions
   async playSong(songId: number) {
     await invoke("play_song", { songId });
+    await playlistsStore.refreshPlaylists();
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (queuePl) {
+      this.activeContextName = "Queue";
+      if (playlistsStore.activePlaylistId === queuePl.id) {
+        await playlistsStore.selectPlaylist(queuePl.id);
+      }
+    }
   }
 
   async openAndPlay(paths: string[]) {
     await invoke("open_and_play", { paths });
+    await playlistsStore.refreshPlaylists();
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    if (queuePl) {
+      this.activeContextName = "Queue";
+      await playlistsStore.selectPlaylist(queuePl.id);
+    }
   }
 
   async openFileDialog() {
@@ -285,6 +300,8 @@ export class PlayerStore {
   }
 
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
+    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const effectivePlaylistId = playlistId ?? queuePl?.id;
     if (contextName) {
       this.activeContextName = contextName;
     } else if (context?.type === "album" && context.album) {
@@ -292,14 +309,14 @@ export class PlayerStore {
     } else if (context?.type === "playlist" && context.playlistId) {
       const pl = playlistsStore.playlists.find((p) => p.id === context.playlistId);
       if (pl) this.activeContextName = pl.name;
-    } else if (playlistId) {
-      const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    } else if (effectivePlaylistId) {
+      const pl = playlistsStore.playlists.find((p) => p.id === effectivePlaylistId);
       if (pl) this.activeContextName = pl.name;
     } else {
       this.activeContextName = undefined;
     }
     await playlistsStore.replaceQueueTracks(songIds);
-    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
+    await invoke("play_songs", { songIds, startIndex, playlistId: effectivePlaylistId ?? null, context: context ?? null });
   }
 
   /** Background cleanup only — never a precondition for playback. Trims
@@ -310,6 +327,7 @@ export class PlayerStore {
    * block on) the act of starting playback itself. */
   private async syncQueueTrackPosition() {
     if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
+    if (this.repeatMode === "playlist") return;
     const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
     if (pl?.name?.toLowerCase() === "queue" || this.activeContextName === "Queue") {
       await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
@@ -320,6 +338,12 @@ export class PlayerStore {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
     await invoke("play_playlist_item", { playlistId, itemIndex });
+  }
+
+  async playPlaylistItemByUuid(playlistId: number, uuid: string) {
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    if (pl) this.activeContextName = pl.name;
+    await invoke("play_playlist_item_by_uuid", { playlistId, uuid });
   }
 
   async pause() {

@@ -373,9 +373,7 @@
   }
 
   function handlePlaySong(song: Song) {
-    const index = filteredSongs.findIndex((s) => s.id === song.id);
-    const songIds = filteredSongs.map((s) => s.id);
-    playerStore.playSongs(songIds, index >= 0 ? index : 0);
+    playerStore.playSong(song.id);
   }
 
   async function handlePlayAlbum(albumName: string) {

@@ -145,6 +145,21 @@ pub async fn remove_from_playlist(
 }
 
 #[tauri::command]
+pub async fn reorder_playlist_item_by_uuid(
+    playlist_id: i64,
+    source_uuid: String,
+    target_uuid: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn reorder_playlist_item(
     playlist_id: i64,
     from: i32,
