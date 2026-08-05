@@ -8,43 +8,59 @@ use std::path::Path;
 /// Point resolution for the cached waveform peak envelope.
 pub const WAVEFORM_POINTS: usize = 150;
 
-/// Compute peak waveform amplitudes (0..255) for a sample buffer, normalized relative to overall peak.
+/// Format version of the data produced by `compute_waveform_peaks`, stored
+/// alongside each cached blob in `waveforms.style`. Bump whenever the
+/// computation changes so stale cached blobs (written by an older build) are
+/// regenerated rather than displayed under the new interpretation.
+///
+/// Version 1: RMS energy per chunk (was: max abs sample per chunk, which read
+/// as a flat, uniformly-tall rectangle for loudness-maximized masters instead
+/// of a shaped envelope).
+pub const WAVEFORM_STYLE_VERSION: i64 = 1;
+
+/// Compute waveform amplitude envelope (0..255) for a sample buffer, normalized
+/// relative to the loudest chunk.
+///
+/// Uses RMS (root-mean-square) energy per chunk rather than each chunk's max
+/// sample. Modern loudness-maximized masters keep their true peak sitting
+/// near the ceiling almost everywhere except actual silence, so a per-chunk
+/// max-peak envelope reads as a flat, uniformly-tall rectangle instead of a
+/// shaped contour — RMS reflects the track's perceived loudness envelope
+/// instead (the same approach used by Spotify/SoundCloud-style waveforms).
 pub fn compute_waveform_peaks(samples: &[f32], points: usize) -> Vec<u8> {
     if samples.is_empty() {
         return vec![0; points];
     }
 
-    let overall_max_peak = samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     let chunk_size = (samples.len() as f64 / points as f64).max(1.0);
-    let mut data = Vec::with_capacity(points);
+    let mut rms_per_chunk = Vec::with_capacity(points);
 
     for i in 0..points {
         let start = (i as f64 * chunk_size) as usize;
         let end = (((i + 1) as f64 * chunk_size) as usize).min(samples.len());
         if start >= samples.len() {
-            data.push(0);
+            rms_per_chunk.push(0.0f32);
             continue;
         }
 
         let chunk = &samples[start..end];
-        let mut max_val = 0.0f32;
-        for &s in chunk {
-            let abs_s = s.abs();
-            if abs_s > max_val {
-                max_val = abs_s;
-            }
-        }
-
-        let normalized = if overall_max_peak > 1e-6 {
-            max_val / overall_max_peak
-        } else {
-            0.0
-        };
-
-        let val = (normalized * 255.0).clamp(0.0, 255.0) as u8;
-        data.push(val);
+        let sum_sq: f32 = chunk.iter().map(|&s| s * s).sum();
+        rms_per_chunk.push((sum_sq / chunk.len() as f32).sqrt());
     }
-    data
+
+    let overall_max_rms = rms_per_chunk.iter().cloned().fold(0.0f32, f32::max);
+
+    rms_per_chunk
+        .into_iter()
+        .map(|rms| {
+            let normalized = if overall_max_rms > 1e-6 {
+                rms / overall_max_rms
+            } else {
+                0.0
+            };
+            (normalized * 255.0).clamp(0.0, 255.0) as u8
+        })
+        .collect()
 }
 
 use parking_lot::Mutex;
@@ -90,8 +106,8 @@ pub fn generate_visualizer_data(
     let tx = conn.transaction()?;
 
     tx.execute(
-        "INSERT OR REPLACE INTO waveforms (song_id, data) VALUES (?1, ?2)",
-        params![song_id, waveform_peaks],
+        "INSERT OR REPLACE INTO waveforms (song_id, data, style) VALUES (?1, ?2, ?3)",
+        params![song_id, waveform_peaks, WAVEFORM_STYLE_VERSION],
     )?;
 
     tx.execute(
@@ -120,21 +136,29 @@ pub fn generate_waveform(db: &Database, song_id: i64, path: &Path) -> Result<Vec
     }
 }
 
-/// Retrieve the cached waveform data from the database.
+/// Retrieve the cached waveform data from the database, if it was written by
+/// the current `WAVEFORM_STYLE_VERSION`. A blob cached under an older style is
+/// treated as a cache miss so callers regenerate it rather than misinterpret it.
 pub fn get_cached_waveform(db: &Database, song_id: i64) -> Result<Option<Vec<u8>>> {
     let conn = db.pool.get()?;
-    let data: Option<Vec<u8>> = conn
+    let row: Option<(Vec<u8>, i64)> = conn
         .query_row(
-            "SELECT data FROM waveforms WHERE song_id = ?1",
+            "SELECT data, style FROM waveforms WHERE song_id = ?1",
             params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .ok();
-    Ok(data)
+    Ok(row.and_then(|(data, style)| {
+        if style == WAVEFORM_STYLE_VERSION {
+            Some(data)
+        } else {
+            None
+        }
+    }))
 }
 
 /// Queries database for songs missing either waveform or moodbar cache, or whose
-/// cached moodbar was written by an older `MOODBAR_STYLE_VERSION` and needs
+/// cached waveform/moodbar was written by an older style version and needs
 /// regenerating under the current format.
 pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>> {
     let conn = db.pool.get()?;
@@ -143,13 +167,17 @@ pub fn get_missing_visualizer_songs(db: &Database) -> Result<Vec<(i64, String)>>
          LEFT JOIN waveforms w ON s.id = w.song_id
          LEFT JOIN moodbars m ON s.id = m.song_id
          WHERE s.unavailable = 0 AND s.path IS NOT NULL
-           AND (w.song_id IS NULL OR m.song_id IS NULL OR m.style != ?1)",
+           AND (w.song_id IS NULL OR m.song_id IS NULL OR w.style != ?1 OR m.style != ?2)",
     )?;
 
     let missing_songs: Vec<(i64, String)> = stmt
-        .query_map(params![crate::moodbar::MOODBAR_STYLE_VERSION], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?
+        .query_map(
+            params![
+                WAVEFORM_STYLE_VERSION,
+                crate::moodbar::MOODBAR_STYLE_VERSION
+            ],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?
         .filter_map(|r| r.ok())
         .collect();
     Ok(missing_songs)
@@ -233,6 +261,64 @@ mod tests {
         );
         // First chunk should be near 0
         assert!(peaks[0] < 50);
+    }
+
+    #[test]
+    fn test_compute_waveform_peaks_rms_reflects_loudness_not_just_peak() {
+        // A sparse single loud sample in an otherwise silent chunk (as in a
+        // transient click) vs. a chunk that's consistently near that same
+        // peak amplitude throughout (a brickwall-limited/loud passage). A
+        // peak-only envelope would render both chunks at the same height;
+        // RMS should show the sparse-transient chunk as much quieter.
+        let mut samples = vec![0.0f32; 500];
+        samples[250] = 0.9;
+        samples.extend(vec![0.9f32; 500]);
+
+        let peaks = compute_waveform_peaks(&samples, 2);
+        assert_eq!(peaks.len(), 2);
+        assert!(
+            peaks[1] > peaks[0] * 3,
+            "sustained-loud chunk ({}) should read far louder than a single transient click in silence ({})",
+            peaks[1],
+            peaks[0]
+        );
+    }
+
+    #[test]
+    fn test_stale_waveform_style_is_treated_as_missing() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(temp_dir.path().to_path_buf()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (path, unavailable) VALUES ('/tmp/song.mp3', 0)",
+            [],
+        )
+        .unwrap();
+        let song_id = conn.last_insert_rowid();
+
+        // Cached under a stale style (pre-RMS-fix peak-based format).
+        conn.execute(
+            "INSERT INTO waveforms (song_id, data, style) VALUES (?1, ?2, 0)",
+            params![song_id, vec![0u8; 150]],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO moodbars (song_id, data, style) VALUES (?1, ?2, ?3)",
+            params![
+                song_id,
+                vec![0u8; crate::moodbar::MOODBAR_POINTS * 3],
+                crate::moodbar::MOODBAR_STYLE_VERSION
+            ],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(get_cached_waveform(&db, song_id).unwrap(), None);
+
+        let missing = get_missing_visualizer_songs(&db).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].0, song_id);
     }
 
     #[test]

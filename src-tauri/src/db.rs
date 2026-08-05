@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 14;
+pub const CURRENT_SCHEMA_VERSION: i32 = 15;
 
 #[derive(Debug)]
 pub struct Database {
@@ -215,6 +215,15 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![14],
+            )?;
+        }
+
+        if version < 15 {
+            log::info!("Running migration 15: waveforms style column for cache invalidation");
+            conn.execute_batch(MIGRATION_15)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![15],
             )?;
         }
 
@@ -549,6 +558,10 @@ CREATE TABLE IF NOT EXISTS album_ratings (
     album_key TEXT PRIMARY KEY,
     rating REAL NOT NULL DEFAULT -1
 );
+";
+
+const MIGRATION_15: &str = "
+ALTER TABLE waveforms ADD COLUMN style INTEGER NOT NULL DEFAULT 0;
 ";
 
 #[cfg(test)]
