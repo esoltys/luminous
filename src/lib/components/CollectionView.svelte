@@ -721,7 +721,8 @@
             </div>
           {:else}
             {#key gridColsStyle}
-            <VirtualList items={filteredSongs} let:item={song}>
+            <VirtualList items={filteredSongs} itemHeight={41}>
+              {#snippet children({ item: song }: { item: Song })}
               {@const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path)}
               {@const disabled = song.unavailable || disconnected}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -916,6 +917,7 @@
                   </div>
                 {/if}
               </div>
+              {/snippet}
             </VirtualList>
             {/key}
           {/if}
