@@ -7,7 +7,6 @@
 
   const CANVAS_BAR_HEIGHT_PX = 28;
   const NARROW_WIDTH_BREAKPOINT_PX = 450;
-  const MOODBAR_SEGMENT_COUNT = 40;
 
   // Fixed layer colors for the low/mid/high band waveform (moodbar mode). These
   // are a deliberate exception to DESIGN.md's "accent is the only
@@ -218,56 +217,36 @@
     accentColor: string,
   ) {
     const totalPoints = moodbarData.length > 0 ? Math.floor(moodbarData.length / 3) : 150;
-
-    // Downsample the raw points into broad, averaged regions instead of
-    // drawing one bar per point. Individually-colored 1-2px bars read as
-    // visual noise/a barcode; averaging groups of adjacent points into ~40
-    // wider contiguous columns still preserves the layered low/mid/high
-    // structure at a glance (verse/chorus-scale bass, vocal entrances, drum
-    // transients) without the strip looking like static.
-    const segmentCount = Math.min(MOODBAR_SEGMENT_COUNT, totalPoints);
-    const groupSize = Math.max(1, Math.ceil(totalPoints / segmentCount));
-    const segCount = Math.ceil(totalPoints / groupSize);
-    const segWidth = width / segCount;
+    const segWidth = width / totalPoints;
 
     // Still decoding/generating (or nothing loaded yet for this track): show
     // the same pulsing scan animation as drawWaveform's placeholder, instead
     // of silently rendering nothing (all-zero bands) while data is in flight.
     const isPlaceholder = isLoadingMoodbar || moodbarData.length === 0;
 
-    for (let s = 0; s < segCount; s++) {
+    for (let s = 0; s < totalPoints; s++) {
       const x = s * segWidth;
       const w = segWidth + 0.5;
 
       if (isPlaceholder) {
-        const sine = Math.sin(pulseAngle + (s / segCount) * Math.PI * 4);
+        const sine = Math.sin(pulseAngle + (s / totalPoints) * Math.PI * 4);
         const barH = Math.max(2, (0.25 + 0.2 * sine) * height * 0.85);
-        ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (s / segCount) * Math.PI * 3);
+        ctx.globalAlpha = 0.4 + 0.35 * Math.sin(pulseAngle + (s / totalPoints) * Math.PI * 3);
         ctx.fillStyle = accentColor;
         ctx.fillRect(x, (height - barH) / 2, w, barH);
         continue;
       }
 
-      const start = s * groupSize;
-      const end = Math.min(start + groupSize, totalPoints);
+      // Full per-point resolution (no downsampling/averaging) — unlike a
+      // single blended mood color, the layered low/mid/high bands benefit
+      // from the finer time resolution: exactly what makes transient hits
+      // (hi-hats, drum spikes) precisely locatable rather than smeared
+      // across an averaged region.
+      const low = moodbarData[s * 3];
+      const mid = moodbarData[s * 3 + 1];
+      const high = moodbarData[s * 3 + 2];
 
-      let low = 0;
-      let mid = 0;
-      let high = 0;
-      if (moodbarData.length > 0) {
-        let n = 0;
-        for (let i = start; i < end; i++) {
-          low += moodbarData[i * 3];
-          mid += moodbarData[i * 3 + 1];
-          high += moodbarData[i * 3 + 2];
-          n++;
-        }
-        low /= n;
-        mid /= n;
-        high /= n;
-      }
-
-      const segPct = s / segCount;
+      const segPct = s / totalPoints;
       const played = segPct <= progressPct;
       // Unplayed columns are dimmed as a whole (not blended toward a
       // per-theme gray — these are fixed structural colors, not mood-derived
