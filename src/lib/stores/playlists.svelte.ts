@@ -251,12 +251,19 @@ class PlaylistsStore {
     }
   }
 
-  async trimQueueBeforeIndex(index: number) {
+  /** Removes every Queue track ahead of `uuid` (in current DB order). Always
+   * resolves `uuid`'s position from a fresh `get_playlist_tracks` fetch
+   * rather than trusting a caller-supplied index, since the Queue can be
+   * trimmed in the background (see `syncQueueTrackPosition`) between when a
+   * position is read on the frontend and when a trim actually runs — an
+   * index captured too early would otherwise cut the wrong rows. */
+  async trimQueueBeforeUuid(uuid: string) {
     const queuePl = await this.ensureQueuePlaylist();
-    if (!queuePl || index <= 0) return;
+    if (!queuePl) return;
     try {
       const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
-      if (existingItems.length > index) {
+      const index = existingItems.findIndex((i) => i.uuid === uuid);
+      if (index > 0) {
         const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
         await invoke("remove_from_playlist", { playlistId: queuePl.id, uuids: uuidsToRemove });
         if (this.activePlaylistId === queuePl.id) {
@@ -265,7 +272,7 @@ class PlaylistsStore {
         await this.refreshPlaylists();
       }
     } catch (err) {
-      console.error("Failed to trim Queue tracks before index:", err);
+      console.error("Failed to trim Queue tracks before uuid:", err);
     }
   }
 

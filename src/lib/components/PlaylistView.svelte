@@ -427,11 +427,10 @@
     collectionStore.selectedPlaylistId = null;
   }
 
-  function handlePlayPlaylistItem(index: number) {
-    const item = playlistsStore.activePlaylistTracks[index];
+  function handlePlayPlaylistItem(item: PlaylistItem) {
     if (!item || isItemUnavailable(item)) return;
     if (playlistsStore.activePlaylistId !== null) {
-      playerStore.playPlaylistItem(playlistsStore.activePlaylistId, index);
+      playerStore.playPlaylistItemByUuid(playlistsStore.activePlaylistId, item.uuid);
     }
   }
 
@@ -1195,7 +1194,7 @@
             role="row"
             tabindex="0"
             onkeydown={(e) => {
-              if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(actualIndex);
+              if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(item);
             }}
             data-playlist-row="true"
             draggable={!unavailable ? "true" : "false"}
@@ -1207,7 +1206,7 @@
             ondrop={(e) => handleDrop(e, actualIndex)}
             onclick={(e) => handleRowClick(e, item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
-            ondblclick={() => !unavailable && handlePlayPlaylistItem(actualIndex)}
+            ondblclick={() => !unavailable && handlePlayPlaylistItem(item)}
             class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
               {unavailable
                 ? 'opacity-50 cursor-not-allowed'
@@ -1233,7 +1232,7 @@
                   </span>
                 {/if}
                 <button
-                  onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(actualIndex); }}
+                  onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(item); }}
                   class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
                   disabled={unavailable}
                   title={i18n.t("playlists.playTrack")}

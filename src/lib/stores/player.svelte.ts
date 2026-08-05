@@ -306,14 +306,12 @@ export class PlayerStore {
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     if (!queuePl || !this.currentSong) return;
     if (this.playlistId === queuePl.id || this.activeContextName === "Queue") {
-      const tracks = playlistsStore.activePlaylistId === queuePl.id
-        ? playlistsStore.activePlaylistTracks
-        : await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: queuePl.id });
-      if (tracks.length > 0) {
-        const activeIndex = tracks.findIndex((t: PlaylistItem) => t.song?.id === this.currentSong?.id);
-        if (activeIndex > 0) {
-          await playlistsStore.trimQueueBeforeIndex(activeIndex);
-        }
+      // Identify the now-playing row by its stable uuid (mirrored from the
+      // backend's authoritative current_item_uuid) rather than matching
+      // song id against activePlaylistTracks, which can be a stale snapshot
+      // mid-transition and would trim the wrong rows.
+      if (this.playlistItemUuid) {
+        await playlistsStore.trimQueueBeforeUuid(this.playlistItemUuid);
       }
     }
   }
@@ -321,15 +319,24 @@ export class PlayerStore {
   async playPlaylistItem(playlistId: number, itemIndex: number) {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
+    await invoke("play_playlist_item", { playlistId, itemIndex });
+  }
+
+  /** Same as `playPlaylistItem`, but identifies the target row by uuid
+   * instead of a numeric index — use this wherever the index was captured
+   * from UI state that could go stale before this call actually runs (e.g.
+   * clicking a Queue row, since the Queue auto-trims in the background on
+   * every track change). */
+  async playPlaylistItemByUuid(playlistId: number, uuid: string) {
+    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+    if (pl) this.activeContextName = pl.name;
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     if (queuePl && (playlistId === queuePl.id || pl?.name?.toLowerCase() === "queue")) {
-      if (itemIndex > 0) {
-        await playlistsStore.trimQueueBeforeIndex(itemIndex);
-        await invoke("play_playlist_item", { playlistId: queuePl.id, itemIndex: 0 });
-        return;
-      }
+      await playlistsStore.trimQueueBeforeUuid(uuid);
+      await invoke("play_playlist_item_by_uuid", { playlistId: queuePl.id, uuid });
+      return;
     }
-    await invoke("play_playlist_item", { playlistId, itemIndex });
+    await invoke("play_playlist_item_by_uuid", { playlistId, uuid });
   }
 
   async pause() {

@@ -97,6 +97,37 @@ pub async fn play_playlist_item(
         .map_err(|e| e.to_string())
 }
 
+/// Same as `play_playlist_item`, but resolves the target row by uuid instead
+/// of a numeric position. Used wherever the requested item's position could
+/// have shifted between when the user clicked and when this command runs —
+/// e.g. the Queue view, which auto-trims already-played tracks on every
+/// track change. An index captured at click time can go stale mid-flight and
+/// end up playing whatever now sits at that position instead of what was
+/// actually clicked; resolving by uuid against a freshly fetched track list
+/// sidesteps that race entirely.
+#[tauri::command]
+pub async fn play_playlist_item_by_uuid(
+    playlist_id: i64,
+    uuid: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let items = {
+        let playlists = state.playlists.lock().await;
+        playlists
+            .get_playlist_tracks(playlist_id)
+            .map_err(|e| e.to_string())?
+    };
+    let item_index = items
+        .iter()
+        .position(|item| item.uuid == uuid)
+        .ok_or_else(|| "Track is no longer in the playlist".to_string())?;
+    let mut player = state.player.lock().await;
+    player
+        .play_playlist(items, item_index, playlist_id, None)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn pause(state: State<'_, AppState>) -> Result<(), String> {
     state
