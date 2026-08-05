@@ -18,14 +18,20 @@ use std::path::Path;
 /// (legacy) was the same byte layout but rendered/interpreted as a single
 /// blended mood color.
 ///
-/// Version 2: same layered format, raised to `MOODBAR_POINTS` (300) resolution
-/// for finer transient (hi-hat/percussion) detail.
-pub const MOODBAR_STYLE_VERSION: i64 = 2;
+/// Version 2: same layered format, raised to 300-point resolution for finer
+/// transient (hi-hat/percussion) detail.
+///
+/// Version 3: raised to `MOODBAR_POINTS` (512) resolution — the seek bar's
+/// rendered width is capped by PlayerBar's layout (max-w-[1200px] footer, 1/3
+/// column) at ~285 CSS px regardless of window/monitor size, so 512 points
+/// covers up to ~200% OS display scaling (dpr 2, ~570 physical px) before
+/// additional resolution stops being visually distinguishable.
+pub const MOODBAR_STYLE_VERSION: i64 = 3;
 
 /// Point resolution for the cached layered low/mid/high band waveform. Higher
 /// than `WAVEFORM_POINTS` — transient detail benefits from finer time
 /// resolution than the waveform's coarser peak envelope needs.
-pub const MOODBAR_POINTS: usize = 300;
+pub const MOODBAR_POINTS: usize = 512;
 
 /// Compute per-point low/mid/high band amplitudes (RGB-flavored byte triples)
 /// representing the song's frequency-band structure from decoded samples.
