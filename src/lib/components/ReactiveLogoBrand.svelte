@@ -27,12 +27,6 @@
   let midIntensity = $state(0);
   let coronalIntensity = $state(0);
   let unlisten: (() => void) | null = null;
-  // Recomputing the SVG saturate() filter over the already-blurred glow
-  // circles is expensive; the backend streams spectrum-data at 30fps, but
-  // updating this component that often causes visible jank elsewhere on
-  // the page (e.g. flicker in other views' blurred backdrops). Halving the
-  // update rate keeps the pulse looking reactive at a much lower cost.
-  let frameSkip = 0;
 
   onMount(async () => {
     const stored = localStorage.getItem("logo_pulsing");
@@ -55,9 +49,6 @@
           coronalIntensity = 0;
           return;
         }
-        frameSkip = (frameSkip + 1) % 2;
-        if (frameSkip !== 0) return;
-
         const data = event.payload;
         if (data && data.length > 0) {
           // Segment and average the 32 spectrum bins into Bass, Mids, and Coronal/Treble
@@ -138,7 +129,7 @@
 <button
   type="button"
   onclick={togglePulsing}
-  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate transition-shadow duration-300"
+  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate"
   title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
   aria-label={i18n.t('common.toggleLogoPulsing')}
 >
@@ -231,10 +222,5 @@
   svg {
     overflow: hidden;
     isolation: isolate;
-    transition: filter 0.3s ease;
-  }
-
-  svg:hover {
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
   }
 </style>
