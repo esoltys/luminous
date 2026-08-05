@@ -302,17 +302,17 @@ export class PlayerStore {
     await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
   }
 
+  /** Background cleanup only — never a precondition for playback. Trims
+   * already-played Queue rows behind the now-playing track so the Queue
+   * view visually shrinks as you play through it. Runs *after* a track
+   * change has already succeeded, using the backend's own authoritative
+   * `this.playlistId`/`playlistItemUuid`, so it can never race with (or
+   * block on) the act of starting playback itself. */
   private async syncQueueTrackPosition() {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (!queuePl || !this.currentSong) return;
-    if (this.playlistId === queuePl.id || this.activeContextName === "Queue") {
-      // Identify the now-playing row by its stable uuid (mirrored from the
-      // backend's authoritative current_item_uuid) rather than matching
-      // song id against activePlaylistTracks, which can be a stale snapshot
-      // mid-transition and would trim the wrong rows.
-      if (this.playlistItemUuid) {
-        await playlistsStore.trimQueueBeforeUuid(this.playlistItemUuid);
-      }
+    if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
+    const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
+    if (pl?.name?.toLowerCase() === "queue" || this.activeContextName === "Queue") {
+      await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
     }
   }
 
@@ -326,16 +326,13 @@ export class PlayerStore {
    * instead of a numeric index — use this wherever the index was captured
    * from UI state that could go stale before this call actually runs (e.g.
    * clicking a Queue row, since the Queue auto-trims in the background on
-   * every track change). */
+   * every track change). Plays directly with no DB mutation beforehand —
+   * any resulting Queue trim happens afterward via `syncQueueTrackPosition`
+   * once the track change is confirmed, not as a blocking pre-step that
+   * could itself race and leave the target row missing. */
   async playPlaylistItemByUuid(playlistId: number, uuid: string) {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl && (playlistId === queuePl.id || pl?.name?.toLowerCase() === "queue")) {
-      await playlistsStore.trimQueueBeforeUuid(uuid);
-      await invoke("play_playlist_item_by_uuid", { playlistId: queuePl.id, uuid });
-      return;
-    }
     await invoke("play_playlist_item_by_uuid", { playlistId, uuid });
   }
 

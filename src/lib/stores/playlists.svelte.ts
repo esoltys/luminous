@@ -251,23 +251,25 @@ class PlaylistsStore {
     }
   }
 
-  /** Removes every Queue track ahead of `uuid` (in current DB order). Always
-   * resolves `uuid`'s position from a fresh `get_playlist_tracks` fetch
-   * rather than trusting a caller-supplied index, since the Queue can be
-   * trimmed in the background (see `syncQueueTrackPosition`) between when a
-   * position is read on the frontend and when a trim actually runs — an
-   * index captured too early would otherwise cut the wrong rows. */
-  async trimQueueBeforeUuid(uuid: string) {
-    const queuePl = await this.ensureQueuePlaylist();
-    if (!queuePl) return;
+  /** Removes every track ahead of `uuid` (in current DB order) from
+   * `playlistId`. Takes the target playlist id explicitly rather than
+   * re-resolving "the Queue" via `ensureQueuePlaylist()` — that lookup can
+   * disagree with whichever playlist the caller actually means (e.g. is
+   * already viewing), and always resolves `uuid`'s position from a fresh
+   * `get_playlist_tracks` fetch rather than trusting a caller-supplied
+   * index, since the Queue can be trimmed in the background (see
+   * `syncQueueTrackPosition`) between when a position is read on the
+   * frontend and when a trim actually runs — an index captured too early
+   * would otherwise cut the wrong rows. */
+  async trimQueueBeforeUuid(playlistId: number, uuid: string) {
     try {
-      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
+      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId });
       const index = existingItems.findIndex((i) => i.uuid === uuid);
       if (index > 0) {
         const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
-        await invoke("remove_from_playlist", { playlistId: queuePl.id, uuids: uuidsToRemove });
-        if (this.activePlaylistId === queuePl.id) {
-          await this.selectPlaylist(queuePl.id);
+        await invoke("remove_from_playlist", { playlistId, uuids: uuidsToRemove });
+        if (this.activePlaylistId === playlistId) {
+          await this.selectPlaylist(playlistId);
         }
         await this.refreshPlaylists();
       }
