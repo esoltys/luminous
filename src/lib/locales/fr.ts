@@ -459,6 +459,7 @@ export const fr = {
     relativeYearsAgo: "Il y a {count} ans",
     makeActiveBtn: "Définir comme active",
     activeBadgeLabel: "Active",
+    refreshPlaylistBtn: "Rafraîchir la playlist",
     refreshAutoPlaylistTooltip: "Rafraîchir la playlist automatique avec une nouvelle sélection de titres de votre bibliothèque",
     refreshAllPlaylistsTooltip: "Rafraîchir toutes les playlists automatiques et intelligentes avec les derniers titres de votre bibliothèque",
     allMatchingTracksAdded: "Tous les titres correspondants de votre bibliothèque ont été ajoutés à cette liste automatique.",

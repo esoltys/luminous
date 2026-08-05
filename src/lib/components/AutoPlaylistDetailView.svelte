@@ -532,36 +532,6 @@ import { shuffleArray } from "../utils/shuffle";
             disabled={loading || songs.length === 0}
             class="shrink-0"
           />
-          <IconActionButton
-            onclick={handleAddAllToPlaylist}
-            disabled={loading || songs.length === 0}
-            title={playlistsStore.activeCustomPlaylist
-              ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
-              : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
-            class="shrink-0"
-          >
-            {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
-          </IconActionButton>
-          <IconActionButton
-            onclick={handleSaveAsCustomPlaylist}
-            disabled={loading || songs.length === 0}
-            title={i18n.t('playlists.saveAsCustomTooltip')}
-            class="shrink-0"
-          >
-            {#snippet icon()}<FolderPlus class="w-4 h-4" />{/snippet}
-          </IconActionButton>
-
-          {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
-            <!-- Refresh button: force-regenerate playlist with fresh songs from library -->
-            <IconActionButton
-              onclick={handleRefreshAutoPlaylist}
-              disabled={loading || isRefreshing}
-              title={i18n.t('playlists.refreshAutoPlaylistTooltip')}
-              class="shrink-0"
-            >
-              {#snippet icon()}<RefreshCw class="w-4 h-4 {isRefreshing ? 'animate-spin' : ''}" />{/snippet}
-            </IconActionButton>
-          {/if}
           <ColumnSelector align="left" iconOnly />
         </div>
 
@@ -1193,17 +1163,38 @@ import { shuffleArray } from "../utils/shuffle";
     y={overflowMenuPos.y}
     onClose={() => { overflowMenuPos = null; }}
   >
+    <ContextMenuItem
+      icon={Plus}
+      label={playlistsStore.activeCustomPlaylist
+        ? i18n.t('albumDetail.addAllToPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
+        : i18n.t('albumDetail.addAllToPlaylistTooltipDefault')}
+      onclick={() => { handleAddAllToPlaylist(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0}
+    />
+    <ContextMenuItem
+      icon={FolderPlus}
+      label={i18n.t("playlists.saveAsCustomTooltip")}
+      onclick={() => { handleSaveAsCustomPlaylist(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0}
+    />
+
+    {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+      <ContextMenuItem
+        icon={RefreshCw}
+        label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
+        onclick={() => { handleRefreshAutoPlaylist(); overflowMenuPos = null; }}
+        disabled={loading || isRefreshing}
+      />
+    {/if}
+
     {#if kind === "history"}
+      <ContextMenuDivider />
       <ContextMenuItem
         icon={Eraser}
+        destructive
         label={i18n.t("playlists.clearHistoryBtn", {}, "Clear History")}
         onclick={handleClearHistory}
-      />
-    {:else}
-      <ContextMenuItem
-        icon={FolderPlus}
-        label={i18n.t("playlists.saveAsCustomTooltip")}
-        onclick={() => { handleSaveAsCustomPlaylist(); overflowMenuPos = null; }}
+        disabled={loading || songs.length === 0}
       />
     {/if}
   </ContextMenu>

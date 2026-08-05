@@ -460,6 +460,7 @@ export const en = {
     relativeYearsAgo: "{count} years ago",
     makeActiveBtn: "Make Active",
     activeBadgeLabel: "Active",
+    refreshPlaylistBtn: "Refresh Playlist",
     refreshAutoPlaylistTooltip: "Refresh auto-playlist with a new selection of songs from your library",
     refreshAllPlaylistsTooltip: "Refresh all auto-playlists and Smart Playlists with the latest songs from your library",
     allMatchingTracksAdded: "All matching songs from your library have been added to this auto-playlist.",
