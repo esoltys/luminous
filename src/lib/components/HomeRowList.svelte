@@ -9,6 +9,7 @@
   import CoverArt from "./CoverArt.svelte";
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
+  import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
@@ -158,6 +159,9 @@
               artManual={item.album.art_manual}
               sizeClass="w-11 h-11"
             />
+            {#if item.album.rating === 5}
+              <FavouriteCornerFlag size="sm" />
+            {/if}
           {:else}
             <PlaylistCoverThumb playlist={item.playlist} sizeClass="w-11 h-11" />
           {/if}

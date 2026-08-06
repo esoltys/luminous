@@ -86,4 +86,16 @@ describe("AlbumRowCard.svelte", () => {
 
     expect(handleContextMenu).toHaveBeenCalled();
   });
+
+  it("renders favourite corner flag when album rating is 5", () => {
+    const favoritedAlbum = { ...mockAlbum, rating: 5 };
+    const { getByTestId } = render(AlbumRowCard, { props: { album: favoritedAlbum } });
+    expect(getByTestId("favourite-corner-flag")).toBeInTheDocument();
+  });
+
+  it("does not render favourite corner flag when album rating is not 5", () => {
+    const unratedAlbum = { ...mockAlbum, rating: 2 };
+    const { queryByTestId } = render(AlbumRowCard, { props: { album: unratedAlbum } });
+    expect(queryByTestId("favourite-corner-flag")).toBeNull();
+  });
 });
