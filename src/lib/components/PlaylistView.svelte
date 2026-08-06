@@ -758,7 +758,10 @@
   {/if}
 
   {#if activePlaylist}
-    <div class="flex-1 flex flex-col min-h-0 relative z-10">
+    <div
+      class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto carousel-scroll"
+      use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
+    >
     <!-- Stacked Cover Art Hero & Summary Banner Header -->
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
@@ -942,8 +945,8 @@
     </div>
 
     <!-- Tracks List Container -->
-    <div class="flex-1 min-h-0 p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-      <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto" use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}>
+    <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
       <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
@@ -1676,3 +1679,13 @@
     </form>
   </Modal>
 {/if}
+
+<style>
+  :global(.carousel-scroll) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  :global(.carousel-scroll::-webkit-scrollbar) {
+    display: none;
+  }
+</style>
