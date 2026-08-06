@@ -9,6 +9,7 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
+  import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -614,6 +615,9 @@
           />
           {#if albumItem && albumItem.rating === 5}
             <FavouriteCornerFlag size="lg" />
+          {/if}
+          {#if albumItem && albumItem.disc_count > 1}
+            <BoxSetDiscIcons discCount={albumItem.disc_count} size="md" />
           {/if}
         </div>
       </div>
