@@ -8,6 +8,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
+  import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
  
   interface Props {
     album: AlbumItem;
@@ -69,6 +70,9 @@
     />
     {#if album.rating === 5}
       <FavouriteCornerFlag size="md" />
+    {/if}
+    {#if album.disc_count > 1}
+      <BoxSetDiscIcons discCount={album.disc_count} size="md" />
     {/if}
   </div>
   <div class="p-3.5 flex flex-col flex-1">
