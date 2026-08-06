@@ -64,7 +64,7 @@
     > = [];
 
     // Favourites auto-playlist
-    const favLabel = i18n.t("playlists.autoFavourites", {}, "Favourites");
+    const favLabel = i18n.t("playlists.autoFavourites", {}, "Favourite Songs");
     if (favLabel.toLowerCase().includes(query) || "favourites".includes(query) || "favorites".includes(query)) {
       results.push({
         type: "auto",
