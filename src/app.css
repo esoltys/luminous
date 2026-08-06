@@ -88,6 +88,11 @@
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  /* Pin to its own GPU layer, same fix as .glass-surface (see below), so the
+     backdrop-filter is cached instead of re-rasterized on every composite
+     frame triggered elsewhere in the window. */
+  will-change: backdrop-filter;
+  transform: translateZ(0);
 }
 
 .glass-premium {
@@ -95,6 +100,8 @@
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  will-change: backdrop-filter;
+  transform: translateZ(0);
 }
 
 /*
