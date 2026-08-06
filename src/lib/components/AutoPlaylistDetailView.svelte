@@ -180,7 +180,7 @@ import { shuffleArray } from "../utils/shuffle";
       ? (decade || i18n.t("artistDetail.unknownYear"))
       : (genre || i18n.t("artistDetail.unknownGenre"));
     const suffix = getPopulationModeSuffix(populationMode);
-    return suffix ? `${base} ${suffix}` : base;
+    return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
   let topCovers = $derived((kind === "genre" || kind === "decade") ? songsToCoverStack(songs) : []);

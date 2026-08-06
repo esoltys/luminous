@@ -30,7 +30,7 @@ export function getPlaylistDisplayName(
     return baseName;
   }
   const suffix = getPopulationModeSuffix(playlist.population_mode);
-  return suffix ? `${baseName} ${suffix}` : baseName;
+  return suffix ? i18n.t("playlists.populationModeTitleFormat", { base: baseName, suffix }) : baseName;
 }
 
 /**
