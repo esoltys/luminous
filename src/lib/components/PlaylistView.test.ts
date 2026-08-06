@@ -135,7 +135,7 @@ describe("PlaylistView.svelte", () => {
   });
 
   it("handles drag and drop reordering of playlist items", async () => {
-    const reorderSpy = vi.spyOn(playlistsStore, "reorderItem");
+    const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
     const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
@@ -158,11 +158,11 @@ describe("PlaylistView.svelte", () => {
 
     // Drop on row 2
     await fireEvent.drop(rowThree, { dataTransfer });
-    expect(reorderSpy).toHaveBeenCalledWith(1, 0, 2);
+    expect(reorderSpy).toHaveBeenCalledWith(1, "uuid-1", "uuid-3");
   });
 
   it("falls back to dataTransfer string data on drop if draggedIndex was cleared", async () => {
-    const reorderSpy = vi.spyOn(playlistsStore, "reorderItem");
+    const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
     const rowTwo = getByText("Track Two").closest("[data-playlist-row]")!;
@@ -176,7 +176,7 @@ describe("PlaylistView.svelte", () => {
 
     // Trigger drop directly with text/plain data = 0 on row index 1
     await fireEvent.drop(rowTwo, { dataTransfer });
-    expect(reorderSpy).toHaveBeenCalledWith(1, 0, 1);
+    expect(reorderSpy).toHaveBeenCalledWith(1, "uuid-1", "uuid-2");
   });
 
   it("filters tracks by title or artist using the filter search input", async () => {
