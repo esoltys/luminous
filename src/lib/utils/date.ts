@@ -1,7 +1,7 @@
 import { i18n } from "../stores/i18n.svelte";
+import { formatDate } from "./formatters";
 
-export function formatRelativeDate(timestampSec: number | undefined | null): string {
-  if (!timestampSec) return "";
+function diffDaysFromNow(timestampSec: number): number {
   const now = new Date();
   const date = new Date(timestampSec * 1000);
 
@@ -9,7 +9,38 @@ export function formatRelativeDate(timestampSec: number | undefined | null): str
   const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   const diffMs = nowStart.getTime() - dateStart.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+// Today / Yesterday / "N days ago" through 6 days, then falls back to the
+// absolute date — used for the Date Added column, where older entries read
+// better as a real date than as "3 weeks ago". Today's entries drill down
+// further into minutes/hours ago rather than just reading "Today".
+export function formatDateAdded(timestampSec: number | undefined | null): string {
+  if (!timestampSec) return "—";
+  const diffDays = diffDaysFromNow(timestampSec);
+
+  if (diffDays <= 0) {
+    const diffMinutes = Math.floor((Date.now() / 1000 - timestampSec) / 60);
+    if (diffMinutes < 1) return i18n.t("playlists.relativeJustNow");
+    if (diffMinutes < 60) {
+      return diffMinutes === 1
+        ? i18n.t("playlists.relativeOneMinuteAgo")
+        : i18n.t("playlists.relativeMinutesAgo", { count: diffMinutes });
+    }
+    const diffHours = Math.floor(diffMinutes / 60);
+    return diffHours === 1
+      ? i18n.t("playlists.relativeOneHourAgo")
+      : i18n.t("playlists.relativeHoursAgo", { count: diffHours });
+  }
+  if (diffDays === 1) return i18n.t("playlists.relativeYesterday");
+  if (diffDays <= 6) return i18n.t("playlists.relativeDaysAgo", { count: diffDays });
+  return formatDate(timestampSec);
+}
+
+export function formatRelativeDate(timestampSec: number | undefined | null): string {
+  if (!timestampSec) return "";
+  const diffDays = diffDaysFromNow(timestampSec);
 
   if (diffDays <= 0) return i18n.t("playlists.relativeToday");
   if (diffDays === 1) return i18n.t("playlists.relativeYesterday");

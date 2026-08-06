@@ -27,6 +27,7 @@
   import { Clock, Play, Plus, FolderPlus, Edit3, Music, RefreshCw, CheckCircle2, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
 import { shuffleArray } from "../utils/shuffle";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { formatDateAdded } from "../utils/date";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -1077,7 +1078,7 @@ import { shuffleArray } from "../utils/shuffle";
               {/if}
               {#if collectionStore.visibleColumns.added}
                 <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
-                  {formatDate(song.added)}
+                  {formatDateAdded(song.added)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.duration}

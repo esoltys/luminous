@@ -28,6 +28,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { formatDateAdded } from "../utils/date";
   import { rememberScroll } from "../utils/scrollMemory";
 
   let { albumName }: { albumName: string } = $props();
@@ -1045,7 +1046,7 @@
               {/if}
               {#if collectionStore.visibleColumns.added}
                 <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
-                  {formatDate(song.added)}
+                  {formatDateAdded(song.added)}
                 </div>
               {/if}
 

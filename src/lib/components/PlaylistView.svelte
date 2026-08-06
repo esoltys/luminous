@@ -57,6 +57,7 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { portal } from "../utils/portal";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
 
   let gridColsStyle = $derived.by(() => {
@@ -297,7 +298,7 @@
     if (vc.playcount) values.push(song.playcount);
     if (vc.skipcount) values.push(song.skipcount);
     if (vc.lastplayed) values.push(formatDate(song.lastplayed));
-    if (vc.added) values.push(formatDate(song.added));
+    if (vc.added) values.push(formatDateAdded(song.added));
     if (vc.duration) values.push(formatDuration(song.length_nanosec));
     if (vc.path) values.push(song.path);
     return values
@@ -1423,7 +1424,7 @@
             {/if}
             {#if collectionStore.visibleColumns.added}
               <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
-                {formatDate(item.song?.added)}
+                {formatDateAdded(item.song?.added)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.duration}
