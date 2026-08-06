@@ -29,6 +29,7 @@
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { formatDateAdded } from "../utils/date";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { rememberScroll, watchScrollMemory } from "../utils/scrollMemory";
 
@@ -895,7 +896,7 @@
                 {/if}
                 {#if collectionStore.visibleColumns.added}
                   <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
-                    {formatDate(song.added)}
+                    {formatDateAdded(song.added)}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.duration}

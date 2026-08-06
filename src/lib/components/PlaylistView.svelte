@@ -57,6 +57,7 @@
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import { portal } from "../utils/portal";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
+  import { formatDateAdded } from "../utils/date";
   import { CONTEXT_MENU_WIDTH_PX } from "../constants";
 
   let gridColsStyle = $derived.by(() => {
@@ -297,7 +298,7 @@
     if (vc.playcount) values.push(song.playcount);
     if (vc.skipcount) values.push(song.skipcount);
     if (vc.lastplayed) values.push(formatDate(song.lastplayed));
-    if (vc.added) values.push(formatDate(song.added));
+    if (vc.added) values.push(formatDateAdded(song.added));
     if (vc.duration) values.push(formatDuration(song.length_nanosec));
     if (vc.path) values.push(song.path);
     return values
@@ -766,7 +767,7 @@
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
-        <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
+        <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -802,7 +803,7 @@
           {/if}
 
           <!-- Summary Metadata Line -->
-          <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
+          <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
             <span>
               {#if isSpecialPlaylist}
                 {playlistsStore.activePlaylistTracks.length === 1
@@ -1423,7 +1424,7 @@
             {/if}
             {#if collectionStore.visibleColumns.added}
               <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
-                {formatDate(item.song?.added)}
+                {formatDateAdded(item.song?.added)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.duration}

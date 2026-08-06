@@ -13,7 +13,7 @@
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
-  import { getArtistAlbums } from "../utils/artist";
+  import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
@@ -96,14 +96,14 @@
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
 
-  // Mirrors getAlbumCategoryLabel()'s canonical release categories (used for
-  // the per-card badge everywhere else in the app) so the discography tabs
-  // agree with how a release is labeled elsewhere: multi-disc releases are
-  // "Sets" regardless of track count, then Albums/EPs/Singles by track count.
-  let sets = $derived(albums.filter((a) => a.disc_count > 1));
-  let fullAlbums = $derived(albums.filter((a) => a.disc_count <= 1 && a.track_count >= 7));
-  let eps = $derived(albums.filter((a) => a.disc_count <= 1 && a.track_count >= 2 && a.track_count <= 6));
-  let singles = $derived(albums.filter((a) => a.disc_count <= 1 && a.track_count === 1));
+  // Shares classifyRelease() with the per-card badge everywhere else in the
+  // app, so the discography tabs agree with how a release is labeled
+  // elsewhere: multi-disc releases are "Sets" regardless of duration, then
+  // Albums/EPs by total duration (EP = under 30 minutes) and Singles by track count.
+  let sets = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "set"));
+  let fullAlbums = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "album"));
+  let eps = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "ep"));
+  let singles = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single"));
 
   let albumsText = $derived(
     fullAlbums.length === 1 ? i18n.t("collection.oneAlbum") : i18n.t("collection.albumsCount", { count: fullAlbums.length })
@@ -174,11 +174,11 @@
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
-      <div class="flex flex-col justify-end gap-2 max-w-xl">
+      <div class="flex flex-col justify-end gap-1.5 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <!-- Summary Metadata Line -->
-        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
+        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
           <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albums: albumsText, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 

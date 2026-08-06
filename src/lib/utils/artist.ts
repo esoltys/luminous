@@ -41,18 +41,43 @@ export function formatTrackNumber(
   return String(trackNum);
 }
 
+export type ReleaseCategory = "set" | "single" | "ep" | "album";
+
+const EP_MAX_DURATION_NANOSEC = 30 * 60 * 1_000_000_000;
+
 /**
- * Single card-facing category label for an album: "Single" (1 track), "EP"
- * (2-6 tracks), "Album" (7+ tracks) — overridden by "{n}-Disc Set" whenever
- * the release spans more than one disc, so a card never shows two labels.
+ * Canonical release category for an album: "set" whenever it spans more than
+ * one disc (regardless of track count or duration), else "single" (1 track),
+ * else "ep" (under 30 minutes) or "album" (30+ minutes) — EP/Album is a
+ * duration split, not a track-count one.
  */
-export function getAlbumCategoryLabel(trackCount: number, discCount: number | null | undefined): string {
-  if ((discCount ?? 1) > 1) {
-    return i18n.t("artistDetail.discSet", { count: discCount ?? 1 });
+export function classifyRelease(
+  trackCount: number,
+  discCount: number | null | undefined,
+  totalDurationNanosec: number | null | undefined
+): ReleaseCategory {
+  if ((discCount ?? 1) > 1) return "set";
+  if (trackCount === 1) return "single";
+  if ((totalDurationNanosec ?? 0) < EP_MAX_DURATION_NANOSEC) return "ep";
+  return "album";
+}
+
+/** Single card-facing category label for an album, e.g. "{n}-Disc Set", "Single", "EP", "Album". */
+export function getAlbumCategoryLabel(
+  trackCount: number,
+  discCount: number | null | undefined,
+  totalDurationNanosec: number | null | undefined
+): string {
+  switch (classifyRelease(trackCount, discCount, totalDurationNanosec)) {
+    case "set":
+      return i18n.t("artistDetail.discSet", { count: discCount ?? 1 });
+    case "single":
+      return i18n.t("artistDetail.single");
+    case "ep":
+      return i18n.t("artistDetail.ep");
+    case "album":
+      return i18n.t("artistDetail.album");
   }
-  if (trackCount === 1) return i18n.t("artistDetail.single");
-  if (trackCount <= 6) return i18n.t("artistDetail.ep");
-  return i18n.t("artistDetail.album");
 }
 
 const GRADIENTS = [
