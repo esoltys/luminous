@@ -1007,7 +1007,8 @@ impl CollectionScanner {
                 COALESCE(
                     (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
                     -1
-                ) AS rating
+                ) AS rating,
+                MAX(added) AS added
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
@@ -1026,6 +1027,7 @@ impl CollectionScanner {
                     "art_manual": row.get::<_, Option<String>>(7)?,
                     "genre": row.get::<_, Option<String>>(8)?,
                     "rating": row.get::<_, f32>(9)?,
+                    "added": row.get::<_, Option<i64>>(10)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -2809,6 +2811,7 @@ mod tests {
         let album_one = find_album("Album One");
         assert_eq!(album_one["artist"].as_str(), Some("Artist A"));
         assert_eq!(album_one["track_count"].as_i64(), Some(2));
+        assert!(album_one["added"].is_number());
 
         // Assert Album Two -> album_artist is None (will fall back to Various Artists in UI)
         let album_two = find_album("Album Two");

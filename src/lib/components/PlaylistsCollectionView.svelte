@@ -343,12 +343,12 @@
                 }}
                 class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
-                <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
-                <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
-                <option value="track_count-false">{i18n.t('playlists.sortTrackCountDesc')}</option>
-                <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
-                <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
-                <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
+                <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
+                <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
+                <option value="track_count-true">▲ {i18n.t('playlists.sortLabelSongs')}</option>
+                <option value="track_count-false">▼ {i18n.t('playlists.sortLabelSongs')}</option>
+                <option value="updated-true">▲ {i18n.t('playlists.sortLabelUpdated')}</option>
+                <option value="updated-false">▼ {i18n.t('playlists.sortLabelUpdated')}</option>
               </Select>
             {:else}
               <Select
@@ -360,12 +360,12 @@
                 }}
                 class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
-                <option value="name-true">{i18n.t('playlists.sortNameAsc')}</option>
-                <option value="name-false">{i18n.t('playlists.sortNameDesc')}</option>
-                <option value="track_count-false">{i18n.t('playlists.sortTrackCountDesc')}</option>
-                <option value="track_count-true">{i18n.t('playlists.sortTrackCountAsc')}</option>
-                <option value="updated-false">{i18n.t('playlists.sortUpdatedNewest')}</option>
-                <option value="updated-true">{i18n.t('playlists.sortUpdatedOldest')}</option>
+                <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
+                <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
+                <option value="track_count-true">▲ {i18n.t('playlists.sortLabelSongs')}</option>
+                <option value="track_count-false">▼ {i18n.t('playlists.sortLabelSongs')}</option>
+                <option value="updated-true">▲ {i18n.t('playlists.sortLabelUpdated')}</option>
+                <option value="updated-false">▼ {i18n.t('playlists.sortLabelUpdated')}</option>
               </Select>
             {/if}
             </div>
