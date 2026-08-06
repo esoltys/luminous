@@ -1417,12 +1417,12 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.lastplayed}
-              <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
+              <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
                 {formatDate(item.song?.lastplayed)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.added}
-              <div class="text-center text-brand-text-primary font-mono text-xs whitespace-nowrap">
+              <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
                 {formatDate(item.song?.added)}
               </div>
             {/if}
