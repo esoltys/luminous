@@ -340,18 +340,21 @@
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       if (songs.length > 0) {
-        if (playlistsStore.activeCustomPlaylist) {
-          await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
-          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-        } else {
-          const queuePl = await playlistsStore.ensureQueuePlaylist();
+        const targetPlaylist = playlistsStore.activeCustomPlaylist;
+        const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+        const songIds = songs.map(s => s.id);
+
+        if (isQueue) {
+          const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
           if (queuePl) {
-            const songIds = songs.map(s => s.id);
             await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
             await invoke("append_songs_to_player_playlist", { songIds });
             const name = album.album || i18n.t("collection.unknownAlbum");
             toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
           }
+        } else {
+          await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
         }
       }
     }}
