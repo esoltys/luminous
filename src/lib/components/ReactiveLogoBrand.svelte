@@ -28,6 +28,18 @@
   let coronalIntensity = $state(0);
   let unlisten: (() => void) | null = null;
 
+  // Below this delta, a new intensity reading is visually indistinguishable
+  // from the current one. The three intensities each drive an SVG element
+  // filtered with feGaussianBlur (glow/rim/ring/burst below) — changing their
+  // r/stroke-width forces the browser to re-rasterize that blur, which is far
+  // more expensive than a plain compositor update. Skipping no-op-sized
+  // writes at up to ~30fps (spectrum-data cadence) cuts that re-rasterization
+  // during quiet/steady passages without touching how peaks render.
+  const INTENSITY_EPSILON = 0.015;
+  function settle(current: number, next: number): number {
+    return Math.abs(next - current) < INTENSITY_EPSILON ? current : next;
+  }
+
   onMount(async () => {
     const stored = localStorage.getItem("logo_pulsing");
     if (stored !== null) {
@@ -61,9 +73,9 @@
           // (see analyzer::calculate_spectrum), so only a modest boost is
           // needed for visual punch — a large fixed multiplier here would
           // just re-saturate every band back to the ceiling.
-          bassIntensity = Math.min(1.0, bassAvg * 1.4);
-          midIntensity = Math.min(1.0, midAvg * 1.4);
-          coronalIntensity = Math.min(1.0, coronalAvg * 1.6);
+          bassIntensity = settle(bassIntensity, Math.min(1.0, bassAvg * 1.4));
+          midIntensity = settle(midIntensity, Math.min(1.0, midAvg * 1.4));
+          coronalIntensity = settle(coronalIntensity, Math.min(1.0, coronalAvg * 1.6));
         } else {
           bassIntensity = 0;
           midIntensity = 0;
