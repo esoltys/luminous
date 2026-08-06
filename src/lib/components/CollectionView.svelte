@@ -215,12 +215,12 @@
     });
   });
 
-  let albumSortField = $state<"album" | "artist" | "year" | "rating">(
+  let albumSortField = $state<"album" | "artist" | "year" | "rating" | "added">(
     (() => {
       if (typeof window === "undefined") return "album";
       const saved = localStorage.getItem("sort_album_field");
       if (saved === "track_count") return "album";
-      return (saved as "album" | "artist" | "year" | "rating") || "album";
+      return (saved as "album" | "artist" | "year" | "rating" | "added") || "album";
     })()
   );
   let albumSortAsc = $state(
@@ -438,8 +438,8 @@
               class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
             >
               {#each sortableColumns as col (col.key)}
-                <option value="{col.field}-true">{i18n.t(col.label)} ▲</option>
-                <option value="{col.field}-false">{i18n.t(col.label)} ▼</option>
+                <option value="{col.field}-true">▲ {i18n.t(col.label)}</option>
+                <option value="{col.field}-false">▼ {i18n.t(col.label)}</option>
               {/each}
             </Select>
           </div>
@@ -966,19 +966,21 @@
                   value={`${albumSortField}-${albumSortAsc}`}
                   onchange={(e) => {
                     const [field, asc] = e.currentTarget.value.split("-");
-                    albumSortField = field as "album" | "artist" | "year" | "rating";
+                    albumSortField = field as "album" | "artist" | "year" | "rating" | "added";
                     albumSortAsc = asc === "true";
                   }}
                   class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
                 >
-                  <option value="album-true">{i18n.t('collection.sortAlbumNameAsc')}</option>
-                  <option value="album-false">{i18n.t('collection.sortAlbumNameDesc')}</option>
-                  <option value="artist-true">{i18n.t('collection.sortArtistNameAsc')}</option>
-                  <option value="artist-false">{i18n.t('collection.sortArtistNameDesc')}</option>
-                  <option value="year-false">{i18n.t('collection.sortYearDesc')}</option>
-                  <option value="year-true">{i18n.t('collection.sortYearAsc')}</option>
-                  <option value="rating-false">{i18n.t('collection.sortRatingDesc')}</option>
-                  <option value="rating-true">{i18n.t('collection.sortRatingAsc')}</option>
+                  <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
+                  <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
+                  <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
+                  <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
+                  <option value="year-true">▲ {i18n.t('collection.tableHeaderYear')}</option>
+                  <option value="year-false">▼ {i18n.t('collection.tableHeaderYear')}</option>
+                  <option value="rating-true">▲ {i18n.t('collection.tableHeaderRating')}</option>
+                  <option value="rating-false">▼ {i18n.t('collection.tableHeaderRating')}</option>
+                  <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
+                  <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
                 </Select>
               </div>
             {:else if collectionStore.activeSubTab === "artists"}
@@ -992,12 +994,12 @@
                   }}
                   class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
                 >
-                  <option value="name-true">{i18n.t('collection.sortArtistNameAsc')}</option>
-                  <option value="name-false">{i18n.t('collection.sortArtistNameDesc')}</option>
-                  <option value="genre-true">{i18n.t('collection.sortGenreAsc')}</option>
-                  <option value="genre-false">{i18n.t('collection.sortGenreDesc')}</option>
-                  <option value="song_count-false">{i18n.t('collection.sortSongsDesc')}</option>
-                  <option value="song_count-true">{i18n.t('collection.sortSongsAsc')}</option>
+                  <option value="name-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
+                  <option value="name-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
+                  <option value="genre-true">▲ {i18n.t('collection.tableHeaderGenre')}</option>
+                  <option value="genre-false">▼ {i18n.t('collection.tableHeaderGenre')}</option>
+                  <option value="song_count-true">▲ {i18n.t('collection.sortLabelSongs')}</option>
+                  <option value="song_count-false">▼ {i18n.t('collection.sortLabelSongs')}</option>
                 </Select>
               </div>
             {/if}

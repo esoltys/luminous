@@ -160,8 +160,8 @@ describe("CollectionView.svelte", () => {
     collectionStore.activeSubTab = "artists";
     const { getByText } = render(CollectionView);
 
-    expect(getByText("Sort: Genre (A-Z)")).toBeInTheDocument();
-    expect(getByText("Sort: Genre (Z-A)")).toBeInTheDocument();
+    expect(getByText("▲ Genre")).toBeInTheDocument();
+    expect(getByText("▼ Genre")).toBeInTheDocument();
   });
 
   it("displays empty state when no songs match search query", () => {
@@ -210,5 +210,13 @@ describe("CollectionView.svelte", () => {
 
     expect(prefs.artistsViewMode).toBe("rows");
     expect(prefs.albumsViewMode).toBe("cards");
+  });
+
+  it("renders Sort: Date Added options in Albums sub-tab", () => {
+    collectionStore.activeSubTab = "albums";
+    const { getByText } = render(CollectionView);
+
+    expect(getByText("▲ Date Added")).toBeInTheDocument();
+    expect(getByText("▼ Date Added")).toBeInTheDocument();
   });
 });
