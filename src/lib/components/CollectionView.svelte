@@ -300,7 +300,7 @@
   let gridColsStyle = $derived.by(() => {
     const vc = collectionStore.visibleColumns;
     const cols: string[] = ["36px"]; // play indicator always present
-    if (vc.track) cols.push("40px");
+    if (vc.track) cols.push("48px");
     if (vc.title) cols.push("2fr");
     if (vc.artist) cols.push("1.5fr");
     if (vc.album) cols.push("1.5fr");
@@ -760,7 +760,7 @@
                   </button>
                 </div>
                 {#if collectionStore.visibleColumns.track}
-                  <div class="text-brand-text-secondary truncate pr-4 min-w-0 font-medium">
+                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
                     {song.track !== undefined && song.track !== null ? song.track : "—"}
                   </div>
                 {/if}

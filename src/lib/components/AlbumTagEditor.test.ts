@@ -36,6 +36,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Test Artist",
       initialGenre: "Pop",
       initialYear: 2024,
+      initialDisc: 1,
       onClose,
     });
 
@@ -45,11 +46,13 @@ describe("AlbumTagEditor.svelte", () => {
     const artistInput = getByLabelText("Album Artist") as HTMLInputElement;
     const genreInput = getByLabelText("Genre") as HTMLInputElement;
     const yearInput = getByLabelText("Release Year") as HTMLInputElement;
+    const discInput = getByLabelText("Disc #") as HTMLInputElement;
 
     expect(albumInput.value).toBe("Test Album");
     expect(artistInput.value).toBe("Test Artist");
     expect(genreInput.value).toBe("Pop");
     expect(yearInput.value).toBe("2024");
+    expect(discInput.value).toBe("1");
   });
 
   it("calls onClose when cancel button is clicked", async () => {
@@ -73,6 +76,7 @@ describe("AlbumTagEditor.svelte", () => {
       initialAlbumArtist: "Old Artist",
       initialGenre: "Rock",
       initialYear: 2020,
+      initialDisc: 2,
       onClose,
       onSave,
     });
@@ -90,6 +94,77 @@ describe("AlbumTagEditor.svelte", () => {
         albumArtist: "Old Artist",
         genre: "Rock",
         year: 2020,
+        disc: 2,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("handles null initial genre and saves empty string for genre", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Test Artist",
+      initialGenre: null,
+      initialYear: 2024,
+      initialDisc: null,
+      onClose,
+      onSave,
+    });
+
+    const genreInput = getByLabelText("Genre") as HTMLInputElement;
+    expect(genreInput.value).toBe("");
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Test Album",
+        albumArtist: "Test Artist",
+        genre: "",
+        year: 2024,
+        disc: null,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("allows clearing the Disc input field to save null disc", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Test Artist",
+      initialGenre: "Pop",
+      initialYear: 2024,
+      initialDisc: 1,
+      onClose,
+      onSave,
+    });
+
+    const discInput = getByLabelText("Disc #") as HTMLInputElement;
+    expect(discInput.value).toBe("1");
+
+    await fireEvent.input(discInput, { target: { value: "" } });
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Test Album",
+        albumArtist: "Test Artist",
+        genre: "Pop",
+        year: 2024,
+        disc: null,
       });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();

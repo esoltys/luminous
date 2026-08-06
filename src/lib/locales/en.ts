@@ -650,6 +650,7 @@ export const en = {
     albumArtistField: "Album Artist",
     genreField: "Genre",
     yearField: "Release Year",
+    discField: "Disc #",
     tracksAffected: "Applies to {count} songs",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",

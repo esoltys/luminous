@@ -11,10 +11,11 @@
 
   interface Props {
     songIds: number[];
-    initialAlbum?: string;
-    initialAlbumArtist?: string;
-    initialGenre?: string;
+    initialAlbum?: string | null;
+    initialAlbumArtist?: string | null;
+    initialGenre?: string | null;
     initialYear?: number | null;
+    initialDisc?: number | null;
     onClose: () => void;
     onSave?: () => void;
   }
@@ -25,18 +26,21 @@
     initialAlbumArtist = "",
     initialGenre = "",
     initialYear = null,
+    initialDisc = null,
     onClose,
     onSave
   }: Props = $props();
 
   // svelte-ignore state_referenced_locally
-  let album = $state(initialAlbum);
+  let album = $state(initialAlbum ?? "");
   // svelte-ignore state_referenced_locally
-  let albumArtist = $state(initialAlbumArtist);
+  let albumArtist = $state(initialAlbumArtist ?? "");
   // svelte-ignore state_referenced_locally
-  let genre = $state(initialGenre);
+  let genre = $state(initialGenre ?? "");
   // svelte-ignore state_referenced_locally
   let year = $state<number | null>(initialYear);
+  // svelte-ignore state_referenced_locally
+  let disc = $state<number | null>(initialDisc);
 
   let isSaving = $state(false);
 
@@ -45,10 +49,11 @@
     try {
       await invoke("save_album_tags", {
         songIds,
-        album,
-        albumArtist,
-        genre,
+        album: album ?? "",
+        albumArtist: albumArtist ?? "",
+        genre: genre ?? "",
         year,
+        disc,
       });
 
       await collectionStore.refreshStats();
@@ -103,13 +108,40 @@
           </FormField>
 
           <!-- Genre -->
-          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre">
+          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
             <Input id="album-tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
           </FormField>
 
           <!-- Year -->
           <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
-            <Input id="album-tag-year" type="number" bind:value={year} disabled={isSaving} size="sm" class="w-full" />
+            <Input
+              id="album-tag-year"
+              type="number"
+              value={year ?? ""}
+              disabled={isSaving}
+              oninput={(e) => {
+                const val = parseInt(e.currentTarget.value, 10);
+                year = isNaN(val) ? null : val;
+              }}
+              size="sm"
+              class="w-full"
+            />
+          </FormField>
+
+          <!-- Disc -->
+          <FormField label={i18n.t('albumTagEditor.discField')} for="album-tag-disc">
+            <Input
+              id="album-tag-disc"
+              type="number"
+              value={disc ?? ""}
+              disabled={isSaving}
+              oninput={(e) => {
+                const val = parseInt(e.currentTarget.value, 10);
+                disc = isNaN(val) ? null : val;
+              }}
+              size="sm"
+              class="w-full"
+            />
           </FormField>
         </div>
       </div>

@@ -298,7 +298,7 @@
   let gridColsStyle = $derived.by(() => {
     const vc = collectionStore.visibleColumns;
     const cols: string[] = ["36px"]; // play indicator always present
-    if (vc.track) cols.push("40px");
+    if (vc.track) cols.push("48px");
     if (vc.title) cols.push("2fr");
     if (vc.artist) cols.push("1.5fr");
     if (vc.album) cols.push("1.5fr");
@@ -872,7 +872,7 @@
               </div>
 
               {#if collectionStore.visibleColumns.track}
-                <div class="text-brand-text-primary truncate pr-4 min-w-0 font-medium">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatTrackNumber(song.track, song.disc, discCount, index)}
                 </div>
               {/if}
@@ -1001,7 +1001,7 @@
               {/if}
 
               {#if collectionStore.visibleColumns.duration}
-                <div class="text-center text-brand-text-primary font-medium">
+                <div class="text-center text-brand-text-primary text-xs font-medium">
                   {formatDuration(song.length_nanosec)}
                 </div>
               {/if}
@@ -1055,6 +1055,7 @@
     initialAlbumArtist={songs[0].album_artist || songs[0].artist}
     initialGenre={songs[0].genre}
     initialYear={songs[0].year}
+    initialDisc={songs[0].disc}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />
