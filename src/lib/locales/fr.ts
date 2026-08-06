@@ -747,6 +747,9 @@ export const fr = {
     addAllToPlaylistTooltip: "Ajouter toutes les chansons à {name}",
     addAllToPlaylistTooltipDefault: "Ajouter toutes les chansons à la file d'attente",
     editInfoTooltip: "Modifier les infos de l'album",
+    refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
+    refreshSuccess: "Métadonnées et pochette de l'album actualisées",
+    refreshError: "Échec de l'actualisation de l'album",
     goToGenrePlaylistTooltip: "Aller à la playlist automatique {genre}"
   },
   immersive: {

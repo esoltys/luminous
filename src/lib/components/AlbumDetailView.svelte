@@ -19,7 +19,7 @@
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
-  import { Play, Plus, Edit3, Clock, Music } from "lucide-svelte";
+  import { Play, Plus, Edit3, RefreshCw, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -32,9 +32,34 @@
 
   let songs = $state<Song[]>([]);
   let loading = $state(true);
+  let refreshing = $state(false);
   let editingSongId = $state<number | null>(null);
   let showAlbumTagEditor = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+
+  async function handleRefreshAlbum() {
+    if (refreshing || collectionStore.isScanning) return;
+    refreshing = true;
+    try {
+      await collectionStore.startScan(true);
+      await collectionStore.refreshLibrary();
+      const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
+      let filtered = [...fetchedSongs];
+      filtered.sort((a, b) => {
+        if (a.disc !== b.disc) {
+          return (a.disc ?? 1) - (b.disc ?? 1);
+        }
+        return (a.track ?? 0) - (b.track ?? 0);
+      });
+      songs = filtered;
+      toastStore.show(i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"));
+    } catch (err) {
+      console.error("Failed to refresh album:", err);
+      toastStore.show(i18n.t("albumDetail.refreshError", {}, "Failed to refresh album metadata"));
+    } finally {
+      refreshing = false;
+    }
+  }
 
   let selectedSongIds = $state<Set<number>>(new Set());
   let lastSelectedSongId = $state<number | null>(null);
@@ -564,6 +589,13 @@
             title={i18n.t('albumDetail.editInfoTooltip')}
           >
             {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
+            onclick={handleRefreshAlbum}
+            disabled={loading || collectionStore.isScanning || refreshing}
+            title={i18n.t('albumDetail.refreshTooltip')}
+          >
+            {#snippet icon()}<RefreshCw class="w-4 h-4 {refreshing || collectionStore.isScanning ? 'animate-spin' : ''}" />{/snippet}
           </IconActionButton>
           <ColumnSelector align="left" iconOnly />
         </div>
