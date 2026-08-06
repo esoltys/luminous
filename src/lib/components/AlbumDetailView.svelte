@@ -8,6 +8,7 @@
   import { shuffleArray } from "../utils/shuffle";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
+  import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -579,6 +580,9 @@
             artManual={albumItem?.art_manual}
             sizeClass="w-full h-full object-cover"
           />
+          {#if albumItem && albumItem.rating === 5}
+            <FavouriteCornerFlag size="lg" />
+          {/if}
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@
   import { getCoverArtUrl, type RecentSearchItem } from "../types";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import CoverArt from "./CoverArt.svelte";
+  import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import ReactiveLogoBrand from "./ReactiveLogoBrand.svelte";
   import { fade } from "svelte/transition";
   import { MAX_SEARCH_SUGGESTIONS_PER_CATEGORY } from "../constants";
@@ -382,13 +383,18 @@
                     class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <CoverArt
-                        songId={undefined}
-                        artManual={album.art_manual}
-                        artAutomatic={album.art_automatic}
-                        artEmbedded={album.art_embedded}
-                        sizeClass="w-8 h-8"
-                      />
+                      <div class="relative shrink-0 overflow-hidden">
+                        <CoverArt
+                          songId={undefined}
+                          artManual={album.art_manual}
+                          artAutomatic={album.art_automatic}
+                          artEmbedded={album.art_embedded}
+                          sizeClass="w-8 h-8"
+                        />
+                        {#if album.rating === 5}
+                          <FavouriteCornerFlag size="xs" />
+                        {/if}
+                      </div>
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
                           {album.album}

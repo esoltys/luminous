@@ -7,7 +7,8 @@
   import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
-
+  import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
+ 
   interface Props {
     album: AlbumItem;
     covers?: CoverItem[];
@@ -66,6 +67,9 @@
       covers={covers && covers.length > 0 ? covers : [{ artEmbedded: album.art_embedded, artAutomatic: album.art_automatic, artManual: album.art_manual }]}
       sizeClass={covers && covers.length > 1 ? "w-24 h-24" : "w-full h-full"}
     />
+    {#if album.rating === 5}
+      <FavouriteCornerFlag size="md" />
+    {/if}
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton

@@ -6,6 +6,7 @@
   import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { queueAlbumAsPlaylist } from "../utils/playlist";
+  import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
 
   interface Props {
     album: AlbumItem;
@@ -62,6 +63,9 @@
       artManual={album.art_manual}
       sizeClass="w-11 h-11"
     />
+    {#if album.rating === 5}
+      <FavouriteCornerFlag size="sm" />
+    {/if}
   </div>
 
   <div class="min-w-0 flex-1 flex flex-col gap-0.5">
