@@ -174,11 +174,11 @@
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
-      <div class="flex flex-col justify-end gap-2 max-w-xl">
+      <div class="flex flex-col justify-end gap-1.5 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <!-- Summary Metadata Line -->
-        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
+        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
           <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albums: albumsText, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 

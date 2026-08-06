@@ -766,7 +766,7 @@
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
         <!-- Left Title & Summary Metadata -->
-        <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
+        <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -802,7 +802,7 @@
           {/if}
 
           <!-- Summary Metadata Line -->
-          <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium mt-1">
+          <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
             <span>
               {#if isSpecialPlaylist}
                 {playlistsStore.activePlaylistTracks.length === 1

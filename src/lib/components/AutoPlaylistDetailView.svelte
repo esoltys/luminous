@@ -528,12 +528,12 @@ import { shuffleArray } from "../utils/shuffle";
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-stretch justify-between gap-6 relative z-10">
       <!-- Left Title & Summary Metadata -->
-      <div class="flex flex-col justify-end gap-2 min-w-0 flex-1">
+      <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
           {displayName}
         </h1>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary mt-1 font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           <span>{songs.length === 1 ? i18n.t('playlists.oneSong') : i18n.t('playlists.songsCount', { count: songs.length })}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
