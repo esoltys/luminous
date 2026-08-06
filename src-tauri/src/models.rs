@@ -670,6 +670,11 @@ pub struct AlbumItem {
     /// that have a DB connection handy (see `attach_album_ratings`); defaults to
     /// unrated at construction time.
     pub rating: f32,
+    /// Sum of every track's `length_nanosec`, used to classify a release as an
+    /// EP (under 30 minutes) vs. an Album — the Home-carousel construction sites
+    /// don't have this aggregate handy and default it to 0, which is harmless
+    /// since those `AlbumItem`s aren't run through release-category logic.
+    pub total_duration_nanosec: i64,
 }
 
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).

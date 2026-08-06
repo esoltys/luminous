@@ -1065,7 +1065,8 @@ impl CollectionScanner {
                     (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
                     -1
                 ) AS rating,
-                MAX(added) AS added
+                MAX(added) AS added,
+                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
@@ -1085,6 +1086,7 @@ impl CollectionScanner {
                     "genre": row.get::<_, Option<String>>(8)?,
                     "rating": row.get::<_, f32>(9)?,
                     "added": row.get::<_, Option<i64>>(10)?,
+                    "total_duration_nanosec": row.get::<_, i64>(11)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1439,6 +1441,7 @@ fn group_songs_into_home_items(
                             genre: song.genre.clone(),
                             sample_song_id: Some(song.id),
                             rating: crate::stats::RATING_UNRATED,
+                            total_duration_nanosec: 0,
                         },
                     });
                 }
@@ -1557,6 +1560,7 @@ fn home_item_for_context(
                     genre: song.genre.clone(),
                     sample_song_id: Some(song.id),
                     rating: crate::stats::RATING_UNRATED,
+                    total_duration_nanosec: 0,
                 },
             }
         }

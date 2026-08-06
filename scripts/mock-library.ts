@@ -179,6 +179,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
       existing.art_automatic = existing.art_automatic ?? song.art_automatic ?? null;
       existing.art_manual = existing.art_manual ?? song.art_manual ?? null;
       existing.genre = existing.genre ?? song.genre ?? null;
+      existing.total_duration_nanosec += song.length_nanosec ?? 0;
     } else {
       byKey.set(key, {
         album: song.album,
@@ -191,6 +192,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
         art_manual: song.art_manual ?? null,
         genre: song.genre ?? null,
         rating: -1,
+        total_duration_nanosec: song.length_nanosec ?? 0,
       });
     }
   }

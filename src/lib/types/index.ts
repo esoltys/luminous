@@ -246,6 +246,8 @@ export interface AlbumItem {
   /** Independent album rating (-1 = unrated, else 0.5–5.0), separate from any song's rating. */
   rating: number;
   added?: number | null;
+  /** Sum of every track's length_nanosec; 0 for AlbumItems built outside get_albums() (e.g. Home carousels). */
+  total_duration_nanosec: number;
 }
 
 export interface ArtistItem {

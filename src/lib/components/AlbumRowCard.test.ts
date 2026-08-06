@@ -23,6 +23,7 @@ describe("AlbumRowCard.svelte", () => {
     art_manual: null,
     genre: "Alternative",
     rating: -1,
+    total_duration_nanosec: 0,
   };
 
   beforeEach(() => {

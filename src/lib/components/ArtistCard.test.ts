@@ -30,6 +30,7 @@ describe("ArtistCard.svelte", () => {
     art_automatic: "covers/dave.jpg",
     art_manual: null,
     rating: -1,
+    total_duration_nanosec: 0,
   };
 
   const mockSongWithArt: Song = {

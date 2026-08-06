@@ -38,6 +38,7 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
     art_manual: null,
     genre: "Rock",
     rating: -1,
+    total_duration_nanosec: 0,
     ...overrides,
   };
 }
