@@ -24,7 +24,7 @@ class PlaylistsStore {
 
   /** Count of auto-playlists that currently have at least one song — used for
    * the sidebar's Auto badge, kept in sync with the Auto grid's own filtering. */
-  get visibleAutoPlaylistCount(): number {
+  visibleAutoPlaylistCount = $derived.by(() => {
     const genreCount = this.playlists.filter((p) => p.dynamic_enabled && p.track_count > 0).length;
     return (
       genreCount +
@@ -32,36 +32,44 @@ class PlaylistsStore {
       (this.recentlyAddedCount > 0 ? 1 : 0) +
       (this.historyCount > 0 ? 1 : 0)
     );
-  }
+  });
 
   /** The special pinned Queue playlist, always present and never deletable. */
-  private get queuePlaylist(): Playlist | null {
+  queuePlaylist = $derived.by((): Playlist | null => {
     return (
       this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
     );
+  });
+
+  queueVersion = $state(0);
+
+  notifyQueueChanged() {
+    this.queueVersion++;
   }
 
-  get queueTrackCount(): number {
+  queueTrackCount = $derived.by((): number => {
+    // Explicit signal dependency for Svelte 5 reactivity
+    this.queueVersion;
     const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
     if (q === undefined) return 0;
     if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
       return this.activePlaylistTracks.length;
     }
     return q.track_count ?? 0;
-  }
+  });
 
   /** The "Active" playlist id: whatever's explicitly pinned via "Make Active",
    * falling back to the Queue playlist when nothing has been pinned yet. */
-  get effectivePinnedPlaylistId(): number | null {
+  effectivePinnedPlaylistId = $derived.by((): number | null => {
     return this.pinnedPlaylistId ?? this.queuePlaylist?.id ?? null;
-  }
+  });
 
   /** The pinned/"Active" playlist ONLY if it is a custom playlist (not an auto/dynamic playlist). */
-  get activeCustomPlaylist(): Playlist | null {
+  activeCustomPlaylist = $derived.by((): Playlist | null => {
     if (this.effectivePinnedPlaylistId === null) return null;
     const pl = this.playlists.find((p) => p.id === this.effectivePinnedPlaylistId);
     return pl && !pl.dynamic_enabled ? pl : null;
-  }
+  });
 
   constructor() {
     this.init();
@@ -128,6 +136,7 @@ class PlaylistsStore {
 
   async refreshPlaylists() {
     this.playlists = await invoke("get_playlists");
+    this.notifyQueueChanged();
   }
 
   async refreshAutoPlaylistCounts() {
@@ -149,6 +158,7 @@ class PlaylistsStore {
   async selectPlaylist(id: number) {
     this.activePlaylistId = id;
     this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
+    this.notifyQueueChanged();
     try {
       await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
     } catch (err) {
@@ -242,9 +252,7 @@ class PlaylistsStore {
       if (songIds.length > 0) {
         await invoke("add_to_playlist", { playlistId: queuePl.id, songIds });
       }
-      if (this.activePlaylistId === queuePl.id) {
-        await this.selectPlaylist(queuePl.id);
-      }
+      await this.selectPlaylist(queuePl.id);
       await this.refreshPlaylists();
     } catch (err) {
       console.error("Failed to sync Queue playlist tracks:", err);
@@ -281,7 +289,8 @@ class PlaylistsStore {
 
   async addSongsToPlaylist(playlistId: number, songIds: number[]) {
     await invoke("add_to_playlist", { playlistId, songIds });
-    if (this.activePlaylistId === playlistId) {
+    const qPl = this.queuePlaylist;
+    if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
       await this.selectPlaylist(playlistId);
     }
     await this.refreshPlaylists(); // update track counts
@@ -292,7 +301,8 @@ class PlaylistsStore {
     // Keep the live playback queue in sync — a no-op if these uuids aren't
     // part of the currently loaded queue (see #262).
     await invoke("remove_songs_from_player_playlist", { uuids });
-    if (this.activePlaylistId === playlistId) {
+    const qPl = this.queuePlaylist;
+    if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
       await this.selectPlaylist(playlistId);
     }
     await this.refreshPlaylists(); // update track counts

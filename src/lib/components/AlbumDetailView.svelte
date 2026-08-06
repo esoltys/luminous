@@ -329,10 +329,6 @@
     const songIds = songs.map((s) => s.id);
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
-    }
   }
 
   async function handlePlayAll() {
@@ -340,10 +336,6 @@
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
-    }
   }
 
   async function handleShufflePlay() {

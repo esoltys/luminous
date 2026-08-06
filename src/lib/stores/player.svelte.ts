@@ -250,9 +250,7 @@ export class PlayerStore {
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     if (queuePl) {
       this.activeContextName = "Queue";
-      if (playlistsStore.activePlaylistId === queuePl.id) {
-        await playlistsStore.selectPlaylist(queuePl.id);
-      }
+      await playlistsStore.selectPlaylist(queuePl.id);
     }
   }
 
@@ -316,7 +314,15 @@ export class PlayerStore {
       this.activeContextName = undefined;
     }
     await playlistsStore.replaceQueueTracks(songIds);
-    await invoke("play_songs", { songIds, startIndex, playlistId: effectivePlaylistId ?? null, context: context ?? null });
+    if (effectivePlaylistId) {
+      await invoke("play_playlist_item", { playlistId: effectivePlaylistId, itemIndex: startIndex });
+    } else {
+      await invoke("play_songs", { songIds, startIndex, playlistId: null, context: context ?? null });
+    }
+    if (queuePl) {
+      await playlistsStore.selectPlaylist(queuePl.id);
+      await playlistsStore.refreshPlaylists();
+    }
   }
 
   /** Background cleanup only — never a precondition for playback. Trims
