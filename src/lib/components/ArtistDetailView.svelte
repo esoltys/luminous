@@ -339,10 +339,20 @@
     }}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
-        await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
-      } else if (songs.length > 0) {
-        toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
+      if (songs.length > 0) {
+        if (playlistsStore.activeCustomPlaylist) {
+          await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
+          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
+        } else {
+          const queuePl = await playlistsStore.ensureQueuePlaylist();
+          if (queuePl) {
+            const songIds = songs.map(s => s.id);
+            await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
+            await invoke("append_songs_to_player_playlist", { songIds });
+            const name = album.album || i18n.t("collection.unknownAlbum");
+            toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
+          }
+        }
       }
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}

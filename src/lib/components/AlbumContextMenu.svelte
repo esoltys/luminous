@@ -40,7 +40,8 @@
           const songIds = songs.map((s) => s.id);
           await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
           await invoke("append_songs_to_player_playlist", { songIds });
-          toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, `Added to Queue`));
+          const name = albumName || i18n.t("collection.unknownAlbum");
+          toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
         }
       }
     } catch (err) {
