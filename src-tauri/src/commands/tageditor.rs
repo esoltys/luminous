@@ -113,7 +113,7 @@ pub async fn save_song_tags(
     album: String,
     album_artist: String,
     composer: String,
-    genre: String,
+    genre: Option<String>,
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
@@ -146,7 +146,8 @@ pub async fn save_song_tags(
     let album_c = album.clone();
     let album_artist_c = album_artist.clone();
     let composer_c = composer.clone();
-    let genre_c = genre.clone();
+    let genre_str = genre.unwrap_or_default();
+    let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
 
@@ -193,7 +194,7 @@ pub async fn save_song_tags(
             album,
             album_artist,
             composer,
-            genre,
+            genre_str,
             track,
             disc,
             year,
@@ -214,8 +215,9 @@ pub async fn save_album_tags(
     song_ids: Vec<i64>,
     album: String,
     album_artist: String,
-    genre: String,
+    genre: Option<String>,
     year: Option<u32>,
+    disc: Option<u32>,
 ) -> Result<u32, String> {
     if song_ids.is_empty() {
         return Ok(0);
@@ -234,7 +236,6 @@ pub async fn save_album_tags(
         artist: String,
         composer: String,
         track: Option<u32>,
-        disc: Option<u32>,
         grouping: String,
         bpm: Option<f32>,
         initial_key: String,
@@ -243,7 +244,7 @@ pub async fn save_album_tags(
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, artist, composer, track, disc, grouping, bpm, initial_key
+            "SELECT path, title, artist, composer, track, grouping, bpm, initial_key
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
@@ -253,10 +254,9 @@ pub async fn save_album_tags(
                     artist: row.get(2).unwrap_or_default(),
                     composer: row.get(3).unwrap_or_default(),
                     track: row.get(4).ok(),
-                    disc: row.get(5).ok(),
-                    grouping: row.get(6).unwrap_or_default(),
-                    bpm: row.get(7).ok(),
-                    initial_key: row.get(8).unwrap_or_default(),
+                    grouping: row.get(5).unwrap_or_default(),
+                    bpm: row.get(6).ok(),
+                    initial_key: row.get(7).unwrap_or_default(),
                 })
             },
         );
@@ -267,7 +267,8 @@ pub async fn save_album_tags(
 
     let album_c = album.clone();
     let album_artist_c = album_artist.clone();
-    let genre_c = genre.clone();
+    let genre_str = genre.unwrap_or_default();
+    let genre_c = genre_str.clone();
 
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
@@ -282,7 +283,7 @@ pub async fn save_album_tags(
                 &item.composer,
                 &genre_c,
                 item.track,
-                item.disc,
+                disc,
                 year,
                 &item.grouping,
                 item.bpm,
@@ -304,9 +305,10 @@ pub async fn save_album_tags(
                 album = ?1,
                 album_artist = ?2,
                 genre = ?3,
-                year = ?4
-             WHERE id = ?5",
-            rusqlite::params![album, album_artist, genre, year, song_id],
+                year = ?4,
+                disc = ?5
+             WHERE id = ?6",
+            rusqlite::params![album, album_artist, genre_str, year, disc, song_id],
         )
         .map_err(|e| e.to_string())?;
     }

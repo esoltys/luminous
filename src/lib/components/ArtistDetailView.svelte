@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -113,15 +112,6 @@
     songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
   );
 
-  let discographyFilter = $state<"sets" | "albums" | "eps" | "singles">("albums");
-  let showAll = $state(false);
-  const POPULAR_CAP = 8;
-
-  function setDiscographyFilter(filter: "sets" | "albums" | "eps" | "singles") {
-    discographyFilter = filter;
-    showAll = false;
-  }
-
   // Some artists have no proper album releases at all (every track is a loose
   // single with no album tag), so getArtistAlbums() returns nothing and the
   // Albums/Singles/Popular filters all end up empty. Fall back to showing the
@@ -131,30 +121,6 @@
   let looseSongs = $derived(
     albums.length === 0 ? [...songs].sort((a, b) => (a.title || "").localeCompare(b.title || "")) : []
   );
-  let singlesCount = $derived(singles.length + looseSongs.length);
-
-  // Land on whichever category actually has releases when switching artists,
-  // rather than defaulting to a possibly-empty "Albums" tab (e.g. an
-  // EP-only or singles-only artist). Keyed on artistName so a manual tab
-  // pick while browsing the same artist isn't overridden.
-  $effect(() => {
-    const _artist = artistName;
-    discographyFilter = untrack(() => {
-      if (fullAlbums.length > 0) return "albums";
-      if (sets.length > 0) return "sets";
-      if (eps.length > 0) return "eps";
-      if (singlesCount > 0) return "singles";
-      return "albums";
-    });
-    showAll = false;
-  });
-
-  let discographySource = $derived(
-    discographyFilter === "sets" ? sets : discographyFilter === "eps" ? eps : discographyFilter === "singles" ? singles : fullAlbums
-  );
-  let discographyItems = $derived(showAll ? discographySource : discographySource.slice(0, POPULAR_CAP));
-
-  let displayedLooseSongs = $derived(showAll ? looseSongs : looseSongs.slice(0, POPULAR_CAP));
 
   function openAlbum(album: AlbumItem) {
     collectionStore.viewAlbum(album.album || "");
@@ -235,76 +201,67 @@
     </div>
   </div>
 
-  <!-- Discography -->
-  <div class="px-6 pt-8">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.discography')}</h2>
-      {#if discographySource.length > POPULAR_CAP || looseSongs.length > POPULAR_CAP}
-        <button
-          onclick={() => { showAll = !showAll; }}
-          class="text-xs text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
-        >
-          {showAll ? i18n.t('artistDetail.showLess') : i18n.t('artistDetail.showAll')}
-        </button>
-      {/if}
-    </div>
-
-    {#if albums.length > 0 || looseSongs.length > 0}
-      <div class="flex items-center gap-2 mb-4">
-        {#if sets.length > 0}
-          <button
-            onclick={() => setDiscographyFilter("sets")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'sets' ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-          >
-            {i18n.t('artistDetail.setsFilter', { count: sets.length })}
-          </button>
-        {/if}
-        {#if fullAlbums.length > 0}
-          <button
-            onclick={() => setDiscographyFilter("albums")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'albums' ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-          >
-            {i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}
-          </button>
-        {/if}
-        {#if eps.length > 0}
-          <button
-            onclick={() => setDiscographyFilter("eps")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'eps' ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-          >
-            {i18n.t('artistDetail.epsFilter', { count: eps.length })}
-          </button>
-        {/if}
-        {#if singlesCount > 0}
-          <button
-            onclick={() => setDiscographyFilter("singles")}
-            class="px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer flex-shrink-0 {discographyFilter === 'singles' ? 'bg-brand-accent border-brand-accent text-brand-accent-contrast font-semibold shadow-sm' : 'border-transparent text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar'}"
-          >
-            {i18n.t('artistDetail.singlesFilter', { count: singlesCount })}
-          </button>
-        {/if}
-      </div>
-    {/if}
-
-    {#if discographyItems.length > 0}
-      <HorizontalScrollRow>
-        {#each discographyItems as album (album.album)}
+  <!-- Release Categories (Sets, Albums, EPs, Singles) -->
+  <div class="px-6 pt-6 flex flex-col gap-8">
+    {#if sets.length > 0}
+      <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
+        {#each sets as album (album.album)}
           <AlbumCard
             {album}
             widthClass="w-48 shrink-0"
-            showArtist={false}
             onclick={() => openAlbum(album)}
             oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
           />
         {/each}
       </HorizontalScrollRow>
-    {:else if displayedLooseSongs.length > 0}
-      <HorizontalScrollRow>
-        {#each displayedLooseSongs as song (song.id)}
+    {/if}
+
+    {#if fullAlbums.length > 0}
+      <HorizontalScrollRow title={i18n.t('artistDetail.albumsFilter', { count: fullAlbums.length })}>
+        {#each fullAlbums as album (album.album)}
+          <AlbumCard
+            {album}
+            widthClass="w-48 shrink-0"
+            onclick={() => openAlbum(album)}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+          />
+        {/each}
+      </HorizontalScrollRow>
+    {/if}
+
+    {#if eps.length > 0}
+      <HorizontalScrollRow title={i18n.t('artistDetail.epsFilter', { count: eps.length })}>
+        {#each eps as album (album.album)}
+          <AlbumCard
+            {album}
+            widthClass="w-48 shrink-0"
+            onclick={() => openAlbum(album)}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+          />
+        {/each}
+      </HorizontalScrollRow>
+    {/if}
+
+    {#if singles.length > 0}
+      <HorizontalScrollRow title={i18n.t('artistDetail.singlesFilter', { count: singles.length })}>
+        {#each singles as album (album.album)}
+          <AlbumCard
+            {album}
+            widthClass="w-48 shrink-0"
+            onclick={() => openAlbum(album)}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+          />
+        {/each}
+      </HorizontalScrollRow>
+    {:else if looseSongs.length > 0}
+      <HorizontalScrollRow title={i18n.t('artistDetail.singlesFilter', { count: looseSongs.length })}>
+        {#each looseSongs as song (song.id)}
           <CarouselCard item={{ type: "song", song }} />
         {/each}
       </HorizontalScrollRow>
-    {:else if !loading}
+    {/if}
+
+    {#if albums.length === 0 && looseSongs.length === 0 && !loading}
       <p class="text-xs text-brand-text-secondary py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
     {/if}
   </div>
@@ -340,18 +297,21 @@
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       if (songs.length > 0) {
-        if (playlistsStore.activeCustomPlaylist) {
-          await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map(s => s.id));
-          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-        } else {
-          const queuePl = await playlistsStore.ensureQueuePlaylist();
+        const targetPlaylist = playlistsStore.activeCustomPlaylist;
+        const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+        const songIds = songs.map(s => s.id);
+
+        if (isQueue) {
+          const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
           if (queuePl) {
-            const songIds = songs.map(s => s.id);
             await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
             await invoke("append_songs_to_player_playlist", { songIds });
             const name = album.album || i18n.t("collection.unknownAlbum");
             toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
           }
+        } else {
+          await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
         }
       }
     }}

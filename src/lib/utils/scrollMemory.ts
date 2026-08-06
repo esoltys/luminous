@@ -29,13 +29,14 @@ function attachScrollMemory(node: HTMLElement, key: string): () => void {
   };
 
   restore();
-  let rafId: number;
-  rafId = requestAnimationFrame(function tick(frame = 0) {
+  let rafId: number | undefined;
+  function tick(frame = 0) {
     restore();
     if (frame + 1 < RESTORE_RETRY_FRAMES) {
       rafId = requestAnimationFrame(() => tick(frame + 1));
     }
-  });
+  }
+  rafId = requestAnimationFrame(() => tick(0));
 
   // Distinguishes the user actually grabbing the scrollbar/wheel from the
   // 'scroll' events our own programmatic restore() calls above trigger.

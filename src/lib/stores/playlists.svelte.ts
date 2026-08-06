@@ -51,8 +51,8 @@ class PlaylistsStore {
     // Explicit signal dependency for Svelte 5 reactivity
     this.queueVersion;
     const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
-    if (q === undefined) return 0;
-    if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
+    if (q === undefined) return this.activePlaylistTracks.length ?? 0;
+    if (this.activePlaylistId !== null && this.activePlaylistId === q.id && this.activePlaylistTracks.length > (q.track_count ?? 0)) {
       return this.activePlaylistTracks.length;
     }
     return q.track_count ?? 0;
@@ -289,11 +289,11 @@ class PlaylistsStore {
 
   async addSongsToPlaylist(playlistId: number, songIds: number[]) {
     await invoke("add_to_playlist", { playlistId, songIds });
+    await this.refreshPlaylists(); // update track counts FIRST
     const qPl = this.queuePlaylist;
     if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
       await this.selectPlaylist(playlistId);
     }
-    await this.refreshPlaylists(); // update track counts
   }
 
   async removeItemsFromPlaylist(playlistId: number, uuids: string[]) {
@@ -301,11 +301,11 @@ class PlaylistsStore {
     // Keep the live playback queue in sync — a no-op if these uuids aren't
     // part of the currently loaded queue (see #262).
     await invoke("remove_songs_from_player_playlist", { uuids });
+    await this.refreshPlaylists(); // update track counts FIRST
     const qPl = this.queuePlaylist;
     if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
       await this.selectPlaylist(playlistId);
     }
-    await this.refreshPlaylists(); // update track counts
   }
 
   async reorderItemByUuid(playlistId: number, sourceUuid: string, targetUuid: string) {

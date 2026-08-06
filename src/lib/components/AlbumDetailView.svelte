@@ -109,17 +109,20 @@
   async function handleBulkAddToPlaylist() {
     if (selectedSongIds.size === 0) return;
     const songIds = Array.from(selectedSongIds);
-    if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-    } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const targetPlaylist = playlistsStore.activeCustomPlaylist;
+    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+
+    if (isQueue) {
+      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
         const label = songIds.length === 1 ? "1 song" : `${songIds.length} songs`;
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: label }, `Added ${label} to Queue`));
       }
+    } else {
+      await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
     }
   }
 
@@ -298,7 +301,7 @@
   let gridColsStyle = $derived.by(() => {
     const vc = collectionStore.visibleColumns;
     const cols: string[] = ["36px"]; // play indicator always present
-    if (vc.track) cols.push("40px");
+    if (vc.track) cols.push("48px");
     if (vc.title) cols.push("2fr");
     if (vc.artist) cols.push("1.5fr");
     if (vc.album) cols.push("1.5fr");
@@ -355,36 +358,42 @@
   }
 
   async function handleAddSongToPlaylist(songId: number) {
-    if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-    } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const targetPlaylist = playlistsStore.activeCustomPlaylist;
+    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const songIds = [songId];
+
+    if (isQueue) {
+      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
       if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, [songId]);
-        await invoke("append_songs_to_player_playlist", { songIds: [songId] });
+        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
+        await invoke("append_songs_to_player_playlist", { songIds });
         const songObj = songs.find((s) => s.id === songId);
-        const title = songObj?.title || "Song";
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: title }, `Added ${title} to Queue`));
+        const name = songObj?.title || "Song";
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }
+    } else {
+      await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
     }
   }
 
   async function handleAddAlbumToPlaylist() {
     if (songs.length === 0) return;
-    if (playlistsStore.activeCustomPlaylist) {
-      const songIds = songs.map((s) => s.id);
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-    } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const targetPlaylist = playlistsStore.activeCustomPlaylist;
+    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const songIds = songs.map((s) => s.id);
+
+    if (isQueue) {
+      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
       if (queuePl) {
-        const songIds = songs.map((s) => s.id);
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
         const name = albumName || "Album";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }
+    } else {
+      await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
     }
   }
 
@@ -872,7 +881,7 @@
               </div>
 
               {#if collectionStore.visibleColumns.track}
-                <div class="text-brand-text-primary truncate pr-4 min-w-0 font-medium">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatTrackNumber(song.track, song.disc, discCount, index)}
                 </div>
               {/if}
@@ -1001,7 +1010,7 @@
               {/if}
 
               {#if collectionStore.visibleColumns.duration}
-                <div class="text-center text-brand-text-primary font-medium">
+                <div class="text-center text-brand-text-primary text-xs font-medium">
                   {formatDuration(song.length_nanosec)}
                 </div>
               {/if}
@@ -1055,6 +1064,7 @@
     initialAlbumArtist={songs[0].album_artist || songs[0].artist}
     initialGenre={songs[0].genre}
     initialYear={songs[0].year}
+    initialDisc={songs[0].disc}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />
