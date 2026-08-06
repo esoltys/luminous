@@ -1,0 +1,28 @@
+name: Auto re-run failed workflows
+
+on:
+  workflow_run:
+    workflows: ["CodeQL Advanced"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  rerun:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait before retry
+        run: sleep 30
+      - name: Re-run failed workflow
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            await github.rest.actions.reRunWorkflow({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
