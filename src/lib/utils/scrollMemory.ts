@@ -51,7 +51,7 @@ function attachScrollMemory(node: HTMLElement, key: string): () => void {
   node.addEventListener("scroll", onScroll, { passive: true });
 
   return () => {
-    cancelAnimationFrame(rafId);
+    if (rafId !== undefined) cancelAnimationFrame(rafId);
     node.removeEventListener("scroll", onScroll);
   };
 }
