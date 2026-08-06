@@ -99,7 +99,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(collectionStore.activeTab).toBe("collection");
   });
 
-  it("switches view to Queue when user clicks Shuffle Play", async () => {
+  it("retains view on Shuffle Play while updating playback and queue", async () => {
     const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist");
     const playSongsSpy = vi.spyOn(playerStore, "playSongs");
     const setShuffleSpy = vi.spyOn(playerStore, "setShuffleMode");
@@ -118,6 +118,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
     expect(setShuffleSpy).toHaveBeenCalledWith("all");
     expect(playSongsSpy).toHaveBeenCalled();
-    expect(viewPlaylistSpy).toHaveBeenCalledWith(99);
+    expect(viewPlaylistSpy).not.toHaveBeenCalled();
+    expect(collectionStore.activeTab).toBe("collection");
   });
 });

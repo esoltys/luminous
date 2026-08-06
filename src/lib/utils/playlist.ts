@@ -34,31 +34,19 @@ export function getPlaylistDisplayName(
 }
 
 /**
- * Queues an album into its dedicated "Album: {name}" playlist (reusing/clearing
- * it if one already exists) and starts playback. Shared double-click action
- * for AlbumCard and the compact row view — keeps both entry points in sync.
+ * Queues an album into the main Queue playlist and starts playback.
+ * Shared double-click action for AlbumCard and AlbumRowCard.
  */
 export async function queueAlbumAsPlaylist(album: AlbumItem): Promise<void> {
   const albumName = album.album || i18n.t("collection.unknownAlbum");
-  const playlistName = i18n.t("collection.albumPlaylistName", { name: albumName });
-  const existingPlaylist = playlistsStore.playlists.find((p) => p.name === playlistName);
-
-  if (existingPlaylist) {
-    await playlistsStore.selectPlaylist(existingPlaylist.id);
-    await playlistsStore.clearPlaylist(existingPlaylist.id);
-  } else {
-    await playlistsStore.createPlaylist(playlistName);
-  }
-
   try {
     const songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-    if (songs.length > 0 && playlistsStore.activeCustomPlaylist) {
+    if (songs.length > 0) {
       const songIds = songs.map((s) => s.id);
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
-      collectionStore.activeTab = "playlists";
-      await playerStore.playPlaylistItem(playlistsStore.activeCustomPlaylist.id, 0);
+      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, albumName);
     }
   } catch (err) {
-    console.error("Failed to add album to playlist:", err);
+    console.error("Failed to add album to Queue:", err);
   }
 }

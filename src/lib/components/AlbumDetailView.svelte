@@ -343,11 +343,7 @@
     const queuePl = await playlistsStore.ensureQueuePlaylist();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
-    }
+    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, albumName || "Queue");
   }
 
   async function handleAddSongToPlaylist(songId: number) {
