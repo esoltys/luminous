@@ -478,6 +478,8 @@ export const fr = {
     contextMenuPlaySong: "Lire la chanson",
     contextMenuPlayAlbum: "Lire l'album",
     contextMenuAddQueue: "Ajouter à la file",
+    addedToQueueSuccess: "Ajouté à la file d'attente",
+    addedToPlaylistSuccess: "Ajouté à {name}",
     contextMenuAddToPlaylist: "Ajouter à {name}",
     contextMenuAddToPlaylistDefault: "Ajouter à la liste active",
     saveQueueAsPlaylist: "Enregistrer comme liste personnalisée",
@@ -742,7 +744,7 @@ export const fr = {
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
     addAllToPlaylistTooltip: "Ajouter toutes les chansons à {name}",
-    addAllToPlaylistTooltipDefault: "Ajouter toutes les chansons à la playlist active",
+    addAllToPlaylistTooltipDefault: "Ajouter toutes les chansons à la file d'attente",
     editInfoTooltip: "Modifier les infos de l'album",
     goToGenrePlaylistTooltip: "Aller à la playlist automatique {genre}"
   },

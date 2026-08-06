@@ -479,6 +479,8 @@ export const en = {
     contextMenuPlaySong: "Play Song",
     contextMenuPlayAlbum: "Play Album",
     contextMenuAddQueue: "Add to Queue",
+    addedToQueueSuccess: "Added to Queue",
+    addedToPlaylistSuccess: "Added to {name}",
     contextMenuAddToPlaylist: "Add to {name}",
     contextMenuAddToPlaylistDefault: "Add to Active Playlist",
     saveQueueAsPlaylist: "Save as Custom Playlist",
@@ -745,7 +747,7 @@ export const en = {
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {year} · {duration}",
     addAllToPlaylistTooltip: "Add all songs to {name}",
-    addAllToPlaylistTooltipDefault: "Add all songs to active playlist",
+    addAllToPlaylistTooltipDefault: "Add all songs to Queue",
     editInfoTooltip: "Edit album info",
     goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
   },

@@ -108,10 +108,17 @@
 
   async function handleBulkAddToPlaylist() {
     if (selectedSongIds.size === 0) return;
+    const songIds = Array.from(selectedSongIds);
     if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
+      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      if (queuePl) {
+        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
+        await invoke("append_songs_to_player_playlist", { songIds });
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+      }
     }
   }
 
@@ -349,17 +356,31 @@
   async function handleAddSongToPlaylist(songId: number) {
     if (playlistsStore.activeCustomPlaylist) {
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
+      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      if (queuePl) {
+        await playlistsStore.addSongsToPlaylist(queuePl.id, [songId]);
+        await invoke("append_songs_to_player_playlist", { songIds: [songId] });
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+      }
     }
   }
 
   async function handleAddAlbumToPlaylist() {
     if (songs.length === 0) return;
     if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
+      const songIds = songs.map((s) => s.id);
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songIds);
+      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      toastStore.show(i18n.t('collection.selectPlaylistFirstAlert'));
+      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      if (queuePl) {
+        const songIds = songs.map((s) => s.id);
+        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
+        await invoke("append_songs_to_player_playlist", { songIds });
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+      }
     }
   }
 

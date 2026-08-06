@@ -121,4 +121,22 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
     expect(collectionStore.activeTab).toBe("collection");
   });
+
+  it("adds all album songs to Queue when clicking the + button with no active custom playlist", async () => {
+    playlistsStore.activeCustomPlaylist = null;
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist");
+
+    const { getByTitle } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const addButton = getByTitle("Add all songs to Queue");
+    await fireEvent.click(addButton);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(addSongsSpy).toHaveBeenCalledWith(99, [1, 2]);
+    expect(invoke).toHaveBeenCalledWith("append_songs_to_player_playlist", { songIds: [1, 2] });
+  });
 });
