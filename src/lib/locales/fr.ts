@@ -647,6 +647,7 @@ export const fr = {
     albumArtistField: "Artiste de l'album",
     genreField: "Genre",
     yearField: "Année de sortie",
+    discField: "N° de disque",
     tracksAffected: "S'applique à {count} chansons",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
