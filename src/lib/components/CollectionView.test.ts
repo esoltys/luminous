@@ -219,4 +219,15 @@ describe("CollectionView.svelte", () => {
     expect(getByText("▲ Date Added")).toBeInTheDocument();
     expect(getByText("▼ Date Added")).toBeInTheDocument();
   });
+
+  it("does not use font-mono for the date added column in songs view", () => {
+    collectionStore.activeSubTab = "songs";
+    collectionStore.visibleColumns.added = true;
+    mockSongs[0].added = 1700000000;
+    const { getByText } = render(CollectionView);
+
+    const addedCell = getByText("11/14/2023").closest("div");
+    expect(addedCell).not.toBeNull();
+    expect(addedCell).not.toHaveClass("font-mono");
+  });
 });
