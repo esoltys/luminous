@@ -479,7 +479,7 @@ export const en = {
     contextMenuPlaySong: "Play Song",
     contextMenuPlayAlbum: "Play Album",
     contextMenuAddQueue: "Add to Queue",
-    addedToQueueSuccess: "Added to Queue",
+    addedToQueueSuccess: "Added {name} to Queue",
     addedToPlaylistSuccess: "Added to {name}",
     contextMenuAddToPlaylist: "Add to {name}",
     contextMenuAddToPlaylistDefault: "Add to Active Playlist",

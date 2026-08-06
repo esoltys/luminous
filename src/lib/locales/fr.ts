@@ -478,7 +478,7 @@ export const fr = {
     contextMenuPlaySong: "Lire la chanson",
     contextMenuPlayAlbum: "Lire l'album",
     contextMenuAddQueue: "Ajouter à la file",
-    addedToQueueSuccess: "Ajouté à la file d'attente",
+    addedToQueueSuccess: "Ajouté {name} à la file d'attente",
     addedToPlaylistSuccess: "Ajouté à {name}",
     contextMenuAddToPlaylist: "Ajouter à {name}",
     contextMenuAddToPlaylistDefault: "Ajouter à la liste active",

@@ -117,7 +117,8 @@
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+        const label = songIds.length === 1 ? "1 song" : `${songIds.length} songs`;
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: label }, `Added ${label} to Queue`));
       }
     }
   }
@@ -362,7 +363,9 @@
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, [songId]);
         await invoke("append_songs_to_player_playlist", { songIds: [songId] });
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+        const songObj = songs.find((s) => s.id === songId);
+        const title = songObj?.title || "Song";
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: title }, `Added ${title} to Queue`));
       }
     }
   }
@@ -379,7 +382,8 @@
         const songIds = songs.map((s) => s.id);
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: "Queue" }, "Added to Queue"));
+        const name = albumName || "Album";
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }
     }
   }
