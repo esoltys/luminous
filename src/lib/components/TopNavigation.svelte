@@ -17,7 +17,42 @@
 
   let searchInput: HTMLInputElement | undefined;
   let searchContainerRef: HTMLDivElement | undefined;
+  let searchDropdownRef: HTMLDivElement | undefined = $state();
   let isSearchFocused = $state(false);
+
+  // Move focus into the dropdown's result list, roving with the arrow keys
+  function focusFirstSearchResult() {
+    const first = searchDropdownRef?.querySelector<HTMLElement>(".search-result-item");
+    first?.focus();
+  }
+
+  function handleSearchInputKeyDown(e: KeyboardEvent) {
+    if (e.key === "ArrowDown" && isSearchFocused) {
+      e.preventDefault();
+      focusFirstSearchResult();
+    }
+  }
+
+  // Roving keyboard navigation between result rows in the dropdown
+  function handleSearchResultKeyDown(e: KeyboardEvent) {
+    const items = searchDropdownRef
+      ? Array.from(searchDropdownRef.querySelectorAll<HTMLElement>(".search-result-item"))
+      : [];
+    const currentIndex = items.indexOf(e.target as HTMLElement);
+    if (currentIndex === -1) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      items[currentIndex + 1]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (currentIndex === 0) {
+        searchInput?.focus();
+      } else {
+        items[currentIndex - 1]?.focus();
+      }
+    }
+  }
 
   let matchingPlaylists = $derived.by(() => {
     const query = collectionStore.searchQuery.trim().toLowerCase();
@@ -227,6 +262,7 @@
           isSearchFocused = true;
           collectionStore.search((e.target as HTMLInputElement).value);
         }}
+        onkeydown={handleSearchInputKeyDown}
         type="text"
         placeholder={i18n.t('topNav.searchPlaceholder')}
         class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
@@ -263,6 +299,7 @@
     <!-- Search Dropdown Popover -->
     {#if isSearchFocused}
       <div
+        bind:this={searchDropdownRef}
         class="absolute left-0 right-0 top-full mt-2 bg-brand-sidebar rounded-xl border border-brand-border shadow-2xl p-3 z-50 max-h-96 overflow-y-auto"
       >
         {#if hasAdvancedSearchTerms(collectionStore.searchQuery)}
@@ -342,8 +379,11 @@
                         isSearchFocused = false;
                       }
                     }}
-                    onkeydown={(e) => e.key === 'Enter' && artist.name && collectionStore.viewArtist(artist.name)}
-                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                    onkeydown={(e) => {
+                      if (e.key === 'Enter' && artist.name) collectionStore.viewArtist(artist.name);
+                      else handleSearchResultKeyDown(e);
+                    }}
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
@@ -379,8 +419,11 @@
                         isSearchFocused = false;
                       }
                     }}
-                    onkeydown={(e) => e.key === 'Enter' && album.album && collectionStore.viewAlbum(album.album)}
-                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                    onkeydown={(e) => {
+                      if (e.key === 'Enter' && album.album) collectionStore.viewAlbum(album.album);
+                      else handleSearchResultKeyDown(e);
+                    }}
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="relative shrink-0 overflow-hidden">
@@ -438,9 +481,11 @@
                         if (item.type === 'auto') collectionStore.viewAutoPlaylist(item.ref);
                         else collectionStore.viewPlaylist(item.id);
                         isSearchFocused = false;
+                      } else {
+                        handleSearchResultKeyDown(e);
                       }
                     }}
-                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
@@ -485,9 +530,11 @@
                         if (song.album) collectionStore.viewAlbum(song.album);
                         else collectionStore.search(song.title || "");
                         isSearchFocused = false;
+                      } else {
+                        handleSearchResultKeyDown(e);
                       }
                     }}
-                    class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <CoverArt
@@ -540,8 +587,11 @@
                 role="button"
                 tabindex="0"
                 onclick={() => selectRecentSearch(item)}
-                onkeydown={(e) => e.key === 'Enter' && selectRecentSearch(item)}
-                class="group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') selectRecentSearch(item);
+                  else handleSearchResultKeyDown(e);
+                }}
+                class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                   <!-- Avatar / Artwork / Icon -->
