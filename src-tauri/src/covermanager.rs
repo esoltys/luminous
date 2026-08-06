@@ -11,6 +11,50 @@ pub struct CoverManager {
     covers_dir: PathBuf,
 }
 
+/// Inspects raw image bytes to detect magic headers for PNG, JPEG, WEBP, GIF, BMP.
+/// If extraneous bytes are prepended before valid magic headers (e.g. JPEG SOI 0xFF 0xD8 0xFF
+/// or PNG header \x89PNG\r\n\x1a\n), it trims the slice to start at the valid magic header.
+/// Returns `(cleaned_data_slice, mime_type, extension)`.
+pub fn detect_image_format_and_clean(data: &[u8]) -> (&[u8], &'static str, &'static str) {
+    if data.is_empty() {
+        return (data, "image/jpeg", "jpg");
+    }
+
+    // 1. Direct magic byte checks
+    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return (data, "image/png", "png");
+    }
+    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return (data, "image/jpeg", "jpg");
+    }
+    if data.starts_with(b"RIFF") && data.len() >= 12 && &data[8..12] == b"WEBP" {
+        return (data, "image/webp", "webp");
+    }
+    if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        return (data, "image/gif", "gif");
+    }
+    if data.starts_with(b"BM") {
+        return (data, "image/bmp", "bmp");
+    }
+
+    // 2. Scan for embedded JPEG SOI marker (0xFF, 0xD8, 0xFF) within the first 128KB if prepended with extraneous bytes
+    const SCAN_LIMIT: usize = 131072;
+    let search_buf = &data[..data.len().min(SCAN_LIMIT)];
+
+    if let Some(pos) = search_buf.windows(3).position(|w| w == [0xFF, 0xD8, 0xFF]) {
+        return (&data[pos..], "image/jpeg", "jpg");
+    }
+
+    // 3. Scan for embedded PNG header (\x89PNG\r\n\x1a\n)
+    const PNG_HEADER: &[u8; 8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    if let Some(pos) = search_buf.windows(8).position(|w| w == PNG_HEADER) {
+        return (&data[pos..], "image/png", "png");
+    }
+
+    // 4. Fallback if no magic bytes found
+    (data, "image/jpeg", "jpg")
+}
+
 impl CoverManager {
     pub fn new(db: Arc<Database>, app_data_dir: PathBuf) -> Self {
         let covers_dir = app_data_dir.join("covers");
@@ -53,18 +97,15 @@ impl CoverManager {
             None => return Ok(None),
         };
 
-        // Determine extension based on mime type
-        let ext = match picture.mime_type() {
-            Some(lofty::picture::MimeType::Png) => "png",
-            _ => "jpg",
-        };
+        let raw_data = picture.data();
+        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(raw_data);
 
         let hash_name = self.get_album_hash(album_artist, album);
         let filename = format!("{}.{}", hash_name, ext);
         let dest_path = self.covers_dir.join(&filename);
 
         // Write the picture data to the covers directory
-        std::fs::write(&dest_path, picture.data())
+        std::fs::write(&dest_path, cleaned_data)
             .context("failed to write cover art file to cache")?;
 
         log::info!("Extracted embedded cover art to: {}", dest_path.display());
@@ -89,7 +130,7 @@ impl CoverManager {
             "album-art",
             "folder-art",
         ];
-        let common_extensions = ["jpg", "jpeg", "png"];
+        let common_extensions = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
         if let Ok(entries) = std::fs::read_dir(parent_dir) {
             for entry in entries.filter_map(|e| e.ok()) {
@@ -171,16 +212,12 @@ impl CoverManager {
                     log::info!("Downloading remote cover art from: {}", url_600);
 
                     let img_bytes = client.get(&url_600).send().await?.bytes().await?;
-                    let ext = if url_600.contains(".png") {
-                        "png"
-                    } else {
-                        "jpg"
-                    };
+                    let (cleaned_bytes, _mime, ext) = detect_image_format_and_clean(&img_bytes);
                     let hash_name = self.get_album_hash(query_artist, query_album);
                     let filename = format!("{}.{}", hash_name, ext);
                     let dest_path = self.covers_dir.join(&filename);
 
-                    std::fs::write(&dest_path, img_bytes)?;
+                    std::fs::write(&dest_path, cleaned_bytes)?;
                     log::info!("Saved remote cover art to: {}", dest_path.display());
 
                     // Update song database row
@@ -306,6 +343,69 @@ mod tests {
             hash_a,
             manager.get_album_hash("Eric Soltys", "You Wreck Me")
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_detect_image_format_and_clean_png() {
+        let raw_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR";
+        let (data, mime, ext) = detect_image_format_and_clean(raw_png);
+        assert_eq!(data, raw_png);
+        assert_eq!(mime, "image/png");
+        assert_eq!(ext, "png");
+    }
+
+    #[test]
+    fn test_detect_image_format_and_clean_jpeg() {
+        let raw_jpeg = b"\xFF\xD8\xFF\xE0\x00\x10JFIF";
+        let (data, mime, ext) = detect_image_format_and_clean(raw_jpeg);
+        assert_eq!(data, raw_jpeg);
+        assert_eq!(mime, "image/jpeg");
+        assert_eq!(ext, "jpg");
+    }
+
+    #[test]
+    fn test_detect_image_format_and_clean_prepended_extraneous_bytes_jpeg() {
+        // Simulated ID3 tag junk or extraneous metadata prepended to a JPEG image
+        let mut junk = vec![0x00; 23712];
+        let jpeg_data = b"\xFF\xD8\xFF\xE2\x00\x10MPF";
+        junk.extend_from_slice(jpeg_data);
+
+        let (cleaned, mime, ext) = detect_image_format_and_clean(&junk);
+        assert_eq!(cleaned, jpeg_data);
+        assert_eq!(mime, "image/jpeg");
+        assert_eq!(ext, "jpg");
+    }
+
+    #[test]
+    fn test_detect_image_format_and_clean_webp() {
+        let raw_webp = b"RIFF\x00\x00\x00\x00WEBPVP8 ";
+        let (data, mime, ext) = detect_image_format_and_clean(raw_webp);
+        assert_eq!(data, raw_webp);
+        assert_eq!(mime, "image/webp");
+        assert_eq!(ext, "webp");
+    }
+
+    #[test]
+    fn test_scan_folder_art_supports_webp() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_cover_webp_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        let cover_path = temp_dir.join("cover.webp");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        std::fs::write(&cover_path, b"RIFF....WEBPVP8 ").unwrap();
+
+        let found = CoverManager::scan_folder_art_static(&audio_path);
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().extension().unwrap(), "webp");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

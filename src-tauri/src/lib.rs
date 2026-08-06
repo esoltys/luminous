@@ -149,16 +149,13 @@ pub fn run() {
 
             if file_path.exists() && file_path.is_file() {
                 if let Ok(data) = std::fs::read(&file_path) {
-                    let mime = if file_path.extension().is_some_and(|e| e == "png") {
-                        "image/png"
-                    } else {
-                        "image/jpeg"
-                    };
+                    let (cleaned_data, mime, _) =
+                        crate::covermanager::detect_image_format_and_clean(&data);
                     tauri::http::Response::builder()
                         .status(200)
                         .header("content-type", mime)
                         .header("access-control-allow-origin", "*")
-                        .body(data)
+                        .body(cleaned_data.to_vec())
                         .unwrap()
                 } else {
                     tauri::http::Response::builder()

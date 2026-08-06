@@ -750,6 +750,9 @@ export const en = {
     addAllToPlaylistTooltip: "Add all songs to {name}",
     addAllToPlaylistTooltipDefault: "Add all songs to Queue",
     editInfoTooltip: "Edit album info",
+    refreshTooltip: "Rescan metadata and artwork for this album",
+    refreshSuccess: "Album metadata and artwork refreshed",
+    refreshError: "Failed to refresh album metadata",
     goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
   },
   immersive: {
