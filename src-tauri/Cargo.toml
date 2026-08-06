@@ -104,6 +104,9 @@ parking_lot = "0.12"
 rand = "0.8"
 percent-encoding = "2"
 
+# --- Data-parallel tag reading during library scan ---
+rayon = "1"
+
 # WebView2-only settings for tauri-plugin-prevent-default (zoom control,
 # browser accelerator keys) — the feature links webview2-com/windows, so it's
 # gated to the Windows target only.

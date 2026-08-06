@@ -16,8 +16,10 @@ use lofty::{
     tag::{Accessor, ItemKey, Tag},
 };
 use notify::Watcher;
+use rayon::prelude::*;
 use rusqlite::{params, ToSql};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, AtomicU64, Ordering},
@@ -27,6 +29,22 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
+
+/// Chunk size for batching per-file DB writes into transactions during a
+/// library scan, instead of one implicit-autocommit write per file. Also
+/// bounds how many decoded `Song`s are held in memory at once.
+const SCAN_WRITE_BATCH_SIZE: usize = 300;
+
+/// Thread count for the scan's parallel tag-reading pool. Leaves headroom
+/// below the machine's full core count so a scan doesn't compete with the
+/// audio playback thread or background analysis for CPU.
+fn scan_thread_count() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .saturating_sub(2)
+        .max(1)
+}
 
 /// How long to keep the watcher paused *after* a guard's write is done,
 /// before actually re-arming it. The OS delivers filesystem-change
@@ -441,46 +459,85 @@ impl CollectionScanner {
                 Err(e) => log::warn!("Failed to reconcile moved songs during scan: {e}"),
             }
 
+            // Load every known (path -> mtime) pair in one query instead of
+            // issuing a SELECT per file — for large libraries this turns
+            // O(files) round-trips into a single read.
+            let mut known_mtimes: HashMap<String, i64> = HashMap::new();
+            if !force {
+                let mut stmt =
+                    conn.prepare("SELECT path, mtime FROM songs WHERE unavailable = 0")?;
+                let rows = stmt.query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })?;
+                for row in rows.filter_map(|r| r.ok()) {
+                    known_mtimes.insert(row.0, row.1);
+                }
+            }
+
+            // Partition into unchanged (skip tag re-read) vs. needs-update.
+            let mut needs_update: Vec<&PathBuf> = Vec::new();
             for path in &all_paths {
-                let path_str = path.to_string_lossy().to_string();
-
-                // mtime-based incremental scan: skip if mtime unchanged (unless force is requested)
                 if !force {
+                    let path_str = path.to_string_lossy().to_string();
                     let mtime = get_mtime(path).unwrap_or(0);
-                    let existing_mtime: Option<i64> = conn
-                        .query_row(
-                            "SELECT mtime FROM songs WHERE path = ?1 AND unavailable = 0",
-                            params![path_str],
-                            |row| row.get(0),
-                        )
-                        .ok();
-
-                    if existing_mtime == Some(mtime) {
+                    if known_mtimes.get(&path_str) == Some(&mtime) {
                         scanned += 1;
-                        continue; // No change — skip tag re-read
+                        continue;
                     }
                 }
+                needs_update.push(path);
+            }
 
-                // Read tags, resolve art, and upsert
-                if let Err(e) = read_and_upsert_song(&conn, &cover_manager, path) {
-                    log::warn!("Failed to read tags for {}: {e}", path.display());
+            // Read tags + resolve local art in parallel across a bounded thread
+            // pool — this is disk-I/O/CPU-bound per file and independent of the
+            // DB, so it's the part worth parallelizing. We deliberately cap the
+            // pool below the machine's full core count (rather than using
+            // Rayon's global default of one thread per core) so a library scan
+            // doesn't starve the audio playback thread or background loudness/
+            // waveform analysis of CPU. DB writes below stay on the single
+            // connection, serialized in batched transactions, which also caps
+            // how many decoded `Song`s are held in memory at once.
+            let scan_pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(scan_thread_count())
+                .build()
+                .context("failed to build scan thread pool")?;
+
+            for chunk in needs_update.chunks(SCAN_WRITE_BATCH_SIZE) {
+                let prepared: Vec<(PathBuf, Result<Song>)> = scan_pool.install(|| {
+                    chunk
+                        .par_iter()
+                        .map(|path| ((*path).clone(), read_and_prepare_song(&cover_manager, path)))
+                        .collect()
+                });
+
+                let tx = conn.unchecked_transaction()?;
+                for (path, result) in prepared {
+                    match result {
+                        Ok(song) => {
+                            if let Err(e) = upsert_song(&tx, &song) {
+                                log::warn!("Failed to save tags for {}: {e}", path.display());
+                            }
+                        }
+                        Err(e) => log::warn!("Failed to read tags for {}: {e}", path.display()),
+                    }
+
+                    scanned += 1;
+
+                    // Emit progress every 50 files to avoid flooding
+                    if scanned.is_multiple_of(50) || scanned == total {
+                        let _ = app.emit(
+                            "scan-progress",
+                            ScanProgress {
+                                phase: ScanPhase::ReadingTags,
+                                scanned,
+                                total,
+                                current_path: Some(path.to_string_lossy().to_string()),
+                                silent,
+                            },
+                        );
+                    }
                 }
-
-                scanned += 1;
-
-                // Emit progress every 50 files to avoid flooding
-                if scanned.is_multiple_of(50) || scanned == total {
-                    let _ = app.emit(
-                        "scan-progress",
-                        ScanProgress {
-                            phase: ScanPhase::ReadingTags,
-                            scanned,
-                            total,
-                            current_path: Some(path_str),
-                            silent,
-                        },
-                    );
-                }
+                tx.commit()?;
             }
         }
 
@@ -1727,11 +1784,11 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 /// output directly ends up nulling out an already-cached art_automatic via
 /// upsert_song()'s unconditional overwrite. Shared by the initial scan and
 /// the realtime file watcher so both keep it populated correctly.
-pub(crate) fn read_and_upsert_song(
-    conn: &rusqlite::Connection,
-    cover_manager: &CoverManager,
-    path: &Path,
-) -> Result<()> {
+/// Read tags + resolve local art for a single file, without touching the DB.
+/// Split out from [`read_and_upsert_song`] so the (disk-I/O-heavy, CPU-light)
+/// tag-reading work can be run in parallel across a thread pool while DB
+/// writes stay serialized on one connection (see `scan_all` phase 2).
+pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -> Result<Song> {
     let mut song = read_tags(path)?;
 
     if song.art_embedded {
@@ -1759,6 +1816,15 @@ pub(crate) fn read_and_upsert_song(
         song.art_unset = false;
     }
 
+    Ok(song)
+}
+
+pub(crate) fn read_and_upsert_song(
+    conn: &rusqlite::Connection,
+    cover_manager: &CoverManager,
+    path: &Path,
+) -> Result<()> {
+    let song = read_and_prepare_song(cover_manager, path)?;
     upsert_song(conn, &song)
 }
 
