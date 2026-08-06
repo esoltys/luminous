@@ -7,18 +7,49 @@
 // these components via {#if}/{#await} blocks).
 const positions = new Map<string, number>();
 
+// How many animation frames to keep re-asserting the restored scrollTop for.
+// Views whose rows come from an async IPC fetch (e.g. playlist tracks) often
+// still have stale/empty content on the frame right after mount — a single
+// rAF isn't enough to outlast that round trip — so we keep retrying for a
+// short window instead of just once.
+const RESTORE_RETRY_FRAMES = 20;
+
 function attachScrollMemory(node: HTMLElement, key: string): () => void {
+  let userScrolled = false;
+  let lastRestoredValue: number | null = null;
+
   const restore = () => {
+    if (userScrolled) return;
     node.scrollTop = positions.get(key) ?? 0;
+    // Read back the actual (possibly clamped, e.g. if content hasn't grown to
+    // its final height yet) value the browser applied, not the raw target —
+    // otherwise the resulting 'scroll' event won't match and looks like a
+    // real user scroll, permanently disabling further retries below.
+    lastRestoredValue = node.scrollTop;
   };
-  // Restore immediately for content whose layout is already correct, and again
-  // next frame for content (e.g. virtualized lists) whose height settles late.
+
   restore();
-  const raf = requestAnimationFrame(restore);
-  const onScroll = () => positions.set(key, node.scrollTop);
+  let rafId = requestAnimationFrame(function tick(frame = 0) {
+    restore();
+    if (frame + 1 < RESTORE_RETRY_FRAMES) {
+      rafId = requestAnimationFrame(() => tick(frame + 1));
+    }
+  });
+
+  // Distinguishes the user actually grabbing the scrollbar/wheel from the
+  // 'scroll' events our own programmatic restore() calls above trigger.
+  const onScroll = () => {
+    if (lastRestoredValue !== null && node.scrollTop === lastRestoredValue) {
+      lastRestoredValue = null;
+      return;
+    }
+    userScrolled = true;
+    positions.set(key, node.scrollTop);
+  };
   node.addEventListener("scroll", onScroll, { passive: true });
+
   return () => {
-    cancelAnimationFrame(raf);
+    cancelAnimationFrame(rafId);
     node.removeEventListener("scroll", onScroll);
   };
 }
