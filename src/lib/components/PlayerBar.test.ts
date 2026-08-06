@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
+import { collectionStore } from "../stores/collection.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -61,13 +62,26 @@ describe("PlayerBar.svelte", () => {
     expect(getByText(/nothing playing/i)).toBeInTheDocument();
   });
 
-  it("renders song title and artist when a song is active", () => {
+  it("renders song title, album title, and artist when a song is active", () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
 
     const { getByText } = render(PlayerBar);
     expect(getByText("Test Track Title")).toBeInTheDocument();
+    expect(getByText("Test Album")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
+  });
+
+  it("navigates to album when album title is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum").mockImplementation(() => {});
+
+    const { getByText } = render(PlayerBar);
+    const albumLink = getByText("Test Album");
+    await fireEvent.click(albumLink);
+
+    expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {

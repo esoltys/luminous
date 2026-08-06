@@ -213,6 +213,19 @@
           />
         {/if}
       </div>
+      {#if playerStore.currentSong?.album}
+        <LinkButton
+          onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(playerStore.currentSong?.album || ""); }}
+          class="text-xs text-brand-text-secondary/70 truncate"
+          title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
+        >
+          {playerStore.currentSong.album}
+        </LinkButton>
+      {:else if playerStore.currentSong}
+        <span class="text-xs text-brand-text-secondary/70 truncate">
+          {i18n.t('collection.unknownAlbum')}
+        </span>
+      {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton
           onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
