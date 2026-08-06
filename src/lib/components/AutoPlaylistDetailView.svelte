@@ -504,7 +504,10 @@ import { shuffleArray } from "../utils/shuffle";
 
 </script>
 
-<div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
+<div
+  class="flex-1 flex flex-col overflow-y-auto carousel-scroll bg-brand-main text-brand-text-secondary h-full"
+  use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? ""}`}
+>
   <!-- Auto-Playlist Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-stretch justify-between gap-6 relative z-10">
@@ -634,8 +637,8 @@ import { shuffleArray } from "../utils/shuffle";
     </div>
   </div>
 
-  <div class="flex-1 min-h-0 px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-    <div class="flex-1 min-h-0 border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-auto" use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? ""}`}>
+  <div class="px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
+    <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
       <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
@@ -1239,3 +1242,13 @@ import { shuffleArray } from "../utils/shuffle";
     </form>
   </Modal>
 {/if}
+
+<style>
+  :global(.carousel-scroll) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  :global(.carousel-scroll::-webkit-scrollbar) {
+    display: none;
+  }
+</style>
