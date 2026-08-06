@@ -713,11 +713,11 @@ export const fr = {
     suppressSameAlbumHint: "Ignorer le fondu enchaîné entre les chansons d'un même album"
   },
   themes: {
+    "dynamic-artwork": "✨ Luminous",
     system: "Système",
     "ruby-red": "Rouge rubis",
     "nordic-blue": "Bleu nordique",
-    "retro-amber": "Ambre rétro",
-    "dynamic-artwork": "Pochette dynamique"
+    "retro-amber": "Ambre rétro"
   },
   artistDetail: {
     backToArtists: "Voir les artistes",

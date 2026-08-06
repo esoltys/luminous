@@ -155,6 +155,20 @@ const NORDIC_BLUE_COLORS: ThemeColors = {
 
 export const PREDEFINED_THEMES: Theme[] = [
   {
+    id: "dynamic-artwork",
+    name: "✨ Luminous",
+    colors: {
+      "bg-main": "var(--color-artwork-primary)",
+      "bg-sidebar": "var(--color-artwork-sidebar)",
+      "bg-playerbar": "var(--color-artwork-playerbar)",
+      "color-accent": "var(--color-artwork-accent)",
+      "color-accent-hover": "var(--color-artwork-accent-hover)",
+      "color-text-primary": "#ffffff",
+      "color-text-secondary": "#e2e8f0",
+      "color-border": "var(--color-artwork-border)"
+    }
+  },
+  {
     id: "system",
     name: "System",
     colors: { ...LUMINOUS_DARK_COLORS }
@@ -173,20 +187,6 @@ export const PREDEFINED_THEMES: Theme[] = [
     id: "retro-amber",
     name: "Retro Amber",
     colors: generatePaletteFromSeed(RETRO_AMBER_SEED)
-  },
-  {
-    id: "dynamic-artwork",
-    name: "Dynamic Artwork",
-    colors: {
-      "bg-main": "var(--color-artwork-primary)",
-      "bg-sidebar": "var(--color-artwork-sidebar)",
-      "bg-playerbar": "var(--color-artwork-playerbar)",
-      "color-accent": "var(--color-artwork-accent)",
-      "color-accent-hover": "var(--color-artwork-accent-hover)",
-      "color-text-primary": "#ffffff",
-      "color-text-secondary": "#e2e8f0",
-      "color-border": "var(--color-artwork-border)"
-    }
   }
 ];
 

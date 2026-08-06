@@ -14,6 +14,11 @@ import { checkWcagCompliance, pickAccessibleOnColor, hexToRgb, rgbToHsl, hslToRg
 import { invoke } from "@tauri-apps/api/core";
 
 describe("PREDEFINED_THEMES", () => {
+  it("has dynamic-artwork (✨ Luminous) as the first theme in the list", () => {
+    expect(PREDEFINED_THEMES[0].id).toBe("dynamic-artwork");
+    expect(PREDEFINED_THEMES[0].name).toBe("✨ Luminous");
+  });
+
   it("does not include the removed Luminous Violet theme", () => {
     expect(PREDEFINED_THEMES.some(t => t.id === "luminous-violet")).toBe(false);
   });
