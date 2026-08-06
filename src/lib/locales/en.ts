@@ -715,11 +715,11 @@ export const en = {
     suppressSameAlbumHint: "Skip auto-crossfade between consecutive songs from the same album"
   },
   themes: {
+    "dynamic-artwork": "✨ Luminous",
     system: "System",
     "ruby-red": "Ruby Red",
     "nordic-blue": "Nordic Blue",
-    "retro-amber": "Retro Amber",
-    "dynamic-artwork": "Dynamic Artwork"
+    "retro-amber": "Retro Amber"
   },
   artistDetail: {
     backToArtists: "View Artists",

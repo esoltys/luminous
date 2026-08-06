@@ -822,7 +822,6 @@
               >
                 <div class="flex items-center justify-between w-full">
                   <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
-                    {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
                     {#if theme.id === 'system'}
                       <span title={themeStore.systemColorScheme === 'dark' ? i18n.t('settings.systemThemeDark') : i18n.t('settings.systemThemeLight')}>
                         {#if themeStore.systemColorScheme === 'dark'}
@@ -832,6 +831,7 @@
                         {/if}
                       </span>
                     {/if}
+                    {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
                   </span>
                 </div>
                 <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->

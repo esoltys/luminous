@@ -29,7 +29,8 @@ function attachScrollMemory(node: HTMLElement, key: string): () => void {
   };
 
   restore();
-  let rafId = requestAnimationFrame(function tick(frame = 0) {
+  let rafId: number;
+  rafId = requestAnimationFrame(function tick(frame = 0) {
     restore();
     if (frame + 1 < RESTORE_RETRY_FRAMES) {
       rafId = requestAnimationFrame(() => tick(frame + 1));
