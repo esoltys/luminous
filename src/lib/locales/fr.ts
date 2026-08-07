@@ -32,6 +32,7 @@ export const fr = {
     searchSuggestions: "Suggestions",
     noSuggestions: "Aucune suggestion correspondante",
     toggleSidebar: "Basculer le menu latéral",
+    toggleSidebarCompact: "Basculer la barre latérale (compacte / étendue)",
     toggleImmersive: "Basculer l'écran de pochette immersif",
     toggleRightPanel: "Basculer le panneau de détails",
     resizeSidebar: "Redimensionner la barre latérale gauche",

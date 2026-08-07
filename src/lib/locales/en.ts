@@ -32,6 +32,7 @@ export const en = {
     searchSuggestions: "Suggestions",
     noSuggestions: "No matching suggestions",
     toggleSidebar: "Toggle Menu Sidebar",
+    toggleSidebarCompact: "Toggle sidebar (compact / expanded)",
     toggleImmersive: "Toggle Immersive Album Art Screen",
     toggleRightPanel: "Toggle Detail Panel",
     resizeSidebar: "Resize Left Sidebar",

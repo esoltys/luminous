@@ -44,4 +44,17 @@ describe("TopNavigation.svelte", () => {
     expect(collectionStore.immersiveMode).toBe(true);
     expect(immersiveBtn.className).toContain("bg-brand-accent text-white");
   });
+
+  it("toggles sidebar compact state when clicking the hamburger menu button", async () => {
+    collectionStore.sidebarOpen = true;
+    collectionStore.setSidebarWidth(256);
+    const { getByTitle } = render(TopNavigation);
+    const hamburgerBtn = getByTitle("Toggle sidebar (compact / expanded)");
+
+    await fireEvent.click(hamburgerBtn);
+    expect(collectionStore.sidebarWidth).toBe(64);
+
+    await fireEvent.click(hamburgerBtn);
+    expect(collectionStore.sidebarWidth).toBe(256);
+  });
 });

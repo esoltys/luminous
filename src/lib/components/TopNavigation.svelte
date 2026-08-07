@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
+  import { Menu, ChevronLeft, ChevronRight, Search, FolderOpen, PanelLeft, PanelBottom, PanelRight, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
@@ -232,6 +232,13 @@
 <header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
+    <button
+      onclick={() => collectionStore.toggleSidebarCompact()}
+      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors cursor-pointer"
+      title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
+    >
+      <Menu class="w-5 h-5" />
+    </button>
     <button
       onclick={() => collectionStore.goBack()}
       disabled={!collectionStore.canGoBack}
