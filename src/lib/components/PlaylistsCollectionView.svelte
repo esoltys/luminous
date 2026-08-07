@@ -190,13 +190,17 @@
   );
 
   // Favourites/Recently Added are always pinned first, ahead of the sort
-  // order applied to decade, genre & BPM auto-playlists.
+  // order applied to decade & genre auto-playlists. BPM auto-playlists always
+  // sort last, in their fixed intensity order (Down-Tempo → Extreme, set by
+  // BPM_BUCKET_ORDER above) — never interleaved into the name/track_count/
+  // updated sort applied to genre/decade, which would otherwise scramble them
+  // (e.g. "High Energy BPM" sorting alphabetically between two genres).
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
     const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "bpm");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "bpm")
+      .filter((d) => d.kind === "genre" || d.kind === "decade")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -205,7 +209,8 @@
         const valB = field === "track_count" ? b.trackCount : (b.updated ?? 0);
         return asc ? valA - valB : valB - valA;
       });
-    return [...pinned, ...rest];
+    const bpmBlock = autoDefs.filter((d) => d.kind === "bpm");
+    return [...pinned, ...rest, ...bpmBlock];
   });
 
   // ---- Custom grid sort ----
