@@ -19,6 +19,10 @@ scripts/mock-config.json
 .cargo/
 *.cargo/config.toml
 
+# Cargo build output
+/target/
+/src-tauri/target/
+
 # Scratch file for Claude's per-task walkthrough summaries (see .claude/CLAUDE.md) —
 # always local-only, never meant to land in a commit.
 /WALKTHROUGH.md
