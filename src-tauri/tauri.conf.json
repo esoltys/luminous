@@ -21,7 +21,8 @@
         "decorations": true,
         "transparent": false,
         "center": true,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "additionalBrowserArgs": "--disable-gpu-compositing"
       }
     ],
     "security": {
