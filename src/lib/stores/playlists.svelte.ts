@@ -61,7 +61,7 @@ class PlaylistsStore {
     this.queueVersion;
     const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
     if (q === undefined) return this.activePlaylistTracks.length ?? 0;
-    if (this.activePlaylistId !== null && this.activePlaylistId === q.id && this.activePlaylistTracks.length > (q.track_count ?? 0)) {
+    if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
       return this.activePlaylistTracks.length;
     }
     return q.track_count ?? 0;

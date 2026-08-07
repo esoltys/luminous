@@ -356,20 +356,21 @@
   }
 
   async function handlePlaySong(song: Song) {
-    const index = songs.findIndex((s) => s.id === song.id);
-    const songIds = songs.map((s) => s.id);
+    const list = sortedSongs;
+    const index = list.findIndex((s) => s.id === song.id);
+    const songIds = list.map((s) => s.id);
     await playerStore.playSongs(songIds, index >= 0 ? index : 0, undefined, albumPlayContext());
   }
 
   async function handlePlayAll() {
-    if (songs.length === 0) return;
+    if (sortedSongs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, undefined, albumPlayContext());
+    await playerStore.playSongs(sortedSongs.map((s) => s.id), 0, undefined, albumPlayContext());
   }
 
   async function handleShufflePlay() {
-    if (songs.length === 0) return;
-    const shuffledIds = shuffleArray(songs.map((s) => s.id));
+    if (sortedSongs.length === 0) return;
+    const shuffledIds = shuffleArray(sortedSongs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
     await playerStore.playSongs(shuffledIds, 0, undefined, albumPlayContext());
   }

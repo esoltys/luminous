@@ -313,12 +313,9 @@ export class PlayerStore {
     } else {
       this.activeContextName = undefined;
     }
-    await playlistsStore.replaceQueueTracks(songIds);
-    if (effectivePlaylistId) {
-      await invoke("play_playlist_item", { playlistId: effectivePlaylistId, itemIndex: startIndex, context: context ?? null });
-    } else {
-      await invoke("play_songs", { songIds, startIndex, playlistId: null, context: context ?? null });
-    }
+
+    await invoke("play_songs", { songIds, startIndex, playlistId: playlistId ?? null, context: context ?? null });
+
     if (queuePl) {
       await playlistsStore.selectPlaylist(queuePl.id);
       await playlistsStore.refreshPlaylists();

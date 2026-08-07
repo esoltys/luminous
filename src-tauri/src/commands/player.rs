@@ -1,5 +1,5 @@
 use crate::{
-    models::{PlayContext, PlaybackState, PlaylistItem, RepeatMode, ShuffleMode},
+    models::{PlayContext, PlaybackState, RepeatMode, ShuffleMode},
     AppState,
 };
 use tauri::State;
@@ -75,47 +75,58 @@ pub async fn play_songs(
     context: Option<PlayContext>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-
-    // Fetch all requested songs in a single batched query instead of one
-    // `SELECT` per id — with hundreds of ids (e.g. after a runaway auto-play
-    // refill) the per-row round trip was slow enough to block the async
-    // executor and freeze the UI (#194).
-    let mut songs_by_id: std::collections::HashMap<i64, crate::models::Song> =
-        std::collections::HashMap::with_capacity(song_ids.len());
-    for chunk in song_ids.chunks(500) {
-        let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!(
-            "SELECT {} FROM songs WHERE id IN ({})",
-            crate::collection::SONG_SELECT_COLS,
-            placeholders
-        );
-        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-        let params = rusqlite::params_from_iter(chunk.iter());
-        let rows = stmt
-            .query_map(params, crate::collection::row_to_song)
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            if let Ok(song) = row {
-                songs_by_id.insert(song.id, song);
-            }
-        }
+    if song_ids.is_empty() {
+        return Ok(());
     }
 
-    let pid = playlist_id.unwrap_or(0);
-    let items = song_ids
-        .iter()
-        // `.get()` + `.cloned()` (not `.remove()`) so a song referenced more
-        // than once in `song_ids` (a playlist can legitimately contain the
-        // same track twice) still produces an item for each occurrence.
-        .filter_map(|id| songs_by_id.get(id).cloned())
-        .enumerate()
-        .map(|(i, s)| PlaylistItem::new_song(pid, i as i32, s))
-        .collect::<Vec<_>>();
+    let queue_id = {
+        let playlists = state.playlists.lock().await;
+        let queue_pl = playlists
+            .get_playlists()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
+
+        match queue_pl {
+            Some(pl) => pl.id,
+            None => {
+                let created = playlists
+                    .create_playlist("Queue")
+                    .map_err(|e| e.to_string())?;
+                created.id
+            }
+        }
+    };
+
+    let target_playlist_id = playlist_id.unwrap_or(queue_id);
+
+    // If target is Queue (or unspecified), replace Queue in DB with song_ids
+    if target_playlist_id == queue_id || playlist_id.is_none() {
+        let mut playlists = state.playlists.lock().await;
+        let existing = playlists
+            .get_playlist_tracks(queue_id)
+            .map_err(|e| e.to_string())?;
+        if !existing.is_empty() {
+            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
+            playlists
+                .remove_from_playlist(queue_id, &uuids)
+                .map_err(|e| e.to_string())?;
+        }
+        playlists
+            .add_songs_to_playlist(queue_id, &song_ids)
+            .map_err(|e| e.to_string())?;
+    }
+
+    let items = {
+        let playlists = state.playlists.lock().await;
+        playlists
+            .get_playlist_tracks(target_playlist_id)
+            .map_err(|e| e.to_string())?
+    };
 
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, start_index, pid, context)
+        .play_playlist(items, start_index, target_playlist_id, context)
         .await
         .map_err(|e| e.to_string())
 }
