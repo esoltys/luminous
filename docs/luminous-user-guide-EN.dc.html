@@ -170,7 +170,7 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the waveform to jump to a different point in the song.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the icon next to the waveform to toggle showing the <b style="color:#f1f3f8;">moodbar</b> instead. The moodbar's color bands reflect the song's frequency balance — red for bass, greens for mid, blue for treble — with brighter regions carrying more energy.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the icon next to the waveform to toggle showing <b style="color:#f1f3f8;">Frequency Bands</b> instead. It layers all three bands at once — blue for low (bass), amber for mid (vocals/snares/leads), white for high (hi-hats/cymbals/transients) — with taller bands carrying more energy.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A small spectrum display next to the volume control gives you a live look at the song's frequencies as it plays.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The icon on the far right pops the player out into a small floating <b style="color:#f1f3f8;">mini player</b> — handy for keeping an eye on playback while you work in other apps. <kbd>Ctrl</kbd><kbd>M</kbd> toggles it from anywhere.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click <b style="color:#f1f3f8;">Shuffle</b> to cycle through five modes:
@@ -531,7 +531,7 @@ class Component extends DCLogic {
     const mk = (item) => ({
       ...item,
       icon: { __html: item.icon },
-      onClick: () => this.setState({ active: item.id }),
+      onClick: () => { this.setState({ active: item.id }); window.scrollTo({ top: 0, behavior: 'instant' }); },
       bg: active === item.id ? 'rgba(111,126,169,0.15)' : 'transparent',
       color: active === item.id ? '#f1f3f8' : '#a6adc4',
       weight: active === item.id ? 600 : 500,

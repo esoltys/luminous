@@ -170,7 +170,7 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur la forme d'onde pour sauter à un autre moment de la chanson.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt le <b style="color:#f1f3f8;">moodbar</b>. Ses bandes de couleur reflètent l'équilibre des fréquences de la chanson — rouge pour les graves, vert pour les médiums, bleu pour les aigus — les régions plus lumineuses portant plus d'énergie.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt les <b style="color:#f1f3f8;">bandes de fréquences</b>. Elles superposent les trois bandes à la fois — bleu pour les graves, ambre pour les médiums (voix, caisses claires, lignes principales), blanc pour les aigus (charleston, cymbales, transitoires) — les bandes plus hautes portant plus d'énergie.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un petit affichage du spectre à côté du contrôle de volume vous donne un aperçu en direct des fréquences de la chanson pendant sa lecture.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône à l'extrême droite détache le lecteur en un petit <b style="color:#f1f3f8;">mini lecteur</b> flottant — pratique pour garder un œil sur la lecture pendant que vous travaillez dans d'autres applications. <kbd>Ctrl</kbd><kbd>M</kbd> l'active ou le désactive depuis n'importe où.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur <b style="color:#f1f3f8;">Aléatoire</b> pour parcourir cinq modes :
@@ -531,7 +531,7 @@ class Component extends DCLogic {
     const mk = (item) => ({
       ...item,
       icon: { __html: item.icon },
-      onClick: () => this.setState({ active: item.id }),
+      onClick: () => { this.setState({ active: item.id }); window.scrollTo({ top: 0, behavior: 'instant' }); },
       bg: active === item.id ? 'rgba(111,126,169,0.15)' : 'transparent',
       color: active === item.id ? '#f1f3f8' : '#a6adc4',
       weight: active === item.id ? 600 : 500,
