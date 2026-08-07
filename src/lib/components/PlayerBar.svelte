@@ -275,7 +275,7 @@
       {#if playerStore.state === 'playing'}
         <button
           onclick={() => playerStore.pause()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all"
           title={i18n.t('playerBar.pause')}
         >
           <Pause class="w-4 h-4 fill-current" />
@@ -283,7 +283,7 @@
       {:else}
         <button
           onclick={() => playerStore.resume()}
-          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all shadow-md"
+          class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-all"
           title={i18n.t('playerBar.play')}
         >
           <Play class="w-4 h-4 fill-current ml-0.5" />
@@ -447,7 +447,6 @@
     background: #ffffff;
     border: 2px solid var(--color-accent);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     transition: transform 0.1s, border-color 0.2s;
   }
 
@@ -464,7 +463,6 @@
     border-radius: 50%;
     background: #ffffff;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     transition: transform 0.1s, border-color 0.2s;
   }
 
