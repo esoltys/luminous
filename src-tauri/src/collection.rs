@@ -3506,6 +3506,17 @@ mod tests {
             }
         }
 
+        // Verify that plays with explicit album context are attributed to their album
+        for i in 0..15 {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('album', ?1, ?2)",
+                params![album_track_1, 2000 + i],
+            )
+            .unwrap();
+        }
+        let frequent_after_album = scanner.get_most_frequently_played(10).unwrap();
+        assert!(frequent_after_album.iter().any(|item| matches!(item, HomeItem::Album { album, .. } if album.album.as_deref() == Some("Album A"))));
+
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
