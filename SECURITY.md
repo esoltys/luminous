@@ -28,3 +28,12 @@ To help me fix things quickly, try to share:
 - **Credit:** Once a fix is ready and released, we'll gladly give you credit in our release notes (unless you prefer to stay anonymous).
 
 Thank you for making Luminous better for everyone!
+
+## Automated Security & Supply Chain Monitoring
+
+To ensure the security and integrity of Luminous and its dependencies, we maintain automated security checks in CI:
+
+- **Cargo Security Auditing (`cargo-audit`)**: Scans `Cargo.lock` against the [RustSec Advisory Database](https://rustsec.org/) on every commit, pull request, and weekly schedule.
+- **CodeQL Analysis**: Continuous static application security testing (SAST) across Rust, JavaScript/TypeScript, and GitHub Actions code.
+- **Dependabot Security & Version Updates**: Automated dependency tracking and security alerts for Rust (`cargo`) and frontend (`npm`) packages.
+
