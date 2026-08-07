@@ -27,7 +27,7 @@ jobs:
         - language: javascript-typescript
           build-mode: none
         - language: rust
-          build-mode: manual
+          build-mode: none
 
     steps:
     - name: Checkout repository
@@ -39,16 +39,16 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libasound2-dev libssl-dev pkg-config libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev
 
+    - name: Pre-build Rust dependencies & generated code
+      if: matrix.language == 'rust'
+      run: |
+        cargo check
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-
-    - name: Build Rust (traced by CodeQL)
-      if: matrix.language == 'rust'
-      run: |
-        cargo build --manifest-path src-tauri/Cargo.toml
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
