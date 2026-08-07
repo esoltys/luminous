@@ -25,8 +25,53 @@ function ensureStyles() {
     .col-resize-handle.col-resize-dragging {
       border-right-color: var(--color-brand-accent, #6366f1);
     }
+
+    /* Full-height vertical drag marker — appended to <body> during a drag */
+    .col-resize-marker {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      pointer-events: none;
+      z-index: 9999;
+      background: var(--color-brand-accent, #6366f1);
+      box-shadow: 0 0 6px 1px color-mix(in srgb, var(--color-brand-accent, #6366f1) 60%, transparent);
+      opacity: 0;
+      transition: opacity 80ms ease;
+    }
+    .col-resize-marker.col-resize-marker-visible {
+      opacity: 1;
+    }
   `;
   document.head.appendChild(style);
+}
+
+/** Singleton drag marker shared across all column resize instances. */
+let marker: HTMLDivElement | null = null;
+
+function getMarker(): HTMLDivElement {
+  if (!marker) {
+    marker = document.createElement("div");
+    marker.className = "col-resize-marker";
+    marker.setAttribute("aria-hidden", "true");
+    document.body.appendChild(marker);
+  }
+  return marker;
+}
+
+function showMarker(x: number) {
+  const m = getMarker();
+  m.style.left = `${x}px`;
+  // Trigger the CSS transition by setting the class on the next frame
+  requestAnimationFrame(() => m.classList.add("col-resize-marker-visible"));
+}
+
+function moveMarker(x: number) {
+  if (marker) marker.style.left = `${x}px`;
+}
+
+function hideMarker() {
+  marker?.classList.remove("col-resize-marker-visible");
 }
 
 export interface ColumnResizeOptions {
@@ -76,6 +121,12 @@ export function columnResize(
   let startX = 0;
   let startWidth = 0;
 
+  function markerXForWidth(width: number): number {
+    // Place the marker at the right edge of the column as it would be after resize
+    const nodeLeft = node.getBoundingClientRect().left;
+    return nodeLeft + width - 1; // -1 so the 2px line is centred on the border
+  }
+
   function onPointerDown(e: PointerEvent) {
     // Only respond to primary button
     if (e.button !== 0) return;
@@ -89,6 +140,8 @@ export function columnResize(
 
     handle.classList.add("col-resize-dragging");
     handle.setPointerCapture(e.pointerId);
+
+    showMarker(markerXForWidth(startWidth));
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -99,12 +152,14 @@ export function columnResize(
     // the actual grid column value is updated only on pointerup to avoid
     // triggering excessive store writes and re-renders.
     node.style.width = `${newWidth}px`;
+    moveMarker(markerXForWidth(newWidth));
   }
 
   function onPointerUp(e: PointerEvent) {
     if (!dragging) return;
     dragging = false;
     handle.classList.remove("col-resize-dragging");
+    hideMarker();
 
     const delta = e.clientX - startX;
     const finalWidth = Math.max(MIN_WIDTH_PX, startWidth + delta);
