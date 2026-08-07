@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Every Sunday at midnight
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   security_audit:
     name: Cargo Security Audit
