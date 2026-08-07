@@ -359,6 +359,7 @@ export const fr = {
   playlists: {
     title: "Listes de lecture",
     untitledPlaylistName: "Liste sans titre",
+    reservedPlaylistName: "« {name} » est réservé à la file d'attente intégrée. Veuillez choisir un autre nom.",
     noPlaylistsTitle: "Aucune liste de lecture",
     noPlaylistsText: "Cliquez sur « Nouvelle liste » ci-dessus pour créer la première.",
     showingOnePlaylist: "Affichage de 1 liste de lecture",
