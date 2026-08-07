@@ -453,6 +453,7 @@ export const en = {
     populationModeEmptyDeepCuts: "All Deep Cuts played! Switch fill mode or hit Refresh to listen to more.",
     genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Decade",
+    bpmAutoPlaylist: "BPM",
     smartAutoPlaylist: "Smart",
     playlistTypeLabel: "Playlist",
     favouritesAutoPlaylist: "Auto-Playlist",

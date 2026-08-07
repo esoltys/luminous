@@ -57,14 +57,16 @@ export interface VisibleColumns {
   skipcount: boolean;
 }
 
-/** An auto-playlist reference (Favourites, Recently Added, genre, or decade), for the auto-playlist detail view. */
+/** An auto-playlist reference (Favourites, Recently Added, genre, decade, or BPM), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
+  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
   genre?: string;
   decade?: string;
-  /** For kind "genre" or "decade": the materialized (dynamic_enabled) playlist row backing it. */
+  /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
+  bpm?: string;
+  /** For kind "genre", "decade" or "bpm": the materialized (dynamic_enabled) playlist row backing it. */
   playlistId?: number;
-  /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
+  /** For kind "genre", "decade" or "bpm": when this playlist's songs were last (re)generated. */
   updated?: number;
 }
 
@@ -597,14 +599,15 @@ class CollectionStore {
             console.error("Failed to refresh playback queue after scan:", err);
           });
 
-          // Genre/decade auto-playlists otherwise only regenerate on their own
-          // 24h staleness window (or whenever the Playlists tab happens to
+          // Genre/decade/BPM auto-playlists otherwise only regenerate on their
+          // own 24h staleness window (or whenever the Playlists tab happens to
           // mount) — a scan can add new genres/decades or shift which songs
           // qualify, so rebuild them right away instead of leaving them stale.
           (async () => {
             try {
               await invoke("sync_genre_auto_playlists");
               await invoke("sync_decade_auto_playlists");
+              await invoke("sync_bpm_auto_playlists");
               await playlistsStore.refreshPlaylists();
             } catch (err) {
               console.error("Failed to sync auto-playlists after scan:", err);

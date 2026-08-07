@@ -1032,6 +1032,41 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs whose BPM falls within `[min, max]` (an unbounded `max` means "or
+    /// higher"), selected per `mode`'s bias (see #120), for the fixed-bucket
+    /// BPM auto-playlists (Down-Tempo, Mid-Tempo, Uptempo, High Energy, Extreme).
+    pub fn get_songs_by_bpm_range(
+        &self,
+        min: f64,
+        max: Option<f64>,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let upper_bound = match max {
+            Some(_) => "AND bpm <= ?2",
+            None => "",
+        };
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE bpm >= ?1
+               {upper_bound}
+               AND source IN (1, 2)
+               AND unavailable = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?3",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![min, max.unwrap_or(0.0), limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Group only by album name so that tracks with different per-track artists
@@ -3931,4 +3966,18 @@ pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
     let start = (year / 10) * 10;
     let end = start + 9;
     Some((start, end))
+}
+
+/// Parses a `bpmrange:` dynamic-spec suffix (e.g. `"60-90"` or the
+/// open-ended `"150-"`) into a `(min, max)` pair for
+/// [`CollectionScanner::get_songs_by_bpm_range`].
+pub fn parse_bpm_range_spec(spec: &str) -> Option<(f64, Option<f64>)> {
+    let (min_str, max_str) = spec.split_once('-')?;
+    let min: f64 = min_str.trim().parse().ok()?;
+    let max = if max_str.trim().is_empty() {
+        None
+    } else {
+        Some(max_str.trim().parse().ok()?)
+    };
+    Some((min, max))
 }

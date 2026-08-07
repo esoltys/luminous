@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, RefreshCw } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, RefreshCw } from "lucide-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
@@ -10,12 +10,14 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
     genre?: string;
     decade?: string;
-    /** For kind "genre" or "decade": the materialized playlist row backing it (refreshed at most every 24h). */
+    /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
+    bpm?: string;
+    /** For kind "genre", "decade" or "bpm": the materialized playlist row backing it (refreshed at most every 24h). */
     playlistId?: number;
-    /** For kind "genre" or "decade": when this playlist's songs were last (re)generated. */
+    /** For kind "genre", "decade" or "bpm": when this playlist's songs were last (re)generated. */
     updated?: number;
     trackCount: number;
     autoPlay?: boolean;
@@ -26,10 +28,10 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
-  let { label, kind, genre, decade, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
+  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade") && playlistId !== undefined) {
+    if ((kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -38,6 +40,7 @@
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
+    if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
@@ -51,10 +54,11 @@
     const k = kind;
     const g = genre;
     const d = decade;
+    const b = bpm;
     const pid = playlistId;
 
     const request =
-      (k === "genre" || k === "decade") && pid !== undefined
+      (k === "genre" || k === "decade" || k === "bpm") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
@@ -66,11 +70,13 @@
               ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
               : k === "decade"
                 ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
-                : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
+                : k === "bpm"
+                  ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
+                  : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
 
     request
       .then((res) => {
-        if (kind === k && genre === g && decade === d && playlistId === pid) {
+        if (kind === k && genre === g && decade === d && bpm === b && playlistId === pid) {
           songs = res;
         }
       })
@@ -82,13 +88,14 @@
   // Favourites/Recently Added/History use a fixed icon cover instead of a CoverStack —
   // they're rebuilt from the whole library on every load, so a coverstack of
   // whichever songs happen to be in them right now reads as arbitrary rather
-  // than representative (unlike a genre, decade, or user playlist).
-  let topCovers = $derived(kind === "genre" || kind === "decade" ? songsToCoverStack(songs) : []);
+  // than representative (unlike a genre, decade, BPM, or user playlist).
+  let topCovers = $derived(kind === "genre" || kind === "decade" || kind === "bpm" ? songsToCoverStack(songs) : []);
 
   let badgeColorClass = $derived.by(() => {
     switch (kind) {
       case "decade": return "bg-[#2563EB] text-white";
       case "genre": return "bg-[#059669] text-white";
+      case "bpm": return "bg-[#EA580C] text-white";
       case "favourites": return "bg-[#DB2777] text-white";
       case "recently_added": return "bg-[#CA8A04] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
@@ -96,7 +103,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm") || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -108,8 +115,8 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
-    {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : kind === 'bpm' ? 'from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
         <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
@@ -131,6 +138,10 @@
     {:else if kind === "genre"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]">
         <Music class="w-10 h-10 text-[#34D399]" />
+      </div>
+    {:else if kind === "bpm"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 flex items-center justify-center overflow-hidden border border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]">
+        <Gauge class="w-10 h-10 text-[#FB923C]" />
       </div>
     {:else}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">

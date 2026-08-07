@@ -82,6 +82,31 @@ pub async fn get_songs_by_decade(
 }
 
 #[tauri::command]
+pub async fn sync_bpm_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .sync_bpm_auto_playlists()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_songs_by_bpm(
+    state: State<'_, AppState>,
+    spec: String,
+    limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
+) -> Result<Vec<crate::models::Song>, String> {
+    let (min, max) = crate::collection::parse_bpm_range_spec(&spec)
+        .ok_or_else(|| format!("Invalid BPM range spec: {spec}"))?;
+    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_by_bpm_range(min, max, limit.unwrap_or(50), mode.unwrap_or_default())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,

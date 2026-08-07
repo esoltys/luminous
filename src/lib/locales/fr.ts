@@ -452,6 +452,7 @@ export const fr = {
     populationModeEmptyDeepCuts: "Tous les titres oubliés ont été écoutés ! Changez le mode de remplissage ou appuyez sur Actualiser.",
     genreAutoPlaylist: "Genre",
     decadeAutoPlaylist: "Décennie",
+    bpmAutoPlaylist: "BPM",
     smartAutoPlaylist: "Intelligente",
     playlistTypeLabel: "Playlist",
     favouritesAutoPlaylist: "Liste auto",

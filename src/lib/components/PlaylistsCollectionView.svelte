@@ -25,9 +25,10 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
     genre?: string;
     decade?: string;
+    bpm?: string;
     label: string;
     playlistId?: number;
     updated?: number;
@@ -35,12 +36,18 @@
     autoPlay?: boolean;
   }
 
+  // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
+  // src-tauri/src/playlist.rs's BPM_BUCKETS) — alphabetical sort would
+  // scramble Down-Tempo/Mid-Tempo/Uptempo/High Energy/Extreme.
+  const BPM_BUCKET_ORDER = ["Down-Tempo BPM", "Mid-Tempo BPM", "Uptempo BPM", "High Energy BPM", "Extreme BPM"];
+
   onMount(async () => {
     try {
-      // Auto-playlists (genre and decade) are materialized as real (dynamic_enabled) playlist
+      // Auto-playlists (genre, decade, and BPM) are materialized as real (dynamic_enabled) playlist
       // rows, refreshed at most once every 24h — sync then re-pull the list.
       await invoke("sync_genre_auto_playlists");
       await invoke("sync_decade_auto_playlists");
+      await invoke("sync_bpm_auto_playlists");
       await playlistsStore.refreshPlaylists();
     } catch (err) {
       console.error("Failed to sync auto-playlists:", err);
@@ -54,10 +61,11 @@
     if (isRefreshingAll) return;
     isRefreshingAll = true;
     try {
-      // Pick up genres/decades that just crossed the auto-playlist threshold,
-      // and prune ones that no longer have any matching songs.
+      // Pick up genres/decades/BPM buckets that just crossed the auto-playlist
+      // threshold, and prune ones that no longer have any matching songs.
       await invoke("sync_genre_auto_playlists");
       await invoke("sync_decade_auto_playlists");
+      await invoke("sync_bpm_auto_playlists");
       await playlistsStore.refreshPlaylists();
 
       // Force-regenerate every dynamic playlist (genre/decade auto-playlists
@@ -78,10 +86,19 @@
   // Smart playlists built via the Smart Playlist builder always contain a "field:value" rule (e.g. "genre:jazz rating:>=4").
   let genreAutoPlaylists = $derived(
     playlistsStore.playlists.filter(
-      (p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:") && !isSmartPlaylistSpec(p.dynamic_spec)
+      (p) =>
+        p.dynamic_enabled &&
+        !p.dynamic_spec?.startsWith("decade:") &&
+        !p.dynamic_spec?.startsWith("bpmrange:") &&
+        !isSmartPlaylistSpec(p.dynamic_spec)
     )
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
+  let bpmAutoPlaylists = $derived(
+    playlistsStore.playlists
+      .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
+      .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name))
+  );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
@@ -145,6 +162,20 @@
         });
       }
     }
+    for (const p of bpmAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:bpm:${p.id}`,
+          kind: "bpm",
+          bpm: p.dynamic_spec?.replace(/^bpmrange:/, "") ?? "",
+          label: getPlaylistDisplayName(p),
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+          autoPlay: p.auto_play ?? false,
+        });
+      }
+    }
     return defs;
   });
 
@@ -159,13 +190,13 @@
   );
 
   // Favourites/Recently Added are always pinned first, ahead of the sort
-  // order applied to decade & genre auto-playlists.
+  // order applied to decade, genre & BPM auto-playlists.
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade");
+    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "bpm");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade")
+      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "bpm")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -229,7 +260,9 @@
         ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
         : def.kind === "decade"
           ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
-          : { kind: def.kind }
+          : def.kind === "bpm"
+            ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
+            : { kind: def.kind }
     );
   }
 
@@ -383,6 +416,7 @@
                   kind={def.kind}
                   genre={def.genre}
                   decade={def.decade}
+                  bpm={def.bpm}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
@@ -395,6 +429,7 @@
                   kind={def.kind}
                   genre={def.genre}
                   decade={def.decade}
+                  bpm={def.bpm}
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
