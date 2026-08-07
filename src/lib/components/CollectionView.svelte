@@ -771,6 +771,13 @@
                 {/if}
                 {#if collectionStore.visibleColumns.title}
                   <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
+                    <CoverArt
+                      songId={song.id}
+                      artEmbedded={song.art_embedded}
+                      artAutomatic={song.art_automatic}
+                      artManual={song.art_manual}
+                      sizeClass="w-7 h-7 rounded shrink-0"
+                    />
                     <span
                       class="truncate min-w-0 font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
                       title={song.title || i18n.t('collection.unknownSong')}
