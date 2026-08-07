@@ -268,6 +268,27 @@ describe("CollectionStore", () => {
     expect(collectionStore.immersiveMode).toBe(false);
   });
 
+  it("toggles sidebar compact state between 64px and expanded width", () => {
+    collectionStore.sidebarOpen = true;
+    collectionStore.setSidebarWidth(256);
+    expect(collectionStore.sidebarWidth).toBe(256);
+
+    // Toggle compact -> collapses to 64px
+    collectionStore.toggleSidebarCompact();
+    expect(collectionStore.sidebarWidth).toBe(64);
+
+    // Toggle compact again -> expands to 256px
+    collectionStore.toggleSidebarCompact();
+    expect(collectionStore.sidebarWidth).toBe(256);
+
+    // If sidebar was hidden, toggleSidebarCompact opens and expands it
+    collectionStore.sidebarOpen = false;
+    collectionStore.sidebarWidth = 64;
+    collectionStore.toggleSidebarCompact();
+    expect(collectionStore.sidebarOpen).toBe(true);
+    expect(collectionStore.sidebarWidth).toBe(256);
+  });
+
   it("sends remembered size/position as the toggle target when geometry capture is supported, ignoring any command return value", async () => {
     collectionStore.setMiniplayerGeometry(310, 370, 20, 30);
     collectionStore.setSavedWindowGeometry(1400, 900, 50, 60);

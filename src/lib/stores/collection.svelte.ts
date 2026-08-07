@@ -18,7 +18,7 @@ import type {
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
-import { MAX_RECENT_SEARCHES } from "../constants";
+import { MAX_RECENT_SEARCHES, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_COLLAPSED_WIDTH_PX } from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists";
@@ -400,6 +400,7 @@ class CollectionStore {
   sidebarOpen = $state<boolean>(true);
   rightPanelOpen = $state<boolean>(true);
   sidebarWidth = $state<number>(256);
+  lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
   isMiniplayer = $state<boolean>(false);
@@ -443,7 +444,17 @@ class CollectionStore {
         if (savedRight !== null) this.rightPanelOpen = savedRight === "true";
 
         const savedSidebarWidth = localStorage.getItem("layout_sidebarWidth");
-        if (savedSidebarWidth) this.sidebarWidth = parseInt(savedSidebarWidth, 10);
+        if (savedSidebarWidth) {
+          const w = parseInt(savedSidebarWidth, 10);
+          this.sidebarWidth = w;
+          if (w >= SIDEBAR_MIN_WIDTH_PX) {
+            this.lastExpandedSidebarWidth = w;
+          }
+        }
+        const savedLastExpanded = localStorage.getItem("layout_lastExpandedSidebarWidth");
+        if (savedLastExpanded) {
+          this.lastExpandedSidebarWidth = parseInt(savedLastExpanded, 10);
+        }
 
         const savedRightWidth = localStorage.getItem("layout_rightPanelWidth");
         if (savedRightWidth) this.rightPanelWidth = parseInt(savedRightWidth, 10);
@@ -935,6 +946,22 @@ class CollectionStore {
     }
   }
 
+  toggleSidebarCompact() {
+    if (!this.sidebarOpen) {
+      this.sidebarOpen = true;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("layout_sidebarOpen", "true");
+      }
+    }
+
+    if (this.sidebarWidth < SIDEBAR_MIN_WIDTH_PX) {
+      const targetWidth = Math.max(SIDEBAR_MIN_WIDTH_PX, this.lastExpandedSidebarWidth || 256);
+      this.setSidebarWidth(targetWidth);
+    } else {
+      this.setSidebarWidth(SIDEBAR_COLLAPSED_WIDTH_PX);
+    }
+  }
+
   toggleImmersiveMode() {
     this.immersiveMode = !this.immersiveMode;
     if (typeof window !== "undefined") {
@@ -1115,6 +1142,12 @@ class CollectionStore {
 
   setSidebarWidth(width: number) {
     this.sidebarWidth = width;
+    if (width >= SIDEBAR_MIN_WIDTH_PX) {
+      this.lastExpandedSidebarWidth = width;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("layout_lastExpandedSidebarWidth", width.toString());
+      }
+    }
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_sidebarWidth", width.toString());
     }
