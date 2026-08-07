@@ -42,7 +42,7 @@ jobs:
     - name: Pre-build Rust dependencies & generated code
       if: matrix.language == 'rust'
       run: |
-        cargo check --manifest-path src-tauri/Cargo.toml
+        cargo check
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
