@@ -56,7 +56,7 @@
       : kind === 'genre'
         ? 'bg-[#34D399]/15 border-[#34D399]/30'
         : kind === 'bpm'
-          ? 'bg-[#FB923C]/15 border-[#FB923C]/30'
+          ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
           : kind === 'favourites'
             ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
             : kind === 'history'
@@ -72,7 +72,7 @@
     {:else if kind === "decade"}
       <Calendar class="w-5 h-5 text-[#38BDF8]" />
     {:else if kind === "bpm"}
-      <Gauge class="w-5 h-5 text-[#FB923C]" />
+      <Gauge class="w-5 h-5 text-[#E879F9]" />
     {:else}
       <Music class="w-5 h-5 text-[#34D399]" />
     {/if}

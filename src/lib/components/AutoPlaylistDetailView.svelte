@@ -631,7 +631,7 @@ import { shuffleArray } from "../utils/shuffle";
       <!-- Right: Cover Stack -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : kind === 'bpm' ? 'from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if kind === "favourites"}
@@ -651,8 +651,8 @@ import { shuffleArray } from "../utils/shuffle";
             <Calendar class="w-16 h-16 text-[#38BDF8]" />
           </div>
         {:else if kind === "bpm"}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 flex items-center justify-center overflow-hidden border border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)]">
-            <Gauge class="w-16 h-16 text-[#FB923C]" />
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]">
+            <Gauge class="w-16 h-16 text-[#E879F9]" />
           </div>
         {:else}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]">

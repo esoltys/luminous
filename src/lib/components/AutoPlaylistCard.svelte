@@ -95,7 +95,7 @@
     switch (kind) {
       case "decade": return "bg-[#2563EB] text-white";
       case "genre": return "bg-[#059669] text-white";
-      case "bpm": return "bg-[#EA580C] text-white";
+      case "bpm": return "bg-[#C026D3] text-white";
       case "favourites": return "bg-[#DB2777] text-white";
       case "recently_added": return "bg-[#CA8A04] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
@@ -116,7 +116,7 @@
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : kind === 'bpm' ? 'from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_20px_2px_rgba(232,121,249,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
         <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
@@ -140,8 +140,8 @@
         <Music class="w-10 h-10 text-[#34D399]" />
       </div>
     {:else if kind === "bpm"}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 flex items-center justify-center overflow-hidden border border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]">
-        <Gauge class="w-10 h-10 text-[#FB923C]" />
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_20px_2px_rgba(232,121,249,0.35)]">
+        <Gauge class="w-10 h-10 text-[#E879F9]" />
       </div>
     {:else}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">
