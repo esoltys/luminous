@@ -515,8 +515,8 @@
       <img
         src={backdropUrl}
         alt=""
-        class="w-full h-full object-cover scale-150 blur-2xl"
-        style="will-change: filter; transform: translateZ(0);"
+        class="w-full h-full object-cover blur-2xl"
+        style="will-change: filter; transform: translateZ(0) scale(1.5);"
       />
       <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
     </div>

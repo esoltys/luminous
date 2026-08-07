@@ -241,7 +241,10 @@
   {/if}
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
-    <div class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none scale-125">
+    <div
+      class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none"
+      style="will-change: filter; transform: translateZ(0) scale(1.25);"
+    >
       <CoverArt
         songId={playerStore.currentSong?.id}
         artEmbedded={playerStore.currentSong?.art_embedded}
