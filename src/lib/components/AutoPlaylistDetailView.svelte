@@ -31,7 +31,7 @@ import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
@@ -180,7 +180,10 @@ import { shuffleArray } from "../utils/shuffle";
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
       : kind === "bpm"
-        ? (playlistsStore.playlists.find((p) => p.id === playlistId)?.name ?? bpm ?? "")
+        ? (() => {
+            const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+            return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
+          })()
         : (genre || i18n.t("artistDetail.unknownGenre"));
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
