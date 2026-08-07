@@ -55,7 +55,7 @@ r2d2_sqlite = "0.25"
 # --- Audio decoding ---
 # `all` enables every codec and format symphonia supports.
 # Note: AIFF is not yet a supported format in symphonia 0.5.x.
-symphonia = { version = "0.5", features = ["all"] }
+symphonia = { version = "0.6", features = ["all"] }
 
 # --- Audio output ---
 cpal = "0.15"

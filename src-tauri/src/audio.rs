@@ -33,9 +33,12 @@ use std::sync::{
     mpsc, Arc, Mutex,
 };
 use symphonia::core::{
-    audio::SampleBuffer, codecs::Decoder, codecs::DecoderOptions, errors::Error as SymphoniaError,
-    formats::FormatOptions, formats::FormatReader, io::MediaSource, io::MediaSourceStream,
-    meta::MetadataOptions, probe::Hint,
+    codecs::audio::{AudioDecoder, AudioDecoderOptions},
+    errors::Error as SymphoniaError,
+    formats::{probe::Hint, FormatOptions, FormatReader, TrackType},
+    io::MediaSource,
+    io::MediaSourceStream,
+    meta::MetadataOptions,
 };
 
 /// How far before the end boundary the `AboutToFinish` signal fires.
@@ -356,7 +359,7 @@ fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
 struct ActiveTrack {
     song: Box<Song>,
     format: Box<dyn FormatReader>,
-    decoder: Box<dyn Decoder>,
+    decoder: Box<dyn AudioDecoder>,
     track_id: u32,
     src_rate: u32,
     src_channels: usize,
@@ -388,31 +391,32 @@ impl ActiveTrack {
 
         let source = open_media_source(&path)?;
         let mss = MediaSourceStream::new(source, Default::default());
-        let probed = symphonia::default::get_probe()
-            .format(
+        let mut format = symphonia::default::get_probe()
+            .probe(
                 &Hint::new(),
                 mss,
-                &FormatOptions::default(),
-                &MetadataOptions::default(),
+                FormatOptions::default(),
+                MetadataOptions::default(),
             )
             .map_err(|e| format!("Format probe failed: {e}"))?;
 
-        let mut format = probed.format;
         let track = format
-            .tracks()
-            .iter()
-            .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+            .default_track(TrackType::Audio)
             .cloned()
             .ok_or_else(|| "No audio track found".to_string())?;
 
         let track_id = track.id;
+        let audio_params = track
+            .codec_params
+            .as_ref()
+            .and_then(|c| c.audio())
+            .ok_or_else(|| "No audio codec parameters".to_string())?;
         let mut decoder = symphonia::default::get_codecs()
-            .make(&track.codec_params, &DecoderOptions::default())
+            .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
             .map_err(|e| format!("Decoder init failed: {e}"))?;
 
         if start_nanosec > 0 {
-            let target_time =
-                symphonia::core::units::Time::from(std::time::Duration::from_nanos(start_nanosec));
+            let target_time = symphonia::core::units::Time::from_nanos(start_nanosec as i64);
             match format.seek(
                 symphonia::core::formats::SeekMode::Accurate,
                 symphonia::core::formats::SeekTo::Time {
@@ -425,8 +429,12 @@ impl ActiveTrack {
             }
         }
 
-        let src_rate = track.codec_params.sample_rate.unwrap_or(44100);
-        let src_channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
+        let src_rate = audio_params.sample_rate.unwrap_or(44100);
+        let src_channels = audio_params
+            .channels
+            .as_ref()
+            .map(|c| c.count())
+            .unwrap_or(2);
 
         let end_ns = (song.end_nanosec > 0).then_some(song.end_nanosec as u64);
         let about_end_ns = end_ns.or_else(|| song.length_nanosec.map(|ns| ns.max(0) as u64));
@@ -930,9 +938,8 @@ fn decode_thread(
                             target_sample_rate = new_out.sample_rate;
                             target_channels = new_out.channels;
 
-                            let target_time = symphonia::core::units::Time::from(
-                                std::time::Duration::from_nanos(cur_pos),
-                            );
+                            let target_time =
+                                symphonia::core::units::Time::from_nanos(cur_pos as i64);
                             let _ = current.format.seek(
                                 symphonia::core::formats::SeekMode::Accurate,
                                 symphonia::core::formats::SeekTo::Time {
@@ -1068,9 +1075,8 @@ fn decode_thread(
                             }
                         }
                     } else {
-                        let target_time = symphonia::core::units::Time::from(
-                            std::time::Duration::from_nanos(target_ns),
-                        );
+                        let target_time =
+                            symphonia::core::units::Time::from_nanos(target_ns as i64);
                         let seek_res = current.format.seek(
                             symphonia::core::formats::SeekMode::Accurate,
                             symphonia::core::formats::SeekTo::Time {
@@ -1253,17 +1259,15 @@ fn decode_thread(
 
             // Decode one packet
             match current.format.next_packet() {
-                Ok(packet) => {
-                    if packet.track_id() != current.track_id {
+                Ok(Some(packet)) => {
+                    if packet.track_id != current.track_id {
                         continue;
                     }
                     match current.decoder.decode(&packet) {
                         Ok(decoded) => {
-                            let spec = *decoded.spec();
-                            let mut sample_buf =
-                                SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                            sample_buf.copy_interleaved_ref(decoded);
-                            let mut samples = sample_buf.samples();
+                            let mut sample_vec: Vec<f32> = Vec::new();
+                            decoded.copy_to_vec_interleaved(&mut sample_vec);
+                            let mut samples: &[f32] = &sample_vec;
 
                             // Enforce the CUE end boundary (`end_nanosec`):
                             // truncate the packet at the cut and treat the
@@ -1310,6 +1314,10 @@ fn decode_thread(
                         Err(SymphoniaError::DecodeError(_)) => continue,
                         Err(_) => break 'decode,
                     }
+                }
+                Ok(None) => {
+                    current.eof = true;
+                    continue 'decode;
                 }
                 Err(SymphoniaError::IoError(ref e))
                     if e.kind() == std::io::ErrorKind::UnexpectedEof =>
