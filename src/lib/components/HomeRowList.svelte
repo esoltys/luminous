@@ -96,6 +96,8 @@
   function openItem(item: HomeItem) {
     if (item.type === "song" && item.song.album) {
       collectionStore.viewAlbum(item.song.album);
+    } else if (item.type === "song") {
+      playerStore.playSong(item.song.id);
     } else if (item.type === "album") {
       collectionStore.viewAlbum(item.album.album || "");
     } else if (item.type === "playlist") {
