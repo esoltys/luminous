@@ -241,7 +241,10 @@
   {/if}
   <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
-    <div class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none scale-125">
+    <div
+      class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none"
+      style="will-change: filter; transform: translateZ(0) scale(1.25);"
+    >
       <CoverArt
         songId={playerStore.currentSong?.id}
         artEmbedded={playerStore.currentSong?.art_embedded}
@@ -256,7 +259,7 @@
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
     <!-- Centered Sharp Active Album Art Card -->
     <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
-      <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden shadow-xl border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
+      <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
         <CoverArt
           songId={playerStore.currentSong?.id}
           artEmbedded={playerStore.currentSong?.art_embedded}
@@ -346,7 +349,7 @@
         {#if playerStore.state === 'playing'}
           <button
             onclick={() => playerStore.pause()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-transform shadow-lg cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
             title={i18n.t('playerBar.pause')}
           >
             <Pause class="w-5 h-5 fill-current" />
@@ -354,7 +357,7 @@
         {:else}
           <button
             onclick={() => playerStore.resume()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-transform shadow-lg cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
             title={i18n.t('playerBar.play')}
           >
             <Play class="w-5 h-5 fill-current ml-0.5" />
@@ -468,12 +471,10 @@
     background: #ffffff;
     border: 2px solid var(--color-accent);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    transition: transform 0.1s, border-color 0.2s;
+    transition: border-color 0.2s;
   }
 
   .volume-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.25);
     border-color: var(--color-accent-hover);
   }
 
@@ -484,12 +485,10 @@
     border-radius: 50%;
     background: #ffffff;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    transition: transform 0.1s, border-color 0.2s;
+    transition: border-color 0.2s;
   }
 
   .volume-slider::-moz-range-thumb:hover {
-    transform: scale(1.25);
     border-color: var(--color-accent-hover);
   }
 </style>
