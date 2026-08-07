@@ -32,7 +32,7 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
-  class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 cursor-pointer select-none"
+  class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     <CoverStack

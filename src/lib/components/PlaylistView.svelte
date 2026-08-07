@@ -773,10 +773,10 @@
                 class="bg-brand-sidebar border border-brand-accent text-brand-text-primary px-3 py-1 text-2xl font-bold rounded-lg focus:outline-none"
                 use:focusAndSelect
               />
-              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent cursor-pointer" title={i18n.t('playlists.saveRenameTooltip')}>
+              <button onclick={saveRename} class="p-1.5 text-brand-accent-text hover:text-brand-accent" title={i18n.t('playlists.saveRenameTooltip')}>
                 <Check class="w-5 h-5" />
               </button>
-              <button onclick={cancelRename} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary cursor-pointer" title={i18n.t('playlists.cancel')}>
+              <button onclick={cancelRename} class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary" title={i18n.t('playlists.cancel')}>
                 <X class="w-5 h-5" />
               </button>
             </div>
@@ -784,14 +784,14 @@
             <div class="flex items-center gap-3 group/title">
               <h1
                 ondblclick={startRename}
-                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary cursor-pointer hover:text-brand-accent-text transition-colors truncate py-0.5 leading-snug"
+                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary hover:text-brand-accent-text transition-colors truncate py-0.5 leading-snug"
                 title={i18n.t("playlists.renamePlaylistTooltip")}
               >
                 {activePlaylist.name}
               </h1>
               <button
                 onclick={startRename}
-                class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-1 cursor-pointer"
+                class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-1"
                 title={i18n.t("playlists.renamePlaylistTooltip")}
               >
                 <Pencil class="w-4 h-4" />
@@ -881,7 +881,7 @@
               {#if filterQuery}
                 <button
                   onclick={() => { filterQuery = ""; }}
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5"
                   title={i18n.t("playlists.clearFilter")}
                 >
                   <X class="w-3.5 h-3.5" />
@@ -900,7 +900,7 @@
                 bind:this={overflowButtonEl}
                 onclick={toggleOverflowMenu}
                 title={i18n.t("playlists.moreActionsTooltip")}
-                class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer shadow-xs"
+                class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs"
               >
                 <MoreHorizontal class="w-4 h-4" />
               </button>
@@ -952,7 +952,7 @@
             active={sortField === "position"}
             {sortAsc}
             onclick={() => toggleSort("position")}
-            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0"
           >
             {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderTrack")} {arrow}</span>{/snippet}
           </SortableHeader>
@@ -962,7 +962,7 @@
               active={sortField === "title"}
               {sortAsc}
               onclick={() => toggleSort("title")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderTitle")} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -974,7 +974,7 @@
               active={sortField === "artist"}
               {sortAsc}
               onclick={() => toggleSort("artist")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("playlists.tableHeaderArtist")} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -986,7 +986,7 @@
               active={sortField === "album"}
               {sortAsc}
               onclick={() => toggleSort("album")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t("collection.tableHeaderAlbum")} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -999,7 +999,7 @@
               active={sortField === "composer"}
               {sortAsc}
               onclick={() => toggleSort("composer")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1011,7 +1011,7 @@
               active={sortField === "album_artist"}
               {sortAsc}
               onclick={() => toggleSort("album_artist")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1023,7 +1023,7 @@
               active={sortField === "filetype"}
               {sortAsc}
               onclick={() => toggleSort("filetype")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1035,7 +1035,7 @@
               active={sortField === "year"}
               {sortAsc}
               onclick={() => toggleSort("year")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1047,7 +1047,7 @@
               active={sortField === "genre"}
               {sortAsc}
               onclick={() => toggleSort("genre")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1059,7 +1059,7 @@
               active={sortField === "grouping"}
               {sortAsc}
               onclick={() => toggleSort("grouping")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1071,7 +1071,7 @@
               active={sortField === "bpm"}
               {sortAsc}
               onclick={() => toggleSort("bpm")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1083,7 +1083,7 @@
               active={sortField === "initial_key"}
               {sortAsc}
               onclick={() => toggleSort("initial_key")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1095,7 +1095,7 @@
               active={sortField === "bitrate"}
               {sortAsc}
               onclick={() => toggleSort("bitrate")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1107,7 +1107,7 @@
               active={sortField === "samplerate"}
               {sortAsc}
               onclick={() => toggleSort("samplerate")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1119,7 +1119,7 @@
               active={sortField === "bitdepth"}
               {sortAsc}
               onclick={() => toggleSort("bitdepth")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1131,7 +1131,7 @@
               active={sortField === "channels"}
               {sortAsc}
               onclick={() => toggleSort("channels")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1143,7 +1143,7 @@
               active={sortField === "filesize"}
               {sortAsc}
               onclick={() => toggleSort("filesize")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1155,7 +1155,7 @@
               active={sortField === "rating"}
               {sortAsc}
               onclick={() => toggleSort("rating")}
-              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1167,7 +1167,7 @@
               active={sortField === "playcount"}
               {sortAsc}
               onclick={() => toggleSort("playcount")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1179,7 +1179,7 @@
               active={sortField === "skipcount"}
               {sortAsc}
               onclick={() => toggleSort("skipcount")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1191,7 +1191,7 @@
               active={sortField === "lastplayed"}
               {sortAsc}
               onclick={() => toggleSort("lastplayed")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1203,7 +1203,7 @@
               active={sortField === "added"}
               {sortAsc}
               onclick={() => toggleSort("added")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1215,7 +1215,7 @@
               active={sortField === "length_nanosec"}
               {sortAsc}
               onclick={() => toggleSort("length_nanosec")}
-              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<Clock class="w-4 h-4 shrink-0" /> {arrow}{/snippet}
             </SortableHeader>
@@ -1227,7 +1227,7 @@
               active={sortField === "path"}
               {sortAsc}
               onclick={() => toggleSort("path")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -1292,7 +1292,7 @@
                 {/if}
                 <button
                   onclick={(e) => { e.stopPropagation(); if (!unavailable) handlePlayPlaylistItem(item); }}
-                  class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                  class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity disabled:opacity-0 disabled:cursor-not-allowed"
                   disabled={unavailable}
                   title={i18n.t("playlists.playTrack")}
                 >
@@ -1486,7 +1486,7 @@
                 <div class="flex items-center justify-center gap-2.5">
                   <button
                     onclick={(e) => { e.stopPropagation(); item.song?.id && !unavailable && openTagEditor(item.song.id); }}
-                    class="text-brand-text-primary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30 cursor-pointer"
+                    class="text-brand-text-primary/60 hover:text-brand-accent-text transition-colors disabled:opacity-30"
                     title={i18n.t("collection.editTagsTooltip")}
                     disabled={!item.song || unavailable}
                   >
@@ -1494,7 +1494,7 @@
                   </button>
                   <button
                     onclick={(e) => { e.stopPropagation(); handleRemoveItem(item.uuid); }}
-                    class="text-brand-text-primary/60 hover:text-red-400 transition-colors cursor-pointer"
+                    class="text-brand-text-primary/60 hover:text-red-400 transition-colors"
                     title={i18n.t("playlists.removeFromPlaylist")}
                   >
                     <Trash2 class="w-4 h-4" />
@@ -1531,14 +1531,14 @@
         <div class="h-4 w-px bg-brand-border/60"></div>
         <button
           onclick={playSelected}
-          class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
+          class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors"
         >
           <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
           <span>{i18n.t("playlists.playSelected")}</span>
         </button>
         <button
           onclick={removeSelected}
-          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+          class="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors"
         >
           <Trash2 class="w-3.5 h-3.5" />
           <span>{i18n.t("playlists.removeSelected")}</span>
@@ -1546,7 +1546,7 @@
         <div class="h-4 w-px bg-brand-border/60"></div>
         <button
           onclick={() => { selectedUuids = new Set(); lastSelectedIndex = null; }}
-          class="text-brand-text-primary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="text-brand-text-primary hover:text-brand-text-primary transition-colors"
         >
           {i18n.t("playlists.clearSelection")}
         </button>
@@ -1657,11 +1657,11 @@
         {i18n.t("playlists.exportModalTitle")}
       </h3>
       <div class="space-y-2.5 text-xs text-brand-text-secondary">
-        <label class="flex items-center gap-2 cursor-pointer hover:text-brand-text-primary transition-colors">
+        <label class="flex items-center gap-2 hover:text-brand-text-primary transition-colors">
           <input type="radio" name="exportPathType" bind:group={exportRelative} value={true} class="accent-brand-accent" />
           <span>{i18n.t("playlists.useRelativePaths")}</span>
         </label>
-        <label class="flex items-center gap-2 cursor-pointer hover:text-brand-text-primary transition-colors">
+        <label class="flex items-center gap-2 hover:text-brand-text-primary transition-colors">
           <input type="radio" name="exportPathType" bind:group={exportRelative} value={false} class="accent-brand-accent" />
           <span>{i18n.t("playlists.useAbsolutePaths")}</span>
         </label>
@@ -1669,13 +1669,13 @@
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => { showExportOptionsModal = false; }}
-          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors cursor-pointer"
+          class="px-3 py-1.5 rounded text-xs font-medium text-brand-text-secondary hover:bg-brand-main transition-colors"
         >
           {i18n.t("playlists.cancelBtn")}
         </button>
         <button
           onclick={triggerExport}
-          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
+          class="px-3 py-1.5 rounded text-xs font-medium bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
         >
           {i18n.t("playlists.exportBtn")}
         </button>
@@ -1691,7 +1691,7 @@
         <FolderPlus class="w-4 h-4 text-brand-accent-text" />
         <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveQueueAsPlaylist", {}, "Save as Custom Playlist")}</h3>
       </div>
-      <button onclick={() => showSaveQueueModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+      <button onclick={() => showSaveQueueModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
         <X class="w-4 h-4" />
       </button>
     </div>

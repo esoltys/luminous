@@ -49,7 +49,7 @@
   {type}
   {disabled}
   {title}
-  class="flex items-center justify-center rounded-full font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[size]} {variantClasses[variant]} {className}"
+  class="flex items-center justify-center rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed {sizeClasses[size]} {variantClasses[variant]} {className}"
 >
   {@render children()}
 </button>

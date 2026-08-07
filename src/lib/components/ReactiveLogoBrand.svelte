@@ -141,7 +141,7 @@
 <button
   type="button"
   onclick={togglePulsing}
-  class="bg-transparent border-none p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate"
+  class="bg-transparent border-none p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent rounded-full overflow-hidden isolate"
   title={isPulsingEnabled ? i18n.t('common.disableLogoPulse') : i18n.t('common.enableLogoPulse')}
   aria-label={i18n.t('common.toggleLogoPulsing')}
 >

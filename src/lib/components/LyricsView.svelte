@@ -309,7 +309,7 @@
               <p
                 data-index={idx}
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                class="text-xl md:text-2xl font-bold cursor-pointer transition-all duration-300 transform {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
+                class="text-xl md:text-2xl font-bold transition-all duration-300 transform {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
                 {line.text || "•••"}
               </p>

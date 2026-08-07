@@ -49,7 +49,7 @@
       {disabled}
       title={i18n.t(m.tooltipKey)}
       onclick={() => onChange(m.value)}
-      class="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
+      class="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed
         {mode === m.value
         ? 'bg-brand-accent text-brand-accent-contrast shadow-sm'
         : 'text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"

@@ -292,37 +292,37 @@
     <div class="flex bg-brand-sidebar border border-brand-border rounded-xl p-0.5 text-xs shadow-sm">
       <button
         onclick={() => { settingsTab = "general"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'general' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'general' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabGeneral')}
       </button>
       <button
         onclick={() => { settingsTab = "folders"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'folders' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'folders' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabFolders')}
       </button>
       <button
         onclick={() => { settingsTab = "tools"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'tools' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'tools' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabTools')}
       </button>
       <button
         onclick={() => { settingsTab = "themes"; editingThemeId = null; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'themes' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'themes' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabThemes')}
       </button>
       <button
         onclick={() => { settingsTab = "equalizer"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'equalizer' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'equalizer' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabEqualizer')}
       </button>
       <button
         onclick={() => { settingsTab = "about"; }}
-        class="px-4 py-1.5 rounded-lg font-semibold transition-all cursor-pointer {settingsTab === 'about' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'about' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
         {i18n.t('settings.tabAbout')}
       </button>
@@ -422,7 +422,7 @@
             </div>
             <button
               onclick={copyVersion}
-              class="px-3 py-1 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 hover:bg-brand-accent/30 transition-colors cursor-pointer flex items-center gap-1.5"
+              class="px-3 py-1 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 hover:bg-brand-accent/30 transition-colors flex items-center gap-1.5"
               title={i18n.t('settings.copyVersionHint')}
             >
               {#if versionCopied}
@@ -590,7 +590,7 @@
               </div>
               <button
                 onclick={() => handleRemoveDirectory(dir.path)}
-                class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
+                class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
                 title={i18n.t('settings.folderItemStopWatch')}
               >
                 <Trash2 class="w-4 h-4 text-brand-accent-text" />
@@ -755,9 +755,9 @@
             <div class="space-y-1 min-w-0">
               <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.acoustidIntegration')}</h3>
               <p class="text-xs text-brand-text-secondary leading-relaxed">
-                {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline cursor-pointer">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
+                {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
                 <br />
-                {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline cursor-pointer">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
+                {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
               </p>
             </div>
           </div>
@@ -783,7 +783,7 @@
               <button 
                 type="button"
                 onclick={() => showAcoustidKey = !showAcoustidKey}
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
                 title={showAcoustidKey ? "Hide key" : "Show key"}
               >
                 {#if showAcoustidKey}
@@ -818,7 +818,7 @@
               {@const previewColors = getPreviewColors(theme)}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
-                class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 cursor-pointer w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+                class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
               >
                 <div class="flex items-center justify-between w-full">
                   <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
@@ -859,7 +859,7 @@
                   onclick={() => themeStore.setTheme(theme.id)}
                   role="button"
                   tabindex="0"
-                  class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors cursor-pointer w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
+                  class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
                 >
                   <div class="flex items-center justify-between w-full">
                     <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
@@ -876,14 +876,14 @@
                   <div class="flex gap-2">
                     <button
                       onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
-                      class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors cursor-pointer"
+                      class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
                       title={i18n.t('settings.editTheme')}
                     >
                       {i18n.t('settings.editThemeShort')}
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
-                      class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors cursor-pointer"
+                      class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
                       title={i18n.t('settings.deleteTheme')}
                     >
                       <Trash2 class="w-3.5 h-3.5" />
@@ -936,7 +936,7 @@
                 <!-- Dark Muted (Main Background) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['bg-main']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -948,7 +948,7 @@
                 <!-- Dark Vibrant (Sidebar Background) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['bg-sidebar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -960,7 +960,7 @@
                 <!-- Light Muted (Player Bar Background) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['bg-playerbar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -972,7 +972,7 @@
                 <!-- Vibrant (Accent Color) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['color-accent']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -984,7 +984,7 @@
                 <!-- Light Vibrant (Accent Hover Color) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['color-accent-hover']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -996,7 +996,7 @@
                 <!-- Muted (Border Color) -->
                 <div class="flex items-center gap-3">
                   <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-                    <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 cursor-pointer bg-transparent border-none shrink-0" />
+                    <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 bg-transparent border-none shrink-0" />
                     <input type="text" bind:value={customColors['color-border']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
                   </div>
                   <div class="flex flex-col min-w-0">
@@ -1032,7 +1032,7 @@
               {i18n.t('settings.aboutCreatedByPrefix', {}, 'Created by ')}
               <button
                 onclick={() => openExternalUrl("https://esoltys.dev/")}
-                class="text-brand-accent-text hover:text-brand-accent-text-hover font-bold hover:underline cursor-pointer transition-colors"
+                class="text-brand-accent-text hover:text-brand-accent-text-hover font-bold hover:underline transition-colors"
                 title="Eric Soltys — esoltys.dev"
               >
                 Eric Soltys 🍁
@@ -1046,7 +1046,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onclick={() => openExternalUrl("https://esoltys.dev/luminous")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <Home class="w-5 h-5" />
@@ -1059,7 +1059,7 @@
 
           <button
             onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/CREDITS.md")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <Info class="w-5 h-5" />
@@ -1072,7 +1072,7 @@
 
           <button
             onclick={() => openExternalUrl("https://github.com/esoltys/luminous/blob/main/LICENSE")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <Shield class="w-5 h-5" />
@@ -1085,7 +1085,7 @@
 
           <button
             onclick={() => openExternalUrl("https://github.com/esoltys/luminous")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5" aria-hidden="true">
@@ -1100,7 +1100,7 @@
 
           <button
             onclick={() => openExternalUrl("https://github.com/esoltys/luminous/discussions")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <MessageCircle class="w-5 h-5" />
@@ -1113,7 +1113,7 @@
 
           <button
             onclick={() => openExternalUrl("https://github.com/esoltys/luminous/issues")}
-            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group cursor-pointer"
+            class="bg-brand-sidebar/60 border border-brand-border hover:border-brand-accent/50 rounded-xl p-4 flex items-center gap-3 text-left transition-all group"
           >
             <div class="w-9 h-9 rounded-lg bg-brand-main border border-brand-border flex items-center justify-center text-brand-accent-text shrink-0 group-hover:scale-105 transition-transform">
               <Bug class="w-5 h-5" />

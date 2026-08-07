@@ -56,7 +56,7 @@
     </div>
     <button
       onclick={onClose}
-      class="text-brand-text-secondary hover:text-brand-text-primary p-1.5 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer"
+      class="text-brand-text-secondary hover:text-brand-text-primary p-1.5 rounded-lg hover:bg-brand-main/80 transition-colors"
     >
       <X class="w-4 h-4" />
     </button>

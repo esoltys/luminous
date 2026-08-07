@@ -37,7 +37,7 @@
       <AlertTriangle class="w-4 h-4 {danger ? 'text-red-400' : 'text-brand-accent-text'}" />
       <h3 class="text-sm font-bold">{title}</h3>
     </div>
-    <button onclick={onCancel} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+    <button onclick={onCancel} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
       <X class="w-4 h-4" />
     </button>
   </div>

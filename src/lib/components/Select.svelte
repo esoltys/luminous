@@ -25,7 +25,7 @@
   {id}
   {value}
   {onchange}
-  class="appearance-none -webkit-appearance-none cursor-pointer {className}"
+  class="appearance-none -webkit-appearance-none {className}"
   style="background-image: url(&quot;data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E&quot;); background-position: right {chevronPosition} center; background-repeat: no-repeat; background-size: 1.25em;"
 >
   {@render children()}

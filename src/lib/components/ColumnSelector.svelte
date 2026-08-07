@@ -110,7 +110,7 @@
   <button
     bind:this={buttonEl}
     onclick={toggleMenu}
-    class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors cursor-pointer font-semibold rounded-full
+    class="flex items-center justify-center gap-2 border border-brand-border text-brand-text-secondary focus:outline-none transition-colors font-semibold rounded-full
       {iconOnly
         ? 'w-10 h-10 hover:text-brand-accent-text hover:bg-brand-sidebar shadow-xs'
         : 'bg-brand-sidebar hover:bg-brand-main hover:text-brand-text-primary transition-all ' + (size === 'sm' ? 'px-2.5 h-7 text-[11px] gap-1.5' : 'px-5 py-2 text-sm')}"
@@ -134,7 +134,7 @@
         <div class="px-2 py-2 text-[11px] text-brand-text-secondary/60 italic">No columns visible</div>
       {:else}
         {#each visibleInOrder as col (col.key)}
-          <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer text-brand-text-primary">
+          <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs text-brand-text-primary">
             <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
             {i18n.t(col.label)}
           </label>
@@ -146,7 +146,7 @@
         Metatags
       </div>
       {#each METATAG_COLS as col (col.key)}
-        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
           <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
           {i18n.t(col.label)}
         </label>
@@ -157,7 +157,7 @@
         Luminous
       </div>
       {#each LUMINOUS_COLS as col (col.key)}
-        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs cursor-pointer {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-brand-main/60 rounded-lg text-xs {collectionStore.visibleColumns[col.key] ? 'text-brand-text-primary' : 'text-brand-text-secondary/70'}">
           <input type="checkbox" checked={collectionStore.visibleColumns[col.key]} onchange={() => collectionStore.toggleColumn(col.key)} class="rounded accent-brand-accent" />
           {i18n.t(col.label)}
         </label>
