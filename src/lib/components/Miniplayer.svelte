@@ -349,7 +349,7 @@
         {#if playerStore.state === 'playing'}
           <button
             onclick={() => playerStore.pause()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-transform cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
             title={i18n.t('playerBar.pause')}
           >
             <Pause class="w-5 h-5 fill-current" />
@@ -357,7 +357,7 @@
         {:else}
           <button
             onclick={() => playerStore.resume()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center hover:scale-105 transition-transform cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
             title={i18n.t('playerBar.play')}
           >
             <Play class="w-5 h-5 fill-current ml-0.5" />
@@ -471,11 +471,10 @@
     background: #ffffff;
     border: 2px solid var(--color-accent);
     cursor: pointer;
-    transition: transform 0.1s, border-color 0.2s;
+    transition: border-color 0.2s;
   }
 
   .volume-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.25);
     border-color: var(--color-accent-hover);
   }
 
@@ -486,11 +485,10 @@
     border-radius: 50%;
     background: #ffffff;
     cursor: pointer;
-    transition: transform 0.1s, border-color 0.2s;
+    transition: border-color 0.2s;
   }
 
   .volume-slider::-moz-range-thumb:hover {
-    transform: scale(1.25);
     border-color: var(--color-accent-hover);
   }
 </style>
