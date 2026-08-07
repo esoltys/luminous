@@ -20,6 +20,28 @@ const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
 /// library (e.g. 500+ songs in a single decade).
 const NO_SONG_LIMIT: i64 = -1;
 
+/// Fixed BPM buckets for the BPM auto-playlist category: (display name, min
+/// BPM inclusive, max BPM inclusive — `None` means "or higher"). Unlike
+/// genre/decade auto-playlists (one per distinct library value), BPM
+/// auto-playlists are always this same set of five, each created only if it
+/// clears [`MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST`].
+const BPM_BUCKETS: [(&str, f64, Option<f64>); 5] = [
+    ("Down-Tempo BPM", 60.0, Some(90.0)),
+    ("Mid-Tempo BPM", 90.0, Some(115.0)),
+    ("Uptempo BPM", 115.0, Some(130.0)),
+    ("High Energy BPM", 130.0, Some(150.0)),
+    ("Extreme BPM", 150.0, None),
+];
+
+/// Formats a BPM bucket's `(min, max)` into its `dynamic_spec` suffix, e.g.
+/// `"60-90"` or the open-ended `"150-"`.
+fn format_bpm_range_spec(min: f64, max: Option<f64>) -> String {
+    match max {
+        Some(max) => format!("bpmrange:{}-{}", min, max),
+        None => format!("bpmrange:{}-", min),
+    }
+}
+
 /// Names reserved for the app's single built-in Queue playlist: the literal
 /// DB name ("Queue" — see `queuePlaylist` in playlists.svelte.ts, which
 /// identifies it purely by this string) plus every locale's translated
@@ -484,6 +506,101 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Regenerates each fixed-bucket BPM "auto-playlist" — a system-managed
+    /// `playlists` row with `dynamic_enabled = 1` and `dynamic_spec` set to
+    /// `bpmrange:<min>-<max>` (e.g. `bpmrange:60-90`, or `bpmrange:150-` for
+    /// the open-ended top bucket) — if it's missing or its `updated`
+    /// timestamp is more than 24h old. Unlike genre/decade, the bucket set
+    /// is fixed (see [`BPM_BUCKETS`]), not derived from distinct library
+    /// values, so there is no pruning pass for "buckets no longer present".
+    pub fn sync_bpm_auto_playlists(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        for (name, min, max) in BPM_BUCKETS {
+            let spec = format_bpm_range_spec(min, max);
+            let existing_row: Option<(i64, i64, i64, String)> = conn
+                .query_row(
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    params![spec],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .ok();
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
+
+            // Check library threshold first, same precedent as genre/decade:
+            // created once >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST songs fall in
+            // this bucket; once created, only pruned if it drops to 0 songs.
+            let total_songs = scanner.get_songs_by_bpm_range(
+                min,
+                max,
+                MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
+                QueuePopulationMode::All,
+            )?;
+            if existing_row.is_none()
+                && total_songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize
+            {
+                continue;
+            }
+            if existing_row.is_some() && total_songs.is_empty() {
+                if let Some((id, _, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
+            let songs = scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)?;
+
+            let needs_generation = match existing_row {
+                None => true,
+                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let playlist_id = match existing_row {
+                Some((id, _, _, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                        params![now, id],
+                    )?;
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated, auto_play) VALUES (?1, 1, ?2, ?3, ?3, 1)",
+                        params![name, spec, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            for (position, song) in songs.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Auto-Play (dynamic refill) — #26
     // -----------------------------------------------------------------------
@@ -530,6 +647,11 @@ impl PlaylistManager {
         let scanner = CollectionScanner::new(self.db.clone());
         let songs = if let Some(decade) = spec.strip_prefix("decade:") {
             scanner.get_songs_by_decade(decade, NO_SONG_LIMIT, mode)?
+        } else if let Some((min, max)) = spec
+            .strip_prefix("bpmrange:")
+            .and_then(crate::collection::parse_bpm_range_spec)
+        {
+            scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)?
         } else if !spec.contains(':') {
             // Bare-name convention: a system genre auto-playlist, not a Smart
             // Playlist rule spec (which always contains a "field:" rule).
@@ -590,6 +712,11 @@ impl PlaylistManager {
         // Parse spec prefix to determine filter type
         let songs: Vec<Song> = if let Some(decade) = dynamic_spec.strip_prefix("decade:") {
             scanner.get_songs_by_decade(decade, (limit * 4) as i64, mode)?
+        } else if let Some((min, max)) = dynamic_spec
+            .strip_prefix("bpmrange:")
+            .and_then(crate::collection::parse_bpm_range_spec)
+        {
+            scanner.get_songs_by_bpm_range(min, max, (limit * 4) as i64, mode)?
         } else if !dynamic_spec.contains(':') {
             // Bare-name convention: a system genre auto-playlist, not a Smart
             // Playlist rule spec (which always contains a "field:" rule).
@@ -1722,6 +1849,72 @@ mod tests {
         assert_eq!(decade_playlists[0].name, "1990s");
 
         let tracks = manager.get_playlist_tracks(decade_playlists[0].id).unwrap();
+        assert_eq!(tracks.len(), 25);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_bpm_auto_playlists() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+
+            // 10 songs at BPM 70 (Down-Tempo bucket) — below the 25-song threshold, should be skipped.
+            for i in 0..10 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, bpm, source, unavailable) VALUES ('Chill {}', 70, 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+
+            // 25 songs at BPM 140 (High Energy bucket) — meets the threshold.
+            for i in 0..25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, bpm, source, unavailable) VALUES ('Banger {}', 140, 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_bpm_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let bpm_playlists: Vec<_> = playlists
+            .iter()
+            .filter(|p| {
+                p.dynamic_enabled
+                    && p.dynamic_spec
+                        .as_deref()
+                        .unwrap_or("")
+                        .starts_with("bpmrange:")
+            })
+            .collect();
+
+        assert!(
+            !bpm_playlists.iter().any(|p| p.name == "Down-Tempo BPM"),
+            "expected Down-Tempo bucket to be skipped (< 25 songs)"
+        );
+
+        assert_eq!(bpm_playlists.len(), 1);
+        assert_eq!(bpm_playlists[0].name, "High Energy BPM");
+        assert_eq!(
+            bpm_playlists[0].dynamic_spec.as_deref(),
+            Some("bpmrange:130-150")
+        );
+
+        let tracks = manager.get_playlist_tracks(bpm_playlists[0].id).unwrap();
         assert_eq!(tracks.len(), 25);
 
         let _ = std::fs::remove_dir_all(temp_dir);

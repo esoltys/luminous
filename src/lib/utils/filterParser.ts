@@ -97,5 +97,5 @@ export function hasAdvancedSearchTerms(query: string): boolean {
  * categorization in playlist.rs.
  */
 export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
-  return !!spec && spec.includes(":") && !spec.startsWith("decade:");
+  return !!spec && spec.includes(":") && !spec.startsWith("decade:") && !spec.startsWith("bpmrange:");
 }

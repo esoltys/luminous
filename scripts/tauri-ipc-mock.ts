@@ -569,6 +569,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
     sync_genre_auto_playlists: () => null,
     sync_decade_auto_playlists: () => null,
+    sync_bpm_auto_playlists: () => null,
     get_favourite_songs: () => {
       const cannonsSongs = library.songs.filter((s) => s.artist === "Cannons" || s.album_artist === "Cannons");
       return (cannonsSongs.length > 0 ? cannonsSongs : library.songs).slice(0, 20);
@@ -584,6 +585,18 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       return library.songs.filter((s) => {
         const y = s.year ?? s.originalyear;
         return y !== undefined && y !== null && y >= startYear && y <= startYear + 9;
+      });
+    },
+
+    get_songs_by_bpm: (args) => {
+      const spec = args.spec as string;
+      const [minStr, maxStr] = spec.split("-");
+      const min = parseFloat(minStr);
+      const max = maxStr ? parseFloat(maxStr) : undefined;
+      if (isNaN(min)) return library.songs;
+      return library.songs.filter((s) => {
+        const bpm = s.bpm;
+        return bpm !== undefined && bpm !== null && bpm >= min && (max === undefined || bpm <= max);
       });
     },
 

@@ -24,14 +24,14 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, RefreshCw, CheckCircle2, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, Music, Gauge, RefreshCw, CheckCircle2, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
 import { shuffleArray } from "../utils/shuffle";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
@@ -73,6 +73,7 @@ import { shuffleArray } from "../utils/shuffle";
   });
   let genre = $derived(view.genre);
   let decade = $derived(view.decade);
+  let bpm = $derived(view.bpm);
   let playlistId = $derived(view.playlistId);
   let updated = $derived(view.updated);
 
@@ -178,15 +179,20 @@ import { shuffleArray } from "../utils/shuffle";
     if (kind === "history") return i18n.t("playlists.autoHistory");
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
-      : (genre || i18n.t("artistDetail.unknownGenre"));
+      : kind === "bpm"
+        ? (() => {
+            const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+            return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
+          })()
+        : (genre || i18n.t("artistDetail.unknownGenre"));
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
-  let topCovers = $derived((kind === "genre" || kind === "decade") ? songsToCoverStack(songs) : []);
+  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm") ? songsToCoverStack(songs) : []);
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm") || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -198,8 +204,8 @@ import { shuffleArray } from "../utils/shuffle";
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
 
-  async function fetchSongs(k: typeof kind, g: typeof genre, d: typeof decade, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade") && pid !== undefined) {
+  async function fetchSongs(k: typeof kind, g: typeof genre, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
+    if ((k === "genre" || k === "decade" || k === "bpm") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
     }
@@ -207,6 +213,7 @@ import { shuffleArray } from "../utils/shuffle";
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
     if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
     if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
+    if (k === "bpm") return invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 });
     return invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
   }
 
@@ -221,19 +228,20 @@ import { shuffleArray } from "../utils/shuffle";
     const k = kind;
     const g = genre;
     const d = decade;
+    const b = bpm;
     const pid = playlistId;
     const count = backingTrackCount;
     loading = true;
-    fetchSongs(k, g, d, pid)
+    fetchSongs(k, g, d, b, pid)
       .then((fetchedSongs) => {
-        if (kind !== k || genre !== g || decade !== d || playlistId !== pid) return;
+        if (kind !== k || genre !== g || decade !== d || bpm !== b || playlistId !== pid) return;
         songs = fetchedSongs;
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);
       })
       .finally(() => {
-        if (kind === k && genre === g && decade === d && playlistId === pid) loading = false;
+        if (kind === k && genre === g && decade === d && bpm === b && playlistId === pid) loading = false;
       });
   });
 
@@ -369,7 +377,7 @@ import { shuffleArray } from "../utils/shuffle";
     playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
-      songs = await fetchSongs(kind, genre, decade, playlistId);
+      songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
     } catch (err) {
       console.error("Failed to change queue population mode:", err);
     } finally {
@@ -385,7 +393,7 @@ import { shuffleArray } from "../utils/shuffle";
     playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      songs = await fetchSongs(kind, genre, decade, playlistId);
+      songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -400,7 +408,7 @@ import { shuffleArray } from "../utils/shuffle";
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
     loading = true;
-    fetchSongs(kind, genre, decade, playlistId)
+    fetchSongs(kind, genre, decade, bpm, playlistId)
       .then((fetchedSongs) => {
         songs = fetchedSongs;
       })
@@ -432,7 +440,7 @@ import { shuffleArray } from "../utils/shuffle";
       }
       if (kind === "history" || kind === "favourites" || kind === "recently_added") {
         try {
-          songs = await fetchSongs(kind, genre, decade, playlistId);
+          songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
         } catch (err) {
           console.error("Failed to re-fetch songs on stats change:", err);
         }
@@ -523,7 +531,7 @@ import { shuffleArray } from "../utils/shuffle";
 
 <div
   class="flex-1 flex flex-col overflow-y-auto carousel-scroll bg-brand-main text-brand-text-secondary h-full"
-  use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? ""}`}
+  use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
 >
   <!-- Auto-Playlist Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
@@ -598,7 +606,7 @@ import { shuffleArray } from "../utils/shuffle";
         </div>
 
         <!-- Additional controls for genre/decade playlists: auto-play and population-mode -->
-        {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+        {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
             <div
@@ -625,8 +633,8 @@ import { shuffleArray } from "../utils/shuffle";
 
       <!-- Right: Cover Stack -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
-        {#if (kind === "genre" || kind === "decade") && topCovers.length > 0}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
+        {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if kind === "favourites"}
@@ -644,6 +652,10 @@ import { shuffleArray } from "../utils/shuffle";
         {:else if kind === "decade"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]">
             <Calendar class="w-16 h-16 text-[#38BDF8]" />
+          </div>
+        {:else if kind === "bpm"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]">
+            <Gauge class="w-16 h-16 text-[#E879F9]" />
           </div>
         {:else}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]">
@@ -1120,7 +1132,7 @@ import { shuffleArray } from "../utils/shuffle";
       </div>
     </div>
 
-    {#if autoPlay && (kind === "genre" || kind === "decade") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
+    {#if autoPlay && (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
       <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-primary flex items-center justify-center gap-2 select-none">
         <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
         <span>{i18n.t('playlists.allMatchingTracksAdded')}</span>
@@ -1198,7 +1210,7 @@ import { shuffleArray } from "../utils/shuffle";
       disabled={loading || songs.length === 0}
     />
 
-    {#if (kind === "genre" || kind === "decade") && playlistId !== undefined}
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
