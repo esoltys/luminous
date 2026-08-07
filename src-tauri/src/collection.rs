@@ -1131,31 +1131,47 @@ impl CollectionScanner {
 
     pub fn get_artists(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
+        // Artists are grouped case-insensitively (COLLATE NOCASE) so that tag-casing
+        // drift across files/albums for the same real-world artist (e.g. "The War On
+        // Drugs" vs "The War on Drugs") doesn't show up as two separate cards — see
+        // issue #295. `MIN(...)` picks one deterministic casing per group to display.
         let mut stmt = conn.prepare(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
                 WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
                 GROUP BY album
+             ),
+             base AS (
+                SELECT s.id, s.album, COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist
+                FROM songs s
+                WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ),
+             grouped AS (
+                SELECT MIN(effective_artist) AS effective_artist, COUNT(*) AS song_count
+                FROM base
+                GROUP BY effective_artist COLLATE NOCASE
              )
              SELECT
-                COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist,
-                COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN s.album END) AS album_count,
-                COUNT(*) AS song_count,
+                g.effective_artist,
+                (
+                    SELECT COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN b.album END)
+                    FROM base b
+                    LEFT JOIN album_counts ac ON b.album = ac.album
+                    WHERE b.effective_artist = g.effective_artist COLLATE NOCASE
+                ) AS album_count,
+                g.song_count,
                 (
                     SELECT genre
-                    FROM songs g
-                    WHERE COALESCE(NULLIF(g.album_artist, ''), g.artist) = COALESCE(NULLIF(s.album_artist, ''), s.artist)
-                      AND g.source IN (1, 2) AND g.unavailable = 0 AND g.genre IS NOT NULL AND g.genre != ''
-                    GROUP BY g.genre
-                    ORDER BY COUNT(*) DESC, g.genre ASC
+                    FROM songs sg
+                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist) = g.effective_artist COLLATE NOCASE
+                      AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                    GROUP BY sg.genre
+                    ORDER BY COUNT(*) DESC, sg.genre ASC
                     LIMIT 1
                 ) AS genre
-             FROM songs s
-             LEFT JOIN album_counts ac ON s.album = ac.album
-             WHERE s.source IN (1, 2) AND s.unavailable = 0
-             GROUP BY effective_artist
-             ORDER BY effective_artist",
+             FROM grouped g
+             ORDER BY g.effective_artist COLLATE NOCASE",
         )?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
@@ -1177,33 +1193,50 @@ impl CollectionScanner {
     /// directory (see `get_artists` for that).
     pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
+        // See get_artists() for why grouping is case-insensitive (issue #295).
         let mut stmt = conn.prepare(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
                 WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
                 GROUP BY album
+             ),
+             base AS (
+                SELECT s.id, s.album, s.playcount,
+                       COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist
+                FROM songs s
+                WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ),
+             grouped AS (
+                SELECT
+                    MIN(effective_artist) AS effective_artist,
+                    COUNT(*) AS song_count,
+                    SUM(COALESCE(playcount, 0)) AS total_playcount
+                FROM base
+                GROUP BY effective_artist COLLATE NOCASE
+                HAVING SUM(COALESCE(playcount, 0)) > 0
              )
              SELECT
-                COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist,
-                COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN s.album END) AS album_count,
-                COUNT(*) AS song_count,
-                SUM(COALESCE(s.playcount, 0)) AS total_playcount,
+                g.effective_artist,
+                (
+                    SELECT COUNT(DISTINCT CASE WHEN ac.track_count > 7 THEN b.album END)
+                    FROM base b
+                    LEFT JOIN album_counts ac ON b.album = ac.album
+                    WHERE b.effective_artist = g.effective_artist COLLATE NOCASE
+                ) AS album_count,
+                g.song_count,
+                g.total_playcount,
                 (
                     SELECT genre
-                    FROM songs g
-                    WHERE COALESCE(NULLIF(g.album_artist, ''), g.artist) = COALESCE(NULLIF(s.album_artist, ''), s.artist)
-                      AND g.source IN (1, 2) AND g.unavailable = 0 AND g.genre IS NOT NULL AND g.genre != ''
-                    GROUP BY g.genre
-                    ORDER BY COUNT(*) DESC, g.genre ASC
+                    FROM songs sg
+                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist) = g.effective_artist COLLATE NOCASE
+                      AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                    GROUP BY sg.genre
+                    ORDER BY COUNT(*) DESC, sg.genre ASC
                     LIMIT 1
                 ) AS genre
-             FROM songs s
-             LEFT JOIN album_counts ac ON s.album = ac.album
-             WHERE s.source IN (1, 2) AND s.unavailable = 0
-             GROUP BY effective_artist
-             HAVING SUM(COALESCE(s.playcount, 0)) > 0
-             ORDER BY total_playcount DESC, effective_artist ASC
+             FROM grouped g
+             ORDER BY g.total_playcount DESC, g.effective_artist COLLATE NOCASE
              LIMIT ?1",
         )?;
         let artists: Vec<serde_json::Value> = stmt
@@ -3029,6 +3062,68 @@ mod tests {
             .unwrap();
         assert_eq!(full_artist["album_count"].as_i64(), Some(1));
         assert_eq!(full_artist["song_count"].as_i64(), Some(8));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #295: songs whose artist tag only differs in case
+    /// (e.g. from albums organized/tagged at different times) must be merged
+    /// into a single artist entry rather than shown as two separate artists.
+    #[test]
+    fn test_get_artists_merges_case_only_variants() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_case_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("The War on Drugs".to_string()),
+                album: Some("Lost in the Dream".to_string()),
+                title: Some("Under the Pressure".to_string()),
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\The War on Drugs\track1.mp3".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("The War On Drugs".to_string()),
+                album: Some("A Deeper Understanding".to_string()),
+                title: Some("Holding On".to_string()),
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\The War On Drugs\track2.mp3".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let matches: Vec<&serde_json::Value> = artists
+            .iter()
+            .filter(|a| {
+                a["name"]
+                    .as_str()
+                    .is_some_and(|n| n.eq_ignore_ascii_case("the war on drugs"))
+            })
+            .collect();
+        assert_eq!(
+            matches.len(),
+            1,
+            "expected a single merged artist entry, got {:?}",
+            artists
+        );
+        assert_eq!(matches[0]["song_count"].as_i64(), Some(2));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

@@ -1,22 +1,31 @@
 import type { AlbumItem, Song } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 
+/**
+ * Matched case-insensitively: tag casing can drift across files/albums for the
+ * same real-world artist (e.g. "The War On Drugs" vs "The War on Drugs"), and
+ * the backend's artist grouping (get_artists/get_top_artists) already picks one
+ * canonical casing to display — see issue #295.
+ */
+function sameArtist(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 /** An artist's albums, newest first. */
 export function getArtistAlbums(albums: AlbumItem[], name: string | null): AlbumItem[] {
   if (!name) return [];
   return albums
-    .filter((a) => a.artist === name)
+    .filter((a) => a.artist && sameArtist(a.artist, name))
     .sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 }
 
 /** An artist's songs, matched by either album_artist or (per-track) artist. */
 export function getArtistSongs(songs: Song[], name: string | null): Song[] {
   if (!name) return [];
-  const trimmed = name.trim();
   return songs.filter(
     (s) =>
-      (s.album_artist && s.album_artist.trim() === trimmed) ||
-      (s.artist && s.artist.trim() === trimmed)
+      (s.album_artist && sameArtist(s.album_artist, name)) ||
+      (s.artist && sameArtist(s.artist, name))
   );
 }
 
