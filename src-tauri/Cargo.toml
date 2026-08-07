@@ -75,7 +75,7 @@ rustfft = "6"
 bs1770 = "1"
 
 # --- File watching ---
-notify = { version = "6", features = ["serde"] }
+notify = { version = "8", features = ["serde"] }
 
 # --- OS "Now Playing" integration: SMTC (Windows), MPRIS2 (Linux), ---
 # --- MPNowPlayingInfoCenter (macOS) (#80) ---
