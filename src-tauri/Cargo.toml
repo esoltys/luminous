@@ -58,7 +58,7 @@ r2d2_sqlite = "0.25"
 symphonia = { version = "0.6", features = ["all"] }
 
 # --- Audio output ---
-cpal = "0.15"
+cpal = "0.18"
 ringbuf = "0.5"
 
 
