@@ -735,7 +735,7 @@ export const fr = {
   artistDetail: {
     backToArtists: "Voir les artistes",
     unknownGenre: "Genre inconnu",
-    statsLine: "{genre} · {albums} • {songs} • {duration} au total",
+    statsLine: "{genre} · {songs} • {duration} au total",
     playAll: "Lire",
     shuffleAndPlay: "Lecture aléatoire",
     discography: "Discographie",

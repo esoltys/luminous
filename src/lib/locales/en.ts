@@ -738,7 +738,7 @@ export const en = {
   artistDetail: {
     backToArtists: "View Artists",
     unknownGenre: "Unknown genre",
-    statsLine: "{genre} · {albums} • {songs} • {duration} total",
+    statsLine: "{genre} · {songs} • {duration} total",
     playAll: "Play",
     shuffleAndPlay: "Shuffle Play",
     discography: "Discography",

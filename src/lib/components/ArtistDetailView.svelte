@@ -187,9 +187,6 @@
   let eps = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "ep"));
   let singles = $derived(albums.filter((a) => classifyRelease(a.track_count, a.disc_count, a.total_duration_nanosec) === "single"));
 
-  let albumsText = $derived(
-    fullAlbums.length === 1 ? i18n.t("collection.oneAlbum") : i18n.t("collection.albumsCount", { count: fullAlbums.length })
-  );
   let songsText = $derived(
     songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
   );
@@ -322,7 +319,7 @@
 
         <!-- Summary Metadata Line -->
         <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
-          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, albums: albumsText, songs: songsText, duration: totalDurationLabel })}</span>
+          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 
         <!-- Action Buttons: Play All & Shuffle Play -->
