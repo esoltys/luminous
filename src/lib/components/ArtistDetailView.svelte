@@ -27,6 +27,8 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
+  import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
+  import { columnResize } from "../utils/columnResize";
 
   let { artistName }: { artistName: string } = $props();
 
@@ -239,35 +241,25 @@
 
   // Mirrors AlbumDetailView/CollectionView/PlaylistView/AutoPlaylistDetailView's
   // identical formula so this table's columns match what's shown everywhere else.
+  // Default column widths (px or fr) — used when no saved width exists for a column.
+  const ARTIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
+    track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
+    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px",
+    genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
+    bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
+    filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+  };
+
   let gridColsStyle = $derived.by(() => {
     const vc = collectionStore.visibleColumns;
+    const cw = collectionStore.columnWidths;
     const cols: string[] = ["36px"]; // play indicator always present
-    if (vc.track) cols.push("48px");
-    if (vc.title) cols.push("2fr");
-    if (vc.artist) cols.push("1.5fr");
-    if (vc.album) cols.push("1.5fr");
-    if (vc.composer) cols.push("1.5fr");
-    if (vc.album_artist) cols.push("1.5fr");
-    if (vc.format) cols.push("64px");
-    if (vc.year) cols.push("60px");
-    if (vc.genre) cols.push("1.2fr");
-    if (vc.grouping) cols.push("1.2fr");
-    if (vc.bpm) cols.push("60px");
-    if (vc.initial_key) cols.push("60px");
-    if (vc.bitrate) cols.push("70px");
-    if (vc.samplerate) cols.push("75px");
-    if (vc.bitdepth) cols.push("65px");
-    if (vc.channels) cols.push("70px");
-    if (vc.filesize) cols.push("75px");
-    if (vc.rating) cols.push("96px");
-    if (vc.playcount) cols.push("70px");
-    if (vc.skipcount) cols.push("70px");
-    if (vc.lastplayed) cols.push("90px");
-    if (vc.added) cols.push("90px");
-    if (vc.duration) cols.push("80px");
-    if (vc.path) cols.push("2fr");
-    if (vc.actions) cols.push("80px");
-
+    for (const { key } of SONG_TABLE_COLUMNS) {
+      if (!vc[key]) continue;
+      const saved = cw[key];
+      cols.push(saved !== undefined ? `${saved}px` : (ARTIST_COL_DEFAULTS[key] ?? "80px"));
+    }
     return `grid-template-columns: ${cols.join(" ")}`;
   });
 
@@ -405,247 +397,295 @@
             <div class="grid items-center py-2.5 px-4" style={gridColsStyle}>
               <div class="text-center w-9"></div>
               {#if collectionStore.visibleColumns.track}
+                <div use:columnResize={{ column: "track", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "track"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("track")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.title}
+                <div use:columnResize={{ column: "title", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "title"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("title")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.artist}
+                <div use:columnResize={{ column: "artist", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "artist"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("artist")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.album}
+                <div use:columnResize={{ column: "album", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "album"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("album")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.composer}
+                <div use:columnResize={{ column: "composer", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "composer"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("composer")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.album_artist}
+                <div use:columnResize={{ column: "album_artist", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "album_artist"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("album_artist")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.format}
+                <div use:columnResize={{ column: "format", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "filetype"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("filetype")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.year}
+                <div use:columnResize={{ column: "year", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "year"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("year")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.genre}
+                <div use:columnResize={{ column: "genre", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "genre"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("genre")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.grouping}
+                <div use:columnResize={{ column: "grouping", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "grouping"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("grouping")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.bpm}
+                <div use:columnResize={{ column: "bpm", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "bpm"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bpm")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.initial_key}
+                <div use:columnResize={{ column: "initial_key", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "initial_key"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("initial_key")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.bitrate}
+                <div use:columnResize={{ column: "bitrate", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "bitrate"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bitrate")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.samplerate}
+                <div use:columnResize={{ column: "samplerate", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "samplerate"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("samplerate")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.bitdepth}
+                <div use:columnResize={{ column: "bitdepth", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "bitdepth"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bitdepth")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.channels}
+                <div use:columnResize={{ column: "channels", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "channels"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("channels")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.filesize}
+                <div use:columnResize={{ column: "filesize", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "filesize"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("filesize")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.rating}
+                <div use:columnResize={{ column: "rating", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "rating"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("rating")}
-                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.playcount}
+                <div use:columnResize={{ column: "playcount", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "playcount"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("playcount")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.skipcount}
+                <div use:columnResize={{ column: "skipcount", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "skipcount"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("skipcount")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.lastplayed}
+                <div use:columnResize={{ column: "lastplayed", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "lastplayed"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("lastplayed")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.added}
+                <div use:columnResize={{ column: "added", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "added"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("added")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.duration}
+                <div use:columnResize={{ column: "duration", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "length_nanosec"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("length_nanosec")}
-                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<Clock class="w-3.5 h-3.5 shrink-0" /> {arrow}{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.path}
+                <div use:columnResize={{ column: "path", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
                 <SortableHeader
                   active={singleSortField === "path"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("path")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
                 </SortableHeader>
+                </div>
               {/if}
               {#if collectionStore.visibleColumns.actions}
-                <div class="text-center">{i18n.t('collection.tableHeaderActions')}</div>
+                <div use:columnResize={{ column: "actions", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden text-center">{i18n.t('collection.tableHeaderActions')}</div>
               {/if}
             </div>
           </div>
