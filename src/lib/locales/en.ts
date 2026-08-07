@@ -259,10 +259,13 @@ export const en = {
     loudnessAnalysisActive: "Loudness Normalization is analyzing {remaining} song(s) in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
+    dynamicThemes: "Dynamic Themes",
     predefinedThemes: "Predefined Themes",
     customThemes: "Custom Themes",
     systemThemeLight: "Currently following your OS's Light mode",
     systemThemeDark: "Currently following your OS's Dark mode",
+    luminousFootnote: "Colors shift to match whatever album art is playing now",
+    systemFootnote: "Switches between light and dark to match your OS",
     editTheme: "Edit Theme",
     editThemeShort: "Edit",
     deleteTheme: "Delete Theme",
@@ -734,7 +737,9 @@ export const en = {
     system: "System",
     "ruby-red": "Ruby Red",
     "nordic-blue": "Nordic Blue",
-    "retro-amber": "Retro Amber"
+    "retro-amber": "Retro Amber",
+    metallic: "Metallic",
+    sabrina: "Sabrina"
   },
   artistDetail: {
     backToArtists: "View Artists",

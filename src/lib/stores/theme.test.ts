@@ -35,13 +35,17 @@ describe("PREDEFINED_THEMES", () => {
 const rubyRedColors = PREDEFINED_THEMES.find(t => t.id === "ruby-red")!.colors;
 const nordicBlueColors = PREDEFINED_THEMES.find(t => t.id === "nordic-blue")!.colors;
 const retroAmberColors = PREDEFINED_THEMES.find(t => t.id === "retro-amber")!.colors;
+const metallicColors = PREDEFINED_THEMES.find(t => t.id === "metallic")!.colors;
+const sabrinaColors = PREDEFINED_THEMES.find(t => t.id === "sabrina")!.colors;
 
 describe.each([
   ["dark", LUMINOUS_DARK_COLORS],
   ["light", LUMINOUS_LIGHT_COLORS],
   ["Ruby Red (generated)", rubyRedColors],
   ["Nordic Blue (generated)", nordicBlueColors],
-  ["Retro Amber (generated)", retroAmberColors]
+  ["Retro Amber (generated)", retroAmberColors],
+  ["Metallic", metallicColors],
+  ["Sabrina", sabrinaColors]
 ] as const)("%s palette accessibility", (_scheme, palette) => {
   const surfaces: (keyof typeof palette)[] = ["bg-main", "bg-sidebar", "bg-playerbar"];
 

@@ -32,5 +32,20 @@ describe("FoldersView.svelte", () => {
     const { findByText } = render(FoldersView);
     expect(await findByText("v0.75.0#048f421")).toBeInTheDocument();
   });
+
+  it("renders Dynamic Themes row and footnotes for Luminous and System in Themes view", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "get_all_app_settings") {
+        return Promise.resolve({ active_settings_tab: "themes" });
+      }
+      return Promise.resolve([]);
+    });
+
+    const { findByText } = render(FoldersView);
+    expect(await findByText("Dynamic Themes")).toBeInTheDocument();
+    expect(await findByText("Colors shift to match whatever album art is playing now")).toBeInTheDocument();
+    expect(await findByText("Switches between light and dark to match your OS")).toBeInTheDocument();
+  });
 });
 
