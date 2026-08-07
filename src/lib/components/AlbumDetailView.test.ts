@@ -94,7 +94,11 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(setShuffleSpy).toHaveBeenCalledWith("off");
-    expect(playSongsSpy).toHaveBeenCalledWith([1, 2], 0, 99, undefined, "Queue");
+    expect(playSongsSpy).toHaveBeenCalledWith([1, 2], 0, undefined, {
+      type: "album",
+      album: mockAlbumName,
+      albumArtist: "The Beatles",
+    });
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
     expect(collectionStore.activeTab).toBe("collection");
   });

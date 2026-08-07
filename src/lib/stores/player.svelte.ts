@@ -315,7 +315,7 @@ export class PlayerStore {
     }
     await playlistsStore.replaceQueueTracks(songIds);
     if (effectivePlaylistId) {
-      await invoke("play_playlist_item", { playlistId: effectivePlaylistId, itemIndex: startIndex });
+      await invoke("play_playlist_item", { playlistId: effectivePlaylistId, itemIndex: startIndex, context: context ?? null });
     } else {
       await invoke("play_songs", { songIds, startIndex, playlistId: null, context: context ?? null });
     }
@@ -340,10 +340,10 @@ export class PlayerStore {
     }
   }
 
-  async playPlaylistItem(playlistId: number, itemIndex: number) {
+  async playPlaylistItem(playlistId: number, itemIndex: number, context?: PlayContext) {
     const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
     if (pl) this.activeContextName = pl.name;
-    await invoke("play_playlist_item", { playlistId, itemIndex });
+    await invoke("play_playlist_item", { playlistId, itemIndex, context: context ?? null });
   }
 
   async playPlaylistItemByUuid(playlistId: number, uuid: string) {

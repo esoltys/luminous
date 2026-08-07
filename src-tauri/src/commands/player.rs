@@ -124,6 +124,7 @@ pub async fn play_songs(
 pub async fn play_playlist_item(
     playlist_id: i64,
     item_index: usize,
+    context: Option<PlayContext>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let items = {
@@ -134,7 +135,7 @@ pub async fn play_playlist_item(
     };
     let mut player = state.player.lock().await;
     player
-        .play_playlist(items, item_index, playlist_id, None)
+        .play_playlist(items, item_index, playlist_id, context)
         .await
         .map_err(|e| e.to_string())
 }
@@ -485,14 +486,7 @@ pub async fn open_and_play(
 
     let mut player = state.player.lock().await;
     let res = player
-        .play_playlist(
-            items,
-            0,
-            queue_id,
-            Some(PlayContext::Playlist {
-                playlist_id: queue_id,
-            }),
-        )
+        .play_playlist(items, 0, queue_id, Some(PlayContext::Song))
         .await
         .map_err(|e| e.to_string());
     let _ = app.emit("library-changed", ());

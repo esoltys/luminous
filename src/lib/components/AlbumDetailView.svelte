@@ -358,23 +358,20 @@
   async function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(songIds, index >= 0 ? index : 0, undefined, albumPlayContext());
   }
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(songs.map((s) => s.id), 0, undefined, albumPlayContext());
   }
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
-    await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, albumName || "Queue");
+    await playerStore.playSongs(shuffledIds, 0, undefined, albumPlayContext());
   }
 
   async function handleAddSongToPlaylist(songId: number) {

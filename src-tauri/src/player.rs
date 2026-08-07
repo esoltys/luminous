@@ -325,6 +325,22 @@ impl Player {
         player
     }
 
+    pub fn is_queue_playlist(&self, playlist_id: i64) -> bool {
+        if playlist_id <= 0 {
+            return false;
+        }
+        if let Ok(conn) = self._db.pool.get() {
+            conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM playlists WHERE id = ?1 AND dynamic_enabled = 0 AND LOWER(TRIM(name)) = 'queue')",
+                rusqlite::params![playlist_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(false)
+        } else {
+            false
+        }
+    }
+
     /// Load a playlist into the player and start playing the given index.
     pub async fn play_playlist(
         &mut self,
@@ -335,8 +351,13 @@ impl Player {
     ) -> Result<()> {
         self.playlist_items = items;
         self.current_playlist_id = Some(playlist_id);
-        self.current_play_context =
-            context.or_else(|| (playlist_id > 0).then_some(PlayContext::Playlist { playlist_id }));
+        self.current_play_context = context.or_else(|| {
+            if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
+                Some(PlayContext::Playlist { playlist_id })
+            } else {
+                None
+            }
+        });
         self.played_indices.clear();
         self.queue.clear();
         self.scrobbled = false;
@@ -373,8 +394,11 @@ impl Player {
             let items = db_playlists.get_playlist_tracks(playlist_id)?;
             self.playlist_items = items;
             self.current_playlist_id = Some(playlist_id);
-            self.current_play_context =
-                (playlist_id > 0).then_some(PlayContext::Playlist { playlist_id });
+            self.current_play_context = if playlist_id > 0 && !self.is_queue_playlist(playlist_id) {
+                Some(PlayContext::Playlist { playlist_id })
+            } else {
+                self.current_play_context.clone()
+            };
             self.played_indices.clear();
             self.queue.clear();
             self.scrobbled = false;
@@ -1610,13 +1634,8 @@ mod tests {
     use std::sync::Arc;
 
     fn setup_test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_player_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir =
+            std::env::temp_dir().join(format!("luminous_player_test_{}", uuid::Uuid::new_v4()));
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
     }
