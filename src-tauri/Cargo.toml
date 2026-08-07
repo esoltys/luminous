@@ -63,7 +63,7 @@ ringbuf = "0.5"
 
 
 # --- Audio resampling ---
-rubato = "0.16"
+rubato = "4.0"
 
 # --- Tag reading/writing ---
 lofty = "0.21"
