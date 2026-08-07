@@ -399,7 +399,7 @@
                   active={singleSortField === "track"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("track")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -411,7 +411,7 @@
                   active={singleSortField === "title"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("title")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -423,7 +423,7 @@
                   active={singleSortField === "artist"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("artist")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -435,7 +435,7 @@
                   active={singleSortField === "album"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("album")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -447,7 +447,7 @@
                   active={singleSortField === "composer"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("composer")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -459,7 +459,7 @@
                   active={singleSortField === "album_artist"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("album_artist")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -471,7 +471,7 @@
                   active={singleSortField === "filetype"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("filetype")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -483,7 +483,7 @@
                   active={singleSortField === "year"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("year")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -495,7 +495,7 @@
                   active={singleSortField === "genre"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("genre")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -507,7 +507,7 @@
                   active={singleSortField === "grouping"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("grouping")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -519,7 +519,7 @@
                   active={singleSortField === "bpm"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bpm")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -531,7 +531,7 @@
                   active={singleSortField === "initial_key"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("initial_key")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -543,7 +543,7 @@
                   active={singleSortField === "bitrate"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bitrate")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -555,7 +555,7 @@
                   active={singleSortField === "samplerate"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("samplerate")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -567,7 +567,7 @@
                   active={singleSortField === "bitdepth"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("bitdepth")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -579,7 +579,7 @@
                   active={singleSortField === "channels"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("channels")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -591,7 +591,7 @@
                   active={singleSortField === "filesize"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("filesize")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -603,7 +603,7 @@
                   active={singleSortField === "rating"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("rating")}
-                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -615,7 +615,7 @@
                   active={singleSortField === "playcount"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("playcount")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -627,7 +627,7 @@
                   active={singleSortField === "skipcount"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("skipcount")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -639,7 +639,7 @@
                   active={singleSortField === "lastplayed"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("lastplayed")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -651,7 +651,7 @@
                   active={singleSortField === "added"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("added")}
-                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -663,7 +663,7 @@
                   active={singleSortField === "length_nanosec"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("length_nanosec")}
-                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<Clock class="w-3.5 h-3.5 shrink-0" /> {arrow}{/snippet}
                 </SortableHeader>
@@ -675,7 +675,7 @@
                   active={singleSortField === "path"}
                   sortAsc={singleSortAsc}
                   onclick={() => toggleSingleSort("path")}
-                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+                  class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
                 >
                   {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
                 </SortableHeader>
@@ -701,7 +701,7 @@
                 style={gridColsStyle}
                 title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : undefined}
                 class="grid items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
-                  {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  {disabled ? 'opacity-50 cursor-not-allowed' : ''}
                   {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : ''}"
               >
                 <div class="text-center flex justify-center relative w-9 h-6 items-center">
@@ -712,7 +712,7 @@
                   {/if}
                   <button
                     onclick={(e) => { e.stopPropagation(); if (!disabled) handlePlaySingle(song); }}
-                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
                     disabled={disabled}
                     title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : i18n.t('collection.playSong')}
                   >
@@ -862,7 +862,7 @@
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={(e) => { e.stopPropagation(); handleAddSingleToPlaylist(song.id); }}
-                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
                       title={playlistsStore.activeCustomPlaylist
                         ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                         : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -871,7 +871,7 @@
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
-                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
                       title={i18n.t('collection.editTagsTooltip')}
                     >
                       <Edit3 class="w-4 h-4" />

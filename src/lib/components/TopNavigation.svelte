@@ -234,7 +234,7 @@
   <div class="flex items-center gap-2">
     <button
       onclick={() => collectionStore.toggleSidebarCompact()}
-      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors cursor-pointer"
+      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors"
       title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
     >
       <Menu class="w-5 h-5" />
@@ -279,7 +279,7 @@
       <button
         type="button"
         onclick={() => playerStore.openFileDialog()}
-        class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0 cursor-pointer"
+        class="p-1 text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
         title={i18n.t('topNav.openFilesTooltip')}
       >
         <FolderOpen class="w-4 h-4" />
@@ -317,7 +317,7 @@
               collectionStore.openSmartBuilder(rules);
               isSearchFocused = false;
             }}
-            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-brand-accent/10 border border-brand-accent/40 hover:bg-brand-accent/20 transition-all cursor-pointer text-left group"
+            class="w-full flex items-center justify-between p-2.5 mb-2.5 rounded-xl bg-brand-accent/10 border border-brand-accent/40 hover:bg-brand-accent/20 transition-all text-left group"
           >
             <div class="flex items-center gap-2.5">
               <div class="p-1.5 rounded-lg bg-brand-accent text-brand-accent-contrast">
@@ -390,7 +390,7 @@
                       if (e.key === 'Enter' && artist.name) collectionStore.viewArtist(artist.name);
                       else handleSearchResultKeyDown(e);
                     }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
@@ -430,7 +430,7 @@
                       if (e.key === 'Enter' && album.album) collectionStore.viewAlbum(album.album);
                       else handleSearchResultKeyDown(e);
                     }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="relative shrink-0 overflow-hidden">
@@ -492,7 +492,7 @@
                         handleSearchResultKeyDown(e);
                       }
                     }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
@@ -541,7 +541,7 @@
                         handleSearchResultKeyDown(e);
                       }
                     }}
-                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                    class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <CoverArt
@@ -576,7 +576,7 @@
             <button
               type="button"
               onclick={(e) => { e.stopPropagation(); collectionStore.clearRecentSearches(); }}
-              class="text-xs text-brand-text-secondary hover:text-brand-accent-text transition-colors cursor-pointer"
+              class="text-xs text-brand-text-secondary hover:text-brand-accent-text transition-colors"
             >
               {i18n.t('topNav.clearRecentSearches', {}, 'Clear recent searches')}
             </button>
@@ -598,7 +598,7 @@
                   if (e.key === 'Enter') selectRecentSearch(item);
                   else handleSearchResultKeyDown(e);
                 }}
-                class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-accent"
+                class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                   <!-- Avatar / Artwork / Icon -->
@@ -643,7 +643,7 @@
                     e.stopPropagation();
                     collectionStore.removeRecentSearch(item.id);
                   }}
-                  class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-400 text-brand-text-secondary/60 transition-all cursor-pointer rounded"
+                  class="p-1.5 opacity-0 group-hover:opacity-100 hover:text-red-400 text-brand-text-secondary/60 transition-all rounded"
                   title={i18n.t('topNav.removeRecentSearchTooltip')}
                 >
                   <X class="w-3.5 h-3.5" />
@@ -660,21 +660,21 @@
   <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
     <button
       onclick={() => collectionStore.toggleSidebar()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.sidebarOpen ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+      class="p-1.5 rounded-md transition-all {collectionStore.sidebarOpen ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleSidebar')}
     >
       <PanelLeft class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleImmersiveMode()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.immersiveMode ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+      class="p-1.5 rounded-md transition-all {collectionStore.immersiveMode ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleImmersive')}
     >
       <PanelBottom class="w-4 h-4" />
     </button>
     <button
       onclick={() => collectionStore.toggleRightPanel()}
-      class="p-1.5 rounded-md transition-all cursor-pointer {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+      class="p-1.5 rounded-md transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleRightPanel')}
     >
       <PanelRight class="w-4 h-4" />

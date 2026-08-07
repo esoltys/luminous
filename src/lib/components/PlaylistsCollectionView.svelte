@@ -348,7 +348,7 @@
             <button
               onclick={handleRefreshAll}
               disabled={isRefreshingAll}
-              class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+              class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border bg-brand-sidebar text-brand-text-secondary hover:text-brand-accent-text hover:border-brand-accent/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
               title={i18n.t('playlists.refreshAllPlaylistsTooltip')}
               aria-label={i18n.t('playlists.refreshAllPlaylistsTooltip')}
             >
@@ -357,7 +357,7 @@
             <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
               <button
                 onclick={() => setActiveViewMode("cards")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewCards')}
                 aria-label={i18n.t('collection.viewCards')}
                 aria-pressed={activeViewMode === "cards"}
@@ -366,7 +366,7 @@
               </button>
               <button
                 onclick={() => setActiveViewMode("rows")}
-                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
                 title={i18n.t('collection.viewRows')}
                 aria-label={i18n.t('collection.viewRows')}
                 aria-pressed={activeViewMode === "rows"}

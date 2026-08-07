@@ -136,7 +136,7 @@
         onclick={() => openItem(item)}
         oncontextmenu={(e) => handleContextMenu(e, item)}
         onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(item); } }}
-        class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 cursor-pointer select-none"
+        class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
         {#if variant === "rank"}
           <span class="w-5 shrink-0 text-center text-sm font-bold text-brand-text-secondary tabular-nums">

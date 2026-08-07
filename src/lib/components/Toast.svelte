@@ -50,7 +50,7 @@
         <button
           type="button"
           onclick={() => openExternalUrl(toast.url!)}
-          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid cursor-pointer"
+          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid"
         >
           {toast.text}
         </button>
@@ -59,7 +59,7 @@
       {/if}
       <button
         onclick={() => toastStore.dismiss(toast.id)}
-        class="shrink-0 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+        class="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
       >
         <X class="w-3.5 h-3.5" />
       </button>

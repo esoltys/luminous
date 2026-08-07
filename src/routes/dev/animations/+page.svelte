@@ -101,7 +101,7 @@
         <p class="text-xs text-brand-text-secondary">
           Your OS has "reduce motion" on, so every card below is correctly collapsing to the spec's reduced-motion fallback (plain fade, or nothing for rings/glows) — that's intentional, not broken. Toggle below to preview full motion anyway.
         </p>
-        <label class="flex items-center gap-2 text-xs font-semibold shrink-0 cursor-pointer select-none">
+        <label class="flex items-center gap-2 text-xs font-semibold shrink-0 select-none">
           <input type="checkbox" bind:checked={forceFullMotion} class="accent-[var(--color-accent)]" />
           Preview full motion
         </label>
@@ -120,7 +120,7 @@
       <div class="h-16 flex items-center justify-center bg-brand-main rounded-lg">
         <HeartToggle favorite={favoriteDemo} onToggle={() => (favoriteDemo = !favoriteDemo)} sizeClass="w-6 h-6" />
       </div>
-      <button onclick={replayFavorite} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={replayFavorite} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 2. Import finished (real Toast component, mounted in +layout.svelte) -->
@@ -132,7 +132,7 @@
       <div class="h-16 flex items-center justify-center bg-brand-main rounded-lg text-xs text-brand-text-secondary text-center px-3">
         Watch the bottom of the screen
       </div>
-      <button onclick={replayToast} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={replayToast} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 3. Organizing complete -->
@@ -151,7 +151,7 @@
           {/each}
         {/key}
       </div>
-      <button onclick={() => replay('organizing')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => replay('organizing')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 4. First watched folder -->
@@ -168,7 +168,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('folder')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => replay('folder')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 5. Creating a new playlist -->
@@ -185,7 +185,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('playlist')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => replay('playlist')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 6. New auto-playlist appears -->
@@ -203,7 +203,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('autoPlaylist')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => replay('autoPlaylist')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 7. New release available — a new Luminous version, not a new song/album; shown in Settings → About -->
@@ -223,7 +223,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => replay('release')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => replay('release')} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 8. Reaching a milestone -->
@@ -238,7 +238,7 @@
           <span class="text-lg font-black text-brand-gold anim-milestone-bounce">1,000 songs</span>
         {/key}
       </div>
-      <button onclick={() => { replay('milestone'); replayMilestoneToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('milestone'); replayMilestoneToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 9. Completing a queue -->
@@ -255,7 +255,7 @@
           >Queue complete — nice listening</span>
         {/key}
       </div>
-      <button onclick={() => { replay('queue'); replayQueueToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('queue'); replayQueueToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 10. First launch -->
@@ -273,7 +273,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => { replay('firstLaunch'); replayWelcomeToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('firstLaunch'); replayWelcomeToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
     <!-- 11. Import needs attention -->
@@ -290,7 +290,7 @@
           </div>
         {/key}
       </div>
-      <button onclick={() => { replay('warning'); replayWarningToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start cursor-pointer hover:bg-brand-accent/10">▸ Replay</button>
+      <button onclick={() => { replay('warning'); replayWarningToast(); }} class="text-xs font-semibold text-brand-accent-text border border-brand-accent/40 rounded-full px-3 py-1.5 self-start hover:bg-brand-accent/10">▸ Replay</button>
     </div>
 
   </div>

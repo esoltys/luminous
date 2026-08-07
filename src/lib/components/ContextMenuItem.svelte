@@ -21,10 +21,10 @@
   class="w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors {disabled
     ? 'opacity-40 cursor-not-allowed text-brand-text-secondary'
     : destructive
-      ? 'hover:bg-red-500/10 hover:text-red-400 text-red-400 cursor-pointer'
+      ? 'hover:bg-red-500/10 hover:text-red-400 text-red-400'
       : accent
-        ? 'hover:bg-brand-accent/15 hover:text-brand-accent-text cursor-pointer'
-        : 'hover:bg-brand-main hover:text-brand-text-primary cursor-pointer'}"
+        ? 'hover:bg-brand-accent/15 hover:text-brand-accent-text'
+        : 'hover:bg-brand-main hover:text-brand-text-primary'}"
   role="menuitem"
 >
   <Icon

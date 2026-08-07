@@ -189,7 +189,7 @@
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
-      class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 cursor-pointer disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
+      class="group relative overflow-hidden focus:outline-hidden flex-shrink-0 disabled:cursor-default disabled:pointer-events-none active:scale-95 transition-transform duration-200"
       title={coverTitle}
     >
       <CoverArt
@@ -249,7 +249,7 @@
         {#if playerStore.shuffleMode !== 'off'}
           <button
             onclick={cycleShuffle}
-            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
             {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
@@ -309,7 +309,7 @@
         {#if playerStore.repeatMode !== 'off'}
           <button
             onclick={cycleRepeat}
-            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap cursor-pointer"
+            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
             {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
@@ -367,14 +367,14 @@
       onchange={releaseVolumeFocus}
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
-      class="volume-slider w-20 h-1 rounded-lg cursor-pointer outline-none"
+      class="volume-slider w-20 h-1 rounded-lg outline-none"
       style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     <button
       onclick={() => collectionStore.toggleMiniplayerMode()}
-      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0 cursor-pointer"
+      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
       title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
     >
 
@@ -385,7 +385,7 @@
 
       <button 
         onclick={() => collectionStore.toggleImmersiveMode()}
-        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0 cursor-pointer"
+        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0"
         title={i18n.t('playerBar.restoreInterface', {}, 'Restore Full Interface')}
       >
         <PanelBottomOpen class="w-4.5 h-4.5" />
@@ -446,7 +446,6 @@
     border-radius: 50%;
     background: #ffffff;
     border: 2px solid var(--color-accent);
-    cursor: pointer;
     transition: border-color 0.2s;
   }
 
@@ -461,7 +460,6 @@
     border: 2px solid var(--color-accent);
     border-radius: 50%;
     background: #ffffff;
-    cursor: pointer;
     transition: border-color 0.2s;
   }
 

@@ -112,7 +112,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
@@ -156,7 +156,7 @@
 
   <button
     onclick={(e) => { e.stopPropagation(); onClick(); }}
-    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full"
     title={displayLabel}
   >
     {displayLabel}

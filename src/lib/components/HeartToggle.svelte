@@ -56,7 +56,7 @@
   bind:this={buttonEl}
   type="button"
   onclick={handleClick}
-  class="inline-flex transition-colors cursor-pointer {favorite
+  class="inline-flex transition-colors {favorite
     ? 'text-brand-accent-text'
     : 'text-brand-text-secondary/60 hover:text-brand-accent-text'}"
   title={favorite ? i18n.t('rating.unfavoriteTooltip') : i18n.t('rating.favoriteTooltip')}

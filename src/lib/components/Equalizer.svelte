@@ -366,14 +366,14 @@
       <!-- Mode segmented control -->
       <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("graphic10")}
           aria-pressed={mode === "graphic10"}
         >
           {i18n.t('equalizer.modeGraphic')}
         </button>
         <button
-          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+          class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'parametric20' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           onclick={() => handleModeChange("parametric20")}
           aria-pressed={mode === "parametric20"}
         >
@@ -418,7 +418,7 @@
 
       {#if mode === "parametric20"}
         <button
-          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="text-xs font-semibold px-4 py-1.5 bg-brand-main border border-brand-border rounded-full text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           onclick={resetParametric}
         >
           {i18n.t('equalizer.resetBands')}
@@ -494,7 +494,7 @@
       <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
         {#each parametric as band, idx}
           <div
-            class="flex flex-col items-center justify-between h-full group rounded-md transition-colors cursor-pointer {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
+            class="flex flex-col items-center justify-between h-full group rounded-md transition-colors {selectedBand === idx ? 'bg-brand-accent/10 ring-1 ring-brand-accent/50' : 'hover:bg-brand-sidebar/30'}"
             onclick={() => (selectedBand = idx)}
             role="button"
             tabindex="0"
@@ -547,7 +547,7 @@
             step="0.1"
             bind:value={parametric[selectedBand].q}
             oninput={() => pushParametricBand(selectedBand)}
-            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none cursor-pointer"
+            class="w-full accent-brand-accent bg-brand-main h-1.5 rounded-lg appearance-none"
           />
         </div>
       {/if}
@@ -594,7 +594,7 @@
           <span class="text-[10px] font-bold text-brand-text-secondary uppercase tracking-wider text-center">{i18n.t('loudness.mode')}</span>
           <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5 mt-1 mx-auto w-full max-w-[200px]" role="group" aria-label={i18n.t('loudness.mode')}>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'track' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("track")}
               aria-pressed={loudnessMode === "track"}
               disabled={!loudnessStore.enabled}
@@ -602,7 +602,7 @@
               {i18n.t('loudness.modeTrack')}
             </button>
             <button
-              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors cursor-pointer {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              class="flex-1 text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {loudnessMode === 'album' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               onclick={() => handleLoudnessModeChange("album")}
               aria-pressed={loudnessMode === "album"}
               disabled={!loudnessStore.enabled}
@@ -673,7 +673,7 @@
             step="100"
             bind:value={fadePauseDurationMs}
             onchange={saveFadeSettings}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            class="themed-range w-full h-1.5 rounded-lg"
             style={rangeFillStyle(fadePauseDurationMs, 0, 1000)}
           />
           <div class="px-[7px]">
@@ -711,7 +711,7 @@
             step="0.25"
             bind:value={crossfadeAutoDurationSecs}
             onchange={saveFadeSettings}
-            class="themed-range w-full h-1.5 rounded-lg cursor-pointer"
+            class="themed-range w-full h-1.5 rounded-lg"
             style={rangeFillStyle(crossfadeAutoDurationSecs, 0.0, 8.0)}
           />
           <div class="px-[7px]">

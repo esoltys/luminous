@@ -71,7 +71,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 cursor-pointer group relative"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 group relative"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
     {#if isQueue}
@@ -110,7 +110,7 @@
 
   <button
     onclick={(e) => { e.stopPropagation(); onClick(); }}
-    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full cursor-pointer"
+    class="font-semibold text-sm text-brand-text-primary hover:text-brand-accent-text hover:underline transition-all duration-150 text-left truncate w-full"
     title={cardTitle}
   >
     {cardTitle}
@@ -129,7 +129,7 @@
     {#if !isActive}
       <button
         onclick={(e) => { e.stopPropagation(); playlistsStore.pinPlaylist(playlist.id); }}
-        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+        class="mt-2.5 w-full py-1 px-2.5 text-xs font-semibold rounded-lg bg-brand-main/80 hover:bg-brand-accent hover:text-brand-accent-contrast border border-brand-border/60 text-brand-text-secondary hover:border-transparent transition-all duration-150 flex items-center justify-center gap-1.5 shadow-xs"
         title={i18n.t('playlists.makeActiveBtn')}
       >
         <Radio class="w-3.5 h-3.5 text-brand-accent-text group-hover:text-current" />

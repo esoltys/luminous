@@ -54,7 +54,7 @@
       type="button"
       disabled={rating <= 0}
       onclick={handleClear}
-      class="block text-brand-text-secondary/50 hover:text-brand-text-secondary transition-colors cursor-pointer disabled:cursor-default disabled:pointer-events-none"
+      class="block text-brand-text-secondary/50 hover:text-brand-text-secondary transition-colors disabled:cursor-default disabled:pointer-events-none"
       title={i18n.t('rating.clearTooltip')}
       aria-label={i18n.t('rating.clearTooltip')}
     >
@@ -69,7 +69,7 @@
       onmousemove={(e) => {
         if (onRate) hoverValue = valueAt(star, e);
       }}
-      class="relative block {onRate ? 'cursor-pointer' : 'cursor-default'} disabled:pointer-events-none"
+      class="relative block {onRate ? '' : 'cursor-default'} disabled:pointer-events-none"
       title={onRate ? i18n.t('rating.setTooltip', { value: hoverValue ?? star }) : undefined}
       aria-label={i18n.t('rating.setTooltip', { value: star })}
     >

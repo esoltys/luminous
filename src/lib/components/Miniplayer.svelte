@@ -326,7 +326,7 @@
         <!-- Shuffle Mode -->
         <button
           onclick={cycleShuffle}
-          class="p-1.5 transition-colors hover:text-brand-text-primary cursor-pointer flex items-center gap-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
+          class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
           title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
         >
           {#if shuffleTypeIcon(playerStore.shuffleMode)}
@@ -339,7 +339,7 @@
         <!-- Skip Previous -->
         <button
           onclick={() => playerStore.previous()}
-          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           title={i18n.t('playerBar.previous')}
         >
           <SkipBack class="w-5 h-5 fill-current" />
@@ -349,7 +349,7 @@
         {#if playerStore.state === 'playing'}
           <button
             onclick={() => playerStore.pause()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors flex-shrink-0"
             title={i18n.t('playerBar.pause')}
           >
             <Pause class="w-5 h-5 fill-current" />
@@ -357,7 +357,7 @@
         {:else}
           <button
             onclick={() => playerStore.resume()}
-            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+            class="w-10 h-10 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors flex-shrink-0"
             title={i18n.t('playerBar.play')}
           >
             <Play class="w-5 h-5 fill-current ml-0.5" />
@@ -367,7 +367,7 @@
         <!-- Skip Next -->
         <button
           onclick={() => playerStore.next()}
-          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
           title={i18n.t('playerBar.next')}
         >
           <SkipForward class="w-5 h-5 fill-current" />
@@ -376,7 +376,7 @@
         <!-- Repeat Mode -->
         <button
           onclick={cycleRepeat}
-          class="p-1.5 transition-colors hover:text-brand-text-primary cursor-pointer flex items-center gap-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
+          class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
           title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
         >
           <Repeat class="w-4.5 h-4.5" />
@@ -403,7 +403,7 @@
       <div class="flex items-center gap-1.5">
         <button
           onclick={toggleMute}
-          class="p-1 text-brand-text-secondary/70 hover:text-brand-text-primary transition-colors cursor-pointer"
+          class="p-1 text-brand-text-secondary/70 hover:text-brand-text-primary transition-colors"
           title={i18n.t('playerBar.volume')}
         >
           {#if isMuted || playerStore.volume === 0}
@@ -422,7 +422,7 @@
           onchange={releaseVolumeFocus}
           onpointerup={releaseVolumeFocus}
           onkeyup={releaseVolumeFocus}
-          class="volume-slider w-14 h-1 rounded-lg cursor-pointer outline-none"
+          class="volume-slider w-14 h-1 rounded-lg outline-none"
           style={volumeSliderStyle}
           aria-label={i18n.t('playerBar.volumeSlider')}
           title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
@@ -432,7 +432,7 @@
       <!-- Restore -->
       <button
         onclick={() => collectionStore.exitMiniplayerMode()}
-        class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors cursor-pointer"
+        class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"
         title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Ctrl+M)')}
       >
         <Maximize2 class="w-3.5 h-3.5" />
@@ -470,7 +470,6 @@
     border-radius: 50%;
     background: #ffffff;
     border: 2px solid var(--color-accent);
-    cursor: pointer;
     transition: border-color 0.2s;
   }
 
@@ -484,7 +483,6 @@
     border: 2px solid var(--color-accent);
     border-radius: 50%;
     background: #ffffff;
-    cursor: pointer;
     transition: border-color 0.2s;
   }
 

@@ -67,7 +67,7 @@
         <button
           onclick={() => scroll("left")}
           disabled={!canScrollLeft}
-          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           title={i18n.t('common.scrollLeft')}
           aria-label={i18n.t('common.scrollLeft')}
         >
@@ -76,7 +76,7 @@
         <button
           onclick={() => scroll("right")}
           disabled={!canScrollRight}
-          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+          class="p-1.5 rounded-full text-brand-text-primary hover:bg-brand-sidebar transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           title={i18n.t('common.scrollRight')}
           aria-label={i18n.t('common.scrollRight')}
         >

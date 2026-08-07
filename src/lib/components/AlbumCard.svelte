@@ -59,7 +59,7 @@
   onclick={handleCardClick}
   ondblclick={handleCardDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group hover:border-brand-accent/40 transition-all duration-200 cursor-pointer select-none"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group hover:border-brand-accent/40 transition-all duration-200 select-none"
 >
   <div
     class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"

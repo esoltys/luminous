@@ -357,13 +357,13 @@
             <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50">
               <button
                 onclick={() => { scope = "selection"; }}
-                class="px-3 py-1 rounded-md transition-colors cursor-pointer {scope === 'selection' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="px-3 py-1 rounded-md transition-colors {scope === 'selection' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               >
                 {i18n.t("organizer.scopeSelection", { count: songIds.length })}
               </button>
               <button
                 onclick={() => { scope = "library"; }}
-                class="px-3 py-1 rounded-md transition-colors cursor-pointer {scope === 'library' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                class="px-3 py-1 rounded-md transition-colors {scope === 'library' ? 'bg-brand-accent text-brand-accent-contrast font-bold shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
               >
                 {i18n.t("organizer.scopeLibrary", { count: items.length })}
               </button>
@@ -379,7 +379,7 @@
             </label>
             <button
               onclick={() => { template = DEFAULT_TEMPLATE; }}
-              class="text-[11px] text-brand-accent-text hover:underline cursor-pointer"
+              class="text-[11px] text-brand-accent-text hover:underline"
             >
               {i18n.t("organizer.defaultPattern")}
             </button>
@@ -401,7 +401,7 @@
               <button
                 type="button"
                 onclick={() => insertChip(chip.label)}
-                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors cursor-pointer border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
+                class="px-2 py-0.5 rounded-lg text-[11px] font-mono transition-colors border bg-brand-sidebar hover:bg-brand-accent/15 border-brand-border/80 text-brand-text-primary hover:text-brand-accent-text font-medium"
                 title={chip.desc}
               >
                 {chip.label === '/' ? '/ (Folder)' : chip.label}
@@ -427,7 +427,7 @@
               />
               <button
                 onclick={selectDestinationDir}
-                class="px-3 py-1.5 bg-brand-sidebar border border-brand-border/80 hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-text-primary rounded-xl transition-colors cursor-pointer font-medium"
+                class="px-3 py-1.5 bg-brand-sidebar border border-brand-border/80 hover:bg-brand-accent/15 hover:text-brand-accent-text text-brand-text-primary rounded-xl transition-colors font-medium"
               >
                 {i18n.t("organizer.browse")}
               </button>
@@ -754,7 +754,7 @@
 
           <button
             onclick={() => onClose?.()}
-            class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors cursor-pointer"
+            class="p-1.5 rounded-lg text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-sidebar/80 transition-colors"
             title={i18n.t("organizer.close")}
           >
             <X class="w-4 h-4" />
@@ -777,7 +777,7 @@
             <button
               type="button"
               onclick={() => onClose?.()}
-              class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors cursor-pointer"
+              class="px-4 py-2 rounded-xl border border-brand-border/80 text-brand-text-primary hover:bg-brand-sidebar transition-colors"
             >
               {i18n.t("organizer.cancel")}
             </button>

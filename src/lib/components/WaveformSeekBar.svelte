@@ -365,7 +365,7 @@
 <div
   bind:this={containerEl}
   onmousedown={handleMouseDown}
-  class="relative flex-1 h-7 overflow-hidden cursor-pointer flex items-center group select-none"
+  class="relative flex-1 h-7 overflow-hidden flex items-center group select-none"
   title={prefs.seekBarMode === 'bands'
     ? i18n.t('playerBar.bandsLegend', {}, 'Frequency bands — blue = low (bass), amber = mid (vocals/snares/leads), white = high (hi-hats/cymbals/transients); taller bands carry more energy')
     : undefined}

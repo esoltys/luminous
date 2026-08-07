@@ -26,14 +26,14 @@
   <div class="h-4 w-px bg-brand-border/60"></div>
   <button
     onclick={onPlaySelected}
-    class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
+    class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors"
   >
     <Play class="w-3.5 h-3.5 fill-current text-brand-accent-text" />
     <span>{i18n.t('playlists.playSelected')}</span>
   </button>
   <button
     onclick={onAddToPlaylist}
-    class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors cursor-pointer"
+    class="flex items-center gap-1.5 hover:text-brand-accent-text transition-colors"
   >
     <Plus class="w-3.5 h-3.5 text-brand-accent-text" />
     <span>
@@ -45,7 +45,7 @@
   <div class="h-4 w-px bg-brand-border/60"></div>
   <button
     onclick={onClear}
-    class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer"
+    class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
   >
     {i18n.t('playlists.clearSelection')}
   </button>

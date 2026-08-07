@@ -573,7 +573,7 @@ import { shuffleArray } from "../utils/shuffle";
             {#if filterQuery}
               <button
                 onclick={() => { filterQuery = ""; }}
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5 cursor-pointer"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 hover:text-brand-text-primary p-0.5"
                 title={i18n.t("playlists.clearFilter")}
               >
                 <X class="w-3.5 h-3.5" />
@@ -591,7 +591,7 @@ import { shuffleArray } from "../utils/shuffle";
             <button
               onclick={toggleOverflowMenu}
               title={i18n.t("playlists.moreActionsTooltip")}
-              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors cursor-pointer shadow-xs"
+              class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs"
             >
               <MoreHorizontal class="w-4 h-4" />
             </button>
@@ -668,7 +668,7 @@ import { shuffleArray } from "../utils/shuffle";
             active={sortField === "track" || sortField === "default"}
             {sortAsc}
             onclick={() => toggleSort("track")}
-            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0"
+            class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0"
           >
             {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTrack')} {arrow}</span>{/snippet}
           </SortableHeader>
@@ -678,7 +678,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "title"}
               {sortAsc}
               onclick={() => toggleSort("title")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTitle')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -690,7 +690,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "artist"}
               {sortAsc}
               onclick={() => toggleSort("artist")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderArtist')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -702,7 +702,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "album"}
               {sortAsc}
               onclick={() => toggleSort("album")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -715,7 +715,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "composer"}
               {sortAsc}
               onclick={() => toggleSort("composer")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -727,7 +727,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "album_artist"}
               {sortAsc}
               onclick={() => toggleSort("album_artist")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -739,7 +739,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "filetype"}
               {sortAsc}
               onclick={() => toggleSort("filetype")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -751,7 +751,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "year"}
               {sortAsc}
               onclick={() => toggleSort("year")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -763,7 +763,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "genre"}
               {sortAsc}
               onclick={() => toggleSort("genre")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -775,7 +775,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "grouping"}
               {sortAsc}
               onclick={() => toggleSort("grouping")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -787,7 +787,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "bpm"}
               {sortAsc}
               onclick={() => toggleSort("bpm")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -799,7 +799,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "initial_key"}
               {sortAsc}
               onclick={() => toggleSort("initial_key")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -811,7 +811,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "bitrate"}
               {sortAsc}
               onclick={() => toggleSort("bitrate")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -823,7 +823,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "samplerate"}
               {sortAsc}
               onclick={() => toggleSort("samplerate")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -835,7 +835,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "bitdepth"}
               {sortAsc}
               onclick={() => toggleSort("bitdepth")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -847,7 +847,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "channels"}
               {sortAsc}
               onclick={() => toggleSort("channels")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -859,7 +859,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "filesize"}
               {sortAsc}
               onclick={() => toggleSort("filesize")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -871,7 +871,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "rating"}
               {sortAsc}
               onclick={() => toggleSort("rating")}
-              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -883,7 +883,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "playcount"}
               {sortAsc}
               onclick={() => toggleSort("playcount")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -895,7 +895,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "skipcount"}
               {sortAsc}
               onclick={() => toggleSort("skipcount")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -907,7 +907,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "lastplayed"}
               {sortAsc}
               onclick={() => toggleSort("lastplayed")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -919,7 +919,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "added"}
               {sortAsc}
               onclick={() => toggleSort("added")}
-              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -931,7 +931,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "length_nanosec"}
               {sortAsc}
               onclick={() => toggleSort("length_nanosec")}
-              class="flex items-center justify-center hover:text-brand-text-primary transition-colors cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<Clock class="w-4 h-4 shrink-0" /> {arrow}{/snippet}
             </SortableHeader>
@@ -943,7 +943,7 @@ import { shuffleArray } from "../utils/shuffle";
               active={sortField === "path"}
               {sortAsc}
               onclick={() => toggleSort("path")}
-              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 cursor-pointer font-semibold uppercase tracking-wider min-w-0 w-full"
+              class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
             >
               {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
             </SortableHeader>
@@ -981,7 +981,7 @@ import { shuffleArray } from "../utils/shuffle";
               oncontextmenu={(e) => handleContextMenu(e, song)}
               title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : undefined}
               class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
-                {disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                {disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : 'hover:bg-brand-sidebar/40')}"
               style={gridColsStyle}
             >
@@ -998,7 +998,7 @@ import { shuffleArray } from "../utils/shuffle";
                   {/if}
                   <button
                     onclick={(e) => { e.stopPropagation(); if (!disabled) handlePlaySong(song); }}
-                    class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity cursor-pointer disabled:opacity-0 disabled:cursor-not-allowed"
+                    class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-opacity disabled:opacity-0 disabled:cursor-not-allowed"
                     disabled={disabled}
                     title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : i18n.t('collection.playSong')}
                   >
@@ -1148,7 +1148,7 @@ import { shuffleArray } from "../utils/shuffle";
                   <div class="flex items-center justify-center gap-2.5">
                     <button
                       onclick={(e) => { e.stopPropagation(); handleAddSongToPlaylist(song.id); }}
-                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
                       title={playlistsStore.activeCustomPlaylist
                         ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
                         : i18n.t('collection.addPlaylistTooltipDefault')}
@@ -1157,7 +1157,7 @@ import { shuffleArray } from "../utils/shuffle";
                     </button>
                     <button
                       onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
-                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors cursor-pointer"
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
                       title={i18n.t('collection.editTagsTooltip')}
                     >
                       <Edit3 class="w-4 h-4" />
@@ -1278,7 +1278,7 @@ import { shuffleArray } from "../utils/shuffle";
         <FolderPlus class="w-4 h-4 text-brand-accent-text" />
         <h3 class="text-sm font-bold text-brand-text-primary">{i18n.t("playlists.saveAsCustomTitle", {}, "Save as Custom Playlist")}</h3>
       </div>
-      <button onclick={() => showSaveModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors cursor-pointer">
+      <button onclick={() => showSaveModal = false} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
         <X class="w-4 h-4" />
       </button>
     </div>
