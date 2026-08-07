@@ -3083,7 +3083,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tauri-runtime",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.19",
  "tokio",
  "uuid",
  "walkdir",
