@@ -259,10 +259,13 @@ export const fr = {
     loudnessAnalysisActive: "La normalisation du volume analyse {remaining} chanson(s) en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter.",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
+    dynamicThemes: "Thèmes dynamiques",
     predefinedThemes: "Thèmes prédéfinis",
     customThemes: "Thèmes personnalisés",
     systemThemeLight: "Suit actuellement le mode clair de votre système",
     systemThemeDark: "Suit actuellement le mode sombre de votre système",
+    luminousFootnote: "Les couleurs s'adaptent à la pochette d'album en cours d'écoute",
+    systemFootnote: "Bascule entre mode clair et sombre selon votre système",
     editTheme: "Modifier le thème",
     editThemeShort: "Modifier",
     deleteTheme: "Supprimer le thème",
@@ -731,7 +734,9 @@ export const fr = {
     system: "Système",
     "ruby-red": "Rouge rubis",
     "nordic-blue": "Bleu nordique",
-    "retro-amber": "Ambre rétro"
+    "retro-amber": "Ambre rétro",
+    metallic: "Métallique",
+    sabrina: "Sabrina"
   },
   artistDetail: {
     backToArtists: "Voir les artistes",

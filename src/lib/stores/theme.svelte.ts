@@ -153,6 +153,28 @@ const NORDIC_BLUE_COLORS: ThemeColors = {
   "color-border": "#55879a",
 };
 
+const METALLIC_COLORS: ThemeColors = {
+  "bg-main": "#000000",
+  "bg-sidebar": "#000010",
+  "bg-playerbar": "#000000",
+  "color-accent": "#775F37",
+  "color-accent-hover": "#8C8C8C",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#808080"
+};
+
+const SABRINA_COLORS: ThemeColors = {
+  "bg-main": "#3E4B68",
+  "bg-sidebar": "#280C00",
+  "bg-playerbar": "#3D4A66",
+  "color-accent": "#255098",
+  "color-accent-hover": "#E9B787",
+  "color-text-primary": "#ffffff",
+  "color-text-secondary": "#e2e8f0",
+  "color-border": "#85674C"
+};
+
 export const PREDEFINED_THEMES: Theme[] = [
   {
     id: "dynamic-artwork",
@@ -187,6 +209,16 @@ export const PREDEFINED_THEMES: Theme[] = [
     id: "retro-amber",
     name: "Retro Amber",
     colors: generatePaletteFromSeed(RETRO_AMBER_SEED)
+  },
+  {
+    id: "metallic",
+    name: "Metallic",
+    colors: { ...METALLIC_COLORS }
+  },
+  {
+    id: "sabrina",
+    name: "Sabrina",
+    colors: { ...SABRINA_COLORS }
   }
 ];
 

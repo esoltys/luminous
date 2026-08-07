@@ -176,6 +176,9 @@
     "color-border": "#1f1b2e"
   });
 
+  const DYNAMIC_THEMES = PREDEFINED_THEMES.filter((t) => t.id === "dynamic-artwork" || t.id === "system");
+  const STATIC_PREDEFINED_THEMES = PREDEFINED_THEMES.filter((t) => t.id !== "dynamic-artwork" && t.id !== "system");
+
   // The System theme's live colors depend on the OS light/dark preference,
   // not the static (dark) preview baked into its PREDEFINED_THEMES entry —
   // use the current system scheme so its swatch matches what's on screen.
@@ -811,10 +814,12 @@
             </div>
           </div>
         </div>
+
+        <!-- Dynamic Themes Section -->
         <div>
-          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes')}</h4>
-          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {#each PREDEFINED_THEMES as theme}
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.dynamicThemes', {}, 'Dynamic Themes')}</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {#each DYNAMIC_THEMES as theme}
               {@const previewColors = getPreviewColors(theme)}
               <button
                 onclick={() => themeStore.setTheme(theme.id)}
@@ -831,6 +836,40 @@
                         {/if}
                       </span>
                     {/if}
+                    {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
+                  </span>
+                </div>
+                <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
+                <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+                  <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
+                  <div class="flex-1" style="background-color: {previewColors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
+                </div>
+                {#if theme.id === 'dynamic-artwork'}
+                  <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.luminousFootnote', {}, 'Colors shift to match whatever album art is playing now')}</span>
+                {:else if theme.id === 'system'}
+                  <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.systemFootnote', {}, 'Switches between light and dark to match your OS')}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Predefined Themes Section -->
+        <div>
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes', {}, 'Predefined Themes')}</h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {#each STATIC_PREDEFINED_THEMES as theme}
+              {@const previewColors = getPreviewColors(theme)}
+              <button
+                onclick={() => themeStore.setTheme(theme.id)}
+                class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+              >
+                <div class="flex items-center justify-between w-full">
+                  <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
                     {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
                   </span>
                 </div>
