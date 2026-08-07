@@ -136,55 +136,57 @@ pub fn compute_gain(
 /// decode loop but keeps channels separate instead of downmixing to mono.
 fn decode_channels(path: &Path) -> Result<(Vec<Vec<f32>>, u32)> {
     use symphonia::core::{
-        audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
-        formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
+        codecs::audio::AudioDecoderOptions,
+        errors::Error as SymphoniaError,
+        formats::{probe::Hint, FormatOptions, TrackType},
+        io::MediaSourceStream,
+        meta::MetadataOptions,
     };
 
     let file = std::fs::File::open(path).context("failed to open audio file for R128 analysis")?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
-    let probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &Hint::new(),
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .context("format probe failed during R128 analysis")?;
 
-    let mut format = probed.format;
     let track = format
-        .tracks()
-        .iter()
-        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+        .default_track(TrackType::Audio)
         .cloned()
         .ok_or_else(|| anyhow!("no active audio track found for R128 analysis"))?;
 
     let track_id = track.id;
-    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+    let audio_params = track
+        .codec_params
+        .as_ref()
+        .and_then(|c| c.audio())
+        .ok_or_else(|| anyhow!("no audio codec parameters for R128 analysis"))?;
+    let sample_rate = audio_params.sample_rate.unwrap_or(44100);
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .context("failed to create decoder for R128 analysis")?;
 
     let mut out_channels: Vec<Vec<f32>> = Vec::new();
 
-    while let Ok(packet) = format.next_packet() {
-        if packet.track_id() != track_id {
+    while let Ok(Some(packet)) = format.next_packet() {
+        if packet.track_id != track_id {
             continue;
         }
         match decoder.decode(&packet) {
             Ok(decoded) => {
-                let spec = *decoded.spec();
-                let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                sample_buf.copy_interleaved_ref(decoded);
-
-                let channels = spec.channels.count().max(1);
+                let channels = decoded.spec().channels().count().max(1);
                 let out_count = channels.min(2);
                 if out_channels.is_empty() {
                     out_channels = vec![Vec::new(); out_count];
                 }
-                let decoded_samples = sample_buf.samples();
+                let mut decoded_samples: Vec<f32> = Vec::new();
+                decoded.copy_to_vec_interleaved(&mut decoded_samples);
 
                 for chunk in decoded_samples.chunks(channels) {
                     for (c, out) in out_channels.iter_mut().enumerate() {

@@ -143,54 +143,56 @@ pub fn calculate_spectrum(
 /// Decode an entire audio file as fast as the CPU allows and average it to mono.
 pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
     use symphonia::core::{
-        audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
-        formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
+        codecs::audio::AudioDecoderOptions,
+        errors::Error as SymphoniaError,
+        formats::{probe::Hint, FormatOptions, TrackType},
+        io::MediaSourceStream,
+        meta::MetadataOptions,
     };
 
     let file = std::fs::File::open(path).context("failed to open audio file for offline decode")?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
-    let probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &Hint::new(),
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .context("format probe failed during offline decode")?;
 
-    let mut format = probed.format;
     let track = format
-        .tracks()
-        .iter()
-        .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
+        .default_track(TrackType::Audio)
         .cloned()
         .ok_or_else(|| anyhow!("no active audio track found for offline decode"))?;
 
     let track_id = track.id;
-    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
+    let audio_params = track
+        .codec_params
+        .as_ref()
+        .and_then(|c| c.audio())
+        .ok_or_else(|| anyhow!("no audio codec parameters for offline decode"))?;
+    let sample_rate = audio_params.sample_rate.unwrap_or(44100);
 
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(audio_params, &AudioDecoderOptions::default())
         .context("failed to create decoder for offline decode")?;
 
     let mut samples = Vec::new();
 
-    while let Ok(packet) = format.next_packet() {
-        if packet.track_id() != track_id {
+    while let Ok(Some(packet)) = format.next_packet() {
+        if packet.track_id != track_id {
             continue;
         }
         match decoder.decode(&packet) {
             Ok(decoded) => {
-                let spec = *decoded.spec();
-                let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                sample_buf.copy_interleaved_ref(decoded);
-
-                let channels = spec.channels.count();
-                let decoded_samples = sample_buf.samples();
+                let channels = decoded.spec().channels().count();
+                let mut decoded_samples: Vec<f32> = Vec::new();
+                decoded.copy_to_vec_interleaved(&mut decoded_samples);
 
                 if channels == 1 {
-                    samples.extend_from_slice(decoded_samples);
+                    samples.extend_from_slice(&decoded_samples);
                 } else {
                     for chunk in decoded_samples.chunks(channels) {
                         let sum: f32 = chunk.iter().sum();
