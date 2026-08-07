@@ -59,7 +59,7 @@ symphonia = { version = "0.5", features = ["all"] }
 
 # --- Audio output ---
 cpal = "0.15"
-ringbuf = "0.4"
+ringbuf = "0.5"
 
 
 # --- Audio resampling ---
