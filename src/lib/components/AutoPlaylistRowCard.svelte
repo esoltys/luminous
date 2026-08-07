@@ -48,7 +48,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/40 transition-colors duration-200 cursor-pointer select-none"
+  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-brand-accent transition-colors duration-200 cursor-pointer select-none"
 >
   <div
     class="relative shrink-0 w-11 h-11 flex items-center justify-center overflow-hidden border {kind === 'decade'
