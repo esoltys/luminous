@@ -10,8 +10,10 @@ use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::io;
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
@@ -229,13 +231,18 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
     expanded
 }
 
-/// Compute target path for a song given a template, options, and base directory.
-pub fn build_target_path(
+/// Computes a song's target *directory* segments (sanitized, root-to-leaf-parent,
+/// i.e. excluding the file name) and file name separately, without joining them
+/// into a final path. Used by `compute_preview` so directory casing can be
+/// canonicalized across the whole library (see `build_dir_casing_map`) before the
+/// path is finalized. `build_target_path` is the simple wrapper that just joins
+/// everything together as-is.
+fn build_target_path_parts(
     song: &Song,
     template: &str,
     options: &OrganizeOptions,
     library_dirs: &[String],
-) -> Result<PathBuf> {
+) -> Result<(PathBuf, Vec<String>, String)> {
     let source_path_str = song
         .path
         .as_ref()
@@ -261,34 +268,131 @@ pub fn build_target_path(
 
     let expanded = expand_template(template, song, ext);
 
-    let parts: Vec<&str> = expanded
+    let raw_parts: Vec<&str> = expanded
         .split(&['/', '\\'][..])
         .filter(|p| !p.trim().is_empty())
         .collect();
 
-    let mut relative_path = PathBuf::new();
-    for (idx, part) in parts.iter().enumerate() {
-        let is_last = idx == parts.len() - 1;
+    let mut dir_parts = Vec::with_capacity(raw_parts.len().saturating_sub(1));
+    let mut file_name = String::new();
+    for (idx, part) in raw_parts.iter().enumerate() {
+        let is_last = idx == raw_parts.len() - 1;
         let sanitized = sanitize_component(
             part,
             options.replace_spaces_with_underscores,
             options.ascii_only,
         );
         if is_last {
-            if !sanitized
+            file_name = if !sanitized
                 .to_lowercase()
                 .ends_with(&format!(".{}", ext.to_lowercase()))
             {
-                relative_path.push(format!("{}.{}", sanitized, ext));
+                format!("{}.{}", sanitized, ext)
             } else {
-                relative_path.push(sanitized);
-            }
+                sanitized
+            };
         } else {
-            relative_path.push(sanitized);
+            dir_parts.push(sanitized);
         }
     }
 
+    Ok((root_dir, dir_parts, file_name))
+}
+
+/// Compute target path for a song given a template, options, and base directory.
+pub fn build_target_path(
+    song: &Song,
+    template: &str,
+    options: &OrganizeOptions,
+    library_dirs: &[String],
+) -> Result<PathBuf> {
+    let (root_dir, dir_parts, file_name) =
+        build_target_path_parts(song, template, options, library_dirs)?;
+    let mut relative_path = PathBuf::new();
+    for part in &dir_parts {
+        relative_path.push(part);
+    }
+    relative_path.push(&file_name);
     Ok(root_dir.join(relative_path))
+}
+
+/// A hierarchical (parent-path, lowercased segment) -> canonical-cased-segment map,
+/// built by `build_dir_casing_map` and consumed by `apply_dir_casing_map`.
+type DirCasingMap = HashMap<(String, String), String>;
+
+/// Builds a casing map from a set of songs' target directory-segment sequences
+/// (as produced by `build_target_path_parts`), so any song's target directory can
+/// be rewritten to a consistent casing regardless of which tag(s) the *template*
+/// happens to use to build folder names — artist, album, genre, or any other
+/// field, in whatever order the template puts them. This deliberately doesn't
+/// hardcode "artist" or "album": at each directory depth, songs are bucketed by
+/// the case-insensitive path built so far (so e.g. an album is naturally scoped
+/// under its artist without special-casing that relationship), and within each
+/// bucket the majority-cased spelling of that segment wins (ties broken
+/// alphabetically, for determinism).
+///
+/// Without this, two songs whose tags disagree only in case (e.g. "The War on
+/// Drugs" vs "The War On Drugs", or "Lost in the Dream" vs "Lost In The Dream")
+/// each compute their own differently-cased target folder, and Apply just flips
+/// the real folder's on-disk casing back and forth depending on processing order
+/// without ever converging — issue #295.
+fn build_dir_casing_map(entries: &[Vec<String>]) -> DirCasingMap {
+    let max_depth = entries.iter().map(|e| e.len()).max().unwrap_or(0);
+    let mut map = DirCasingMap::new();
+    let mut parent_keys: Vec<String> = vec![String::new(); entries.len()];
+
+    for depth in 0..max_depth {
+        let mut counts: HashMap<(String, String), HashMap<String, usize>> = HashMap::new();
+        for (idx, parts) in entries.iter().enumerate() {
+            if let Some(part) = parts.get(depth) {
+                let key = (parent_keys[idx].clone(), part.to_lowercase());
+                *counts
+                    .entry(key)
+                    .or_default()
+                    .entry(part.clone())
+                    .or_insert(0) += 1;
+            }
+        }
+
+        for (key, casings) in counts {
+            if let Some((name, _)) =
+                casings
+                    .into_iter()
+                    .max_by(|(a_name, a_count), (b_name, b_count)| {
+                        a_count.cmp(b_count).then_with(|| b_name.cmp(a_name))
+                    })
+            {
+                map.insert(key, name);
+            }
+        }
+
+        for (idx, parts) in entries.iter().enumerate() {
+            if let Some(part) = parts.get(depth) {
+                let lower = part.to_lowercase();
+                let canon_lower = map
+                    .get(&(parent_keys[idx].clone(), lower.clone()))
+                    .map(|c| c.to_lowercase())
+                    .unwrap_or(lower);
+                parent_keys[idx] = format!("{}\u{0}{}", parent_keys[idx], canon_lower);
+            }
+        }
+    }
+    map
+}
+
+/// Rewrites `parts` (a song's target directory segments, root to leaf-parent) in
+/// place to their canonical casing per `map`, walking depth-by-depth so each
+/// level's lookup is scoped to its already-canonicalized ancestor chain. See
+/// `build_dir_casing_map`.
+fn apply_dir_casing_map(parts: &mut [String], map: &DirCasingMap) {
+    let mut parent_key = String::new();
+    for part in parts.iter_mut() {
+        let lower = part.to_lowercase();
+        if let Some(canon) = map.get(&(parent_key.clone(), lower.clone())) {
+            *part = canon.clone();
+        }
+        parent_key = format!("{}\u{0}{}", parent_key, part.to_lowercase());
+    }
 }
 
 /// Compute dry-run preview items for given song IDs.
@@ -362,6 +466,42 @@ pub fn compute_preview(
         result
     };
 
+    // Canonicalization basis: every eligible song's target directory segments,
+    // regardless of `song_ids`, so previewing only a subset of an artist's tracks
+    // still converges with the folder casing implied by the rest of that artist's
+    // library. See `build_dir_casing_map`.
+    let casing_basis_songs: Vec<Song> = if song_ids.is_empty() {
+        songs.clone()
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2) AND unavailable = 0",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Song {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                track: row.get(6)?,
+                disc: row.get(7)?,
+                year: row.get(8)?,
+                genre: row.get(9)?,
+                ..Default::default()
+            })
+        })?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+
+    let dir_entries: Vec<Vec<String>> = casing_basis_songs
+        .iter()
+        .filter_map(|s| build_target_path_parts(s, template, options, &library_dirs).ok())
+        .map(|(_, dir_parts, _)| dir_parts)
+        .collect();
+    let dir_casing_map = build_dir_casing_map(&dir_entries);
+
     let mut preview_items = Vec::with_capacity(songs.len());
     let mut target_paths_map: HashMap<String, Vec<usize>> = HashMap::new();
 
@@ -381,9 +521,15 @@ pub fn compute_preview(
 
         let source_exists = Path::new(&from_path).exists();
 
-        match build_target_path(song, template, options, &library_dirs) {
-            Ok(target_buf) => {
-                let to_path = target_buf.to_string_lossy().to_string();
+        match build_target_path_parts(song, template, options, &library_dirs) {
+            Ok((root_dir, mut dir_parts, file_name)) => {
+                apply_dir_casing_map(&mut dir_parts, &dir_casing_map);
+                let mut relative_path = PathBuf::new();
+                for part in &dir_parts {
+                    relative_path.push(part);
+                }
+                relative_path.push(&file_name);
+                let to_path = root_dir.join(relative_path).to_string_lossy().to_string();
 
                 let (status, err_msg) = if !source_exists {
                     (
@@ -692,6 +838,97 @@ fn move_companion_files(
     errors
 }
 
+/// Looks for a directory entry in `dir` whose name matches `name` case-insensitively
+/// and returns its actual on-disk name (which may differ in case from `name`).
+fn find_case_insensitive_entry(dir: &Path, name: &OsStr) -> io::Result<Option<std::ffi::OsString>> {
+    if !dir.is_dir() {
+        return Ok(None);
+    }
+    let target = name.to_string_lossy().to_lowercase();
+    for entry in fs::read_dir(dir)? {
+        let entry_name = entry?.file_name();
+        if entry_name.to_string_lossy().to_lowercase() == target {
+            return Ok(Some(entry_name));
+        }
+    }
+    Ok(None)
+}
+
+/// Renames `old_name` to `new_name` within `parent` via a temporary intermediate name.
+/// A direct `fs::rename` between two names that differ only by case is often treated by
+/// Windows (and other case-insensitive-but-case-preserving filesystems) as a same-file
+/// no-op that returns `Ok` without actually updating the stored casing. Hopping through a
+/// distinct temporary name forces the filesystem to register the change.
+fn rename_fixing_case(parent: &Path, old_name: &OsStr, new_name: &OsStr) -> io::Result<()> {
+    if old_name == new_name {
+        return Ok(());
+    }
+    let old_path = parent.join(old_name);
+    let new_path = parent.join(new_name);
+    let tmp_path = parent.join(format!(".luminous-case-tmp-{}", std::process::id()));
+    fs::rename(&old_path, &tmp_path)?;
+    match fs::rename(&tmp_path, &new_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = fs::rename(&tmp_path, &old_path);
+            Err(e)
+        }
+    }
+}
+
+/// Creates all ancestor directories of `dir`, fixing the on-disk casing of any directory
+/// that already exists (case-insensitively) under a different case than requested.
+/// `fs::create_dir_all` alone treats a case-insensitive match as "already exists" and
+/// silently leaves its casing untouched, which is how case-only album/artist folder
+/// renames go missing on Windows (see issue #295).
+fn create_dir_all_case_correct(dir: &Path) -> io::Result<()> {
+    let mut current = PathBuf::new();
+    for component in dir.components() {
+        match component {
+            Component::Normal(name) => {
+                // Deliberately resolve the actual on-disk entry name via a directory
+                // listing rather than `Path::is_dir()`/`exists()`: those succeed via a
+                // case-insensitive lookup on NTFS even when the stored casing differs,
+                // which would make this function silently skip the very fix it exists
+                // to perform.
+                match find_case_insensitive_entry(&current, name)? {
+                    Some(actual_name) if actual_name.as_os_str() == name => {}
+                    Some(actual_name) => rename_fixing_case(&current, &actual_name, name)?,
+                    None => fs::create_dir(current.join(name))?,
+                }
+                current.push(name);
+            }
+            _ => current.push(component),
+        }
+    }
+    Ok(())
+}
+
+/// Verifies that every path component of `path` matches the on-disk entry name exactly
+/// (including case), by walking the directory listing rather than trusting `exists()`,
+/// which succeeds on case-insensitive filesystems even when the case is wrong.
+fn verify_case_on_disk(path: &Path) -> io::Result<bool> {
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(name) => {
+                if !current.is_dir() {
+                    return Ok(false);
+                }
+                let matches = fs::read_dir(&current)?
+                    .filter_map(|e| e.ok())
+                    .any(|e| e.file_name() == name);
+                if !matches {
+                    return Ok(false);
+                }
+                current.push(name);
+            }
+            _ => current.push(component),
+        }
+    }
+    Ok(true)
+}
+
 /// Execute batch file relocation and SQLite path updates.
 pub fn execute_apply(
     db: &Database,
@@ -735,7 +972,7 @@ pub fn execute_apply(
         }
 
         if let Some(dst_parent) = dst.parent() {
-            if let Err(e) = fs::create_dir_all(dst_parent) {
+            if let Err(e) = create_dir_all_case_correct(dst_parent) {
                 errors.push(format!(
                     "Failed to create directory {}: {}",
                     dst_parent.display(),
@@ -748,6 +985,14 @@ pub fn execute_apply(
 
         let move_res =
             fs::rename(src, dst).or_else(|_| fs::copy(src, dst).and_then(|_| fs::remove_file(src)));
+
+        let move_res = move_res.and_then(|_| match verify_case_on_disk(dst) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(io::Error::other(
+                "move reported success but on-disk casing does not match the target path",
+            )),
+            Err(e) => Err(e),
+        });
 
         match move_res {
             Ok(_) => {
@@ -1110,6 +1355,80 @@ mod tests {
         );
     }
 
+    /// `build_dir_casing_map`/`apply_dir_casing_map` are field-agnostic: they
+    /// operate on whatever directory segments a template happens to produce, not
+    /// on hardcoded "artist"/"album" concepts. This proves convergence for a
+    /// genre-led template shape ("%genre/%artist/%album"), including that album
+    /// casing correctly stays scoped per-artist rather than merging globally.
+    #[test]
+    fn test_dir_casing_map_generalizes_to_arbitrary_template_fields() {
+        let entries = vec![
+            // 3 songs use "Rock" for genre, 1 uses "rock" -> majority wins.
+            vec![
+                "Rock".to_string(),
+                "The War On Drugs".to_string(),
+                "Lost In The Dream".to_string(),
+            ],
+            vec![
+                "Rock".to_string(),
+                "The War on Drugs".to_string(),
+                "Lost in the Dream".to_string(),
+            ],
+            vec![
+                "Rock".to_string(),
+                "The War On Drugs".to_string(),
+                "Lost In The Dream".to_string(),
+            ],
+            vec![
+                "rock".to_string(),
+                "The War On Drugs".to_string(),
+                "Lost In The Dream".to_string(),
+            ],
+            // A different artist's "Greatest Hits" must not be merged with
+            // some other artist's differently-cased "greatest hits".
+            vec![
+                "Pop".to_string(),
+                "Artist One".to_string(),
+                "Greatest Hits".to_string(),
+            ],
+            vec![
+                "Pop".to_string(),
+                "Artist Two".to_string(),
+                "greatest hits".to_string(),
+            ],
+        ];
+        let map = build_dir_casing_map(&entries);
+
+        let mut variant = vec![
+            "rock".to_string(),
+            "the war on drugs".to_string(),
+            "lost in the dream".to_string(),
+        ];
+        // None of these raw values are in `entries` verbatim, but a case-insensitive
+        // lookup within the right ancestor scope must still resolve them.
+        apply_dir_casing_map(&mut variant, &map);
+        assert_eq!(
+            variant,
+            vec!["Rock", "The War On Drugs", "Lost In The Dream"]
+        );
+
+        let mut artist_one_album = vec![
+            "Pop".to_string(),
+            "Artist One".to_string(),
+            "greatest hits".to_string(),
+        ];
+        apply_dir_casing_map(&mut artist_one_album, &map);
+        assert_eq!(artist_one_album[2], "Greatest Hits");
+
+        let mut artist_two_album = vec![
+            "Pop".to_string(),
+            "Artist Two".to_string(),
+            "GREATEST HITS".to_string(),
+        ];
+        apply_dir_casing_map(&mut artist_two_album, &map);
+        assert_eq!(artist_two_album[2], "greatest hits");
+    }
+
     #[test]
     fn test_compute_preview_excludes_unavailable_songs() {
         use crate::collection::upsert_song;
@@ -1251,6 +1570,209 @@ mod tests {
             art_automatic,
             Some(dst_cover_path.to_string_lossy().to_string())
         );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// Regression test for #295: a rename where the only difference is the casing of an
+    /// ancestor directory (e.g. `Hero` -> `HERO`) must actually update the on-disk casing,
+    /// not silently no-op while the DB is updated to the new casing anyway.
+    #[test]
+    fn test_execute_apply_fixes_case_only_ancestor_directory() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base = std::env::temp_dir().join(format!(
+            "luminous_organizer_case_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let src_dir = base.join("Hero");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let src_song_path = src_dir.join("track.mp3");
+        fs::write(&src_song_path, b"fake audio").unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song = Song {
+            path: Some(src_song_path.to_string_lossy().to_string()),
+            title: Some("Track".to_string()),
+            artist: Some("Artist".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+        let song_id: i64 = conn
+            .query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![song.path],
+                |r| r.get(0),
+            )
+            .unwrap();
+        drop(conn);
+
+        // Same directory, only the casing differs: Hero -> HERO.
+        let dst_dir = base.join("HERO");
+        let dst_song_path = dst_dir.join("track.mp3");
+        let items = vec![OrganizeApplyItem {
+            song_id,
+            from_path: src_song_path.to_string_lossy().to_string(),
+            to_path: dst_song_path.to_string_lossy().to_string(),
+        }];
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let result = execute_apply(&db, &watcher_paused, &items, false, false, None).unwrap();
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+        assert_eq!(result.moved_count, 1);
+
+        // The directory entry itself must now carry the corrected casing on disk.
+        let actual_name = fs::read_dir(&base)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case("hero"))
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .unwrap();
+        assert_eq!(actual_name, "HERO");
+
+        let conn = db.pool.get().unwrap();
+        let db_path: String = conn
+            .query_row(
+                "SELECT path FROM songs WHERE id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(db_path, dst_song_path.to_string_lossy().to_string());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// Regression test for #295: songs tagged with two casing variants of the same
+    /// artist ("The War on Drugs" / "The War On Drugs") AND two casing variants of
+    /// the same album ("Lost in the Dream" / "Lost In The Dream") must converge on
+    /// a single target folder casing at *every* level of the template, so
+    /// re-running preview after Apply doesn't show them as needing organization
+    /// again.
+    #[test]
+    fn test_compute_preview_and_apply_converge_on_majority_artist_and_album_casing() {
+        use crate::collection::upsert_song;
+        use crate::db::Database;
+        use crate::models::{FileType, SongSource};
+
+        let base = std::env::temp_dir().join(format!(
+            "luminous_organizer_casing_convergence_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        // On-disk folders start out lowercase ("on"/"in the"), while the majority
+        // of tags use the differently-cased forms.
+        let src_dir = base.join("The War on Drugs").join("Lost in the Dream");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        let db = Arc::new(Database::new(base.join("appdata")).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let tag_casings = [
+            ("The War On Drugs", "Lost In The Dream"),
+            ("The War On Drugs", "Lost In The Dream"),
+            ("The War on Drugs", "Lost in the Dream"),
+        ];
+        let mut song_ids = Vec::new();
+        for (i, (artist, album)) in tag_casings.iter().enumerate() {
+            let path = src_dir.join(format!("track{}.mp3", i + 1));
+            fs::write(&path, b"fake audio").unwrap();
+            let song = Song {
+                path: Some(path.to_string_lossy().to_string()),
+                title: Some(format!("Track {}", i + 1)),
+                artist: Some(artist.to_string()),
+                album: Some(album.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+            let song_id: i64 = conn
+                .query_row(
+                    "SELECT id FROM songs WHERE path = ?1",
+                    params![song.path],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            song_ids.push(song_id);
+        }
+        drop(conn);
+
+        let options = OrganizeOptions {
+            destination_dir: Some(base.to_string_lossy().to_string()),
+            replace_spaces_with_underscores: false,
+            ascii_only: false,
+            clean_empty_dirs: false,
+            move_extra_files: false,
+        };
+
+        let preview = compute_preview(&db, &song_ids, "%artist/%album/%title", &options).unwrap();
+
+        // Every song must compute the exact same (majority) target directory at
+        // both the artist and album level, regardless of its own tags' casing.
+        let target_dirs: std::collections::HashSet<String> = preview
+            .iter()
+            .map(|item| {
+                Path::new(&item.to_path)
+                    .parent()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(
+            target_dirs.len(),
+            1,
+            "preview items disagree on target dir: {:?}",
+            preview
+        );
+        let target_dir = target_dirs.into_iter().next().unwrap();
+        assert_eq!(
+            target_dir,
+            base.join("The War On Drugs")
+                .join("Lost In The Dream")
+                .to_string_lossy()
+        );
+
+        let apply_items: Vec<OrganizeApplyItem> = preview
+            .iter()
+            .zip(song_ids.iter())
+            .filter(|(item, _)| item.status != OrganizePreviewStatus::Unchanged)
+            .map(|(item, &song_id)| OrganizeApplyItem {
+                song_id,
+                from_path: item.from_path.clone(),
+                to_path: item.to_path.clone(),
+            })
+            .collect();
+
+        let watcher_paused = Arc::new(AtomicU32::new(0));
+        let result = execute_apply(&db, &watcher_paused, &apply_items, false, false, None).unwrap();
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        // Re-running preview after Apply must show every song as Unchanged now —
+        // this is the "keeps showing up in Refresh Preview" symptom from #295.
+        let second_preview =
+            compute_preview(&db, &song_ids, "%artist/%album/%title", &options).unwrap();
+        for item in &second_preview {
+            assert_eq!(
+                item.status,
+                OrganizePreviewStatus::Unchanged,
+                "item still needs organizing after apply: {:?}",
+                item
+            );
+        }
 
         let _ = std::fs::remove_dir_all(&base);
     }
