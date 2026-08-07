@@ -114,7 +114,7 @@ rayon = "1"
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
 
 [dev-dependencies]
-cucumber = { version = "0.20", features = ["macros"] }
+cucumber = { version = "0.23", features = ["macros"] }
 tempfile = "3"
 
 [[test]]
