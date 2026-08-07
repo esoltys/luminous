@@ -1,0 +1,9 @@
+# Cargo audit configuration
+
+[advisories]
+ignore = [
+    # RUSTSEC-2024-0429 (GHSA-wrw7-89jp-8q8g): Unsoundness in glib::VariantStrIter
+    # Transitive dependency via Tauri 2 GTK3 Linux bindings (glib 0.18.5).
+    # Luminous does not invoke VariantStrIter anywhere in its codebase.
+    "RUSTSEC-2024-0429",
+]

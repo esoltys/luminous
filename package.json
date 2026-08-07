@@ -55,10 +55,12 @@
   },
   "overrides": {
     "postcss": "^8.5.18",
-    "cookie": "^0.7.0"
+    "cookie": "^0.7.0",
+    "nanoid": "^3.3.18"
   },
   "resolutions": {
     "postcss": "^8.5.18",
-    "cookie": "^0.7.0"
+    "cookie": "^0.7.0",
+    "nanoid": "^3.3.18"
   }
 }
