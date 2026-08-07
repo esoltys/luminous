@@ -57,6 +57,14 @@ export interface VisibleColumns {
   skipcount: boolean;
 }
 
+/**
+ * Saved pixel widths for song-table columns, keyed by `VisibleColumns` property name.
+ * Only columns that have been explicitly resized have an entry; others fall back to
+ * their compile-time defaults.  A single shared map is used for all four table views
+ * (Collection, AlbumDetail, Playlist, AutoPlaylist).
+ */
+export type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
+
 /** An auto-playlist reference (Favourites, Recently Added, genre, decade, or BPM), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
   kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
@@ -177,6 +185,36 @@ class CollectionStore {
     this.visibleColumns[column] = !this.visibleColumns[column];
     if (typeof window !== "undefined") {
       localStorage.setItem("luminous_visible_columns", JSON.stringify(this.visibleColumns));
+    }
+  }
+
+  columnWidths = $state<ColumnWidths>(
+    (() => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("luminous_column_widths");
+        if (saved) {
+          try {
+            return JSON.parse(saved) as ColumnWidths;
+          } catch (e) {
+            console.error("Failed to parse column widths:", e);
+          }
+        }
+      }
+      return {};
+    })()
+  );
+
+  setColumnWidth(column: keyof VisibleColumns, widthPx: number) {
+    this.columnWidths[column] = widthPx;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("luminous_column_widths", JSON.stringify(this.columnWidths));
+    }
+  }
+
+  resetColumnWidth(column: keyof VisibleColumns) {
+    delete this.columnWidths[column];
+    if (typeof window !== "undefined") {
+      localStorage.setItem("luminous_column_widths", JSON.stringify(this.columnWidths));
     }
   }
 
