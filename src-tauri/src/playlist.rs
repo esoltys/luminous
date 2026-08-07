@@ -20,6 +20,23 @@ const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
 /// library (e.g. 500+ songs in a single decade).
 const NO_SONG_LIMIT: i64 = -1;
 
+/// Names reserved for the app's single built-in Queue playlist: the literal
+/// DB name ("Queue" — see `queuePlaylist` in playlists.svelte.ts, which
+/// identifies it purely by this string) plus every locale's translated
+/// `playerBar.queueTitle` label (see src/lib/locales/*.ts), so a playlist
+/// can't be named something a user would mistake for the real Queue in any
+/// supported language. Keep this list in sync with `queueTitle` across
+/// locale files.
+const RESERVED_PLAYLIST_NAMES: &[&str] = &[
+    "queue",          // en: playerBar.queueTitle
+    "file d'attente", // fr: playerBar.queueTitle
+];
+
+fn is_reserved_playlist_name(name: &str) -> bool {
+    let trimmed = name.trim().to_lowercase();
+    RESERVED_PLAYLIST_NAMES.contains(&trimmed.as_str())
+}
+
 // ---------------------------------------------------------------------------
 // Undo/Redo stack operations
 // ---------------------------------------------------------------------------
@@ -111,6 +128,23 @@ impl PlaylistManager {
 
     pub fn create_playlist(&self, name: &str) -> Result<Playlist> {
         let conn = self.db.pool.get()?;
+        // The one legitimate "Queue" playlist is bootstrapped through this same
+        // method (see ensureQueuePlaylist in playlists.svelte.ts) — allow that
+        // single creation, but reject it (and any other reserved name) once a
+        // Queue playlist already exists, so users can't create a duplicate.
+        if is_reserved_playlist_name(name) {
+            let queue_exists: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM playlists WHERE LOWER(TRIM(name)) = 'queue')",
+                [],
+                |row| row.get(0),
+            )?;
+            if queue_exists || !name.trim().eq_ignore_ascii_case("queue") {
+                return Err(anyhow!(
+                    "\"{}\" is reserved for the app's built-in Queue playlist",
+                    name.trim()
+                ));
+            }
+        }
         let now = chrono::Utc::now().timestamp();
         conn.execute(
             "INSERT INTO playlists (name, updated) VALUES (?1, ?2)",
@@ -132,6 +166,15 @@ impl PlaylistManager {
     }
 
     pub fn rename_playlist(&self, id: i64, name: &str) -> Result<()> {
+        // Renaming never legitimately produces the Queue playlist (it's only
+        // ever created directly, see create_playlist above), so any reserved
+        // name is rejected outright here.
+        if is_reserved_playlist_name(name) {
+            return Err(anyhow!(
+                "\"{}\" is reserved for the app's built-in Queue playlist",
+                name.trim()
+            ));
+        }
         let conn = self.db.pool.get()?;
         conn.execute(
             "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
@@ -1394,6 +1437,39 @@ mod tests {
         ));
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    #[test]
+    fn test_reserved_playlist_names() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        // Bootstrapping the real Queue playlist (as ensureQueuePlaylist does) succeeds once.
+        let queue = manager.create_playlist("Queue").unwrap();
+
+        // A second attempt at any reserved name (any case/whitespace, any locale) is rejected.
+        assert!(manager.create_playlist("queue").is_err());
+        assert!(manager.create_playlist("  QUEUE  ").is_err());
+        assert!(manager.create_playlist("File d'attente").is_err());
+
+        // Renaming another playlist to a reserved name is always rejected.
+        let other = manager.create_playlist("Chill Mix").unwrap();
+        assert!(manager.rename_playlist(other.id, "Queue").is_err());
+        assert!(manager.rename_playlist(other.id, "File D'Attente").is_err());
+        let playlists = manager.get_playlists().unwrap();
+        assert_eq!(
+            playlists.iter().find(|p| p.id == other.id).unwrap().name,
+            "Chill Mix"
+        );
+
+        // The real Queue playlist itself is untouched.
+        assert_eq!(
+            playlists.iter().find(|p| p.id == queue.id).unwrap().name,
+            "Queue"
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

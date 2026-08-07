@@ -239,9 +239,13 @@
   }
 
   async function handleCreateBlankPlaylist() {
-    const playlist = await playlistsStore.createPlaylist(i18n.t("playlists.untitledPlaylistName"));
-    if (playlist) {
-      collectionStore.viewPlaylist(playlist.id);
+    try {
+      const playlist = await playlistsStore.createPlaylist(i18n.t("playlists.untitledPlaylistName"));
+      if (playlist) {
+        collectionStore.viewPlaylist(playlist.id);
+      }
+    } catch (err) {
+      console.error("Failed to create playlist:", err);
     }
   }
 

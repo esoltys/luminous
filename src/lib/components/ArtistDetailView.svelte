@@ -136,7 +136,7 @@
       .then(([fetchedSongs, fetchedPlaylists]) => {
         if (requested !== artistName) return;
         songs = fetchedSongs;
-        playlists = fetchedPlaylists;
+        playlists = fetchedPlaylists.filter((p) => p.name.toLowerCase() !== "queue");
       })
       .catch((err) => {
         console.error("Failed to load artist detail:", err);

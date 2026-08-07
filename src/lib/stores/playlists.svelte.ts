@@ -5,6 +5,15 @@ import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
+/** Marker substring from the backend's reserved-name rejection (playlist.rs,
+ * is_reserved_playlist_name) — always in English regardless of locale, since
+ * it's matched here rather than shown directly to the user. */
+const RESERVED_PLAYLIST_NAME_MARKER = "is reserved for the app's built-in Queue playlist";
+
+function isReservedPlaylistNameError(err: unknown): boolean {
+  return String(err).includes(RESERVED_PLAYLIST_NAME_MARKER);
+}
+
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
@@ -179,7 +188,15 @@ class PlaylistsStore {
   }
 
   async createPlaylist(name: string): Promise<Playlist> {
-    const playlist: Playlist = await invoke("create_playlist", { name });
+    let playlist: Playlist;
+    try {
+      playlist = await invoke("create_playlist", { name });
+    } catch (err) {
+      if (isReservedPlaylistNameError(err)) {
+        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
+      }
+      throw err;
+    }
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
     await this.pinPlaylist(playlist.id);
@@ -236,7 +253,14 @@ class PlaylistsStore {
   }
 
   async renamePlaylist(id: number, name: string) {
-    await invoke("rename_playlist", { id, name });
+    try {
+      await invoke("rename_playlist", { id, name });
+    } catch (err) {
+      if (isReservedPlaylistNameError(err)) {
+        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
+      }
+      throw err;
+    }
     await this.refreshPlaylists();
   }
 

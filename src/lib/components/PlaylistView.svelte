@@ -159,7 +159,12 @@
   async function saveRename() {
     if (!isEditingTitle) return;
     if (activePlaylist && editTitleValue.trim() !== "" && editTitleValue.trim() !== activePlaylist.name) {
-      await playlistsStore.renamePlaylist(activePlaylist.id, editTitleValue.trim());
+      try {
+        await playlistsStore.renamePlaylist(activePlaylist.id, editTitleValue.trim());
+      } catch (err) {
+        console.error("Failed to rename playlist:", err);
+        return;
+      }
     }
     isEditingTitle = false;
   }
