@@ -76,9 +76,9 @@
     return formatRelativeDate(item.song.added);
   }
 
-  // Mirrors CarouselCard's openPlaylist: genre/decade auto-playlists open in
-  // AutoPlaylistDetailView, custom playlists (including Smart Playlists) in
-  // the regular PlaylistView.
+  // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
+  // in AutoPlaylistDetailView, custom playlists (including Smart Playlists)
+  // in the regular PlaylistView.
   function openPlaylist(playlist: Playlist) {
     if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;

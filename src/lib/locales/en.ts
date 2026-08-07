@@ -360,6 +360,7 @@ export const en = {
   playlists: {
     title: "Playlists",
     untitledPlaylistName: "Untitled Playlist",
+    reservedPlaylistName: "\"{name}\" is reserved for the built-in Queue playlist. Please choose a different name.",
     noPlaylistsTitle: "No playlists",
     noPlaylistsText: "Click \"New Playlist\" above to create your first one.",
     showingOnePlaylist: "Showing 1 playlist",
