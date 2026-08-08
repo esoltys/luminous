@@ -157,7 +157,6 @@ export interface Playlist {
   name: string;
   dynamic_enabled: boolean;
   dynamic_spec?: string;
-  auto_play?: boolean;
   population_mode?: QueuePopulationMode;
   last_played_row?: number;
   created: number;

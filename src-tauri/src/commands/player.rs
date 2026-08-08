@@ -450,37 +450,41 @@ pub async fn get_startup_file(state: State<'_, AppState>) -> Result<Option<Strin
     Ok(lock.take())
 }
 
-/// Append songs to the live in-memory player playlist without interrupting
-/// playback.  Called by the frontend Auto-Play refill logic (#26) after
-/// `refill_auto_playlist` has persisted the new items to the DB.
+/// Add songs to the built-in Queue: appends the DB rows AND mirrors them
+/// into the live in-memory play order, so "Add to Queue" is one call and the
+/// two sides of that invariant can't drift (previously the frontend had to
+/// remember to pair add_to_playlist with a live-queue append).
 #[tauri::command]
-pub async fn append_songs_to_player_playlist(
+pub async fn add_songs_to_queue(
     song_ids: Vec<i64>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    use rusqlite::params;
     use tauri::Emitter;
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    let mut items = Vec::with_capacity(song_ids.len());
-    for &id in &song_ids {
-        let sql = format!(
-            "SELECT {} FROM songs WHERE id = ?1 AND unavailable = 0",
-            crate::collection::SONG_SELECT_COLS
-        );
-        if let Ok(song) = conn.query_row(&sql, params![id], crate::collection::row_to_song) {
-            let item = crate::models::PlaylistItem::new_song(0, 0, song);
-            items.push(item);
-        }
-    }
+    let added = {
+        let mut playlists = state.playlists.lock().await;
+        let queue = playlists.queue().map_err(|e| e.to_string())?;
+        let before: std::collections::HashSet<String> = playlists
+            .get_playlist_tracks(queue.id)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|i| i.uuid)
+            .collect();
+        playlists
+            .add_songs_to_playlist(queue.id, &song_ids)
+            .map_err(|e| e.to_string())?;
+        playlists
+            .get_playlist_tracks(queue.id)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .filter(|i| !before.contains(&i.uuid))
+            .collect::<Vec<_>>()
+    };
 
-    if !items.is_empty() {
+    if !added.is_empty() {
         let mut player = state.player.lock().await;
-        player.append_songs_to_playlist_items(items);
-        // Without this, the frontend's `remainingPlaylistItems` stays stale
-        // at 0, which keeps re-triggering the auto-refill on every playback
-        // event (#194).
+        player.append_songs_to_playlist_items(added);
         let playback_state = player.get_state().await;
         let _ = app.emit("playback-state", playback_state);
     }

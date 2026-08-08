@@ -630,6 +630,23 @@ pub fn run() {
                 }
             }
 
+            // Keep every dynamic playlist's membership in line with its
+            // definition the moment the library or song stats change —
+            // additions from scans/tag edits and stat-driven moves
+            // (favourite/unfavourite, deep-cut played) all land immediately.
+            // Runs serialized behind the playlists mutex; redundant passes
+            // triggered by event bursts reconcile to a no-op.
+            {
+                use tauri::Listener;
+                let handle = app.handle().clone();
+                for event in ["library-changed", "song-stats-changed"] {
+                    let handle = handle.clone();
+                    app.listen(event, move |_| {
+                        tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
+                    });
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -662,7 +679,7 @@ pub fn run() {
             commands::player::play_playlist_item_by_uuid,
             commands::player::open_and_play,
             commands::player::get_startup_file,
-            commands::player::append_songs_to_player_playlist,
+            commands::player::add_songs_to_queue,
             commands::player::remove_songs_from_player_playlist,
             commands::player::reorder_player_playlist_items,
             commands::player::reorder_player_item_by_uuid,
@@ -701,10 +718,8 @@ pub fn run() {
             commands::playlist::redo_playlist,
             commands::playlist::import_playlist,
             commands::playlist::export_playlist,
-            commands::playlist::set_playlist_auto_play,
             commands::playlist::set_playlist_population_mode,
             commands::playlist::set_playlist_dynamic_spec,
-            commands::playlist::refill_auto_playlist,
             commands::playlist::refresh_auto_playlist,
             // Cover Art commands
             commands::cover::get_cover_art_uri,

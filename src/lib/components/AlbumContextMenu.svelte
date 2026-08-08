@@ -35,10 +35,8 @@
     try {
       const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
       if (songs.length > 0) {
-        const queuePl = await playlistsStore.requireQueue();
         const songIds = songs.map((s) => s.id);
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+        await playlistsStore.addSongsToQueue(songIds);
         const name = albumName || i18n.t("collection.unknownAlbum");
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }

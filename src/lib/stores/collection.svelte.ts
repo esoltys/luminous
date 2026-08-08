@@ -223,13 +223,12 @@ class CollectionStore {
   smartBuilderEditing = $state<{
     id: number;
     name: string;
-    autoPlay: boolean;
     populationMode?: QueuePopulationMode;
   } | null>(null);
 
   openSmartBuilder(
     rules?: Array<{ field: string; op: string; value: string }>,
-    editing?: { id: number; name: string; autoPlay: boolean; populationMode?: QueuePopulationMode }
+    editing?: { id: number; name: string; populationMode?: QueuePopulationMode }
   ) {
     this.smartBuilderRules = rules || [];
     this.smartBuilderEditing = editing ?? null;

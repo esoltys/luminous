@@ -143,10 +143,8 @@
     const isQueue = !targetPlaylist || targetPlaylist.is_queue;
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
-      if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+      {
+        await playlistsStore.addSongsToQueue(songIds);
         const label = songIds.length === 1 ? "1 song" : `${songIds.length} songs`;
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: label }, `Added ${label} to Queue`));
       }
@@ -381,10 +379,8 @@
     const songIds = [songId];
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
-      if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+      {
+        await playlistsStore.addSongsToQueue(songIds);
         const songObj = songs.find((s) => s.id === songId);
         const name = songObj?.title || "Song";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
@@ -402,10 +398,8 @@
     const songIds = songs.map((s) => s.id);
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
-      if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+      {
+        await playlistsStore.addSongsToQueue(songIds);
         const name = albumName || "Album";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }

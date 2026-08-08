@@ -101,10 +101,8 @@
     const songIds = [songId];
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
-      if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+      {
+        await playlistsStore.addSongsToQueue(songIds);
         const songObj = songs.find((s) => s.id === songId);
         const name = songObj?.title || "Song";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
@@ -926,10 +924,8 @@
         const songIds = songs.map(s => s.id);
 
         if (isQueue) {
-          const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
-          if (queuePl) {
-            await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-            await invoke("append_songs_to_player_playlist", { songIds });
+          {
+            await playlistsStore.addSongsToQueue(songIds);
             const name = album.album || i18n.t("collection.unknownAlbum");
             toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
           }

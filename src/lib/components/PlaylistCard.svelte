@@ -101,9 +101,7 @@
       <ListMusic class="w-10 h-10 text-brand-text-secondary" />
     {/if}
 
-    {#if (autoKind === "decade" || autoKind === "genre") && playlist.auto_play}
-      <CardBadge icon={Radio} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} colorClass={badgeColorClass} />
-    {:else if autoKind === "smart"}
+    {#if autoKind === "smart"}
       <CardBadge icon={Sparkles} label={i18n.t("playlists.smartBadgeLabel")} title={i18n.t("playlists.smartRuleBasedTooltip")} colorClass={badgeColorClass} />
     {/if}
   </div>

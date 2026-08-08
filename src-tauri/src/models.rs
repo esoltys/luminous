@@ -400,8 +400,6 @@ pub struct Playlist {
     pub dynamic_enabled: bool,
     pub dynamic_spec: Option<String>, // JSON-serialized smart playlist spec
     #[serde(default)]
-    pub auto_play: bool, // Auto-Play: keep appending next batch when approaching end (#26)
-    #[serde(default)]
     pub population_mode: QueuePopulationMode, // Queue population bias (#120)
     pub last_played_row: Option<i32>,
     pub created: i64,
@@ -421,9 +419,9 @@ impl Playlist {
         !dynamic_enabled && name.trim().eq_ignore_ascii_case("queue")
     }
 
-    /// Maps the canonical 10-column playlist SELECT: id, name,
-    /// dynamic_enabled, dynamic_spec, auto_play, population_mode,
-    /// last_played_row, created, updated, track_count.
+    /// Maps the canonical 9-column playlist SELECT: id, name,
+    /// dynamic_enabled, dynamic_spec, population_mode, last_played_row,
+    /// created, updated, track_count.
     pub fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
         let name: String = row.get(1)?;
         let dynamic_enabled: bool = row.get(2)?;
@@ -433,16 +431,15 @@ impl Playlist {
             name,
             dynamic_enabled,
             dynamic_spec: row.get(3)?,
-            auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
             population_mode: QueuePopulationMode::from(
-                row.get::<_, Option<String>>(5)?
+                row.get::<_, Option<String>>(4)?
                     .unwrap_or_default()
                     .as_str(),
             ),
-            last_played_row: row.get(6)?,
-            created: row.get(7)?,
-            updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-            track_count: row.get(9)?,
+            last_played_row: row.get(5)?,
+            created: row.get(6)?,
+            updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+            track_count: row.get(8)?,
             is_queue,
         })
     }

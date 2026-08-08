@@ -1647,7 +1647,7 @@ fn get_playlists_by_ids(
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play, p.population_mode,
+        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.population_mode,
                 p.last_played_row, p.created, p.updated,
                 (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
          FROM playlists p WHERE p.id IN ({placeholders})"

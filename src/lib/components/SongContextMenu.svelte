@@ -40,10 +40,8 @@
   } = $props();
 
   async function handleDefaultAddToQueue() {
-    const queuePl = await playlistsStore.requireQueue();
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
-    await playlistsStore.addSongsToPlaylist(queuePl.id, ids);
-    await invoke("append_songs_to_player_playlist", { songIds: ids });
+    await playlistsStore.addSongsToQueue(ids);
     const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }

@@ -33,7 +33,6 @@
     playlistId?: number;
     updated?: number;
     trackCount: number;
-    autoPlay?: boolean;
   }
 
   // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
@@ -144,7 +143,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -158,7 +156,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -172,7 +169,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -429,7 +425,6 @@
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
-                  autoPlay={def.autoPlay}
                   onClick={() => openAuto(def)}
                 />
               {:else}
@@ -442,7 +437,6 @@
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
-                  autoPlay={def.autoPlay}
                   onClick={() => openAuto(def)}
                 />
               {/if}

@@ -96,6 +96,17 @@ class PlaylistsStore {
         this.refreshAutoPlaylistCounts();
       });
 
+      // The backend reconciles dynamic playlists whenever the library or
+      // song stats change (see reconcile_and_sync in playlist.rs) and
+      // announces which ones changed — refresh so views reflect the new
+      // membership immediately.
+      await listen<number[]>("playlists-changed", async (event) => {
+        await this.refreshPlaylists();
+        if (this.activePlaylistId !== null && event.payload.includes(this.activePlaylistId)) {
+          await this.selectPlaylist(this.activePlaylistId);
+        }
+      });
+
       await this.refreshPlaylists();
       this.refreshAutoPlaylistCounts();
       const queuePl = await this.requireQueue();
@@ -189,14 +200,12 @@ class PlaylistsStore {
   async updatePlaylistSpec(
     id: number,
     spec: string,
-    autoPlay: boolean = false,
     populationMode: QueuePopulationMode = "all"
   ) {
     // Mode is persisted before the spec so that the spec-triggered
     // (re)population below already uses it.
     await invoke("set_playlist_population_mode", { playlistId: id, mode: populationMode });
     await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
-    await invoke("set_playlist_auto_play", { playlistId: id, autoPlay });
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
       await this.selectPlaylist(id);
@@ -278,6 +287,18 @@ class PlaylistsStore {
       }
     } catch (err) {
       console.error("Failed to trim Queue tracks before uuid:", err);
+    }
+  }
+
+  /** Add songs to the built-in Queue. The backend appends the DB rows and
+   * mirrors them into the live play order in one call, so callers no longer
+   * pair add_to_playlist with a live-queue append. */
+  async addSongsToQueue(songIds: number[]) {
+    await invoke("add_songs_to_queue", { songIds });
+    await this.refreshPlaylists();
+    const qPl = this.queuePlaylist;
+    if (qPl && this.activePlaylistId === qPl.id) {
+      await this.selectPlaylist(qPl.id);
     }
   }
 
@@ -418,16 +439,6 @@ class PlaylistsStore {
 
   async exportPlaylist(playlistId: number, exportPath: string, relative: boolean = true) {
     await invoke("export_playlist", { playlistId, exportPath, relative });
-  }
-
-  /**
-   * Toggle the Auto-Play flag on a dynamic/auto playlist.
-   * When enabled, playback will keep appending the next batch of matching
-   * songs as the queue approaches the end of the current batch (#26).
-   */
-  async setPlaylistAutoPlay(playlistId: number, autoPlay: boolean) {
-    await invoke("set_playlist_auto_play", { playlistId, autoPlay });
-    await this.refreshPlaylists();
   }
 
   /**

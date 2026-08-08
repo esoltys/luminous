@@ -16,7 +16,7 @@
 
   interface Props {
     initialRules?: Rule[];
-    editing?: { id: number; name: string; autoPlay: boolean; populationMode?: QueuePopulationMode } | null;
+    editing?: { id: number; name: string; populationMode?: QueuePopulationMode } | null;
     onClose: () => void;
   }
 
@@ -115,7 +115,6 @@
   // capturing the initial value only is intentional here.
   let userHasEditedName = $state(untrack(() => editing !== null));
   let playlistName = $state(untrack(() => editing?.name ?? generateSuggestedName(rules)));
-  let autoPlay = $state(untrack(() => editing?.autoPlay ?? true));
   let populationMode = $state<QueuePopulationMode>(untrack(() => editing?.populationMode ?? "all"));
 
   $effect(() => {
@@ -204,7 +203,7 @@
         if (name !== editing.name) {
           await playlistsStore.renamePlaylist(editing.id, name);
         }
-        await playlistsStore.updatePlaylistSpec(editing.id, specString, autoPlay, populationMode);
+        await playlistsStore.updatePlaylistSpec(editing.id, specString, populationMode);
         collectionStore.closeSmartBuilder();
         collectionStore.viewPlaylist(editing.id);
         return;
@@ -212,7 +211,7 @@
 
       const playlist = await playlistsStore.createPlaylist(name);
       if (playlist && specString) {
-        await playlistsStore.updatePlaylistSpec(playlist.id, specString, autoPlay, populationMode);
+        await playlistsStore.updatePlaylistSpec(playlist.id, specString, populationMode);
       }
       collectionStore.closeSmartBuilder();
       if (playlist) {
@@ -351,19 +350,6 @@
             </div>
           {/each}
         </div>
-      </div>
-
-      <!-- Auto-Refill Toggle -->
-      <div class="flex items-center justify-between gap-3 pt-2">
-        <div>
-          <span class="text-xs font-semibold text-brand-text-primary block">{i18n.t("smartPlaylistBuilder.autoRefillLabel")}</span>
-          <span class="text-[11px] text-brand-text-secondary/70">{i18n.t("smartPlaylistBuilder.autoRefillHint")}</span>
-        </div>
-        <Toggle
-          checked={autoPlay}
-          onchange={(v) => { autoPlay = v; }}
-          label={i18n.t("smartPlaylistBuilder.autoRefillLabel")}
-        />
       </div>
 
       <!-- Queue population mode tabs (#120): applied when this playlist (re)populates -->
