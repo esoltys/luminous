@@ -758,6 +758,30 @@ impl Player {
         }
     }
 
+    /// How long a live loudness-gain change ramps over when a track is
+    /// already audible (`refresh_loudness_gain`), to avoid an audible step
+    /// in level. Track-start application (`apply_loudness_gain`) applies
+    /// instantly instead — there's no continuous waveform across a track
+    /// boundary for a step to be audible against.
+    const LOUDNESS_REFRESH_RAMP_MS: u32 = 150;
+
+    fn compute_loudness_gain(
+        settings: &crate::models::LoudnessSettings,
+        song: &Song,
+    ) -> (f32, LoudnessGainSource, Option<f32>) {
+        if settings.enabled {
+            let result = crate::loudness::compute_gain(
+                song.ebur128_integrated_loudness_lufs,
+                song.replaygain_track_gain,
+                song.replaygain_album_gain,
+                settings,
+            );
+            (result.linear, result.source, Some(result.gain_db))
+        } else {
+            (1.0, LoudnessGainSource::Disabled, None)
+        }
+    }
+
     /// Recompute and apply the loudness-normalization gain (#77) for a track
     /// that is about to become audible. Called for every non-gapless track
     /// start; for gapless handovers it's applied at the actual audible
@@ -772,17 +796,7 @@ impl Player {
                 return;
             }
         };
-        let (gain, source, gain_db) = if settings.enabled {
-            let result = crate::loudness::compute_gain(
-                song.ebur128_integrated_loudness_lufs,
-                song.replaygain_track_gain,
-                song.replaygain_album_gain,
-                &settings,
-            );
-            (result.linear, result.source, Some(result.gain_db))
-        } else {
-            (1.0, LoudnessGainSource::Disabled, None)
-        };
+        let (gain, source, gain_db) = Self::compute_loudness_gain(&settings, song);
         self.current_loudness_source = source;
         self.current_loudness_gain_db = gain_db;
         self.audio.lock().await.set_loudness_gain(gain);
@@ -790,10 +804,38 @@ impl Player {
 
     /// Re-apply the loudness gain for the currently playing track — called
     /// after a loudness setting changes, so the effect is heard immediately
-    /// rather than waiting for the next track change.
+    /// rather than waiting for the next track change. Ramps to the new gain
+    /// instead of stepping it, since (unlike a track boundary) this changes
+    /// the level in the middle of the same continuous waveform and a hard
+    /// step would be an audible click/zipper.
     pub async fn refresh_loudness_gain(&mut self) {
-        if let Some(song) = self.current_song.clone() {
-            self.apply_loudness_gain(&song).await;
+        let Some(song) = self.current_song.clone() else {
+            return;
+        };
+        let settings = match crate::loudness::get_settings(&self._db) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("Failed to load loudness settings: {e}");
+                return;
+            }
+        };
+        let (target_gain, source, gain_db) = Self::compute_loudness_gain(&settings, &song);
+        self.current_loudness_source = source;
+        self.current_loudness_gain_db = gain_db;
+
+        let handle = self.audio.lock().await.loudness_gain.clone();
+        let start_gain = f32::from_bits(handle.load(std::sync::atomic::Ordering::Relaxed));
+        if (target_gain - start_gain).abs() < f32::EPSILON {
+            return;
+        }
+        const STEPS: u32 = 15;
+        let step_dur =
+            std::time::Duration::from_millis((Self::LOUDNESS_REFRESH_RAMP_MS / STEPS) as u64);
+        for i in 1..=STEPS {
+            let t = i as f32 / STEPS as f32;
+            let g = start_gain + (target_gain - start_gain) * t;
+            handle.store(g.to_bits(), std::sync::atomic::Ordering::Relaxed);
+            tokio::time::sleep(step_dur).await;
         }
     }
 
