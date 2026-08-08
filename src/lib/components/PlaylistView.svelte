@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -747,11 +748,24 @@
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full relative select-none">
   {#if currentCoverUrl}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
-      <div
-        class="absolute inset-0 bg-cover bg-center opacity-[0.12] scale-105 blur-[60px] saturate-[180%] transition-all duration-1000"
-        style="background-image: url('{currentCoverUrl}');"
-      ></div>
-      <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-transparent to-brand-main/20"></div>
+      {#if isQueue}
+        {#key currentCoverUrl}
+          <img
+            src={currentCoverUrl}
+            alt=""
+            class="absolute inset-0 w-full h-full object-cover blur-2xl"
+            style="will-change: filter; transform: translateZ(0) scale(1.5);"
+            in:fade={{ duration: 400 }}
+          />
+        {/key}
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
+      {:else}
+        <div
+          class="absolute inset-0 bg-cover bg-center opacity-[0.12] scale-105 blur-[60px] saturate-[180%] transition-all duration-1000"
+          style="background-image: url('{currentCoverUrl}');"
+        ></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-transparent to-brand-main/20"></div>
+      {/if}
     </div>
   {/if}
 
@@ -911,7 +925,23 @@
         <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue/Smart Banner -->
         {#if isQueue}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
-            <Layers class="w-16 h-16 text-brand-accent-text" />
+            {#key playerStore.currentSong?.id}
+              <div class="w-full h-full" in:fade={{ duration: 200 }}>
+                {#if playerStore.currentSong}
+                  <CoverArt
+                    songId={playerStore.currentSong.id}
+                    artEmbedded={playerStore.currentSong.art_embedded}
+                    artAutomatic={playerStore.currentSong.art_automatic}
+                    artManual={playerStore.currentSong.art_manual}
+                    sizeClass="w-full h-full"
+                  />
+                {:else}
+                  <div class="w-full h-full flex items-center justify-center">
+                    <Layers class="w-16 h-16 text-brand-accent-text" />
+                  </div>
+                {/if}
+              </div>
+            {/key}
           </div>
         {:else if isSmartPlaylist && topAlbums.length > 0}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
