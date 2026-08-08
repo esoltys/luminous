@@ -572,13 +572,15 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_playlists: () => library.playlists,
     create_playlist: (args) => {
       const now = Math.floor(Date.now() / 1000);
+      const name = (args.name as string) ?? "New Playlist";
       const newPlaylist = {
         id: Math.max(0, ...library.playlists.map((p) => p.id)) + 1,
-        name: (args.name as string) ?? "New Playlist",
+        name,
         dynamic_enabled: false,
         created: now,
         updated: now,
         track_count: 0,
+        is_queue: name.trim().toLowerCase() === "queue",
       };
       library.playlists.push(newPlaylist);
       return newPlaylist;
@@ -753,11 +755,24 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
   };
 
+  // The engine echoes the applied (clamped) config back; the component
+  // assigns from the echo, so a bare noop would blank the EQ UI.
+  commands["apply_equalizer_config"] = (args) => args.config;
+  commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
+  commands["get_ui_preferences"] = () => ({
+    rating_style: "heart",
+    seekbar_mode: "waveform",
+    acoustid_api_key: "",
+    albums_view_mode: "cards",
+    artists_view_mode: "cards",
+    playlists_auto_view_mode: "cards",
+    playlists_custom_view_mode: "cards",
+  });
+
   const NOOP_COMMANDS = [
-    "set_equalizer_enabled", "set_equalizer_preamp", "set_equalizer_band", "set_spectrum_enabled",
-    "set_equalizer_mode", "set_parametric_band",
+    "set_spectrum_enabled",
     "set_loudness_enabled", "set_loudness_target_lufs", "set_loudness_mode", "set_loudness_fallback_gain",
-    "set_fade_settings",
+    "set_fade_settings", "set_ui_preferences", "add_songs_to_queue",
     "play_song", "play_songs", "play_playlist_item", "pause", "resume", "stop",
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",

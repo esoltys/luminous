@@ -249,9 +249,13 @@ function rowToSong(row: Record<string, unknown>): Song {
 }
 
 function rowToPlaylist(row: Record<string, unknown>): Playlist {
+  const dynamicEnabled = !!row.dynamic_enabled;
   return {
     ...(row as unknown as Playlist),
-    dynamic_enabled: !!row.dynamic_enabled,
+    dynamic_enabled: dynamicEnabled,
+    // Mirrors Playlist::is_queue_row in models.rs — the backend computes
+    // this flag rather than storing it, so the mock must too.
+    is_queue: !dynamicEnabled && String(row.name ?? "").trim().toLowerCase() === "queue",
   };
 }
 
