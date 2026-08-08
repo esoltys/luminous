@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin";
+import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
 
 import { execSync } from "child_process";
 

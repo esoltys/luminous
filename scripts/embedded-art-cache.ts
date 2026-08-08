@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { parseFile } from "music-metadata";
-import type { Song } from "../src/lib/types/index";
+import type { Song } from "../src/lib/types/index.ts";
 
 export const EMBEDDED_ART_CACHE_DIR = path.join(os.tmpdir(), "luminous-mock-embedded-art");
 const FILENAME_PREFIX = "album-mockembed-";
