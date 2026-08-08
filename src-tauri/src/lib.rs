@@ -715,12 +715,8 @@ pub fn run() {
             commands::visualizer::set_spectrum_enabled,
             // Equalizer commands
             commands::equalizer::get_equalizer_state,
-            commands::equalizer::set_equalizer_enabled,
-            commands::equalizer::set_equalizer_mode,
-            commands::equalizer::set_equalizer_band,
-            commands::equalizer::set_parametric_band,
+            commands::equalizer::apply_equalizer_config,
             commands::equalizer::reset_parametric_bands,
-            commands::equalizer::set_equalizer_preamp,
             commands::equalizer::load_equalizer_preset,
             // Loudness normalization commands
             commands::loudness::get_loudness_settings,
@@ -742,6 +738,8 @@ pub fn run() {
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
+            commands::settings::get_ui_preferences,
+            commands::settings::set_ui_preferences,
             commands::settings::get_commit_hash,
             commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,

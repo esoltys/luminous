@@ -4,6 +4,18 @@ export type RatingStyle = "heart" | "stars";
 export type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 
+/** Shape of the backend's UiPreferences struct — the schema (keys, domains,
+ * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
+interface UiPreferences {
+  rating_style: RatingStyle;
+  seekbar_mode: SeekBarMode;
+  acoustid_api_key: string;
+  albums_view_mode: CollectionViewMode;
+  artists_view_mode: CollectionViewMode;
+  playlists_auto_view_mode: CollectionViewMode;
+  playlists_custom_view_mode: CollectionViewMode;
+}
+
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
@@ -14,95 +26,63 @@ class PrefsStore {
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
 
   async init() {
-    try {
-      const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      if (settings?.rating_style === "stars" || settings?.rating_style === "heart") {
-        this.ratingStyle = settings.rating_style;
-      }
-      if (settings?.seekbar_mode === "waveform" || settings?.seekbar_mode === "bands") {
-        this.seekBarMode = settings.seekbar_mode;
-      }
-      if (settings?.acoustid_api_key) {
-        this.acoustidApiKey = settings.acoustid_api_key;
-      }
-      if (settings?.albums_view_mode === "cards" || settings?.albums_view_mode === "rows") {
-        this.albumsViewMode = settings.albums_view_mode;
-      }
-      if (settings?.artists_view_mode === "cards" || settings?.artists_view_mode === "rows") {
-        this.artistsViewMode = settings.artists_view_mode;
-      }
-      if (settings?.playlists_auto_view_mode === "cards" || settings?.playlists_auto_view_mode === "rows") {
-        this.playlistsAutoViewMode = settings.playlists_auto_view_mode;
-      }
-      if (settings?.playlists_custom_view_mode === "cards" || settings?.playlists_custom_view_mode === "rows") {
-        this.playlistsCustomViewMode = settings.playlists_custom_view_mode;
-      }
-    } catch (e) {
-      console.error("Failed to load preference settings:", e);
-    }
+    const prefs = await invoke<UiPreferences>("get_ui_preferences");
+    this.ratingStyle = prefs.rating_style;
+    this.seekBarMode = prefs.seekbar_mode;
+    this.acoustidApiKey = prefs.acoustid_api_key;
+    this.albumsViewMode = prefs.albums_view_mode;
+    this.artistsViewMode = prefs.artists_view_mode;
+    this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
+    this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
   }
 
-  async setRatingStyle(style: RatingStyle) {
+  /** Persist the whole current state — fire-and-forget on the backend. */
+  private save() {
+    const prefs: UiPreferences = {
+      rating_style: this.ratingStyle,
+      seekbar_mode: this.seekBarMode,
+      acoustid_api_key: this.acoustidApiKey,
+      albums_view_mode: this.albumsViewMode,
+      artists_view_mode: this.artistsViewMode,
+      playlists_auto_view_mode: this.playlistsAutoViewMode,
+      playlists_custom_view_mode: this.playlistsCustomViewMode,
+    };
+    invoke("set_ui_preferences", { prefs });
+  }
+
+  setRatingStyle(style: RatingStyle) {
     this.ratingStyle = style;
-    try {
-      await invoke("set_app_setting", { key: "rating_style", value: style });
-    } catch (e) {
-      console.error("Failed to save rating style:", e);
-    }
+    this.save();
   }
 
-  async toggleSeekBarMode() {
+  toggleSeekBarMode() {
     this.seekBarMode = this.seekBarMode === "waveform" ? "bands" : "waveform";
-    try {
-      await invoke("set_app_setting", { key: "seekbar_mode", value: this.seekBarMode });
-    } catch (e) {
-      console.error("Failed to save seek bar mode:", e);
-    }
+    this.save();
   }
 
-  async setAcoustidApiKey(key: string) {
+  setAcoustidApiKey(key: string) {
     this.acoustidApiKey = key;
-    try {
-      await invoke("set_app_setting", { key: "acoustid_api_key", value: key });
-    } catch (e) {
-      console.error("Failed to save AcoustID API key:", e);
-    }
+    this.save();
   }
 
-  async setAlbumsViewMode(mode: CollectionViewMode) {
+  setAlbumsViewMode(mode: CollectionViewMode) {
     this.albumsViewMode = mode;
-    try {
-      await invoke("set_app_setting", { key: "albums_view_mode", value: mode });
-    } catch (e) {
-      console.error("Failed to save albums view mode:", e);
-    }
+    this.save();
   }
 
-  async setArtistsViewMode(mode: CollectionViewMode) {
+  setArtistsViewMode(mode: CollectionViewMode) {
     this.artistsViewMode = mode;
-    try {
-      await invoke("set_app_setting", { key: "artists_view_mode", value: mode });
-    } catch (e) {
-      console.error("Failed to save artists view mode:", e);
-    }
+    this.save();
   }
 
-  async setPlaylistsAutoViewMode(mode: CollectionViewMode) {
+  setPlaylistsAutoViewMode(mode: CollectionViewMode) {
     this.playlistsAutoViewMode = mode;
-    try {
-      await invoke("set_app_setting", { key: "playlists_auto_view_mode", value: mode });
-    } catch (e) {
-      console.error("Failed to save playlists auto view mode:", e);
-    }
+    this.save();
   }
 
-  async setPlaylistsCustomViewMode(mode: CollectionViewMode) {
+  setPlaylistsCustomViewMode(mode: CollectionViewMode) {
     this.playlistsCustomViewMode = mode;
-    try {
-      await invoke("set_app_setting", { key: "playlists_custom_view_mode", value: mode });
-    } catch (e) {
-      console.error("Failed to save playlists custom view mode:", e);
-    }
+    this.save();
   }
 }
 

@@ -43,8 +43,10 @@ describe("Equalizer.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_equalizer_state") return defaultEqConfig;
+      // The backend echoes the applied config back (post-clamping).
+      if (cmd === "apply_equalizer_config") return args?.config;
       if (cmd === "get_loudness_settings") return defaultLoudness;
       if (cmd === "get_fade_settings") return defaultFadeSettings;
       if (cmd === "get_loudness_analysis_remaining") return 0;
@@ -70,7 +72,10 @@ describe("Equalizer.svelte", () => {
     });
 
     await fireEvent.click(toggle!);
-    expect(invoke).toHaveBeenCalledWith("set_equalizer_enabled", { enabled: false });
+    expect(invoke).toHaveBeenCalledWith(
+      "apply_equalizer_config",
+      expect.objectContaining({ config: expect.objectContaining({ enabled: false }) })
+    );
   });
 
   it("switches between Graphic and Parametric modes", async () => {
@@ -82,7 +87,10 @@ describe("Equalizer.svelte", () => {
     const parametricBtn = getByText(/20-band/i);
     await fireEvent.click(parametricBtn);
 
-    expect(invoke).toHaveBeenCalledWith("set_equalizer_mode", { mode: "parametric20" });
+    expect(invoke).toHaveBeenCalledWith(
+      "apply_equalizer_config",
+      expect.objectContaining({ config: expect.objectContaining({ mode: "parametric20" }) })
+    );
   });
 
   it("loads a preset when selected", async () => {

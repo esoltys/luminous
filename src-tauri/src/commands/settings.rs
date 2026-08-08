@@ -31,6 +31,110 @@ pub async fn set_app_setting(
     Ok(())
 }
 
+/// Typed UI preferences. The schema (keys, value domains, defaults) lives
+/// here rather than being implied by whatever strings the frontend happens
+/// to write into the app_state KV table. Storage stays one KV row per field
+/// for backwards compatibility with existing databases.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct UiPreferences {
+    pub rating_style: String,
+    pub seekbar_mode: String,
+    pub acoustid_api_key: String,
+    pub albums_view_mode: String,
+    pub artists_view_mode: String,
+    pub playlists_auto_view_mode: String,
+    pub playlists_custom_view_mode: String,
+}
+
+impl Default for UiPreferences {
+    fn default() -> Self {
+        Self {
+            rating_style: "heart".into(),
+            seekbar_mode: "waveform".into(),
+            acoustid_api_key: String::new(),
+            albums_view_mode: "cards".into(),
+            artists_view_mode: "cards".into(),
+            playlists_auto_view_mode: "cards".into(),
+            playlists_custom_view_mode: "cards".into(),
+        }
+    }
+}
+
+impl UiPreferences {
+    /// Field ↔ app_state key mapping, shared by load and store so the two
+    /// can't drift.
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 7] {
+        const RATING: &[&str] = &["heart", "stars"];
+        const SEEKBAR: &[&str] = &["waveform", "bands"];
+        const VIEW: &[&str] = &["cards", "rows"];
+        const ANY: &[&str] = &[];
+        [
+            ("rating_style", &mut self.rating_style, RATING),
+            ("seekbar_mode", &mut self.seekbar_mode, SEEKBAR),
+            ("acoustid_api_key", &mut self.acoustid_api_key, ANY),
+            ("albums_view_mode", &mut self.albums_view_mode, VIEW),
+            ("artists_view_mode", &mut self.artists_view_mode, VIEW),
+            (
+                "playlists_auto_view_mode",
+                &mut self.playlists_auto_view_mode,
+                VIEW,
+            ),
+            (
+                "playlists_custom_view_mode",
+                &mut self.playlists_custom_view_mode,
+                VIEW,
+            ),
+        ]
+    }
+}
+
+#[tauri::command]
+pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
+    let mut prefs = UiPreferences::default();
+    let Ok(conn) = state.db.pool.get() else {
+        return prefs;
+    };
+    for (key, slot, allowed) in prefs.fields() {
+        let stored: Option<String> = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            )
+            .ok();
+        if let Some(v) = stored {
+            // An out-of-domain stored value falls back to the default rather
+            // than leaking into the UI.
+            if allowed.is_empty() || allowed.contains(&v.as_str()) {
+                *slot = v;
+            }
+        }
+    }
+    prefs
+}
+
+/// Fire-and-forget like [`set_app_setting`] — always `Ok`. Values outside a
+/// field's domain are silently replaced with the default on the next load.
+#[tauri::command]
+pub async fn set_ui_preferences(
+    state: State<'_, AppState>,
+    mut prefs: UiPreferences,
+) -> Result<(), String> {
+    let Ok(conn) = state.db.pool.get() else {
+        log::error!("Failed to persist UI preferences: no DB connection");
+        return Ok(());
+    };
+    for (key, slot, _) in prefs.fields() {
+        if let Err(e) = conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+            rusqlite::params![key, slot.as_str()],
+        ) {
+            log::error!("Failed to persist UI preference '{key}': {e}");
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_all_app_settings(
     state: State<'_, AppState>,

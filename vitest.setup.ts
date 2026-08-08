@@ -66,6 +66,17 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "validate_playlist_name") {
         return { valid: true, reason: null };
       }
+      if (cmd === "get_ui_preferences") {
+        return {
+          rating_style: "heart",
+          seekbar_mode: "waveform",
+          acoustid_api_key: "",
+          albums_view_mode: "cards",
+          artists_view_mode: "cards",
+          playlists_auto_view_mode: "cards",
+          playlists_custom_view_mode: "cards",
+        };
+      }
       if (cmd === "open_and_play") {
         return { played: 1, skipped: 0 };
       }
