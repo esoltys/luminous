@@ -910,8 +910,8 @@
 
         <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue/Smart Banner -->
         {#if isQueue}
-          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#4338CA]/25 to-[#7C3AED]/15 items-center justify-center overflow-hidden border border-[#7C3AED]/30 shadow-[0_0_28px_3px_rgba(124,58,237,0.4)]">
-            <Layers class="w-16 h-16 text-[#7C3AED]" />
+          <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
+            <Layers class="w-16 h-16 text-brand-accent-text" />
           </div>
         {:else if isSmartPlaylist && topAlbums.length > 0}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-[#C2410C]/25 to-[#F59E0B]/15 items-center justify-center overflow-hidden border border-[#F59E0B]/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
