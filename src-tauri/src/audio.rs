@@ -498,10 +498,10 @@ struct AudioOutput {
 }
 
 fn get_default_device_name() -> Option<String> {
-    use cpal::traits::{DeviceTrait, HostTrait};
+    use cpal::traits::HostTrait;
     let host = cpal::default_host();
     let device = host.default_output_device()?;
-    device.name().ok()
+    Some(device.to_string())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -520,7 +520,7 @@ fn build_output(
     let device = host
         .default_output_device()
         .ok_or_else(|| "No audio output device".to_string())?;
-    let device_name = device.name().ok();
+    let device_name = Some(device.to_string());
     let default_config = device
         .default_output_config()
         .map_err(|e| format!("Failed to get default output config: {e}"))?;
@@ -534,7 +534,7 @@ fn build_output(
         cpal::SupportedBufferSize::Unknown => cpal::BufferSize::Default,
     };
 
-    let target_sample_rate = config.sample_rate.0;
+    let target_sample_rate = config.sample_rate;
     let target_channels = config.channels;
 
     // Update equalizer sample rate and channels format using target device values
@@ -572,7 +572,7 @@ fn build_output(
 
     let stream = device
         .build_output_stream(
-            &config,
+            config,
             move |output: &mut [f32], _| {
                 let vol = vol_ref.lock().map(|v| *v).unwrap_or(1.0);
                 let loudness = f32::from_bits(loudness_cpal.load(Ordering::Relaxed));
