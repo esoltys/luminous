@@ -21,7 +21,7 @@ Luminous is a fast, local-first player for your own audio library — no streami
 
 Grab the latest build from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)**.
 
-- **Windows**: download `Luminous-setup.exe` and run it.
+- **Windows**: download `Luminous_{version}_x64-setup.exe` and run it.
 - **Linux**: download the `.deb`, `.rpm`, or `.AppImage` for your distro from the same release and install/run it as usual.
 
 ---
