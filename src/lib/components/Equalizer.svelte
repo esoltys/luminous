@@ -44,7 +44,7 @@
 
   const presets = [
     "Flat", "Rock", "Pop", "Classical", "Jazz",
-    "Bass Boost", "Vocal Boost"
+    "Bass Boost", "Vocal Boost", "Clarity"
   ];
 
   function getPresetTranslationKey(presetName: string): string {
@@ -56,7 +56,8 @@
       "Jazz": "jazzPreset",
       "Bass Boost": "bassBoostPreset",
       "Vocal Boost": "vocalBoostPreset",
-      "Treble Boost": "trebleBoostPreset"
+      "Treble Boost": "trebleBoostPreset",
+      "Clarity": "clarityPreset"
     };
     return "equalizer." + (keyMap[presetName] || "customPreset");
   }
@@ -82,6 +83,7 @@
     const jazzGains = [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0];
     const bassBoostGains = [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     const vocalBoostGains = [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0];
+    const clarityGains = [4.0, 2.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, 2.0, 4.0];
     const flatGains = Array(10).fill(0.0);
 
     const matches = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.1);
@@ -93,6 +95,7 @@
     else if (matches(gains, jazzGains)) activePreset = "Jazz";
     else if (matches(gains, bassBoostGains)) activePreset = "Bass Boost";
     else if (matches(gains, vocalBoostGains)) activePreset = "Vocal Boost";
+    else if (matches(gains, clarityGains)) activePreset = "Clarity";
     else activePreset = "Custom";
   }
 

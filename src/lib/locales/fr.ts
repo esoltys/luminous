@@ -680,6 +680,7 @@ export const fr = {
     bassBoostPreset: "Amplification des basses",
     vocalBoostPreset: "Amplification des voix",
     trebleBoostPreset: "Amplification des aigus",
+    clarityPreset: "Clarté",
     preamp: "Préampli",
     enableEq: "Activer l'égaliseur",
     subtitle: "Ajustez votre réponse en fréquence avec un filtre de crête en cascade à 10 bandes",
