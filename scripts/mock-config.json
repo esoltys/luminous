@@ -1,6 +1,6 @@
 {
-  "//": "Tracked template for scripts/mock-config.json (gitignored) — copy this file to mock-config.json in your worktree to configure bun run take-screenshots. See .claude/CLAUDE.md.",
-  "//dbPath": "Optional. Auto-detected from the real app's Tauri app-data dir (e.g. %APPDATA%\\org.luminous.app\\luminous.db on Windows) if omitted. Set this to point at a different database instead.",
+  "//": "Configures bun run take-screenshots (see .claude/CLAUDE.md). For a personal override without touching this tracked file, use scripts/mock-config.local.json instead — it takes priority when present.",
+  "//dbPath": "Optional. Auto-detected from the real app's Tauri app-data dir (e.g. %APPDATA%\\org.luminous.music\\luminous.db on Windows) if omitted. Set this to point at a different database instead.",
   "dbPath": "",
   "songLimit": 2000,
   "default": {
@@ -29,9 +29,13 @@
       "tab": "collection",
       "subTab": "albums",
       "action": "click-album",
-      "sidebarWidth": 220,
-      "rightPanelOpen": true,
-      "positionSeconds": 79
+      "theme": "dynamic-artwork",
+      "featuredSong": "Revel in Your Time",
+      "featuredArtist": "GUNSHIP",
+      "featuredAlbum": "GUNSHIP",
+      "sidebarWidth": 64,
+      "rightPanelOpen": false,
+      "positionSeconds": 81
     },
     {
       "name": "album-tag-editor",
@@ -98,7 +102,12 @@
       "name": "lyrics",
       "filename": "lyrics.png",
       "tab": "lyrics",
-      "positionSeconds": 79
+      "theme": "dynamic-artwork",
+      "featuredSong": "Halloween",
+      "featuredArtist": "Phoebe Bridgers",
+      "sidebarWidth": 64,
+      "rightPanelOpen": false,
+      "positionSeconds": 163
     },
     {
       "name": "miniplayer-hover",
