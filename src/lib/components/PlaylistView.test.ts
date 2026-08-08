@@ -21,6 +21,7 @@ describe("PlaylistView.svelte", () => {
     created: 1700000000,
     updated: 1700000000,
     dynamic_enabled: false,
+    is_queue: false,
   };
 
   const mockTracks: PlaylistItem[] = [

@@ -277,9 +277,14 @@ pub fn run() {
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             // Initialize playlist manager
-            let playlists = Arc::new(Mutex::new(
-                PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists"),
-            ));
+            let manager = PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists");
+            // Bootstrap the built-in Queue before the window loads, so the
+            // frontend can treat its existence as a guarantee rather than a
+            // condition to re-check at every call site.
+            if let Err(e) = manager.queue() {
+                log::error!("Failed to bootstrap Queue playlist: {e}");
+            }
+            let playlists = Arc::new(Mutex::new(manager));
 
             // Initialize cover manager
             let cover_manager = Arc::new(CoverManager::new(

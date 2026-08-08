@@ -247,21 +247,17 @@ export class PlayerStore {
   async playSong(songId: number) {
     await invoke("play_song", { songId });
     await playlistsStore.refreshPlaylists();
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl) {
-      this.activeContextName = "Queue";
-      await playlistsStore.selectPlaylist(queuePl.id);
-    }
+    const queuePl = await playlistsStore.requireQueue();
+    this.activeContextName = "Queue";
+    await playlistsStore.selectPlaylist(queuePl.id);
   }
 
   async openAndPlay(paths: string[]) {
     await invoke("open_and_play", { paths });
     await playlistsStore.refreshPlaylists();
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl) {
-      this.activeContextName = "Queue";
-      await playlistsStore.selectPlaylist(queuePl.id);
-    }
+    const queuePl = await playlistsStore.requireQueue();
+    this.activeContextName = "Queue";
+    await playlistsStore.selectPlaylist(queuePl.id);
   }
 
   async openFileDialog() {
@@ -298,7 +294,7 @@ export class PlayerStore {
   }
 
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     const effectivePlaylistId = playlistId ?? queuePl?.id;
     if (contextName) {
       this.activeContextName = contextName;
@@ -332,7 +328,7 @@ export class PlayerStore {
     if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
     if (this.repeatMode === "playlist") return;
     const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
-    if (pl?.name?.toLowerCase() === "queue" || this.activeContextName === "Queue") {
+    if (pl?.is_queue || this.activeContextName === "Queue") {
       await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
     }
   }

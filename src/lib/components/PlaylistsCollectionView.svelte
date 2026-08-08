@@ -102,8 +102,8 @@
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
-    const queue = list.find((p) => p.name.toLowerCase() === "queue");
-    const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
+    const queue = list.find((p) => p.is_queue);
+    const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;
   });
 
@@ -236,7 +236,7 @@
     const field = customSortField;
     const asc = customSortAsc;
     return customPlaylists
-      .filter((p) => p.name.toLowerCase() !== "queue")
+      .filter((p) => !p.is_queue)
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);

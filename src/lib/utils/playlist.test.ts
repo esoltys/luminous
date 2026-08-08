@@ -11,6 +11,7 @@ describe("playlist utils", () => {
       updated: 100,
       track_count: 5,
       dynamic_enabled: false,
+      is_queue: false,
     };
     expect(getPlaylistDisplayName(playlist)).toBe("My Favorites");
   });
@@ -25,6 +26,7 @@ describe("playlist utils", () => {
       updated: 100,
       track_count: 25,
       dynamic_enabled: true,
+      is_queue: false,
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Rock");
   });
@@ -39,6 +41,7 @@ describe("playlist utils", () => {
       updated: 100,
       track_count: 10,
       dynamic_enabled: true,
+      is_queue: false,
     };
     expect(getPlaylistDisplayName(playlistDeepCuts)).toBe("1980s Rock Deep Cuts");
 
@@ -51,6 +54,7 @@ describe("playlist utils", () => {
       updated: 100,
       track_count: 15,
       dynamic_enabled: true,
+      is_queue: false,
     };
     expect(getPlaylistDisplayName(playlistFavourites)).toBe("Jazz Favourites");
   });

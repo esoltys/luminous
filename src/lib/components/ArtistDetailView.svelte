@@ -78,7 +78,7 @@
   }
 
   async function handlePlaySingle(song: Song) {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.playSongs([song.id], 0, queuePl?.id, undefined, "Queue");
   }
 
@@ -97,11 +97,11 @@
 
   async function handleAddSingleToPlaylist(songId: number) {
     const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
     const songIds = [songId];
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
@@ -138,7 +138,7 @@
       .then(([fetchedSongs, fetchedPlaylists]) => {
         if (requested !== artistName) return;
         songs = fetchedSongs;
-        playlists = fetchedPlaylists.filter((p) => p.name.toLowerCase() !== "queue");
+        playlists = fetchedPlaylists.filter((p) => !p.is_queue);
       })
       .catch((err) => {
         console.error("Failed to load artist detail:", err);
@@ -287,7 +287,7 @@
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -298,7 +298,7 @@
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
@@ -922,11 +922,11 @@
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       if (songs.length > 0) {
         const targetPlaylist = playlistsStore.activeCustomPlaylist;
-        const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+        const isQueue = !targetPlaylist || targetPlaylist.is_queue;
         const songIds = songs.map(s => s.id);
 
         if (isQueue) {
-          const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+          const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
           if (queuePl) {
             await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
             await invoke("append_songs_to_player_playlist", { songIds });

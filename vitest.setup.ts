@@ -63,6 +63,13 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "has_acoustid_env_key") {
         return false;
       }
+      // The backend bootstraps the built-in Queue playlist at startup, so a
+      // playlist listing always contains it — model that guarantee here.
+      if (cmd === "get_playlists") {
+        return [
+          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
+        ];
+      }
       return null;
     }),
   };

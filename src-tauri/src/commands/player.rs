@@ -4,11 +4,33 @@ use crate::{
 };
 use tauri::State;
 
+/// Shared tail of every "replace the Queue and start playing" command:
+/// swap the Queue's contents for `song_ids`, then hand the fresh items to
+/// the player.
+async fn replace_queue_and_play(
+    state: &State<'_, AppState>,
+    song_ids: &[i64],
+    start_index: usize,
+    context: Option<PlayContext>,
+) -> Result<(), String> {
+    let (queue_id, items) = {
+        let mut playlists = state.playlists.lock().await;
+        playlists
+            .replace_queue(song_ids)
+            .map_err(|e| e.to_string())?
+    };
+    let mut player = state.player.lock().await;
+    player
+        .play_playlist(items, start_index, queue_id, context)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     use rusqlite::params;
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    // Use a direct query to get by ID
+    // Reject unknown ids up front so the Queue isn't cleared for nothing.
     let sql = format!(
         "SELECT {} FROM songs WHERE id = ?1",
         crate::collection::SONG_SELECT_COLS
@@ -17,54 +39,7 @@ pub async fn play_song(song_id: i64, state: State<'_, AppState>) -> Result<(), S
         .query_row(&sql, params![song_id], crate::collection::row_to_song)
         .map_err(|e| e.to_string())?;
 
-    let queue_id = {
-        let playlists = state.playlists.lock().await;
-        let queue_pl = playlists
-            .get_playlists()
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
-
-        match queue_pl {
-            Some(pl) => pl.id,
-            None => {
-                let created = playlists
-                    .create_playlist("Queue")
-                    .map_err(|e| e.to_string())?;
-                created.id
-            }
-        }
-    };
-
-    // Replace Queue in DB with this single song
-    {
-        let mut playlists = state.playlists.lock().await;
-        let existing = playlists
-            .get_playlist_tracks(queue_id)
-            .map_err(|e| e.to_string())?;
-        if !existing.is_empty() {
-            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
-            playlists
-                .remove_from_playlist(queue_id, &uuids)
-                .map_err(|e| e.to_string())?;
-        }
-        playlists
-            .add_songs_to_playlist(queue_id, &[song_id])
-            .map_err(|e| e.to_string())?;
-    }
-
-    let items = {
-        let playlists = state.playlists.lock().await;
-        playlists
-            .get_playlist_tracks(queue_id)
-            .map_err(|e| e.to_string())?
-    };
-
-    let mut player = state.player.lock().await;
-    player
-        .play_playlist(items, 0, queue_id, Some(PlayContext::Song))
-        .await
-        .map_err(|e| e.to_string())
+    replace_queue_and_play(&state, &[song_id], 0, Some(PlayContext::Song)).await
 }
 
 #[tauri::command]
@@ -79,56 +54,37 @@ pub async fn play_songs(
         return Ok(());
     }
 
-    let queue_id = {
-        let playlists = state.playlists.lock().await;
-        let queue_pl = playlists
-            .get_playlists()
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
-
-        match queue_pl {
-            Some(pl) => pl.id,
-            None => {
-                let created = playlists
-                    .create_playlist("Queue")
-                    .map_err(|e| e.to_string())?;
-                created.id
+    // Playing "into" the Queue (explicitly or by default) replaces its
+    // contents; playing a real playlist just plays that playlist's rows.
+    let target = match playlist_id {
+        None => None,
+        Some(pid) => {
+            let playlists = state.playlists.lock().await;
+            let queue = playlists.queue().map_err(|e| e.to_string())?;
+            if pid == queue.id {
+                None
+            } else {
+                Some(pid)
             }
         }
     };
 
-    let target_playlist_id = playlist_id.unwrap_or(queue_id);
-
-    // If target is Queue (or unspecified), replace Queue in DB with song_ids
-    if target_playlist_id == queue_id || playlist_id.is_none() {
-        let mut playlists = state.playlists.lock().await;
-        let existing = playlists
-            .get_playlist_tracks(queue_id)
-            .map_err(|e| e.to_string())?;
-        if !existing.is_empty() {
-            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
-            playlists
-                .remove_from_playlist(queue_id, &uuids)
-                .map_err(|e| e.to_string())?;
+    match target {
+        None => replace_queue_and_play(&state, &song_ids, start_index, context).await,
+        Some(pid) => {
+            let items = {
+                let playlists = state.playlists.lock().await;
+                playlists
+                    .get_playlist_tracks(pid)
+                    .map_err(|e| e.to_string())?
+            };
+            let mut player = state.player.lock().await;
+            player
+                .play_playlist(items, start_index, pid, context)
+                .await
+                .map_err(|e| e.to_string())
         }
-        playlists
-            .add_songs_to_playlist(queue_id, &song_ids)
-            .map_err(|e| e.to_string())?;
     }
-
-    let items = {
-        let playlists = state.playlists.lock().await;
-        playlists
-            .get_playlist_tracks(target_playlist_id)
-            .map_err(|e| e.to_string())?
-    };
-
-    let mut player = state.player.lock().await;
-    player
-        .play_playlist(items, start_index, target_playlist_id, context)
-        .await
-        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -452,54 +408,7 @@ pub async fn open_and_play(
 
     let song_ids: Vec<i64> = songs.iter().map(|s| s.id).collect();
 
-    let queue_id = {
-        let playlists = state.playlists.lock().await;
-        let queue_pl = playlists
-            .get_playlists()
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|p| !p.dynamic_enabled && p.name.to_lowercase() == "queue");
-
-        match queue_pl {
-            Some(pl) => pl.id,
-            None => {
-                let created = playlists
-                    .create_playlist("Queue")
-                    .map_err(|e| e.to_string())?;
-                created.id
-            }
-        }
-    };
-
-    // Replace tracks in DB Queue playlist so open file(s) replace the Queue
-    {
-        let mut playlists = state.playlists.lock().await;
-        let existing = playlists
-            .get_playlist_tracks(queue_id)
-            .map_err(|e| e.to_string())?;
-        if !existing.is_empty() {
-            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
-            playlists
-                .remove_from_playlist(queue_id, &uuids)
-                .map_err(|e| e.to_string())?;
-        }
-        playlists
-            .add_songs_to_playlist(queue_id, &song_ids)
-            .map_err(|e| e.to_string())?;
-    }
-
-    let items = {
-        let playlists = state.playlists.lock().await;
-        playlists
-            .get_playlist_tracks(queue_id)
-            .map_err(|e| e.to_string())?
-    };
-
-    let mut player = state.player.lock().await;
-    let res = player
-        .play_playlist(items, 0, queue_id, Some(PlayContext::Song))
-        .await
-        .map_err(|e| e.to_string());
+    let res = replace_queue_and_play(&state, &song_ids, 0, Some(PlayContext::Song)).await;
     let _ = app.emit("library-changed", ());
     res
 }

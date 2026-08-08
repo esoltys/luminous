@@ -184,7 +184,32 @@ impl PlaylistManager {
             created: now,
             updated: now,
             track_count: 0,
+            is_queue: Playlist::is_queue_row(name, false),
         })
+    }
+
+    /// The app's built-in Queue playlist. Creates it on first use, so callers
+    /// can rely on it existing — "no Queue" is not a representable state.
+    pub fn queue(&self) -> Result<Playlist> {
+        if let Some(pl) = self.get_playlists()?.into_iter().find(|p| p.is_queue) {
+            return Ok(pl);
+        }
+        self.create_playlist("Queue")
+    }
+
+    /// Replace the Queue's contents with `song_ids` and return the queue id
+    /// plus its fresh items. Goes through remove/add (rather than a raw
+    /// DELETE) so the replacement stays undoable like any other edit.
+    pub fn replace_queue(&mut self, song_ids: &[i64]) -> Result<(i64, Vec<PlaylistItem>)> {
+        let queue = self.queue()?;
+        let existing = self.get_playlist_tracks(queue.id)?;
+        if !existing.is_empty() {
+            let uuids: Vec<String> = existing.into_iter().map(|i| i.uuid).collect();
+            self.remove_from_playlist(queue.id, &uuids)?;
+        }
+        self.add_songs_to_playlist(queue.id, song_ids)?;
+        let items = self.get_playlist_tracks(queue.id)?;
+        Ok((queue.id, items))
     }
 
     pub fn rename_playlist(&self, id: i64, name: &str) -> Result<()> {
@@ -224,24 +249,7 @@ impl PlaylistManager {
              ORDER BY p.created",
         )?;
         let playlists = stmt
-            .query_map([], |row| {
-                Ok(Playlist {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    dynamic_enabled: row.get(2)?,
-                    dynamic_spec: row.get(3)?,
-                    auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                    population_mode: QueuePopulationMode::from(
-                        row.get::<_, Option<String>>(5)?
-                            .unwrap_or_default()
-                            .as_str(),
-                    ),
-                    last_played_row: row.get(6)?,
-                    created: row.get(7)?,
-                    updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                    track_count: row.get(9)?,
-                })
-            })?
+            .query_map([], Playlist::from_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(playlists)
@@ -264,24 +272,7 @@ impl PlaylistManager {
              ORDER BY p.created",
         )?;
         let playlists = stmt
-            .query_map(params![artist], |row| {
-                Ok(Playlist {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    dynamic_enabled: row.get(2)?,
-                    dynamic_spec: row.get(3)?,
-                    auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                    population_mode: QueuePopulationMode::from(
-                        row.get::<_, Option<String>>(5)?
-                            .unwrap_or_default()
-                            .as_str(),
-                    ),
-                    last_played_row: row.get(6)?,
-                    created: row.get(7)?,
-                    updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                    track_count: row.get(9)?,
-                })
-            })?
+            .query_map(params![artist], Playlist::from_row)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(playlists)
@@ -1595,6 +1586,68 @@ mod tests {
             playlists.iter().find(|p| p.id == queue.id).unwrap().name,
             "Queue"
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_queue_is_idempotent_and_flagged() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        let q1 = manager.queue().unwrap();
+        let q2 = manager.queue().unwrap();
+        assert_eq!(q1.id, q2.id, "queue() must not create duplicates");
+        assert!(q1.is_queue);
+        assert_eq!(manager.get_playlists().unwrap().len(), 1);
+
+        // Ordinary playlists are never flagged as the Queue.
+        let other = manager.create_playlist("Road Trip").unwrap();
+        assert!(!other.is_queue);
+        let listed = manager.get_playlists().unwrap();
+        assert!(listed.iter().find(|p| p.id == q1.id).unwrap().is_queue);
+        assert!(!listed.iter().find(|p| p.id == other.id).unwrap().is_queue);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_replace_queue_swaps_contents_and_is_undoable() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=3 {
+                conn.execute(
+                    "INSERT INTO songs (title, artist, path) VALUES (?1, 'A', ?2)",
+                    params![format!("Song {i}"), format!("/s{i}.mp3")],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let (queue_id, items) = manager.replace_queue(&[1, 2]).unwrap();
+        assert_eq!(items.len(), 2);
+
+        let (queue_id_2, items) = manager.replace_queue(&[3]).unwrap();
+        assert_eq!(
+            queue_id, queue_id_2,
+            "replace must reuse the same Queue row"
+        );
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Song 3")
+        );
+
+        // The replacement went through the normal edit ops, so undoing the
+        // add restores the pre-replace state step by step.
+        manager.undo().unwrap(); // undo add of [3]
+        manager.undo().unwrap(); // undo removal of [1, 2]
+        let tracks = manager.get_playlist_tracks(queue_id).unwrap();
+        assert_eq!(tracks.len(), 2);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

@@ -45,9 +45,7 @@ class PlaylistsStore {
 
   /** The special pinned Queue playlist, always present and never deletable. */
   queuePlaylist = $derived.by((): Playlist | null => {
-    return (
-      this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
-    );
+    return this.playlists.find((p) => p.is_queue) ?? null;
   });
 
   queueVersion = $state(0);
@@ -59,7 +57,7 @@ class PlaylistsStore {
   queueTrackCount = $derived.by((): number => {
     // Explicit signal dependency for Svelte 5 reactivity
     this.queueVersion;
-    const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
+    const q = this.playlists.find((p) => p.is_queue);
     if (q === undefined) return this.activePlaylistTracks.length ?? 0;
     if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
       return this.activePlaylistTracks.length;
@@ -84,21 +82,14 @@ class PlaylistsStore {
     this.init();
   }
 
-  async ensureQueuePlaylist(): Promise<Playlist | null> {
-    if (!Array.isArray(this.playlists)) return null;
-    let queuePl = this.playlists.find((p) => p && !p.dynamic_enabled && p.name && p.name.toLowerCase() === "queue");
-    if (!queuePl) {
-      try {
-        const created: Playlist = await invoke("create_playlist", { name: "Queue" });
-        await this.refreshPlaylists();
-        if (Array.isArray(this.playlists)) {
-          queuePl = this.playlists.find((p) => p && p.id === created?.id) || created;
-        }
-      } catch (err) {
-        console.error("Failed to auto-create Queue playlist:", err);
-      }
-    }
-    return queuePl || null;
+  /** The built-in Queue playlist. The backend bootstraps it before the
+   * window loads, so it always exists — this only refreshes the local list
+   * if the Queue hasn't been fetched yet. */
+  async requireQueue(): Promise<Playlist> {
+    if (!this.queuePlaylist) await this.refreshPlaylists();
+    const queue = this.queuePlaylist;
+    if (!queue) throw new Error("built-in Queue playlist missing from backend");
+    return queue;
   }
 
   private async init() {
@@ -116,7 +107,7 @@ class PlaylistsStore {
 
       await this.refreshPlaylists();
       this.refreshAutoPlaylistCounts();
-      const queuePl = await this.ensureQueuePlaylist();
+      const queuePl = await this.requireQueue();
 
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.pinned_playlist_id) {
@@ -133,18 +124,15 @@ class PlaylistsStore {
           return;
         }
       }
-      if (queuePl) {
-        await this.selectPlaylist(queuePl.id);
-      } else if (this.playlists.length > 0) {
-        await this.selectPlaylist(this.playlists[0].id);
-      }
+      await this.selectPlaylist(queuePl.id);
     } catch (err) {
       console.error("Failed to initialize PlaylistsStore:", err);
     }
   }
 
   async refreshPlaylists() {
-    this.playlists = await invoke("get_playlists");
+    const playlists = await invoke<Playlist[]>("get_playlists");
+    this.playlists = Array.isArray(playlists) ? playlists : [];
     this.notifyQueueChanged();
   }
 
@@ -227,7 +215,7 @@ class PlaylistsStore {
   async deletePlaylist(id: number) {
     if (Array.isArray(this.playlists)) {
       const target = this.playlists.find((p) => p && p.id === id);
-      if (target && !target.dynamic_enabled && target.name && target.name.toLowerCase() === "queue") {
+      if (target?.is_queue) {
         console.warn("Cannot delete special Queue playlist");
         return;
       }
@@ -265,8 +253,7 @@ class PlaylistsStore {
   }
 
   async replaceQueueTracks(songIds: number[]) {
-    const queuePl = await this.ensureQueuePlaylist();
-    if (!queuePl) return;
+    const queuePl = await this.requireQueue();
     try {
       const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
       if (existingItems.length > 0) {
@@ -285,7 +272,7 @@ class PlaylistsStore {
 
   /** Removes every track ahead of `uuid` (in current DB order) from
    * `playlistId`. Takes the target playlist id explicitly rather than
-   * re-resolving "the Queue" via `ensureQueuePlaylist()` — that lookup can
+   * re-resolving "the Queue" via `requireQueue()` — that lookup can
    * disagree with whichever playlist the caller actually means (e.g. is
    * already viewing), and always resolves `uuid`'s position from a fresh
    * `get_playlist_tracks` fetch rather than trusting a caller-supplied

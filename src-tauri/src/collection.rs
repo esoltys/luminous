@@ -1655,22 +1655,7 @@ fn get_playlists_by_ids(
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            let playlist = Playlist {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                dynamic_enabled: row.get(2)?,
-                dynamic_spec: row.get(3)?,
-                auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                population_mode: QueuePopulationMode::from(
-                    row.get::<_, Option<String>>(5)?
-                        .unwrap_or_default()
-                        .as_str(),
-                ),
-                last_played_row: row.get(6)?,
-                created: row.get(7)?,
-                updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                track_count: row.get(9)?,
-            };
+            let playlist = Playlist::from_row(row)?;
             Ok((playlist.id, playlist))
         })?
         .filter_map(|r| r.ok())

@@ -198,11 +198,11 @@ export const FALLBACK_SONGS: Song[] = ALBUM_SEEDS.flatMap((seed) =>
 );
 
 export const FALLBACK_PLAYLISTS: Playlist[] = [
-  { id: 1, name: "Chill Midnight", dynamic_enabled: false, created: 1782800000000, updated: 1782800000000, track_count: 3 },
-  { id: 2, name: "Heavy Riffs", dynamic_enabled: false, created: 1782810000000, updated: 1782810000000, track_count: 2 },
-  { id: 3, name: "Acoustic Morning", dynamic_enabled: false, created: 1782820000000, updated: 1782820000000, track_count: 6 },
-  { id: 4, name: "Indie Rock", dynamic_enabled: true, dynamic_spec: "Indie Rock", created: 1782830000000, updated: 1782830000000, track_count: 8 },
-  { id: 5, name: "Queue", dynamic_enabled: false, created: 1782840000000, updated: 1782840000000, track_count: 4 },
+  { id: 1, name: "Chill Midnight", dynamic_enabled: false, created: 1782800000000, updated: 1782800000000, track_count: 3, is_queue: false },
+  { id: 2, name: "Heavy Riffs", dynamic_enabled: false, created: 1782810000000, updated: 1782810000000, track_count: 2, is_queue: false },
+  { id: 3, name: "Acoustic Morning", dynamic_enabled: false, created: 1782820000000, updated: 1782820000000, track_count: 6, is_queue: false },
+  { id: 4, name: "Indie Rock", dynamic_enabled: true, dynamic_spec: "Indie Rock", created: 1782830000000, updated: 1782830000000, track_count: 8, is_queue: false },
+  { id: 5, name: "Queue", dynamic_enabled: false, created: 1782840000000, updated: 1782840000000, track_count: 4, is_queue: true },
 ];
 
 export const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me

@@ -48,6 +48,7 @@ function makePlaylist(overrides: Partial<Playlist> = {}): Playlist {
     id: 1,
     name: "Road Trip",
     dynamic_enabled: false,
+    is_queue: false,
     created: 0,
     updated: 0,
     track_count: 5,

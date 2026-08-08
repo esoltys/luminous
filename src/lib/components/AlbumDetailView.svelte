@@ -140,10 +140,10 @@
     if (selectedSongIds.size === 0) return;
     const songIds = Array.from(selectedSongIds);
     const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
@@ -377,11 +377,11 @@
 
   async function handleAddSongToPlaylist(songId: number) {
     const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
     const songIds = [songId];
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
@@ -398,11 +398,11 @@
   async function handleAddAlbumToPlaylist() {
     if (songs.length === 0) return;
     const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
     const songIds = songs.map((s) => s.id);
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });

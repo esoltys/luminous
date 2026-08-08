@@ -163,6 +163,9 @@ export interface Playlist {
   created: number;
   updated: number;
   track_count: number;
+  /** True for the app's single built-in Queue playlist (backend-computed —
+   * never derive this from the playlist name). */
+  is_queue: boolean;
 }
 
 /** Queue population bias — see #120. Tab order: All, Favourites, Familiar, Discover, Deep Cuts. */

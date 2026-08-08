@@ -173,13 +173,9 @@
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl) {
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
-    } else if (playerStore.currentSong.album) {
-      collectionStore.viewAlbum(playerStore.currentSong.album);
-    }
+    const queuePl = await playlistsStore.requireQueue();
+    playlistsStore.selectPlaylist(queuePl.id);
+    collectionStore.viewPlaylist(queuePl.id);
   }
 </script>
 

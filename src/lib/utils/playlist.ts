@@ -67,8 +67,8 @@ export async function queueAlbumAsPlaylist(album: AlbumItem): Promise<void> {
     const songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
     if (songs.length > 0) {
       const songIds = songs.map((s) => s.id);
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
-      await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, albumName);
+      const queuePl = await playlistsStore.requireQueue();
+      await playerStore.playSongs(songIds, 0, queuePl.id, undefined, albumName);
     }
   } catch (err) {
     console.error("Failed to add album to Queue:", err);

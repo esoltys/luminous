@@ -50,7 +50,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     collectionStore.activeTab = "collection";
     collectionStore.albums = [];
     playlistsStore.playlists = [
-      { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false },
+      { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true },
     ];
 
     vi.mocked(invoke).mockImplementation((cmd: string) => {
@@ -61,10 +61,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         return Promise.resolve({});
       }
       if (cmd === "get_playlists") {
-        return Promise.resolve([{ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false }]);
+        return Promise.resolve([{ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true }]);
       }
       if (cmd === "create_playlist") {
-        return Promise.resolve({ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false });
+        return Promise.resolve({ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true });
       }
       if (cmd === "get_playlist_items") {
         return Promise.resolve([]);

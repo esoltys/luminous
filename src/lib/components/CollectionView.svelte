@@ -387,11 +387,11 @@
 
   async function handleAddSongToPlaylist(songId: number) {
     const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
     const songIds = [songId];
 
     if (isQueue) {
-      const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+      const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
         await invoke("append_songs_to_player_playlist", { songIds });
@@ -1215,11 +1215,11 @@
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       if (songs.length > 0) {
         const targetPlaylist = playlistsStore.activeCustomPlaylist;
-        const isQueue = !targetPlaylist || targetPlaylist.name?.toLowerCase() === "queue";
+        const isQueue = !targetPlaylist || targetPlaylist.is_queue;
         const songIds = songs.map(s => s.id);
 
         if (isQueue) {
-          const queuePl = targetPlaylist || (await playlistsStore.ensureQueuePlaylist());
+          const queuePl = targetPlaylist || (await playlistsStore.requireQueue());
           if (queuePl) {
             await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
             await invoke("append_songs_to_player_playlist", { songIds });

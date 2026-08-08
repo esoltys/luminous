@@ -241,7 +241,7 @@ import { shuffleArray } from "../utils/shuffle";
   async function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
@@ -251,7 +251,7 @@ import { shuffleArray } from "../utils/shuffle";
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -262,7 +262,7 @@ import { shuffleArray } from "../utils/shuffle";
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
@@ -277,7 +277,7 @@ import { shuffleArray } from "../utils/shuffle";
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
       toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      const queuePl = await playlistsStore.requireQueue();
       if (queuePl) {
         await playlistsStore.addSongsToPlaylist(queuePl.id, [songId]);
         await invoke("append_songs_to_player_playlist", { songIds: [songId] });
@@ -294,7 +294,7 @@ import { shuffleArray } from "../utils/shuffle";
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
       toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
+      const queuePl = await playlistsStore.requireQueue();
       if (queuePl) {
         const songIds = songs.map((s) => s.id);
         await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
