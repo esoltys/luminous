@@ -529,9 +529,7 @@ export class ThemeStore {
     if (PREDEFINED_THEMES.some(t => t.id === themeId) || this.customThemes.some(t => t.id === themeId)) {
       this.activeThemeId = themeId;
       this.applyActiveTheme();
-      await invoke("set_app_setting", { key: "active_theme_id", value: themeId }).catch(err => {
-        console.error("Failed to save active_theme_id:", err);
-      });
+      await invoke("set_app_setting", { key: "active_theme_id", value: themeId });
     }
   }
 
@@ -545,19 +543,13 @@ export class ThemeStore {
     this.activeThemeId = theme.id;
     this.applyActiveTheme();
 
-    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) }).catch(err => {
-      console.error("Failed to save custom_themes:", err);
-    });
-    await invoke("set_app_setting", { key: "active_theme_id", value: theme.id }).catch(err => {
-      console.error("Failed to save active_theme_id:", err);
-    });
+    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) });
+    await invoke("set_app_setting", { key: "active_theme_id", value: theme.id });
   }
 
   async deleteCustomTheme(themeId: string) {
     this.customThemes = this.customThemes.filter(t => t.id !== themeId);
-    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) }).catch(err => {
-      console.error("Failed to save custom_themes:", err);
-    });
+    await invoke("set_app_setting", { key: "custom_themes", value: JSON.stringify(this.customThemes) });
 
     if (this.activeThemeId === themeId) {
       await this.setTheme("system");

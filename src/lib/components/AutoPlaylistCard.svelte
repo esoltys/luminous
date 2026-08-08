@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, RefreshCw } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge } from "lucide-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
@@ -20,7 +20,6 @@
     /** For kind "genre", "decade" or "bpm": when this playlist's songs were last (re)generated. */
     updated?: number;
     trackCount: number;
-    autoPlay?: boolean;
     onClick: () => void;
     widthClass?: string;
   }
@@ -28,7 +27,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
-  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, autoPlay = false, onClick, widthClass = "w-full" }: Props = $props();
+  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if ((kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined) {
@@ -147,10 +146,6 @@
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">
         <ListMusic class="w-10 h-10 text-slate-300" />
       </div>
-    {/if}
-
-    {#if autoPlay}
-      <CardBadge icon={RefreshCw} label={i18n.t('playlists.autoPlayBadgeLabel')} title={i18n.t('playlists.autoPlayBadgeTooltip')} colorClass={badgeColorClass} spin />
     {/if}
   </div>
 

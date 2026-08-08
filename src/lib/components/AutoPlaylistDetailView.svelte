@@ -11,7 +11,6 @@
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
-  import Toggle from "./Toggle.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import EmptyState from "./EmptyState.svelte";
@@ -24,7 +23,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, Gauge, RefreshCw, CheckCircle2, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
 import { shuffleArray } from "../utils/shuffle";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
@@ -241,7 +240,7 @@ import { shuffleArray } from "../utils/shuffle";
   async function handlePlaySong(song: Song) {
     const index = songs.findIndex((s) => s.id === song.id);
     const songIds = songs.map((s) => s.id);
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
@@ -251,7 +250,7 @@ import { shuffleArray } from "../utils/shuffle";
 
   async function handlePlayAll() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -262,7 +261,7 @@ import { shuffleArray } from "../utils/shuffle";
 
   async function handleShufflePlay() {
     if (songs.length === 0) return;
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
     await playerStore.setShuffleMode("all");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
@@ -277,10 +276,8 @@ import { shuffleArray } from "../utils/shuffle";
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
       toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
-      if (queuePl) {
-        await playlistsStore.addSongsToPlaylist(queuePl.id, [songId]);
-        await invoke("append_songs_to_player_playlist", { songIds: [songId] });
+      {
+        await playlistsStore.addSongsToQueue([songId]);
         const songObj = songs.find((s) => s.id === songId);
         const name = songObj?.title || "Song";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
@@ -294,11 +291,9 @@ import { shuffleArray } from "../utils/shuffle";
       await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
       toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
     } else {
-      const queuePl = await playlistsStore.ensureQueuePlaylist();
-      if (queuePl) {
+      {
         const songIds = songs.map((s) => s.id);
-        await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-        await invoke("append_songs_to_player_playlist", { songIds });
+        await playlistsStore.addSongsToQueue(songIds);
         const name = displayName || "Playlist";
         toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }
@@ -322,22 +317,6 @@ import { shuffleArray } from "../utils/shuffle";
     } catch (err) {
       console.error("Failed to save auto-playlist as custom playlist:", err);
     }
-  }
-
-  /**
-   * Derive current auto_play state from the backing playlist row (genre/decade only).
-   * For virtual playlists (favourites, recently_added) there is no row — so we
-   * always show the toggle but store the preference in app_settings.
-   */
-  let autoPlay = $derived.by(() => {
-    if (playlistId === undefined) return true;
-    const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-    return pl?.auto_play ?? true;
-  });
-
-  async function handleToggleAutoPlay() {
-    if (playlistId === undefined) return;
-    await playlistsStore.setPlaylistAutoPlay(playlistId, !autoPlay);
   }
 
   /** Derive the current queue population mode from the backing playlist row (#120). */
@@ -367,7 +346,6 @@ import { shuffleArray } from "../utils/shuffle";
   async function handleChangePopulationMode(newMode: QueuePopulationMode) {
     if (playlistId === undefined || newMode === populationMode || isChangingMode) return;
     isChangingMode = true;
-    playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
       songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
@@ -383,7 +361,6 @@ import { shuffleArray } from "../utils/shuffle";
   async function handleRefreshAutoPlaylist() {
     if (playlistId === undefined || isRefreshing) return;
     isRefreshing = true;
-    playerStore.clearExhausted(playlistId);
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
       songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
@@ -598,22 +575,9 @@ import { shuffleArray } from "../utils/shuffle";
           </div>
         </div>
 
-        <!-- Additional controls for genre/decade playlists: auto-play and population-mode -->
+        <!-- Additional controls for genre/decade playlists: population-mode -->
         {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
-            <!-- Auto-Play toggle: keep appending next batch as playback approaches end (#26) -->
-            <div
-              id="auto-play-toggle-{playlistId}"
-              title={autoPlay
-                ? i18n.t('playlists.autoPlayTooltipOn')
-                : i18n.t('playlists.autoPlayTooltipOff')}
-              class="flex items-center gap-2 pl-2.5 pr-0.5 h-7 rounded-full border border-brand-border bg-brand-main/40 text-xs font-semibold whitespace-nowrap shrink-0 text-brand-text-primary"
-            >
-              <RefreshCw class="w-3.5 h-3.5 shrink-0 text-brand-text-secondary {autoPlay ? 'animate-spin [animation-duration:3s] text-brand-accent-text' : ''}" />
-              <span class="whitespace-nowrap text-[11px]">{i18n.t('playlists.autoPlayLabel')}</span>
-              <Toggle checked={autoPlay} onchange={handleToggleAutoPlay} label={i18n.t('playlists.autoPlayLabel')} showOnOffLabel={false} />
-            </div>
-
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
               mode={populationMode}
@@ -1171,12 +1135,6 @@ import { shuffleArray } from "../utils/shuffle";
       </div>
     </div>
 
-    {#if autoPlay && (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined && playerStore.isAutoPlayExhausted(playlistId)}
-      <div class="mt-4 p-3 rounded-lg bg-brand-sidebar/60 border border-brand-border/40 text-center text-xs text-brand-text-primary flex items-center justify-center gap-2 select-none">
-        <CheckCircle2 class="w-4 h-4 text-brand-accent shrink-0" />
-        <span>{i18n.t('playlists.allMatchingTracksAdded')}</span>
-      </div>
-    {/if}
   </div>
 </div>
 

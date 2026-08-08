@@ -400,13 +400,49 @@ pub struct Playlist {
     pub dynamic_enabled: bool,
     pub dynamic_spec: Option<String>, // JSON-serialized smart playlist spec
     #[serde(default)]
-    pub auto_play: bool, // Auto-Play: keep appending next batch when approaching end (#26)
-    #[serde(default)]
     pub population_mode: QueuePopulationMode, // Queue population bias (#120)
     pub last_played_row: Option<i32>,
     pub created: i64,
     pub updated: i64,
     pub track_count: i32, // joined field, not stored directly
+    /// Whether this row is the app's single built-in Queue playlist. Computed
+    /// from the row (not stored) so the "playlist named Queue" convention
+    /// lives only in `Playlist::is_queue_row`; everything else — frontend
+    /// included — branches on this flag instead of matching the name.
+    #[serde(default)]
+    pub is_queue: bool,
+}
+
+impl Playlist {
+    /// The single definition of what makes a row "the Queue".
+    pub fn is_queue_row(name: &str, dynamic_enabled: bool) -> bool {
+        !dynamic_enabled && name.trim().eq_ignore_ascii_case("queue")
+    }
+
+    /// Maps the canonical 9-column playlist SELECT: id, name,
+    /// dynamic_enabled, dynamic_spec, population_mode, last_played_row,
+    /// created, updated, track_count.
+    pub fn from_row(row: &rusqlite::Row) -> rusqlite::Result<Self> {
+        let name: String = row.get(1)?;
+        let dynamic_enabled: bool = row.get(2)?;
+        let is_queue = Self::is_queue_row(&name, dynamic_enabled);
+        Ok(Playlist {
+            id: row.get(0)?,
+            name,
+            dynamic_enabled,
+            dynamic_spec: row.get(3)?,
+            population_mode: QueuePopulationMode::from(
+                row.get::<_, Option<String>>(4)?
+                    .unwrap_or_default()
+                    .as_str(),
+            ),
+            last_played_row: row.get(5)?,
+            created: row.get(6)?,
+            updated: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
+            track_count: row.get(8)?,
+            is_queue,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------

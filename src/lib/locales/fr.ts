@@ -433,11 +433,6 @@ export const fr = {
     removeDuplicatesBtn: "Retirer {count} doublons",
     duplicateTrackFlag: "Chanson en double",
     selectedCount: "{count} sélectionnée(s)",
-    autoPlayLabel: "Recharge auto",
-    autoPlayBadgeLabel: "Auto",
-    autoPlayTooltipOn: "Recharge auto ACTIVÉE — continue d'ajouter des chansons correspondantes vers la fin. Cliquer pour désactiver.",
-    autoPlayTooltipOff: "Recharge auto DÉSACTIVÉE — s'arrête à la fin du lot actuel. Cliquer pour activer la recharge continue.",
-    autoPlayBadgeTooltip: "Recharge auto activée — continue à ajouter des chansons correspondantes",
     populationModeLabel: "Lecture depuis",
     populationModeTitleFormat: "{suffix} – {base}",
     populationModeAll: "Tout",
@@ -487,7 +482,6 @@ export const fr = {
     refreshPlaylistBtn: "Rafraîchir la playlist",
     refreshAutoPlaylistTooltip: "Rafraîchir la playlist automatique avec une nouvelle sélection de titres de votre bibliothèque",
     refreshAllPlaylistsTooltip: "Rafraîchir toutes les playlists automatiques et intelligentes avec les derniers titres de votre bibliothèque",
-    allMatchingTracksAdded: "Tous les titres correspondants de votre bibliothèque ont été ajoutés à cette liste automatique.",
     playSelected: "Lire la sélection",
     removeSelected: "Retirer la sélection",
     clearSelection: "Effacer la sélection",
@@ -615,7 +609,8 @@ export const fr = {
     lyricsPlain: "Texte brut",
     lyricsNone: "Non téléchargées",
     trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
-    tracksSkippedToast: "{count} morceaux indisponibles ignorés."
+    tracksSkippedToast: "{count} morceaux indisponibles ignorés.",
+    openNothingPlayable: "Aucun fichier audio pris en charge à lire."
   },
   miniplayer: {
     title: "Mini-lecteur",
@@ -891,8 +886,6 @@ export const fr = {
     addRule: "Ajouter une règle",
     valuePlaceholder: "Valeur...",
     removeRuleTooltip: "Retirer la règle",
-    autoRefillLabel: "Recharge auto par lots",
-    autoRefillHint: "Ajoutez automatiquement des chansons correspondantes lorsque la lecture approche de la fin",
     cancel: "Annuler",
     updateBtn: "Mettre à jour la liste intelligente",
     createBtn: "Créer la liste intelligente"

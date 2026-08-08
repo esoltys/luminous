@@ -40,11 +40,8 @@
   } = $props();
 
   async function handleDefaultAddToQueue() {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (!queuePl) return;
     const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
-    await playlistsStore.addSongsToPlaylist(queuePl.id, ids);
-    await invoke("append_songs_to_player_playlist", { songIds: ids });
+    await playlistsStore.addSongsToQueue(ids);
     const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
@@ -81,7 +78,7 @@
     }}
   />
 
-  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && playlistsStore.activeCustomPlaylist.name?.toLowerCase() !== "queue"}
+  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && !playlistsStore.activeCustomPlaylist.is_queue}
     <ContextMenuItem
       icon={Plus}
       label={i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })}

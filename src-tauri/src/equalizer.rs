@@ -170,6 +170,45 @@ fn interp_preset_gain(gains: &[f32; 10], freq: f32) -> f32 {
     gains[9]
 }
 
+/// Snapshot of the user-adjustable EQ state — the value type crossing the
+/// IPC boundary in both directions. The frontend edits a config and applies
+/// it whole; the echoed snapshot (post-clamping) is the canonical state.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EqualizerConfig {
+    pub enabled: bool,
+    pub mode: EqMode,
+    pub gains: [f32; 10],
+    pub preamp: f32,
+    pub parametric: Vec<ParametricBand>,
+}
+
+impl EqualizerConfig {
+    pub fn snapshot(eq: &Equalizer) -> Self {
+        Self {
+            enabled: eq.enabled,
+            mode: eq.mode,
+            gains: eq.gains,
+            preamp: eq.preamp,
+            parametric: eq.parametric.to_vec(),
+        }
+    }
+}
+
+/// Named 10-band presets. Mapped onto the parametric bands by interpolation
+/// when that mode is active (see `load_preset_into_parametric`). Unknown
+/// names fall back to flat.
+pub fn preset_gains(name: &str) -> [f32; 10] {
+    match name.to_lowercase().as_str() {
+        "rock" => [4.0, 3.0, 2.0, -1.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0],
+        "pop" => [-2.0, -1.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, -1.0, -2.0],
+        "classical" => [5.0, 3.0, 2.0, 2.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0],
+        "jazz" => [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
+        "bass boost" | "bassboost" => [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "vocal boost" | "vocalboost" => [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0],
+        _ => [0.0; 10], // Flat
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Equalizer — 10-band graphic or 20-band parametric cascade
 // ---------------------------------------------------------------------------
@@ -257,6 +296,27 @@ impl Equalizer {
 
     pub fn set_preamp(&mut self, preamp_db: f32) {
         self.preamp = preamp_db.clamp(-12.0, 12.0);
+    }
+
+    /// Apply a whole config in one step, clamping every field through the
+    /// individual setters. Parametric center frequencies are fixed and not
+    /// taken from the config. Returns the canonical post-clamp snapshot.
+    pub fn apply(&mut self, config: &EqualizerConfig) -> EqualizerConfig {
+        self.enabled = config.enabled;
+        self.set_mode(config.mode);
+        for (idx, gain_db) in config.gains.iter().enumerate() {
+            self.set_gain(idx, *gain_db);
+        }
+        self.set_preamp(config.preamp);
+        for (idx, band) in config
+            .parametric
+            .iter()
+            .take(PARAMETRIC_BAND_COUNT)
+            .enumerate()
+        {
+            self.set_parametric_band(idx, band.gain_db, band.q);
+        }
+        EqualizerConfig::snapshot(self)
     }
 
     pub fn load_preset(&mut self, gains: [f32; 10]) {

@@ -22,7 +22,7 @@
           : "genre"
   );
 
-  let isQueue = $derived(!playlist.dynamic_enabled && playlist.name.toLowerCase() === "queue");
+  let isQueue = $derived(playlist.is_queue);
 
   let subtitleLabel = $derived.by(() => {
     if (!playlist.dynamic_enabled) return null;

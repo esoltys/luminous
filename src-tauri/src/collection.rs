@@ -1647,7 +1647,7 @@ fn get_playlists_by_ids(
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
-        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.auto_play, p.population_mode,
+        "SELECT p.id, p.name, p.dynamic_enabled, p.dynamic_spec, p.population_mode,
                 p.last_played_row, p.created, p.updated,
                 (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id) as track_count
          FROM playlists p WHERE p.id IN ({placeholders})"
@@ -1655,22 +1655,7 @@ fn get_playlists_by_ids(
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            let playlist = Playlist {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                dynamic_enabled: row.get(2)?,
-                dynamic_spec: row.get(3)?,
-                auto_play: row.get::<_, Option<bool>>(4)?.unwrap_or(false),
-                population_mode: QueuePopulationMode::from(
-                    row.get::<_, Option<String>>(5)?
-                        .unwrap_or_default()
-                        .as_str(),
-                ),
-                last_played_row: row.get(6)?,
-                created: row.get(7)?,
-                updated: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
-                track_count: row.get(9)?,
-            };
+            let playlist = Playlist::from_row(row)?;
             Ok((playlist.id, playlist))
         })?
         .filter_map(|r| r.ok())

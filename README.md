@@ -30,6 +30,8 @@ Grab the latest build from the **[Releases page](https://github.com/esoltys/lumi
 
 Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI, state, and rendering, while a Rust backend owns everything performance- or system-sensitive — audio decoding and playback, the SQLite-backed library index, file scanning, and OS media integration. The two sides talk over Tauri's IPC layer, with the frontend invoking commands and the backend emitting events for things like playback position, scan progress, and now-playing metadata. Keeping decoding, DSP, and disk I/O in Rust off the UI thread is what lets a multi-thousand-track library scan, gapless-playback, and real-time visualizers stay smooth at once.
 
+The IPC commands are deliberately *deep*: each one owns a whole workflow rather than forwarding a single field. The backend owns the built-in Queue (bootstrapped at startup, exposed via an `is_queue` flag — the frontend never infers it from a name), applies equalizer changes as one whole-config call, and keeps every dynamic playlist — genre/decade/BPM auto playlists and user smart playlists alike — *always complete*: whenever the library or a song's stats change, a backend reconciler immediately appends newly-matching songs and evicts stale ones, syncing the live play order without ever reshuffling it. There is no refill logic, and no such setting, anywhere in the frontend.
+
 ```mermaid
 flowchart TD
     subgraph Frontend["Svelte 5 Frontend"]
@@ -81,7 +83,7 @@ luminous/
     │   ├── models.rs         # Shared structs and types
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
-    │   ├── playlist.rs       # Playlist manager & undo/redo command stack
+    │   ├── playlist.rs       # Playlist manager, Queue abstraction, dynamic-playlist reconciler & undo/redo stack
     │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
     │   ├── stats.rs          # Play counts, ratings, and history tracking
     │   ├── tageditor.rs      # lofty tag writer & AcoustID fingerprint generator

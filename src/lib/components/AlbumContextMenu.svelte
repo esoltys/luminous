@@ -35,14 +35,10 @@
     try {
       const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
       if (songs.length > 0) {
-        const queuePl = await playlistsStore.ensureQueuePlaylist();
-        if (queuePl) {
-          const songIds = songs.map((s) => s.id);
-          await playlistsStore.addSongsToPlaylist(queuePl.id, songIds);
-          await invoke("append_songs_to_player_playlist", { songIds });
-          const name = albumName || i18n.t("collection.unknownAlbum");
-          toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
-        }
+        const songIds = songs.map((s) => s.id);
+        await playlistsStore.addSongsToQueue(songIds);
+        const name = albumName || i18n.t("collection.unknownAlbum");
+        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
       }
     } catch (err) {
       console.error("Failed to add album to Queue:", err);
@@ -75,7 +71,7 @@
     }}
   />
 
-  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && playlistsStore.activeCustomPlaylist.name?.toLowerCase() !== "queue"}
+  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && !playlistsStore.activeCustomPlaylist.is_queue}
     <ContextMenuItem
       icon={Plus}
       label={i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })}

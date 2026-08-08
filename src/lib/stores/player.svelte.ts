@@ -8,10 +8,6 @@ import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { i18n } from "./i18n.svelte";
 
-/** Minimum remaining tracks before the auto-refill is triggered (#26). */
-const AUTO_PLAY_REFILL_THRESHOLD = 3;
-
-
 export class PlayerStore {
   // Reactive state using Svelte 5 Runes
   state = $state<PlayState>("stopped");
@@ -25,10 +21,9 @@ export class PlayerStore {
   stopAfterCurrent = $state<boolean>(false);
   loudnessSource = $state<LoudnessGainSource>("disabled");
   loudnessGainDb = $state<number | undefined>(undefined);
-  /** Tracks remaining after the current one; populated from PlaybackState (#26). */
+  /** Tracks remaining after the current one; populated from PlaybackState.
+   * Only read for the queue-completion celebration (#182). */
   remainingPlaylistItems = $state<number>(0);
-  /** Set of playlist IDs whose library auto-refill pool has been exhausted. */
-  exhaustedPlaylistIds = $state<number[]>([]);
 
   /** Celebration: queue just finished naturally (#182, Milestone tier). */
   queueJustCompleted = $state<boolean>(false);
@@ -42,17 +37,6 @@ export class PlayerStore {
    *  toast instead of a notification per failed track. */
   private _playbackErrorBatch: string[] = [];
   private _playbackErrorTimer: ReturnType<typeof setTimeout> | null = null;
-
-  isAutoPlayExhausted(playlistId: number): boolean {
-    return this.exhaustedPlaylistIds.includes(playlistId);
-  }
-
-  clearExhausted(playlistId: number) {
-    this.exhaustedPlaylistIds = this.exhaustedPlaylistIds.filter((id) => id !== playlistId);
-  }
-
-  /** Prevents concurrent refill invocations for the same playlist. */
-  private _refillInFlight = false;
 
   constructor() {
     this.init();
@@ -96,10 +80,6 @@ export class PlayerStore {
           toastStore.show(toastText, "milestone");
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
         }
-
-        // Auto-Play refill: checked on every state change so we react when
-        // remaining drops below threshold after each track advance (#26).
-        await this.maybeRefillAutoPlaylist();
       });
 
       // Listen for track changes
@@ -185,51 +165,6 @@ export class PlayerStore {
     this.remainingPlaylistItems = state.remaining_playlist_items ?? 0;
   }
 
-  /**
-   * Auto-Play refill (#26): when a dynamic playlist has auto_play enabled and
-   * the remaining track count drops below the threshold, fetch the next batch
-   * and append it to both the DB playlist and the live player queue.
-   */
-  private async maybeRefillAutoPlaylist() {
-    const pid = this.playlistId;
-    if (!pid || pid === 0) return;
-    if (this.remainingPlaylistItems >= AUTO_PLAY_REFILL_THRESHOLD) return;
-    if (this._refillInFlight) return;
-
-    // Look up this playlist to check dynamic_enabled + auto_play
-    try {
-      const playlists = await invoke<Playlist[]>("get_playlists");
-      const pl = playlists.find((p) => p.id === pid);
-      if (!pl?.dynamic_enabled || !pl?.auto_play) return;
-
-      this._refillInFlight = true;
-      const newSongs = await invoke<Song[]>("refill_auto_playlist", { playlistId: pid });
-      if (newSongs.length > 0) {
-        const songIds = newSongs.map((s) => s.id);
-        await invoke("append_songs_to_player_playlist", { songIds });
-        // The backend emits a playback-state event after appending, but
-        // refresh explicitly too so remainingPlaylistItems is guaranteed
-        // to be current before _refillInFlight resets — otherwise a stale
-        // count keeps re-triggering this refill in a runaway loop (#194).
-        await this.refreshPlaybackState();
-        const { playlistsStore } = await import("./playlists.svelte");
-        if (playlistsStore.activePlaylistId === pid) {
-          await playlistsStore.selectPlaylist(pid);
-        }
-        await playlistsStore.refreshPlaylists();
-      } else {
-        // No new songs returned: all matching tracks in library have been added
-        if (!this.exhaustedPlaylistIds.includes(pid)) {
-          this.exhaustedPlaylistIds = [...this.exhaustedPlaylistIds, pid];
-        }
-      }
-    } catch (err) {
-      console.error("[PlayerStore] Auto-Play refill failed:", err);
-    } finally {
-      this._refillInFlight = false;
-    }
-  }
-
   /** Force a refresh of the playback state from the backend (e.g., after tags are edited) */
   async refreshPlaybackState() {
     try {
@@ -247,21 +182,30 @@ export class PlayerStore {
   async playSong(songId: number) {
     await invoke("play_song", { songId });
     await playlistsStore.refreshPlaylists();
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl) {
-      this.activeContextName = "Queue";
-      await playlistsStore.selectPlaylist(queuePl.id);
-    }
+    const queuePl = await playlistsStore.requireQueue();
+    this.activeContextName = "Queue";
+    await playlistsStore.selectPlaylist(queuePl.id);
   }
 
   async openAndPlay(paths: string[]) {
-    await invoke("open_and_play", { paths });
-    await playlistsStore.refreshPlaylists();
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
-    if (queuePl) {
-      this.activeContextName = "Queue";
-      await playlistsStore.selectPlaylist(queuePl.id);
+    const outcome = await invoke<{ played: number; skipped: number }>("open_and_play", { paths });
+    if (outcome.played === 0) {
+      toastStore.show(
+        i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
+        "error"
+      );
+      return;
     }
+    if (outcome.skipped > 0) {
+      toastStore.show(
+        i18n.t("playerBar.tracksSkippedToast", { count: outcome.skipped }, `Skipped ${outcome.skipped} unavailable tracks.`),
+        "error"
+      );
+    }
+    await playlistsStore.refreshPlaylists();
+    const queuePl = await playlistsStore.requireQueue();
+    this.activeContextName = "Queue";
+    await playlistsStore.selectPlaylist(queuePl.id);
   }
 
   async openFileDialog() {
@@ -298,7 +242,7 @@ export class PlayerStore {
   }
 
   async playSongs(songIds: number[], startIndex: number, playlistId?: number, context?: PlayContext, contextName?: string) {
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     const effectivePlaylistId = playlistId ?? queuePl?.id;
     if (contextName) {
       this.activeContextName = contextName;
@@ -332,7 +276,7 @@ export class PlayerStore {
     if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
     if (this.repeatMode === "playlist") return;
     const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
-    if (pl?.name?.toLowerCase() === "queue" || this.activeContextName === "Queue") {
+    if (pl?.is_queue || this.activeContextName === "Queue") {
       await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
     }
   }

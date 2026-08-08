@@ -2,18 +2,136 @@ use crate::AppState;
 use std::collections::HashMap;
 use tauri::State;
 
+/// Fire-and-forget by design: a failed preference write is nothing the UI
+/// can act on, so it's logged here instead of rejecting the invoke() and
+/// forcing every caller into a try/catch it can only console.error in.
+/// (The `Result` is a Tauri requirement for async commands borrowing State —
+/// this command always returns `Ok`.)
 #[tauri::command]
 pub async fn set_app_setting(
     state: State<'_, AppState>,
     key: String,
     value: String,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-        rusqlite::params![key, value],
-    )
-    .map_err(|e| e.to_string())?;
+    let result = state
+        .db
+        .pool
+        .get()
+        .map_err(|e| e.to_string())
+        .and_then(|conn| {
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![key, value],
+            )
+            .map_err(|e| e.to_string())
+        });
+    if let Err(e) = result {
+        log::error!("Failed to persist app setting '{key}': {e}");
+    }
+    Ok(())
+}
+
+/// Typed UI preferences. The schema (keys, value domains, defaults) lives
+/// here rather than being implied by whatever strings the frontend happens
+/// to write into the app_state KV table. Storage stays one KV row per field
+/// for backwards compatibility with existing databases.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct UiPreferences {
+    pub rating_style: String,
+    pub seekbar_mode: String,
+    pub acoustid_api_key: String,
+    pub albums_view_mode: String,
+    pub artists_view_mode: String,
+    pub playlists_auto_view_mode: String,
+    pub playlists_custom_view_mode: String,
+}
+
+impl Default for UiPreferences {
+    fn default() -> Self {
+        Self {
+            rating_style: "heart".into(),
+            seekbar_mode: "waveform".into(),
+            acoustid_api_key: String::new(),
+            albums_view_mode: "cards".into(),
+            artists_view_mode: "cards".into(),
+            playlists_auto_view_mode: "cards".into(),
+            playlists_custom_view_mode: "cards".into(),
+        }
+    }
+}
+
+impl UiPreferences {
+    /// Field ↔ app_state key mapping, shared by load and store so the two
+    /// can't drift.
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 7] {
+        const RATING: &[&str] = &["heart", "stars"];
+        const SEEKBAR: &[&str] = &["waveform", "bands"];
+        const VIEW: &[&str] = &["cards", "rows"];
+        const ANY: &[&str] = &[];
+        [
+            ("rating_style", &mut self.rating_style, RATING),
+            ("seekbar_mode", &mut self.seekbar_mode, SEEKBAR),
+            ("acoustid_api_key", &mut self.acoustid_api_key, ANY),
+            ("albums_view_mode", &mut self.albums_view_mode, VIEW),
+            ("artists_view_mode", &mut self.artists_view_mode, VIEW),
+            (
+                "playlists_auto_view_mode",
+                &mut self.playlists_auto_view_mode,
+                VIEW,
+            ),
+            (
+                "playlists_custom_view_mode",
+                &mut self.playlists_custom_view_mode,
+                VIEW,
+            ),
+        ]
+    }
+}
+
+#[tauri::command]
+pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
+    let mut prefs = UiPreferences::default();
+    let Ok(conn) = state.db.pool.get() else {
+        return prefs;
+    };
+    for (key, slot, allowed) in prefs.fields() {
+        let stored: Option<String> = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            )
+            .ok();
+        if let Some(v) = stored {
+            // An out-of-domain stored value falls back to the default rather
+            // than leaking into the UI.
+            if allowed.is_empty() || allowed.contains(&v.as_str()) {
+                *slot = v;
+            }
+        }
+    }
+    prefs
+}
+
+/// Fire-and-forget like [`set_app_setting`] — always `Ok`. Values outside a
+/// field's domain are silently replaced with the default on the next load.
+#[tauri::command]
+pub async fn set_ui_preferences(
+    state: State<'_, AppState>,
+    mut prefs: UiPreferences,
+) -> Result<(), String> {
+    let Ok(conn) = state.db.pool.get() else {
+        log::error!("Failed to persist UI preferences: no DB connection");
+        return Ok(());
+    };
+    for (key, slot, _) in prefs.fields() {
+        if let Err(e) = conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+            rusqlite::params![key, slot.as_str()],
+        ) {
+            log::error!("Failed to persist UI preference '{key}': {e}");
+        }
+    }
     Ok(())
 }
 
@@ -123,12 +241,19 @@ pub async fn get_fade_settings(
     get_fade_settings_from_db(&state.db)
 }
 
+/// Fire-and-forget for the same reason as [`set_app_setting`] — always `Ok`.
 #[tauri::command]
 pub async fn set_fade_settings(
     state: State<'_, AppState>,
     settings: crate::models::FadeSettings,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = match state.db.pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            log::error!("Failed to persist fade settings: {e}");
+            return Ok(());
+        }
+    };
     let pairs = [
         (
             "fade_pause_enabled",
@@ -161,12 +286,12 @@ pub async fn set_fade_settings(
     ];
 
     for (k, v) in pairs {
-        conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
             rusqlite::params![k, v],
-        )
-        .map_err(|e| e.to_string())?;
+        ) {
+            log::error!("Failed to persist fade setting '{k}': {e}");
+        }
     }
-
     Ok(())
 }

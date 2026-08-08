@@ -461,12 +461,6 @@ async function main() {
       await selects.nth(5).selectOption("<=");
       await page.waitForTimeout(100);
       await valInputs.nth(2).fill("1989");
-
-      // Toggle is a <button role="switch" aria-checked>, not a real checkbox input.
-      const toggle = page.getByRole("switch", { name: t(language, "smartPlaylistBuilder.autoRefillLabel") });
-      if ((await toggle.getAttribute("aria-checked")) !== "true") {
-        await toggle.click();
-      }
       await page.waitForTimeout(400);
     },
     "type-search": async (page, _featured, language) => {

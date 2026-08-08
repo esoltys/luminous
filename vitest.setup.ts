@@ -63,6 +63,30 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "has_acoustid_env_key") {
         return false;
       }
+      if (cmd === "validate_playlist_name") {
+        return { valid: true, reason: null };
+      }
+      if (cmd === "get_ui_preferences") {
+        return {
+          rating_style: "heart",
+          seekbar_mode: "waveform",
+          acoustid_api_key: "",
+          albums_view_mode: "cards",
+          artists_view_mode: "cards",
+          playlists_auto_view_mode: "cards",
+          playlists_custom_view_mode: "cards",
+        };
+      }
+      if (cmd === "open_and_play") {
+        return { played: 1, skipped: 0 };
+      }
+      // The backend bootstraps the built-in Queue playlist at startup, so a
+      // playlist listing always contains it — model that guarantee here.
+      if (cmd === "get_playlists") {
+        return [
+          { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
+        ];
+      }
       return null;
     }),
   };

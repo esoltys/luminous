@@ -277,9 +277,14 @@ pub fn run() {
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             // Initialize playlist manager
-            let playlists = Arc::new(Mutex::new(
-                PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists"),
-            ));
+            let manager = PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists");
+            // Bootstrap the built-in Queue before the window loads, so the
+            // frontend can treat its existence as a guarantee rather than a
+            // condition to re-check at every call site.
+            if let Err(e) = manager.queue() {
+                log::error!("Failed to bootstrap Queue playlist: {e}");
+            }
+            let playlists = Arc::new(Mutex::new(manager));
 
             // Initialize cover manager
             let cover_manager = Arc::new(CoverManager::new(
@@ -625,6 +630,23 @@ pub fn run() {
                 }
             }
 
+            // Keep every dynamic playlist's membership in line with its
+            // definition the moment the library or song stats change —
+            // additions from scans/tag edits and stat-driven moves
+            // (favourite/unfavourite, deep-cut played) all land immediately.
+            // Runs serialized behind the playlists mutex; redundant passes
+            // triggered by event bursts reconcile to a no-op.
+            {
+                use tauri::Listener;
+                let handle = app.handle().clone();
+                for event in ["library-changed", "song-stats-changed"] {
+                    let handle = handle.clone();
+                    app.listen(event, move |_| {
+                        tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
+                    });
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -657,7 +679,7 @@ pub fn run() {
             commands::player::play_playlist_item_by_uuid,
             commands::player::open_and_play,
             commands::player::get_startup_file,
-            commands::player::append_songs_to_player_playlist,
+            commands::player::add_songs_to_queue,
             commands::player::remove_songs_from_player_playlist,
             commands::player::reorder_player_playlist_items,
             commands::player::reorder_player_item_by_uuid,
@@ -674,6 +696,7 @@ pub fn run() {
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
             // Playlist commands
+            commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,
             commands::playlist::delete_playlist,
             commands::playlist::rename_playlist,
@@ -695,10 +718,8 @@ pub fn run() {
             commands::playlist::redo_playlist,
             commands::playlist::import_playlist,
             commands::playlist::export_playlist,
-            commands::playlist::set_playlist_auto_play,
             commands::playlist::set_playlist_population_mode,
             commands::playlist::set_playlist_dynamic_spec,
-            commands::playlist::refill_auto_playlist,
             commands::playlist::refresh_auto_playlist,
             // Cover Art commands
             commands::cover::get_cover_art_uri,
@@ -709,12 +730,8 @@ pub fn run() {
             commands::visualizer::set_spectrum_enabled,
             // Equalizer commands
             commands::equalizer::get_equalizer_state,
-            commands::equalizer::set_equalizer_enabled,
-            commands::equalizer::set_equalizer_mode,
-            commands::equalizer::set_equalizer_band,
-            commands::equalizer::set_parametric_band,
+            commands::equalizer::apply_equalizer_config,
             commands::equalizer::reset_parametric_bands,
-            commands::equalizer::set_equalizer_preamp,
             commands::equalizer::load_equalizer_preset,
             // Loudness normalization commands
             commands::loudness::get_loudness_settings,
@@ -736,6 +753,8 @@ pub fn run() {
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
+            commands::settings::get_ui_preferences,
+            commands::settings::set_ui_preferences,
             commands::settings::get_commit_hash,
             commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,

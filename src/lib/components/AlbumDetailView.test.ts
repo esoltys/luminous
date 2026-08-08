@@ -50,7 +50,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     collectionStore.activeTab = "collection";
     collectionStore.albums = [];
     playlistsStore.playlists = [
-      { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false },
+      { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true },
     ];
 
     vi.mocked(invoke).mockImplementation((cmd: string) => {
@@ -61,10 +61,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
         return Promise.resolve({});
       }
       if (cmd === "get_playlists") {
-        return Promise.resolve([{ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false }]);
+        return Promise.resolve([{ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true }]);
       }
       if (cmd === "create_playlist") {
-        return Promise.resolve({ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false });
+        return Promise.resolve({ id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true });
       }
       if (cmd === "get_playlist_items") {
         return Promise.resolve([]);
@@ -128,7 +128,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   it("adds all album songs to Queue when clicking the + button with no active custom playlist", async () => {
     playlistsStore.activeCustomPlaylist = null;
-    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToPlaylist");
+    const addSongsSpy = vi.spyOn(playlistsStore, "addSongsToQueue");
 
     const { getByTitle } = render(AlbumDetailView, {
       props: { albumName: mockAlbumName },
@@ -140,7 +140,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(addButton);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(addSongsSpy).toHaveBeenCalledWith(99, [1, 2]);
-    expect(invoke).toHaveBeenCalledWith("append_songs_to_player_playlist", { songIds: [1, 2] });
+    expect(addSongsSpy).toHaveBeenCalledWith([1, 2]);
+    expect(invoke).toHaveBeenCalledWith("add_songs_to_queue", { songIds: [1, 2] });
   });
 });

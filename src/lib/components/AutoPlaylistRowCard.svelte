@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, RefreshCw } from "lucide-svelte";
+  import { Heart, Clock, Hourglass, Calendar, Music, Gauge } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -14,11 +14,10 @@
     playlistId?: number;
     updated?: number;
     trackCount: number;
-    autoPlay?: boolean;
     onClick: () => void;
   }
 
-  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, autoPlay = false, onClick }: Props = $props();
+  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if ((kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined) {
@@ -75,9 +74,6 @@
       <Gauge class="w-5 h-5 text-[#E879F9]" />
     {:else}
       <Music class="w-5 h-5 text-[#34D399]" />
-    {/if}
-    {#if autoPlay}
-      <RefreshCw class="w-3 h-3 absolute bottom-0.5 right-0.5 opacity-70 animate-spin [animation-duration:3s]" />
     {/if}
   </div>
 

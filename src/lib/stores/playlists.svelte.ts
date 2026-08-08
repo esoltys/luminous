@@ -5,15 +5,6 @@ import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
-/** Marker substring from the backend's reserved-name rejection (playlist.rs,
- * is_reserved_playlist_name) — always in English regardless of locale, since
- * it's matched here rather than shown directly to the user. */
-const RESERVED_PLAYLIST_NAME_MARKER = "is reserved for the app's built-in Queue playlist";
-
-function isReservedPlaylistNameError(err: unknown): boolean {
-  return String(err).includes(RESERVED_PLAYLIST_NAME_MARKER);
-}
-
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
@@ -45,9 +36,7 @@ class PlaylistsStore {
 
   /** The special pinned Queue playlist, always present and never deletable. */
   queuePlaylist = $derived.by((): Playlist | null => {
-    return (
-      this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue") ?? null
-    );
+    return this.playlists.find((p) => p.is_queue) ?? null;
   });
 
   queueVersion = $state(0);
@@ -59,7 +48,7 @@ class PlaylistsStore {
   queueTrackCount = $derived.by((): number => {
     // Explicit signal dependency for Svelte 5 reactivity
     this.queueVersion;
-    const q = this.playlists.find((p) => !p.dynamic_enabled && p.name?.toLowerCase() === "queue");
+    const q = this.playlists.find((p) => p.is_queue);
     if (q === undefined) return this.activePlaylistTracks.length ?? 0;
     if (this.activePlaylistId !== null && this.activePlaylistId === q.id) {
       return this.activePlaylistTracks.length;
@@ -84,21 +73,14 @@ class PlaylistsStore {
     this.init();
   }
 
-  async ensureQueuePlaylist(): Promise<Playlist | null> {
-    if (!Array.isArray(this.playlists)) return null;
-    let queuePl = this.playlists.find((p) => p && !p.dynamic_enabled && p.name && p.name.toLowerCase() === "queue");
-    if (!queuePl) {
-      try {
-        const created: Playlist = await invoke("create_playlist", { name: "Queue" });
-        await this.refreshPlaylists();
-        if (Array.isArray(this.playlists)) {
-          queuePl = this.playlists.find((p) => p && p.id === created?.id) || created;
-        }
-      } catch (err) {
-        console.error("Failed to auto-create Queue playlist:", err);
-      }
-    }
-    return queuePl || null;
+  /** The built-in Queue playlist. The backend bootstraps it before the
+   * window loads, so it always exists — this only refreshes the local list
+   * if the Queue hasn't been fetched yet. */
+  async requireQueue(): Promise<Playlist> {
+    if (!this.queuePlaylist) await this.refreshPlaylists();
+    const queue = this.queuePlaylist;
+    if (!queue) throw new Error("built-in Queue playlist missing from backend");
+    return queue;
   }
 
   private async init() {
@@ -114,9 +96,20 @@ class PlaylistsStore {
         this.refreshAutoPlaylistCounts();
       });
 
+      // The backend reconciles dynamic playlists whenever the library or
+      // song stats change (see reconcile_and_sync in playlist.rs) and
+      // announces which ones changed — refresh so views reflect the new
+      // membership immediately.
+      await listen<number[]>("playlists-changed", async (event) => {
+        await this.refreshPlaylists();
+        if (this.activePlaylistId !== null && event.payload.includes(this.activePlaylistId)) {
+          await this.selectPlaylist(this.activePlaylistId);
+        }
+      });
+
       await this.refreshPlaylists();
       this.refreshAutoPlaylistCounts();
-      const queuePl = await this.ensureQueuePlaylist();
+      const queuePl = await this.requireQueue();
 
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.pinned_playlist_id) {
@@ -133,18 +126,15 @@ class PlaylistsStore {
           return;
         }
       }
-      if (queuePl) {
-        await this.selectPlaylist(queuePl.id);
-      } else if (this.playlists.length > 0) {
-        await this.selectPlaylist(this.playlists[0].id);
-      }
+      await this.selectPlaylist(queuePl.id);
     } catch (err) {
       console.error("Failed to initialize PlaylistsStore:", err);
     }
   }
 
   async refreshPlaylists() {
-    this.playlists = await invoke("get_playlists");
+    const playlists = await invoke<Playlist[]>("get_playlists");
+    this.playlists = Array.isArray(playlists) ? playlists : [];
     this.notifyQueueChanged();
   }
 
@@ -168,11 +158,7 @@ class PlaylistsStore {
     this.activePlaylistId = id;
     this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
     this.notifyQueueChanged();
-    try {
-      await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
-    } catch (err) {
-      console.error("Failed to save active playlist settings:", err);
-    }
+    await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
   }
 
   /** Explicitly pins `id` as the "Active" quick-add target — only called from
@@ -180,23 +166,27 @@ class PlaylistsStore {
    * viewing/opening a playlist. */
   async pinPlaylist(id: number) {
     this.pinnedPlaylistId = id;
-    try {
-      await invoke("set_app_setting", { key: "pinned_playlist_id", value: id.toString() });
-    } catch (err) {
-      console.error("Failed to save pinned playlist setting:", err);
+    await invoke("set_app_setting", { key: "pinned_playlist_id", value: id.toString() });
+  }
+
+  /** Asks the backend whether `name` would be rejected, and toasts the
+   * reason if so. Replaces the old approach of matching substrings of the
+   * create/rename error message after the fact. */
+  private async checkPlaylistName(name: string): Promise<boolean> {
+    const check = await invoke<{ valid: boolean; reason?: string }>("validate_playlist_name", {
+      name,
+    });
+    if (!check.valid && check.reason === "reserved") {
+      toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
     }
+    return check.valid;
   }
 
   async createPlaylist(name: string): Promise<Playlist> {
-    let playlist: Playlist;
-    try {
-      playlist = await invoke("create_playlist", { name });
-    } catch (err) {
-      if (isReservedPlaylistNameError(err)) {
-        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
-      }
-      throw err;
+    if (!(await this.checkPlaylistName(name))) {
+      throw new Error(`invalid playlist name: ${name}`);
     }
+    const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
     await this.pinPlaylist(playlist.id);
@@ -210,14 +200,12 @@ class PlaylistsStore {
   async updatePlaylistSpec(
     id: number,
     spec: string,
-    autoPlay: boolean = false,
     populationMode: QueuePopulationMode = "all"
   ) {
     // Mode is persisted before the spec so that the spec-triggered
     // (re)population below already uses it.
     await invoke("set_playlist_population_mode", { playlistId: id, mode: populationMode });
     await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
-    await invoke("set_playlist_auto_play", { playlistId: id, autoPlay });
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
       await this.selectPlaylist(id);
@@ -227,7 +215,7 @@ class PlaylistsStore {
   async deletePlaylist(id: number) {
     if (Array.isArray(this.playlists)) {
       const target = this.playlists.find((p) => p && p.id === id);
-      if (target && !target.dynamic_enabled && target.name && target.name.toLowerCase() === "queue") {
+      if (target?.is_queue) {
         console.warn("Cannot delete special Queue playlist");
         return;
       }
@@ -244,29 +232,20 @@ class PlaylistsStore {
     }
     if (this.pinnedPlaylistId === id) {
       this.pinnedPlaylistId = null;
-      try {
-        await invoke("set_app_setting", { key: "pinned_playlist_id", value: "" });
-      } catch (err) {
-        console.error("Failed to clear pinned playlist setting:", err);
-      }
+      await invoke("set_app_setting", { key: "pinned_playlist_id", value: "" });
     }
   }
 
   async renamePlaylist(id: number, name: string) {
-    try {
-      await invoke("rename_playlist", { id, name });
-    } catch (err) {
-      if (isReservedPlaylistNameError(err)) {
-        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
-      }
-      throw err;
+    if (!(await this.checkPlaylistName(name))) {
+      throw new Error(`invalid playlist name: ${name}`);
     }
+    await invoke("rename_playlist", { id, name });
     await this.refreshPlaylists();
   }
 
   async replaceQueueTracks(songIds: number[]) {
-    const queuePl = await this.ensureQueuePlaylist();
-    if (!queuePl) return;
+    const queuePl = await this.requireQueue();
     try {
       const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
       if (existingItems.length > 0) {
@@ -285,7 +264,7 @@ class PlaylistsStore {
 
   /** Removes every track ahead of `uuid` (in current DB order) from
    * `playlistId`. Takes the target playlist id explicitly rather than
-   * re-resolving "the Queue" via `ensureQueuePlaylist()` — that lookup can
+   * re-resolving "the Queue" via `requireQueue()` — that lookup can
    * disagree with whichever playlist the caller actually means (e.g. is
    * already viewing), and always resolves `uuid`'s position from a fresh
    * `get_playlist_tracks` fetch rather than trusting a caller-supplied
@@ -308,6 +287,18 @@ class PlaylistsStore {
       }
     } catch (err) {
       console.error("Failed to trim Queue tracks before uuid:", err);
+    }
+  }
+
+  /** Add songs to the built-in Queue. The backend appends the DB rows and
+   * mirrors them into the live play order in one call, so callers no longer
+   * pair add_to_playlist with a live-queue append. */
+  async addSongsToQueue(songIds: number[]) {
+    await invoke("add_songs_to_queue", { songIds });
+    await this.refreshPlaylists();
+    const qPl = this.queuePlaylist;
+    if (qPl && this.activePlaylistId === qPl.id) {
+      await this.selectPlaylist(qPl.id);
     }
   }
 
@@ -448,16 +439,6 @@ class PlaylistsStore {
 
   async exportPlaylist(playlistId: number, exportPath: string, relative: boolean = true) {
     await invoke("export_playlist", { playlistId, exportPath, relative });
-  }
-
-  /**
-   * Toggle the Auto-Play flag on a dynamic/auto playlist.
-   * When enabled, playback will keep appending the next batch of matching
-   * songs as the queue approaches the end of the current batch (#26).
-   */
-  async setPlaylistAutoPlay(playlistId: number, autoPlay: boolean) {
-    await invoke("set_playlist_auto_play", { playlistId, autoPlay });
-    await this.refreshPlaylists();
   }
 
   /**

@@ -96,49 +96,53 @@
     else activePreset = "Custom";
   }
 
+  /** The single EQ mutation path: send the whole edited config; the engine
+   * clamps and echoes the canonical state back. Local edits already updated
+   * the reactive fields, so the echo only matters when clamping changed a
+   * value. */
+  async function applyConfig() {
+    const canonical = await invoke<EqConfig>("apply_equalizer_config", {
+      config: { enabled, mode, preamp, gains, parametric },
+    });
+    enabled = canonical.enabled;
+    mode = canonical.mode;
+    preamp = canonical.preamp;
+    gains = canonical.gains;
+    parametric = canonical.parametric;
+  }
+
   async function ensureEnabled() {
-    if (!enabled) {
-      enabled = true;
-      await invoke("set_equalizer_enabled", { enabled: true });
-    }
+    if (!enabled) enabled = true;
   }
 
   async function handleToggle() {
-    await invoke("set_equalizer_enabled", { enabled });
+    await applyConfig();
   }
 
   async function handleModeChange(newMode: EqMode) {
     if (mode === newMode) return;
     mode = newMode;
-    try {
-      await invoke("set_equalizer_mode", { mode: newMode });
-    } catch (e) {
-      console.error("Failed to set equalizer mode:", e);
-    }
+    await applyConfig();
   }
 
   async function handlePreampChange() {
     await ensureEnabled();
-    await invoke("set_equalizer_preamp", { preampDb: preamp });
+    await applyConfig();
   }
 
   async function handleBandChange(index: number) {
     activePreset = "Custom";
     await ensureEnabled();
-    await invoke("set_equalizer_band", { bandIdx: index, gainDb: gains[index] });
+    await applyConfig();
   }
 
   async function pushParametricBand(index: number) {
-    const band = parametric[index];
-    if (!band) return;
+    if (!parametric[index]) return;
     activePreset = "Custom";
     await ensureEnabled();
-    // Band center frequencies are fixed — only gain and Q are adjustable.
-    await invoke("set_parametric_band", {
-      bandIdx: index,
-      gainDb: band.gain_db,
-      q: band.q
-    });
+    // Band center frequencies are fixed — the backend ignores them and only
+    // applies gain and Q.
+    await applyConfig();
   }
 
   async function resetParametric() {

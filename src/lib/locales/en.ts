@@ -434,11 +434,6 @@ export const en = {
     removeDuplicatesBtn: "Remove {count} duplicate files",
     duplicateTrackFlag: "Duplicate file",
     selectedCount: "{count} selected",
-    autoPlayLabel: "Auto-Refill",
-    autoPlayBadgeLabel: "Auto",
-    autoPlayTooltipOn: "Auto-Refill ON — keeps appending matching songs as you reach the end. Click to disable.",
-    autoPlayTooltipOff: "Auto-Refill OFF — stops at end of current batch. Click to enable continuous refill.",
-    autoPlayBadgeTooltip: "Auto-Refill enabled — keeps appending matching songs",
     populationModeLabel: "Playing from",
     populationModeTitleFormat: "{base} {suffix}",
     populationModeAll: "All",
@@ -488,7 +483,6 @@ export const en = {
     refreshPlaylistBtn: "Refresh Playlist",
     refreshAutoPlaylistTooltip: "Refresh auto-playlist with a new selection of songs from your library",
     refreshAllPlaylistsTooltip: "Refresh all auto-playlists and Smart Playlists with the latest songs from your library",
-    allMatchingTracksAdded: "All matching songs from your library have been added to this auto-playlist.",
     playSelected: "Play Selected",
     removeSelected: "Remove Selected",
     clearSelection: "Clear Selection",
@@ -617,7 +611,8 @@ export const en = {
     lyricsPlain: "Plain text",
     lyricsNone: "Not downloaded",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
-    tracksSkippedToast: "Skipped {count} unavailable tracks."
+    tracksSkippedToast: "Skipped {count} unavailable tracks.",
+    openNothingPlayable: "No supported audio files found to play."
   },
   miniplayer: {
     title: "Miniplayer",
@@ -894,8 +889,6 @@ export const en = {
     addRule: "Add Rule",
     valuePlaceholder: "Value...",
     removeRuleTooltip: "Remove rule",
-    autoRefillLabel: "Auto-Refill Batch Playback",
-    autoRefillHint: "Queue matching songs automatically as playback nears the end",
     cancel: "Cancel",
     updateBtn: "Update Smart Playlist",
     createBtn: "Create Smart Playlist"

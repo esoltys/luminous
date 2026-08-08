@@ -151,9 +151,7 @@
 
   $effect(() => {
     if (isTabInitialized) {
-      invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab }).catch((err) => {
-        console.error("Failed to save active_settings_tab:", err);
-      });
+      invoke("set_app_setting", { key: "active_settings_tab", value: settingsTab });
     }
   });
 

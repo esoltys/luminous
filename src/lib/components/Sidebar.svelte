@@ -33,9 +33,7 @@
 
   function navigateToFoldersSettings() {
     collectionStore.activeTab = "settings";
-    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" }).catch((err) => {
-      console.error("Failed to set active_settings_tab:", err);
-    });
+    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
   }
 
   async function handleAddDirectory() {
@@ -181,17 +179,15 @@
               <span class="truncate">{i18n.t('sidebar.playlistsCustom')}</span>
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
-              ({playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && p.name?.toLowerCase() !== "queue").length})
+              ({playlistsStore.playlists.filter((p) => (!p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec)) && !p.is_queue).length})
             </span>
           </button>
 
           <button
             onclick={async () => {
-              const queuePl = await playlistsStore.ensureQueuePlaylist();
-              if (queuePl) {
-                playlistsStore.selectPlaylist(queuePl.id);
-                collectionStore.viewPlaylist(queuePl.id);
-              }
+              const queuePl = await playlistsStore.requireQueue();
+              playlistsStore.selectPlaylist(queuePl.id);
+              collectionStore.viewPlaylist(queuePl.id);
             }}
             class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors {collectionStore.activeTab === 'playlists' && collectionStore.selectedPlaylistId && playlistsStore.playlists.find((p) => p.id === collectionStore.selectedPlaylistId)?.name?.toLowerCase() === 'queue' ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
           >

@@ -227,13 +227,13 @@
   );
 
   let isQueue = $derived(
-    activePlaylist !== undefined && !activePlaylist.dynamic_enabled && activePlaylist.name.toLowerCase() === "queue"
+    activePlaylist !== undefined && activePlaylist.is_queue
   );
 
   let isSpecialPlaylist = $derived(
     activePlaylist !== undefined &&
       (isQueue ||
-       activePlaylist.name.toLowerCase() === "queue" ||
+       activePlaylist.is_queue ||
        activePlaylist.name.toLowerCase() === "history" ||
        activePlaylist.name.toLowerCase() === "favourites" ||
        activePlaylist.name.toLowerCase() === "recently added")
@@ -251,7 +251,6 @@
     collectionStore.openSmartBuilder(rules, {
       id: activePlaylist.id,
       name: activePlaylist.name,
-      autoPlay: activePlaylist.auto_play ?? true,
       populationMode: activePlaylist.population_mode ?? "all",
     });
   }
@@ -670,7 +669,7 @@
     const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
     if (availableTracks.length === 0) return;
     const songIds = availableTracks.map((t) => t.song!.id);
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -684,7 +683,7 @@
     const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
     if (availableTracks.length === 0) return;
     const shuffledSongIds = shuffleArray(availableTracks.map((t) => t.song!.id));
-    const queuePl = await playlistsStore.ensureQueuePlaylist();
+    const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("all");
     await playerStore.playSongs(shuffledSongIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {

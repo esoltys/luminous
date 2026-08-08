@@ -33,7 +33,6 @@
     playlistId?: number;
     updated?: number;
     trackCount: number;
-    autoPlay?: boolean;
   }
 
   // Fixed intensity order for the BPM auto-playlist bucket names (mirrors
@@ -102,8 +101,8 @@
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
-    const queue = list.find((p) => p.name.toLowerCase() === "queue");
-    const rest = list.filter((p) => p.name.toLowerCase() !== "queue");
+    const queue = list.find((p) => p.is_queue);
+    const rest = list.filter((p) => !p.is_queue);
     return queue ? [queue, ...rest] : rest;
   });
 
@@ -144,7 +143,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -158,7 +156,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -172,7 +169,6 @@
           playlistId: p.id,
           updated: p.updated,
           trackCount: p.track_count,
-          autoPlay: p.auto_play ?? false,
         });
       }
     }
@@ -236,7 +232,7 @@
     const field = customSortField;
     const asc = customSortAsc;
     return customPlaylists
-      .filter((p) => p.name.toLowerCase() !== "queue")
+      .filter((p) => !p.is_queue)
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -429,7 +425,6 @@
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
-                  autoPlay={def.autoPlay}
                   onClick={() => openAuto(def)}
                 />
               {:else}
@@ -442,7 +437,6 @@
                   playlistId={def.playlistId}
                   updated={def.updated}
                   trackCount={def.trackCount}
-                  autoPlay={def.autoPlay}
                   onClick={() => openAuto(def)}
                 />
               {/if}
