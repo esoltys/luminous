@@ -206,16 +206,33 @@
     loadLyrics(playerStore.currentSong?.id);
   });
 
-  // Auto-scroll to active lyric line
+  // Whether we've already done the initial jump-to-active-line for the
+  // currently loaded song — reset on song change so each song gets its own
+  // initial jump.
+  let didInitialScroll = false;
+  $effect(() => {
+    playerStore.currentSong?.id;
+    didInitialScroll = false;
+  });
+
+  // Auto-scroll to active lyric line. The very first scroll after opening
+  // this view (or switching songs) must be instant: use:rememberScroll on
+  // the container re-forces scrollTop back to its remembered value (0 for a
+  // song viewed for the first time) for ~20 animation frames after mount,
+  // and an animated "smooth" scroll loses that race — it gets nudged toward
+  // the active line and then snapped back to the top every frame, leaving
+  // the view stuck at scrollTop 0. An instant jump changes scrollTop
+  // synchronously in one frame, which registers as a user scroll and
+  // disables the remembered-position restore immediately. Later line-to-line
+  // transitions during ongoing playback keep the smooth animation.
   $effect(() => {
     if (activeLineIndex !== -1 && containerEl && !isEditing) {
       const activeEl = containerEl.querySelector(`[data-index="${activeLineIndex}"]`);
       if (activeEl) {
-        console.log(`[LyricsView] Auto-scrolling to active index ${activeLineIndex}`);
-        activeEl.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
+        const behavior = didInitialScroll ? "smooth" : "auto";
+        console.log(`[LyricsView] Auto-scrolling to active index ${activeLineIndex} (${behavior})`);
+        activeEl.scrollIntoView({ behavior, block: "center" });
+        didInitialScroll = true;
       }
     }
   });
