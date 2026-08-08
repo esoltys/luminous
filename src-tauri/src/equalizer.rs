@@ -8,11 +8,45 @@ pub const EQ_BANDS: [f32; 10] = [
 /// Number of bands in the parametric equalizer mode.
 pub const PARAMETRIC_BAND_COUNT: usize = 20;
 
-/// Default Q for graphic-mode bands (octave-friendly overlap).
-const GRAPHIC_Q: f32 = 1.2;
+/// Default Q for graphic-mode bands. The 10 bands are spaced 1 octave apart
+/// (9 octaves / 9 gaps across 31.25 Hz – 16 kHz), and the textbook Q for a
+/// constant-Q filter whose -3 dB points meet its neighbors at that spacing is
+/// `Q = 1 / (2 * sinh((ln2/2) * BW_octaves))`, which for `BW = 1` octave is
+/// `sqrt(2) ≈ 1.414` — the standard value used by octave-band graphic EQs.
+const GRAPHIC_Q: f32 = std::f32::consts::SQRT_2;
+
+/// Shelf slope (RBJ cookbook `S`) for the outermost low/high-shelf bands.
+/// `S = 1.0` is the cookbook's "as steep as it can be without overshoot"
+/// default — a smooth, monotonic shelf rather than a peaky corner.
+const SHELF_SLOPE: f32 = 1.0;
+
+/// Which RBJ cookbook filter shape a band uses. The outermost band on each
+/// side of the spectrum shelves (holds its gain flat below/above the corner
+/// frequency, like a true bass/treble control) instead of peaking (which
+/// rolls back to 0 dB away from center) — see `filter_kind_for_band`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FilterKind {
+    Peaking,
+    LowShelf,
+    HighShelf,
+}
+
+/// The first band in a cascade is a low shelf, the last is a high shelf,
+/// and everything in between peaks. Applies to both the 10-band graphic and
+/// 20-band parametric cascades, whose outermost bands sit at the same fixed
+/// 31.25 Hz / 16 kHz corners.
+fn filter_kind_for_band(idx: usize, band_count: usize) -> FilterKind {
+    if idx == 0 {
+        FilterKind::LowShelf
+    } else if idx == band_count - 1 {
+        FilterKind::HighShelf
+    } else {
+        FilterKind::Peaking
+    }
+}
 
 // ---------------------------------------------------------------------------
-// Biquad Filter (Peaking EQ)
+// Biquad Filter (Peaking EQ / Shelf, RBJ Audio EQ Cookbook)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -52,20 +86,21 @@ impl BiquadFilter {
         }
     }
 
-    /// Calculate peaking EQ coefficients using Robert Bristow-Johnson's formulas
-    pub fn calculate_coefficients(&mut self, f0: f32, fs: f32, gain_db: f32) {
-        self.calculate_coefficients_q(f0, fs, gain_db, GRAPHIC_Q);
+    /// Set this filter's coefficients for the given band shape. Peaking uses
+    /// `q`; the shelf shapes use the fixed `SHELF_SLOPE` instead (shelf slope
+    /// isn't the same quantity as peaking Q, and a fixed gentle slope keeps
+    /// the outermost bands from ringing/overshooting at high gain).
+    pub fn calculate_for_kind(&mut self, kind: FilterKind, f0: f32, fs: f32, gain_db: f32, q: f32) {
+        match kind {
+            FilterKind::Peaking => self.calculate_coefficients_q(f0, fs, gain_db, q),
+            FilterKind::LowShelf => self.calculate_low_shelf(f0, fs, gain_db),
+            FilterKind::HighShelf => self.calculate_high_shelf(f0, fs, gain_db),
+        }
     }
 
     /// Peaking EQ coefficients with an explicit Q (parametric mode).
     pub fn calculate_coefficients_q(&mut self, f0: f32, fs: f32, gain_db: f32, q: f32) {
-        // Flat response if gain is zero
-        if gain_db.abs() < 0.05 {
-            self.b0 = 1.0;
-            self.b1 = 0.0;
-            self.b2 = 0.0;
-            self.a1 = 0.0;
-            self.a2 = 0.0;
+        if self.bypass_if_flat(gain_db) {
             return;
         }
 
@@ -83,7 +118,77 @@ impl BiquadFilter {
         let a1 = -2.0 * cos_w0;
         let a2 = 1.0 - alpha / a;
 
-        // Normalize
+        self.normalize(b0, b1, b2, a0, a1, a2);
+    }
+
+    /// Low-shelf coefficients (RBJ cookbook). Holds `gain_db` flat below
+    /// `f0` instead of rolling back to 0 dB, so a bass-band boost lifts
+    /// everything under it rather than just a bell around 31 Hz.
+    pub fn calculate_low_shelf(&mut self, f0: f32, fs: f32, gain_db: f32) {
+        if self.bypass_if_flat(gain_db) {
+            return;
+        }
+
+        let a = 10.0f32.powf(gain_db / 40.0);
+        let w0 = 2.0 * PI * f0 / fs;
+        let cos_w0 = w0.cos();
+        let sin_w0 = w0.sin();
+        let alpha = sin_w0 / 2.0 * ((a + 1.0 / a) * (1.0 / SHELF_SLOPE - 1.0) + 2.0).sqrt();
+        let two_sqrt_a_alpha = 2.0 * a.sqrt() * alpha;
+
+        let b0 = a * ((a + 1.0) - (a - 1.0) * cos_w0 + two_sqrt_a_alpha);
+        let b1 = 2.0 * a * ((a - 1.0) - (a + 1.0) * cos_w0);
+        let b2 = a * ((a + 1.0) - (a - 1.0) * cos_w0 - two_sqrt_a_alpha);
+        let a0 = (a + 1.0) + (a - 1.0) * cos_w0 + two_sqrt_a_alpha;
+        let a1 = -2.0 * ((a - 1.0) + (a + 1.0) * cos_w0);
+        let a2 = (a + 1.0) + (a - 1.0) * cos_w0 - two_sqrt_a_alpha;
+
+        self.normalize(b0, b1, b2, a0, a1, a2);
+    }
+
+    /// High-shelf coefficients (RBJ cookbook). Holds `gain_db` flat above
+    /// `f0` instead of rolling back to 0 dB, so a treble-band boost lifts
+    /// everything above it rather than just a bell around 16 kHz.
+    pub fn calculate_high_shelf(&mut self, f0: f32, fs: f32, gain_db: f32) {
+        if self.bypass_if_flat(gain_db) {
+            return;
+        }
+
+        let a = 10.0f32.powf(gain_db / 40.0);
+        let w0 = 2.0 * PI * f0 / fs;
+        let cos_w0 = w0.cos();
+        let sin_w0 = w0.sin();
+        let alpha = sin_w0 / 2.0 * ((a + 1.0 / a) * (1.0 / SHELF_SLOPE - 1.0) + 2.0).sqrt();
+        let two_sqrt_a_alpha = 2.0 * a.sqrt() * alpha;
+
+        let b0 = a * ((a + 1.0) + (a - 1.0) * cos_w0 + two_sqrt_a_alpha);
+        let b1 = -2.0 * a * ((a - 1.0) + (a + 1.0) * cos_w0);
+        let b2 = a * ((a + 1.0) + (a - 1.0) * cos_w0 - two_sqrt_a_alpha);
+        let a0 = (a + 1.0) - (a - 1.0) * cos_w0 + two_sqrt_a_alpha;
+        let a1 = 2.0 * ((a - 1.0) - (a + 1.0) * cos_w0);
+        let a2 = (a + 1.0) - (a - 1.0) * cos_w0 - two_sqrt_a_alpha;
+
+        self.normalize(b0, b1, b2, a0, a1, a2);
+    }
+
+    /// Flat (identity) response if gain is zero — every filter shape
+    /// converges to a no-op here, so short-circuiting avoids feeding the
+    /// trig/sqrt work a degenerate `A = 1` case. Returns whether it bypassed.
+    fn bypass_if_flat(&mut self, gain_db: f32) -> bool {
+        if gain_db.abs() < 0.05 {
+            self.b0 = 1.0;
+            self.b1 = 0.0;
+            self.b2 = 0.0;
+            self.a1 = 0.0;
+            self.a2 = 0.0;
+            true
+        } else {
+            false
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn normalize(&mut self, b0: f32, b1: f32, b2: f32, a0: f32, a1: f32, a2: f32) {
         self.b0 = b0 / a0;
         self.b1 = b1 / a0;
         self.b2 = b2 / a0;
@@ -128,7 +233,14 @@ pub const PARAMETRIC_FREQ_MIN: f32 = 20.0;
 pub const PARAMETRIC_FREQ_MAX: f32 = 20000.0;
 pub const PARAMETRIC_Q_MIN: f32 = 0.1;
 pub const PARAMETRIC_Q_MAX: f32 = 10.0;
-const PARAMETRIC_DEFAULT_Q: f32 = 1.1;
+/// The 20 bands are spaced 9/19 ≈ 0.474 octaves apart (see
+/// `default_parametric_bands`). Plugging that into the same Q-vs-bandwidth
+/// relation used for `GRAPHIC_Q` gives the "critically spaced" Q whose -3 dB
+/// points just meet each neighbor (≈3.03) — rounded to a clean default so
+/// adjacent bands cover the spectrum without excessive overlap, while still
+/// leaving the full `PARAMETRIC_Q_MIN..=PARAMETRIC_Q_MAX` range for the user
+/// to go narrower (surgical) or wider (smoother) per band.
+const PARAMETRIC_DEFAULT_Q: f32 = 3.0;
 
 /// 20 default center frequencies, log-spaced across the same 31.25 Hz – 16 kHz
 /// span as the graphic bands (9 octaves / 19 steps ≈ half-octave spacing).
@@ -205,6 +317,7 @@ pub fn preset_gains(name: &str) -> [f32; 10] {
         "jazz" => [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
         "bass boost" | "bassboost" => [6.0, 5.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         "vocal boost" | "vocalboost" => [-2.0, -2.0, -1.0, 1.0, 3.0, 4.0, 3.0, 1.0, -1.0, -2.0],
+        "headphones" => [4.0, 2.0, 0.0, 2.0, 4.0, 4.0, 2.0, 0.0, 2.0, 4.0],
         _ => [0.0; 10], // Flat
     }
 }
@@ -360,10 +473,11 @@ impl Equalizer {
         let f0 = EQ_BANDS[idx];
         let gain_db = self.gains[idx];
         let fs = self.sample_rate as f32;
+        let kind = filter_kind_for_band(idx, EQ_BANDS.len());
 
         for ch in 0..self.channels {
             if let Some(filters) = self.channel_filters.get_mut(ch) {
-                filters[idx].calculate_coefficients(f0, fs, gain_db);
+                filters[idx].calculate_for_kind(kind, f0, fs, gain_db, GRAPHIC_Q);
             }
         }
     }
@@ -371,10 +485,11 @@ impl Equalizer {
     fn recalculate_parametric_band(&mut self, idx: usize) {
         let band = self.parametric[idx];
         let fs = self.sample_rate as f32;
+        let kind = filter_kind_for_band(idx, PARAMETRIC_BAND_COUNT);
 
         for ch in 0..self.channels {
             if let Some(filters) = self.parametric_filters.get_mut(ch) {
-                filters[idx].calculate_coefficients_q(band.freq, fs, band.gain_db, band.q);
+                filters[idx].calculate_for_kind(kind, band.freq, fs, band.gain_db, band.q);
             }
         }
     }
@@ -501,7 +616,7 @@ mod tests {
         assert!(eq.parametric[19].gain_db.abs() < 0.5);
         // Q reset to default on every band.
         for band in eq.parametric.iter() {
-            assert!((band.q - 1.1).abs() < 1e-4);
+            assert!((band.q - PARAMETRIC_DEFAULT_Q).abs() < 1e-4);
         }
     }
 
@@ -526,5 +641,49 @@ mod tests {
         eq.set_mode(EqMode::Graphic10);
         assert_eq!(eq.gains[3], 6.0);
         assert_eq!(eq.mode, EqMode::Graphic10);
+    }
+
+    #[test]
+    fn graphic_low_band_shelves_instead_of_peaking() {
+        let mut eq = Equalizer::new();
+        eq.update_format(44100, 2);
+        eq.enabled = true;
+        eq.set_gain(0, 9.0); // boost the 31.25 Hz band
+
+        // A peaking filter centered at 31.25 Hz would have rolled back
+        // toward 0 dB well before 20 Hz; a low shelf holds the boost.
+        let probe = sine(20.0, 44100.0, 8192, 2);
+        let mut processed = probe.clone();
+        eq.process_interleaved(&mut processed);
+
+        let orig_rms = rms(&probe[4096..]);
+        let proc_rms = rms(&processed[4096..]);
+        assert!(
+            proc_rms > orig_rms * 2.0,
+            "expected shelf boost to hold below 31.25 Hz: orig {orig_rms}, processed {proc_rms}"
+        );
+    }
+
+    #[test]
+    fn parametric_high_band_shelves_instead_of_peaking() {
+        let mut eq = Equalizer::new();
+        eq.update_format(44100, 2);
+        eq.enabled = true;
+        eq.set_mode(EqMode::Parametric20);
+        eq.set_parametric_band(19, 9.0, PARAMETRIC_DEFAULT_Q); // boost the ~16 kHz band
+
+        // A peaking filter centered at ~16 kHz would have rolled back toward
+        // 0 dB well past 20 kHz (the top of human hearing); a high shelf
+        // holds the boost. Probe near Nyquist for a 44.1 kHz stream.
+        let probe = sine(21000.0, 44100.0, 8192, 2);
+        let mut processed = probe.clone();
+        eq.process_interleaved(&mut processed);
+
+        let orig_rms = rms(&probe[4096..]);
+        let proc_rms = rms(&processed[4096..]);
+        assert!(
+            proc_rms > orig_rms * 2.0,
+            "expected shelf boost to hold above 16 kHz: orig {orig_rms}, processed {proc_rms}"
+        );
     }
 }

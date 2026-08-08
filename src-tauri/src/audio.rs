@@ -17,10 +17,10 @@
 //!
 //! ## DSP chain (contract shared with #77/#79)
 //! `decode → loudness gain (#77) → EQ preamp → EQ bands → fade envelope (#79)
-//! → volume → output`. Each gain stage is a single precomputed multiplier
-//! read from an atomic — nothing in the output callback allocates or blocks.
-//! When every stage is neutral (EQ off, gains at 1.0) samples pass through
-//! bit-perfect.
+//! → volume → clip guard → output`. Each gain stage is a single precomputed
+//! multiplier read from an atomic — nothing in the output callback allocates
+//! or blocks. When every stage is neutral (EQ off, gains at 1.0) samples pass
+//! through bit-perfect.
 
 use crate::models::{PlayState, Song};
 use anyhow::{anyhow, Result};
@@ -623,6 +623,17 @@ fn build_output(
                 if vol != 1.0 {
                     for sample in output[..played].iter_mut() {
                         *sample *= vol;
+                    }
+                }
+
+                // 5) Final clip guard. The equalizer clamps internally, but
+                // only while enabled — loudness normalization alone can push
+                // samples past full scale (positive R128/ReplayGain gain, up
+                // to the +12 dB clamp in `loudness::compute_gain`), so a
+                // limiter independent of the EQ toggle is needed here too.
+                if loudness != 1.0 {
+                    for sample in output[..played].iter_mut() {
+                        *sample = sample.clamp(-1.0, 1.0);
                     }
                 }
 
