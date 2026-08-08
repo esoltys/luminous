@@ -683,7 +683,7 @@ export const en = {
     bassBoostPreset: "Bass Boost",
     vocalBoostPreset: "Vocal Boost",
     trebleBoostPreset: "Treble Boost",
-    clarityPreset: "Clarity",
+    headphonesPreset: "Headphones",
     preamp: "Preamp",
     enableEq: "Enable EQ",
     subtitle: "Shape your frequency response with a 10-band cascaded peaking filter",
