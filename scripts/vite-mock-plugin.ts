@@ -2,9 +2,9 @@
 // tauri-ipc-mock.ts at /tauri-ipc-mock.js and resolves /covers/* requests
 // against the mock's embedded-art cache or the real app's covers/ dir.
 import type { Plugin } from "vite";
-import { compileMockScript } from "./compile-mock-script";
-import { EMBEDDED_ART_CACHE_DIR } from "./embedded-art-cache";
-import { loadMockConfig, loadMockLibrary, resolveDbPath, resolveFeatured } from "./mock-library";
+import { compileMockScript } from "./compile-mock-script.ts";
+import { EMBEDDED_ART_CACHE_DIR } from "./embedded-art-cache.ts";
+import { loadMockConfig, loadMockLibrary, resolveDbPath, resolveFeatured } from "./mock-library.ts";
 import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 

@@ -96,3 +96,24 @@ vi.mock("@tauri-apps/plugin-process", () => {
     exit: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+// jsdom doesn't implement canvas rendering, so components that draw to a
+// <canvas> (e.g. WaveformSeekBar) spam "not implemented" console noise on
+// every render. Tests here only mount components, they don't assert on
+// pixels, so a minimal no-op 2D context is enough to keep draw() calls from
+// throwing/warning without pulling in the native `canvas` package.
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+    save: vi.fn(),
+    restore: vi.fn(),
+    scale: vi.fn(),
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    fill: vi.fn(),
+    fillRect: vi.fn(),
+    roundRect: vi.fn(),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    fillStyle: "",
+    globalAlpha: 1,
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+}

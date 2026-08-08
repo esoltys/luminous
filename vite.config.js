@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin";
+import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
 
 import { execSync } from "child_process";
 
@@ -59,6 +59,28 @@ export default defineConfig(async () => ({
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
   plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
+
+  // These are only reachable once specific views actually render (icons,
+  // Tauri API shims, the virtualized song list), not from the initial
+  // route's static import graph — so Vite's dep scanner misses them at
+  // startup and discovers them on first navigation instead, forcing a full
+  // client reload mid-session. Declaring them here bundles them upfront so
+  // dev (and the take-screenshots harness, which navigates straight into
+  // arbitrary views) never hits that reload.
+  optimizeDeps: {
+    include: [
+      "lucide-svelte",
+      "@tauri-apps/api/core",
+      "@tauri-apps/api/event",
+      "@tauri-apps/api/window",
+      "@tauri-apps/api/app",
+      "@tauri-apps/plugin-dialog",
+      "@tauri-apps/plugin-opener",
+      "@tauri-apps/plugin-updater",
+      "@tauri-apps/plugin-process",
+      "svelte-virtual-list-ts",
+    ],
+  },
 
   test: {
     globals: true,

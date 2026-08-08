@@ -202,15 +202,31 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // so the mock exercises the same "distinct, highly contrasting" visual the
   // real per-track histogram stretch produces, rather than a flat/uniform
   // strip. Point count matches BAND_WAVEFORM_POINTS.
+  //
+  // A single sine per band produced a perfectly smooth, mirror-symmetric
+  // diamond shape that reads as obviously fake next to real per-track
+  // energy. Summing a few incommensurate harmonics (so the combined shape
+  // never repeats over the visible window) plus per-point noise gives each
+  // band an irregular, bursty envelope closer to real audio dynamics.
   function makeBandWaveform(): number[] {
     const points = 512;
+    const bandHarmonics = [
+      [2.3, 5.1, 11.7], // low — bass/sub-bass
+      [3.7, 7.9, 14.3], // mid — vocals/snares
+      [5.9, 10.1, 19.7], // high — hi-hats/cymbals
+    ];
     const data: number[] = [];
     for (let i = 0; i < points; i++) {
       const t = i / points;
-      const r = (Math.sin(t * Math.PI * 4) * 0.5 + 0.5) ** 1.5;
-      const g = (Math.sin(t * Math.PI * 5.7 + 1.5) * 0.5 + 0.5) ** 1.5;
-      const b = (Math.sin(t * Math.PI * 3.1 + 3.0) * 0.5 + 0.5) ** 1.5;
-      data.push(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+      for (const freqs of bandHarmonics) {
+        let v = 0;
+        for (const freq of freqs) {
+          v += Math.sin(t * Math.PI * freq + freq) / freq;
+        }
+        const noise = (Math.random() - 0.5) * 0.35;
+        const normalized = ((v * 0.6 + 0.5) ** 1.5 + noise) as number;
+        data.push(Math.round(Math.min(1, Math.max(0, normalized)) * 255));
+      }
     }
     return data;
   }

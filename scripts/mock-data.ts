@@ -1,8 +1,8 @@
 // Small, hand-picked fixture library used by the Tauri IPC mock when no local
-// database is configured (see mock-config.example.json). Intentionally tiny —
+// database is configured (see mock-config.json). Intentionally tiny —
 // this used to be a ~8,000-line dump of one real library; a handful of
 // albums is enough to exercise every view in the UI.
-import type { Playlist, Song } from "../src/lib/types/index";
+import type { Playlist, Song } from "../src/lib/types/index.ts";
 
 interface TrackSeed {
   title: string;

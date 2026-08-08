@@ -262,8 +262,13 @@ async function main() {
 
     await page.goto("http://localhost:1420");
 
-    // Wait for Svelte app container to mount
-    await page.waitForSelector(".flex-1");
+    // Wait for Svelte app container to mount. Generous timeout: on a cold
+    // dev-server start, navigating into a view can make Vite discover
+    // previously-unbundled dependencies (icons, Tauri API shims, etc.) that
+    // weren't reachable from the initial crawl, triggering a full client
+    // reload mid-mount — that reoptimize-and-reload cycle can take well
+    // over the default 30s on a first hit.
+    await page.waitForSelector(".flex-1", { timeout: 60000 });
 
     // Wait for rendering & animations to settle (e.g. waveform seek bar, dynamic styles, visualizer FFT frames)
     await page.waitForTimeout(1500);

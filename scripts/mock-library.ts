@@ -1,18 +1,17 @@
 // Loads the data the Tauri IPC mock serves: either the small bundled fixture
 // library (mock-data.ts) or, if configured, a live read from a real Luminous
-// SQLite database. See mock-config.example.json for the config shape.
+// SQLite database. See mock-config.json for the config shape.
 import { existsSync, readFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index";
-import { hydrateEmbeddedArt } from "./embedded-art-cache";
-import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data";
+import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index.ts";
+import { hydrateEmbeddedArt } from "./embedded-art-cache.ts";
+import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "mock-config.json");
 const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
-const EXAMPLE_CONFIG_PATH = path.join(__dirname, "mock-config.example.json");
 const TAURI_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.conf.json");
 
 /**
@@ -149,18 +148,14 @@ function readJsonConfig(configPath: string): MockConfig {
 }
 
 /**
- * Reads scripts/mock-config.local.json (gitignored) if present. Otherwise
- * falls back to the "featured" defaults from mock-config.example.json, minus
- * its placeholder dbPath, so a fresh clone still gets a sensible screenshot
- * without warning about a database that was never configured.
+ * scripts/mock-config.json is tracked and defines the real capture list —
+ * every clone gets it for free. scripts/mock-config.local.json (gitignored)
+ * lets you override it locally (e.g. point dbPath at your own library)
+ * without touching the tracked file, so it takes priority when present.
  */
 export function loadMockConfig(): MockConfig {
-  if (existsSync(CONFIG_PATH)) return readJsonConfig(CONFIG_PATH);
   if (existsSync(LOCAL_CONFIG_PATH)) return readJsonConfig(LOCAL_CONFIG_PATH);
-  if (existsSync(EXAMPLE_CONFIG_PATH)) {
-    const { dbPath: _dbPath, ...defaults } = readJsonConfig(EXAMPLE_CONFIG_PATH);
-    return defaults;
-  }
+  if (existsSync(CONFIG_PATH)) return readJsonConfig(CONFIG_PATH);
   return {};
 }
 
