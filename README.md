@@ -100,14 +100,20 @@ luminous/
 
 Luminous is a cross-platform application that can be built and run on both Linux and Windows.
 
-### Linux (Ubuntu/Debian)
+### Linux (Ubuntu/Debian, Arch/CachyOS)
 
 #### 1. Install System Dependencies
 Ensure the required build tools, GTK, WebKit, ALSA, and SSL development headers are installed:
-```bash
-sudo apt update
-sudo apt install -y build-essential curl wget file libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatanaloop-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev pkg-config
-```
+
+*   **Ubuntu/Debian**:
+    ```bash
+    sudo apt update
+    sudo apt install -y build-essential curl wget file libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libayatanaloop-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev pkg-config
+    ```
+*   **Arch/CachyOS**:
+    ```bash
+    sudo pacman -S --needed base-devel curl wget file openssl gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg pkg-config
+    ```
 
 #### 2. Install Bun & Rust
 *   **Bun**: Install the JavaScript runtime & package manager:
@@ -131,6 +137,7 @@ Production bundles include updater artifacts, which must be signed. If you haven
 ```bash
 bun run tauri build
 ```
+> On rolling-release distros (Arch/CachyOS), the AppImage step bundles `strip` binaries too old to handle the RELR relocations in current system libraries. `bun run tauri build` sets `NO_STRIP=true` for this automatically, so no extra steps are needed here — it only skips stripping debug symbols from vendored libraries, slightly increasing AppImage size.
 
 ---
 
