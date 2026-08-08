@@ -60,6 +60,28 @@ export default defineConfig(async () => ({
   },
   plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
 
+  // These are only reachable once specific views actually render (icons,
+  // Tauri API shims, the virtualized song list), not from the initial
+  // route's static import graph — so Vite's dep scanner misses them at
+  // startup and discovers them on first navigation instead, forcing a full
+  // client reload mid-session. Declaring them here bundles them upfront so
+  // dev (and the take-screenshots harness, which navigates straight into
+  // arbitrary views) never hits that reload.
+  optimizeDeps: {
+    include: [
+      "lucide-svelte",
+      "@tauri-apps/api/core",
+      "@tauri-apps/api/event",
+      "@tauri-apps/api/window",
+      "@tauri-apps/api/app",
+      "@tauri-apps/plugin-dialog",
+      "@tauri-apps/plugin-opener",
+      "@tauri-apps/plugin-updater",
+      "@tauri-apps/plugin-process",
+      "svelte-virtual-list-ts",
+    ],
+  },
+
   test: {
     globals: true,
     include: ["src/**/*.{test,spec}.{js,ts}"],
