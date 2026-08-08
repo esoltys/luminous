@@ -49,6 +49,8 @@ describe("PlaylistsStore", () => {
           return mockTracks;
         case "get_all_app_settings":
           return { active_playlist_id: "101" };
+        case "validate_playlist_name":
+          return { valid: true, reason: null };
         case "create_playlist":
           return { id: 103, name: args?.name || "New Playlist", track_count: 0, created_at: "2026-01-03" };
         default:

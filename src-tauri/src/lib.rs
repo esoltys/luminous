@@ -679,6 +679,7 @@ pub fn run() {
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
             // Playlist commands
+            commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,
             commands::playlist::delete_playlist,
             commands::playlist::rename_playlist,

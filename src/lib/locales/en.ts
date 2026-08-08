@@ -617,7 +617,8 @@ export const en = {
     lyricsPlain: "Plain text",
     lyricsNone: "Not downloaded",
     trackSkippedToast: 'Couldn\'t play "{title}" — file not found. Skipped.',
-    tracksSkippedToast: "Skipped {count} unavailable tracks."
+    tracksSkippedToast: "Skipped {count} unavailable tracks.",
+    openNothingPlayable: "No supported audio files found to play."
   },
   miniplayer: {
     title: "Miniplayer",

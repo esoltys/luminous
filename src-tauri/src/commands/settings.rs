@@ -2,18 +2,32 @@ use crate::AppState;
 use std::collections::HashMap;
 use tauri::State;
 
+/// Fire-and-forget by design: a failed preference write is nothing the UI
+/// can act on, so it's logged here instead of rejecting the invoke() and
+/// forcing every caller into a try/catch it can only console.error in.
+/// (The `Result` is a Tauri requirement for async commands borrowing State —
+/// this command always returns `Ok`.)
 #[tauri::command]
 pub async fn set_app_setting(
     state: State<'_, AppState>,
     key: String,
     value: String,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
-        rusqlite::params![key, value],
-    )
-    .map_err(|e| e.to_string())?;
+    let result = state
+        .db
+        .pool
+        .get()
+        .map_err(|e| e.to_string())
+        .and_then(|conn| {
+            conn.execute(
+                "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
+                rusqlite::params![key, value],
+            )
+            .map_err(|e| e.to_string())
+        });
+    if let Err(e) = result {
+        log::error!("Failed to persist app setting '{key}': {e}");
+    }
     Ok(())
 }
 
@@ -123,12 +137,19 @@ pub async fn get_fade_settings(
     get_fade_settings_from_db(&state.db)
 }
 
+/// Fire-and-forget for the same reason as [`set_app_setting`] — always `Ok`.
 #[tauri::command]
 pub async fn set_fade_settings(
     state: State<'_, AppState>,
     settings: crate::models::FadeSettings,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = match state.db.pool.get() {
+        Ok(conn) => conn,
+        Err(e) => {
+            log::error!("Failed to persist fade settings: {e}");
+            return Ok(());
+        }
+    };
     let pairs = [
         (
             "fade_pause_enabled",
@@ -161,12 +182,12 @@ pub async fn set_fade_settings(
     ];
 
     for (k, v) in pairs {
-        conn.execute(
+        if let Err(e) = conn.execute(
             "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
             rusqlite::params![k, v],
-        )
-        .map_err(|e| e.to_string())?;
+        ) {
+            log::error!("Failed to persist fade setting '{k}': {e}");
+        }
     }
-
     Ok(())
 }

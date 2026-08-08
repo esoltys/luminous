@@ -5,15 +5,6 @@ import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
 
-/** Marker substring from the backend's reserved-name rejection (playlist.rs,
- * is_reserved_playlist_name) — always in English regardless of locale, since
- * it's matched here rather than shown directly to the user. */
-const RESERVED_PLAYLIST_NAME_MARKER = "is reserved for the app's built-in Queue playlist";
-
-function isReservedPlaylistNameError(err: unknown): boolean {
-  return String(err).includes(RESERVED_PLAYLIST_NAME_MARKER);
-}
-
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
   activePlaylistId = $state<number | null>(null);
@@ -156,11 +147,7 @@ class PlaylistsStore {
     this.activePlaylistId = id;
     this.activePlaylistTracks = await invoke("get_playlist_tracks", { playlistId: id });
     this.notifyQueueChanged();
-    try {
-      await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
-    } catch (err) {
-      console.error("Failed to save active playlist settings:", err);
-    }
+    await invoke("set_app_setting", { key: "active_playlist_id", value: id.toString() });
   }
 
   /** Explicitly pins `id` as the "Active" quick-add target — only called from
@@ -168,23 +155,27 @@ class PlaylistsStore {
    * viewing/opening a playlist. */
   async pinPlaylist(id: number) {
     this.pinnedPlaylistId = id;
-    try {
-      await invoke("set_app_setting", { key: "pinned_playlist_id", value: id.toString() });
-    } catch (err) {
-      console.error("Failed to save pinned playlist setting:", err);
+    await invoke("set_app_setting", { key: "pinned_playlist_id", value: id.toString() });
+  }
+
+  /** Asks the backend whether `name` would be rejected, and toasts the
+   * reason if so. Replaces the old approach of matching substrings of the
+   * create/rename error message after the fact. */
+  private async checkPlaylistName(name: string): Promise<boolean> {
+    const check = await invoke<{ valid: boolean; reason?: string }>("validate_playlist_name", {
+      name,
+    });
+    if (!check.valid && check.reason === "reserved") {
+      toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
     }
+    return check.valid;
   }
 
   async createPlaylist(name: string): Promise<Playlist> {
-    let playlist: Playlist;
-    try {
-      playlist = await invoke("create_playlist", { name });
-    } catch (err) {
-      if (isReservedPlaylistNameError(err)) {
-        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
-      }
-      throw err;
+    if (!(await this.checkPlaylistName(name))) {
+      throw new Error(`invalid playlist name: ${name}`);
     }
+    const playlist: Playlist = await invoke("create_playlist", { name });
     await this.refreshPlaylists();
     await this.selectPlaylist(playlist.id);
     await this.pinPlaylist(playlist.id);
@@ -232,23 +223,15 @@ class PlaylistsStore {
     }
     if (this.pinnedPlaylistId === id) {
       this.pinnedPlaylistId = null;
-      try {
-        await invoke("set_app_setting", { key: "pinned_playlist_id", value: "" });
-      } catch (err) {
-        console.error("Failed to clear pinned playlist setting:", err);
-      }
+      await invoke("set_app_setting", { key: "pinned_playlist_id", value: "" });
     }
   }
 
   async renamePlaylist(id: number, name: string) {
-    try {
-      await invoke("rename_playlist", { id, name });
-    } catch (err) {
-      if (isReservedPlaylistNameError(err)) {
-        toastStore.show(i18n.t("playlists.reservedPlaylistName", { name: name.trim() }), "error");
-      }
-      throw err;
+    if (!(await this.checkPlaylistName(name))) {
+      throw new Error(`invalid playlist name: ${name}`);
     }
+    await invoke("rename_playlist", { id, name });
     await this.refreshPlaylists();
   }
 

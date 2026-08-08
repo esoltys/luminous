@@ -615,7 +615,8 @@ export const fr = {
     lyricsPlain: "Texte brut",
     lyricsNone: "Non téléchargées",
     trackSkippedToast: 'Impossible de lire « {title} » — fichier introuvable. Morceau ignoré.',
-    tracksSkippedToast: "{count} morceaux indisponibles ignorés."
+    tracksSkippedToast: "{count} morceaux indisponibles ignorés.",
+    openNothingPlayable: "Aucun fichier audio pris en charge à lire."
   },
   miniplayer: {
     title: "Mini-lecteur",

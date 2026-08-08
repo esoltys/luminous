@@ -54,7 +54,7 @@ const RESERVED_PLAYLIST_NAMES: &[&str] = &[
     "file d'attente", // fr: playerBar.queueTitle
 ];
 
-fn is_reserved_playlist_name(name: &str) -> bool {
+pub fn is_reserved_playlist_name(name: &str) -> bool {
     let trimmed = name.trim().to_lowercase();
     RESERVED_PLAYLIST_NAMES.contains(&trimmed.as_str())
 }

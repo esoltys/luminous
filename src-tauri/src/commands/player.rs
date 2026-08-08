@@ -234,33 +234,53 @@ pub async fn set_repeat_mode(mode: RepeatMode, state: State<'_, AppState>) -> Re
     Ok(())
 }
 
+/// What actually happened to the files the user opened. Unplayable inputs
+/// are an outcome to report (the store shows a toast), not an error to
+/// throw — a Result::Err here would escape as an unhandled rejection.
+#[derive(serde::Serialize)]
+pub struct OpenAndPlayOutcome {
+    pub played: usize,
+    pub skipped: usize,
+}
+
 #[tauri::command]
 pub async fn open_and_play(
     paths: Vec<String>,
     app: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<OpenAndPlayOutcome, String> {
     use rusqlite::params;
     use rusqlite::OptionalExtension;
     use std::path::Path;
     use tauri::Emitter;
 
     let mut resolved_paths = Vec::new();
+    // Candidate entries considered (input files + playlist tracks); whatever
+    // doesn't make it into `songs` below counts as skipped.
+    let mut attempted: usize = 0;
 
     for path_str in paths {
         let path = Path::new(&path_str);
         if !path.exists() {
+            attempted += 1;
             continue;
         }
 
         if path.is_file() {
             if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some() {
                 // Parse M3U/M3U8/PLS/XSPF playlist file
-                let parsed = crate::playlist_parsers::parse_playlist(path)
-                    .map_err(|e| format!("Failed to read playlist file '{}': {}", path_str, e))?;
+                let parsed = match crate::playlist_parsers::parse_playlist(path) {
+                    Ok(parsed) => parsed,
+                    Err(e) => {
+                        log::warn!("Failed to read playlist file '{}': {}", path_str, e);
+                        attempted += 1;
+                        continue;
+                    }
+                };
                 let parent_dir = path.parent();
 
                 for track in parsed.tracks {
+                    attempted += 1;
                     let raw_path = track.path_or_url.trim();
                     let clean_rel = raw_path
                         .trim_start_matches("./")
@@ -294,6 +314,7 @@ pub async fn open_and_play(
                     }
                 }
             } else {
+                attempted += 1;
                 let is_audio = path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -311,7 +332,10 @@ pub async fn open_and_play(
     }
 
     if resolved_paths.is_empty() {
-        return Err("No supported audio files found to play.".to_string());
+        return Ok(OpenAndPlayOutcome {
+            played: 0,
+            skipped: attempted,
+        });
     }
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
@@ -403,14 +427,21 @@ pub async fn open_and_play(
     }
 
     if songs.is_empty() {
-        return Err("Failed to load any of the selected tracks.".to_string());
+        // Nothing decodable — leave the current Queue untouched.
+        return Ok(OpenAndPlayOutcome {
+            played: 0,
+            skipped: attempted,
+        });
     }
 
     let song_ids: Vec<i64> = songs.iter().map(|s| s.id).collect();
 
-    let res = replace_queue_and_play(&state, &song_ids, 0, Some(PlayContext::Song)).await;
+    replace_queue_and_play(&state, &song_ids, 0, Some(PlayContext::Song)).await?;
     let _ = app.emit("library-changed", ());
-    res
+    Ok(OpenAndPlayOutcome {
+        played: songs.len(),
+        skipped: attempted.saturating_sub(songs.len()),
+    })
 }
 
 #[tauri::command]

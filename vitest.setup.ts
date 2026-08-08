@@ -63,6 +63,12 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "has_acoustid_env_key") {
         return false;
       }
+      if (cmd === "validate_playlist_name") {
+        return { valid: true, reason: null };
+      }
+      if (cmd === "open_and_play") {
+        return { played: 1, skipped: 0 };
+      }
       // The backend bootstraps the built-in Queue playlist at startup, so a
       // playlist listing always contains it — model that guarantee here.
       if (cmd === "get_playlists") {

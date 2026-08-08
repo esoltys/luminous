@@ -253,7 +253,20 @@ export class PlayerStore {
   }
 
   async openAndPlay(paths: string[]) {
-    await invoke("open_and_play", { paths });
+    const outcome = await invoke<{ played: number; skipped: number }>("open_and_play", { paths });
+    if (outcome.played === 0) {
+      toastStore.show(
+        i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
+        "error"
+      );
+      return;
+    }
+    if (outcome.skipped > 0) {
+      toastStore.show(
+        i18n.t("playerBar.tracksSkippedToast", { count: outcome.skipped }, `Skipped ${outcome.skipped} unavailable tracks.`),
+        "error"
+      );
+    }
     await playlistsStore.refreshPlaylists();
     const queuePl = await playlistsStore.requireQueue();
     this.activeContextName = "Queue";

@@ -4,6 +4,31 @@ use crate::{
 };
 use tauri::State;
 
+#[derive(serde::Serialize)]
+pub struct PlaylistNameCheck {
+    pub valid: bool,
+    /// Why the name was rejected ("reserved"), when invalid.
+    pub reason: Option<String>,
+}
+
+/// Answers "would this playlist name be rejected?" so the frontend can
+/// validate before submitting, instead of matching substrings of the
+/// create/rename error message after the fact.
+#[tauri::command]
+pub fn validate_playlist_name(name: String) -> PlaylistNameCheck {
+    if crate::playlist::is_reserved_playlist_name(&name) {
+        PlaylistNameCheck {
+            valid: false,
+            reason: Some("reserved".to_string()),
+        }
+    } else {
+        PlaylistNameCheck {
+            valid: true,
+            reason: None,
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn create_playlist(name: String, state: State<'_, AppState>) -> Result<Playlist, String> {
     state

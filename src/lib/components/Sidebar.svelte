@@ -33,9 +33,7 @@
 
   function navigateToFoldersSettings() {
     collectionStore.activeTab = "settings";
-    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" }).catch((err) => {
-      console.error("Failed to set active_settings_tab:", err);
-    });
+    invoke("set_app_setting", { key: "active_settings_tab", value: "folders" });
   }
 
   async function handleAddDirectory() {

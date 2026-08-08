@@ -577,9 +577,7 @@ class CollectionStore {
         }
         if (appVersion && settings.launched_version !== appVersion) {
           this.isFirstLaunch = true;
-          invoke("set_app_setting", { key: "launched_version", value: appVersion }).catch((err) => {
-            console.error("Failed to persist launched_version:", err);
-          });
+          invoke("set_app_setting", { key: "launched_version", value: appVersion });
           // Show the welcome toast after a short delay so the UI has time to
           // render before the celebration.
           const isFirstEver = !settings.launched_version;
@@ -603,9 +601,7 @@ class CollectionStore {
         if (event.payload.phase === "done") {
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
-          invoke("set_app_setting", { key: "last_scan_time", value: nowStr }).catch((err) => {
-            console.error("Failed to save last_scan_time:", err);
-          });
+          invoke("set_app_setting", { key: "last_scan_time", value: nowStr });
           this.refreshDirectories();
           const songCountBeforeRefresh = this.stats.total_songs;
           this.refreshStats().then(() => {
@@ -735,16 +731,12 @@ class CollectionStore {
 
   async setWatchFoldersRealtime(enabled: boolean) {
     this.watchFoldersRealtime = enabled;
-    await invoke("set_app_setting", { key: "watch_folders_realtime", value: String(enabled) }).catch(err => {
-      console.error("Failed to save watch_folders_realtime setting:", err);
-    });
+    await invoke("set_app_setting", { key: "watch_folders_realtime", value: String(enabled) });
   }
 
   async setScanOnStartup(enabled: boolean) {
     this.scanOnStartup = enabled;
-    await invoke("set_app_setting", { key: "scan_on_startup", value: String(enabled) }).catch(err => {
-      console.error("Failed to save scan_on_startup setting:", err);
-    });
+    await invoke("set_app_setting", { key: "scan_on_startup", value: String(enabled) });
   }
 
   async refreshDirectories() {
