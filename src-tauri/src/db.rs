@@ -73,7 +73,6 @@ impl Database {
     fn run_migrations(&self) -> Result<i32> {
         let conn = self.pool.get().context("failed to get db connection")?;
 
-        // Create schema_version table if it doesn't exist
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY);",
         )?;
@@ -588,7 +587,6 @@ mod tests {
 
     #[test]
     fn test_database_initialization() {
-        // Use a unique temp path for testing
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_test_{}",
             std::time::SystemTime::now()
@@ -606,7 +604,6 @@ mod tests {
         ).unwrap();
         assert_eq!(tables_count, 3);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
@@ -643,7 +640,6 @@ mod tests {
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION + 1);
         assert!(db.is_newer_than_app());
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

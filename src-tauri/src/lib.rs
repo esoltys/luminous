@@ -110,7 +110,6 @@ pub fn run() {
             let app_handle = ctx.app_handle();
             let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
 
-            // Extract the resource path directly from the full URI string
             let uri_str = request.uri().to_string();
             let mut trimmed = &uri_str[..];
             if let Some(t) = uri_str.strip_prefix("http://luminous-art.localhost/") {
@@ -216,13 +215,11 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            // Initialize database (creates file + runs migrations)
             let db = Arc::new(
                 Database::new(app.path().app_data_dir().expect("no app data dir"))
                     .expect("failed to initialize database"),
             );
 
-            // Initialize audio engine
             let audio_engine = AudioEngine::new();
 
             // Load and restore equalizer settings on startup
@@ -272,11 +269,9 @@ pub fn run() {
 
             let audio = Arc::new(Mutex::new(audio_engine));
 
-            // Initialize player (needs db + audio refs)
             let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
-            // Initialize playlist manager
             let manager = PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists");
             // Bootstrap the built-in Queue before the window loads, so the
             // frontend can treat its existence as a guarantee rather than a
@@ -286,7 +281,6 @@ pub fn run() {
             }
             let playlists = Arc::new(Mutex::new(manager));
 
-            // Initialize cover manager
             let cover_manager = Arc::new(CoverManager::new(
                 Arc::clone(&db),
                 app.path().app_data_dir().expect("no app data dir"),
@@ -539,7 +533,6 @@ pub fn run() {
                 media_session,
             };
 
-            // Start background directory watcher
             crate::collection::start_watcher(app.handle().clone(), &state);
 
             // Start background EBU R128 loudness analyzer (#77)

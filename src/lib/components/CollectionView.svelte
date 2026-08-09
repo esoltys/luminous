@@ -176,16 +176,13 @@
     SONG_TABLE_COLUMNS.filter((col) => col.field && collectionStore.visibleColumns[col.key])
   );
 
-  // Trigger search on collectionStore when query changes
   $effect(() => {
     collectionStore.search(collectionStore.searchQuery);
   });
 
-  // Computed songs list with filtering and sorting
   let filteredSongs = $derived.by(() => {
     let result = collectionStore.filteredSongs;
 
-    // Apply sort
     return [...result].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
@@ -241,7 +238,6 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_artist_asc") !== "false" : true
   );
 
-  // Save sorting states to localStorage when they change
   $effect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("sort_song_field", sortField);
@@ -253,7 +249,6 @@
     }
   });
 
-  // Computed sorted albums list
   let sortedAlbums = $derived.by(() => {
     const list = [...collectionStore.filteredAlbums];
     const field = albumSortField;
@@ -276,7 +271,6 @@
     });
   });
 
-  // Computed sorted artists list
   let sortedArtists = $derived.by(() => {
     const list = [...collectionStore.filteredArtists];
     const field = artistSortField;
@@ -417,15 +411,12 @@
 {:else}
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
   {#if collectionStore.activeSubTab === "songs"}
-    <!-- Top bar for Songs View -->
     <div class="px-6 pt-4 pb-2 flex-shrink-0">
       <div class="h-9 flex items-center justify-between">
-        <!-- Showing Count (Left) -->
         <div class="text-xs text-brand-text-secondary font-medium">
           {filteredSongs.length === 1 ? i18n.t('collection.showingOneSong') : i18n.t('collection.showingSongs', { count: filteredSongs.length })}
         </div>
 
-        <!-- Columns + Sort Dropdown (Right) -->
         <div class="flex items-center gap-2">
           <ColumnSelector align="right" iconOnly />
           <div class="relative">
@@ -448,9 +439,7 @@
       </div>
     </div>
 
-    <!-- Main View Songs Container -->
     <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <!-- Songs Table View -->
       <div bind:this={songsTableContainer} class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
         <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
           <div class="grid items-center py-3 px-4" style="{gridColsStyle}; padding-right: calc(1rem + {scrollbarWidth}px)">
@@ -980,12 +969,9 @@
     </div>
 
   {:else}
-    <!-- Scrollable Container for Albums / Artists Views -->
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${collectionStore.activeSubTab}`}>
-      <!-- Sticky header: Filter Info / View Mode Toggle / Sort controls -->
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">
-          <!-- Showing Count (Left) -->
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if collectionStore.activeSubTab === "albums"}
               {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
@@ -994,7 +980,6 @@
             {/if}
           </div>
 
-          <!-- View Mode Toggle + Sort Dropdown (Right) -->
           <div class="flex items-center gap-2">
             <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
               <button
@@ -1102,7 +1087,6 @@
       <div class="pt-2">
         {#if collectionStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
-          <!-- Albums Row List View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
             {#each sortedAlbums as album}
               <AlbumRowCard
@@ -1113,7 +1097,6 @@
             {@render albumEmptyState()}
           </div>
         {:else}
-          <!-- Albums Card Grid View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedAlbums as album}
               <AlbumCard
@@ -1127,7 +1110,6 @@
         {/if}
         {:else if collectionStore.activeSubTab === "artists"}
         {#if activeViewMode === "rows"}
-          <!-- Artists Row List View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}
@@ -1142,7 +1124,6 @@
             {@render artistEmptyState()}
           </div>
         {:else}
-          <!-- Artists List Grid View -->
           <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}

@@ -254,7 +254,6 @@ fn build_target_path_parts(
         .and_then(|e| e.to_str())
         .unwrap_or("flac");
 
-    // Determine root destination directory
     let root_dir: PathBuf = if let Some(ref dest) = options.destination_dir {
         PathBuf::from(dest)
     } else {
@@ -706,7 +705,6 @@ pub fn compute_preview(
                 }
             }
 
-            // External collision!
             let dest_folder: PathBuf = if let Some(ref dest) = options.destination_dir {
                 PathBuf::from(dest)
             } else {

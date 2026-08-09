@@ -44,7 +44,6 @@ impl AudioVisualizerBuffer {
             result.push(buf[i]);
         }
 
-        // Zero-pad if needed
         while result.len() < size {
             result.push(0.0);
         }

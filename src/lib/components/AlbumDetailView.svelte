@@ -269,7 +269,6 @@
       .then((fetchedSongs) => {
         if (requested !== albumName) return;
         let filtered = [...fetchedSongs];
-        // Sort by disc, then by track
         filtered.sort((a, b) => {
           if (a.disc !== b.disc) {
             return (a.disc ?? 1) - (b.disc ?? 1);
@@ -420,7 +419,6 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
-    // Reload songs
     loading = true;
     invoke<Song[]>("get_songs_by_album", { album: albumName })
       .then((fetchedSongs) => {
@@ -506,10 +504,8 @@
     </div>
   {/if}
 
-  <!-- Album Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
@@ -554,7 +550,6 @@
           {/if}
         </div>
 
-        <!-- Control Buttons -->
         <div class="flex items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
@@ -588,7 +583,6 @@
         </div>
       </div>
 
-      <!-- Right: Full Album Cover Art -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverArt
@@ -609,10 +603,8 @@
     </div>
   </div>
 
-  <!-- Songs Table Section -->
   <div class="relative z-10 px-6 py-6" class:pb-28={!!playerStore.currentSong}>
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden">
-      <!-- Table Header -->
       <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar/80 backdrop-blur-md border-b border-brand-border text-[10px] text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div class="grid items-center py-2.5 px-4" style={gridColsStyle}>
           <div class="text-center w-9"></div>
@@ -910,7 +902,6 @@
         </div>
       </div>
 
-      <!-- Table Body -->
       <div class="divide-y divide-brand-border/40 rounded-b-lg overflow-hidden">
         {#if loading}
           <div class="flex items-center justify-center py-16">

@@ -115,7 +115,6 @@
     }
   }
 
-  // Draw waveform or bands, depending on prefs.seekBarMode
   function draw() {
     if (!canvas || !containerEl) return;
     const ctx = canvas.getContext("2d");
@@ -137,7 +136,6 @@
     const songLength = playerStore.currentSong?.length_nanosec || 1;
     const progressPct = playerStore.positionNanosec / songLength;
 
-    // Dynamically read active theme colors from themeStore
     const colors = themeStore.resolvedColors;
     const accentColor = colors["color-accent"] || '#8b5cf6';
     const hoverColor = colors["color-accent-hover"] || '#a78bfa';
@@ -166,7 +164,6 @@
     const barGap = width < NARROW_WIDTH_BREAKPOINT_PX ? 0.5 : 1.0;
     const barWidth = Math.max(1, (width - (numBars - 1) * barGap) / numBars);
 
-    // Premium gradients for played part
     const gradPlayed = ctx.createLinearGradient(0, height, 0, 0);
     gradPlayed.addColorStop(0, accentColor);
     gradPlayed.addColorStop(1, hoverColor);
@@ -193,7 +190,6 @@
         }
       }
 
-      // Center the bars vertically
       const barHeight = Math.max(2, val * height * 0.85);
       const x = i * (barWidth + barGap);
       const y = (height - barHeight) / 2;
@@ -302,7 +298,6 @@
   let loadedSongId: number | undefined = undefined;
   let loadedMode: string | undefined = undefined;
 
-  // Fetch waveform or bands when song or mode actually changes.
   $effect(() => {
     const songId = playerStore.currentSong?.id;
     const mode = prefs.seekBarMode;

@@ -243,7 +243,6 @@
     class="bg-brand-sidebar border border-brand-border rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
     style="max-height: min(90vh, calc(100vh - {dockClearance + 32}px))"
   >
-    <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50">
       <div class="flex items-center gap-2.5">
         <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text">
@@ -262,9 +261,7 @@
       </button>
     </div>
 
-    <!-- Form Content -->
     <form onsubmit={handleSubmit} class="p-6 flex-1 overflow-y-auto flex flex-col gap-5">
-      <!-- Playlist Name -->
       <div>
         <label for="smart-playlist-name-input" class="block text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-1.5">
           {i18n.t("smartPlaylistBuilder.nameLabel")}
@@ -280,7 +277,6 @@
         />
       </div>
 
-      <!-- Rules Section -->
       <div>
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
@@ -300,7 +296,6 @@
         <div class="space-y-2.5">
           {#each rules as rule (rule.id)}
             <div class="flex items-center gap-2 bg-brand-main/60 p-2.5 rounded-xl border border-brand-border/40">
-              <!-- Field Selector -->
               <Select
                 value={rule.field}
                 onchange={(e) => {
@@ -315,7 +310,6 @@
                 {/each}
               </Select>
 
-              <!-- Operator Selector -->
               <Select
                 value={rule.op}
                 onchange={(e) => { rule.op = e.currentTarget.value; }}
@@ -326,7 +320,6 @@
                 {/each}
               </Select>
 
-              <!-- Value Input -->
               <Input
                 type="text"
                 bind:value={rule.value}
@@ -336,7 +329,6 @@
                 class="flex-1 min-w-0"
               />
 
-              <!-- Delete Rule -->
               {#if rules.length > 1}
                 <button
                   type="button"
@@ -358,7 +350,6 @@
         <PopulationModeTabs mode={populationMode} onChange={(m) => (populationMode = m)} />
       </div>
 
-      <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-brand-border/60">
         <Button type="button" onclick={onClose} variant="secondary" size="sm">
           {i18n.t("smartPlaylistBuilder.cancel")}

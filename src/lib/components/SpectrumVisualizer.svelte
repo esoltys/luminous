@@ -26,7 +26,6 @@
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Handle high DPI screens
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -43,18 +42,16 @@
     const barGap = 2.5;
     const barWidth = (width - (numBars - 1) * barGap) / numBars;
 
-    // Dynamically read active theme colors from themeStore
     const colors = themeStore.resolvedColors;
     const accentColor = colors["color-accent"] || '#8b5cf6';
     const hoverColor = colors["color-accent-hover"] || '#a78bfa';
 
     const rgb = hexToRgb(accentColor) || { r: 139, g: 92, b: 246 };
 
-    // Premium gradient: custom or themed accent to hover
     const grad = ctx.createLinearGradient(0, height, 0, 0);
-    grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`); // faint accent color at bottom
-    grad.addColorStop(0.5, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`); // strong accent color
-    grad.addColorStop(1, hoverColor); // accent hover color
+    grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`);
+    grad.addColorStop(0.5, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.8)`);
+    grad.addColorStop(1, hoverColor);
 
     ctx.fillStyle = grad;
 
@@ -69,7 +66,6 @@
       const x = i * (barWidth + barGap);
       const y = height - barHeight;
 
-      // Draw rounded rectangle for bar
       ctx.beginPath();
       ctx.roundRect(x, y, barWidth, barHeight, [1.5, 1.5, 0, 0]);
       ctx.fill();
@@ -77,7 +73,6 @@
   }
 
   $effect(() => {
-    // Redraw when theme or artwork colors change
     const _theme = themeStore.activeThemeId;
     const _art = themeStore.artworkColors;
     draw();

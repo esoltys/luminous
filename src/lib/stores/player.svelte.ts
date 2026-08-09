@@ -9,7 +9,6 @@ import { playlistsStore } from "./playlists.svelte";
 import { i18n } from "./i18n.svelte";
 
 export class PlayerStore {
-  // Reactive state using Svelte 5 Runes
   state = $state<PlayState>("stopped");
   currentSong = $state<Song | undefined>(undefined);
   playlistId = $state<number | undefined>(undefined);
@@ -44,7 +43,6 @@ export class PlayerStore {
 
   private async init() {
     try {
-      // Get initial playback state from backend
       const initialState: PlaybackState = await invoke("get_playback_state");
       this.updateState(initialState);
       themeStore.updateArtworkColors(this.currentSong);
@@ -54,7 +52,6 @@ export class PlayerStore {
         this.positionNanosec = event.payload.position_nanosec;
       });
 
-      // Listen for playback state changes
       await listen<PlaybackState>("playback-state", async (event) => {
         const oldSongId = this.currentSong?.id;
         const oldItemUuid = this.playlistItemUuid;
@@ -82,7 +79,6 @@ export class PlayerStore {
         }
       });
 
-      // Listen for track changes
       await listen<{ song: Song | null }>("track-changed", async (event) => {
         this.currentSong = event.payload.song || undefined;
         themeStore.updateArtworkColors(this.currentSong);
@@ -120,7 +116,6 @@ export class PlayerStore {
         this.openAndPlay(event.payload);
       });
 
-      // Check for startup file argument
       const startupFile = await invoke<string | null>("get_startup_file");
       if (startupFile) {
         await this.openAndPlay([startupFile]);

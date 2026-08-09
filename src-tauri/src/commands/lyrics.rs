@@ -96,7 +96,6 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
                 "[Luminous Backend] Successfully fetched online lyrics (len: {}, synced: {is_synced}). Caching in SQLite...",
                 final_lyrics.len()
             );
-            // Cache back in SQLite
             conn.execute(
                 "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
                 rusqlite::params![final_lyrics, song_id],
@@ -106,7 +105,6 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
         }
         Err(e) => {
             eprintln!("[Luminous Backend] Online search failed: {e}");
-            // Online search failed, fall back to cached local lyrics if available
             if let Some(lyrics) = cached_lyrics {
                 if !lyrics.trim().is_empty() {
                     // Mark as checked to prevent future online lookup spamming

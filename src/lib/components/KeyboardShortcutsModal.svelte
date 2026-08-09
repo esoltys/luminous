@@ -46,7 +46,6 @@
 </script>
 
 <Modal {onClose} closeOnBackdropClick ariaLabelledby="shortcuts-modal-title" class="max-h-[85vh]">
-  <!-- Header -->
   <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border/60 bg-brand-main/50 shrink-0">
     <div class="flex items-center gap-2.5">
       <div class="p-2 rounded-xl bg-brand-accent/20 text-brand-accent-text">
@@ -62,7 +61,6 @@
     </button>
   </div>
 
-  <!-- Groups -->
   <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
     {#each groups as group (group.title)}
       <div>

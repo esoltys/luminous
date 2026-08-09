@@ -239,7 +239,6 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
   {/if}
-  <!-- Ambient Tint / Cover Art Glow Background -->
   {#if playerStore.currentSong}
     <div
       class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none"
@@ -257,7 +256,6 @@
 
   <!-- IDLE STATIC LAYOUT -->
   <div class="relative z-10 w-full h-full flex flex-col items-center justify-between pointer-events-auto">
-    <!-- Centered Sharp Active Album Art Card -->
     <div class="flex-1 w-full flex items-center justify-center min-h-0 py-2">
       <div class="relative aspect-square h-full max-h-full max-w-[90%] rounded-none overflow-hidden border border-brand-border/30 bg-brand-sidebar flex items-center justify-center {isHovered ? 'scale-[0.98]' : ''} transition-transform duration-300">
         <CoverArt
@@ -270,7 +268,6 @@
       </div>
     </div>
 
-    <!-- Lower Text Description Card tracking active Title / Artist -->
     <div class="w-full text-center px-2 py-1 flex flex-col items-center justify-center flex-shrink-0">
       <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
         {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
@@ -289,7 +286,6 @@
     onpointerleave={hideHover}
     class="absolute inset-0 z-30 flex flex-col justify-between p-3 transition-opacity duration-200 {isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'} {isLinux ? 'bg-brand-main' : 'bg-brand-main/85 backdrop-blur-md'}"
   >
-    <!-- Full-width Window Drag Region spanning the top edge, textured with a grabber dot pattern -->
     <div
       data-tauri-drag-region
       onpointerdown={handleStartDrag}
@@ -300,7 +296,6 @@
       title={i18n.t('miniplayer.dragHint', {}, 'Drag window')}
     ></div>
 
-    <!-- Song Metadata Info in Hover Mask -->
     <div class="w-full text-center px-1 py-0.5 flex flex-col items-center justify-center flex-shrink-0 mt-auto">
       <span class="text-sm font-bold text-brand-text-primary truncate w-full" title={playerStore.currentSong?.title}>
         {playerStore.currentSong?.title || i18n.t('playerBar.notPlaying')}
@@ -319,11 +314,8 @@
       {/if}
     </div>
 
-    <!-- CENTER PLAYBACK CONTROLS & WAVEFORM PROGRESS (Grouped together with tight spacing) -->
     <div class="flex flex-col items-center justify-center w-full gap-2 my-auto flex-shrink-0">
-      <!-- Transport Control Ring -->
       <div class="flex items-center justify-center gap-4 w-full">
-        <!-- Shuffle Mode -->
         <button
           onclick={cycleShuffle}
           class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.shuffleMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
@@ -336,7 +328,6 @@
           <Shuffle class="w-4.5 h-4.5" />
         </button>
 
-        <!-- Skip Previous -->
         <button
           onclick={() => playerStore.previous()}
           class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
@@ -345,7 +336,6 @@
           <SkipBack class="w-5 h-5 fill-current" />
         </button>
 
-        <!-- Play / Pause prominent ring button -->
         {#if playerStore.state === 'playing'}
           <button
             onclick={() => playerStore.pause()}
@@ -364,7 +354,6 @@
           </button>
         {/if}
 
-        <!-- Skip Next -->
         <button
           onclick={() => playerStore.next()}
           class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
@@ -373,7 +362,6 @@
           <SkipForward class="w-5 h-5 fill-current" />
         </button>
 
-        <!-- Repeat Mode -->
         <button
           onclick={cycleRepeat}
           class="p-1.5 transition-colors hover:text-brand-text-primary flex items-center gap-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/60'}"
@@ -387,7 +375,6 @@
         </button>
       </div>
 
-      <!-- Waveform Progress Timeline positioned directly under play controls -->
       <div class="flex flex-col gap-1 w-full text-[10px] text-brand-text-secondary/70 px-1">
         <WaveformSeekBar />
         <div class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80">
@@ -397,9 +384,7 @@
       </div>
     </div>
 
-    <!-- Bottom-aligned Volume (left) & Restore (right) Controls -->
     <div class="flex items-center justify-between w-full flex-shrink-0 z-50">
-      <!-- Volume Control -->
       <div class="flex items-center gap-1.5">
         <button
           onclick={toggleMute}
@@ -429,7 +414,6 @@
         />
       </div>
 
-      <!-- Restore -->
       <button
         onclick={() => collectionStore.exitMiniplayerMode()}
         class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"

@@ -67,7 +67,6 @@ pub async fn lookup_acoustid_tags(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<SuggestedTags, String> {
-    // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: String = conn
         .query_row(
@@ -127,7 +126,6 @@ pub async fn save_song_tags(
     // whatever feedback the tag editor itself shows (#233).
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
-    // 1. Fetch file path from database
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: String = conn
         .query_row(

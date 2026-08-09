@@ -104,7 +104,6 @@ fn click_save_custom_theme(w: &mut DesignToolsWorld) {
     w.custom_themes.push(theme);
     w.active_theme_id = new_id;
 
-    // Persist in DB app_state table
     let conn = w.db.pool.get().expect("db conn failed");
     conn.execute(
         "INSERT OR REPLACE INTO app_state (key, value) VALUES ('active_theme_id', ?1)",

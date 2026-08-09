@@ -20,7 +20,6 @@
   let searchDropdownRef: HTMLDivElement | undefined = $state();
   let isSearchFocused = $state(false);
 
-  // Move focus into the dropdown's result list, roving with the arrow keys
   function focusFirstSearchResult() {
     const first = searchDropdownRef?.querySelector<HTMLElement>(".search-result-item");
     first?.focus();
@@ -63,7 +62,6 @@
       | { type: "custom"; id: number; label: string; subtitle: string }
     > = [];
 
-    // Favourites auto-playlist
     const favLabel = i18n.t("playlists.autoFavourites", {}, "Favourite Songs");
     if (favLabel.toLowerCase().includes(query) || "favourites".includes(query) || "favorites".includes(query)) {
       results.push({
@@ -75,7 +73,6 @@
       });
     }
 
-    // Recently Added auto-playlist
     const recLabel = i18n.t("playlists.autoRecentlyAdded", {}, "Recently Added");
     if (recLabel.toLowerCase().includes(query) || "recently added".includes(query) || "recent".includes(query)) {
       results.push({
@@ -87,7 +84,6 @@
       });
     }
 
-    // History auto-playlist
     const histLabel = i18n.t("playlists.autoHistory", {}, "History");
     if (histLabel.toLowerCase().includes(query) || "history".includes(query)) {
       results.push({
@@ -140,7 +136,6 @@
     return results;
   });
 
-  // Handle Ctrl+L to focus search & Escape to close search dropdown
   function handleKeyDown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key === "l") {
       e.preventDefault();
@@ -150,7 +145,6 @@
       isSearchFocused = false;
     }
 
-    // Dedicated keyboard "Browser Back"/"Browser Forward" keys
     if (e.key === "BrowserBack") {
       e.preventDefault();
       collectionStore.goBack();
@@ -171,14 +165,12 @@
     }
   }
 
-  // Close dropdown on click outside
   function handleWindowMouseDown(e: MouseEvent) {
     if (searchContainerRef && !searchContainerRef.contains(e.target as Node)) {
       isSearchFocused = false;
     }
   }
 
-  // Search handler (prevent reload & record query to recent searches)
   function handleSearch(e: Event) {
     e.preventDefault();
     const q = collectionStore.searchQuery.trim();
@@ -218,7 +210,6 @@
     isSearchFocused = false;
   }
 
-  // Clear search query
   function clearSearch() {
     collectionStore.searchQuery = "";
     collectionStore.search("");
@@ -230,7 +221,6 @@
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
 <header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
-  <!-- History Navigation Controls -->
   <div class="flex items-center gap-2">
     <button
       onclick={() => collectionStore.toggleSidebarCompact()}
@@ -257,7 +247,6 @@
     </button>
   </div>
 
-  <!-- Universal Search Bar Container -->
   <div bind:this={searchContainerRef} class="relative flex-1 max-w-2xl">
     <form onsubmit={handleSearch} class="w-full flex items-center gap-3 bg-brand-main rounded-lg px-4 py-2 border border-brand-border focus-within:border-brand-accent transition-colors">
       <Search class="w-4 h-4 text-brand-text-secondary flex-shrink-0" />
@@ -275,7 +264,6 @@
         class="flex-1 bg-transparent text-brand-text-primary text-sm focus:outline-none placeholder-brand-text-secondary/50"
       />
 
-      <!-- Open Files/Playlists button -->
       <button
         type="button"
         onclick={() => playerStore.openFileDialog()}
@@ -285,7 +273,6 @@
         <FolderOpen class="w-4 h-4" />
       </button>
 
-      <!-- Search feedback / progress -->
       {#if collectionStore.searchLoading}
         <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-accent border-t-transparent flex-shrink-0" title={i18n.t('topNav.searching')}></div>
       {:else if collectionStore.searchQuery}
@@ -303,7 +290,6 @@
       {/if}
     </form>
 
-    <!-- Search Dropdown Popover -->
     {#if isSearchFocused}
       <div
         bind:this={searchDropdownRef}
@@ -349,7 +335,6 @@
           </div>
         {/if}
 
-        <!-- Auto-suggestions (Shown when typing a non-empty search query) -->
         {#if collectionStore.searchQuery.trim() !== ""}
           <div class="mb-3">
             <div class="flex items-center justify-between px-2 py-1 mb-1 border-b border-brand-border/40 select-none">
@@ -369,7 +354,6 @@
               </div>
             {:else}
               <div class="flex flex-col gap-1">
-                <!-- Matching Artists (Top 3) -->
                 {#each collectionStore.filteredArtists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as artist (artist.name)}
                   <div
                     role="button"
@@ -408,7 +392,6 @@
                   </div>
                 {/each}
 
-                <!-- Matching Albums (Top 3) -->
                 {#each collectionStore.filteredAlbums.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as album (album.album)}
                   <div
                     role="button"
@@ -457,7 +440,6 @@
                   </div>
                 {/each}
 
-                <!-- Matching Playlists & Auto-playlists (Top 3) -->
                 {#each matchingPlaylists.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as item (item.id)}
                   <div
                     role="button"
@@ -510,7 +492,6 @@
                   </div>
                 {/each}
 
-                <!-- Matching Songs (Top 3) -->
                 {#each collectionStore.searchResults.slice(0, MAX_SEARCH_SUGGESTIONS_PER_CATEGORY) as song (song.id)}
                   <div
                     role="button"
@@ -567,7 +548,6 @@
           </div>
         {/if}
 
-        <!-- Recent Searches Section (Below Auto-suggestions) -->
         <div class="flex items-center justify-between px-2 py-1 mb-2 border-b border-brand-border/40 select-none">
           <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
             {i18n.t('topNav.recentSearches', {}, 'Recent searches')}
@@ -601,7 +581,6 @@
                 class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                  <!-- Avatar / Artwork / Icon -->
                   {#if item.artUrl}
                     <CoverArt
                       songId={typeof item.entityId === 'number' ? item.entityId : undefined}
@@ -625,7 +604,6 @@
                     </div>
                   {/if}
 
-                  <!-- Title & Subtitle -->
                   <div class="flex flex-col min-w-0 flex-1">
                     <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">
                       {item.title}
@@ -636,7 +614,6 @@
                   </div>
                 </div>
 
-                <!-- Delete Single Item Button -->
                 <button
                   type="button"
                   onclick={(e) => {
@@ -656,7 +633,6 @@
     {/if}
   </div>
 
-  <!-- Layout Panel Toggles Group -->
   <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
     <button
       onclick={() => collectionStore.toggleSidebar()}
@@ -681,7 +657,6 @@
     </button>
   </div>
 
-  <!-- Reactive Logo Brand -->
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
        which needs overflow-visible for the search dropdown popover) so the
        logo's SVG glow filter can never bleed into the sidebar/header layers -->

@@ -98,7 +98,6 @@
     { key: "skipcount", label: "collection.columnSkipCount" },
   ];
 
-  // Currently-visible columns in table order
   let visibleInOrder = $derived(
     TABLE_ORDER.filter(col => collectionStore.visibleColumns[col.key])
   );
@@ -126,7 +125,6 @@
       class="column-selector-menu fixed bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl p-3 z-50 w-64 overflow-y-auto flex flex-col gap-0.5 select-none custom-scrollbar"
       style="top: {menuTop}px; left: {menuLeft}px; max-height: {menuMaxHeight}px"
     >
-      <!-- Visible: currently-on columns in table order -->
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-1 pb-0.5">
         Visible
       </div>
@@ -141,7 +139,6 @@
         {/each}
       {/if}
 
-      <!-- Metatags: all metatag columns alphabetically -->
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30">
         Metatags
       </div>
@@ -152,7 +149,6 @@
         </label>
       {/each}
 
-      <!-- Luminous: derived values alphabetically -->
       <div class="text-[10px] font-extrabold text-brand-accent-text uppercase tracking-wider px-2 pt-2 pb-0.5 mt-1 border-t border-brand-border/30">
         Luminous
       </div>

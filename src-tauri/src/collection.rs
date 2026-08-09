@@ -672,7 +672,6 @@ impl CollectionScanner {
             // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
             if !resolved && remote_fetch_count < 50 {
                 remote_fetch_count += 1;
-                // Add a small delay between requests
                 std::thread::sleep(std::time::Duration::from_millis(150));
 
                 if let Ok(Some(filename)) = cover_manager.fetch_remote_cover(song_id).await {
@@ -1827,7 +1826,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
             .get_string(&ItemKey::ReplayGainAlbumGain)
             .and_then(parse_replaygain_db);
 
-        // Check for embedded art
         song.art_embedded = !tag.pictures().is_empty();
     }
 
@@ -2427,10 +2425,8 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
     let app_clone = app.clone();
 
-    // Create a channel to receive events
     let (tx, rx) = std::sync::mpsc::channel::<WatcherMsg>();
 
-    // Create recommended watcher
     let watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
         match res {
             Ok(event) => {
@@ -2836,7 +2832,6 @@ mod tests {
         let scanner = CollectionScanner::new(db.clone());
         let conn = db.pool.get().unwrap();
 
-        // Helper to insert a song
         let insert_song = |path: &str,
                            title: &str,
                            artist: Option<&str>,
@@ -2922,7 +2917,6 @@ mod tests {
 
         let albums = scanner.get_albums().unwrap();
 
-        // Helper to find album by name
         let find_album = |name: &str| -> &serde_json::Value {
             albums
                 .iter()
@@ -2951,7 +2945,6 @@ mod tests {
         assert_eq!(album_four["artist"].as_str(), None);
         assert_eq!(album_four["track_count"].as_i64(), Some(2));
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
