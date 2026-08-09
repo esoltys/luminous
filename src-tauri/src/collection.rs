@@ -20,7 +20,7 @@ use rayon::prelude::*;
 use rusqlite::{params, ToSql};
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::{
         atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
@@ -1701,7 +1701,7 @@ fn is_audio_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn get_mtime(path: &Path) -> Option<i64> {
+pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
     std::fs::metadata(path)
         .ok()?
         .modified()
@@ -2148,6 +2148,37 @@ pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
 // ---------------------------------------------------------------------------
 // File Watcher & Deletion Sync
 // ---------------------------------------------------------------------------
+
+/// Resolves `path` to its real on-disk path when it differs only in case from
+/// what's stored — e.g. a tag-driven rename shifted an album folder's casing.
+/// `Path::exists()` treats a stale-cased path as a hit on a case-insensitive-
+/// but-case-preserving filesystem (Windows, macOS), which is why this drift
+/// only ever surfaces as a real playback failure on Linux/ext4. Returns
+/// `None` if some component genuinely doesn't exist on disk under any case.
+pub(crate) fn resolve_case_insensitive_path(path: &Path) -> Option<PathBuf> {
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(name) => {
+                if current.join(name).exists() {
+                    current.push(name);
+                    continue;
+                }
+                if !current.is_dir() {
+                    return None;
+                }
+                let target = name.to_string_lossy().to_lowercase();
+                let entry = std::fs::read_dir(&current)
+                    .ok()?
+                    .filter_map(|e| e.ok())
+                    .find(|e| e.file_name().to_string_lossy().to_lowercase() == target)?;
+                current.push(entry.file_name());
+            }
+            _ => current.push(component),
+        }
+    }
+    Some(current)
+}
 
 /// Matches DB rows whose file has vanished from its recorded path ("orphans")
 /// against freshly discovered files that have no DB row yet ("candidates"),
@@ -3912,6 +3943,47 @@ mod tests {
             .unwrap();
         assert_eq!(id, original_id, "repath must preserve the song's id");
         assert_eq!(path, real_path.to_string_lossy().to_string());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_case_insensitive_path_finds_real_casing() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_resolve_case_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let album_dir = temp_dir.join("HERO");
+        std::fs::create_dir_all(&album_dir).unwrap();
+        let real_path = album_dir.join("Track.mp3");
+        std::fs::write(&real_path, b"pretend audio bytes").unwrap();
+
+        // Same path but with the stale casing a stored DB row might have.
+        let stale_path = temp_dir.join("Hero").join("track.mp3");
+
+        let resolved = resolve_case_insensitive_path(&stale_path)
+            .expect("a case-only mismatch should still resolve to the real file");
+        assert_eq!(resolved, real_path);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_case_insensitive_path_none_when_truly_missing() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_resolve_case_missing_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let missing_path = temp_dir.join("Nonexistent").join("track.mp3");
+        assert!(resolve_case_insensitive_path(&missing_path).is_none());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

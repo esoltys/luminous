@@ -885,6 +885,63 @@ impl Player {
         }
     }
 
+    /// Called by the audio-event loop before treating a playback failure as a
+    /// real skip. If the current song's path is only stale-cased (see
+    /// `collection::resolve_case_insensitive_path`), repoints it to the real
+    /// on-disk path in the DB and retries the same track in place, so the
+    /// user never sees a toast for what's really just a Linux/case-sensitive-
+    /// filesystem quirk. Returns `true` if a heal+retry was attempted.
+    pub async fn try_heal_and_retry_current_track(&mut self) -> bool {
+        let Some(path) = self.current_song.as_ref().and_then(|s| s.path.clone()) else {
+            return false;
+        };
+        if std::path::Path::new(&path).exists() {
+            return false;
+        }
+        let Some(healed) = crate::collection::resolve_case_insensitive_path(std::path::Path::new(&path))
+        else {
+            return false;
+        };
+        let healed_str = healed.to_string_lossy().to_string();
+        if healed_str == path {
+            return false;
+        }
+
+        let Some(song_id) = self.current_song.as_ref().map(|s| s.id) else {
+            return false;
+        };
+        let mtime = crate::collection::get_mtime(&healed).unwrap_or(0);
+        let updated = match self._db.pool.get() {
+            Ok(conn) => conn
+                .execute(
+                    "UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3",
+                    rusqlite::params![healed_str, mtime, song_id],
+                )
+                .map(|n| n > 0)
+                .unwrap_or(false),
+            Err(_) => false,
+        };
+        if !updated {
+            return false;
+        }
+
+        if let Some(song) = self.current_song.as_mut() {
+            song.path = Some(healed_str.clone());
+        }
+        if let Some(uuid) = self.current_item_uuid.clone() {
+            if let Some(item) = self.playlist_items.iter_mut().find(|i| i.uuid == uuid) {
+                if let Some(song) = item.song.as_mut() {
+                    song.path = Some(healed_str.clone());
+                }
+            }
+        }
+
+        if let Some(idx) = self.current_index {
+            let _ = self.play_at_index(idx).await;
+        }
+        true
+    }
+
     /// Called by the audio-event loop when the engine reports it couldn't
     /// open/decode the current track. Flags the failed song `unavailable` if
     /// its file is confirmed gone right now (a live single-file check, not
