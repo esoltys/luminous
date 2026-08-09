@@ -915,13 +915,21 @@ impl Player {
     /// `collection::resolve_case_insensitive_path`), repoints it to the real
     /// on-disk path in the DB and retries the same track in place, so the
     /// user never sees a toast for what's really just a Linux/case-sensitive-
-    /// filesystem quirk. Returns `true` if a heal+retry was attempted.
+    /// filesystem quirk. Returns `true` if the caller should treat the error
+    /// as handled and not surface it — either because a heal+retry was just
+    /// attempted, or because the file already exists under the path we have,
+    /// meaning this `Error` event is stale: the audio engine can report more
+    /// than one `Error` for the same failed open (e.g. a benign device-level
+    /// error alongside the real decode error), and by the time a later one
+    /// arrives an earlier heal may have already fixed and retried the track.
+    /// Without this check that stale event would fall through to the normal
+    /// failure path and wrongly skip a track that's already playing fine.
     pub async fn try_heal_and_retry_current_track(&mut self) -> bool {
         let Some(path) = self.current_song.as_ref().and_then(|s| s.path.clone()) else {
             return false;
         };
         if std::path::Path::new(&path).exists() {
-            return false;
+            return true;
         }
         let Some(healed) = crate::collection::resolve_case_insensitive_path(std::path::Path::new(&path))
         else {
@@ -1890,6 +1898,71 @@ mod tests {
         assert_eq!(restarted.current_song.as_ref().unwrap().id, 2);
         assert_eq!(restarted.playlist_items.len(), 3);
         assert_eq!(restarted.current_index, Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for the "album skips first track, file not found"
+    /// bug: the audio engine can report more than one `AudioEvent::Error`
+    /// for a single failed open (e.g. a benign device-level error alongside
+    /// the real decode error). The first `Error` triggers a successful
+    /// case-heal-and-retry; a second, stale `Error` for that same already-
+    /// resolved attempt must not be misread as a fresh, unrecoverable
+    /// failure — that misread is what skipped the track and showed a
+    /// misleading "file not found" toast even though the track was already
+    /// healed and playing.
+    #[tokio::test]
+    async fn test_duplicate_error_after_successful_heal_is_not_treated_as_failure() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+        let album_dir = temp_dir.join("Album");
+        std::fs::create_dir_all(&album_dir).unwrap();
+        std::fs::write(album_dir.join("Track.mp3"), b"fake audio bytes").unwrap();
+
+        // DB row stores a stale-cased path that only resolves case-insensitively.
+        let stale_path = album_dir.join("track.mp3");
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                &format!(
+                    "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES (1, '{}', 'Track', 'Artist', 'Album', 3000000000)",
+                    stale_path.to_string_lossy()
+                ),
+                [],
+            )
+            .unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+        let song = {
+            let conn = db_arc.pool.get().unwrap();
+            let sql = format!(
+                "SELECT {} FROM songs WHERE id = ?1",
+                crate::collection::SONG_SELECT_COLS
+            );
+            conn.query_row(&sql, rusqlite::params![1i64], crate::collection::row_to_song)
+                .unwrap()
+        };
+        player
+            .play_playlist(vec![PlaylistItem::new_song(0, 0, song)], 0, 0, None)
+            .await
+            .unwrap();
+
+        let healed = player.try_heal_and_retry_current_track().await;
+        assert!(healed, "a case-only path mismatch should heal on the first error");
+        let healed_path = player.current_song.as_ref().unwrap().path.clone().unwrap();
+        assert!(
+            std::path::Path::new(&healed_path).exists(),
+            "heal should repoint to the real on-disk path"
+        );
+
+        let stale_duplicate = player.try_heal_and_retry_current_track().await;
+        assert!(
+            stale_duplicate,
+            "a stale duplicate Error for an already-healed track must be treated as handled, \
+             not fall through to the skip-and-toast failure path"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

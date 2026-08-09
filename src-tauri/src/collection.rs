@@ -2483,6 +2483,18 @@ enum WatcherMsg {
 /// (see #233).
 static NEXT_BATCH_ID: AtomicU64 = AtomicU64::new(0);
 
+/// Whether a raw `notify` event represents an actual filesystem mutation
+/// worth waking the batch processor for. inotify's watch mask (see notify's
+/// `inotify.rs`) includes OPEN/CLOSE so renames can be reported reliably,
+/// but that also means every non-mutating read — a song opened for playback
+/// or waveform decoding, a directory merely listed — surfaces as
+/// `EventKind::Access`. Forwarding those made every play action look like an
+/// external library edit and fire a spurious "song(s) updated" toast on
+/// every single play.
+fn is_mutating_watcher_event(kind: &notify::EventKind) -> bool {
+    !matches!(kind, notify::EventKind::Access(_))
+}
+
 /// Start background directory watching using notify.
 pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let db = Arc::clone(&state.db);
@@ -2493,7 +2505,9 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     let watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
         match res {
             Ok(event) => {
-                let _ = tx.send(WatcherMsg::Event(event));
+                if is_mutating_watcher_event(&event.kind) {
+                    let _ = tx.send(WatcherMsg::Event(event));
+                }
             }
             Err(e) => {
                 // The OS-level change buffer (e.g. Windows' ReadDirectoryChangesW)
@@ -2855,6 +2869,39 @@ mod tests {
     use super::*;
     use crate::models::{FileType, Song, SongSource};
     use std::sync::Arc;
+
+    #[test]
+    fn test_watcher_ignores_non_mutating_access_events() {
+        use notify::event::{AccessKind, AccessMode};
+        use notify::EventKind;
+
+        assert!(!is_mutating_watcher_event(&EventKind::Access(
+            AccessKind::Open(AccessMode::Read)
+        )));
+        assert!(!is_mutating_watcher_event(&EventKind::Access(
+            AccessKind::Close(AccessMode::Read)
+        )));
+        assert!(!is_mutating_watcher_event(&EventKind::Access(
+            AccessKind::Any
+        )));
+    }
+
+    #[test]
+    fn test_watcher_forwards_real_change_events() {
+        use notify::event::{CreateKind, ModifyKind, RemoveKind};
+        use notify::EventKind;
+
+        assert!(is_mutating_watcher_event(&EventKind::Create(
+            CreateKind::File
+        )));
+        assert!(is_mutating_watcher_event(&EventKind::Modify(
+            ModifyKind::Any
+        )));
+        assert!(is_mutating_watcher_event(&EventKind::Remove(
+            RemoveKind::File
+        )));
+        assert!(is_mutating_watcher_event(&EventKind::Any));
+    }
 
     #[test]
     fn test_detect_mp3_vbr_finds_xing_header() {
