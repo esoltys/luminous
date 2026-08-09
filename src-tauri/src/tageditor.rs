@@ -72,7 +72,6 @@ struct AcoustIdResponse {
 // ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 pub fn write_tags(
     path: &Path,
     title: &str,

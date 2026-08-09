@@ -174,19 +174,19 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
     })
 }
 
-fn parse_op_and_value<'a>(val_str: &'a str, is_numeric: bool) -> (Op, &'a str) {
-    if val_str.starts_with(">=") {
-        (Op::Gte, &val_str[2..])
-    } else if val_str.starts_with("<=") {
-        (Op::Lte, &val_str[2..])
-    } else if val_str.starts_with("!=") {
-        (Op::Neq, &val_str[2..])
-    } else if val_str.starts_with('>') {
-        (Op::Gt, &val_str[1..])
-    } else if val_str.starts_with('<') {
-        (Op::Lt, &val_str[1..])
-    } else if val_str.starts_with('=') {
-        (Op::Eq, &val_str[1..])
+fn parse_op_and_value(val_str: &str, is_numeric: bool) -> (Op, &str) {
+    if let Some(rest) = val_str.strip_prefix(">=") {
+        (Op::Gte, rest)
+    } else if let Some(rest) = val_str.strip_prefix("<=") {
+        (Op::Lte, rest)
+    } else if let Some(rest) = val_str.strip_prefix("!=") {
+        (Op::Neq, rest)
+    } else if let Some(rest) = val_str.strip_prefix('>') {
+        (Op::Gt, rest)
+    } else if let Some(rest) = val_str.strip_prefix('<') {
+        (Op::Lt, rest)
+    } else if let Some(rest) = val_str.strip_prefix('=') {
+        (Op::Eq, rest)
     } else if is_numeric {
         (Op::Eq, val_str)
     } else {
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_parse_duration() {
         assert_eq!(parse_duration_ns("3:45"), Some(225_000_000_000));
-        assert_eq!(parse_duration_ns("1:02:03"), Some(3723_000_000_000));
+        assert_eq!(parse_duration_ns("1:02:03"), Some(3_723_000_000_000));
         assert_eq!(parse_duration_ns("180"), Some(180_000_000_000));
     }
 }

@@ -66,11 +66,11 @@ pub fn detect_install_format() -> InstallFormatInfo {
             }
         }
 
-        return InstallFormatInfo {
+        InstallFormatInfo {
             format: "linux_generic".to_string(),
             human_name: "Linux Executable".to_string(),
             supports_self_update: false,
-        };
+        }
     }
 
     #[cfg(target_os = "windows")]
@@ -88,11 +88,11 @@ pub fn detect_install_format() -> InstallFormatInfo {
             }
         }
 
-        return InstallFormatInfo {
+        InstallFormatInfo {
             format: "windows_setup".to_string(),
             human_name: "Windows Installer (.exe / .msi)".to_string(),
             supports_self_update: true,
-        };
+        }
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]

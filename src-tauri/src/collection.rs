@@ -610,10 +610,11 @@ impl CollectionScanner {
             );
         }
 
-        let mut updating_scanned = 0u64;
         let mut remote_fetch_count = 0;
-        for (song_id, path_str, effective_artist, album, art_embedded) in albums_to_resolve {
-            updating_scanned += 1;
+        for (idx, (song_id, path_str, effective_artist, album, art_embedded)) in
+            albums_to_resolve.into_iter().enumerate()
+        {
+            let updating_scanned = idx as u64 + 1;
             let display_desc = if !effective_artist.trim().is_empty() && !album.trim().is_empty() {
                 format!("Cover art: {effective_artist} - {album}")
             } else if !album.trim().is_empty() {
@@ -2761,6 +2762,28 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
         .expect("failed to spawn watcher thread");
 }
 
+pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
+    let clean = decade.trim().trim_end_matches(['s', 'S']);
+    let year: i32 = clean.parse().ok()?;
+    let start = (year / 10) * 10;
+    let end = start + 9;
+    Some((start, end))
+}
+
+/// Parses a `bpmrange:` dynamic-spec suffix (e.g. `"60-90"` or the
+/// open-ended `"150-"`) into a `(min, max)` pair for
+/// [`CollectionScanner::get_songs_by_bpm_range`].
+pub fn parse_bpm_range_spec(spec: &str) -> Option<(f64, Option<f64>)> {
+    let (min_str, max_str) = spec.split_once('-')?;
+    let min: f64 = min_str.trim().parse().ok()?;
+    let max = if max_str.trim().is_empty() {
+        None
+    } else {
+        Some(max_str.trim().parse().ok()?)
+    };
+    Some((min, max))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3813,7 +3836,7 @@ mod tests {
         )
         .unwrap();
 
-        let reconciled = reconcile_moved_songs(&conn, &[new_path.clone()]).unwrap();
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&new_path)).unwrap();
         assert_eq!(reconciled, 1);
 
         let (id, path, playcount): (i64, String, i32) = conn
@@ -4042,26 +4065,4 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
-}
-
-pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
-    let clean = decade.trim().trim_end_matches(['s', 'S']);
-    let year: i32 = clean.parse().ok()?;
-    let start = (year / 10) * 10;
-    let end = start + 9;
-    Some((start, end))
-}
-
-/// Parses a `bpmrange:` dynamic-spec suffix (e.g. `"60-90"` or the
-/// open-ended `"150-"`) into a `(min, max)` pair for
-/// [`CollectionScanner::get_songs_by_bpm_range`].
-pub fn parse_bpm_range_spec(spec: &str) -> Option<(f64, Option<f64>)> {
-    let (min_str, max_str) = spec.split_once('-')?;
-    let min: f64 = min_str.trim().parse().ok()?;
-    let max = if max_str.trim().is_empty() {
-        None
-    } else {
-        Some(max_str.trim().parse().ok()?)
-    };
-    Some((min, max))
 }

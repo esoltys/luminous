@@ -1105,11 +1105,26 @@ pub fn execute_apply(
     })
 }
 
+/// Clears the readonly bit so a stray junk/leftover file can be deleted.
+/// `Permissions::set_readonly(false)` ORs in `0o222` on Unix, which grants
+/// write access to *everyone*, not just the owner — grant owner-write only
+/// instead to avoid briefly making the file world-writable.
+#[cfg(unix)]
+fn clear_readonly(perms: &mut fs::Permissions) {
+    use std::os::unix::fs::PermissionsExt;
+    perms.set_mode(perms.mode() | 0o200);
+}
+
+#[cfg(not(unix))]
+fn clear_readonly(perms: &mut fs::Permissions) {
+    perms.set_readonly(false);
+}
+
 fn force_remove_file(path: &Path) -> std::io::Result<()> {
     if let Ok(metadata) = fs::metadata(path) {
         let mut perms = metadata.permissions();
         if perms.readonly() {
-            perms.set_readonly(false);
+            clear_readonly(&mut perms);
             let _ = fs::set_permissions(path, perms);
         }
     }
@@ -1120,7 +1135,7 @@ fn force_remove_dir(path: &Path) -> std::io::Result<()> {
     if let Ok(metadata) = fs::metadata(path) {
         let mut perms = metadata.permissions();
         if perms.readonly() {
-            perms.set_readonly(false);
+            clear_readonly(&mut perms);
             let _ = fs::set_permissions(path, perms);
         }
     }
@@ -1210,10 +1225,8 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
             continue;
         }
         let dir = entry.path();
-        if clean_if_effectively_empty(dir).unwrap_or(false) {
-            if force_remove_dir(dir).is_ok() {
-                removed += 1;
-            }
+        if clean_if_effectively_empty(dir).unwrap_or(false) && force_remove_dir(dir).is_ok() {
+            removed += 1;
         }
     }
     removed

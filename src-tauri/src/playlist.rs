@@ -813,16 +813,15 @@ impl PlaylistManager {
             )?;
         }
 
-        let mut next_pos: i32 = current.iter().map(|(_, _, p)| *p).max().unwrap_or(-1) + 1;
+        let start_pos: i32 = current.iter().map(|(_, _, p)| *p).max().unwrap_or(-1) + 1;
         let mut added_uuids = std::collections::HashSet::new();
-        for song in &to_add {
+        for (next_pos, song) in (start_pos..).zip(to_add.iter()) {
             let uuid = Uuid::new_v4().to_string();
             conn.execute(
                 "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
                 params![playlist_id, song.id, next_pos, uuid],
             )?;
             added_uuids.insert(uuid);
-            next_pos += 1;
         }
         self.renumber_positions(&conn, playlist_id)?;
         drop(conn);
@@ -1047,10 +1046,8 @@ impl PlaylistManager {
                 if let Some(ref song) = item.song {
                     let p = if let Some(ref path) = song.path {
                         std::path::Path::new(path)
-                    } else if let Some(ref url) = item.url {
-                        std::path::Path::new(url)
                     } else {
-                        return None;
+                        std::path::Path::new(item.url.as_ref()?)
                     };
                     let dur_sec = song.length_nanosec.map(|ns| ns / 1_000_000_000);
                     Some(ExportTrack {

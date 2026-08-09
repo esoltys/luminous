@@ -725,30 +725,40 @@ mod tests {
 
     #[test]
     fn test_is_same_album_or_cue_sibling() {
-        let mut s1 = Song::default();
-        s1.album = Some("The Dark Side of the Moon".to_string());
-        s1.artist = Some("Pink Floyd".to_string());
+        let s1 = Song {
+            album: Some("The Dark Side of the Moon".to_string()),
+            artist: Some("Pink Floyd".to_string()),
+            ..Default::default()
+        };
 
-        let mut s2 = Song::default();
-        s2.album = Some("The Dark Side of the Moon".to_string());
-        s2.artist = Some("Pink Floyd".to_string());
+        let s2 = Song {
+            album: Some("The Dark Side of the Moon".to_string()),
+            artist: Some("Pink Floyd".to_string()),
+            ..Default::default()
+        };
 
         assert!(s1.is_same_album_or_cue_sibling(&s2));
 
-        let mut s3 = Song::default();
-        s3.album = Some("Abbey Road".to_string());
-        s3.artist = Some("The Beatles".to_string());
+        let s3 = Song {
+            album: Some("Abbey Road".to_string()),
+            artist: Some("The Beatles".to_string()),
+            ..Default::default()
+        };
 
         assert!(!s1.is_same_album_or_cue_sibling(&s3));
     }
 
     #[test]
     fn test_cue_sibling_match() {
-        let mut s1 = Song::default();
-        s1.cue_path = Some("/music/album.cue".to_string());
+        let s1 = Song {
+            cue_path: Some("/music/album.cue".to_string()),
+            ..Default::default()
+        };
 
-        let mut s2 = Song::default();
-        s2.cue_path = Some("/music/album.cue".to_string());
+        let s2 = Song {
+            cue_path: Some("/music/album.cue".to_string()),
+            ..Default::default()
+        };
 
         assert!(s1.is_same_album_or_cue_sibling(&s2));
     }
