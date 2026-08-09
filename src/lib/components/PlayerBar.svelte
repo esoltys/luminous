@@ -396,7 +396,7 @@
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
   }
 
-  :global(footer.opaque-linux) {
+  :global(footer.glass-surface.opaque-linux) {
     background-color: var(--bg-playerbar, #191b23) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;

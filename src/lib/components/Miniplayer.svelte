@@ -218,7 +218,7 @@
   onpointerleave={hideHover}
   onmouseleave={hideHover}
   tabindex="0"
-  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme ? 'glass-surface' : ''}"
+  class="group relative w-full h-full flex flex-col justify-between overflow-hidden bg-brand-main select-none p-3 shadow-2xl {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}"
 >
   <!-- Edge and Corner Resize Handles for Frameless Window (non-Linux platforms) -->
   {#if !isLinux}
@@ -429,6 +429,15 @@
   :global(.glass-surface) {
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* backdrop-filter doesn't composite reliably in WebKitGTK, rendering the
+     panel see-through instead of frosted — same issue and same fix as
+     PlayerBar's footer.opaque-linux (PlayerBar.svelte). */
+  :global(.glass-surface.opaque-linux) {
+    background-color: var(--bg-main, #08090c) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   /* Grabber texture: a repeating dot pattern spanning the full drag region,
