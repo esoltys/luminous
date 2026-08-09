@@ -339,7 +339,7 @@ impl PlaylistManager {
                  SELECT 1 FROM playlist_items pi
                  JOIN songs s ON s.id = pi.song_id
                  WHERE pi.playlist_id = p.id
-                   AND COALESCE(NULLIF(s.album_artist, ''), s.artist) = ?1
+                   AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') = ?1
                    AND s.unavailable = 0
              )
              ORDER BY p.created",

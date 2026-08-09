@@ -357,8 +357,13 @@
     }
   }
 
-  function handlePlaySong(song: Song) {
-    playerStore.playSong(song.id);
+  async function handlePlaySong(song: Song) {
+    try {
+      await playerStore.playSong(song.id);
+    } catch (err) {
+      console.error("Failed to play song:", err);
+      toastStore.show(i18n.t("playerBar.playSongFailed", {}, "Couldn't play this track."), "error");
+    }
   }
 
   async function handlePlayAlbum(albumName: string) {

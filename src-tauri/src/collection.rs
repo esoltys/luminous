@@ -884,7 +884,7 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE COALESCE(NULLIF(album_artist, ''), artist) = ?1
+             WHERE COALESCE(NULLIF(album_artist, ''), artist, '') = ?1
                AND source IN (1, 2)
                AND unavailable = 0
              ORDER BY album, disc, track",
@@ -1159,7 +1159,7 @@ impl CollectionScanner {
                 GROUP BY album
              ),
              base AS (
-                SELECT s.id, s.album, COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist
+                SELECT s.id, s.album, COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist
                 FROM songs s
                 WHERE s.source IN (1, 2) AND s.unavailable = 0
              ),
@@ -1180,7 +1180,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs sg
-                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist) = g.effective_artist COLLATE NOCASE
+                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
                       AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, sg.genre ASC
@@ -1219,7 +1219,7 @@ impl CollectionScanner {
              ),
              base AS (
                 SELECT s.id, s.album, s.playcount,
-                       COALESCE(NULLIF(s.album_artist, ''), s.artist) AS effective_artist
+                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist
                 FROM songs s
                 WHERE s.source IN (1, 2) AND s.unavailable = 0
              ),
@@ -1245,7 +1245,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs sg
-                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist) = g.effective_artist COLLATE NOCASE
+                    WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
                       AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, sg.genre ASC
@@ -3238,6 +3238,57 @@ mod tests {
             artists
         );
         assert_eq!(matches[0]["song_count"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #362: a song with no artist/album_artist tags at
+    /// all (both NULL) must still be reachable via the same "effective
+    /// artist" value that get_artists() groups it under — previously
+    /// get_artists() grouped NULL artists together as SQL NULL while
+    /// get_songs_by_artist() only matched against `''`, so NULL never
+    /// equaled `''` and the click-through returned zero songs.
+    #[test]
+    fn test_untagged_song_reachable_via_get_artists_grouping() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_untagged_artist_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                artist: None,
+                album_artist: None,
+                album: None,
+                title: None,
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\untagged.ogg".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let untagged = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some(""))
+            .expect("untagged song should surface as an empty-string artist entry");
+        assert_eq!(untagged["song_count"].as_i64(), Some(1));
+
+        let songs = scanner.get_songs_by_artist("").unwrap();
+        assert_eq!(
+            songs.len(),
+            1,
+            "get_songs_by_artist(\"\") must return the song grouped under the empty-string artist"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
