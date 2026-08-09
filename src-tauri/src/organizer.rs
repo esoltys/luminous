@@ -958,12 +958,6 @@ pub fn execute_apply(
         let src = Path::new(&item.from_path);
         let dst = Path::new(&item.to_path);
 
-        if !src.exists() {
-            errors.push(format!("Source file missing: {}", item.from_path));
-            skipped_count += 1;
-            continue;
-        }
-
         if let (Some(src_parent), Some(dst_parent)) = (src.parent(), dst.parent()) {
             source_parents_to_clean.insert(src_parent.to_path_buf());
             moved_dir_pairs.insert(src_parent.to_path_buf(), dst_parent.to_path_buf());
@@ -981,8 +975,28 @@ pub fn execute_apply(
             }
         }
 
-        let move_res =
-            fs::rename(src, dst).or_else(|_| fs::copy(src, dst).and_then(|_| fs::remove_file(src)));
+        // Fixing an ancestor directory's casing above renames that directory in place,
+        // which carries its contents with it (this can also happen from an earlier item
+        // in this same batch that shares the ancestor). When that ancestor was the only
+        // difference between `src` and `dst`, the file is no longer at the literal `src`
+        // path but instead sitting under the now-corrected ancestor with its old filename.
+        let relocated_src = dst
+            .parent()
+            .and_then(|p| src.file_name().map(|name| p.join(name)));
+        let effective_src = match (src.exists(), &relocated_src) {
+            (true, _) => src,
+            (false, Some(candidate)) if candidate.exists() => candidate.as_path(),
+            _ => src,
+        };
+
+        if !effective_src.exists() {
+            errors.push(format!("Source file missing: {}", item.from_path));
+            skipped_count += 1;
+            continue;
+        }
+
+        let move_res = fs::rename(effective_src, dst)
+            .or_else(|_| fs::copy(effective_src, dst).and_then(|_| fs::remove_file(effective_src)));
 
         let move_res = move_res.and_then(|_| match verify_case_on_disk(dst) {
             Ok(true) => Ok(()),
