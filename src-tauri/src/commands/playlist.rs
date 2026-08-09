@@ -73,23 +73,16 @@ pub async fn get_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, 
         .map_err(|e| e.to_string())
 }
 
+/// Runs the genre, decade, and BPM auto-playlist syncs together — the
+/// frontend used to invoke these as three separate round trips in lockstep
+/// at every call site.
 #[tauri::command]
-pub async fn sync_genre_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn sync_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
     state
         .playlists
         .lock()
         .await
-        .sync_genre_auto_playlists()
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn sync_decade_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .sync_decade_auto_playlists()
+        .sync_all_auto_playlists()
         .map_err(|e| e.to_string())
 }
 
@@ -103,16 +96,6 @@ pub async fn get_songs_by_decade(
     let scanner = crate::collection::CollectionScanner::new(state.db.clone());
     scanner
         .get_songs_by_decade(&decade, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn sync_bpm_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .sync_bpm_auto_playlists()
         .map_err(|e| e.to_string())
 }
 
@@ -249,8 +232,11 @@ pub async fn clear_playlist(playlist_id: i64, state: State<'_, AppState>) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// Returns whether an op was actually undone — `false` means the stack was
+/// already empty, a routine state rather than an error (see
+/// `PlaylistManager::undo`).
 #[tauri::command]
-pub async fn undo_playlist(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn undo_playlist(state: State<'_, AppState>) -> Result<bool, String> {
     state
         .playlists
         .lock()
@@ -259,8 +245,9 @@ pub async fn undo_playlist(state: State<'_, AppState>) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// See [`undo_playlist`] — same `false`-means-empty-stack contract.
 #[tauri::command]
-pub async fn redo_playlist(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn redo_playlist(state: State<'_, AppState>) -> Result<bool, String> {
     state
         .playlists
         .lock()
@@ -311,6 +298,26 @@ pub async fn set_playlist_dynamic_spec(
         .map_err(|e| e.to_string())
 }
 
+/// Set a dynamic playlist's population-mode bias and its rule spec together,
+/// populating its tracks once. Replaces the frontend's old two-call
+/// sequence (set-mode, which repopulated via `set_playlist_population_mode`
+/// below, then set-spec, which populated again) that regenerated the
+/// playlist's tracks twice per edit.
+#[tauri::command]
+pub async fn set_playlist_dynamic_config(
+    playlist_id: i64,
+    mode: QueuePopulationMode,
+    spec: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .set_playlist_dynamic_config(playlist_id, mode, &spec)
+        .map_err(|e| e.to_string())
+}
+
 /// Persist the `population_mode` bias (All/Favourites/Familiar/Discover/Deep
 /// Cuts, see #120) for a playlist, and immediately regenerate its tracks so
 /// the change takes effect right away rather than waiting for the next
@@ -328,8 +335,8 @@ pub async fn set_playlist_population_mode(
         .map_err(|e| e.to_string())
 }
 
-/// Force-regenerates an auto-playlist's tracks from the library (e.g. when
-/// the user clicks the "Refresh" button in the auto-playlist header).
+/// Force-regenerates one auto-playlist's tracks from the library (e.g. when
+/// the user clicks the "Refresh" button in a single auto-playlist's header).
 #[tauri::command]
 pub async fn refresh_auto_playlist(
     playlist_id: i64,
@@ -340,5 +347,18 @@ pub async fn refresh_auto_playlist(
         .lock()
         .await
         .refresh_auto_playlist(playlist_id)
+        .map_err(|e| e.to_string())
+}
+
+/// Force-regenerates every dynamic/auto playlist's tracks from the library
+/// (e.g. when the user clicks the "Refresh All" button) — one call in place
+/// of the frontend's old per-playlist fan-out.
+#[tauri::command]
+pub async fn refresh_all_auto_playlists(state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .playlists
+        .lock()
+        .await
+        .refresh_all_dynamic_playlists()
         .map_err(|e| e.to_string())
 }

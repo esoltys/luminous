@@ -202,10 +202,7 @@ class PlaylistsStore {
     spec: string,
     populationMode: QueuePopulationMode = "all"
   ) {
-    // Mode is persisted before the spec so that the spec-triggered
-    // (re)population below already uses it.
-    await invoke("set_playlist_population_mode", { playlistId: id, mode: populationMode });
-    await invoke("set_playlist_dynamic_spec", { playlistId: id, spec });
+    await invoke("set_playlist_dynamic_config", { playlistId: id, mode: populationMode, spec });
     await this.refreshPlaylists();
     if (this.activePlaylistId === id) {
       await this.selectPlaylist(id);
@@ -416,7 +413,8 @@ class PlaylistsStore {
   }
 
   async undo() {
-    await invoke("undo_playlist");
+    const didUndo = await invoke<boolean>("undo_playlist");
+    if (!didUndo) return;
     if (this.activePlaylistId !== null) {
       await this.selectPlaylist(this.activePlaylistId);
     }
@@ -424,7 +422,8 @@ class PlaylistsStore {
   }
 
   async redo() {
-    await invoke("redo_playlist");
+    const didRedo = await invoke<boolean>("redo_playlist");
+    if (!didRedo) return;
     if (this.activePlaylistId !== null) {
       await this.selectPlaylist(this.activePlaylistId);
     }
