@@ -300,7 +300,7 @@ async function main() {
     // Settle transitions
     await page.waitForTimeout(400);
 
-    const dir = path.join(__dirname, "../docs/screenshots");
+    const dir = path.join(__dirname, "../docs/user-guide/screenshots");
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }

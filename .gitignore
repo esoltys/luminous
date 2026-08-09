@@ -27,7 +27,7 @@ scripts/mock-config.local.json
 /WALKTHROUGH.md
 /walkthrough.md
 
-# Synced from docs/ by `bun run sync-docs` (see scripts/sync-docs.ts)
+# Synced from docs/user-guide/ by `bun run sync-docs` (see scripts/sync-docs.ts)
 /static/luminous-user-guide-EN.html
 /static/luminous-user-guide-FR.html
 /static/support.js
