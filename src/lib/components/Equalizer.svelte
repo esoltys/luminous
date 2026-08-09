@@ -260,23 +260,38 @@
     }
   }
 
+  async function saveLoudnessSettings() {
+    try {
+      await invoke("set_loudness_settings", {
+        settings: {
+          enabled: loudnessStore.enabled,
+          target_lufs: targetLufs,
+          mode: loudnessMode,
+          fallback_gain_db: fallbackGainDb,
+        },
+      });
+    } catch (e) {
+      console.error("Failed to save loudness settings:", e);
+    }
+  }
+
   async function handleLoudnessToggle(enabled: boolean) {
     loudnessStore.setEnabled(enabled);
-    await invoke("set_loudness_enabled", { enabled });
+    await saveLoudnessSettings();
   }
 
   async function handleTargetLufsChange() {
-    await invoke("set_loudness_target_lufs", { targetLufs });
+    await saveLoudnessSettings();
   }
 
   async function handleLoudnessModeChange(newMode: LoudnessMode) {
     if (loudnessMode === newMode) return;
     loudnessMode = newMode;
-    await invoke("set_loudness_mode", { mode: newMode });
+    await saveLoudnessSettings();
   }
 
   async function handleFallbackGainChange() {
-    await invoke("set_loudness_fallback_gain", { fallbackGainDb });
+    await saveLoudnessSettings();
   }
 
   // --- Playback Fades & Crossfade (#79) ---

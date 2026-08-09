@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
+use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -1308,6 +1309,60 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Removes duplicate items from a playlist, keeping the first occurrence
+    /// of each. Identity is: DB song id when the item is a library song,
+    /// else its url (streamed/imported items), else its own uuid (which is
+    /// always unique, so that tier never actually flags a duplicate — it's
+    /// just the fallback for items with neither). Returns the removed uuids.
+    pub fn deduplicate_playlist(&mut self, playlist_id: i64) -> Result<Vec<String>> {
+        let tracks = self.get_playlist_tracks(playlist_id)?;
+        let mut seen = HashSet::new();
+        let mut duplicate_uuids = Vec::new();
+
+        for item in &tracks {
+            let key = if let Some(song) = &item.song {
+                format!("song-{}", song.id)
+            } else if let Some(url) = &item.url {
+                format!("url-{url}")
+            } else {
+                format!("uuid-{}", item.uuid)
+            };
+
+            if !seen.insert(key) {
+                duplicate_uuids.push(item.uuid.clone());
+            }
+        }
+
+        if !duplicate_uuids.is_empty() {
+            self.remove_from_playlist(playlist_id, &duplicate_uuids)?;
+        }
+
+        Ok(duplicate_uuids)
+    }
+
+    /// Removes every item ahead of `uuid` (in current DB order) from
+    /// `playlist_id`. Resolves `uuid`'s position and removes in the same
+    /// call rather than trusting a caller-supplied index, so there's no gap
+    /// between reading a position and acting on it.
+    pub fn trim_playlist_before_uuid(
+        &mut self,
+        playlist_id: i64,
+        uuid: &str,
+    ) -> Result<Vec<String>> {
+        let tracks = self.get_playlist_tracks(playlist_id)?;
+        let Some(index) = tracks.iter().position(|t| t.uuid == uuid) else {
+            return Ok(Vec::new());
+        };
+        if index == 0 {
+            return Ok(Vec::new());
+        }
+
+        let uuids_to_remove: Vec<String> =
+            tracks[..index].iter().map(|t| t.uuid.clone()).collect();
+        self.remove_from_playlist(playlist_id, &uuids_to_remove)?;
+        Ok(uuids_to_remove)
+    }
+
     /// Bumps a playlist's `updated` timestamp to now — called whenever its
     /// contents or name change, so "Updated" sort/display stays accurate.
     fn touch_updated(&self, conn: &rusqlite::Connection, playlist_id: i64) -> Result<()> {
@@ -2107,6 +2162,88 @@ mod tests {
         assert_eq!(reordered[0].song.as_ref().unwrap().id, 2);
         assert_eq!(reordered[1].song.as_ref().unwrap().id, 3);
         assert_eq!(reordered[2].song.as_ref().unwrap().id, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_deduplicate_playlist_removes_repeat_songs_keeping_first_occurrence() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (1, 'Song 1')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (2, 'Song 2')", [])
+                .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Dedup Test").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[2]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+
+        let removed = manager.deduplicate_playlist(pl.id).unwrap();
+        assert_eq!(removed.len(), 1);
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 2);
+        assert_eq!(tracks[0].song.as_ref().unwrap().id, 1);
+        assert_eq!(tracks[1].song.as_ref().unwrap().id, 2);
+
+        // No duplicates left — a second pass is a no-op.
+        let removed_again = manager.deduplicate_playlist(pl.id).unwrap();
+        assert!(removed_again.is_empty());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_trim_playlist_before_uuid_removes_only_earlier_items() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (1, 'Song 1')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (2, 'Song 2')", [])
+                .unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (3, 'Song 3')", [])
+                .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Trim Test").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[2]).unwrap();
+        manager.add_songs_to_playlist(pl.id, &[3]).unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let uuid2 = tracks[2].uuid.clone();
+
+        let removed = manager
+            .trim_playlist_before_uuid(pl.id, &uuid2)
+            .unwrap();
+        assert_eq!(removed.len(), 2);
+
+        let remaining = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].song.as_ref().unwrap().id, 3);
+
+        // The first item in the playlist has nothing ahead of it — a no-op.
+        let removed_at_head = manager
+            .trim_playlist_before_uuid(pl.id, &remaining[0].uuid)
+            .unwrap();
+        assert!(removed_at_head.is_empty());
+
+        // An unknown uuid is also a no-op rather than an error.
+        let removed_unknown = manager
+            .trim_playlist_before_uuid(pl.id, "not-a-real-uuid")
+            .unwrap();
+        assert!(removed_unknown.is_empty());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

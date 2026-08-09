@@ -50,22 +50,22 @@ describe("CollectionStore", () => {
             total_duration_nanosec: 30000000000,
             total_filesize_bytes: 50000000
           };
-        case "get_songs":
-          return [
-            { id: 1, title: "Rock Track 1", artist: "Rock Band", album: "Rock Album", filetype: "MP3" },
-            { id: 2, title: "Jazz Track 1", artist: "Jazz Quartet", album: "Jazz Album", filetype: "FLAC" },
-            { id: 3, title: "Vorbis Track", artist: "Indie Group", album: "Indie Album", filetype: "OGG_VORBIS" }
-          ];
-        case "get_albums":
-          return [
-            { album: "Rock Album", artist: "Rock Band", song_count: 5, year: 2020 },
-            { album: "Jazz Album", artist: "Jazz Quartet", song_count: 5, year: 2021 }
-          ];
-        case "get_artists":
-          return [
-            { name: "Rock Band", album_count: 1, song_count: 5 },
-            { name: "Jazz Quartet", album_count: 1, song_count: 5 }
-          ];
+        case "get_library_snapshot":
+          return {
+            songs: [
+              { id: 1, title: "Rock Track 1", artist: "Rock Band", album: "Rock Album", filetype: "MP3" },
+              { id: 2, title: "Jazz Track 1", artist: "Jazz Quartet", album: "Jazz Album", filetype: "FLAC" },
+              { id: 3, title: "Vorbis Track", artist: "Indie Group", album: "Indie Album", filetype: "OGG_VORBIS" }
+            ],
+            albums: [
+              { album: "Rock Album", artist: "Rock Band", song_count: 5, year: 2020 },
+              { album: "Jazz Album", artist: "Jazz Quartet", song_count: 5, year: 2021 }
+            ],
+            artists: [
+              { name: "Rock Band", album_count: 1, song_count: 5 },
+              { name: "Jazz Quartet", album_count: 1, song_count: 5 }
+            ]
+          };
         case "get_all_app_settings":
           return {};
         case "search_songs":

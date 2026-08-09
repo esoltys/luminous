@@ -225,9 +225,14 @@ describe("CollectionView.svelte", () => {
     collectionStore.activeSubTab = "songs";
     collectionStore.visibleColumns.added = true;
     mockSongs[0].added = 1700000000;
+    // formatDateAdded falls back to Date.toLocaleDateString() for anything
+    // more than 6 days old, which renders in whatever locale the test
+    // environment defaults to (not necessarily en-US) — compute the
+    // expected string the same way rather than hardcoding one locale's format.
+    const expectedDate = new Date(1700000000 * 1000).toLocaleDateString();
     const { getByText } = render(CollectionView);
 
-    const addedCell = getByText("11/14/2023").closest("div");
+    const addedCell = getByText(expectedDate).closest("div");
     expect(addedCell).not.toBeNull();
     expect(addedCell).not.toHaveClass("font-mono");
   });

@@ -109,11 +109,7 @@
     isEditing = false;
 
     try {
-      if (forceRefresh) {
-        console.log("[LyricsView] forceRefresh is true. Clearing DB cache...");
-        await invoke("save_lyrics", { songId, lyrics: "" });
-      }
-      const lyrics = await invoke<string>("get_lyrics", { songId });
+      const lyrics = await invoke<string>("get_lyrics", { songId, forceRefresh });
       console.log(`[LyricsView] get_lyrics returned lyrics of length: ${lyrics?.length || 0}`);
       lyricsText = lyrics;
 

@@ -599,7 +599,6 @@ class CollectionStore {
         if (event.payload.phase === "done") {
           const nowStr = new Date().toLocaleString();
           this.lastScanTime = nowStr;
-          invoke("set_app_setting", { key: "last_scan_time", value: nowStr });
           this.refreshDirectories();
           const songCountBeforeRefresh = this.stats.total_songs;
           this.refreshStats().then(() => {
@@ -634,24 +633,17 @@ class CollectionStore {
           });
           this.refreshLibrary();
 
-          // The active playback queue is a snapshot taken when it was built —
-          // a scan that repoints a moved file's path (or drops a genuinely
-          // missing one) fixes the database but not an already-queued track,
-          // so resync it here rather than requiring a restart.
-          invoke("refresh_playback_queue").catch((err) => {
-            console.error("Failed to refresh playback queue after scan:", err);
-          });
-
-          // Genre/decade/BPM auto-playlists otherwise only regenerate on their
-          // own 24h staleness window (or whenever the Playlists tab happens to
-          // mount) — a scan can add new genres/decades or shift which songs
-          // qualify, so rebuild them right away instead of leaving them stale.
+          // The backend persists last_scan_time, resyncs the live playback
+          // queue (a scan can repoint a moved file's path or drop a
+          // genuinely missing one out from under an already-queued track),
+          // and rebuilds genre/decade/BPM auto-playlists (which otherwise
+          // only regenerate on their own 24h staleness window) in one call.
           (async () => {
             try {
-              await invoke("sync_all_auto_playlists");
+              await invoke("finish_scan", { lastScanTime: nowStr });
               await playlistsStore.refreshPlaylists();
             } catch (err) {
-              console.error("Failed to sync auto-playlists after scan:", err);
+              console.error("Failed to finish scan sync:", err);
             }
           })();
         }
@@ -768,9 +760,12 @@ class CollectionStore {
   }
 
   async refreshLibrary() {
-    this.songs = await invoke("get_songs", { limit: -1, offset: 0 });
-    this.albums = await invoke("get_albums");
-    this.artists = await invoke("get_artists");
+    const snapshot = await invoke<{ songs: Song[]; albums: AlbumItem[]; artists: ArtistItem[] }>(
+      "get_library_snapshot"
+    );
+    this.songs = snapshot.songs;
+    this.albums = snapshot.albums;
+    this.artists = snapshot.artists;
   }
 
   async addDirectory(path: string) {

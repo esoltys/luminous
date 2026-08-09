@@ -24,6 +24,7 @@ describe("AlbumTagEditor.svelte", () => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "save_album_tags") return 2;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
     });
   });

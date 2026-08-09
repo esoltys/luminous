@@ -163,11 +163,29 @@ pub async fn add_to_playlist(
         .map_err(|e| e.to_string())
 }
 
+/// Cascades a set of removed playlist-item uuids into the live playback
+/// queue and broadcasts the resulting state. The live-queue side is keyed
+/// by item UUID, which is never shared across playlists, so this is a safe
+/// no-op whenever none of `uuids` are currently loaded in the queue (or the
+/// list is empty).
+async fn sync_player_after_removal(
+    state: &State<'_, AppState>,
+    app: &tauri::AppHandle,
+    uuids: &[String],
+) {
+    use tauri::Emitter;
+    if uuids.is_empty() {
+        return;
+    }
+    let mut player = state.player.lock().await;
+    player.remove_songs_from_playlist_items(uuids);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+}
+
 /// Removes rows from a playlist and mirrors the removal into the live play
-/// queue in one call. The live-queue side is keyed by item UUID, which is
-/// never shared across playlists, so it's a safe no-op whenever `playlist_id`
-/// isn't the Queue or these UUIDs aren't currently loaded — callers no
-/// longer need to separately pair this with a live-queue removal.
+/// queue in one call — callers no longer need to separately pair this with
+/// a live-queue removal.
 #[tauri::command]
 pub async fn remove_from_playlist(
     playlist_id: i64,
@@ -175,8 +193,6 @@ pub async fn remove_from_playlist(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    use tauri::Emitter;
-
     state
         .playlists
         .lock()
@@ -184,11 +200,51 @@ pub async fn remove_from_playlist(
         .remove_from_playlist(playlist_id, &uuids)
         .map_err(|e| e.to_string())?;
 
-    let mut player = state.player.lock().await;
-    player.remove_songs_from_playlist_items(&uuids);
-    let playback_state = player.get_state().await;
-    let _ = app.emit("playback-state", playback_state);
+    sync_player_after_removal(&state, &app, &uuids).await;
+    Ok(())
+}
 
+/// Removes duplicate items from a playlist (see
+/// `PlaylistManager::deduplicate_playlist` for the identity rule) and
+/// mirrors the removal into the live play queue in one call. Returns the
+/// removed uuids.
+#[tauri::command]
+pub async fn deduplicate_playlist(
+    playlist_id: i64,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    let removed_uuids = state
+        .playlists
+        .lock()
+        .await
+        .deduplicate_playlist(playlist_id)
+        .map_err(|e| e.to_string())?;
+
+    sync_player_after_removal(&state, &app, &removed_uuids).await;
+    Ok(removed_uuids)
+}
+
+/// Removes every item ahead of `uuid` in `playlist_id` and mirrors the
+/// removal into the live play queue in one call. Resolves `uuid`'s position
+/// and removes it atomically server-side (see
+/// `PlaylistManager::trim_playlist_before_uuid`), so there's no window for
+/// the Queue to change shape between reading a position and cutting it.
+#[tauri::command]
+pub async fn trim_playlist_before_uuid(
+    playlist_id: i64,
+    uuid: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let removed_uuids = state
+        .playlists
+        .lock()
+        .await
+        .trim_playlist_before_uuid(playlist_id, &uuid)
+        .map_err(|e| e.to_string())?;
+
+    sync_player_after_removal(&state, &app, &removed_uuids).await;
     Ok(())
 }
 

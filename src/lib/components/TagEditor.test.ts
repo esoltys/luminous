@@ -53,6 +53,7 @@ describe("TagEditor.svelte", () => {
       }
       if (cmd === "save_song_tags") return null;
       if (cmd === "set_song_rating") return 5;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
     });
   });

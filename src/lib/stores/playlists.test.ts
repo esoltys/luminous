@@ -56,6 +56,8 @@ describe("PlaylistsStore", () => {
         case "undo_playlist":
         case "redo_playlist":
           return true;
+        case "deduplicate_playlist":
+          return ["item-dup"];
         default:
           return null;
       }
@@ -213,7 +215,7 @@ describe("PlaylistsStore", () => {
     ];
 
     await playlistsStore.deduplicatePlaylist(101);
-    expect(invoke).toHaveBeenCalledWith("remove_from_playlist", { playlistId: 101, uuids: ["item-dup"] });
+    expect(invoke).toHaveBeenCalledWith("deduplicate_playlist", { playlistId: 101 });
   });
 
   it("returns activeCustomPlaylist when the pinned playlist is a custom playlist", async () => {
