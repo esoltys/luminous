@@ -750,10 +750,6 @@ export const en = {
     albumsFilter: "Albums ({count})",
     epsFilter: "EPs ({count})",
     singlesFilter: "Singles ({count})",
-    singleEp: "Single/EP",
-    single: "Single",
-    ep: "EP",
-    album: "Album",
     discSet: "{count}-Disc Set",
     noReleasesFound: "No releases found.",
     playlistsFeaturing: "Playlists featuring {artist}"

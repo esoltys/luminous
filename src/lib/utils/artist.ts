@@ -1,5 +1,4 @@
 import type { AlbumItem, Song } from "../types";
-import { i18n } from "../stores/i18n.svelte";
 
 /**
  * Matched case-insensitively: tag casing can drift across files/albums for the
@@ -69,24 +68,6 @@ export function classifyRelease(
   if (trackCount === 1) return "single";
   if ((totalDurationNanosec ?? 0) < EP_MAX_DURATION_NANOSEC) return "ep";
   return "album";
-}
-
-/** Single card-facing category label for an album, e.g. "{n}-Disc Set", "Single", "EP", "Album". */
-export function getAlbumCategoryLabel(
-  trackCount: number,
-  discCount: number | null | undefined,
-  totalDurationNanosec: number | null | undefined
-): string {
-  switch (classifyRelease(trackCount, discCount, totalDurationNanosec)) {
-    case "set":
-      return i18n.t("artistDetail.discSet", { count: discCount ?? 1 });
-    case "single":
-      return i18n.t("artistDetail.single");
-    case "ep":
-      return i18n.t("artistDetail.ep");
-    case "album":
-      return i18n.t("artistDetail.album");
-  }
 }
 
 const GRADIENTS = [
