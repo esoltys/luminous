@@ -1,3 +1,14 @@
+//! Cover art acquisition, caching, and lookup.
+//!
+//! Art comes from three sources, tried in this order by the collection
+//! scanner: embedded tag pictures (`extract_embedded_art`), image files
+//! sitting next to the song (`scan_folder_art`), then an iTunes Search API
+//! fallback (`fetch_remote_cover`). Whichever source succeeds writes into
+//! `songs.art_automatic`; a user-picked cover instead goes in
+//! `art_manual` and always takes precedence (see `get_cover_art_path`/
+//! `get_cover_art_uri`). Extracted/downloaded images are cached as files
+//! under `covers_dir`, keyed by `get_album_hash`.
+
 use crate::db::Database;
 use anyhow::{Context, Result};
 use lofty::{file::TaggedFileExt, probe::Probe};
@@ -64,7 +75,10 @@ impl CoverManager {
         Self { db, covers_dir }
     }
 
-    /// Helper to hash artist + album to generate a unique cover filename
+    /// Derive a stable cache filename stem from `album_artist` + `album`
+    /// (case-insensitive). Callers pass a song's own title as `album` for
+    /// albumless singles (#106) rather than an empty string, so that two
+    /// singles by the same artist don't collide onto the same cached file.
     pub fn get_album_hash(&self, album_artist: &str, album: &str) -> String {
         let mut hash = 0xcbf29ce484222325u64;
         let combined = format!("{}:{}", album_artist.to_lowercase(), album.to_lowercase());
@@ -75,7 +89,11 @@ impl CoverManager {
         format!("album-{:016x}", hash)
     }
 
-    /// Extract embedded picture from audio file tags and save it to the covers cache directory
+    /// Save the file's first embedded tag picture (if any) to the covers
+    /// cache and return its cache filename. Returns `Ok(None)` — not an
+    /// error — when the file has no tag or the tag has no picture; callers
+    /// are expected to fall through to `scan_folder_art`/`fetch_remote_cover`
+    /// in that case.
     pub fn extract_embedded_art(
         &self,
         audio_path: &Path,
@@ -111,12 +129,18 @@ impl CoverManager {
         Ok(Some(filename))
     }
 
-    /// Scan directory containing the song for common image names (cover.jpg, folder.png, etc.)
+    /// Look for a same-named-by-convention image file (`cover.jpg`,
+    /// `folder.png`, etc.) next to `audio_path` and return its canonical
+    /// absolute path, or `None` if the song has embedded/manual art already
+    /// or no match exists. Doesn't copy into the covers cache — the
+    /// returned path is used directly (see `get_cover_art_path`).
     pub fn scan_folder_art(&self, audio_path: &Path) -> Option<PathBuf> {
         Self::scan_folder_art_static(audio_path)
     }
 
-    /// Static version of scan_folder_art that does not require a CoverManager instance
+    /// Same as `scan_folder_art`, callable without a `CoverManager`
+    /// instance — used by `organizer.rs` after relocating a file, where no
+    /// manager is in scope.
     pub fn scan_folder_art_static(audio_path: &Path) -> Option<PathBuf> {
         let parent_dir = audio_path.parent()?;
         let common_names = [
@@ -160,7 +184,11 @@ impl CoverManager {
         None
     }
 
-    /// Fetch cover art from iTunes Search API and cache it to covers directory
+    /// Look up the song's artist/album on the iTunes Search API and cache
+    /// the top result's 600x600 artwork. Returns `Ok(None)` — not an error —
+    /// both when the song lacks artist/album metadata to search with and
+    /// when the API returns no match; either way, the song's `art_unset`
+    /// flag is set on a miss so future scans don't keep re-querying it.
     pub async fn fetch_remote_cover(&self, song_id: i64) -> Result<Option<String>> {
         let conn = self.db.pool.get()?;
         let (artist, album, album_artist) = conn.query_row(
@@ -275,7 +303,9 @@ impl CoverManager {
         Ok(None)
     }
 
-    /// Resolve URI string (luminous-art://...) for a given song ID
+    /// Same precedence as `get_cover_art_path` (manual > cached automatic >
+    /// folder-art path > unset), but returns a `luminous-art://` webview URI
+    /// instead of a filesystem path — the form the frontend `<img>` tags use.
     pub fn get_cover_art_uri(&self, song_id: i64) -> Result<Option<String>> {
         let conn = self.db.pool.get()?;
         let (_art_embedded, art_automatic, art_manual, art_unset) = conn.query_row(

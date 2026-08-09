@@ -55,6 +55,7 @@ const RESERVED_PLAYLIST_NAMES: &[&str] = &[
     "file d'attente", // fr: playerBar.queueTitle
 ];
 
+/// Case/whitespace-insensitive check against `RESERVED_PLAYLIST_NAMES`.
 pub fn is_reserved_playlist_name(name: &str) -> bool {
     let trimmed = name.trim().to_lowercase();
     RESERVED_PLAYLIST_NAMES.contains(&trimmed.as_str())
@@ -100,6 +101,13 @@ enum PlaylistOp {
     },
 }
 
+/// Playlist CRUD, item mutation, import/export, and auto-playlist sync, all
+/// backed by SQLite. Mutating item operations (`add_songs_to_playlist`,
+/// `remove_from_playlist`, `clear_playlist`, the `reorder_*` methods) push a
+/// `PlaylistOp` onto `undo_stack` and clear `redo_stack`, so `undo`/`redo`
+/// can step through them — this history is in-memory only (held for the
+/// lifetime of the single long-lived `PlaylistManager` in app state), not
+/// persisted, so it resets on app restart.
 #[derive(Debug)]
 pub struct PlaylistManager {
     db: Arc<Database>,
@@ -161,6 +169,14 @@ pub async fn reconcile_and_sync(app: tauri::AppHandle) {
     let _ = app.emit("playlists-changed", changed_ids);
 }
 
+/// Normalize a path to the same form used for `songs.path` in the DB, so an
+/// imported playlist's track paths (from `.m3u`/`.pls`, often relative or
+/// with `./`/`../` segments) can be matched against already-scanned library
+/// songs by exact string comparison. Prefers `canonicalize` (resolves
+/// symlinks too, and strips Windows' `\\?\` verbatim prefix so the result
+/// matches how `collection.rs` stores paths); if the path doesn't exist on
+/// disk yet, falls back to lexically collapsing `.`/`..` components without
+/// touching the filesystem.
 pub fn clean_path<P: AsRef<std::path::Path>>(path: P) -> std::path::PathBuf {
     let p = path.as_ref();
     if let Ok(canonical) = std::fs::canonicalize(p) {
@@ -309,6 +325,9 @@ impl PlaylistManager {
         Ok(playlists)
     }
 
+    /// Playlists that *contain* at least one available track by `artist`
+    /// (effective artist, album_artist falling back to artist) — not
+    /// playlists named after the artist.
     pub fn get_playlists_by_artist(&self, artist: &str) -> Result<Vec<Playlist>> {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
@@ -332,11 +351,6 @@ impl PlaylistManager {
         Ok(playlists)
     }
 
-    /// Regenerates each genre "auto-playlist" — a system-managed `playlists` row
-    /// with `dynamic_enabled = 1` and `dynamic_spec` set to the genre name — if
-    /// it's missing or its `updated` timestamp is more than 24h old, and prunes
-    /// rows for genres no longer present in the library. `updated` doubles as
-    /// the "last (re)generated at" timestamp shown in the UI.
     /// Runs all three auto-playlist syncs (genre, decade, BPM) in one call —
     /// the frontend used to invoke these as three separate IPC round trips
     /// in lockstep at every call site.
@@ -347,6 +361,12 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Regenerates each genre "auto-playlist" — a system-managed `playlists`
+    /// row with `dynamic_enabled = 1` and `dynamic_spec` set to the genre
+    /// name — if it's missing or its `updated` timestamp is more than 24h
+    /// old, and prunes rows for genres no longer present in the library.
+    /// `updated` doubles as the "last (re)generated at" timestamp shown in
+    /// the UI.
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
@@ -897,6 +917,14 @@ impl PlaylistManager {
     // Import & Export
     // -----------------------------------------------------------------------
 
+    /// Parse an `.m3u`/`.pls`/etc. playlist file (format detected from the
+    /// extension) and create a new playlist from it. Each track is matched
+    /// against the library first by cleaned path (relative entries resolved
+    /// against the playlist file's own directory), then by title+artist(+
+    /// duration) tag metadata as a fallback. Tracks that still don't match
+    /// any library song are added anyway with `song_id = NULL`, preserving
+    /// their title/artist/album/path in `additional_metadata` — nothing
+    /// from the source file is silently dropped.
     pub fn import_playlist<P: AsRef<std::path::Path>>(&mut self, file_path: P) -> Result<Playlist> {
         use crate::playlist_parsers;
 
@@ -1017,6 +1045,11 @@ impl PlaylistManager {
         Ok(playlist)
     }
 
+    /// Write the playlist's tracks to `export_path` in the format inferred
+    /// from its extension (fails if unsupported). `relative` controls
+    /// whether track paths are written relative to `export_path`'s
+    /// directory or as absolute paths — matters for moving the exported
+    /// file to another machine/directory alongside its music.
     pub fn export_playlist<P: AsRef<std::path::Path>>(
         &self,
         playlist_id: i64,
@@ -1095,6 +1128,11 @@ impl PlaylistManager {
         Self::get_playlist_tracks_from_conn(&conn, playlist_id)
     }
 
+    /// Same query as `get_playlist_tracks`, taking an already-open
+    /// connection instead of getting a fresh one from the pool — for
+    /// callers that already hold a connection and would otherwise need a
+    /// second one from the (size-limited) pool just for this call, e.g.
+    /// `player.rs`'s startup restore.
     pub fn get_playlist_tracks_from_conn(
         conn: &rusqlite::Connection,
         playlist_id: i64,
@@ -1407,6 +1445,10 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Move the single item at position `from` to position `to`, shifting
+    /// everything between. The base single-item reorder that
+    /// `reorder_playlist_item_by_uuid` resolves down to; for moving more
+    /// than one item at once see `reorder_playlist_items_batch`.
     pub fn reorder_playlist_item(&mut self, playlist_id: i64, from: i32, to: i32) -> Result<()> {
         if from == to {
             return Ok(());
@@ -1426,6 +1468,10 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Same move as `reorder_playlist_item`, but addressed by item UUID
+    /// instead of position — for callers (drag-and-drop in the UI) that
+    /// only know which items moved, not their current numeric positions.
+    /// A no-op (not an error) if either UUID isn't found in the playlist.
     pub fn reorder_playlist_item_by_uuid(
         &mut self,
         playlist_id: i64,
@@ -1455,6 +1501,10 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Move every item at a position in `from_indices` to sit consecutively
+    /// starting at `to_index`, preserving their relative order — for
+    /// multi-select drag-and-drop. Delegates to `reorder_playlist_item` for
+    /// the single-index case.
     pub fn reorder_playlist_items_batch(
         &mut self,
         playlist_id: i64,

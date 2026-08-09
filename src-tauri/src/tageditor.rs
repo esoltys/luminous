@@ -1,3 +1,12 @@
+//! Tag editing and AcoustID-based tag suggestion.
+//!
+//! Two independent capabilities: writing user-edited tag fields back to a
+//! file on disk (`write_tags`), and suggesting tags for an unidentified file
+//! by fingerprinting it and querying the AcoustID lookup service
+//! (`generate_fingerprint` + `lookup_acoustid`, chained by the command layer
+//! in `commands/tageditor.rs`). Fingerprinting shells out to the external
+//! `fpcalc` (Chromaprint) binary rather than reimplementing the algorithm.
+
 use anyhow::{anyhow, Context, Result};
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -15,6 +24,9 @@ struct FpCalcOutput {
     fingerprint: String,
 }
 
+/// Tag fields proposed by an AcoustID match, for the caller to review and
+/// selectively apply — a `None` field means AcoustID didn't return a value
+/// for it, not that the value should be cleared.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SuggestedTags {
     pub title: Option<String>,
@@ -71,6 +83,15 @@ struct AcoustIdResponse {
 // Tag Editor File Writer
 // ---------------------------------------------------------------------------
 
+/// Write the given tag fields to `path`'s primary tag, creating one if the
+/// file has none yet. Every field is written unconditionally — `Option`
+/// fields (`track`, `disc`, `year`, `bpm`) are cleared from the file when
+/// `None` rather than left untouched, so callers must pass the full desired
+/// state, not a partial patch. Preserves any existing embedded cover art,
+/// which lofty's tag-mutation calls would otherwise silently drop (#106).
+/// Retries the on-disk save up to 5 times with a short delay, since it can
+/// transiently fail if another process (e.g. an antivirus scanner) has the
+/// file open.
 #[allow(clippy::too_many_arguments)]
 pub fn write_tags(
     path: &Path,
@@ -178,6 +199,9 @@ pub fn write_tags(
 // AcoustID Fingerprinting Engine
 // ---------------------------------------------------------------------------
 
+/// Resolves to the `FPCALC_PATH` env var when set (for dev/packaging
+/// environments where `fpcalc` isn't on `PATH`), otherwise falls back to
+/// letting the OS resolve the bare `fpcalc` name.
 fn get_fpcalc_path() -> PathBuf {
     if let Ok(env_path) = std::env::var("FPCALC_PATH") {
         if !env_path.trim().is_empty() {
@@ -187,6 +211,9 @@ fn get_fpcalc_path() -> PathBuf {
     PathBuf::from("fpcalc")
 }
 
+/// Run the external `fpcalc` (Chromaprint) binary on `path` and return its
+/// `(fingerprint, duration_seconds)`. Fails if `fpcalc` isn't installed/on
+/// `PATH`, isn't executable, or exits non-zero.
 pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
     let fpcalc_bin = get_fpcalc_path();
     eprintln!(
@@ -221,6 +248,13 @@ pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
     Ok((res.fingerprint, res.duration.round() as u32))
 }
 
+/// Look up a fingerprint (from `generate_fingerprint`) against the AcoustID
+/// API and return the best-scoring match's tags. `api_key` takes precedence
+/// over the `ACOUSTID_API_KEY` env var; if neither is set, fails with the
+/// literal error text `"NO_API_KEY"` — the frontend (`TagEditor.svelte`)
+/// pattern-matches on that string to show a "configure your API key"
+/// prompt instead of a generic error, so it must not be reworded without
+/// updating that check.
 pub async fn lookup_acoustid(
     fingerprint: &str,
     duration_sec: u32,

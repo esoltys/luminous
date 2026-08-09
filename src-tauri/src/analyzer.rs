@@ -1,3 +1,10 @@
+//! Audio analysis primitives used by two unrelated consumers: a live
+//! ring-buffer + FFT path for the real-time visualizer, and an offline
+//! whole-file decode used wherever a module needs every sample of a track
+//! at once (`loudness.rs`'s R128 analysis, `waveform.rs`'s peak envelope).
+//! The two halves don't interact — they're grouped here because both are
+//! "decode audio and do math on it", not because they share code.
+
 use anyhow::{anyhow, Context, Result};
 use parking_lot::Mutex;
 use rustfft::{num_complex::Complex, FftPlanner};
@@ -8,6 +15,11 @@ use std::path::Path;
 // Real-time Playback Buffer for Spectrum Analyzer
 // ---------------------------------------------------------------------------
 
+/// Fixed-capacity ring buffer of the most recently played samples, fed
+/// continuously from the CPAL output callback (`audio.rs::build_output`) and
+/// polled roughly 30 times/sec by the visualizer's spectrum loop (`lib.rs`).
+/// Producer and consumer run on different threads/tasks — all access goes
+/// through the internal mutex.
 pub struct AudioVisualizerBuffer {
     buffer: Mutex<VecDeque<f32>>,
     max_size: usize,
@@ -21,6 +33,9 @@ impl AudioVisualizerBuffer {
         }
     }
 
+    /// Append newly played samples, evicting the oldest ones once the
+    /// buffer is at `max_size` (so it always holds the *most recent*
+    /// window, not the earliest).
     pub fn push(&self, samples: &[f32]) {
         let mut buf = self.buffer.lock();
         for &s in samples {
@@ -31,6 +46,10 @@ impl AudioVisualizerBuffer {
         }
     }
 
+    /// Return the most recent `size` samples, oldest-first. If fewer than
+    /// `size` samples have ever been pushed (e.g. right after playback
+    /// starts), the result is zero-padded at the front rather than
+    /// shortened, so callers can always assume a fixed-length buffer.
     pub fn get_samples(&self, size: usize) -> Vec<f32> {
         let buf = self.buffer.lock();
         let len = buf.len();
@@ -51,7 +70,12 @@ impl AudioVisualizerBuffer {
     }
 }
 
-/// Calculate 32 frequency bins from the audio buffer using FFT with Hann windowing and log scaling.
+/// Compute 32 log-spaced frequency-bin magnitudes (bass→treble, roughly
+/// perceptually normalized to `[0, 1]`) from the last `fft_size` samples in
+/// `visualizer_buf`, for driving the real-time spectrum visualizer.
+///
+/// `fft_size` must be a power of two (required by `rustfft`'s planner) and
+/// should stay small enough to run every animation frame — callers use 1024.
 pub fn calculate_spectrum(
     visualizer_buf: &AudioVisualizerBuffer,
     fft_size: usize,
@@ -139,7 +163,14 @@ pub fn calculate_spectrum(
 // Offline Fast Audio Decoder
 // ---------------------------------------------------------------------------
 
-/// Decode an entire audio file as fast as the CPU allows and average it to mono.
+/// Decode an entire audio file as fast as the CPU allows (no real-time
+/// pacing, unlike playback) and downmix to mono by averaging all channels.
+/// Returns `(samples, sample_rate)`. Individual corrupt packets are skipped
+/// rather than aborting the whole decode; any other decoder error stops
+/// early and returns whatever was decoded so far. Used by `waveform.rs` for
+/// its peak envelope; `loudness.rs` needs channels kept separate for BS.1770
+/// weighting and so has its own near-identical `decode_channels` instead of
+/// calling this.
 pub fn decode_all_samples(path: &Path) -> Result<(Vec<f32>, u32)> {
     use symphonia::core::{
         codecs::audio::AudioDecoderOptions,
