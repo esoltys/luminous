@@ -1577,7 +1577,18 @@ impl PlaylistManager {
             }
             PlaylistOp::Remove { playlist_id, items } => {
                 let conn = self.db.pool.get()?;
-                for item in items {
+                // Restore items in ascending original-position order, opening a
+                // gap for each one before inserting it. Relying on
+                // renumber_positions' `ORDER BY position` tiebreak instead would
+                // be nondeterministic: SQLite doesn't guarantee tie order, so a
+                // reinserted row can land one slot off from the row it displaces.
+                let mut items_by_position: Vec<&ClearedItem> = items.iter().collect();
+                items_by_position.sort_by_key(|item| item.position);
+                for item in items_by_position {
+                    conn.execute(
+                        "UPDATE playlist_items SET position = position + 1 WHERE playlist_id = ?1 AND position >= ?2",
+                        params![playlist_id, item.position],
+                    )?;
                     conn.execute(
                         "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type, url, stream_url, additional_metadata)
                          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -1961,6 +1972,66 @@ mod tests {
         manager.redo().unwrap();
         let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_redo.len(), 0);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_remove_middle_item_undo_restores_exact_position() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=5 {
+                conn.execute(
+                    "INSERT INTO songs (id, title) VALUES (?1, ?2)",
+                    params![i, format!("Song {i}")],
+                )
+                .unwrap();
+            }
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Middle Remove Test").unwrap();
+        manager
+            .add_songs_to_playlist(pl.id, &[1, 2, 3, 4, 5])
+            .unwrap();
+
+        let original_tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(original_tracks.len(), 5);
+        let original_uuids: Vec<String> = original_tracks.iter().map(|t| t.uuid.clone()).collect();
+        // Song 3 sits at index 2, flanked by items that will shift when it's removed.
+        let middle_uuid = original_tracks[2].uuid.clone();
+        assert_eq!(
+            original_tracks[2].song.as_ref().unwrap().title.as_deref(),
+            Some("Song 3")
+        );
+
+        manager
+            .remove_from_playlist(pl.id, std::slice::from_ref(&middle_uuid))
+            .unwrap();
+        let after_remove = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(after_remove.len(), 4);
+        assert!(after_remove.iter().all(|t| t.uuid != middle_uuid));
+
+        manager.undo().unwrap();
+        let after_undo = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(after_undo.len(), 5);
+
+        // The restored item must land back at its exact original index, not
+        // merely somewhere in the list — and every other item's position must
+        // be untouched too.
+        let restored_uuids: Vec<String> = after_undo.iter().map(|t| t.uuid.clone()).collect();
+        assert_eq!(restored_uuids, original_uuids);
+        assert_eq!(after_undo[2].uuid, middle_uuid);
+        assert_eq!(
+            after_undo[2].song.as_ref().unwrap().title.as_deref(),
+            Some("Song 3")
+        );
+        for (idx, track) in after_undo.iter().enumerate() {
+            assert_eq!(track.position, idx as i32);
+        }
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
