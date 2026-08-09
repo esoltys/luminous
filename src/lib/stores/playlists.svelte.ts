@@ -241,24 +241,6 @@ class PlaylistsStore {
     await this.refreshPlaylists();
   }
 
-  async replaceQueueTracks(songIds: number[]) {
-    const queuePl = await this.requireQueue();
-    try {
-      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId: queuePl.id });
-      if (existingItems.length > 0) {
-        const uuids = existingItems.map((i) => i.uuid);
-        await invoke("remove_from_playlist", { playlistId: queuePl.id, uuids });
-      }
-      if (songIds.length > 0) {
-        await invoke("add_to_playlist", { playlistId: queuePl.id, songIds });
-      }
-      await this.selectPlaylist(queuePl.id);
-      await this.refreshPlaylists();
-    } catch (err) {
-      console.error("Failed to sync Queue playlist tracks:", err);
-    }
-  }
-
   /** Removes every track ahead of `uuid` (in current DB order) from
    * `playlistId`. Takes the target playlist id explicitly rather than
    * re-resolving "the Queue" via `requireQueue()` — that lookup can
@@ -276,7 +258,6 @@ class PlaylistsStore {
       if (index > 0) {
         const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
         await invoke("remove_from_playlist", { playlistId, uuids: uuidsToRemove });
-        await invoke("remove_songs_from_player_playlist", { uuids: uuidsToRemove });
         if (this.activePlaylistId === playlistId) {
           await this.selectPlaylist(playlistId);
         }
@@ -309,10 +290,9 @@ class PlaylistsStore {
   }
 
   async removeItemsFromPlaylist(playlistId: number, uuids: string[]) {
+    // The backend keeps the live playback queue in sync in the same call —
+    // a no-op if these uuids aren't part of the currently loaded queue (see #262).
     await invoke("remove_from_playlist", { playlistId, uuids });
-    // Keep the live playback queue in sync — a no-op if these uuids aren't
-    // part of the currently loaded queue (see #262).
-    await invoke("remove_songs_from_player_playlist", { uuids });
     await this.refreshPlaylists(); // update track counts FIRST
     const qPl = this.queuePlaylist;
     if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
@@ -330,11 +310,9 @@ class PlaylistsStore {
       updated.splice(toIdx, 0, moved);
       this.activePlaylistTracks = updated;
     }
+    // The backend mirrors this into the live playback queue in the same
+    // call when playlistId is the Queue (a no-op otherwise).
     await invoke("reorder_playlist_item_by_uuid", { playlistId, sourceUuid, targetUuid });
-    const queuePl = this.queuePlaylist;
-    if (queuePl && playlistId === queuePl.id) {
-      await invoke("reorder_player_item_by_uuid", { sourceUuid, targetUuid });
-    }
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
@@ -347,11 +325,9 @@ class PlaylistsStore {
       updated.splice(toIndex, 0, moved);
       this.activePlaylistTracks = updated;
     }
+    // The backend mirrors this into the live playback queue in the same
+    // call when playlistId is the Queue.
     await invoke("reorder_playlist_item", { playlistId, from: fromIndex, to: toIndex });
-    const queuePl = this.queuePlaylist;
-    if (queuePl && playlistId === queuePl.id) {
-      await invoke("reorder_player_playlist_items", { fromIndex, toIndex });
-    }
     if (this.activePlaylistId === playlistId) {
       await this.selectPlaylist(playlistId);
     }
@@ -401,11 +377,9 @@ class PlaylistsStore {
   }
 
   async clearPlaylist(playlistId: number) {
+    // The backend also clears the live playback queue in the same call
+    // when playlistId is the Queue.
     await invoke("clear_playlist", { playlistId });
-    const queuePl = this.queuePlaylist;
-    if (queuePl && playlistId === queuePl.id) {
-      await invoke("clear_player_playlist");
-    }
     if (this.activePlaylistId === playlistId) {
       this.activePlaylistTracks = [];
     }
