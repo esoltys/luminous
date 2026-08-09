@@ -44,9 +44,7 @@
     try {
       // Auto-playlists (genre, decade, and BPM) are materialized as real (dynamic_enabled) playlist
       // rows, refreshed at most once every 24h — sync then re-pull the list.
-      await invoke("sync_genre_auto_playlists");
-      await invoke("sync_decade_auto_playlists");
-      await invoke("sync_bpm_auto_playlists");
+      await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
     } catch (err) {
       console.error("Failed to sync auto-playlists:", err);
@@ -62,16 +60,13 @@
     try {
       // Pick up genres/decades/BPM buckets that just crossed the auto-playlist
       // threshold, and prune ones that no longer have any matching songs.
-      await invoke("sync_genre_auto_playlists");
-      await invoke("sync_decade_auto_playlists");
-      await invoke("sync_bpm_auto_playlists");
+      await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
 
       // Force-regenerate every dynamic playlist (genre/decade auto-playlists
       // and user-created Smart Playlists) with the latest matching songs,
       // bypassing the 24h staleness gate the background sync uses.
-      const dynamicIds = playlistsStore.playlists.filter((p) => p.dynamic_enabled).map((p) => p.id);
-      await Promise.all(dynamicIds.map((id) => invoke("refresh_auto_playlist", { playlistId: id })));
+      await invoke("refresh_all_auto_playlists");
 
       await playlistsStore.refreshAutoPlaylistCounts();
     } catch (err) {

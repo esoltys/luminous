@@ -336,6 +336,16 @@ impl PlaylistManager {
     /// it's missing or its `updated` timestamp is more than 24h old, and prunes
     /// rows for genres no longer present in the library. `updated` doubles as
     /// the "last (re)generated at" timestamp shown in the UI.
+    /// Runs all three auto-playlist syncs (genre, decade, BPM) in one call —
+    /// the frontend used to invoke these as three separate IPC round trips
+    /// in lockstep at every call site.
+    pub fn sync_all_auto_playlists(&self) -> Result<()> {
+        self.sync_genre_auto_playlists()?;
+        self.sync_decade_auto_playlists()?;
+        self.sync_bpm_auto_playlists()?;
+        Ok(())
+    }
+
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
@@ -737,6 +747,21 @@ impl PlaylistManager {
         Ok(())
     }
 
+    /// Set a dynamic playlist's population-mode bias and its spec together,
+    /// populating once. The frontend used to make these as two separate
+    /// calls — set-mode (which itself repopulates via the
+    /// `set_playlist_population_mode` command) then set-spec (which
+    /// populates again) — regenerating the playlist's tracks twice per edit.
+    pub fn set_playlist_dynamic_config(
+        &mut self,
+        id: i64,
+        mode: QueuePopulationMode,
+        spec: &str,
+    ) -> Result<()> {
+        self.set_playlist_population_mode(id, mode)?;
+        self.set_playlist_dynamic_spec(id, spec)
+    }
+
     /// Bring one dynamic playlist's membership in line with its definition:
     /// append every song that newly matches (ordered among themselves by the
     /// playlist's population-mode rules), delete rows whose song no longer
@@ -852,6 +877,21 @@ impl PlaylistManager {
     /// with a fresh selection of matching songs from the library.
     pub fn refresh_auto_playlist(&mut self, playlist_id: i64) -> Result<()> {
         self.populate_dynamic_playlist(playlist_id)
+    }
+
+    /// Force-regenerates every dynamic/auto playlist's tracks in one pass —
+    /// the frontend used to fan this out as one IPC call per playlist id.
+    pub fn refresh_all_dynamic_playlists(&mut self) -> Result<()> {
+        let ids: Vec<i64> = self
+            .get_playlists()?
+            .into_iter()
+            .filter(|p| p.dynamic_enabled)
+            .map(|p| p.id)
+            .collect();
+        for id in ids {
+            self.populate_dynamic_playlist(id)?;
+        }
+        Ok(())
     }
 
     // -----------------------------------------------------------------------
@@ -1512,8 +1552,14 @@ impl PlaylistManager {
         Ok(())
     }
 
-    pub fn undo(&mut self) -> Result<()> {
-        let op = self.undo_stack.pop().ok_or(anyhow!("nothing to undo"))?;
+    /// Pops and applies the most recent undo op. Returns `Ok(false)` rather
+    /// than erroring when the stack is empty — the frontend calls this with
+    /// no error handling, and "nothing left to undo" is a routine state a
+    /// user reaches by clicking one time too many, not a failure.
+    pub fn undo(&mut self) -> Result<bool> {
+        let Some(op) = self.undo_stack.pop() else {
+            return Ok(false);
+        };
         match &op {
             PlaylistOp::Move {
                 playlist_id,
@@ -1582,11 +1628,15 @@ impl PlaylistManager {
             }
         }
         self.redo_stack.push(op);
-        Ok(())
+        Ok(true)
     }
 
-    pub fn redo(&mut self) -> Result<()> {
-        let op = self.redo_stack.pop().ok_or(anyhow!("nothing to redo"))?;
+    /// Pops and applies the most recent redo op. See [`Self::undo`] for why
+    /// an empty stack is `Ok(false)` rather than an error.
+    pub fn redo(&mut self) -> Result<bool> {
+        let Some(op) = self.redo_stack.pop() else {
+            return Ok(false);
+        };
         match &op {
             PlaylistOp::Move {
                 playlist_id,
@@ -1635,7 +1685,7 @@ impl PlaylistManager {
             }
         }
         self.undo_stack.push(op);
-        Ok(())
+        Ok(true)
     }
 
     fn renumber_positions(&self, conn: &rusqlite::Connection, playlist_id: i64) -> Result<()> {
@@ -1865,6 +1915,22 @@ mod tests {
         assert_eq!(playlists.len(), 0);
 
         // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_undo_redo_on_empty_stack_returns_false() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+
+        // A brand new manager has nothing to undo or redo — this must be a
+        // routine `Ok(false)`, not an error, since the frontend calls these
+        // with no error handling and reaching the end of the stack is
+        // something a user can trigger just by clicking one time too many.
+        assert!(!manager.undo().unwrap());
+        assert!(!manager.redo().unwrap());
+
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 

@@ -649,9 +649,7 @@ class CollectionStore {
           // qualify, so rebuild them right away instead of leaving them stale.
           (async () => {
             try {
-              await invoke("sync_genre_auto_playlists");
-              await invoke("sync_decade_auto_playlists");
-              await invoke("sync_bpm_auto_playlists");
+              await invoke("sync_all_auto_playlists");
               await playlistsStore.refreshPlaylists();
             } catch (err) {
               console.error("Failed to sync auto-playlists after scan:", err);

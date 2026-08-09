@@ -34,10 +34,8 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_favourite_songs") return Promise.resolve([]);
     if (cmd === "get_recently_added_songs") return Promise.resolve([]);
-    if (cmd === "sync_genre_auto_playlists" || cmd === "sync_decade_auto_playlists") {
-      return Promise.resolve(null);
-    }
-    if (cmd === "refresh_auto_playlist") return Promise.resolve(null);
+    if (cmd === "sync_all_auto_playlists") return Promise.resolve(null);
+    if (cmd === "refresh_all_auto_playlists") return Promise.resolve(null);
     return Promise.resolve([]);
   }),
 }));
@@ -113,10 +111,8 @@ describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
     await fireEvent.click(refreshButton);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("sync_genre_auto_playlists");
-      expect(invoke).toHaveBeenCalledWith("sync_decade_auto_playlists");
-      expect(invoke).toHaveBeenCalledWith("refresh_auto_playlist", { playlistId: 1 });
-      expect(invoke).toHaveBeenCalledWith("refresh_auto_playlist", { playlistId: 2 });
+      expect(invoke).toHaveBeenCalledWith("sync_all_auto_playlists");
+      expect(invoke).toHaveBeenCalledWith("refresh_all_auto_playlists");
     });
   });
 });

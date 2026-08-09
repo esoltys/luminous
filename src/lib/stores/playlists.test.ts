@@ -53,6 +53,9 @@ describe("PlaylistsStore", () => {
           return { valid: true, reason: null };
         case "create_playlist":
           return { id: 103, name: args?.name || "New Playlist", track_count: 0, created_at: "2026-01-03" };
+        case "undo_playlist":
+        case "redo_playlist":
+          return true;
         default:
           return null;
       }
@@ -78,22 +81,19 @@ describe("PlaylistsStore", () => {
     expect(playlistsStore.activePlaylistId).toBe(103);
   });
 
-  it("persists population mode before spec when saving a smart playlist (#120)", async () => {
-    const calls: string[] = [];
+  it("persists population mode and spec together when saving a smart playlist (#120)", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      calls.push(cmd);
       if (cmd === "get_playlists") return mockPlaylists;
       return null;
     });
 
     await playlistsStore.updatePlaylistSpec(101, "genre:rock", "discover");
 
-    expect(invoke).toHaveBeenCalledWith("set_playlist_population_mode", {
+    expect(invoke).toHaveBeenCalledWith("set_playlist_dynamic_config", {
       playlistId: 101,
       mode: "discover",
+      spec: "genre:rock",
     });
-    expect(invoke).toHaveBeenCalledWith("set_playlist_dynamic_spec", { playlistId: 101, spec: "genre:rock" });
-    expect(calls.indexOf("set_playlist_population_mode")).toBeLessThan(calls.indexOf("set_playlist_dynamic_spec"));
   });
 
   it("changes a playlist's population mode and re-selects it if active (#120)", async () => {
