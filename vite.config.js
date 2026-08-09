@@ -55,6 +55,15 @@ export default defineConfig(async () => ({
   css: {
     devSourcemap: false,
   },
+  build: {
+    // Silence Rolldown's `[PLUGIN_TIMINGS]` warnings (Vite 8 defaults to
+    // warning when a plugin's transform takes a while during build).
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
+    },
+  },
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
