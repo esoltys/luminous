@@ -188,25 +188,49 @@ impl CoverManager {
     /// the top result's 600x600 artwork. Returns `Ok(None)` — not an error —
     /// both when the song lacks artist/album metadata to search with and
     /// when the API returns no match; either way, the song's `art_unset`
-    /// flag is set on a miss so future scans don't keep re-querying it.
+    /// flag is set on a miss so future scans (and the frontend's per-row
+    /// retry-on-mount) don't keep re-querying it.
+    ///
+    /// Deliberately never holds a pooled DB connection across the network
+    /// `.await`s below — the pool only has a handful of connections (see
+    /// `Database::new`), and a stalled/slow request holding one would
+    /// starve every other DB-backed command in the app (#362 follow-up).
     pub async fn fetch_remote_cover(&self, song_id: i64) -> Result<Option<String>> {
-        let conn = self.db.pool.get()?;
-        let (artist, album, album_artist) = conn.query_row(
-            "SELECT artist, album, album_artist FROM songs WHERE id = ?1",
-            params![song_id],
-            |row| {
-                Ok((
-                    row.get::<_, Option<String>>(0)?,
-                    row.get::<_, Option<String>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                ))
-            },
-        )?;
+        let (artist, album, album_artist, art_unset) = {
+            let conn = self.db.pool.get()?;
+            conn.query_row(
+                "SELECT artist, album, album_artist, art_unset FROM songs WHERE id = ?1",
+                params![song_id],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, bool>(3)?,
+                    ))
+                },
+            )?
+        };
+
+        // Already tried and failed (no metadata or no API match) — don't
+        // re-hit the network every time a row remounts.
+        if art_unset {
+            return Ok(None);
+        }
 
         let artist_query = album_artist.as_ref().or(artist.as_ref());
         let (query_artist, query_album) = match (artist_query, album.as_ref()) {
             (Some(art), Some(alb)) => (art, alb),
-            _ => return Ok(None),
+            _ => {
+                // No artist/album to search with — mark unset immediately so
+                // untagged songs don't get re-queried on every remount.
+                let conn = self.db.pool.get()?;
+                conn.execute(
+                    "UPDATE songs SET art_unset = 1 WHERE id = ?1",
+                    params![song_id],
+                )?;
+                return Ok(None);
+            }
         };
 
         log::info!(
@@ -214,7 +238,9 @@ impl CoverManager {
             query_artist,
             query_album
         );
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()?;
         let search_url = format!(
             "https://itunes.apple.com/search?term={}&entity=album&limit=1",
             percent_encoding::utf8_percent_encode(
@@ -247,6 +273,7 @@ impl CoverManager {
                     std::fs::write(&dest_path, cleaned_bytes)?;
                     log::info!("Saved remote cover art to: {}", dest_path.display());
 
+                    let conn = self.db.pool.get()?;
                     conn.execute(
                         "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE id = ?2",
                         params![filename, song_id],
@@ -258,6 +285,7 @@ impl CoverManager {
         }
 
         // If no artwork found, mark it as unset so we don't spam requests
+        let conn = self.db.pool.get()?;
         conn.execute(
             "UPDATE songs SET art_unset = 1 WHERE id = ?1",
             params![song_id],
@@ -371,6 +399,76 @@ mod tests {
             hash_a,
             manager.get_album_hash("Eric Soltys", "You Wreck Me")
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    /// Regression test for the #362 follow-up: a song with no artist/album
+    /// tags must be marked `art_unset` on the very first remote-fetch
+    /// attempt (not left perpetually "not yet tried"), so `CoverArt.svelte`
+    /// remounting the row on every navigation doesn't re-trigger this call
+    /// forever — and, separately, once `art_unset` is set, a second call
+    /// must short-circuit before doing any network I/O.
+    #[tokio::test]
+    async fn test_fetch_remote_cover_marks_untagged_song_unset_without_network() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_covermanager_untagged_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        {
+            let conn = db.pool.get().unwrap();
+            crate::collection::upsert_song(
+                &conn,
+                &crate::models::Song {
+                    artist: None,
+                    album: None,
+                    album_artist: None,
+                    title: None,
+                    source: crate::models::SongSource::LocalFile,
+                    path: Some(r"C:\Music\untagged.ogg".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        }
+        let song_id: i64 = {
+            let conn = db.pool.get().unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![r"C:\Music\untagged.ogg"],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+
+        let manager = CoverManager::new(db.clone(), temp_dir.clone());
+
+        let result = manager.fetch_remote_cover(song_id).await.unwrap();
+        assert_eq!(result, None);
+
+        let art_unset: bool = {
+            let conn = db.pool.get().unwrap();
+            conn.query_row(
+                "SELECT art_unset FROM songs WHERE id = ?1",
+                params![song_id],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert!(
+            art_unset,
+            "untagged song should be marked art_unset after the first fetch attempt"
+        );
+
+        // Second call must short-circuit on the art_unset check before ever
+        // touching the network — if it didn't, this would hang/fail in a
+        // sandboxed test environment with no network access.
+        let result2 = manager.fetch_remote_cover(song_id).await.unwrap();
+        assert_eq!(result2, None);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
