@@ -454,7 +454,6 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        // Prune decade auto-playlists for decades no longer in the library.
         let mut stmt =
             conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'decade:%'")?;
         let existing: Vec<(i64, String)> = stmt
@@ -1203,7 +1202,6 @@ impl PlaylistManager {
     pub fn add_songs_to_playlist(&mut self, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
         let conn = self.db.pool.get()?;
 
-        // Get current max position
         let max_pos: i32 = conn
             .query_row(
                 "SELECT COALESCE(MAX(position), -1) FROM playlist_items WHERE playlist_id = ?1",
@@ -1261,7 +1259,6 @@ impl PlaylistManager {
             }
         }
 
-        // Re-number positions to be contiguous
         self.renumber_positions(&conn, playlist_id)?;
         self.touch_updated(&conn, playlist_id)?;
 
@@ -1844,27 +1841,22 @@ mod tests {
         let db_arc = std::sync::Arc::new(db);
         let manager = PlaylistManager::new(db_arc.clone()).unwrap();
 
-        // Create playlist
         let pl = manager.create_playlist("Chill Mix").unwrap();
         let pl_id = pl.id;
         assert!(pl_id > 0);
 
-        // Get playlists
         let playlists = manager.get_playlists().unwrap();
         assert_eq!(playlists.len(), 1);
         assert_eq!(playlists[0].name, "Chill Mix");
 
-        // Rename playlist
         manager.rename_playlist(pl_id, "Chill Beats").unwrap();
         let playlists = manager.get_playlists().unwrap();
         assert_eq!(playlists[0].name, "Chill Beats");
 
-        // Delete playlist
         manager.delete_playlist(pl_id).unwrap();
         let playlists = manager.get_playlists().unwrap();
         assert_eq!(playlists.len(), 0);
 
-        // Cleanup
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
@@ -1873,7 +1865,6 @@ mod tests {
         let (db, temp_dir) = setup_test_db();
         let db_arc = std::sync::Arc::new(db);
 
-        // Insert dummy song into DB
         {
             let conn = db_arc.pool.get().unwrap();
             conn.execute(
@@ -1889,12 +1880,10 @@ mod tests {
         let tracks = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks.len(), 1);
 
-        // Clear playlist
         manager.clear_playlist(pl.id).unwrap();
         let tracks_after_clear = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_clear.len(), 0);
 
-        // Undo clear
         manager.undo().unwrap();
         let tracks_after_undo = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_undo.len(), 1);
@@ -1903,7 +1892,6 @@ mod tests {
             Some("Test Song")
         );
 
-        // Redo clear
         manager.redo().unwrap();
         let tracks_after_redo = manager.get_playlist_tracks(pl.id).unwrap();
         assert_eq!(tracks_after_redo.len(), 0);
@@ -2022,7 +2010,6 @@ mod tests {
             .collect();
         assert_eq!(titles, vec!["Song 3", "Song 4", "Song 1", "Song 2"]);
 
-        // Test Undo
         manager.undo().unwrap();
         let tracks_undo = manager.get_playlist_tracks(pl.id).unwrap();
         let titles_undo: Vec<&str> = tracks_undo
@@ -2368,7 +2355,6 @@ mod tests {
             .unwrap();
         manager.populate_dynamic_playlist(rock_pl.id).unwrap();
 
-        // Trigger sync pass again
         manager.sync_genre_auto_playlists().unwrap();
 
         let playlists_after = manager.get_playlists().unwrap();

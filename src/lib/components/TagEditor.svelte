@@ -167,11 +167,9 @@
         initialKey,
       });
 
-      // Refresh the database views and collection store stats
       await collectionStore.refreshStats();
       await collectionStore.refreshLibrary();
 
-      // Trigger UI updates for playlists and playback queue
       if (playlistsStore.activePlaylistId !== null && playlistsStore.activePlaylistId !== undefined) {
         await playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
       }
@@ -211,7 +209,6 @@
 </script>
 
 <Modal onClose={onClose} onKeydown={handleKeydown}>
-    <!-- Header -->
     <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
       <div class="flex items-center gap-2">
         <Sliders class="w-4 h-4 text-brand-accent-text" />
@@ -222,7 +219,6 @@
       </button>
     </div>
 
-    <!-- Body -->
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       {#if isLoading}
         <div class="w-full py-16 flex flex-col items-center justify-center gap-3">
@@ -236,13 +232,11 @@
         </div>
       {:else}
         <div class="flex flex-col gap-4">
-          <!-- File Path (read-only) -->
           <div class="flex flex-col gap-1 bg-brand-main border border-brand-border rounded-lg p-2.5">
             <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.locationField')}</span>
             <span class="text-[10px] text-brand-text-secondary break-all select-text font-mono">{path}</span>
           </div>
 
-          <!-- AcoustID lookup error info -->
           {#if lookupErrorMsg}
             <div class="flex items-start gap-2.5 bg-brand-main border border-red-500/40 rounded-xl p-3 text-red-500 text-xs">
               <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
@@ -254,7 +248,6 @@
                album, composer, album artist, year, genre, grouping, bpm, initial key), with Disc paired
                alongside Track (Disc first) since it has no column of its own in the table. -->
           <div class="grid grid-cols-2 gap-4">
-            <!-- Disc Number -->
             <FormField label={i18n.t('tagEditor.discField')} for="tag-disc">
               <Input
                 id="tag-disc"
@@ -270,7 +263,6 @@
               />
             </FormField>
 
-            <!-- Track Number -->
             <FormField label={i18n.t('tagEditor.trackField')} for="tag-track">
               <Input
                 id="tag-track"
@@ -286,7 +278,6 @@
               />
             </FormField>
 
-            <!-- Title -->
             <FormField label={i18n.t('tagEditor.titleField')} for="tag-title" span2>
               <Input
                 id="tag-title"
@@ -299,7 +290,6 @@
               />
             </FormField>
 
-            <!-- Artist -->
             <FormField label={i18n.t('tagEditor.artistField')} for="tag-artist">
               <Input
                 id="tag-artist"
@@ -312,7 +302,6 @@
               />
             </FormField>
 
-            <!-- Album -->
             <FormField label={i18n.t('tagEditor.albumField')} for="tag-album">
               <Input
                 id="tag-album"
@@ -325,17 +314,14 @@
               />
             </FormField>
 
-            <!-- Composer -->
             <FormField label={i18n.t('tagEditor.composerField')} for="tag-composer">
               <Input id="tag-composer" bind:value={composer} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
-            <!-- Album Artist -->
             <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist" tooltip={i18n.t('tagEditor.albumArtistTooltip')}>
               <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
-            <!-- Year -->
             <FormField label={i18n.t('tagEditor.yearField')} for="tag-year">
               <Input
                 id="tag-year"
@@ -353,17 +339,14 @@
               />
             </FormField>
 
-            <!-- Genre -->
             <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre">
               <Input id="tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
-            <!-- Grouping -->
             <FormField label={i18n.t('tagEditor.groupingField')} for="tag-grouping" tooltip={i18n.t('tagEditor.groupingTooltip')}>
               <Input id="tag-grouping" bind:value={grouping} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
 
-            <!-- BPM -->
             <FormField label={i18n.t('tagEditor.bpmField')} for="tag-bpm" tooltip={i18n.t('tagEditor.bpmTooltip')}>
               <Input
                 id="tag-bpm"
@@ -379,7 +362,6 @@
               />
             </FormField>
 
-            <!-- Initial Key -->
             <FormField label={i18n.t('tagEditor.initialKeyField')} for="tag-initialkey" tooltip={i18n.t('tagEditor.initialKeyTooltip')}>
               <Input id="tag-initialkey" bind:value={initialKey} disabled={isSaving} size="sm" class="w-full" />
             </FormField>
@@ -394,7 +376,6 @@
       {/if}
     </div>
 
-    <!-- Footer -->
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border shrink-0 bg-brand-main">
       {#if !isLoading && !errorMsg}
         <div class="flex items-center gap-3">

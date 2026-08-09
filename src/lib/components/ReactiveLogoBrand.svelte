@@ -13,7 +13,6 @@
 
   let { size = "md", className = "" }: Props = $props();
 
-  // Map size to dimensions
   const sizeMap = {
     sm: "w-8 h-8",
     md: "w-12 h-12",
@@ -21,7 +20,6 @@
     xl: "w-20 h-20"
   };
 
-  // State variables for pulsing
   let isPulsingEnabled = $state(true);
   let bassIntensity = $state(0);
   let midIntensity = $state(0);
@@ -52,7 +50,6 @@
       );
     }
 
-    // Listen to real-time audio spectrum
     try {
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         if (!isPulsingEnabled) {
@@ -165,7 +162,6 @@
       </filter>
     </defs>
 
-    <!-- Base container with dynamic saturation pulse -->
     <g
       style="filter: saturate({saturationVal}); transition: filter 0.05s ease-out;"
     >

@@ -593,7 +593,6 @@ class CollectionStore {
         }
       }
 
-      // Listen to library scan progress events
       await listen<ScanProgress>("scan-progress", (event) => {
         this.scanProgress = event.payload;
         this.isScanning = event.payload.phase !== "done";

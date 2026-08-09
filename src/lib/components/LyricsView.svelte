@@ -27,7 +27,6 @@
       return [];
     }
     
-    // Clean marker if present
     let cleanText = lyricsText;
     if (cleanText.startsWith("[synced:false]\n")) {
       cleanText = cleanText.substring("[synced:false]\n".length);
@@ -69,7 +68,6 @@
 
   let isSynced = $derived(parsedLines.length > 0);
 
-  // Find active line index based on current playback position
   let activeLineIndex = $derived.by(() => {
     if (!isSynced || parsedLines.length === 0) return -1;
     const currentMs = playerStore.positionNanosec / 1_000_000;
@@ -200,7 +198,6 @@
     isEditing = true;
   }
 
-  // Load lyrics when song changes
   $effect(() => {
     console.log("[LyricsView] Song changed. Reloading lyrics for song ID:", playerStore.currentSong?.id);
     loadLyrics(playerStore.currentSong?.id);
@@ -239,7 +236,6 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <!-- Top Panel Toolbar -->
   <div class="h-16 flex items-center justify-between px-8 border-b border-brand-border bg-brand-main/40 backdrop-blur-md shrink-0">
     <div class="flex items-center gap-3">
       <FileText class="w-6 h-6 text-brand-accent-text" />
@@ -253,7 +249,6 @@
       </div>
     </div>
 
-    <!-- Actions -->
     {#if playerStore.currentSong}
       <div class="flex items-center gap-2">
         {#if playerStore.currentSong.is_instrumental}
@@ -279,14 +274,12 @@
     {/if}
   </div>
 
-  <!-- Lyrics Container Viewport -->
   <div class="flex-1 overflow-y-auto px-6 py-12" class:pb-28={!!playerStore.currentSong} bind:this={containerEl} use:rememberScroll={"lyrics"}>
     {#if isLoading}
       <div class="w-full h-full flex flex-col items-center justify-center gap-3">
         <LoadingSpinner label={i18n.t('lyrics.fetching', {}, "Fetching lyrics...")} />
       </div>
     {:else if playerStore.currentSong?.is_instrumental}
-      <!-- Instrumental View -->
       <div class="w-full h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
         <div class="p-4 rounded-full bg-brand-sidebar border border-brand-border text-brand-accent shadow-inner">
           <Music2 class="w-12 h-12 stroke-[1.5]" />
@@ -304,7 +297,6 @@
         </Button>
       </div>
     {:else if isEditing}
-      <!-- Editor Mode -->
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">
         <label for="lyrics-editor" class="text-xs font-bold text-brand-text-secondary/65 uppercase tracking-wider">{i18n.t('lyrics.editorLabel', {}, "Lyrics Text (plain or LRC synced format)")}</label>
         <textarea
@@ -317,7 +309,6 @@
     {:else if lyricsText}
       <div class="max-w-3xl mx-auto text-center">
         {#if isSynced}
-          <!-- Synced View -->
           <div class="flex flex-col gap-6 md:gap-8 pb-32">
             {#each parsedLines as line, idx}
               {@const isActive = idx === activeLineIndex}
@@ -333,7 +324,6 @@
             {/each}
           </div>
         {:else}
-          <!-- Plain Text View -->
           <div class="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-border bg-brand-sidebar text-[11px] font-semibold text-brand-text-secondary/60 select-none shadow-sm">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
             {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}

@@ -7,12 +7,10 @@ pub async fn get_waveform_data(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<Option<Vec<u8>>, String> {
-    // 1. Check cache in SQLite
     if let Ok(Some(cached)) = crate::waveform::get_cached_waveform(&state.db, song_id) {
         return Ok(Some(cached));
     }
 
-    // 2. Fetch song path from SQLite
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: Option<String> = conn
         .query_row(
@@ -44,12 +42,10 @@ pub async fn get_band_waveform_data(
     state: State<'_, AppState>,
     song_id: i64,
 ) -> Result<Option<Vec<u8>>, String> {
-    // 1. Check cache in SQLite
     if let Ok(Some(cached)) = crate::band_waveform::get_cached_band_waveform(&state.db, song_id) {
         return Ok(Some(cached));
     }
 
-    // 2. Fetch song path from SQLite
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let path_str: Option<String> = conn
         .query_row(

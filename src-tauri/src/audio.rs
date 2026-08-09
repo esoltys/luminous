@@ -537,7 +537,6 @@ fn build_output(
     let target_sample_rate = config.sample_rate;
     let target_channels = config.channels;
 
-    // Update equalizer sample rate and channels format using target device values
     if let Ok(mut eq) = equalizer.lock() {
         eq.update_format(target_sample_rate, target_channels as usize);
     }
@@ -904,7 +903,6 @@ fn decode_thread(
         let mut transition: Option<PendingTransition> = None;
         let mut last_device_check = std::time::Instant::now();
 
-        // Decode loop
         'decode: loop {
             // Periodic default output device change / error check (~500ms throttle)
             let now = std::time::Instant::now();
@@ -1003,7 +1001,6 @@ fn decode_thread(
 
             let out = output.as_mut().unwrap();
 
-            // Non-blocking command check
             match cmd_rx.try_recv() {
                 Ok(AudioCommand::Pause) => {
                     let _ = out.stream.pause();
@@ -1170,7 +1167,7 @@ fn decode_thread(
                         current.about_to_finish_sent = false;
                     }
                 }
-                Err(mpsc::TryRecvError::Empty) => {} // no pending command
+                Err(mpsc::TryRecvError::Empty) => {}
                 Err(mpsc::TryRecvError::Disconnected) => break 'decode,
                 Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {} // already playing
                 Ok(AudioCommand::Cue(_)) => {} // already playing
@@ -1223,7 +1220,6 @@ fn decode_thread(
                 }
             }
 
-            // If the decoder exhausted the current file:
             if current.eof {
                 if transition.is_some() {
                     // Waiting for the boundary to be consumed before the
@@ -1268,7 +1264,6 @@ fn decode_thread(
                 continue 'decode;
             }
 
-            // Decode one packet
             match current.format.next_packet() {
                 Ok(Some(packet)) => {
                     if packet.track_id != current.track_id {
@@ -1309,7 +1304,6 @@ fn decode_thread(
                             );
                             let resampled = current.resampler.resample(&channel_converted);
 
-                            // Push samples into the shared playback buffer
                             let mut pushed = 0;
                             while pushed < resampled.len() {
                                 let written = out.producer.push_slice(&resampled[pushed..]);
