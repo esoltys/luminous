@@ -747,10 +747,6 @@ export const fr = {
     albumsFilter: "Albums ({count})",
     epsFilter: "EPs ({count})",
     singlesFilter: "Singles ({count})",
-    singleEp: "Single/EP",
-    single: "Single",
-    ep: "EP",
-    album: "Album",
     discSet: "Coffret {count} disques",
     noReleasesFound: "Aucune sortie trouvée.",
     playlistsFeaturing: "Listes de lecture avec {artist}"

@@ -6,14 +6,6 @@ import { LIGHTNESS_STEP } from "../constants";
 const MAX_CONTRAST_ADJUST_STEPS = 50;
 const MAX_PALETTE_TEXT_ADJUST_STEPS = 20;
 
-export interface ColorMetrics {
-  hex: string;
-  rgb: { r: number; g: number; b: number };
-  linearRgb: { r: number; g: number; b: number };
-  luminance: number;
-  isLight: boolean;
-}
-
 export interface ContrastResult {
   ratio: number;
   wcagAA: boolean;
@@ -66,16 +58,6 @@ function sRgbToLinearRgb(value: number): number {
     return normalized / 12.92;
   }
   return Math.pow((normalized + 0.055) / 1.055, 2.4);
-}
-
-/**
- * Convert Linear RGB to sRGB
- */
-function linearRgbToSRgb(value: number): number {
-  if (value <= 0.0031308) {
-    return value * 12.92 * 255;
-  }
-  return (1.055 * Math.pow(value, 1 / 2.4) - 0.055) * 255;
 }
 
 /**
@@ -144,14 +126,6 @@ export function checkWcagCompliance(foreground: string, background: string): Con
 }
 
 /**
- * Suggest appropriate text color (dark or light) based on background
- * Uses the 0.179 luminance threshold
- */
-export function suggestTextColor(backgroundColor: string): string {
-  return isLightColor(backgroundColor) ? '#1a1a1a' : '#ffffff';
-}
-
-/**
  * Picks white or black for text/icons rendered directly on top of a
  * background — e.g. a filled accent button — using perceived brightness
  * (YIQ), not the WCAG relative-luminance contrast ratio. Plain "whichever
@@ -204,61 +178,6 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
   // minRatio — return the most extreme candidate reached rather than the
   // original, since it's strictly closer to compliant.
   return candidateHex;
-}
-
-/**
- * Get full color metrics for a hex color
- */
-export function getColorMetrics(hex: string): ColorMetrics {
-  const rgb = hexToRgb(hex);
-  const luminance = calculateLuminance(hex);
-
-  return {
-    hex,
-    rgb,
-    linearRgb: {
-      r: sRgbToLinearRgb(rgb.r),
-      g: sRgbToLinearRgb(rgb.g),
-      b: sRgbToLinearRgb(rgb.b)
-    },
-    luminance,
-    isLight: luminance > 0.179
-  };
-}
-
-/**
- * Format luminance as percentage for display
- */
-export function formatLuminance(luminance: number): string {
-  return `${Math.round(luminance * 100)}%`;
-}
-
-/**
- * Get WCAG level badge color
- */
-export function getWcagBadgeColor(level: 'fail' | 'AA' | 'AAA'): string {
-  switch (level) {
-    case 'AAA':
-      return '#10b981'; // green
-    case 'AA':
-      return '#f59e0b'; // amber
-    case 'fail':
-      return '#ef4444'; // red
-  }
-}
-
-/**
- * Get WCAG level badge text
- */
-export function getWcagBadgeText(level: 'fail' | 'AA' | 'AAA'): string {
-  switch (level) {
-    case 'AAA':
-      return '✓ WCAG AAA';
-    case 'AA':
-      return '✓ WCAG AA';
-    case 'fail':
-      return '✗ Below AA';
-  }
 }
 
 export interface HSL {

@@ -6,11 +6,6 @@ import {
   isLightColor,
   calculateContrastRatio,
   checkWcagCompliance,
-  suggestTextColor,
-  getColorMetrics,
-  formatLuminance,
-  getWcagBadgeColor,
-  getWcagBadgeText,
   rgbToHsl,
   hslToRgb,
   scoreSwatch,
@@ -118,58 +113,6 @@ describe("checkWcagCompliance", () => {
     expect(result.level).toBe("AA");
     expect(result.wcagAA).toBe(true);
     expect(result.wcagAAA).toBe(false);
-  });
-});
-
-describe("suggestTextColor", () => {
-  it("suggests dark text on light backgrounds", () => {
-    expect(suggestTextColor("#ffffff")).toBe("#1a1a1a");
-  });
-
-  it("suggests light text on dark backgrounds", () => {
-    expect(suggestTextColor("#000000")).toBe("#ffffff");
-  });
-});
-
-describe("getColorMetrics", () => {
-  it("returns full metrics for white", () => {
-    const metrics = getColorMetrics("#ffffff");
-    expect(metrics.hex).toBe("#ffffff");
-    expect(metrics.rgb).toEqual({ r: 255, g: 255, b: 255 });
-    expect(metrics.luminance).toBeCloseTo(1, 5);
-    expect(metrics.isLight).toBe(true);
-    expect(metrics.linearRgb.r).toBeCloseTo(1, 5);
-  });
-
-  it("returns full metrics for black", () => {
-    const metrics = getColorMetrics("#000000");
-    expect(metrics.luminance).toBe(0);
-    expect(metrics.isLight).toBe(false);
-    expect(metrics.linearRgb).toEqual({ r: 0, g: 0, b: 0 });
-  });
-});
-
-describe("formatLuminance", () => {
-  it("formats luminance as a rounded percentage", () => {
-    expect(formatLuminance(1)).toBe("100%");
-    expect(formatLuminance(0)).toBe("0%");
-    expect(formatLuminance(0.5)).toBe("50%");
-  });
-});
-
-describe("getWcagBadgeColor", () => {
-  it("returns green for AAA, amber for AA, red for fail", () => {
-    expect(getWcagBadgeColor("AAA")).toBe("#10b981");
-    expect(getWcagBadgeColor("AA")).toBe("#f59e0b");
-    expect(getWcagBadgeColor("fail")).toBe("#ef4444");
-  });
-});
-
-describe("getWcagBadgeText", () => {
-  it("returns the expected label for each level", () => {
-    expect(getWcagBadgeText("AAA")).toBe("✓ WCAG AAA");
-    expect(getWcagBadgeText("AA")).toBe("✓ WCAG AA");
-    expect(getWcagBadgeText("fail")).toBe("✗ Below AA");
   });
 });
 
