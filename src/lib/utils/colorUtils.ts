@@ -68,9 +68,6 @@ function sRgbToLinearRgb(value: number): number {
   return Math.pow((normalized + 0.055) / 1.055, 2.4);
 }
 
-/**
- * Convert Linear RGB to sRGB
- */
 function linearRgbToSRgb(value: number): number {
   if (value <= 0.0031308) {
     return value * 12.92 * 255;
@@ -206,9 +203,6 @@ export function clampForContrast(hex: string, backgroundHex: string, minRatio = 
   return candidateHex;
 }
 
-/**
- * Get full color metrics for a hex color
- */
 export function getColorMetrics(hex: string): ColorMetrics {
   const rgb = hexToRgb(hex);
   const luminance = calculateLuminance(hex);
@@ -226,16 +220,10 @@ export function getColorMetrics(hex: string): ColorMetrics {
   };
 }
 
-/**
- * Format luminance as percentage for display
- */
 export function formatLuminance(luminance: number): string {
   return `${Math.round(luminance * 100)}%`;
 }
 
-/**
- * Get WCAG level badge color
- */
 export function getWcagBadgeColor(level: 'fail' | 'AA' | 'AAA'): string {
   switch (level) {
     case 'AAA':
@@ -247,9 +235,6 @@ export function getWcagBadgeColor(level: 'fail' | 'AA' | 'AAA'): string {
   }
 }
 
-/**
- * Get WCAG level badge text
- */
 export function getWcagBadgeText(level: 'fail' | 'AA' | 'AAA'): string {
   switch (level) {
     case 'AAA':

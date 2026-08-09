@@ -104,7 +104,6 @@ impl CoverManager {
         let filename = format!("{}.{}", hash_name, ext);
         let dest_path = self.covers_dir.join(&filename);
 
-        // Write the picture data to the covers directory
         std::fs::write(&dest_path, cleaned_data)
             .context("failed to write cover art file to cache")?;
 
@@ -220,7 +219,6 @@ impl CoverManager {
                     std::fs::write(&dest_path, cleaned_bytes)?;
                     log::info!("Saved remote cover art to: {}", dest_path.display());
 
-                    // Update song database row
                     conn.execute(
                         "UPDATE songs SET art_automatic = ?1, art_unset = 0 WHERE id = ?2",
                         params![filename, song_id],

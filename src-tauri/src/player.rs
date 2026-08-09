@@ -125,7 +125,6 @@ impl Player {
             ) {
                 if let Ok(v) = v_str.parse::<f32>() {
                     volume = v.clamp(0.0, 1.0);
-                    // Apply to audio engine
                     if let Ok(engine) = audio.try_lock() {
                         let _ = engine.set_volume(volume);
                     }
@@ -370,11 +369,9 @@ impl Player {
 
         self.persist_adhoc_queue();
 
-        // Build shuffle order if needed
         self.rebuild_shuffle_order();
 
         let play_index = if self.shuffle_mode != ShuffleMode::Off {
-            // Find the position of start_index in the shuffle order
             self.shuffle_order
                 .iter()
                 .position(|&i| i == start_index)
@@ -588,7 +585,6 @@ impl Player {
         let mut attempts = 0;
         loop {
             if attempts >= total {
-                // Every item in the playlist is unavailable — stop.
                 log::warn!("Entire playlist contains only unavailable tracks — stopping.");
                 return self.stop().await;
             }
@@ -969,7 +965,6 @@ impl Player {
     }
 
     pub async fn next_track(&mut self) -> Result<()> {
-        // Drain unavailable items from the front of the queue before playing
         while let Some(front) = self.queue.front() {
             if Self::is_item_playable(front) {
                 break;
@@ -978,7 +973,6 @@ impl Player {
             self.queue.pop_front();
         }
 
-        // Check queue first
         if let Some(queued) = self.queue.pop_front() {
             let song = queued
                 .song
@@ -998,10 +992,7 @@ impl Player {
         let next_index = self.get_next_index();
         match next_index {
             Some(idx) => self.play_at_index(idx).await,
-            None => {
-                // End of playlist — stop
-                self.stop().await
-            }
+            None => self.stop().await,
         }
     }
 
@@ -1269,7 +1260,6 @@ impl Player {
 
         match self.repeat_mode {
             RepeatMode::Track => {
-                // Replay current track
                 if let Some(idx) = self.current_index {
                     return self.play_at_index(idx).await;
                 }
@@ -1410,7 +1400,6 @@ impl Player {
                         .push(i);
                 }
 
-                // Shuffle within each album group
                 for group_tracks in groups.values_mut() {
                     group_tracks.shuffle(&mut rng);
                 }
@@ -1452,7 +1441,6 @@ impl Player {
                         .push(i);
                 }
 
-                // Shuffle the order of other albums
                 other_keys.shuffle(&mut rng);
 
                 // Add current album's remaining tracks first (keeps their original order)
@@ -1492,7 +1480,6 @@ impl Player {
                         .push(i);
                 }
 
-                // Shuffle the order of other artists
                 other_keys.shuffle(&mut rng);
 
                 // Add current artist's remaining tracks first (keeps their original order)
@@ -1715,7 +1702,6 @@ mod tests {
         let (db, temp_dir) = setup_test_db();
         let db_arc = Arc::new(db);
 
-        // Insert a dummy song into DB
         {
             let conn = db_arc.pool.get().unwrap();
             conn.execute(
@@ -1749,7 +1735,6 @@ mod tests {
         assert_eq!(state.state, crate::models::PlayState::Paused);
         assert_eq!(state.position_nanosec, 45_000_000_000);
 
-        // Test updating persistence
         player.current_song = None;
         player.persist_current_song();
         player.persist_position(0);

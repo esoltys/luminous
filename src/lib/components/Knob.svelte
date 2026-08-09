@@ -38,10 +38,8 @@
 
   function updateValueFromPointer(e: PointerEvent) {
     if (disabled) return;
-    // Calculate angle from center of the knob
     let a = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
     
-    // Normalize to 0..360
     if (a < 0) a += 360;
     
     // Our track goes from 135 to 405 (which wraps to 45).
@@ -50,7 +48,6 @@
     
     // Dead zone handling (between 90 and 135 degrees)
     if (a > 90 && a < 135) {
-      // Snap to nearest end
       if (a < 112.5) a = 405;
       else a = 135;
     }
@@ -81,7 +78,6 @@
       cy = rect.top + rect.height / 2;
     }
     
-    // Update immediately on click
     updateValueFromPointer(e);
   }
 

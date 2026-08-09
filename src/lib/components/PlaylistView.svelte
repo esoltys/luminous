@@ -97,18 +97,14 @@
 
   let editingSongId = $state<number | null>(null);
 
-  // Inline title rename state
   let isEditingTitle = $state(false);
   let editTitleValue = $state("");
 
-  // In-playlist real-time search filter state
   let filterQuery = $state("");
 
-  // Multi-selection state
   let selectedUuids = $state<Set<string>>(new Set());
   let lastSelectedIndex = $state<number | null>(null);
 
-  // Right-click context menu state
   let contextMenuState = $state<{ x: number; y: number; item: PlaylistItem } | null>(null);
 
   // Overflow ("more actions") menu state — houses the lower-frequency playlist
@@ -118,7 +114,6 @@
   let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
   let overflowButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 
-  // Save Queue as Custom Playlist modal state
   let showSaveQueueModal = $state(false);
   let saveQueueName = $state("Queue Playlist");
 
@@ -166,7 +161,6 @@
     isEditingTitle = false;
   }
 
-  // Import / Export handlers
   async function handleImportPlaylist() {
     try {
       const selected = await open({
@@ -217,7 +211,6 @@
     }
   }
 
-  // Selected playlist from the store
   let activePlaylist = $derived(
     playlistsStore.playlists.find((p) => p.id === playlistsStore.activePlaylistId)
   );
@@ -303,7 +296,6 @@
       .map((v) => String(v).toLowerCase());
   }
 
-  // Derived filtered tracks based on filterQuery and sort selection
   let filteredTracks = $derived.by(() => {
     const q = filterQuery.trim().toLowerCase();
     let result = playlistsStore.activePlaylistTracks;
@@ -355,7 +347,6 @@
     return list;
   });
 
-  // Summary stats
   let totalRuntimeLabel = $derived.by(() => {
     const totalNs = playlistsStore.activePlaylistTracks.reduce(
       (sum, item) => sum + (item.song?.length_nanosec ?? 0),
@@ -383,7 +374,6 @@
     return top.slice(0, 2).join(" / ");
   });
 
-  // Duplicate track detection
   let duplicateUuids = $derived.by(() => {
     const seen = new Set<string>();
     const dupes: string[] = [];
@@ -474,7 +464,6 @@
     });
   }
 
-  // Row selection handlers
   function handleRowClick(event: MouseEvent, item: PlaylistItem) {
     const actualIndex = playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid);
 
@@ -571,7 +560,6 @@
     }
   }
 
-  // Drag and drop state and handlers
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
 
@@ -773,10 +761,8 @@
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto carousel-scroll"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
-    <!-- Stacked Cover Art Hero & Summary Banner Header -->
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
-        <!-- Left Title & Summary Metadata -->
         <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
@@ -812,7 +798,6 @@
             </div>
           {/if}
 
-          <!-- Summary Metadata Line -->
           <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
             <span>
               {#if isSpecialPlaylist}
@@ -832,7 +817,6 @@
             </span>
           </div>
 
-          <!-- Action Buttons: Play All & Shuffle Play -->
           <div class="flex items-center gap-3 mt-3">
             <Button
               onclick={handlePlayAll}
@@ -877,9 +861,7 @@
             <ColumnSelector align="left" iconOnly />
           </div>
 
-          <!-- Secondary Control Buttons Row -->
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
-            <!-- Search Filter Bar -->
             <div class="relative w-full max-w-xs">
               <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
               <Input
@@ -921,7 +903,6 @@
           </div>
         </div>
 
-        <!-- Right: 3D Stacked Album Cover Preview Header or Special Queue/Smart Banner -->
         {#if isQueue}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
             {#key playerStore.currentSong?.id}
@@ -971,10 +952,8 @@
       </div>
     </div>
 
-    <!-- Tracks List Container -->
     <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
       <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
-      <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
           <SortableHeader
@@ -1268,7 +1247,6 @@
         </div>
       </div>
 
-      <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
         {#each filteredTracks as item, index (item.uuid)}
           {@const trueUnavailable = isItemUnavailable(item)}
@@ -1551,7 +1529,6 @@
   </div>
   </div>
 
-    <!-- Floating Multi-Select Batch Toolbar -->
     {#if selectedUuids.size > 0}
       <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
         <span class="text-brand-accent-text font-bold">
@@ -1582,7 +1559,6 @@
       </div>
     {/if}
   {:else}
-    <!-- No playlist selected -->
     <div class="flex-1 flex flex-col items-center justify-center text-brand-text-primary/60">
       <ListMusic class="w-16 h-16 mb-4 text-brand-text-primary/30" />
       <h2 class="text-lg font-bold text-brand-text-primary/80 mb-1">{i18n.t("playlists.noPlaylistsTitle")}</h2>

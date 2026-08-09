@@ -41,7 +41,6 @@ if (typeof window !== "undefined" && typeof (window as any).ResizeObserver === "
   (window as any).ResizeObserver = globalThis.ResizeObserver;
 }
 
-// Mock Tauri core API
 vi.mock("@tauri-apps/api/core", () => {
   return {
     invoke: vi.fn().mockImplementation(async (cmd, args) => {
@@ -92,7 +91,6 @@ vi.mock("@tauri-apps/api/core", () => {
   };
 });
 
-// Mock Tauri event API
 vi.mock("@tauri-apps/api/event", () => {
   return {
     listen: vi.fn().mockImplementation(async (event, callback) => {

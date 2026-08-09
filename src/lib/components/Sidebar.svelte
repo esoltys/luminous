@@ -61,7 +61,6 @@
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}">
-  <!-- Navigation -->
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button
       onclick={() => { collectionStore.activeTab = "home"; }}

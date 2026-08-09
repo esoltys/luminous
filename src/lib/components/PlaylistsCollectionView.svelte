@@ -309,10 +309,8 @@
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${collectionStore.playlistsSubTab}`}>
-      <!-- Top bar with Filter Info / Sort controls (sticky) -->
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         {#if collectionStore.playlistsSubTab === "custom"}
-          <!-- Actions (Left) -->
           <div class="h-10 flex items-center gap-2 mb-2">
             <Button onclick={handleCreateBlankPlaylist} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-4 h-4" />
@@ -330,7 +328,6 @@
         {/if}
 
         <div class="h-9 flex items-center justify-between">
-          <!-- Showing Count (Left) -->
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if collectionStore.playlistsSubTab === "auto"}
               {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
@@ -339,7 +336,6 @@
             {/if}
           </div>
 
-          <!-- View Mode Toggle + Sort Dropdown (Right) -->
           <div class="flex items-center gap-2">
             <button
               onclick={handleRefreshAll}

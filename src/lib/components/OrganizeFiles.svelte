@@ -351,7 +351,6 @@
 
 {#snippet body()}
         {#if songIds.length > 0}
-          <!-- Scope selector -->
           <div class="flex items-center justify-between bg-brand-sidebar/40 p-3 rounded-xl border border-brand-border/30">
             <span class="font-semibold text-brand-text-primary">{i18n.t("organizer.scopeLabel")}</span>
             <div class="flex items-center gap-1.5 bg-brand-sidebar p-1 rounded-lg border border-brand-border/50">
@@ -371,7 +370,6 @@
           </div>
         {/if}
 
-        <!-- Template Pattern Input -->
         <div>
           <div class="flex items-center justify-between mb-1.5">
             <label for="template-input" class="font-semibold text-brand-text-primary">
@@ -394,7 +392,6 @@
             spellcheck="false"
           />
 
-          <!-- Variable chips -->
           <div class="flex flex-wrap items-center gap-1.5 pt-1">
             <span class="text-[11px] text-brand-text-secondary mr-1">{i18n.t("organizer.placeholders")}:</span>
             {#each VARIABLE_CHIPS as chip}
@@ -410,9 +407,7 @@
           </div>
         </div>
 
-        <!-- Options row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-          <!-- Destination folder -->
           <div class="md:col-span-2">
             <label for="dest-dir-input" class="block font-semibold text-brand-text-primary mb-1.5">
               {i18n.t("organizer.destinationDirLabel")}
@@ -434,7 +429,6 @@
             </div>
           </div>
 
-          <!-- Toggles Column -->
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
               <span>{i18n.t("organizer.replaceSpaces")}</span>
@@ -465,7 +459,6 @@
           </div>
         </div>
 
-        <!-- Preview Table Section -->
         <div class="space-y-2 pt-2">
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
@@ -485,7 +478,6 @@
               </Button>
             </div>
 
-            <!-- Summary badges & filter toggle -->
             <div class="flex flex-col gap-2 text-xs">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div class="flex items-center justify-between gap-2 text-brand-text-secondary">
@@ -523,7 +515,6 @@
             </div>
           </div>
 
-          <!-- Virtualized table -->
           <div class="h-64 border border-brand-border/60 rounded-xl overflow-hidden bg-brand-sidebar/40 flex flex-col">
             {#if items.length === 0}
               <div class="h-full flex items-center justify-center text-brand-text-secondary">
@@ -538,7 +529,6 @@
                 <span>{i18n.t("organizer.noChangingFilesMatch")}</span>
               </div>
             {:else}
-              <!-- Common Base Path Bar -->
               {#if commonPrefix}
                 <div class="px-3 py-1 bg-brand-sidebar/80 border-b border-brand-border/40 text-[10px] text-brand-text-secondary font-mono flex items-center gap-1.5 shrink-0" title={commonPrefix}>
                   <span class="font-semibold text-brand-accent-text shrink-0">{i18n.t("organizer.commonBasePath")}</span>
@@ -546,14 +536,11 @@
                 </div>
               {/if}
 
-              <!-- Horizontally scrollable viewport wrapper -->
               <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
                 <div style="min-width: {96 + fromColWidth + 24 + toColWidth + 20}px;" class="h-full flex flex-col">
-                  <!-- Table Column Header with Draggable Splitters -->
                   <div class="h-7 px-3 flex items-center bg-brand-sidebar/95 border-b border-brand-border/60 text-[10px] font-semibold text-brand-text-secondary uppercase tracking-wider select-none shrink-0 font-mono">
                     <div class="w-24 shrink-0">{i18n.t("organizer.colStatus")}</div>
 
-                    <!-- Original Path Header -->
                     <div class="flex items-center shrink-0 pr-1" style="width: {fromColWidth}px;">
                       <span class="truncate flex-1">{i18n.t("organizer.colSource")}</span>
                       <button
@@ -570,7 +557,6 @@
 
                     <div class="w-6 text-center shrink-0 text-brand-text-secondary">→</div>
 
-                    <!-- Target Path Header -->
                     <div class="flex items-center shrink-0 pl-1" style="width: {toColWidth}px;">
                       <span class="truncate flex-1">{i18n.t("organizer.colDestination")}</span>
                       <button
@@ -586,7 +572,6 @@
                     </div>
                   </div>
 
-                  <!-- Virtualized rows -->
                   <div class="flex-1 min-h-0">
                     <VirtualList items={displayedItems} height="100%" itemHeight={36}>
                       {#snippet children(rawRow: any)}
@@ -597,7 +582,6 @@
                         <div
                           class="h-9 px-3 flex items-center border-b border-brand-border/20 text-[11px] font-mono hover:bg-brand-accent/10 transition-colors whitespace-nowrap"
                         >
-                          <!-- Status badge -->
                           <div class="w-24 shrink-0">
                             {#if st === "ok"}
                               <span class="px-2 py-0.5 rounded bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30">
@@ -622,7 +606,6 @@
                             {/if}
                           </div>
 
-                          <!-- Original path cell -->
                           <div
                             class="px-2 overflow-x-auto scrollbar-none shrink-0 {item.from_path ? 'text-brand-text-secondary' : 'text-rose-400 font-medium'}"
                             style="width: {fromColWidth}px;"
@@ -631,10 +614,8 @@
                             {@html highlightPathHtml(displayFrom || i18n.t("organizer.noPathRecorded"))}
                           </div>
 
-                          <!-- Arrow separator -->
                           <div class="w-6 text-center text-brand-text-secondary shrink-0">→</div>
 
-                          <!-- Target path cell -->
                           <div
                             class="px-2 overflow-x-auto scrollbar-none shrink-0 {st === 'ok' ? 'text-brand-text-primary font-medium' : st === 'collision' || st === 'error' ? 'text-rose-400 font-semibold' : 'text-brand-text-primary'}"
                             style="width: {toColWidth}px;"
@@ -736,7 +717,6 @@
       <div
         class="w-full max-w-4xl max-h-[90vh] bg-brand-sidebar border border-brand-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-brand-text-primary"
       >
-        <!-- Header -->
         <div class="px-6 py-4 border-b border-brand-border/40 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text">
@@ -761,12 +741,10 @@
           </button>
         </div>
 
-        <!-- Content area -->
         <div class="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
           {@render body()}
         </div>
 
-        <!-- Footer -->
         <div class="px-6 py-4 border-t border-brand-border/40 flex items-center justify-between shrink-0 bg-brand-sidebar/50">
           <div class="text-xs text-brand-text-secondary">
             {@render collisionWarning()}

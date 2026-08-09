@@ -308,19 +308,15 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
-  <!-- Stacked Cover Art Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-1.5 max-w-xl">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
-        <!-- Summary Metadata Line -->
         <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
           <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 
-        <!-- Action Buttons: Play All & Shuffle Play -->
         <div class="flex items-center gap-3 mt-3">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
@@ -333,7 +329,6 @@
         </div>
       </div>
 
-      <!-- Right: 3D Stacked Album Cover Preview Header -->
       {#if headerCovers.length > 0}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
@@ -342,7 +337,6 @@
     </div>
   </div>
 
-  <!-- Release Categories (Sets, Albums, EPs, Singles) -->
   <div class="px-6 pt-6 flex flex-col gap-8">
     {#if sets.length > 0}
       <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
@@ -387,7 +381,6 @@
       <div class="flex flex-col gap-3">
         <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.singlesFilter', { count: singleSongs.length })}</h2>
         <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden">
-          <!-- Table Header -->
           <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar/80 backdrop-blur-md border-b border-brand-border text-[10px] text-brand-text-primary uppercase tracking-wider font-semibold select-none">
             <div class="grid items-center py-2.5 px-4" style={gridColsStyle}>
               <div class="text-center w-9"></div>
@@ -685,7 +678,6 @@
             </div>
           </div>
 
-          <!-- Table Body -->
           <div class="divide-y divide-brand-border/40 rounded-b-lg overflow-hidden">
             {#each sortedSingleSongs as song, index (song.id)}
               {@const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path)}
@@ -888,7 +880,6 @@
     {/if}
   </div>
 
-  <!-- Playlists featuring this artist -->
   {#if playlists.length > 0}
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
       <HorizontalScrollRow title={i18n.t('artistDetail.playlistsFeaturing', { artist: artistName })}>

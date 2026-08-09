@@ -340,7 +340,6 @@
 </script>
 
 <div class="flex flex-col gap-6 text-brand-text-primary">
-  <!-- EQ Card -->
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 flex flex-col gap-6">
     <div class="flex flex-col gap-4">
     <div class="flex items-start justify-between">
@@ -367,10 +366,8 @@
         />
       </div>
     </div>
-    <!-- Mode, Presets & Preamp controls -->
     <div class="flex items-center gap-4 flex-wrap">
 
-      <!-- Mode segmented control -->
       <div class="flex items-center bg-brand-main border border-brand-border rounded-[2rem] p-0.5" role="group" aria-label={i18n.t('equalizer.modeLabel')}>
         <button
           class="text-xs font-semibold px-4 py-1.5 rounded-full transition-colors {mode === 'graphic10' ? 'bg-brand-accent text-brand-accent-contrast shadow-sm' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
@@ -465,16 +462,13 @@
     {/if}
 
     {#if mode === "graphic10"}
-      <!-- Graphic Sliders Rack -->
       <div class="grid grid-cols-5 md:grid-cols-10 gap-3 md:gap-5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-4 md:p-6">
         {#each gains as gain, idx}
           <div class="flex flex-col items-center justify-between h-full group">
-            <!-- Gain display -->
             <span class="text-[10px] font-bold w-full text-center transition-colors {gain > 0 ? 'text-green-400/80' : gain < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
               {gain > 0 ? "+" : ""}{gain.toFixed(1)}
             </span>
 
-            <!-- Slider track -->
             <div class="h-40 md:h-48 flex items-center justify-center relative">
               <input
                 type="range"
@@ -489,7 +483,6 @@
               />
             </div>
 
-            <!-- Label -->
             <span class="text-[10px] md:text-[11px] font-medium text-brand-text-secondary text-center truncate w-full">
               {bandLabels[idx]}
             </span>
@@ -497,7 +490,6 @@
         {/each}
       </div>
     {:else}
-      <!-- Parametric Sliders Rack -->
       <div class="grid grid-cols-10 md:grid-cols-[repeat(20,minmax(0,1fr))] gap-1 md:gap-1.5 h-64 md:h-72 items-center bg-brand-main/50 border border-brand-border/50 rounded-xl p-3 md:p-4">
         {#each parametric as band, idx}
           <div
@@ -508,12 +500,10 @@
             onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") selectedBand = idx; }}
             aria-label={`${i18n.t('equalizer.bandLabel')} ${idx + 1}`}
           >
-            <!-- Gain display -->
             <span class="text-[9px] font-bold w-full text-center transition-colors {band.gain_db > 0 ? 'text-green-400/80' : band.gain_db < 0 ? 'text-red-400/80' : 'text-brand-text-secondary/70'}">
               {band.gain_db > 0 ? "+" : ""}{band.gain_db.toFixed(1)}
             </span>
 
-            <!-- Slider track -->
             <div class="h-40 md:h-48 flex items-center justify-center relative">
               <input
                 type="range"
@@ -528,7 +518,6 @@
               />
             </div>
 
-            <!-- Frequency label -->
             <span class="text-[9px] font-medium text-center truncate w-full {selectedBand === idx ? 'text-brand-accent-text' : 'text-brand-text-secondary'}">
               {formatFreq(band.freq)}
             </span>
@@ -658,7 +647,6 @@
         </div>
       </div>
 
-      <!-- Fade on Pause/Stop -->
       <div class="flex flex-col gap-1.5 pt-1">
         <div class="flex items-center justify-between mb-4">
           <span class="text-sm font-bold text-brand-text-primary">{i18n.t('fades.fadePause')}</span>
@@ -696,7 +684,6 @@
         {/if}
       </div>
 
-      <!-- Automatic Crossfade -->
       <div class="flex flex-col gap-1.5 border-t border-brand-border pt-6">
         <div class="flex items-center justify-between mb-4">
           <span class="text-sm font-bold text-brand-text-primary">{i18n.t('fades.crossfadeAuto')}</span>

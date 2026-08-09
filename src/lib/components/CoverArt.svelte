@@ -26,7 +26,6 @@
   let isLoading = $state(false);
   let hasFailed = $state(false);
 
-  // Function to load the cover art URI
   async function loadCoverArt() {
     if (artManual) {
       if (artManual.startsWith("http://") || artManual.startsWith("https://") || artManual.startsWith("/")) {
@@ -85,9 +84,7 @@
     }
   }
 
-  // React to changes in songId, artAutomatic, etc. using Svelte 5 $effect
   $effect(() => {
-    // Svelte 5 will re-run this function if any of these referenced variables change
     const _id = songId;
     const _auto = artAutomatic;
     const _manual = artManual;

@@ -74,7 +74,6 @@ import { shuffleArray } from "../utils/shuffle";
   let editingSongId = $state<number | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
-  // Save auto-playlist as custom playlist modal state
   let showSaveModal = $state(false);
   let savePlaylistName = $state("");
 
@@ -503,10 +502,8 @@ import { shuffleArray } from "../utils/shuffle";
   class="flex-1 flex flex-col overflow-y-auto carousel-scroll bg-brand-main text-brand-text-secondary h-full"
   use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
 >
-  <!-- Auto-Playlist Hero & Summary Banner Header -->
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
     <div class="flex items-stretch justify-between gap-6 relative z-10">
-      <!-- Left Title & Summary Metadata -->
       <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={displayName}>
           {displayName}
@@ -522,7 +519,6 @@ import { shuffleArray } from "../utils/shuffle";
           {/if}
         </div>
 
-        <!-- Primary Control Buttons Row -->
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
@@ -533,9 +529,7 @@ import { shuffleArray } from "../utils/shuffle";
           <ColumnSelector align="left" iconOnly />
         </div>
 
-        <!-- Secondary Control Buttons Row: Search Filter Bar, Undo, Redo, More -->
         <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
-          <!-- Search Filter Bar -->
           <div class="relative w-full max-w-xs">
             <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
             <Input
@@ -575,7 +569,6 @@ import { shuffleArray } from "../utils/shuffle";
           </div>
         </div>
 
-        <!-- Additional controls for genre/decade playlists: population-mode -->
         {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
@@ -588,7 +581,6 @@ import { shuffleArray } from "../utils/shuffle";
         {/if}
       </div>
 
-      <!-- Right: Cover Stack -->
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
@@ -625,7 +617,6 @@ import { shuffleArray } from "../utils/shuffle";
 
   <div class="px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
     <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
-      <!-- Header -->
       <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-primary uppercase tracking-wider font-semibold select-none">
         <div role="row" class="grid items-center py-3 px-4" style={gridColsStyle}>
           <SortableHeader
@@ -919,7 +910,6 @@ import { shuffleArray } from "../utils/shuffle";
         </div>
       </div>
 
-      <!-- Rows -->
       <div class="divide-y divide-brand-border/40">
         {#if loading}
           <div class="py-16 text-center text-brand-text-primary text-sm">

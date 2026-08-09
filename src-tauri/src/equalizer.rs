@@ -5,7 +5,6 @@ pub const EQ_BANDS: [f32; 10] = [
     31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
 ];
 
-/// Number of bands in the parametric equalizer mode.
 pub const PARAMETRIC_BAND_COUNT: usize = 20;
 
 /// Default Q for graphic-mode bands. The 10 bands are spaced 1 octave apart
@@ -110,7 +109,6 @@ impl BiquadFilter {
 
         let cos_w0 = w0.cos();
 
-        // Peaking EQ coefficients
         let b0 = 1.0 + alpha * a;
         let b1 = -2.0 * cos_w0;
         let b2 = 1.0 - alpha * a;
@@ -515,7 +513,6 @@ impl Equalizer {
                 }
             }
 
-            // Clip prevention/limiting
             *sample = out.clamp(-1.0, 1.0);
         }
     }
@@ -546,7 +543,6 @@ mod tests {
         assert_eq!(bands.len(), PARAMETRIC_BAND_COUNT);
         assert!((bands[0].freq - 31.0).abs() < 2.0);
         assert!((bands[19].freq - 16000.0).abs() < 50.0);
-        // Strictly ascending
         for pair in bands.windows(2) {
             assert!(pair[1].freq > pair[0].freq);
         }

@@ -49,9 +49,7 @@
 </script>
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
-  <!-- Content Area -->
   <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
-    <!-- Header -->
     <div class="px-6 pt-8">
       <h1 class="text-3xl font-heading font-bold text-brand-text-primary">
         {getTimeOfDayGreeting()}
@@ -67,7 +65,6 @@
         <div class="text-brand-text-secondary">{i18n.t('home.loading')}</div>
       </div>
     {:else}
-      <!-- Top Artists Section -->
       {#if topArtists.length > 0}
         <HorizontalScrollRow title={i18n.t('home.topArtists')}>
           {#each topArtists as artist (artist.name)}
@@ -83,7 +80,6 @@
         </HorizontalScrollRow>
       {/if}
 
-      <!-- Most Played / Recently Added Row Columns -->
       {#if frequentlyPlayed.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if frequentlyPlayed.length > 0}
@@ -95,7 +91,6 @@
         </div>
       {/if}
 
-      <!-- Empty State -->
       {#if topArtists.length === 0 && frequentlyPlayed.length === 0 && recentlyAdded.length === 0}
         <div class="flex items-center justify-center py-16">
           <LibraryWelcome />

@@ -57,9 +57,7 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  <!-- Content -->
   <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
-    <!-- Current Song -->
     {#if currentSong}
       <div class="space-y-3">
         <div class="space-y-1">
@@ -88,7 +86,6 @@
         </div>
       </div>
 
-      <!-- Playback Info -->
       <div class="space-y-2">
         {#if currentSong.filetype}
           <div class="flex items-start justify-between gap-3 text-xs">
@@ -126,7 +123,6 @@
         </div>
       </div>
 
-      <!-- Additional Metadata -->
       <div class="space-y-2 text-xs">
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">

@@ -38,7 +38,6 @@
 
 
 
-  // Helper to format nanoseconds to M:SS
   function formatTime(nanosec: number | undefined): string {
     if (nanosec === undefined) return "0:00";
     const sec = Math.floor(nanosec / 1_000_000_000);
@@ -47,20 +46,17 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
-  // Volume slider gradient style
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
     `background: linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${volumePercent}%, var(--color-border) ${volumePercent}%, var(--color-border) 100%)`
   );
 
-  // Handle seek progress bar click
   function handleSeek(e: Event) {
     const input = e.target as HTMLInputElement;
     const targetNs = parseFloat(input.value);
     playerStore.seek(targetNs);
   }
 
-  // Handle volume bar click
   function handleVolumeChange(e: Event) {
     const input = e.target as HTMLInputElement;
     const vol = parseFloat(input.value);
@@ -180,7 +176,6 @@
 </script>
 
 <footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <!-- Track Metadata & Art -->
   <div class="flex items-center gap-3 w-1/3 min-w-[200px] max-w-xs">
     <button
       onclick={handleCoverClick}
@@ -238,7 +233,6 @@
     </div>
   </div>
 
-  <!-- Player controls / Playback engine controller -->
   <div class="flex flex-col items-center gap-1.5 w-1/3 max-w-[600px]">
     <div class="flex items-center gap-5">
       <div class="relative">
@@ -315,7 +309,6 @@
 
     </div>
 
-    <!-- Scrubber -->
     <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
       <!-- Invisible spacer matching the mode-toggle button's footprint, so the
            waveform + timers stay centered instead of skewing left toward it. -->
@@ -341,7 +334,6 @@
     </div>
   </div>
 
-  <!-- Auxiliary (Volume & Visualizers) -->
   <div class="flex items-center justify-end gap-3 w-1/3 min-w-[200px] max-w-xs">
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />

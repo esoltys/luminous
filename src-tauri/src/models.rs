@@ -275,7 +275,6 @@ impl Song {
 // Playlist models
 // ---------------------------------------------------------------------------
 
-/// Item type within a playlist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlaylistItemType {
@@ -449,7 +448,6 @@ impl Playlist {
 // Playback state models
 // ---------------------------------------------------------------------------
 
-/// Shuffle mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ShuffleMode {
@@ -461,7 +459,6 @@ pub enum ShuffleMode {
     Artists,
 }
 
-/// Repeat mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum RepeatMode {

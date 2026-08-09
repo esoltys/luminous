@@ -161,7 +161,6 @@
     }
   }
 
-  // Custom Theme state
   let newThemeName = $state("");
   let customColors = $state<ThemeColors>({
     "bg-main": "#0d0b18",
@@ -282,14 +281,12 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  <!-- Top Header bar -->
   <div class="h-16 pl-6 pr-8 border-b border-brand-border flex items-center justify-between shrink-0">
     <div class="flex items-center gap-3">
       <Settings class="w-5 h-5 text-brand-accent-text" />
       <h2 class="text-base font-bold text-brand-text-primary">{i18n.t('settings.title')}</h2>
     </div>
 
-    <!-- Sleek Tab Control -->
     <div class="flex bg-brand-sidebar border border-brand-border rounded-xl p-0.5 text-xs shadow-sm">
       <button
         onclick={() => { settingsTab = "general"; }}
@@ -330,10 +327,8 @@
     </div>
   </div>
 
-  <!-- Content Area -->
   <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
     {#if settingsTab === "general"}
-      <!-- General Settings Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
         <div class="pb-3 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -347,7 +342,6 @@
           </div>
         </div>
 
-        <!-- Language row -->
         <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
           <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
           <Select
@@ -361,7 +355,6 @@
           </Select>
         </div>
 
-        <!-- Rating style row -->
         <div class="flex items-center justify-between gap-4 pt-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
@@ -379,7 +372,6 @@
         </div>
       </div>
 
-      <!-- Application & Updates Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="pb-3 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div class="flex items-center gap-3">
@@ -414,7 +406,6 @@
           </div>
         </div>
 
-        <!-- Version & Format Info Row -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
           <div class="bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 flex items-center justify-between">
             <div class="space-y-0.5">
@@ -446,7 +437,6 @@
           </div>
         </div>
 
-        <!-- Update Available Alert Banner (if available) -->
         {#if updaterStore.updateAvailable || updaterStore.installStatus !== 'idle'}
           <div class="bg-brand-accent/10 border border-brand-accent/30 rounded-xl p-4 flex items-center justify-between gap-4 anim-card-materialize">
             <div class="flex items-center gap-3 min-w-0">
@@ -513,7 +503,6 @@
           </div>
         {/if}
 
-        <!-- Toggle Controls -->
         <div class="space-y-4 pt-2 border-t border-brand-border/50">
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">
@@ -544,7 +533,6 @@
         </div>
       </div>
     {:else if settingsTab === "folders"}
-      <!-- Watched Folders Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="pb-3 flex justify-between items-center">
           <div class="flex items-center gap-3">
@@ -568,7 +556,6 @@
           </div>
         {/if}
 
-        <!-- Folders List -->
         <div class="space-y-2">
           {#each collectionStore.directories as dir}
             <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
@@ -609,7 +596,6 @@
         </div>
       </div>
 
-      <!-- Library Scanning & Maintenance Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="pb-3 flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -623,7 +609,6 @@
           </div>
         </div>
 
-        <!-- Scan Status & Progress Bar (when scanning) -->
         {#if collectionStore.isScanning}
           <div class="bg-brand-main/60 border border-brand-accent/30 rounded-xl p-4 space-y-2">
             <div class="flex justify-between items-center text-xs font-semibold text-brand-text-primary">
@@ -643,7 +628,6 @@
           </div>
         {/if}
 
-        <!-- Manual Action Buttons -->
         <div class="flex flex-wrap items-center gap-3">
           <Button
             onclick={() => collectionStore.startScan(false)}
@@ -668,9 +652,7 @@
           </Button>
         </div>
 
-        <!-- Configuration Toggles -->
         <div class="pt-3 space-y-4">
-          <!-- Real-time Folder Watching -->
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
@@ -683,7 +665,6 @@
             />
           </div>
 
-          <!-- Rescan on Startup -->
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
@@ -697,7 +678,6 @@
           </div>
         </div>
 
-        <!-- Library Stats & Last Scan Summary -->
         <div class="pt-3 border-t border-brand-border/50 space-y-3">
           {#if collectionStore.lastScanTime}
             <div class="text-xs text-brand-text-secondary flex items-center justify-between font-medium">
@@ -729,7 +709,6 @@
       </div>
       </div>
     {:else if settingsTab === "tools"}
-      <!-- Tools Section -->
       <OrganizeFiles embedded songIds={[]} initialScope="library" refreshKey={organizeRefreshKey} />
 
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
@@ -746,7 +725,6 @@
         </div>
       </div>
 
-      <!-- AcoustID Integration Section -->
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="pb-3 flex justify-between items-center">
           <div class="flex items-center gap-3">
@@ -798,7 +776,6 @@
         </div>
       </div>
     {:else if settingsTab === "themes"}
-      <!-- UI Themes Section -->
       <div class="space-y-6">
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-6">
         <div class="pb-1 flex justify-between items-center">
@@ -813,7 +790,6 @@
           </div>
         </div>
 
-        <!-- Dynamic Themes Section -->
         <div>
           <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.dynamicThemes', {}, 'Dynamic Themes')}</h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -856,7 +832,6 @@
           </div>
         </div>
 
-        <!-- Predefined Themes Section -->
         <div>
           <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes', {}, 'Predefined Themes')}</h4>
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -933,7 +908,6 @@
         {/if}
         </div>
 
-        <!-- Custom Theme Builder Form -->
         <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
           <div class="flex items-center justify-between border-b border-brand-border pb-3">
             <div class="flex items-center gap-3">
@@ -1052,12 +1026,9 @@
         </div>
       </div>
     {:else if settingsTab === "equalizer"}
-      <!-- Equalizer Section -->
       <Equalizer />
     {:else if settingsTab === "about"}
-      <!-- About & Credits Section -->
       <div class="space-y-6 max-w-4xl">
-        <!-- Hero Header -->
         <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 shadow-md">
           <img src="/app-icon.svg" alt="Luminous Logo" class="w-20 h-20 shrink-0 drop-shadow-md" />
           <div class="space-y-2 text-center md:text-left flex-1 min-w-0">
@@ -1079,7 +1050,6 @@
           </div>
         </div>
 
-        <!-- External Links / Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onclick={() => openExternalUrl("https://esoltys.dev/luminous")}
@@ -1162,7 +1132,6 @@
           </button>
         </div>
 
-        <!-- Tech Stack Breakdown -->
         <div class="bg-brand-sidebar border border-brand-border rounded-2xl p-6 space-y-4">
           <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase border-b border-brand-border pb-2">
             {i18n.t('settings.aboutCoreTech')}
