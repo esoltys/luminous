@@ -114,6 +114,8 @@ describe("Equalizer.svelte", () => {
     });
 
     await fireEvent.click(loudnessToggle!);
-    expect(invoke).toHaveBeenCalledWith("set_loudness_enabled", { enabled: true });
+    expect(invoke).toHaveBeenCalledWith("set_loudness_settings", {
+      settings: { enabled: true, target_lufs: -18.0, mode: "track", fallback_gain_db: -6.0 },
+    });
   });
 });

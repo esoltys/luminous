@@ -3,8 +3,13 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<String, String> {
-    eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}");
+pub async fn get_lyrics(
+    state: State<'_, AppState>,
+    song_id: i64,
+    force_refresh: Option<bool>,
+) -> Result<String, String> {
+    let force_refresh = force_refresh.unwrap_or(false);
+    eprintln!("[Luminous Backend] get_lyrics called for song_id: {song_id}, force_refresh: {force_refresh}");
 
     // 1. Check database cache and instrumental flag
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
@@ -29,8 +34,8 @@ pub async fn get_lyrics(state: State<'_, AppState>, song_id: i64) -> Result<Stri
             let has_plain_marker = lyrics.starts_with("[synced:false]");
 
             // If the cached lyrics are synced LRC, or if we have already checked online and marked it unsynced,
-            // return immediately without hitting the network!
-            if is_synced || has_plain_marker {
+            // return immediately without hitting the network! Skipped entirely on a forced refresh.
+            if !force_refresh && (is_synced || has_plain_marker) {
                 eprintln!(
                     "[Luminous Backend] Cache hit in SQLite. Returning cached lyrics (len: {}, synced: {is_synced}, marked_unsynced: {has_plain_marker})",
                     lyrics.len()

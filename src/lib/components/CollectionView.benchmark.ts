@@ -41,9 +41,9 @@ vi.mock("@tauri-apps/api/core", () => {
 
   return {
     invoke: vi.fn().mockImplementation(async (cmd, args: any) => {
-      if (cmd === "get_songs") return mockSongs;
-      if (cmd === "get_albums") return mockAlbums;
-      if (cmd === "get_artists") return mockArtists;
+      if (cmd === "get_library_snapshot") {
+        return { songs: mockSongs, albums: mockAlbums, artists: mockArtists };
+      }
       if (cmd === "get_playlists") return [];
       if (cmd === "search_songs") {
         const q = (args?.query || "").toLowerCase();

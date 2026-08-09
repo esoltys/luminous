@@ -1,4 +1,4 @@
-use crate::models::{LoudnessMode, LoudnessSettings};
+use crate::models::LoudnessSettings;
 use crate::AppState;
 use tauri::State;
 
@@ -7,46 +7,16 @@ pub async fn get_loudness_settings(state: State<'_, AppState>) -> Result<Loudnes
     crate::loudness::get_settings(&state.db).map_err(|e| e.to_string())
 }
 
+/// Persists the full loudness settings struct in one call and refreshes the
+/// live gain — mirrors `set_fade_settings` (`commands/settings.rs`), which
+/// takes its whole settings struct rather than exposing a setter per field.
 #[tauri::command]
-pub async fn set_loudness_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
-    let mut settings = crate::loudness::get_settings(&state.db).map_err(|e| e.to_string())?;
-    settings.enabled = enabled;
-    crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
-    state.player.lock().await.refresh_loudness_gain().await;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn set_loudness_target_lufs(
+pub async fn set_loudness_settings(
     state: State<'_, AppState>,
-    target_lufs: f32,
+    mut settings: LoudnessSettings,
 ) -> Result<(), String> {
-    let mut settings = crate::loudness::get_settings(&state.db).map_err(|e| e.to_string())?;
-    settings.target_lufs = target_lufs.clamp(-24.0, -14.0);
-    crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
-    state.player.lock().await.refresh_loudness_gain().await;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn set_loudness_mode(
-    state: State<'_, AppState>,
-    mode: LoudnessMode,
-) -> Result<(), String> {
-    let mut settings = crate::loudness::get_settings(&state.db).map_err(|e| e.to_string())?;
-    settings.mode = mode;
-    crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
-    state.player.lock().await.refresh_loudness_gain().await;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn set_loudness_fallback_gain(
-    state: State<'_, AppState>,
-    fallback_gain_db: f32,
-) -> Result<(), String> {
-    let mut settings = crate::loudness::get_settings(&state.db).map_err(|e| e.to_string())?;
-    settings.fallback_gain_db = fallback_gain_db.clamp(-24.0, 0.0);
+    settings.target_lufs = settings.target_lufs.clamp(-24.0, -14.0);
+    settings.fallback_gain_db = settings.fallback_gain_db.clamp(-24.0, 0.0);
     crate::loudness::save_settings(&state.db, &settings).map_err(|e| e.to_string())?;
     state.player.lock().await.refresh_loudness_gain().await;
     Ok(())

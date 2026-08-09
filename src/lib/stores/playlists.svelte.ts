@@ -245,24 +245,16 @@ class PlaylistsStore {
    * `playlistId`. Takes the target playlist id explicitly rather than
    * re-resolving "the Queue" via `requireQueue()` — that lookup can
    * disagree with whichever playlist the caller actually means (e.g. is
-   * already viewing), and always resolves `uuid`'s position from a fresh
-   * `get_playlist_tracks` fetch rather than trusting a caller-supplied
-   * index, since the Queue can be trimmed in the background (see
-   * `syncQueueTrackPosition`) between when a position is read on the
-   * frontend and when a trim actually runs — an index captured too early
-   * would otherwise cut the wrong rows. */
+   * already viewing). The backend resolves `uuid`'s position and removes
+   * it in one atomic call, so there's no gap for the Queue to change shape
+   * between reading a position and cutting it. */
   async trimQueueBeforeUuid(playlistId: number, uuid: string) {
     try {
-      const existingItems: PlaylistItem[] = await invoke("get_playlist_tracks", { playlistId });
-      const index = existingItems.findIndex((i) => i.uuid === uuid);
-      if (index > 0) {
-        const uuidsToRemove = existingItems.slice(0, index).map((i) => i.uuid);
-        await invoke("remove_from_playlist", { playlistId, uuids: uuidsToRemove });
-        if (this.activePlaylistId === playlistId) {
-          await this.selectPlaylist(playlistId);
-        }
-        await this.refreshPlaylists();
+      await invoke("trim_playlist_before_uuid", { playlistId, uuid });
+      if (this.activePlaylistId === playlistId) {
+        await this.selectPlaylist(playlistId);
       }
+      await this.refreshPlaylists();
     } catch (err) {
       console.error("Failed to trim Queue tracks before uuid:", err);
     }
@@ -345,34 +337,15 @@ class PlaylistsStore {
   }
 
   async deduplicatePlaylist(playlistId: number) {
-    const tracks = this.activePlaylistId === playlistId
-      ? this.activePlaylistTracks
-      : await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId });
-    
-    const seen = new Set<string>();
-    const duplicateUuids: string[] = [];
-
-    for (const item of tracks) {
-      let key = "";
-      if (item.song?.id) {
-        key = `song-${item.song.id}`;
-      } else if (item.song?.title && item.song?.artist) {
-        key = `meta-${item.song.title.toLowerCase().trim()}-${item.song.artist.toLowerCase().trim()}`;
-      } else if (item.url) {
-        key = `url-${item.url}`;
-      } else {
-        key = `uuid-${item.uuid}`;
+    // The backend detects duplicates and mirrors the removal into the live
+    // playback queue in the same call (see removeItemsFromPlaylist).
+    const removedUuids = await invoke<string[]>("deduplicate_playlist", { playlistId });
+    if (removedUuids.length > 0) {
+      await this.refreshPlaylists(); // update track counts FIRST
+      const qPl = this.queuePlaylist;
+      if (this.activePlaylistId === playlistId || (qPl && playlistId === qPl.id)) {
+        await this.selectPlaylist(playlistId);
       }
-
-      if (seen.has(key)) {
-        duplicateUuids.push(item.uuid);
-      } else {
-        seen.add(key);
-      }
-    }
-
-    if (duplicateUuids.length > 0) {
-      await this.removeItemsFromPlaylist(playlistId, duplicateUuids);
     }
   }
 
