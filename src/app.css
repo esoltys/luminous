@@ -145,7 +145,7 @@
  * (specular edge, as if light is catching the glass) + a soft elevation
  * shadow + a low-opacity accent-colored glow around the panel.
  */
-:global(.glass-surface) {
+.glass-surface {
   position: relative;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
@@ -159,14 +159,14 @@
   transform: translateZ(0);
 }
 
-:global(.bg-brand-sidebar.glass-surface),
-:global(aside.glass-surface),
-:global(header.glass-surface) {
+.bg-brand-sidebar.glass-surface,
+aside.glass-surface,
+header.glass-surface {
   background-color: var(--glass-bg-sidebar) !important;
 }
 
-:global(.bg-brand-playerbar.glass-surface),
-:global(footer.glass-surface) {
+.bg-brand-playerbar.glass-surface,
+footer.glass-surface {
   background-color: var(--glass-bg-playerbar) !important;
 }
 
