@@ -148,13 +148,3 @@ harness = false
 [[test]]
 name = "design_tools_bdd"
 harness = false
-
-
-[profile.release]
-panic = "abort"
-codegen-units = 1
-opt-level = "s"   # optimize for size in release builds
-
-[profile.dev]
-opt-level = 0
-debug = true
