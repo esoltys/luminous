@@ -98,7 +98,11 @@ impl CollectionScanner {
         Self { db }
     }
 
-    /// Add a directory to the watched list.
+    /// Register `path` as a watched music directory. Silently a no-op (not
+    /// an error) if it's already registered. Doesn't itself scan for
+    /// songs — the caller (`commands::collection::add_directory`) separately
+    /// (re)starts the file watcher, and the frontend triggers the initial
+    /// scan.
     pub fn add_directory(&self, path: &str) -> Result<MusicDirectory> {
         let conn = self.db.pool.get()?;
         conn.execute(
@@ -835,7 +839,8 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Get all songs, optionally filtered by source.
+    /// Paginated library listing — every available local/collection song
+    /// (not streaming sources), ordered by album artist/album/disc/track.
     pub fn get_songs(&self, limit: i64, offset: i64) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -871,6 +876,10 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Matches on the *effective* artist (album_artist, falling back to
+    /// artist), same as the "by artist" grouping used elsewhere — a plain
+    /// `artist` column match would miss compilation tracks credited to a
+    /// different per-track artist under a shared album_artist.
     pub fn get_songs_by_artist(&self, artist: &str) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -1067,6 +1076,10 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// One aggregated entry per distinct `album` value across the whole
+    /// library (untyped JSON, not a `Song`/`AlbumItem` — see the query below
+    /// for the exact field set), each summarizing every track that shares
+    /// that album name regardless of which artist tagged it.
     pub fn get_albums(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Group only by album name so that tracks with different per-track artists
@@ -1129,6 +1142,9 @@ impl CollectionScanner {
         Ok(albums)
     }
 
+    /// One aggregated entry per effective artist (album_artist, falling back
+    /// to artist) across the library — untyped JSON, see the query below for
+    /// the exact field set.
     pub fn get_artists(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Artists are grouped case-insensitively (COLLATE NOCASE) so that tag-casing
@@ -1277,6 +1293,12 @@ impl CollectionScanner {
         Ok(stats)
     }
 
+    /// Flat list of the `limit` most recently played distinct songs, one row
+    /// per song regardless of how many times or contexts it was played in.
+    /// Unlike `get_recently_played`, this doesn't group by playback context
+    /// into Album/Playlist/Song cards — used where a plain song list is
+    /// wanted (e.g. building a "Recently Played" auto-playlist) rather than
+    /// Home-screen cards.
     pub fn get_recently_played_songs(&self, limit: i64) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -1311,6 +1333,11 @@ impl CollectionScanner {
     /// See `play_history` (migration 10) and `PlayContext`.
     pub fn get_recently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
+        // Every track of an album collapses into a single Album card, so
+        // `limit` raw song rows can produce far fewer than `limit` HomeItems.
+        // 20x is a heuristic overfetch so grouping still has enough rows to
+        // reach `limit` items for a normal-sized library; it isn't a
+        // guarantee for pathological cases (e.g. one giant album).
         let query_limit = limit * 20;
         let sql = format!(
             "SELECT {HOME_ITEM_SELECT_COLS}, ph.context_type, ph.playlist_id
@@ -1446,8 +1473,12 @@ impl CollectionScanner {
         Ok(items)
     }
 
+    /// Recently added songs grouped into Album cards where an album's other
+    /// tracks were also added together, or standalone Song cards otherwise —
+    /// same grouping mechanism as `get_recently_played`, see its comments.
     pub fn get_recently_added(&self, limit: i64) -> Result<Vec<HomeItem>> {
         let conn = self.db.pool.get()?;
+        // See get_recently_played's identical overfetch-then-group comment.
         let query_limit = limit * 20;
         let sql = format!(
             "SELECT {HOME_ITEM_SELECT_COLS}
@@ -2793,6 +2824,10 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
         .expect("failed to spawn watcher thread");
 }
 
+/// Parse a decade label like `"1990s"`/`"1990"` into its inclusive year
+/// bounds `(1990, 1999)` for a decade auto-playlist's year filter. The
+/// input year is floored to its decade regardless of which year within the
+/// decade was passed (e.g. `"1995"` also yields `(1990, 1999)`).
 pub fn parse_decade_range(decade: &str) -> Option<(i32, i32)> {
     let clean = decade.trim().trim_end_matches(['s', 'S']);
     let year: i32 = clean.parse().ok()?;

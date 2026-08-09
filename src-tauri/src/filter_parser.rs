@@ -1,8 +1,24 @@
-//! Filter Parser module — parses search expressions with field-specific comparators.
+//! Grammar and parser for advanced-search / smart-playlist query strings,
+//! consumed by `collection.rs`'s song search.
+//!
+//! A query is whitespace-separated tokens (quote with `"`/`'` to include a
+//! space in a term). Each token is either a bare full-text term, or a
+//! `field:value` filter where `field` is a known song attribute (see the
+//! match in `parse_field_filter` for the full alias list, e.g.
+//! `plays`/`play_count` both mean `playcount`). `value` may be prefixed with
+//! a comparator (`>`, `>=`, `<`, `<=`, `!=`, `=`); if omitted, the default is
+//! `=` for numeric fields and a substring `LIKE` match for text fields.
+//! Ranges aren't a single-token construct — `bpm:>=120 bpm:<=130` is two
+//! filters ANDed together, same as any two field filters. Unrecognized
+//! fields are silently dropped (not an error) rather than falling back to a
+//! bare-term match.
 
 use rusqlite::types::{ToSqlOutput, Value as SqlValue};
 use rusqlite::ToSql;
 
+/// SQL comparison operator for a field filter. `Contains` always renders as
+/// `LIKE` — the caller is responsible for wrapping the value in `%...%`
+/// (see `parse_field_filter`), this only emits the SQL keyword.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Eq,
@@ -28,6 +44,9 @@ impl Op {
     }
 }
 
+/// A parsed filter's right-hand-side value, already coerced to the SQL type
+/// its column expects (see `ToSql` impl below) — `Text` values destined for
+/// a `Contains` filter already carry the `%...%` wrapping.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterValue {
     Text(String),
@@ -45,6 +64,10 @@ impl ToSql for FilterValue {
     }
 }
 
+/// One `field:value` filter, ready to splice into a SQL `WHERE` clause as
+/// `{sql_column} {op.to_sql()} ?` with `value` bound as the parameter.
+/// `field` is the user-facing alias as typed (kept for round-tripping in
+/// smart-playlist rule UIs); `sql_column` is the resolved real column name.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldFilter {
     pub field: String,
@@ -54,13 +77,21 @@ pub struct FieldFilter {
     pub value: FilterValue,
 }
 
+/// A query split into its two independent match modes: `bare_terms` (ANDed
+/// full-text substring matches against title/artist/album) and
+/// `field_filters` (ANDed structured comparisons). Both lists apply
+/// together — there's no OR between terms or filters.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParsedQuery {
     pub bare_terms: Vec<String>,
     pub field_filters: Vec<FieldFilter>,
 }
 
-/// Parse a raw search query string into bare full-text search terms and field-specific filter comparators.
+/// Parse a raw search-box or smart-playlist-rule string per the grammar
+/// documented at the top of this module. Never fails — tokens that don't
+/// parse as a recognized `field:value` filter are treated as bare terms
+/// instead (quotes stripped), so malformed input degrades to a plain-text
+/// search rather than being rejected.
 pub fn parse_query(raw_query: &str) -> ParsedQuery {
     let mut parsed = ParsedQuery::default();
     let tokens = tokenize(raw_query);
@@ -194,6 +225,11 @@ fn parse_op_and_value(val_str: &str, is_numeric: bool) -> (Op, &str) {
     }
 }
 
+/// Parse a duration filter value as nanoseconds, matching `songs.length_nanosec`'s
+/// unit. Accepts a bare integer of seconds, or `MM:SS`/`H:MM:SS` — the same
+/// shorthand a user would type for a track length. Returns `None` on
+/// anything else, which `parse_field_filter` propagates up so the whole
+/// token falls back to a bare-term match instead of a duration filter.
 pub fn parse_duration_ns(s: &str) -> Option<i64> {
     if s.contains(':') {
         let parts: Vec<&str> = s.split(':').collect();

@@ -1,5 +1,5 @@
 // scripts/sync-docs.ts
-// Syncs the locale-specific user guides (and their shared assets) from docs/ into
+// Syncs the locale-specific user guides (and their shared assets) from docs/user-guide/ into
 // static/ so the Help view can load them directly (see .gitignore for the generated paths).
 import * as fs from "fs";
 import * as path from "path";
@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
-const docsDir = path.join(rootDir, "docs");
+const userGuideDir = path.join(rootDir, "docs", "user-guide");
 const staticDir = path.join(rootDir, "static");
 
 function copyDir(src: string, dest: string) {
@@ -32,14 +32,14 @@ const HTML_COPIES: Array<[string, string]> = [
 const ASSET_COPIES = ["support.js", "image-slot.js", "luminous-mark.svg", "expose-700.woff2"];
 
 for (const [src, dest] of HTML_COPIES) {
-  fs.copyFileSync(path.join(docsDir, src), path.join(staticDir, dest));
+  fs.copyFileSync(path.join(userGuideDir, src), path.join(staticDir, dest));
 }
 
 for (const asset of ASSET_COPIES) {
-  fs.copyFileSync(path.join(docsDir, asset), path.join(staticDir, asset));
+  fs.copyFileSync(path.join(userGuideDir, asset), path.join(staticDir, asset));
 }
 
-copyDir(path.join(docsDir, "screenshots"), path.join(staticDir, "screenshots"));
-copyDir(path.join(docsDir, "assets"), path.join(staticDir, "assets"));
+copyDir(path.join(userGuideDir, "screenshots"), path.join(staticDir, "screenshots"));
+copyDir(path.join(userGuideDir, "assets"), path.join(staticDir, "assets"));
 
 console.log("[sync-docs] Synced user guides and assets into static/");
