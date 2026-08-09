@@ -163,48 +163,98 @@ pub async fn add_to_playlist(
         .map_err(|e| e.to_string())
 }
 
+/// Removes rows from a playlist and mirrors the removal into the live play
+/// queue in one call. The live-queue side is keyed by item UUID, which is
+/// never shared across playlists, so it's a safe no-op whenever `playlist_id`
+/// isn't the Queue or these UUIDs aren't currently loaded — callers no
+/// longer need to separately pair this with a live-queue removal.
 #[tauri::command]
 pub async fn remove_from_playlist(
     playlist_id: i64,
     uuids: Vec<String>,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    use tauri::Emitter;
+
     state
         .playlists
         .lock()
         .await
         .remove_from_playlist(playlist_id, &uuids)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    let mut player = state.player.lock().await;
+    player.remove_songs_from_playlist_items(&uuids);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+
+    Ok(())
 }
 
+/// Reorders a playlist row and mirrors the move into the live play queue in
+/// one call. The live-queue side is keyed by item UUID (never shared across
+/// playlists), so it's a safe no-op whenever `playlist_id` isn't the Queue
+/// or either UUID isn't currently loaded.
 #[tauri::command]
 pub async fn reorder_playlist_item_by_uuid(
     playlist_id: i64,
     source_uuid: String,
     target_uuid: String,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    use tauri::Emitter;
+
     state
         .playlists
         .lock()
         .await
         .reorder_playlist_item_by_uuid(playlist_id, &source_uuid, &target_uuid)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    let mut player = state.player.lock().await;
+    player.reorder_playlist_item_by_uuid(&source_uuid, &target_uuid);
+    let playback_state = player.get_state().await;
+    let _ = app.emit("playback-state", playback_state);
+
+    Ok(())
 }
 
+/// Reorders a playlist row and, only when `playlist_id` is the Queue, mirrors
+/// the move into the live play queue by index. Unlike the UUID-keyed reorder
+/// above, an index pair is meaningless outside the playlist it was computed
+/// against, so this check (rather than an unconditional call) is required to
+/// avoid corrupting live playback when editing an unrelated playlist.
 #[tauri::command]
 pub async fn reorder_playlist_item(
     playlist_id: i64,
     from: i32,
     to: i32,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .reorder_playlist_item(playlist_id, from, to)
-        .map_err(|e| e.to_string())
+    use tauri::Emitter;
+
+    let is_queue = {
+        let mut playlists = state.playlists.lock().await;
+        playlists
+            .reorder_playlist_item(playlist_id, from, to)
+            .map_err(|e| e.to_string())?;
+        playlists
+            .queue()
+            .map(|q| q.id == playlist_id)
+            .unwrap_or(false)
+    };
+
+    if is_queue {
+        let mut player = state.player.lock().await;
+        player.reorder_playlist_items(from as usize, to as usize);
+        let playback_state = player.get_state().await;
+        let _ = app.emit("playback-state", playback_state);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -222,14 +272,37 @@ pub async fn reorder_playlist_items(
         .map_err(|e| e.to_string())
 }
 
+/// Clears a playlist's rows and, only when `playlist_id` is the Queue, also
+/// clears the live play queue. `Player::clear_playlist_items` has no target
+/// scoping of its own (it just wipes everything), so this check is required
+/// to avoid stopping live playback when clearing an unrelated playlist.
 #[tauri::command]
-pub async fn clear_playlist(playlist_id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .playlists
-        .lock()
-        .await
-        .clear_playlist(playlist_id)
-        .map_err(|e| e.to_string())
+pub async fn clear_playlist(
+    playlist_id: i64,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use tauri::Emitter;
+
+    let is_queue = {
+        let mut playlists = state.playlists.lock().await;
+        playlists
+            .clear_playlist(playlist_id)
+            .map_err(|e| e.to_string())?;
+        playlists
+            .queue()
+            .map(|q| q.id == playlist_id)
+            .unwrap_or(false)
+    };
+
+    if is_queue {
+        let mut player = state.player.lock().await;
+        player.clear_playlist_items();
+        let playback_state = player.get_state().await;
+        let _ = app.emit("playback-state", playback_state);
+    }
+
+    Ok(())
 }
 
 /// Returns whether an op was actually undone — `false` means the stack was
