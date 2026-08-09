@@ -1,6 +1,22 @@
+//! Detects how this build was installed, so the frontend updater can decide
+//! whether an in-app update is possible or the user must update through
+//! their package manager/app store instead.
+//!
+//! Detection is best-effort heuristics (env vars set by AppImage/Flatpak/
+//! Snap runners, and installation path conventions for system packages) —
+//! there's no authoritative "installed via X" marker on any platform, so a
+//! result of `linux_generic`/fallthrough just means none of the known
+//! signals matched, not that detection failed.
+
 use serde::Serialize;
 use std::env;
 
+/// `format` is a stable machine-readable id (used by `updater.test.ts` and
+/// other call sites that branch on it); `human_name` is the user-facing
+/// label. `supports_self_update` gates whether the frontend offers in-app
+/// updates (`FoldersView.svelte`) — false for anything managed by an
+/// external package manager (deb/rpm/flatpak/snap), which would just have
+/// its files overwritten out from under it, or reverted, by a self-update.
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallFormatInfo {
     pub format: String,
@@ -13,6 +29,12 @@ pub fn get_install_format() -> InstallFormatInfo {
     detect_install_format()
 }
 
+/// Checked in order: packaging-runtime env vars (AppImage/Flatpak/Snap),
+/// then — on Linux only — whether the executable lives under `/usr/` with a
+/// distro release file present, indicating a native deb/rpm install. On
+/// Windows every path currently resolves to the same installer info (both
+/// branches return identical values) since NSIS/MSI is the only shipped
+/// distribution today.
 pub fn detect_install_format() -> InstallFormatInfo {
     #[cfg(target_os = "linux")]
     {

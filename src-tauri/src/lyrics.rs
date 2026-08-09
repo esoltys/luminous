@@ -1,8 +1,14 @@
+//! Online lyrics lookup — tries LRCLIB (synced `.lrc` lyrics, preferred)
+//! before falling back to Lyrics.ovh (plain text only). See
+//! `LyricsManager::fetch_lyrics` for the fallback chain.
+
 use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
 
+/// Deserialized LRCLIB `/api/get` response. `_id` is unused but kept so
+/// `#[derive(Deserialize)]` doesn't reject the field the API sends.
 #[derive(Deserialize, Debug)]
 pub struct LrcLibResponse {
     pub _id: Option<i64>,
@@ -12,11 +18,15 @@ pub struct LrcLibResponse {
     pub plain_lyrics: Option<String>,
 }
 
+/// Deserialized Lyrics.ovh response — plain text only, no sync timestamps.
 #[derive(Deserialize, Debug)]
 pub struct LyricsOvhResponse {
     pub lyrics: Option<String>,
 }
 
+/// Holds the shared HTTP client used for every provider request. Cheap to
+/// construct (no state beyond the client), so callers can create one
+/// per-lookup rather than needing to share an instance.
 pub struct LyricsManager {
     client: Client,
 }
@@ -38,7 +48,12 @@ impl LyricsManager {
         }
     }
 
-    /// Primary search chain: query LRCLIB (for synced/plain), fallback to Lyrics.ovh (for plain).
+    /// Search LRCLIB and Lyrics.ovh in priority order, returning the first
+    /// **synced** result found (short-circuits immediately). If none of the
+    /// providers return synced lyrics, falls back to whichever plain-text
+    /// result was found first rather than failing outright. Errs only if
+    /// every provider — including retries with the title's "(feat. ...)"
+    /// annotation stripped — comes back empty.
     pub async fn fetch_lyrics(
         &self,
         artist: &str,
@@ -172,6 +187,10 @@ impl LyricsManager {
     }
 }
 
+/// Strip a trailing "(feat. ...)"/"[ft. ...]" annotation from a title.
+/// Lyrics providers index by the recording's canonical title, which usually
+/// omits featured-artist credits, so searching with the raw tagged title
+/// often misses a match that searching with the cleaned title finds.
 pub fn clean_featured_title(title: &str) -> String {
     let mut cleaned = title.to_string();
     let lower = cleaned.to_lowercase();
@@ -184,6 +203,11 @@ pub fn clean_featured_title(title: &str) -> String {
     cleaned.trim().to_string()
 }
 
+/// True if `text` contains at least one LRC timestamp tag (`[MM:SS`).
+/// Used to distinguish synced lyrics from plain text regardless of which
+/// provider they came from, since Lyrics.ovh's plain-only response and
+/// LRCLIB's `plain_lyrics` field share the same `String` shape as synced
+/// lyrics once unwrapped.
 pub fn is_synced_lrc(text: &str) -> bool {
     let bytes = text.as_bytes();
     if bytes.len() < 6 {

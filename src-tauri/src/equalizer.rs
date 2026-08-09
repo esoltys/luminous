@@ -358,6 +358,15 @@ impl Equalizer {
         }
     }
 
+    /// Re-tune the filter cascade for the output device's actual sample
+    /// rate/channel count. Called by `audio.rs`'s `build_output` whenever
+    /// the CPAL output stream is (re)built — lazily for the first track a
+    /// decode thread ever plays, and again if the output device changes —
+    /// not on every track, since the stream (and its format) stays open
+    /// across ordinary track changes. A channel-count change reallocates the
+    /// whole cascade — new `BiquadFilter`s start with zeroed state memory —
+    /// but a sample-rate-only change just recomputes coefficients in place,
+    /// leaving each filter's existing `x1/x2/y1/y2` state as-is.
     pub fn update_format(&mut self, sample_rate: u32, channels: usize) {
         let mut changed = false;
         if self.sample_rate != sample_rate {
@@ -430,6 +439,9 @@ impl Equalizer {
         EqualizerConfig::snapshot(self)
     }
 
+    /// Replace the 10 graphic-mode band gains wholesale (e.g. from a named
+    /// preset). For applying the same presets under parametric mode, see
+    /// `load_preset_into_parametric`.
     pub fn load_preset(&mut self, gains: [f32; 10]) {
         self.gains = gains;
         self.recalculate();
@@ -447,6 +459,10 @@ impl Equalizer {
         self.recalculate();
     }
 
+    /// Replace all 20 parametric bands wholesale — unlike
+    /// `set_parametric_band`, this also accepts new center frequencies
+    /// (clamped to `PARAMETRIC_FREQ_MIN..=PARAMETRIC_FREQ_MAX`), since a full
+    /// load can come from a saved user layout rather than just a gain tweak.
     pub fn load_parametric(&mut self, bands: [ParametricBand; PARAMETRIC_BAND_COUNT]) {
         for (idx, band) in bands.iter().enumerate() {
             self.parametric[idx] = ParametricBand {
@@ -492,6 +508,12 @@ impl Equalizer {
         }
     }
 
+    /// Apply preamp + the active band cascade (graphic or parametric,
+    /// whichever `mode` selects) to `output` in place, sample by sample —
+    /// the EQ stage of the CPAL output callback's per-buffer DSP chain (see
+    /// `audio.rs`'s module doc). A no-op when `enabled` is false. Each
+    /// output sample is hard-clamped to `[-1.0, 1.0]` afterward as a safety
+    /// net against a high preamp/band gain combination clipping.
     pub fn process_interleaved(&mut self, output: &mut [f32]) {
         if !self.enabled {
             return;

@@ -105,6 +105,11 @@ pub struct Player {
 }
 
 impl Player {
+    /// Construct the player and restore state persisted by
+    /// `persist_current_song`/`persist_position` from a prior run: volume,
+    /// shuffle/repeat mode, and — if the last-played song is still
+    /// available — its playlist context and position, cued into the audio
+    /// engine paused rather than auto-playing.
     pub fn new(db: Arc<Database>, audio: Arc<Mutex<AudioEngine>>) -> Self {
         let mut volume = 1.0f32;
         let mut shuffle_mode = ShuffleMode::Off;
@@ -324,6 +329,11 @@ impl Player {
         player
     }
 
+    /// Whether `playlist_id` is the app's built-in Queue playlist rather than
+    /// a regular/auto playlist — playing from the Queue doesn't set a
+    /// "playing from playlist X" context (see `current_play_context` below),
+    /// since the Queue *is* the current play session, not something you're
+    /// playing "from".
     pub fn is_queue_playlist(&self, playlist_id: i64) -> bool {
         if playlist_id <= 0 {
             return false;
@@ -714,6 +724,12 @@ impl Player {
         }
     }
 
+    /// Write the current song/playlist/queue-item identity to `app_state` so
+    /// playback can resume across an app restart (see `Player::new`'s
+    /// startup restore). `None` fields clear their key rather than leaving a
+    /// stale value behind. Called on every track change; separate from
+    /// `persist_position`, which `lib.rs` also calls periodically on its own
+    /// while a track just keeps playing.
     pub fn persist_current_song(&self) {
         if let Ok(conn) = self._db.pool.get() {
             if let Some(song) = &self.current_song {
@@ -745,6 +761,10 @@ impl Player {
         }
     }
 
+    /// Write the current playback position to `app_state` for restart
+    /// restore. Called on every seek/pause/track-change and, while a track
+    /// keeps playing, periodically by `lib.rs`'s position-tick loop —
+    /// intentionally cheap (one `INSERT OR REPLACE`) since it runs often.
     pub fn persist_position(&self, position_nanosec: u64) {
         if let Ok(conn) = self._db.pool.get() {
             let _ = conn.execute(
@@ -835,6 +855,11 @@ impl Player {
         }
     }
 
+    /// Sync `is_instrumental` into this song's in-memory copies (current
+    /// song, cached playlist items) after the DB row has already been
+    /// updated elsewhere (`commands::lyrics::set_instrumental`) — the
+    /// Player holds its own `Song` copies rather than re-querying the DB on
+    /// every read, so a direct DB write alone wouldn't be reflected here.
     pub fn update_song_instrumental(&mut self, song_id: i64, is_instrumental: bool) {
         if let Some(ref mut song) = self.current_song {
             if song.id == song_id {
@@ -1021,6 +1046,11 @@ impl Player {
         Ok(())
     }
 
+    /// Advance playback: first drains any "play next" `queue` entries
+    /// (skipping ones that became unplayable), and only once that's empty
+    /// falls back to the normal shuffle/repeat-aware playlist advance. This
+    /// `queue` is the ad-hoc "play next" list, unrelated to the persistent
+    /// Queue *playlist* (`is_queue_playlist`).
     pub async fn next_track(&mut self) -> Result<()> {
         while let Some(front) = self.queue.front() {
             if Self::is_item_playable(front) {
@@ -1053,6 +1083,9 @@ impl Player {
         }
     }
 
+    /// Go back a track: in shuffle mode, walks back through actual play
+    /// history (see the comment below on `played_indices`); otherwise steps
+    /// to `current_index - 1` in playlist order.
     pub async fn previous_track(&mut self) -> Result<()> {
         // In shuffle mode, walk back through history (skip unavailable).
         // `play_at_index` pushes every track it plays onto `played_indices`,
@@ -1581,6 +1614,11 @@ impl Player {
         }
     }
 
+    /// The current playlist's items in "up next" order: from the current
+    /// track through the end of `shuffle_order`, which holds identity order
+    /// `[0, 1, 2, ...]` when shuffle is off — so this works the same way
+    /// regardless of shuffle mode. Doesn't wrap around to before the current
+    /// track.
     pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
         let len = self.playlist_items.len();
         if len == 0 {
