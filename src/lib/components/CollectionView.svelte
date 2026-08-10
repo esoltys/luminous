@@ -432,7 +432,7 @@
                 sortField = field as keyof Song;
                 sortAsc = asc === "true";
               }}
-              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
             >
               {#each sortableColumns as col (col.key)}
                 <option value="{col.field}-true">▲ {i18n.t(col.label)}</option>
@@ -1015,7 +1015,7 @@
                     albumSortField = field as "album" | "artist" | "year" | "rating" | "added";
                     albumSortAsc = asc === "true";
                   }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
                 >
                   <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
                   <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
@@ -1038,7 +1038,7 @@
                     artistSortField = field as "name" | "genre" | "song_count";
                     artistSortAsc = asc === "true";
                   }}
-                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                  class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
                 >
                   <option value="name-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
                   <option value="name-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>

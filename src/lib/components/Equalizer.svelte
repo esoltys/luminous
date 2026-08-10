@@ -405,7 +405,7 @@
         <Select
           value={activePreset}
           onchange={(e) => { activePreset = e.currentTarget.value; selectPreset(activePreset); }}
-          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded px-2.5 py-1 pr-6 outline-none focus:border-brand-accent font-medium"
+          class="bg-brand-main text-xs text-brand-text-primary border border-brand-border rounded pl-3.5 pr-6 py-1 outline-none focus:border-brand-accent font-medium"
           chevronPosition="0.375rem"
         >
           {#each presets as preset}

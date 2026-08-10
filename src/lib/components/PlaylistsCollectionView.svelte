@@ -370,7 +370,7 @@
                   autoSortField = field as "name" | "track_count" | "updated";
                   autoSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
                 <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
@@ -387,7 +387,7 @@
                   customSortField = field as "name" | "track_count" | "updated";
                   customSortAsc = asc === "true";
                 }}
-                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
               >
                 <option value="name-true">▲ {i18n.t('playlists.sortLabelName')}</option>
                 <option value="name-false">▼ {i18n.t('playlists.sortLabelName')}</option>
