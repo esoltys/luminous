@@ -402,7 +402,9 @@ class CollectionStore {
   lastExpandedSidebarWidth = $state<number>(256);
   rightPanelWidth = $state<number>(288);
   immersiveMode = $state<boolean>(false);
-  isMiniplayer = $state<boolean>(false);
+  isMiniplayer = $state<boolean>(
+    typeof window !== "undefined" && localStorage.getItem("layout_isMiniplayer") === "true"
+  );
   // Guards enter/exitMiniplayerMode against overlapping calls: isMiniplayer
   // flips synchronously, but the window resize/decoration IPC call it
   // guards is async, so a second toggle fired before that call resolves
@@ -493,9 +495,7 @@ class CollectionStore {
 
         const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
         if (savedIsMiniplayer === "true") {
-          setTimeout(() => {
-            this.enterMiniplayerMode();
-          }, 100);
+          void this.enterMiniplayerMode(true);
         }
 
         const savedTab = localStorage.getItem("navigation_activeTab");
@@ -1004,8 +1004,8 @@ class CollectionStore {
     }
   }
 
-  async enterMiniplayerMode() {
-    if (this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+  async enterMiniplayerMode(force = false) {
+    if ((this.isMiniplayer && !force) || this.miniplayerTransitionInFlight) return;
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = true;
     if (typeof window !== "undefined") {
@@ -1032,8 +1032,8 @@ class CollectionStore {
     }
   }
 
-  async exitMiniplayerMode() {
-    if (!this.isMiniplayer || this.miniplayerTransitionInFlight) return;
+  async exitMiniplayerMode(force = false) {
+    if ((!this.isMiniplayer && !force) || this.miniplayerTransitionInFlight) return;
     this.miniplayerTransitionInFlight = true;
     this.isMiniplayer = false;
     if (typeof window !== "undefined") {
