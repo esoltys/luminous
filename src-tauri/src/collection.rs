@@ -2286,19 +2286,34 @@ pub(crate) fn resolve_case_insensitive_path(path: &Path) -> Option<PathBuf> {
     for component in path.components() {
         match component {
             Component::Normal(name) => {
-                if current.join(name).exists() {
-                    current.push(name);
-                    continue;
-                }
+                // Don't shortcut on `current.join(name).exists()` — on
+                // case-insensitive filesystems (Windows, default macOS) that
+                // returns true even when `name`'s casing doesn't match what's
+                // really on disk, which would defeat the whole point of this
+                // function. Always resolve the real on-disk casing via
+                // `read_dir`, preferring an exact match if one exists.
                 if !current.is_dir() {
                     return None;
                 }
                 let target = name.to_string_lossy().to_lowercase();
-                let entry = std::fs::read_dir(&current)
+                let mut case_insensitive_match = None;
+                let real_name = std::fs::read_dir(&current)
                     .ok()?
                     .filter_map(|e| e.ok())
-                    .find(|e| e.file_name().to_string_lossy().to_lowercase() == target)?;
-                current.push(entry.file_name());
+                    .find_map(|e| {
+                        let entry_name = e.file_name();
+                        if entry_name == name {
+                            return Some(entry_name);
+                        }
+                        if case_insensitive_match.is_none()
+                            && entry_name.to_string_lossy().to_lowercase() == target
+                        {
+                            case_insensitive_match = Some(entry_name);
+                        }
+                        None
+                    })
+                    .or(case_insensitive_match)?;
+                current.push(real_name);
             }
             _ => current.push(component),
         }

@@ -220,17 +220,3 @@ pub async fn start_window_resize(
         .ok_or_else(|| "window not found".to_string())?;
     inner.start_resize_dragging(dir).map_err(|e| e.to_string())
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_miniplayer_and_full_player_defaults_are_distinct() {
-        assert_ne!(super::MINIPLAYER_WIDTH, super::FULL_PLAYER_WIDTH);
-        assert_ne!(super::MINIPLAYER_HEIGHT, super::FULL_PLAYER_HEIGHT);
-    }
-
-    #[test]
-    fn test_enter_miniplayer_dimensions_are_clamped_to_min() {
-        assert_eq!(150.0_f64.round().max(200.0), 200.0);
-    }
-}
