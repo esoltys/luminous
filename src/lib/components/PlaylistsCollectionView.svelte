@@ -322,7 +322,7 @@
           </div>
         {/if}
 
-        <div class="h-9 flex items-center justify-between">
+        <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
             {#if collectionStore.playlistsSubTab === "auto"}
               {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
