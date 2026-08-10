@@ -30,7 +30,8 @@ describe("FoldersView.svelte", () => {
 
   it("renders the version number and build commit hash in the General Settings view", async () => {
     const { findByText } = render(FoldersView);
-    expect(await findByText("v0.75.0#048f421")).toBeInTheDocument();
+    expect(await findByText(/v0\.75\.0/)).toBeInTheDocument();
+    expect(await findByText(/build 048f421/)).toBeInTheDocument();
   });
 
   it("renders Dynamic Themes row and footnotes for Luminous and System in Themes view", async () => {

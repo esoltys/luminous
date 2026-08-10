@@ -36,6 +36,66 @@
       ? Math.min(100, Math.round((updaterStore.downloadProgress.downloaded / updaterStore.downloadProgress.total) * 100))
       : null
   );
+
+  // Ticks every 30s so the "checked N minutes ago" text stays current without a manual refresh.
+  const CHECKED_AGO_TICK_MS = 30_000;
+  let checkedAgoTick = $state(0);
+  $effect(() => {
+    const interval = setInterval(() => { checkedAgoTick++; }, CHECKED_AGO_TICK_MS);
+    return () => clearInterval(interval);
+  });
+
+  let checkedAgoText = $derived.by(() => {
+    checkedAgoTick;
+    if (!updaterStore.lastCheckedAt) return "";
+    const diffMinutes = Math.floor((Date.now() - updaterStore.lastCheckedAt) / 60_000);
+    let relative: string;
+    if (diffMinutes < 1) {
+      relative = i18n.t("playlists.relativeJustNow");
+    } else if (diffMinutes < 60) {
+      relative = diffMinutes === 1
+        ? i18n.t("playlists.relativeOneMinuteAgo")
+        : i18n.t("playlists.relativeMinutesAgo", { count: diffMinutes });
+    } else {
+      const diffHours = Math.floor(diffMinutes / 60);
+      relative = diffHours === 1
+        ? i18n.t("playlists.relativeOneHourAgo")
+        : i18n.t("playlists.relativeHoursAgo", { count: diffHours });
+    }
+    // The playlists.* relative-time strings are capitalized for standalone use (e.g. a
+    // Date Added column); lowercase the leading letter here since we're splicing it mid-sentence.
+    const midSentence = relative.charAt(0).toLocaleLowerCase() + relative.slice(1);
+    return i18n.t("settings.updateLastChecked", { time: midSentence });
+  });
+
+  let versionOnly = $derived(appVersion.split("#")[0] ?? "");
+  let buildHash = $derived(appVersion.includes("#") ? appVersion.split("#")[1] : "");
+
+  let updateHeaderSubtitle = $derived.by(() => {
+    const parts: string[] = [];
+    if (versionOnly) parts.push(`v${versionOnly}`);
+    if (buildHash) parts.push(i18n.t("settings.updateBuildLabel", { hash: buildHash }));
+    if (checkedAgoText) parts.push(checkedAgoText);
+    return parts.join(" · ");
+  });
+
+  let updateHeaderTitle = $derived.by(() => {
+    if (!updaterStore.updateCheckEnabled) return i18n.t("settings.updateChecksDisabledTitle");
+    switch (updaterStore.checkStatus) {
+      case "checking": return i18n.t("settings.updateCheckingTitle");
+      case "error": return i18n.t("settings.updateError");
+      case "available": return i18n.t("settings.updateAvailableTitle", { version: updaterStore.latestVersion });
+      case "up-to-date": return i18n.t("settings.updateUpToDate");
+      default: return i18n.t("settings.appAndUpdatesTitle");
+    }
+  });
+
+  const UPDATE_POLICIES: Array<{ id: "never" | "notify" | "auto"; labelKey: string; hintKey: string }> = [
+    { id: "never", labelKey: "settings.updatePolicyNever", hintKey: "settings.updatePolicyNeverHint" },
+    { id: "notify", labelKey: "settings.updatePolicyNotify", hintKey: "settings.updatePolicyNotifyHint" },
+    { id: "auto", labelKey: "settings.updatePolicyAuto", hintKey: "settings.updatePolicyAutoHint" },
+  ];
+
   $effect(() => {
     const wasChecking = previousCheckStatus === "checking";
     previousCheckStatus = updaterStore.checkStatus;
@@ -372,69 +432,52 @@
         </div>
       </div>
 
-      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-        <div class="pb-3 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-          <div class="flex items-center gap-3">
-            <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-              <Download class="w-5 h-5" />
-            </div>
-            <div class="space-y-1 min-w-0">
-              <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.appAndUpdatesTitle')}</h3>
-              <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.appAndUpdatesSubtitle', {}, 'Manage Luminous version updates and view installation details.')}</p>
-            </div>
-          </div>
-          <div class="flex items-center justify-end gap-3">
-            {#if updaterStore.checkStatus === 'up-to-date'}
-              <div class="text-xs text-brand-text-primary font-medium flex items-center gap-1.5">
-                <span class="relative inline-flex w-4 h-4 shrink-0 items-center justify-center">
+      <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+        <div class="pb-4 border-b border-brand-border/50 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="relative w-9 h-9 rounded-full shrink-0 flex items-center justify-center {
+              updaterStore.checkStatus === 'error' ? 'bg-red-950/30 text-red-400 border border-red-900/30'
+              : updaterStore.checkStatus === 'available' ? 'bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30'
+              : 'bg-brand-accent/15 text-brand-accent-text'
+            }">
+              {#if !updaterStore.updateCheckEnabled}
+                <Download class="w-4.5 h-4.5" />
+              {:else if updaterStore.checkStatus === 'checking'}
+                <RefreshCw class="w-4.5 h-4.5 animate-spin" />
+              {:else if updaterStore.checkStatus === 'error'}
+                <AlertTriangle class="w-4.5 h-4.5" />
+              {:else if updaterStore.checkStatus === 'available'}
+                <ArrowUp class="w-4.5 h-4.5 stroke-[2.5]" />
+              {:else}
+                <span class="relative inline-flex items-center justify-center">
                   {#if justConfirmedUpToDate}
                     <span class="absolute inset-0 rounded-full anim-glow-ring"></span>
                   {/if}
-                  <Check class="w-4 h-4 text-brand-accent {justConfirmedUpToDate ? 'anim-check-pop' : ''}" />
+                  <Check class="w-4.5 h-4.5 {justConfirmedUpToDate ? 'anim-check-pop' : ''}" />
                 </span>
-                {i18n.t('settings.updateUpToDate')}
-              </div>
-            {:else if updaterStore.checkStatus === 'error'}
-              <div class="text-xs text-brand-text-secondary font-medium text-right max-w-xs">
-                {i18n.t('settings.updateError')}: {updaterStore.errorMessage}
-              </div>
-            {/if}
-            <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm">
-              <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
-              {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
-            </Button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          <div class="bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 flex items-center justify-between">
-            <div class="space-y-0.5">
-              <p class="text-xs font-medium text-brand-text-secondary">{i18n.t('settings.appVersionLabel')}</p>
-              <p class="text-sm font-bold text-brand-text-primary">Luminous</p>
+              {/if}
             </div>
             <button
               onclick={copyVersion}
-              class="px-3 py-1 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 hover:bg-brand-accent/30 transition-colors flex items-center gap-1.5"
+              class="min-w-0 text-left group"
               title={i18n.t('settings.copyVersionHint')}
             >
-              {#if versionCopied}
-                <Check class="w-3.5 h-3.5" />
-                {i18n.t('settings.copiedLabel')}
-              {:else}
-                v{appVersion}
-              {/if}
+              <h3 class="font-bold text-sm text-brand-text-primary truncate">{updateHeaderTitle}</h3>
+              <p class="text-xs text-brand-text-secondary leading-relaxed truncate group-hover:text-brand-text-primary transition-colors">
+                {#if versionCopied}
+                  {i18n.t('settings.copiedLabel')}
+                {:else if updaterStore.checkStatus === 'error' && updaterStore.errorMessage}
+                  {updaterStore.errorMessage}
+                {:else}
+                  {updateHeaderSubtitle}
+                {/if}
+              </p>
             </button>
           </div>
-
-          <div class="bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 flex items-center justify-between">
-            <div class="space-y-0.5">
-              <p class="text-xs font-medium text-brand-text-secondary">{i18n.t('settings.installFormatLabel')}</p>
-              <p class="text-sm font-bold text-brand-text-primary">{getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name)}</p>
-            </div>
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {updaterStore.installFormat.supports_self_update ? 'bg-brand-accent/15 text-brand-accent-text border border-brand-accent/30' : 'bg-brand-border/60 text-brand-text-secondary'}">
-              {updaterStore.installFormat.supports_self_update ? i18n.t('settings.autoUpdateReady', {}, 'Auto-Update Ready') : i18n.t('settings.notifyOnly', {}, 'Notify Only')}
-            </span>
-          </div>
+          <Button onclick={() => updaterStore.checkForUpdates()} disabled={updaterStore.checkStatus === 'checking'} variant="secondary" size="sm" class="shrink-0">
+            <RefreshCw class="w-3.5 h-3.5 {updaterStore.checkStatus === 'checking' ? 'animate-spin text-brand-accent-text' : ''}" />
+            {updaterStore.checkStatus === 'checking' ? i18n.t('settings.updateChecking') : i18n.t('settings.updateCheckNowBtn')}
+          </Button>
         </div>
 
         {#if updaterStore.updateAvailable || updaterStore.installStatus !== 'idle'}
@@ -503,33 +546,37 @@
           </div>
         {/if}
 
-        <div class="space-y-4 pt-2 border-t border-brand-border/50">
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col gap-0.5 min-w-0">
-              <label for="update-check-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateCheckEnabledLabel')}</label>
-              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateCheckEnabledHint')}</p>
-            </div>
-            <Toggle
-              id="update-check-toggle"
-              checked={updaterStore.updateCheckEnabled}
-              onchange={(v) => updaterStore.setUpdateCheckEnabled(v)}
-              label={i18n.t('settings.updateCheckEnabledLabel')}
-            />
+        <div>
+          <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.updatePolicyTitle')}</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {#each UPDATE_POLICIES as policy}
+              {@const isSelected = updaterStore.updatePolicy === policy.id}
+              {@const isDisabled = policy.id === 'auto' && !updaterStore.installFormat.supports_self_update}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                disabled={isDisabled}
+                onclick={() => updaterStore.setUpdatePolicy(policy.id)}
+                class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-1 text-left transition-colors duration-200 w-full disabled:opacity-40 disabled:cursor-not-allowed {isSelected ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-accent/40'}"
+              >
+                <span class="font-semibold text-sm text-brand-text-primary">{i18n.t(policy.labelKey)}</span>
+                <span class="text-xs text-brand-text-secondary leading-relaxed">
+                  {isDisabled ? i18n.t('settings.updateGithubLink', {}, 'Download update payload directly from GitHub Releases.') : i18n.t(policy.hintKey)}
+                </span>
+              </button>
+            {/each}
           </div>
+        </div>
 
-          <div class="flex items-center justify-between gap-4 pl-4 border-l-2 border-brand-border/40" class:opacity-50={!updaterStore.updateCheckEnabled}>
-            <div class="flex flex-col gap-0.5 min-w-0">
-              <label for="update-auto-install-toggle" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.updateAutoInstallLabel')}</label>
-              <p class="text-xs text-brand-text-secondary">{i18n.t('settings.updateAutoInstallHint')}</p>
-            </div>
-            <Toggle
-              id="update-auto-install-toggle"
-              disabled={!updaterStore.updateCheckEnabled}
-              checked={updaterStore.updateAutoInstall}
-              onchange={(v) => updaterStore.setUpdateAutoInstall(v)}
-              label={i18n.t('settings.updateAutoInstallLabel')}
-            />
-          </div>
+        <div class="flex items-center justify-between gap-4 pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary">
+          <span>
+            {i18n.t('settings.updateInstalledAsFooter', { format: getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name) })}
+            — {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateAutoSupportedFooter') : i18n.t('settings.updateNotifyOnlyFooter')}
+          </span>
+          <button onclick={() => openExternalUrl(updaterStore.releaseUrl)} class="text-brand-accent-text hover:underline font-medium shrink-0">
+            {i18n.t('settings.releaseNotesLink')}
+          </button>
         </div>
       </div>
     {:else if settingsTab === "folders"}
