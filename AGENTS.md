@@ -11,6 +11,17 @@ Luminous. When scoping a feature request, prefer "good enough, well-integrated" 
 matching a specialist tool's full depth — and when a request is clearly outside that bar,
 recommend the existing dedicated tool instead of expanding scope.
 
+This is not a blanket "no tagging features" rule — the line is *canonical lookup vs. personal
+curation*. Picard's job is resolving a file against MusicBrainz's canonical database: correct
+artist/album/track identity, official release metadata, AcoustID fingerprint matching, bulk
+retagging a whole library against that source of truth. That's squarely out of scope for
+Luminous. But organizing music *the user's own way* — layered on top of whatever canonical tags
+already exist — is core to what a personal library manager should do, and belongs in Luminous
+natively. Example: MusicBrainz has no opinion on whether a track is Folk Metal, Progressive
+Metal, or Symphonic Metal — genre is often too broad and any subgenre taxonomy is inherently
+personal/subjective. A user-defined tag system for exactly this (see #224) isn't scope creep
+into Picard's territory; it's a different, complementary axis Picard was never meant to cover.
+
 ## Tech Stack
 
 - **Frontend**: SvelteKit + Svelte 5 (Runes) + TypeScript + Tailwind CSS v4
