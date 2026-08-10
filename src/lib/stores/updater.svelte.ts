@@ -10,6 +10,7 @@ export interface InstallFormatInfo {
 
 export type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
 export type InstallStatus = "idle" | "downloading" | "ready-to-restart" | "error";
+export type UpdatePolicy = "never" | "notify" | "auto";
 export interface DownloadProgress {
   downloaded: number;
   total: number | null;
@@ -41,6 +42,12 @@ class UpdaterStore {
   latestVersion = $state("");
   releaseUrl = $state(RELEASES_URL);
   errorMessage = $state<string | null>(null);
+  lastCheckedAt = $state<number | null>(null);
+
+  get updatePolicy(): UpdatePolicy {
+    if (!this.updateCheckEnabled) return "never";
+    return this.updateAutoInstall ? "auto" : "notify";
+  }
 
   installStatus = $state<InstallStatus>("idle");
   downloadProgress = $state<DownloadProgress | null>(null);
@@ -114,6 +121,16 @@ class UpdaterStore {
     }
   }
 
+  async setUpdatePolicy(policy: UpdatePolicy) {
+    if (policy === "never") {
+      if (this.updateCheckEnabled) await this.setUpdateCheckEnabled(false);
+      return;
+    }
+    if (!this.updateCheckEnabled) await this.setUpdateCheckEnabled(true);
+    const wantsAutoInstall = policy === "auto";
+    if (this.updateAutoInstall !== wantsAutoInstall) await this.setUpdateAutoInstall(wantsAutoInstall);
+  }
+
   startPeriodicCheck() {
     this.stopPeriodicCheck();
     this.intervalTimer = setInterval(() => {
@@ -143,6 +160,7 @@ class UpdaterStore {
 
     try {
       const update = await checkForUpdate();
+      this.lastCheckedAt = Date.now();
 
       if (update) {
         this.pendingUpdate = update;

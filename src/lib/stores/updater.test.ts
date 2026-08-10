@@ -24,6 +24,7 @@ describe("UpdaterStore", () => {
     updaterStore.errorMessage = null;
     updaterStore.installStatus = "idle";
     updaterStore.downloadProgress = null;
+    updaterStore.lastCheckedAt = null;
     updaterStore.installFormat = {
       format: "windows_setup",
       human_name: "Windows Installer (.exe / .msi)",
@@ -141,5 +142,62 @@ describe("UpdaterStore", () => {
   it("restartNow calls relaunch", async () => {
     await updaterStore.restartNow();
     expect(relaunch).toHaveBeenCalled();
+  });
+
+  it("records lastCheckedAt after a successful check", async () => {
+    vi.mocked(check).mockResolvedValueOnce(null);
+    expect(updaterStore.lastCheckedAt).toBe(null);
+
+    await updaterStore.checkForUpdates();
+
+    expect(updaterStore.lastCheckedAt).toEqual(expect.any(Number));
+  });
+
+  it("does not record lastCheckedAt when the check errors", async () => {
+    vi.mocked(check).mockRejectedValueOnce("network down");
+
+    await updaterStore.checkForUpdates();
+
+    expect(updaterStore.lastCheckedAt).toBe(null);
+  });
+
+  describe("updatePolicy", () => {
+    it("derives never/notify/auto from the underlying toggles", () => {
+      updaterStore.updateCheckEnabled = false;
+      updaterStore.updateAutoInstall = false;
+      expect(updaterStore.updatePolicy).toBe("never");
+
+      updaterStore.updateCheckEnabled = true;
+      updaterStore.updateAutoInstall = false;
+      expect(updaterStore.updatePolicy).toBe("notify");
+
+      updaterStore.updateAutoInstall = true;
+      expect(updaterStore.updatePolicy).toBe("auto");
+    });
+
+    it("setUpdatePolicy('never') disables checks and auto-install", async () => {
+      await updaterStore.setUpdatePolicy("auto");
+      expect(updaterStore.updatePolicy).toBe("auto");
+
+      await updaterStore.setUpdatePolicy("never");
+      expect(updaterStore.updateCheckEnabled).toBe(false);
+      expect(updaterStore.updateAutoInstall).toBe(false);
+    });
+
+    it("setUpdatePolicy('notify') enables checks without auto-install", async () => {
+      await updaterStore.setUpdatePolicy("notify");
+      expect(updaterStore.updateCheckEnabled).toBe(true);
+      expect(updaterStore.updateAutoInstall).toBe(false);
+    });
+
+    it("setUpdatePolicy('auto') enables checks and auto-install", async () => {
+      const update = fakeUpdate({ version: "2.0.0" });
+      vi.mocked(check).mockResolvedValueOnce(update);
+
+      await updaterStore.setUpdatePolicy("auto");
+
+      expect(updaterStore.updateCheckEnabled).toBe(true);
+      expect(updaterStore.updateAutoInstall).toBe(true);
+    });
   });
 });
