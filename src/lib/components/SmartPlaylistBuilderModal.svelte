@@ -145,12 +145,15 @@
     { key: "samplerate", label: i18n.t("smartPlaylistBuilder.fieldSampleRate", {}, "Sample Rate (Hz)"), type: "number" },
     { key: "bitdepth", label: i18n.t("smartPlaylistBuilder.fieldBitDepth", {}, "Bit Depth"), type: "number" },
     { key: "channels", label: i18n.t("smartPlaylistBuilder.fieldChannels", {}, "Channels"), type: "number" },
-    { key: "compilation", label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation (1/0)"), type: "number" },
+    { key: "compilation", label: i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation"), type: "boolean" },
     { key: "duration", label: i18n.t("smartPlaylistBuilder.fieldDuration", {}, "Duration (MM:SS or Sec)"), type: "text" },
   ];
 
   function getOperatorsForField(fieldKey: string) {
     const fieldObj = availableFields.find((f) => f.key === fieldKey);
+    if (fieldObj && fieldObj.type === "boolean") {
+      return [{ op: "=", label: i18n.t("smartPlaylistBuilder.opEquals", {}, "=") }];
+    }
     if (fieldObj && fieldObj.type === "number") {
       return [
         { op: "=", label: i18n.t("smartPlaylistBuilder.opEquals", {}, "=") },
@@ -295,6 +298,7 @@
 
         <div class="space-y-2.5">
           {#each rules as rule (rule.id)}
+            {@const fieldType = availableFields.find((f) => f.key === rule.field)?.type}
             <div class="flex items-center gap-2 bg-brand-main/60 p-2.5 rounded-xl border border-brand-border/40">
               <Select
                 value={rule.field}
@@ -302,6 +306,13 @@
                   rule.field = e.currentTarget.value;
                   const ops = getOperatorsForField(rule.field);
                   rule.op = ops[0].op;
+                  // A boolean field has no free-text value to type, so seed
+                  // it with a valid "1"/"0" right away — otherwise it'd read
+                  // as an empty rule and get dropped from the saved spec.
+                  const newFieldType = availableFields.find((f) => f.key === rule.field)?.type;
+                  if (newFieldType === "boolean" && rule.value.trim() === "") {
+                    rule.value = "1";
+                  }
                 }}
                 class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
               >
@@ -310,24 +321,37 @@
                 {/each}
               </Select>
 
-              <Select
-                value={rule.op}
-                onchange={(e) => { rule.op = e.currentTarget.value; }}
-                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
-              >
-                {#each getOperatorsForField(rule.field) as opItem}
-                  <option value={opItem.op}>{opItem.label}</option>
-                {/each}
-              </Select>
+              {#if fieldType !== "boolean"}
+                <Select
+                  value={rule.op}
+                  onchange={(e) => { rule.op = e.currentTarget.value; }}
+                  class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
+                >
+                  {#each getOperatorsForField(rule.field) as opItem}
+                    <option value={opItem.op}>{opItem.label}</option>
+                  {/each}
+                </Select>
+              {/if}
 
-              <Input
-                type="text"
-                bind:value={rule.value}
-                placeholder={i18n.t("smartPlaylistBuilder.valuePlaceholder")}
-                size="sm"
-                surface="sidebar"
-                class="flex-1 min-w-0"
-              />
+              {#if fieldType === "boolean"}
+                <div class="flex-1 min-w-0 flex items-center">
+                  <Toggle
+                    id="rule-toggle-{rule.id}"
+                    checked={rule.value.trim() === "1"}
+                    onchange={(checked) => { rule.value = checked ? "1" : "0"; }}
+                    label={i18n.t("smartPlaylistBuilder.fieldCompilation", {}, "Compilation")}
+                  />
+                </div>
+              {:else}
+                <Input
+                  type="text"
+                  bind:value={rule.value}
+                  placeholder={i18n.t("smartPlaylistBuilder.valuePlaceholder")}
+                  size="sm"
+                  surface="sidebar"
+                  class="flex-1 min-w-0"
+                />
+              {/if}
 
               {#if rules.length > 1}
                 <button

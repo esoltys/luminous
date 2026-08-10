@@ -145,6 +145,17 @@ pub async fn get_songs_by_artist(
 }
 
 #[tauri::command]
+pub async fn get_compilations_by_artist(
+    artist: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_compilations_by_artist(&artist)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_favourite_songs(state: State<'_, AppState>) -> Result<Vec<Song>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.get_favourite_songs().map_err(|e| e.to_string())

@@ -96,6 +96,7 @@ describe("AlbumTagEditor.svelte", () => {
         genre: "Rock",
         year: 2020,
         disc: 2,
+        compilation: false,
       });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
@@ -130,6 +131,7 @@ describe("AlbumTagEditor.svelte", () => {
         genre: "",
         year: 2024,
         disc: null,
+        compilation: false,
       });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
@@ -166,9 +168,72 @@ describe("AlbumTagEditor.svelte", () => {
         genre: "Pop",
         year: 2024,
         disc: null,
+        compilation: false,
       });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it("toggling Compilation on replaces the Album Artist input with a Various Artists pill and saves both", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, getByText, queryByLabelText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Now That's What I Call Tests",
+      initialAlbumArtist: "Artist A",
+      initialGenre: "Pop",
+      initialYear: 2024,
+      initialDisc: 1,
+      initialCompilation: false,
+      onClose,
+      onSave,
+    });
+
+    expect(getByLabelText("Album Artist")).toBeInTheDocument();
+
+    const compilationCheckbox = getByLabelText(/compilation/i) as HTMLInputElement;
+    expect(compilationCheckbox.checked).toBe(false);
+    await fireEvent.click(compilationCheckbox);
+    expect(compilationCheckbox.checked).toBe(true);
+
+    // The editable input is gone; a static "Various Artists" pill takes its place.
+    expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
+    expect(getByText("Various Artists")).toBeInTheDocument();
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Now That's What I Call Tests",
+        albumArtist: "Various Artists",
+        genre: "Pop",
+        year: 2024,
+        disc: 1,
+        compilation: true,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("unchecking Compilation restores the previous Album Artist value", async () => {
+    const onClose = vi.fn();
+    const { getByLabelText, queryByLabelText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Artist A",
+      onClose,
+    });
+
+    const compilationCheckbox = getByLabelText(/compilation/i) as HTMLInputElement;
+    await fireEvent.click(compilationCheckbox);
+    expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
+
+    await fireEvent.click(compilationCheckbox);
+    const artistInput = getByLabelText("Album Artist") as HTMLInputElement;
+    expect(artistInput.value).toBe("Artist A");
   });
 });

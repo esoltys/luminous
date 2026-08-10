@@ -931,7 +931,8 @@ impl Player {
         if std::path::Path::new(&path).exists() {
             return true;
         }
-        let Some(healed) = crate::collection::resolve_case_insensitive_path(std::path::Path::new(&path))
+        let Some(healed) =
+            crate::collection::resolve_case_insensitive_path(std::path::Path::new(&path))
         else {
             return false;
         };
@@ -1941,8 +1942,12 @@ mod tests {
                 "SELECT {} FROM songs WHERE id = ?1",
                 crate::collection::SONG_SELECT_COLS
             );
-            conn.query_row(&sql, rusqlite::params![1i64], crate::collection::row_to_song)
-                .unwrap()
+            conn.query_row(
+                &sql,
+                rusqlite::params![1i64],
+                crate::collection::row_to_song,
+            )
+            .unwrap()
         };
         player
             .play_playlist(vec![PlaylistItem::new_song(0, 0, song)], 0, 0, None)
@@ -1950,7 +1955,10 @@ mod tests {
             .unwrap();
 
         let healed = player.try_heal_and_retry_current_track().await;
-        assert!(healed, "a case-only path mismatch should heal on the first error");
+        assert!(
+            healed,
+            "a case-only path mismatch should heal on the first error"
+        );
         let healed_path = player.current_song.as_ref().unwrap().path.clone().unwrap();
         assert!(
             std::path::Path::new(&healed_path).exists(),

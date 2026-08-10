@@ -1129,6 +1129,7 @@
     initialGenre={songs[0].genre}
     initialYear={songs[0].year}
     initialDisc={songs[0].disc}
+    initialCompilation={songs[0].compilation}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />

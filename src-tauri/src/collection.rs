@@ -898,6 +898,92 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Compilation albums featuring `artist` on at least one track — the
+    /// mirror image of `get_songs_by_artist`'s effective-artist match: this
+    /// matches on the *raw per-track* `artist` column, since a Various
+    /// Artists compilation's effective (album-level) artist is never the
+    /// individual track artist, so it would otherwise never surface on that
+    /// artist's own detail page (#343). An album counts as a compilation if
+    /// any track has `compilation = 1`, its tracks disagree on `album_artist`,
+    /// or `album_artist` is literally "Various Artists". Returns the same
+    /// aggregated shape as `get_albums()`, but with `artist` always
+    /// "Various Artists" since these are compilations by definition.
+    pub fn get_compilations_by_artist(&self, artist: &str) -> Result<Vec<serde_json::Value>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT
+                album,
+                MIN(year) AS year,
+                COUNT(*) AS track_count,
+                MAX(COALESCE(disc, 1)) AS disc_count,
+                MAX(CAST(art_embedded AS INTEGER)) AS art_embedded,
+                MAX(art_automatic) AS art_automatic,
+                MAX(art_manual) AS art_manual,
+                (
+                    SELECT genre
+                    FROM songs g
+                    WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
+                      AND g.genre IS NOT NULL AND g.genre != ''
+                    GROUP BY genre
+                    ORDER BY COUNT(*) DESC, genre ASC
+                    LIMIT 1
+                ) AS genre,
+                COALESCE(
+                    (SELECT rating FROM album_ratings ar WHERE ar.album_key = songs.album),
+                    -1
+                ) AS rating,
+                MAX(added) AS added,
+                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
+             FROM songs
+             WHERE source IN (1, 2) AND unavailable = 0 AND album IS NOT NULL
+               AND album IN (
+                 SELECT album FROM songs s2
+                 WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.artist = ?1
+               )
+               AND album IN (
+                 SELECT album FROM songs s3
+                 WHERE s3.source IN (1, 2) AND s3.unavailable = 0
+                 GROUP BY album
+                 -- Mirrors get_albums()'s various-artists fallback: a compilation
+                 -- either has TCMP set, is explicitly credited to Various
+                 -- Artists, or fails to agree on a single effective album
+                 -- artist (the same condition that makes get_albums() emit
+                 -- NULL and the UI fall back to displaying Various Artists).
+                 HAVING MAX(s3.compilation) = 1
+                    OR MAX(CASE WHEN s3.album_artist = 'Various Artists' THEN 1 ELSE 0 END) = 1
+                    OR NOT (
+                         COUNT(DISTINCT NULLIF(s3.album_artist, '')) = 1
+                         OR (
+                           COUNT(DISTINCT NULLIF(s3.album_artist, '')) = 0
+                           AND COUNT(DISTINCT NULLIF(s3.artist, '')) = 1
+                         )
+                       )
+               )
+             GROUP BY album
+             ORDER BY album",
+        )?;
+        let albums: Vec<serde_json::Value> = stmt
+            .query_map(params![artist], |row| {
+                Ok(serde_json::json!({
+                    "artist": "Various Artists",
+                    "album": row.get::<_, Option<String>>(0)?,
+                    "year": row.get::<_, Option<i32>>(1)?,
+                    "track_count": row.get::<_, i32>(2)?,
+                    "disc_count": row.get::<_, i32>(3)?,
+                    "art_embedded": row.get::<_, bool>(4)?,
+                    "art_automatic": row.get::<_, Option<String>>(5)?,
+                    "art_manual": row.get::<_, Option<String>>(6)?,
+                    "genre": row.get::<_, Option<String>>(7)?,
+                    "rating": row.get::<_, f32>(8)?,
+                    "added": row.get::<_, Option<i64>>(9)?,
+                    "total_duration_nanosec": row.get::<_, i64>(10)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(albums)
+    }
+
     /// Songs favourited via the 5-star/heart rating, for the "Favourites" auto-playlist.
     pub fn get_favourite_songs(&self) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
@@ -1831,6 +1917,13 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         // Album artist (various tag formats store this differently)
         song.album_artist = tag.get_string(&ItemKey::AlbumArtist).map(|s| s.to_string());
 
+        // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
+        // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
+        song.compilation = tag
+            .get_string(&ItemKey::FlagCompilation)
+            .map(|s| s.trim() == "1")
+            .unwrap_or(false);
+
         song.composer = tag.get_string(&ItemKey::Composer).map(|s| s.to_string());
 
         song.lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
@@ -1971,6 +2064,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     album=excluded.album, album_artist=excluded.album_artist,
                     track=excluded.track, disc=excluded.disc,
                     year=excluded.year, originalyear=excluded.originalyear, genre=excluded.genre,
+                    compilation=excluded.compilation,
                     composer=excluded.composer, lyrics=excluded.lyrics,
                     grouping=excluded.grouping, bpm=excluded.bpm, initial_key=excluded.initial_key,
                     comment=excluded.comment, length_nanosec=excluded.length_nanosec,
@@ -2003,6 +2097,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.year,
             song.originalyear,
             song.genre,
+            song.compilation,
             song.grouping,
             song.bpm,
             song.initial_key,
@@ -2104,7 +2199,7 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
-    composer, lyrics, comment, track, disc, year, originalyear, genre,
+    composer, lyrics, comment, track, disc, year, originalyear, genre, compilation,
     grouping, bpm, initial_key,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
@@ -2112,7 +2207,7 @@ const SONG_INSERT_COLS: &str = "
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     Ok(Song {
@@ -3080,6 +3175,148 @@ mod tests {
         let album_four = find_album("Album Four");
         assert_eq!(album_four["artist"].as_str(), None);
         assert_eq!(album_four["track_count"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_upsert_song_round_trips_compilation_flag() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_compilation_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let song = Song {
+            path: Some("path/comp.mp3".to_string()),
+            title: Some("Comp Track".to_string()),
+            artist: Some("Artist A".to_string()),
+            album: Some("Now That's What I Call Tests".to_string()),
+            source: SongSource::LocalFile,
+            filetype: FileType::Mp3,
+            unavailable: false,
+            compilation: true,
+            ..Default::default()
+        };
+        upsert_song(&conn, &song).unwrap();
+
+        let stored: bool = conn
+            .query_row(
+                "SELECT compilation FROM songs WHERE path = ?1",
+                params!["path/comp.mp3"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(stored, "compilation flag should persist through upsert");
+
+        // Re-upserting the same path with compilation=false should clear it
+        // (SONG_INSERT_COLS previously omitted this column entirely, so it
+        // could only ever stay 0 — this guards against that regression).
+        let song_updated = Song {
+            compilation: false,
+            ..song
+        };
+        upsert_song(&conn, &song_updated).unwrap();
+        let stored: bool = conn
+            .query_row(
+                "SELECT compilation FROM songs WHERE path = ?1",
+                params!["path/comp.mp3"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!stored, "compilation flag should update on re-scan");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_compilations_by_artist() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_compilations_by_artist_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str,
+                           artist: &str,
+                           album: &str,
+                           album_artist: Option<&str>,
+                           compilation: bool| {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some(path.to_string()),
+                artist: Some(artist.to_string()),
+                album: Some(album.to_string()),
+                album_artist: album_artist.map(|s| s.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                compilation,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // A properly tagged compilation: TCMP=1, shared "Various Artists" album_artist.
+        insert_song(
+            "path/comp1.mp3",
+            "Artist A",
+            "Compilation One",
+            Some("Various Artists"),
+            true,
+        );
+        insert_song(
+            "path/comp2.mp3",
+            "Artist B",
+            "Compilation One",
+            Some("Various Artists"),
+            true,
+        );
+
+        // A compilation identifiable only by disagreeing album_artist (no TCMP).
+        insert_song("path/comp3.mp3", "Artist A", "Compilation Two", None, false);
+        insert_song("path/comp4.mp3", "Artist C", "Compilation Two", None, false);
+
+        // Artist A's own solo album should NOT show up as a compilation.
+        insert_song(
+            "path/solo1.mp3",
+            "Artist A",
+            "Solo Album",
+            Some("Artist A"),
+            false,
+        );
+        insert_song(
+            "path/solo2.mp3",
+            "Artist A",
+            "Solo Album",
+            Some("Artist A"),
+            false,
+        );
+
+        let comps = scanner.get_compilations_by_artist("Artist A").unwrap();
+        let names: Vec<&str> = comps.iter().map(|a| a["album"].as_str().unwrap()).collect();
+        assert!(names.contains(&"Compilation One"));
+        assert!(names.contains(&"Compilation Two"));
+        assert!(!names.contains(&"Solo Album"));
+        assert_eq!(comps.len(), 2);
+
+        for comp in &comps {
+            assert_eq!(comp["artist"].as_str(), Some("Various Artists"));
+        }
+
+        // Artist B only appears on Compilation One.
+        let comps_b = scanner.get_compilations_by_artist("Artist B").unwrap();
+        assert_eq!(comps_b.len(), 1);
+        assert_eq!(comps_b[0]["album"].as_str(), Some("Compilation One"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

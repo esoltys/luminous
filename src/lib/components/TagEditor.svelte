@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX } from "lucide-svelte";
+  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -37,6 +37,11 @@
   let initialKey = $state("");
   let path = $state("");
   let rating = $state(-1);
+  // Compilation is an album-level property edited via AlbumTagEditor, not
+  // here — this is read-only, just so a compilation's Album Artist shows
+  // the same "Various Artists" pill here as it does there instead of an
+  // editable field that would suggest a per-track override is meaningful.
+  let compilation = $state(false);
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -68,6 +73,7 @@
         bpm: number | null;
         initial_key: string;
         rating: number;
+        compilation: boolean;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -84,6 +90,7 @@
       initialKey = details.initial_key;
       path = details.path;
       rating = details.rating;
+      compilation = details.compilation;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
@@ -319,7 +326,16 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist" tooltip={i18n.t('tagEditor.albumArtistTooltip')}>
-              <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+              {#if compilation}
+                <div class="flex items-center h-9">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
+                    Various Artists
+                    <Lock class="w-3 h-3 text-brand-text-secondary shrink-0" />
+                  </span>
+                </div>
+              {:else}
+                <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+              {/if}
             </FormField>
 
             <FormField label={i18n.t('tagEditor.yearField')} for="tag-year">
