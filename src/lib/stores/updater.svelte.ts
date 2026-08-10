@@ -47,12 +47,18 @@ class UpdaterStore {
 
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
   private pendingUpdate: Update | null = null;
+  private initialized = false;
 
   async init() {
+    if (this.initialized) return;
+    this.initialized = true;
+
     try {
       // 1. Load preferences
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
-      if (settings?.update_check_enabled === "true") {
+      if (settings?.update_check_enabled === "false") {
+        this.updateCheckEnabled = false;
+      } else {
         this.updateCheckEnabled = true;
       }
       if (settings?.update_auto_install === "true") {
