@@ -314,7 +314,7 @@
                     rule.value = "1";
                   }
                 }}
-                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
+                class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
               >
                 {#each availableFields as f}
                   <option value={f.key}>{f.label}</option>
@@ -325,7 +325,7 @@
                 <Select
                   value={rule.op}
                   onchange={(e) => { rule.op = e.currentTarget.value; }}
-                  class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-2.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
+                  class="bg-brand-sidebar border border-brand-border text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent font-medium"
                 >
                   {#each getOperatorsForField(rule.field) as opItem}
                     <option value={opItem.op}>{opItem.label}</option>
