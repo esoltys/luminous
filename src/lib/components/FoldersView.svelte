@@ -62,7 +62,10 @@
         ? i18n.t("playlists.relativeOneHourAgo")
         : i18n.t("playlists.relativeHoursAgo", { count: diffHours });
     }
-    return i18n.t("settings.updateLastChecked", { time: relative });
+    // The playlists.* relative-time strings are capitalized for standalone use (e.g. a
+    // Date Added column); lowercase the leading letter here since we're splicing it mid-sentence.
+    const midSentence = relative.charAt(0).toLocaleLowerCase() + relative.slice(1);
+    return i18n.t("settings.updateLastChecked", { time: midSentence });
   });
 
   let versionOnly = $derived(appVersion.split("#")[0] ?? "");
