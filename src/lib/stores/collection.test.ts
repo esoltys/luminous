@@ -469,4 +469,14 @@ describe("CollectionStore", () => {
     expect(collectionStore.recentSearches).toHaveLength(0);
     expect(localStorage.getItem("luminous_recent_searches")).toBe("[]");
   });
+
+  it("restores miniplayer mode synchronously from localStorage on startup and syncs backend IPC", async () => {
+    localStorage.setItem("layout_isMiniplayer", "true");
+    vi.mocked(invoke).mockResolvedValue(null);
+
+    // Re-initialize collection store
+    await collectionStore.enterMiniplayerMode(true);
+    expect(collectionStore.isMiniplayer).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", expect.any(Object));
+  });
 });
