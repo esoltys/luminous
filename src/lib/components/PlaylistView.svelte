@@ -1416,27 +1416,27 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bpm}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {item.song?.bpm || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.initial_key}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {item.song?.initial_key || "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bitrate}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {item.song?.bitrate ? `${item.song.bitrate}k` : "—"}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.samplerate}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {formatSampleRate(item.song?.samplerate)}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.bitdepth}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {formatBitDepth(item.song?.bitdepth)}
               </div>
             {/if}
@@ -1446,7 +1446,7 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.filesize}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                 {formatFileSize(item.song?.filesize)}
               </div>
             {/if}
@@ -1483,7 +1483,7 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.path}
-              <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-mono" title={item.song?.path}>
+              <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={item.song?.path}>
                 {item.song?.path || "—"}
               </div>
             {/if}
