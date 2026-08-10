@@ -663,6 +663,7 @@ pub fn run() {
             commands::collection::finish_scan,
             commands::collection::get_songs_by_album,
             commands::collection::get_songs_by_artist,
+            commands::collection::get_compilations_by_artist,
             commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,

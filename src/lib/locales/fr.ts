@@ -659,6 +659,7 @@ export const fr = {
     albumField: "Titre de l'album",
     albumArtistField: "Artiste de l'album",
     genreField: "Genre",
+    compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",
     tracksAffected: "S'applique à {count} chansons",
@@ -750,7 +751,8 @@ export const fr = {
     singlesFilter: "Singles ({count})",
     discSet: "Coffret {count} disques",
     noReleasesFound: "Aucune sortie trouvée.",
-    playlistsFeaturing: "Listes de lecture avec {artist}"
+    playlistsFeaturing: "Listes de lecture avec {artist}",
+    compilationsFeaturing: "Compilations avec {artist}"
   },
   albumDetail: {
     backToAlbums: "Retour aux albums",
@@ -865,7 +867,7 @@ export const fr = {
     fieldChannels: "Canaux",
     fieldAdded: "Date d'ajout (horodatage Unix)",
     fieldOriginalYear: "Année d'origine",
-    fieldCompilation: "Compilation (1/0)",
+    fieldCompilation: "Compilation",
     opEquals: "=",
     opNotEquals: "!=",
     opGte: ">=",

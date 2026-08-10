@@ -107,6 +107,7 @@ pub fn write_tags(
     grouping: &str,
     bpm: Option<f32>,
     initial_key: &str,
+    compilation: bool,
 ) -> Result<()> {
     let mut tagged_file = Probe::open(path)
         .context("failed to open audio file for tag writing")?
@@ -138,6 +139,12 @@ pub fn write_tags(
     tag.insert_text(lofty::tag::ItemKey::Composer, composer.to_string());
     tag.insert_text(lofty::tag::ItemKey::ContentGroup, grouping.to_string());
     tag.insert_text(lofty::tag::ItemKey::InitialKey, initial_key.to_string());
+    // TCMP/cpil/COMPILATION "part of a compilation" flag — written as text
+    // "1"/"0" the same way lofty reads it back (see read_tags).
+    tag.insert_text(
+        lofty::tag::ItemKey::FlagCompilation,
+        if compilation { "1" } else { "0" }.to_string(),
+    );
 
     if let Some(b) = bpm {
         // ID3v2 (TBPM) and MP4 (tmpo) map from IntegerBpm; Vorbis/APE's freeform

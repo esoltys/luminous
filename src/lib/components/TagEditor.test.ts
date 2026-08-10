@@ -37,6 +37,7 @@ describe("TagEditor.svelte", () => {
     bpm: 120,
     initial_key: "Cmaj",
     rating: 3,
+    compilation: false,
   };
 
   beforeEach(() => {
@@ -73,6 +74,24 @@ describe("TagEditor.svelte", () => {
     expect(titleInput.value).toBe("Original Title");
     expect(artistInput.value).toBe("Original Artist");
     expect(albumInput.value).toBe("Original Album");
+  });
+
+  it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, album_artist: "Various Artists", compilation: true };
+      }
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const { getByText, queryByLabelText } = render(TagEditor, { songId: 10, onClose });
+
+    await waitFor(() => {
+      expect(getByText("Various Artists")).toBeInTheDocument();
+    });
+    expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
   });
 
   it("calls onClose when cancel button is clicked", async () => {

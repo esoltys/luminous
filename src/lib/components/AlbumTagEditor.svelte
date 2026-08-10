@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Sliders, Save, X, LoaderCircle, Layers } from "lucide-svelte";
+  import { Sliders, Save, X, LoaderCircle, Layers, Lock } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -16,6 +16,7 @@
     initialGenre?: string | null;
     initialYear?: number | null;
     initialDisc?: number | null;
+    initialCompilation?: boolean;
     onClose: () => void;
     onSave?: () => void;
   }
@@ -27,6 +28,7 @@
     initialGenre = "",
     initialYear = null,
     initialDisc = null,
+    initialCompilation = false,
     onClose,
     onSave
   }: Props = $props();
@@ -41,6 +43,26 @@
   let year = $state<number | null>(initialYear);
   // svelte-ignore state_referenced_locally
   let disc = $state<number | null>(initialDisc);
+  // svelte-ignore state_referenced_locally
+  let compilation = $state(initialCompilation ?? false);
+
+  const VARIOUS_ARTISTS = "Various Artists";
+  // Remembers whatever was in Album Artist before the Compilation toggle
+  // overwrote it, so unchecking restores it instead of leaving "Various
+  // Artists" behind.
+  // svelte-ignore state_referenced_locally
+  let previousAlbumArtist = $state(initialAlbumArtist ?? "");
+
+  function handleCompilationToggle(e: Event) {
+    const next = (e.currentTarget as HTMLInputElement).checked;
+    if (next) {
+      previousAlbumArtist = albumArtist;
+      albumArtist = VARIOUS_ARTISTS;
+    } else {
+      albumArtist = previousAlbumArtist;
+    }
+    compilation = next;
+  }
 
   let isSaving = $state(false);
 
@@ -54,6 +76,7 @@
         genre: genre ?? "",
         year,
         disc,
+        compilation,
       });
 
       await collectionStore.refreshStats();
@@ -99,8 +122,29 @@
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-            <Input id="album-tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+            {#if compilation}
+              <div class="flex items-center h-9">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
+                  {VARIOUS_ARTISTS}
+                  <Lock class="w-3 h-3 text-brand-text-secondary shrink-0" />
+                </span>
+              </div>
+            {:else}
+              <Input id="album-tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+            {/if}
           </FormField>
+
+          <label class="flex items-center gap-2 col-span-2 text-xs text-brand-text-primary select-none">
+            <input
+              type="checkbox"
+              id="album-tag-compilation"
+              checked={compilation}
+              onchange={handleCompilationToggle}
+              disabled={isSaving}
+              class="rounded accent-brand-accent"
+            />
+            {i18n.t('albumTagEditor.compilationField')}
+          </label>
 
           <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
             <Input id="album-tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />

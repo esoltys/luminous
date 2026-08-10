@@ -21,6 +21,7 @@ pub struct SongDetails {
     pub bpm: Option<f32>,
     pub initial_key: String,
     pub rating: f32,
+    pub compilation: bool,
 }
 
 #[tauri::command]
@@ -31,7 +32,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year,
-                grouping, bpm, initial_key, rating
+                grouping, bpm, initial_key, rating, compilation
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -51,6 +52,7 @@ pub async fn get_song_details(
                 bpm: row.get(12).ok(),
                 initial_key: row.get(13).unwrap_or_default(),
                 rating: row.get(14).unwrap_or(crate::stats::RATING_UNRATED),
+                compilation: row.get(15).unwrap_or(false),
             })
         },
     )
@@ -127,17 +129,20 @@ pub async fn save_song_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: String = conn
+    let (path_str, compilation): (String, bool) = conn
         .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+            "SELECT path, compilation FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
 
     // 2. Write metadata back to disk (blocking lofty write in threadpool)
+    // The single-song tag editor has no compilation toggle (that's an
+    // album-level property owned by AlbumTagEditor.svelte), so preserve
+    // whatever's already in the DB rather than clobbering it.
     let path_clone = path.clone();
     let title_c = title.clone();
     let artist_c = artist.clone();
@@ -164,6 +169,7 @@ pub async fn save_song_tags(
             &grouping_c,
             bpm,
             &initial_key_c,
+            compilation,
         )
     })
     .await
@@ -208,6 +214,7 @@ pub async fn save_song_tags(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn save_album_tags(
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
@@ -216,6 +223,7 @@ pub async fn save_album_tags(
     genre: Option<String>,
     year: Option<u32>,
     disc: Option<u32>,
+    compilation: bool,
 ) -> Result<u32, String> {
     if song_ids.is_empty() {
         return Ok(0);
@@ -286,6 +294,7 @@ pub async fn save_album_tags(
                 &item.grouping,
                 item.bpm,
                 &item.initial_key,
+                compilation,
             );
             if write_res.is_ok() {
                 count += 1;
@@ -304,9 +313,18 @@ pub async fn save_album_tags(
                 album_artist = ?2,
                 genre = ?3,
                 year = ?4,
-                disc = ?5
-             WHERE id = ?6",
-            rusqlite::params![album, album_artist, genre_str, year, disc, song_id],
+                disc = ?5,
+                compilation = ?6
+             WHERE id = ?7",
+            rusqlite::params![
+                album,
+                album_artist,
+                genre_str,
+                year,
+                disc,
+                compilation,
+                song_id
+            ],
         )
         .map_err(|e| e.to_string())?;
     }

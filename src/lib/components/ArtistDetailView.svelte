@@ -34,6 +34,7 @@
 
   let songs = $state<Song[]>([]);
   let playlists = $state<Playlist[]>([]);
+  let compilations = $state<AlbumItem[]>([]);
   let loading = $state(true);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
@@ -131,12 +132,14 @@
     loading = true;
     Promise.all([
       invoke<Song[]>("get_songs_by_artist", { artist: requested }),
-      invoke<Playlist[]>("get_playlists_by_artist", { artist: requested })
+      invoke<Playlist[]>("get_playlists_by_artist", { artist: requested }),
+      invoke<AlbumItem[]>("get_compilations_by_artist", { artist: requested })
     ])
-      .then(([fetchedSongs, fetchedPlaylists]) => {
+      .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations]) => {
         if (requested !== artistName) return;
         songs = fetchedSongs;
         playlists = fetchedPlaylists.filter((p) => !p.is_queue);
+        compilations = fetchedCompilations;
       })
       .catch((err) => {
         console.error("Failed to load artist detail:", err);
@@ -879,6 +882,21 @@
       <p class="text-xs text-brand-text-secondary py-8 text-center">{i18n.t('artistDetail.noReleasesFound')}</p>
     {/if}
   </div>
+
+  {#if compilations.length > 0}
+    <div class="px-6 pt-10">
+      <HorizontalScrollRow title={i18n.t('artistDetail.compilationsFeaturing', { artist: artistName })}>
+        {#each compilations as album (album.album)}
+          <AlbumCard
+            {album}
+            widthClass="w-48 shrink-0"
+            onclick={() => openAlbum(album)}
+            oncontextmenu={(e) => handleAlbumContextMenu(e, album)}
+          />
+        {/each}
+      </HorizontalScrollRow>
+    </div>
+  {/if}
 
   {#if playlists.length > 0}
     <div class="px-6 pt-10 {playerStore.currentSong ? 'pb-28' : 'pb-6'}">

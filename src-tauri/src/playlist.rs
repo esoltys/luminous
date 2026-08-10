@@ -1395,8 +1395,7 @@ impl PlaylistManager {
             return Ok(Vec::new());
         }
 
-        let uuids_to_remove: Vec<String> =
-            tracks[..index].iter().map(|t| t.uuid.clone()).collect();
+        let uuids_to_remove: Vec<String> = tracks[..index].iter().map(|t| t.uuid.clone()).collect();
         self.remove_from_playlist(playlist_id, &uuids_to_remove)?;
         Ok(uuids_to_remove)
     }
@@ -2274,9 +2273,7 @@ mod tests {
         let tracks = manager.get_playlist_tracks(pl.id).unwrap();
         let uuid2 = tracks[2].uuid.clone();
 
-        let removed = manager
-            .trim_playlist_before_uuid(pl.id, &uuid2)
-            .unwrap();
+        let removed = manager.trim_playlist_before_uuid(pl.id, &uuid2).unwrap();
         assert_eq!(removed.len(), 2);
 
         let remaining = manager.get_playlist_tracks(pl.id).unwrap();
