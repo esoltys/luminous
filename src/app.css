@@ -110,8 +110,8 @@
 /* Glassmorphism utility classes */
 .glass {
   background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.05);
   /* Pin to its own GPU layer, same fix as .glass-surface (see below), so the
      backdrop-filter is cached instead of re-rasterized on every composite
@@ -122,8 +122,8 @@
 
 .glass-premium {
   background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(11, 15, 25, 0.9));
-  backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
   will-change: backdrop-filter;
   transform: translateZ(0);
@@ -147,8 +147,8 @@
  */
 .glass-surface {
   position: relative;
-  backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
   border-color: var(--glass-border-color, var(--color-border));
   box-shadow: var(--glass-shadow, none);
 }

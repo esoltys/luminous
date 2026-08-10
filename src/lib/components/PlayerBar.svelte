@@ -389,8 +389,8 @@
      the shared variable itself. */
   :global(footer.glass-surface) {
     position: relative;
-    backdrop-filter: blur(20px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
     background-color: var(--glass-bg-playerbar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none), var(--glass-glow, none);
@@ -398,8 +398,8 @@
 
   :global(footer.glass-surface.opaque-linux) {
     background-color: var(--bg-playerbar, #191b23) !important;
-    backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 35px 4px var(--color-accent), 0 0 90px 12px var(--color-accent) !important;
   }
 

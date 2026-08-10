@@ -256,8 +256,8 @@
 <style>
   aside.glass-surface {
     position: relative;
-    backdrop-filter: blur(20px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
     background-color: var(--glass-bg-sidebar) !important;
     border-color: var(--glass-border-color, var(--color-border)) !important;
     box-shadow: var(--glass-shadow, none);

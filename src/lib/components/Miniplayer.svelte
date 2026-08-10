@@ -427,8 +427,8 @@
 
 <style>
   :global(.glass-surface) {
-    backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
   }
 
   /* backdrop-filter doesn't composite reliably in WebKitGTK, rendering the
@@ -436,8 +436,8 @@
      PlayerBar's footer.opaque-linux (PlayerBar.svelte). */
   :global(.glass-surface.opaque-linux) {
     background-color: var(--bg-main, #08090c) !important;
-    backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   /* Grabber texture: a repeating dot pattern spanning the full drag region,
