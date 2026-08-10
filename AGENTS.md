@@ -1,5 +1,16 @@
 # Luminous Music Player
 
+## Product Scope
+
+Luminous is not trying to be a best-of-all-worlds app. It covers the tagging, library, and
+playback needs of most users well, but it deliberately does not chase feature parity with
+specialist tools. For example: if a user needs heavy-duty batch tagging (AcoustID-driven
+bulk retagging, complex fingerprint-based lookups, tag scripting), the answer is to direct
+them to a dedicated tool like MusicBrainz Picard rather than building that depth into
+Luminous. When scoping a feature request, prefer "good enough, well-integrated" over
+matching a specialist tool's full depth — and when a request is clearly outside that bar,
+recommend the existing dedicated tool instead of expanding scope.
+
 ## Tech Stack
 
 - **Frontend**: SvelteKit + Svelte 5 (Runes) + TypeScript + Tailwind CSS v4
