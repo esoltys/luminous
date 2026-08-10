@@ -14,6 +14,7 @@ function fakeUpdate(overrides: Partial<{ version: string }> = {}) {
 
 describe("UpdaterStore", () => {
   beforeEach(() => {
+    (updaterStore as any).initialized = false;
     updaterStore.updateCheckEnabled = false;
     updaterStore.updateAutoInstall = false;
     updaterStore.checkStatus = "idle";
@@ -38,6 +39,25 @@ describe("UpdaterStore", () => {
     expect(updaterStore.updateAutoInstall).toBe(false);
     expect(updaterStore.checkStatus).toBe("idle");
     expect(updaterStore.updateAvailable).toBe(false);
+  });
+
+  it("init() defaults updateCheckEnabled to true and triggers check", async () => {
+    vi.mocked(check).mockResolvedValueOnce(null);
+    await updaterStore.init();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(updaterStore.updateCheckEnabled).toBe(true);
+    expect(updaterStore.checkStatus).toBe("up-to-date");
+  });
+
+  it("init() is idempotent on subsequent calls", async () => {
+    vi.mocked(check).mockResolvedValueOnce(null);
+    await updaterStore.init();
+
+    const checkCallsAfterFirstInit = vi.mocked(check).mock.calls.length;
+    await updaterStore.init();
+    expect(vi.mocked(check).mock.calls.length).toBe(checkCallsAfterFirstInit);
   });
 
   it("toggles updateCheckEnabled and stops auto-install if disabled", async () => {

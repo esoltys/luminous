@@ -16,6 +16,7 @@
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
+  import { updaterStore } from '../lib/stores/updater.svelte';
   import { onMount } from 'svelte';
   import {
     SIDEBAR_MIN_WIDTH_PX,
@@ -34,6 +35,7 @@
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
     i18n.init();
     prefs.init();
+    updaterStore.init();
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;
