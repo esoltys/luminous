@@ -1027,27 +1027,27 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bpm}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {song.bpm || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.initial_key}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {song.initial_key || "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bitrate}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {song.bitrate ? `${song.bitrate}k` : "—"}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.samplerate}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatSampleRate(song.samplerate)}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.bitdepth}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatBitDepth(song.bitdepth)}
                 </div>
               {/if}
@@ -1057,7 +1057,7 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.filesize}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-mono">
+                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
                   {formatFileSize(song.filesize)}
                 </div>
               {/if}
@@ -1092,7 +1092,7 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.path}
-                <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-mono" title={song.path}>
+                <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
                   {song.path || "—"}
                 </div>
               {/if}
