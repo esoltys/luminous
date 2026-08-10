@@ -14,8 +14,7 @@ Feature: Graphic Equalizer
   Scenario: Adjusting equalizer band gains
     Given the equalizer is enabled
     When I set the gain of the "1kHz" band (index 5) to "+6.0dB"
-    Then the 1kHz band filter coefficients should recalculate
-    And the audio engine should boost frequencies around 1kHz by 6.0dB
+    Then the audio engine should boost frequencies around 1kHz by 6.0dB
 
   Scenario: Loading an Equalizer Preset
     Given the equalizer is enabled

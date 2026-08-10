@@ -6,8 +6,7 @@ Feature: Cover Art Management
   Scenario: Extracting embedded cover art on library scan
     Given a watched directory containing a song with embedded cover art
     When I trigger a library scan
-    Then the scanner should extract the image from the audio file
-    And save it to the covers cache directory with an FNV-1a hash filename
+    Then save it to the covers cache directory with an FNV-1a hash filename
     And the song in the database should have "art_embedded" set to true
     And "art_automatic" set to the cached filename
 
@@ -22,6 +21,4 @@ Feature: Cover Art Management
     Given a song has no embedded cover art
     And there is no cover image file in the song's directory
     When the song is played or loaded in the player
-    Then the player should query the iTunes Search API for the album's cover art
-    And download the artwork to the covers cache directory
-    And update the database with the cached artwork filename in "art_automatic"
+    Then update the database with the cached artwork filename in "art_automatic"

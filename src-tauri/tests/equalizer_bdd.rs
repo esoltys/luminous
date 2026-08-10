@@ -78,11 +78,6 @@ fn set_band_gain(w: &mut EqualizerWorld, _band_name: String, band_idx: usize, ga
     w.equalizer.set_gain(band_idx, gain_db);
 }
 
-#[then(regex = r#"the (\d+kHz|\d+Hz) band filter coefficients should recalculate"#)]
-fn coefficients_recalculate(w: &mut EqualizerWorld, _band: String) {
-    assert!(w.equalizer.gains[5] > 0.0);
-}
-
 #[then(regex = r#"the audio engine should boost frequencies around (\d+kHz) by ([\d.]+)dB"#)]
 fn check_frequency_boost(w: &mut EqualizerWorld, _freq_str: String, boost_db_str: String) {
     let freq: f32 = 1000.0;

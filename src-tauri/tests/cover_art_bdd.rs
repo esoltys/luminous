@@ -55,9 +55,6 @@ fn trigger_scan(w: &mut CoverArtWorld) {
     }
 }
 
-#[then("the scanner should extract the image from the audio file")]
-fn scanner_extracts_image(_w: &mut CoverArtWorld) {}
-
 #[then("save it to the covers cache directory with an FNV-1a hash filename")]
 fn saves_to_hash_filename(w: &mut CoverArtWorld) {
     let conn = w.db.pool.get().expect("db conn failed");
@@ -161,12 +158,6 @@ fn song_played_or_loaded(w: &mut CoverArtWorld) {
     )
     .unwrap();
 }
-
-#[then("the player should query the iTunes Search API for the album's cover art")]
-fn query_itunes_search_api(_w: &mut CoverArtWorld) {}
-
-#[then("download the artwork to the covers cache directory")]
-fn download_artwork_cache(_w: &mut CoverArtWorld) {}
 
 #[then("update the database with the cached artwork filename in \"art_automatic\"")]
 fn update_db_art_automatic(w: &mut CoverArtWorld) {
