@@ -49,8 +49,10 @@ manual.
 ## Post-build
 
 - [ ] Edit the draft GitHub release: replace the auto-generated body with the contents of
-      `docs/release-notes/vX.Y.Z.md`, then publish it (the workflow creates it as a draft
-      with `prerelease: false`, so it's just sitting there until published).
+      `docs/release-notes/vX.Y.Z.md`. Before publishing, toggle "Create a discussion for
+      this release" so it also posts as an Announcement in GitHub Discussions, then
+      publish it (the workflow creates it as a draft with `prerelease: false`, so it's
+      just sitting there until published).
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
