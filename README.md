@@ -24,7 +24,7 @@ Grab the latest build from the **[Releases page](https://github.com/esoltys/lumi
 - **Windows**: download `Luminous_{version}_x64-setup.exe` and run it.
 - **Linux**: download the `.deb` or `.rpm` for your distro from the same release and install it as usual.
 
-> **No AppImage right now.** Tauri's AppImage bundling links against WebKitGTK/Mesa/EGL libraries baked in at build time, and on many host systems that collides with the system's own graphics stack, producing a window that opens fully blank (`Could not create default EGL display: EGL_BAD_PARAMETER`) — this is an [upstream](https://github.com/tauri-apps/tauri/issues/11988) [Tauri/WebKitGTK](https://girishjoshi.io/post/tauri-2.0-appimage-egl-issue-on-wayland/) bug, not something app code can work around, and the only real fix (an experimental, unreleased Tauri bundler branch) isn't stable enough to ship. Use the `.deb`/`.rpm` above, or build your own AppImage locally with `bun run tauri build` (see [Building Luminous](#building-luminous)) — a locally built one links against your own system libraries and doesn't hit this.
+> **No AppImage right now.** Tauri's AppImage bundling links against WebKitGTK/Mesa/EGL libraries baked in at build time, and on many host systems that collides with the system's own graphics stack, producing a window that opens fully blank (`Could not create default EGL display: EGL_BAD_PARAMETER`) — this is an [upstream](https://github.com/tauri-apps/tauri/issues/11988) [Tauri/WebKitGTK](https://girishjoshi.io/post/tauri-2.0-appimage-egl-issue-on-wayland/) bug, not something app code can work around, and the only real fix (an experimental, unreleased Tauri bundler branch) isn't stable enough to ship. Use the `.deb`/`.rpm` above, or build your own AppImage locally with `bun run tauri build -b appimage` (see [Building Luminous](#building-luminous)) — a locally built one links against your own system libraries and doesn't hit this.
 
 ---
 
@@ -119,6 +119,10 @@ bun run tauri dev
 Production bundles include updater artifacts, which must be signed. If you haven't generated a signing keypair yet, see [Generating an Updater Signing Key](#generating-an-updater-signing-key) below first.
 ```bash
 bun run tauri build
+```
+This produces `.deb`/`.rpm` on Linux — `appimage` was dropped from the default bundle targets (see [Quick Install](#quick-install)) because CI-built AppImages hit an unfixable upstream WebKitGTK/EGL bug. To build an AppImage anyway for local use, which links against your own system libraries and doesn't hit that bug:
+```bash
+bun run tauri build -b appimage
 ```
 > On rolling-release distros (Arch/CachyOS), the AppImage step bundles `strip` binaries too old to handle the RELR relocations in current system libraries. `bun run tauri build` sets `NO_STRIP=true` for this automatically, so no extra steps are needed here — it only skips stripping debug symbols from vendored libraries, slightly increasing AppImage size.
 
