@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap');</style>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5b6478"/></marker>
+    <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#626fe8"/></marker>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#f7f7fa"/>
+
+  <!-- Zone: Rust Backend (drawn before arrows and nodes) -->
+  <rect x="700" y="120" width="260" height="292" rx="8"
+        fill="rgba(20,21,28,0.02)" stroke="rgba(20,21,28,0.10)" stroke-width="0.8"/>
+  <rect x="768" y="124" width="124" height="12" rx="2" fill="#f7f7fa"/>
+  <text x="830" y="133" fill="rgba(20,21,28,0.40)" font-size="7" font-family="'Geist Mono', monospace"
+        text-anchor="middle" letter-spacing="0.14em">RUST BACKEND</text>
+
+  <!-- Arrows (behind nodes) -->
+  <!-- Invoke: Frontend -> IPC -> Backend (accent, primary flow) -->
+  <line x1="216" y1="228" x2="436" y2="228" stroke="#626fe8" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+  <line x1="564" y1="228" x2="700" y2="228" stroke="#626fe8" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+
+  <!-- Events: Backend -> IPC -> Frontend (dashed, return/async) -->
+  <path d="M 700,252 H 564" fill="none" stroke="#5b6478" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <path d="M 436,252 H 216" fill="none" stroke="#5b6478" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+  <!-- Arrow labels -->
+  <rect x="284" y="212" width="56" height="12" rx="2" fill="#f7f7fa"/>
+  <text x="312" y="221" fill="#626fe8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INVOKE</text>
+
+  <rect x="284" y="258" width="56" height="12" rx="2" fill="#f7f7fa"/>
+  <text x="312" y="267" fill="#5b6478" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EVENTS</text>
+
+  <!-- Node: Svelte 5 Frontend -->
+  <rect x="40" y="208" width="176" height="64" rx="6" fill="#f7f7fa"/>
+  <rect x="40" y="208" width="176" height="64" rx="6" fill="#ffffff" stroke="#14151c" stroke-width="1"/>
+  <rect x="48" y="216" width="24" height="12" rx="2" fill="transparent" stroke="rgba(20,21,28,0.40)" stroke-width="0.8"/>
+  <text x="60" y="225" fill="#14151c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+  <text x="128" y="244" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Svelte 5 Frontend</text>
+  <text x="128" y="260" fill="#5b6478" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">UI, state &amp; rendering</text>
+
+  <!-- Node: Tauri IPC (focal) -->
+  <rect x="436" y="208" width="128" height="64" rx="6" fill="#f7f7fa"/>
+  <rect x="436" y="208" width="128" height="64" rx="6" fill="rgba(98,111,232,0.08)" stroke="#626fe8" stroke-width="1"/>
+  <rect x="444" y="216" width="28" height="12" rx="2" fill="transparent" stroke="rgba(98,111,232,0.50)" stroke-width="0.8"/>
+  <text x="458" y="225" fill="#626fe8" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">IPC</text>
+  <text x="500" y="244" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Tauri IPC</text>
+  <text x="500" y="260" fill="#5b6478" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">commands · events</text>
+
+  <!-- Node: Audio decoding &amp; playback -->
+  <rect x="720" y="160" width="220" height="48" rx="6" fill="#f7f7fa"/>
+  <rect x="720" y="160" width="220" height="48" rx="6" fill="#ffffff" stroke="#14151c" stroke-width="1"/>
+  <rect x="728" y="166" width="40" height="12" rx="2" fill="transparent" stroke="rgba(20,21,28,0.40)" stroke-width="0.8"/>
+  <text x="748" y="175" fill="#14151c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUDIO</text>
+  <text x="830" y="189" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Audio decode &amp; playback</text>
+
+  <!-- Node: SQLite library index -->
+  <rect x="720" y="224" width="220" height="48" rx="6" fill="#f7f7fa"/>
+  <rect x="720" y="224" width="220" height="48" rx="6" fill="rgba(20,21,28,0.05)" stroke="#5b6478" stroke-width="1"/>
+  <rect x="728" y="230" width="24" height="12" rx="2" fill="transparent" stroke="rgba(91,100,120,0.50)" stroke-width="0.8"/>
+  <text x="740" y="239" fill="#5b6478" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+  <text x="830" y="253" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SQLite library index</text>
+
+  <!-- Node: File scanning -->
+  <rect x="720" y="288" width="220" height="48" rx="6" fill="#f7f7fa"/>
+  <rect x="720" y="288" width="220" height="48" rx="6" fill="#ffffff" stroke="#14151c" stroke-width="1"/>
+  <rect x="728" y="294" width="36" height="12" rx="2" fill="transparent" stroke="rgba(20,21,28,0.40)" stroke-width="0.8"/>
+  <text x="746" y="303" fill="#14151c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SCAN</text>
+  <text x="830" y="317" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">File scanning</text>
+
+  <!-- Node: OS media integration -->
+  <rect x="720" y="352" width="220" height="48" rx="6" fill="#f7f7fa"/>
+  <rect x="720" y="352" width="220" height="48" rx="6" fill="#ffffff" stroke="#14151c" stroke-width="1"/>
+  <rect x="728" y="358" width="40" height="12" rx="2" fill="transparent" stroke="rgba(20,21,28,0.40)" stroke-width="0.8"/>
+  <text x="748" y="367" fill="#14151c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MEDIA</text>
+  <text x="830" y="381" fill="#14151c" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">OS media integration</text>
+
+  <!-- Legend strip -->
+  <line x1="40" y1="428" x2="960" y2="428" stroke="rgba(20,21,28,0.10)" stroke-width="0.8"/>
+  <text x="40" y="444" fill="#5b6478" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+  <rect x="40" y="460" width="14" height="10" rx="2" fill="rgba(98,111,232,0.08)" stroke="#626fe8" stroke-width="1"/>
+  <text x="60" y="468" fill="#5b6478" font-size="8.5" font-family="'Geist', sans-serif">IPC boundary</text>
+
+  <rect x="190" y="460" width="14" height="10" rx="2" fill="#ffffff" stroke="#14151c" stroke-width="1"/>
+  <text x="210" y="468" fill="#5b6478" font-size="8.5" font-family="'Geist', sans-serif">Component</text>
+
+  <line x1="330" y1="465" x2="358" y2="465" stroke="#626fe8" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+  <text x="366" y="468" fill="#5b6478" font-size="8.5" font-family="'Geist', sans-serif">Invoke commands</text>
+
+  <line x1="510" y1="465" x2="538" y2="465" stroke="#5b6478" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+  <text x="546" y="468" fill="#5b6478" font-size="8.5" font-family="'Geist', sans-serif">Emit events</text>
+</svg>
