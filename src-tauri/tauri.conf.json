@@ -33,8 +33,7 @@
     "targets": [
       "nsis",
       "deb",
-      "rpm",
-      "appimage"
+      "rpm"
     ],
     "createUpdaterArtifacts": true,
     "publisher": "Eric James Soltys (https://esoltys.dev/luminous/)",

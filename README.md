@@ -22,7 +22,9 @@ Luminous is a fast, local-first player for your own audio library — no streami
 Grab the latest build from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)**.
 
 - **Windows**: download `Luminous_{version}_x64-setup.exe` and run it.
-- **Linux**: download the `.deb`, `.rpm`, or `.AppImage` for your distro from the same release and install/run it as usual.
+- **Linux**: download the `.deb` or `.rpm` for your distro from the same release and install it as usual.
+
+> **No AppImage right now.** Tauri's AppImage bundling links against WebKitGTK/Mesa/EGL libraries baked in at build time, and on many host systems that collides with the system's own graphics stack, producing a window that opens fully blank (`Could not create default EGL display: EGL_BAD_PARAMETER`) — this is an [upstream](https://github.com/tauri-apps/tauri/issues/11988) [Tauri/WebKitGTK](https://girishjoshi.io/post/tauri-2.0-appimage-egl-issue-on-wayland/) bug, not something app code can work around, and the only real fix (an experimental, unreleased Tauri bundler branch) isn't stable enough to ship. Use the `.deb`/`.rpm` above, or build your own AppImage locally with `bun run tauri build` (see [Building Luminous](#building-luminous)) — a locally built one links against your own system libraries and doesn't hit this.
 
 ---
 
