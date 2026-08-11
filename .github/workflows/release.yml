@@ -11,6 +11,12 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
+      # Serialized (not parallel): tauri-action creates the draft release if
+      # it doesn't exist yet, and both platforms running at once raced to
+      # create two separate drafts with split assets and incompatible
+      # updater manifests (v0.99.2). Running one platform at a time means
+      # the second always finds and reuses the first's draft.
+      max-parallel: 1
       matrix:
         platform: [ubuntu-24.04, windows-latest]
 
