@@ -59,7 +59,10 @@ fn write_test_wav(path: &std::path::Path, seconds: f32) {
 async fn smoke_full_pipeline() {
     let temp_dir = tempfile::tempdir().expect("temp dir");
     let song_path = temp_dir.path().join("smoke_test_tone.wav");
-    write_test_wav(&song_path, 2.0);
+    // Long enough that the cumulative sleeps below (start + seek + pause +
+    // resume) can't run past the end of the track and turn a real "the song
+    // finished" Stopped transition into a flaky pause/resume assertion.
+    write_test_wav(&song_path, 6.0);
 
     // --- Tag writing (real lofty write to a real file on disk) ---
     tageditor::write_tags(
