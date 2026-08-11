@@ -79,4 +79,67 @@ jobs:
           $url = "https://github.com/esoltys/luminous/releases/download/v$ver/Luminous_${ver}_x64-setup.exe"
           wingetcreate update EricSoltys.Luminous --version $ver --urls $url --token ${{ secrets.WINGET_PAT }}
 
+  deploy-hosted-binary:
+    name: Deploy Hosted Binary for Store & Cleanup Old Versions
+    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract release version
+        id: get_version
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
+
+      - name: Checkout website repository
+        uses: actions/checkout@v4
+        with:
+          repository: esoltys/esoltys.github.io
+          token: ${{ secrets.WINGET_PAT }}
+          path: website
+
+      - name: Update binary and clean up old versions
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          DOWNLOAD_DIR="website/luminous/downloads"
+          
+          # Clean up previous version directories
+          rm -rf "$DOWNLOAD_DIR"/*
+          mkdir -p "$DOWNLOAD_DIR/v$VERSION"
+          
+          # Download installer from release asset
+          curl -sL -o "$DOWNLOAD_DIR/v$VERSION/Luminous_${VERSION}_x64-setup.exe" "https://github.com/esoltys/luminous/releases/download/v${VERSION}/Luminous_${VERSION}_x64-setup.exe"
+          
+          cd website
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add luminous/downloads
+          git commit -m "chore: publish Luminous v${VERSION} setup binary for Microsoft Store" || echo "No changes"
+          git push origin main
+
+  microsoft-store:
+    name: Publish to Microsoft Store
+    needs: deploy-hosted-binary
+    if: secrets.STORE_APP_ID != '' && ((github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract release version
+        id: get_version
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
+
+      - name: Submit to Microsoft Store
+        uses: microsoft/store-submission@v1
+        with:
+          tenant-id: ${{ secrets.STORE_TENANT_ID }}
+          client-id: ${{ secrets.STORE_CLIENT_ID }}
+          client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
+          app-id: ${{ secrets.STORE_APP_ID }}
+          package-path: "https://esoltys.dev/luminous/downloads/v${{ steps.get_version.outputs.version }}/Luminous_${{ steps.get_version.outputs.version }}_x64-setup.exe"
+
+
 
