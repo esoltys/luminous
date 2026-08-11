@@ -102,6 +102,14 @@ fn build_prevent_default_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlug
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The AppImage bundles its own WebKitGTK (built on the CI runner), which
+    // can be substantially older than the host's system WebKitGTK. Older
+    // WebKitGTK builds' accelerated compositing path is known to render a
+    // blank window against newer Mesa/Wayland stacks; disabling compositing
+    // mode avoids that without touching DMA-BUF handling, which the line
+    // below already covers separately (#370).
+    #[cfg(target_os = "linux")]
+    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     #[cfg(target_os = "linux")]
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
 
