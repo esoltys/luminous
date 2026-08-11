@@ -34,26 +34,7 @@ Luminous splits cleanly along the Tauri boundary: a Svelte 5 frontend handles UI
 
 The IPC commands are deliberately *deep*: each one owns a whole workflow rather than forwarding a single field. The backend owns the built-in Queue (bootstrapped at startup, exposed via an `is_queue` flag — the frontend never infers it from a name), applies equalizer changes as one whole-config call, and keeps every dynamic playlist — genre/decade/BPM auto playlists and user smart playlists alike — *always complete*: whenever the library or a song's stats change, a backend reconciler immediately appends newly-matching songs and evicts stale ones, syncing the live play order without ever reshuffling it. There is no refill logic, and no such setting, anywhere in the frontend.
 
-```mermaid
-flowchart TD
-    subgraph Frontend["Svelte 5 Frontend"]
-        UI["UI, state & rendering"]
-    end
-
-    IPC{{"Tauri IPC"}}
-
-    subgraph Backend["Rust Backend"]
-        Audio["Audio decoding & playback"]
-        DB["SQLite library index"]
-        Scan["File scanning"]
-        Media["OS media integration"]
-    end
-
-    Frontend ~~~ Backend
-
-    UI -- "invoke commands" --> IPC --> Backend
-    Backend -- "emit events (position, scan progress, now-playing metadata)" --> IPC --> UI
-```
+![Luminous architecture: Svelte 5 frontend and Rust backend split along the Tauri IPC boundary](./docs/architecture.svg)
 
 ```
 luminous/
