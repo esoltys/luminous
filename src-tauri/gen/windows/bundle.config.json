@@ -1,0 +1,22 @@
+{
+  "publisher": "CN=D497347D-E082-41C5-8B70-20EA278E5213",
+  "publisherDisplayName": "Eric James Soltys",
+  "capabilities": {
+    "general": [
+      "internetClient"
+    ]
+  },
+  "extensions": {
+    "shareTarget": false,
+    "fileAssociations": [],
+    "protocolHandlers": []
+  },
+  "signing": {
+    "pfx": null,
+    "pfxPassword": null
+  },
+  "resourceIndex": {
+    "enabled": false,
+    "keepConfig": false
+  }
+}
