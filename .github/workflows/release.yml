@@ -145,7 +145,6 @@ jobs:
           TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
 
       - name: Submit to Microsoft Store
-        if: ${{ secrets.STORE_APP_ID != '' }}
         uses: microsoft/store-submission@v1
         with:
           tenant-id: ${{ secrets.STORE_TENANT_ID }}
