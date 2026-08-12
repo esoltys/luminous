@@ -9,18 +9,55 @@ on:
   workflow_dispatch:
 
 jobs:
+  create-release:
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      release_id: ${{ steps.release.outputs.id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Release Tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+            TAG="v${VERSION}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Create the draft release once, up front, so both matrix legs below
+      # can run in parallel and upload into the same release instead of each
+      # racing to create their own draft (split assets, incompatible updater
+      # manifests — this bit us in v0.99.2).
+      - name: Create or reuse draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if ID=$(gh release view "$TAG" --json id -q .id 2>/dev/null); then
+            echo "Found existing release $ID for $TAG"
+          else
+            gh release create "$TAG" --draft --title "Luminous $TAG" --notes "Release of Luminous $TAG."
+            ID=$(gh release view "$TAG" --json id -q .id)
+          fi
+          echo "id=${ID}" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: create-release
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
     strategy:
       fail-fast: false
-      # Serialized (not parallel): tauri-action creates the draft release if
-      # it doesn't exist yet, and both platforms running at once raced to
-      # create two separate drafts with split assets and incompatible
-      # updater manifests (v0.99.2). Running one platform at a time means
-      # the second always finds and reuses the first's draft.
-      max-parallel: 1
       matrix:
         platform: [ubuntu-24.04, windows-latest]
 
@@ -43,33 +80,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Determine Release Tag
-        id: tag
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          else
-            VERSION=$(node -p "require('./package.json').version")
-            TAG="v${VERSION}"
-          fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      - name: Cache Tauri bundler tools (NSIS/WiX)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/AppData/Local/tauri/NSIS
+            ~/AppData/Local/tauri/WixTools*
+          key: tauri-bundler-tools-windows
 
+      # tauri-apps/binary-releases (source of the NSIS toolchain) occasionally
+      # returns transient 503s, which fails the whole matrix leg. Retry a
+      # couple of times before giving up.
       - name: Build and Release
-        uses: tauri-apps/tauri-action@v0
+        uses: Wandalen/wretry.action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ steps.tag.outputs.tag }}
-          releaseName: 'Luminous ${{ steps.tag.outputs.tag }}'
-          releaseBody: 'Release of Luminous ${{ steps.tag.outputs.tag }}.'
-          releaseDraft: true
-          prerelease: false
+          action: tauri-apps/tauri-action@v0
+          attempt_limit: 3
+          attempt_delay: 15000
+          with: |
+            releaseId: ${{ needs.create-release.outputs.release_id }}
+            tagName: ${{ needs.create-release.outputs.tag }}
+            releaseDraft: true
+            prerelease: false
 
       - name: Build MSIX Package (Windows)
         if: matrix.platform == 'windows-latest'
+        # src-tauri is a workspace member (see root Cargo.toml), so Cargo's
+        # shared target dir lives at the workspace root, not src-tauri/target.
+        # tauri-windows-bundle assumes the latter unless told otherwise.
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           cargo install tauri-cli
           bun run tauri:windows:build
@@ -78,64 +123,12 @@ jobs:
         if: matrix.platform == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ needs.create-release.outputs.tag }}
           files: |
-            src-tauri/target/msix/*.msix
-            src-tauri/target/msix/*.msixbundle
+            target/msix/*.msix
+            target/msix/*.msixbundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  winget:
-    name: Publish to Winget
-    needs: release
-    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    runs-on: windows-latest
-    steps:
-      - name: Extract release version
-        id: get_version
-        shell: bash
-        run: |
-          VERSION="${TAG_NAME#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
-
-      - name: Install wingetcreate
-        run: winget install Microsoft.WingetCreate --disable-interactivity --accept-source-agreements
-
-      - name: Submit package update using wingetcreate
-        run: |
-          $ver = "${{ steps.get_version.outputs.version }}"
-          $url = "https://github.com/esoltys/luminous/releases/download/v$ver/Luminous_${ver}_x64-setup.exe"
-          wingetcreate update EricSoltys.Luminous --version $ver --urls $url --token ${{ secrets.WINGET_PAT }}
-
-  microsoft-store:
-    name: Publish to Microsoft Store
-    needs: release
-    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    steps:
-      - name: Extract release version
-        id: get_version
-        run: |
-          VERSION="${TAG_NAME#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
-
-      - name: Submit to Microsoft Store
-        uses: microsoft/store-submission@v1
-        with:
-          tenant-id: ${{ secrets.STORE_TENANT_ID }}
-          client-id: ${{ secrets.STORE_CLIENT_ID }}
-          client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
-          app-id: ${{ secrets.STORE_APP_ID }}
-          package-path: "https://github.com/esoltys/luminous/releases/download/v${{ steps.get_version.outputs.version }}/Luminous_${{ steps.get_version.outputs.version }}_x64.msix"
-
 
 
 
