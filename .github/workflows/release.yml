@@ -153,7 +153,7 @@ jobs:
       - name: Submit package update using wingetcreate
         run: |
           $ver = "${{ steps.get_version.outputs.version }}"
-          $url = "https://github.com/esoltys/luminous/releases/download/v$ver/Luminous_${ver}_x64-setup.exe"
+          $url = "https://github.com/esoltys/luminous/releases/download/v$ver/LuminousMusicPlayer_${ver}_x64-setup.exe"
           wingetcreate update EricSoltys.Luminous --version $ver --urls $url --token ${{ secrets.WINGET_PAT }}
 
   microsoft-store:
@@ -169,6 +169,9 @@ jobs:
         run: |
           VERSION="${TAG_NAME#v}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          # tauri-windows-bundle pads to a four-part version (X.Y.Z -> X.Y.Z.0)
+          # for the MSIX filename.
+          echo "msix_version=${VERSION}.0" >> $GITHUB_OUTPUT
         env:
           TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
 
@@ -179,7 +182,7 @@ jobs:
           client-id: ${{ secrets.STORE_CLIENT_ID }}
           client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
           app-id: ${{ secrets.STORE_APP_ID }}
-          package-path: "https://github.com/esoltys/luminous/releases/download/v${{ steps.get_version.outputs.version }}/Luminous_${{ steps.get_version.outputs.version }}_x64.msix"
+          package-path: "https://github.com/esoltys/luminous/releases/download/v${{ steps.get_version.outputs.version }}/LuminousMusicPlayer_${{ steps.get_version.outputs.msix_version }}_x64.msix"
 
 
 
