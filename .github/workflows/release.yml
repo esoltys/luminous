@@ -124,6 +124,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.create-release.outputs.tag }}
+          # softprops/action-gh-release publishes the release if `draft` is
+          # omitted - it doesn't preserve the existing draft state.
+          draft: true
           files: |
             target/msix/*.msix
             target/msix/*.msixbundle
