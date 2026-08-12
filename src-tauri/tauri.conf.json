@@ -32,6 +32,7 @@
     "active": true,
     "targets": [
       "nsis",
+      "msix",
       "deb",
       "rpm"
     ],
@@ -249,6 +250,10 @@
     "windows": {
       "nsis": {
         "installerHooks": "windows/installer-hooks.nsh"
+      },
+      "msix": {
+        "publisher": "CN=D497347D-E082-41C5-8B70-20EA278E5213",
+        "identityName": "39231EricJamesSoltys.LuminousMusicPlayer"
       }
     },
     "linux": {
