@@ -39,15 +39,17 @@ jobs:
       # manifests — this bit us in v0.99.2).
       - name: Create or reuse draft release
         id: release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: 'Luminous ${{ steps.tag.outputs.tag }}'
-          body: 'Release of Luminous ${{ steps.tag.outputs.tag }}.'
-          draft: true
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if ID=$(gh release view "$TAG" --json id -q .id 2>/dev/null); then
+            echo "Found existing release $ID for $TAG"
+          else
+            gh release create "$TAG" --draft --title "Luminous $TAG" --notes "Release of Luminous $TAG."
+            ID=$(gh release view "$TAG" --json id -q .id)
+          fi
+          echo "id=${ID}" >> "$GITHUB_OUTPUT"
 
   release:
     needs: create-release
