@@ -86,6 +86,11 @@ jobs:
 
       - name: Build MSIX Package (Windows)
         if: matrix.platform == 'windows-latest'
+        # src-tauri is a workspace member (see root Cargo.toml), so Cargo's
+        # shared target dir lives at the workspace root, not src-tauri/target.
+        # tauri-windows-bundle assumes the latter unless told otherwise.
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           cargo install tauri-cli
           bun run tauri:windows:build
@@ -96,8 +101,8 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           files: |
-            src-tauri/target/msix/*.msix
-            src-tauri/target/msix/*.msixbundle
+            target/msix/*.msix
+            target/msix/*.msixbundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
