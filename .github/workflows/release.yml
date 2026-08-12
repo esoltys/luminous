@@ -130,57 +130,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  winget:
-    name: Publish to Winget
-    needs: release
-    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    runs-on: windows-latest
-    steps:
-      - name: Extract release version
-        id: get_version
-        shell: bash
-        run: |
-          VERSION="${TAG_NAME#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
-
-      - name: Install wingetcreate
-        run: winget install Microsoft.WingetCreate --disable-interactivity --accept-source-agreements
-
-      - name: Submit package update using wingetcreate
-        run: |
-          $ver = "${{ steps.get_version.outputs.version }}"
-          $url = "https://github.com/esoltys/luminous/releases/download/v$ver/Luminous_${ver}_x64-setup.exe"
-          wingetcreate update EricSoltys.Luminous --version $ver --urls $url --token ${{ secrets.WINGET_PAT }}
-
-  microsoft-store:
-    name: Publish to Microsoft Store
-    needs: release
-    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    steps:
-      - name: Extract release version
-        id: get_version
-        run: |
-          VERSION="${TAG_NAME#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
-
-      - name: Submit to Microsoft Store
-        uses: microsoft/store-submission@v1
-        with:
-          tenant-id: ${{ secrets.STORE_TENANT_ID }}
-          client-id: ${{ secrets.STORE_CLIENT_ID }}
-          client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
-          app-id: ${{ secrets.STORE_APP_ID }}
-          package-path: "https://github.com/esoltys/luminous/releases/download/v${{ steps.get_version.outputs.version }}/Luminous_${{ steps.get_version.outputs.version }}_x64.msix"
-
-
 
 
