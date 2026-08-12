@@ -105,6 +105,7 @@ jobs:
           with: |
             releaseId: ${{ needs.create-release.outputs.release_id }}
             tagName: ${{ needs.create-release.outputs.tag }}
+            releaseDraft: true
             prerelease: false
 
       - name: Build MSIX Package (Windows)
