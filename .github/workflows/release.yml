@@ -55,18 +55,34 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-      - name: Build and Release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Cache Tauri bundler tools (NSIS/WiX)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
         with:
-          tagName: ${{ steps.tag.outputs.tag }}
-          releaseName: 'Luminous ${{ steps.tag.outputs.tag }}'
-          releaseBody: 'Release of Luminous ${{ steps.tag.outputs.tag }}.'
-          releaseDraft: true
-          prerelease: false
+          path: |
+            ~/AppData/Local/tauri/NSIS
+            ~/AppData/Local/tauri/WixTools*
+          key: tauri-bundler-tools-windows
+
+      # tauri-apps/binary-releases (source of the NSIS toolchain) occasionally
+      # returns transient 503s, which fails the whole matrix leg. Retry a
+      # couple of times before giving up.
+      - name: Build and Release
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: tauri-apps/tauri-action@v0
+          attempt_limit: 3
+          attempt_delay: 15000
+          env: |
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          with: |
+            tagName: ${{ steps.tag.outputs.tag }}
+            releaseName: 'Luminous ${{ steps.tag.outputs.tag }}'
+            releaseBody: 'Release of Luminous ${{ steps.tag.outputs.tag }}.'
+            releaseDraft: true
+            prerelease: false
 
       - name: Build MSIX Package (Windows)
         if: matrix.platform == 'windows-latest'
