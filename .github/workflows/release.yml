@@ -69,14 +69,14 @@ jobs:
       # couple of times before giving up.
       - name: Build and Release
         uses: Wandalen/wretry.action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           action: tauri-apps/tauri-action@v0
           attempt_limit: 3
           attempt_delay: 15000
-          env: |
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-            TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           with: |
             tagName: ${{ steps.tag.outputs.tag }}
             releaseName: 'Luminous ${{ steps.tag.outputs.tag }}'
