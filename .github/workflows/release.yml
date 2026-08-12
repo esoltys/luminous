@@ -133,7 +133,7 @@ jobs:
   microsoft-store:
     name: Publish to Microsoft Store
     needs: deploy-hosted-binary
-    if: secrets.STORE_APP_ID != '' && ((github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch')
+    if: (github.event_name == 'release' && github.event.action == 'published') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Extract release version
@@ -145,6 +145,7 @@ jobs:
           TAG_NAME: ${{ github.event.release.tag_name || github.ref_name }}
 
       - name: Submit to Microsoft Store
+        if: ${{ secrets.STORE_APP_ID != '' }}
         uses: microsoft/store-submission@v1
         with:
           tenant-id: ${{ secrets.STORE_TENANT_ID }}
@@ -152,6 +153,7 @@ jobs:
           client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
           app-id: ${{ secrets.STORE_APP_ID }}
           package-path: "https://esoltys.dev/luminous/downloads/v${{ steps.get_version.outputs.version }}/Luminous_${{ steps.get_version.outputs.version }}_x64-setup.exe"
+
 
 
 
