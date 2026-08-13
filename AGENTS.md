@@ -158,6 +158,21 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Database access uses indices, FTS5 for track/album search, and prepared statements.
 - Band waveform/FFT analysis runs on a background thread and must not block playback.
 
+## Issue Priority Labels
+
+Open issues in the "2.0" milestone carry a `P1`–`P4` label indicating priority for work after
+1.0 ships. Use this scheme when picking up 2.0 work or triaging a new issue into it:
+
+- **P1** — real (non-cosmetic) bugs, plus foundational/first-run work that other issues depend on.
+- **P2** — features touched often, expected for parity with comparable desktop music players, or
+  that encourage exploring the library (cover art, artist bios and connections, browsing by
+  genre) rather than just playing tracks.
+- **P3** — lower-frequency or power-user features, and cosmetic/low-severity bugs.
+- **P4** — speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
+
+Pull current state with `gh issue list --milestone "2.0" --label P1` (swap the label for
+P2–P4). Don't default new issues to P2/P3 — assign a label using the same criteria above.
+
 ## Version Control
 
 - Make atomic git commits at logical points (e.g., after completing each task phase, after scaffolding, after adding a major feature).
