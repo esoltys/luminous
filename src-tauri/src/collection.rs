@@ -1910,45 +1910,47 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         song.album = tag.album().map(|a| a.to_string());
         song.genre = tag.genre().map(|g| g.to_string());
         song.comment = tag.comment().map(|c| c.to_string());
-        song.year = tag.year().map(|y| y as i32);
+        song.year = tag
+            .get_string(ItemKey::Year)
+            .and_then(|s| s.trim().parse::<i32>().ok());
         song.track = tag.track().map(|t| t as i32);
         song.disc = tag.disk().map(|d| d as i32);
 
         // Album artist (various tag formats store this differently)
-        song.album_artist = tag.get_string(&ItemKey::AlbumArtist).map(|s| s.to_string());
+        song.album_artist = tag.get_string(ItemKey::AlbumArtist).map(|s| s.to_string());
 
         // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
         // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
         song.compilation = tag
-            .get_string(&ItemKey::FlagCompilation)
+            .get_string(ItemKey::FlagCompilation)
             .map(|s| s.trim() == "1")
             .unwrap_or(false);
 
-        song.composer = tag.get_string(&ItemKey::Composer).map(|s| s.to_string());
+        song.composer = tag.get_string(ItemKey::Composer).map(|s| s.to_string());
 
-        song.lyrics = tag.get_string(&ItemKey::Lyrics).map(|s| s.to_string());
+        song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
 
         song.grouping = tag
-            .get_string(&ItemKey::ContentGroup)
+            .get_string(ItemKey::ContentGroup)
             .map(|s| s.to_string());
-        song.initial_key = tag.get_string(&ItemKey::InitialKey).map(|s| s.to_string());
+        song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
         // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
         // store it as freeform text — check both generic keys to cover either.
         // Some taggers write "0" as an "unknown tempo" sentinel rather than
         // omitting the tag — treat that the same as absent, since 0 is never a
         // real tempo.
         song.bpm = tag
-            .get_string(&ItemKey::IntegerBpm)
-            .or_else(|| tag.get_string(&ItemKey::Bpm))
+            .get_string(ItemKey::IntegerBpm)
+            .or_else(|| tag.get_string(ItemKey::Bpm))
             .and_then(|s| s.trim().parse::<f32>().ok())
             .filter(|&b| b > 0.0);
 
         // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
         song.replaygain_track_gain = tag
-            .get_string(&ItemKey::ReplayGainTrackGain)
+            .get_string(ItemKey::ReplayGainTrackGain)
             .and_then(parse_replaygain_db);
         song.replaygain_album_gain = tag
-            .get_string(&ItemKey::ReplayGainAlbumGain)
+            .get_string(ItemKey::ReplayGainAlbumGain)
             .and_then(parse_replaygain_db);
 
         song.art_embedded = !tag.pictures().is_empty();
