@@ -1422,7 +1422,7 @@ impl Player {
             return;
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let current_real_idx = if let Some(pos) = self.current_index {
             let idx = if self.shuffle_order.is_empty() {

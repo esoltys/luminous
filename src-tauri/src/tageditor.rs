@@ -157,26 +157,26 @@ pub fn write_tags(
         tag.insert_text(lofty::tag::ItemKey::IntegerBpm, bpm_str.clone());
         tag.insert_text(lofty::tag::ItemKey::Bpm, bpm_str);
     } else {
-        tag.remove_key(&lofty::tag::ItemKey::IntegerBpm);
-        tag.remove_key(&lofty::tag::ItemKey::Bpm);
+        tag.remove_key(lofty::tag::ItemKey::IntegerBpm);
+        tag.remove_key(lofty::tag::ItemKey::Bpm);
     }
 
     if let Some(t) = track {
         tag.set_track(t);
     } else {
-        tag.remove_key(&lofty::tag::ItemKey::TrackNumber);
+        tag.remove_key(lofty::tag::ItemKey::TrackNumber);
     }
 
     if let Some(d) = disc {
         tag.set_disk(d);
     } else {
-        tag.remove_key(&lofty::tag::ItemKey::DiscNumber);
+        tag.remove_key(lofty::tag::ItemKey::DiscNumber);
     }
 
     if let Some(y) = year {
-        tag.set_year(y);
+        tag.insert_text(lofty::tag::ItemKey::Year, y.to_string());
     } else {
-        tag.remove_key(&lofty::tag::ItemKey::Year);
+        tag.remove_key(lofty::tag::ItemKey::Year);
     }
 
     if tag.pictures().is_empty() && !original_pictures.is_empty() {

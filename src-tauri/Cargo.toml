@@ -70,7 +70,7 @@ ringbuf = "0.5"
 rubato = "4.0"
 
 # --- Tag reading/writing ---
-lofty = "0.21"
+lofty = "0.25"
 
 # --- FFT (spectrum analyzer, band waveform) ---
 rustfft = "6"
@@ -105,7 +105,7 @@ log = "0.4"
 walkdir = "2"
 chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
-rand = "0.8"
+rand = "0.10"
 percent-encoding = "2"
 
 # --- Data-parallel tag reading during library scan ---
