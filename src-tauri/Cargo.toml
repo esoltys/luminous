@@ -70,7 +70,7 @@ ringbuf = "0.5"
 rubato = "4.0"
 
 # --- Tag reading/writing ---
-lofty = "0.21"
+lofty = "0.25"
 
 # --- FFT (spectrum analyzer, band waveform) ---
 rustfft = "6"
