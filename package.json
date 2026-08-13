@@ -42,7 +42,7 @@
     "@sveltejs/kit": "^2.70.2",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@tauri-apps/cli": "^2",
-    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.1.2",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
