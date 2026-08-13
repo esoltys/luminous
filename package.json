@@ -52,7 +52,7 @@
     "svelte": "^5.56.8",
     "svelte-check": "^4.7.5",
     "typescript": "~6.0.3",
-    "vite": "^8.2.0",
+    "vite": "^8.2.1",
     "vitest": "^4.1.10",
     "@choochmeque/tauri-windows-bundle": "^0.1.28"
   },
