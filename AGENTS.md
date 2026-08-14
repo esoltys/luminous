@@ -158,6 +158,20 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - Database access uses indices, FTS5 for track/album search, and prepared statements.
 - Band waveform/FFT analysis runs on a background thread and must not block playback.
 
+## Branching Model
+
+- **`main`** is the rolling 1.x release line. Milestone-1 fixes (and any 1.x feature work) land
+  here and ship as rolling releases (1.1, 1.25, 1.44, etc.) per `docs/RELEASE_CHECKLIST.md`.
+- **`next`** is the long-lived 2.0 feature-integration branch. New stories tracked under the
+  "2.0" GitHub Milestone (see Issue Priority Labels below) target PRs at `next`, not `main`.
+  `next` is a branch name — don't confuse it with the "2.0" Milestone used for issue triage;
+  they're two different things that happen to be about the same release.
+- Keep `next` current by periodically merging `main` into it (`git merge origin/main`, no
+  automated sync) — at minimum before starting a new round of 2.0 work, and always right before
+  eventually merging `next` back into `main`.
+- When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
+  new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
+
 ## Issue Priority Labels
 
 Open issues in the "2.0" milestone carry a `P1`–`P4` label indicating priority for work after
