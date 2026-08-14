@@ -41,9 +41,22 @@ manual.
 ## Cut the release
 
 - [ ] `bun run release <version>` to bump the version, run checks, commit, and tag
-      locally — then `bun run release <version> --push` (or push manually) to trigger
-      [`release.yml`](../.github/workflows/release.yml), which builds signed Linux +
-      Windows bundles and drafts a GitHub release.
+      locally on the release worktree branch. Don't pass `--push` — that pushes the
+      branch straight to `main`, bypassing branch protection and skipping review.
+- [ ] Open a PR from the release branch into `main` and get it reviewed/merged like any
+      other change.
+- [ ] After the PR merges, `git checkout main && git pull` so `main` includes the merge
+      commit, then re-tag `main` at that commit (the local tag from `bun run release`
+      still points at the old worktree-branch commit, which is not `main`'s tip once
+      merged):
+  ```bash
+  git tag -d vX.Y.Z
+  git tag -a vX.Y.Z -m "Release vX.Y.Z"
+  git push origin vX.Y.Z
+  ```
+  Pushing the tag (not `main` itself) is what triggers
+  [`release.yml`](../.github/workflows/release.yml), which builds signed Linux + Windows
+  bundles and drafts a GitHub release.
 - [ ] Watch the GitHub Actions run to completion for **both** platforms
       (`gh run watch`, or the Beeper notification from `release.ts` if configured).
 
