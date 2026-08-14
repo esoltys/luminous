@@ -10,10 +10,11 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use lofty::{
+    config::ParsingMode,
     file::TaggedFileExt,
     prelude::*,
     probe::Probe,
-    tag::{Accessor, ItemKey, Tag},
+    tag::{items::Timestamp, Accessor, ItemKey, Tag},
 };
 use notify::Watcher;
 use rayon::prelude::*;
@@ -1914,6 +1915,18 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
         // silently drops the year for every ID3v2-tagged file (#428).
         song.year = tag.date().map(|d| d.year as i32);
+        // Original release date (ID3v2 TDOR, MP4/Vorbis equivalents) — used by
+        // decade auto-playlists as a fallback when `year` (the pressing's own
+        // date, e.g. a reissue) isn't set. Parsed the same relaxed way `date()`
+        // parses ItemKey::RecordingDate, since lofty has no Accessor helper for it.
+        song.originalyear = tag
+            .get_string(ItemKey::OriginalReleaseDate)
+            .and_then(|s| {
+                Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
+                    .ok()
+                    .flatten()
+            })
+            .map(|d| d.year as i32);
         song.track = tag.track().map(|t| t as i32);
         song.disc = tag.disk().map(|d| d as i32);
 
