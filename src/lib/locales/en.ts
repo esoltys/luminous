@@ -238,6 +238,7 @@ export const en = {
     updateInstallError: "Update failed.",
     updateRetryBtn: "Retry",
     formatWindowsSetup: "Windows Installer (.exe / .msi)",
+    formatMsix: "Microsoft Store",
     formatAppImage: "Linux AppImage",
     formatDeb: "Debian Package (.deb)",
     formatRpm: "RPM Package (.rpm)",
