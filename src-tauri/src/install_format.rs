@@ -99,6 +99,20 @@ pub fn detect_install_format() -> InstallFormatInfo {
     {
         if let Ok(exe_path) = env::current_exe() {
             let path_lower = exe_path.to_string_lossy().to_lowercase();
+            // MSIX/Store installs live under `...\WindowsApps\<PackageFamilyName>_...\`,
+            // a system-protected, read-only directory the in-app updater can't write to.
+            // The Store owns updates for these installs, so the downloaded installer can
+            // never actually take effect — without this check the app would keep seeing
+            // itself as out-of-date and re-download/re-"install" the same build on every
+            // launch.
+            if path_lower.contains("\\windowsapps\\") {
+                return InstallFormatInfo {
+                    format: "msix".to_string(),
+                    human_name: "Microsoft Store".to_string(),
+                    supports_self_update: false,
+                };
+            }
+
             if path_lower.contains("appdata\\local\\programs")
                 || path_lower.contains("program files")
             {

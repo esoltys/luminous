@@ -128,6 +128,7 @@
   function getFormatName(fmt: string, fallback: string): string {
     switch (fmt) {
       case "windows_setup": return i18n.t('settings.formatWindowsSetup', {}, fallback);
+      case "msix": return i18n.t('settings.formatMsix', {}, fallback);
       case "appimage": return i18n.t('settings.formatAppImage', {}, fallback);
       case "deb": return i18n.t('settings.formatDeb', {}, fallback);
       case "rpm": return i18n.t('settings.formatRpm', {}, fallback);

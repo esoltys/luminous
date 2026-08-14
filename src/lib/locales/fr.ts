@@ -238,6 +238,7 @@ export const fr = {
     updateInstallError: "Échec de la mise à jour.",
     updateRetryBtn: "Réessayer",
     formatWindowsSetup: "Installeur Windows (.exe / .msi)",
+    formatMsix: "Microsoft Store",
     formatAppImage: "AppImage Linux",
     formatDeb: "Paquet Debian (.deb)",
     formatRpm: "Paquet RPM (.rpm)",
