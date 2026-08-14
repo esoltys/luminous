@@ -189,7 +189,7 @@ export class PlayerStore {
         i18n.t("playerBar.openNothingPlayable", {}, "No supported audio files found to play."),
         "error"
       );
-      return;
+      return outcome;
     }
     if (outcome.skipped > 0) {
       toastStore.show(
@@ -201,6 +201,29 @@ export class PlayerStore {
     const queuePl = await playlistsStore.requireQueue();
     this.activeContextName = "Queue";
     await playlistsStore.selectPlaylist(queuePl.id);
+    return outcome;
+  }
+
+  /** Drag-and-dropped (or otherwise opened) paths, appended to the end of the
+   * Queue instead of replacing it — the "hold Shift to append" counterpart to
+   * `openAndPlay`. Playback is left untouched. */
+  async addPathsToQueue(paths: string[]) {
+    const outcome = await invoke<{ added: number; skipped: number }>("add_paths_to_queue", { paths });
+    if (outcome.added === 0) {
+      toastStore.show(
+        i18n.t("dragDrop.nothingToAdd", {}, "No supported audio files found to add."),
+        "error"
+      );
+      return outcome;
+    }
+    if (outcome.skipped > 0) {
+      toastStore.show(
+        i18n.t("playerBar.tracksSkippedToast", { count: outcome.skipped }, `Skipped ${outcome.skipped} unavailable tracks.`),
+        "error"
+      );
+    }
+    await playlistsStore.refreshPlaylists();
+    return outcome;
   }
 
   async openFileDialog() {

@@ -12,12 +12,14 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
-  import { Music } from 'lucide-svelte';
+  import { Music, UploadCloud } from 'lucide-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
+  import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -30,6 +32,8 @@
   let { children } = $props();
   let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
+  let isDragActive = $state(false);
+  let isShiftHeld = $state(false);
 
   onMount(() => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
@@ -79,9 +83,64 @@
           break;
       }
     }
+    // Tracks whether Shift is currently held so a drop can be told apart from
+    // a plain drop (replace Queue & play) vs. a Shift-drop (append to Queue).
+    // The native DragDropEvent payload carries no modifier state, so this is
+    // the only signal available — it requires the window to have keyboard
+    // focus while hovering, which is the common case for a drag entering an
+    // already-focused app window.
+    function handleShiftTracking(e: KeyboardEvent) {
+      isShiftHeld = e.shiftKey;
+    }
+    window.addEventListener('keydown', handleShiftTracking);
+    window.addEventListener('keyup', handleShiftTracking);
+
+    async function handleFilesDropped(paths: string[], append: boolean) {
+      if (append) {
+        const outcome = await playerStore.addPathsToQueue(paths);
+        if (outcome.added > 0) {
+          const text = outcome.added === 1
+            ? i18n.t('dragDrop.addedTrack', {}, 'Added 1 track to queue')
+            : i18n.t('dragDrop.addedTracks', { count: outcome.added }, `Added ${outcome.added} tracks to queue`);
+          toastStore.show(text, 'success');
+        }
+      } else {
+        const outcome = await playerStore.openAndPlay(paths);
+        if (outcome.played > 0) {
+          const text = outcome.played === 1
+            ? i18n.t('dragDrop.playingTrack', {}, 'Playing 1 track')
+            : i18n.t('dragDrop.playingTracks', { count: outcome.played }, `Playing ${outcome.played} tracks`);
+          toastStore.show(text, 'success');
+        }
+      }
+    }
+
+    let dragDropUnlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          isDragActive = false;
+          void handleFilesDropped(event.payload.paths, isShiftHeld);
+        } else if (event.payload.type === 'leave') {
+          isDragActive = false;
+        } else {
+          // 'enter' or 'over'
+          isDragActive = true;
+        }
+      })
+      .then((unlisten) => {
+        dragDropUnlisten = unlisten;
+      })
+      .catch((e) => {
+        console.warn('Failed to attach drag-and-drop listener:', e);
+      });
+
     window.addEventListener('keydown', handleGlobalHotkeys);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
+      window.removeEventListener('keydown', handleShiftTracking);
+      window.removeEventListener('keyup', handleShiftTracking);
+      dragDropUnlisten?.();
     };
   });
 
@@ -348,6 +407,31 @@
         <PlayerBar />
       </div>
     {/if}
+  {/if}
+
+  <!-- Drag-and-drop overlay: shown while the OS reports a file/folder drag
+       hovering the window (native `dragDropEnabled` events, not HTML5 DnD).
+       Purely visual — pointer-events-none so it never intercepts the drop
+       itself, which the window-level listener in onMount handles. -->
+  {#if isDragActive}
+    <div
+      class="absolute inset-0 z-[100] flex items-center justify-center bg-brand-main/85 backdrop-blur-sm border-4 border-dashed border-brand-accent pointer-events-none select-none"
+      transition:fly={{ duration: 150 }}
+    >
+      <div class="flex flex-col items-center gap-3 text-center px-8">
+        <UploadCloud class="w-14 h-14 text-brand-accent" />
+        <p class="text-2xl font-bold text-brand-text-primary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendTitle', {}, 'Drop to append to queue')
+            : i18n.t('dragDrop.overlayReplaceTitle', {}, 'Drop to replace queue & play')}
+        </p>
+        <p class="text-sm text-brand-text-secondary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendHint', {}, "Playback won't be interrupted")
+            : i18n.t('dragDrop.overlayReplaceHint', {}, 'Hold Shift to append instead')}
+        </p>
+      </div>
+    </div>
   {/if}
 </div>
 

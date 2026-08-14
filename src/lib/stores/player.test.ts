@@ -116,10 +116,18 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 0 });
   });
 
-  it("should trigger open_and_play invoke on openAndPlay", async () => {
+  it("should trigger open_and_play invoke on openAndPlay and return its outcome", async () => {
     const testPaths = ["/path/to/song.mp3", "/path/to/playlist.m3u"];
-    await store.openAndPlay(testPaths);
+    const outcome = await store.openAndPlay(testPaths);
     expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: testPaths });
+    expect(outcome).toEqual({ played: 1, skipped: 0 });
+  });
+
+  it("should trigger add_paths_to_queue invoke on addPathsToQueue and return its outcome", async () => {
+    const testPaths = ["/path/to/song.mp3", "/path/to/dropped-folder"];
+    const outcome = await store.addPathsToQueue(testPaths);
+    expect(invoke).toHaveBeenCalledWith("add_paths_to_queue", { paths: testPaths });
+    expect(outcome).toEqual({ added: 1, skipped: 0 });
   });
 
   it("should clear currentSong when track-changed reports no song", async () => {

@@ -932,5 +932,16 @@ export const fr = {
     contextComplete: "{name} terminé",
     queueComplete: "Votre file d'attente est terminée",
     playlistCreated: "Liste de lecture « {name} » créée"
+  },
+  dragDrop: {
+    overlayReplaceTitle: "Déposer pour remplacer la file d'attente et lire",
+    overlayReplaceHint: "Maintenez Maj pour ajouter à la place",
+    overlayAppendTitle: "Déposer pour ajouter à la file d'attente",
+    overlayAppendHint: "La lecture ne sera pas interrompue",
+    playingTrack: "Lecture d'1 morceau",
+    playingTracks: "Lecture de {count} morceaux",
+    addedTrack: "1 morceau ajouté à la file d'attente",
+    addedTracks: "{count} morceaux ajoutés à la file d'attente",
+    nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter."
   }
 };

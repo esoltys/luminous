@@ -689,6 +689,7 @@ pub fn run() {
             commands::player::open_and_play,
             commands::player::get_startup_file,
             commands::player::add_songs_to_queue,
+            commands::player::add_paths_to_queue,
             commands::player::pause,
             commands::player::resume,
             commands::player::stop,
