@@ -161,18 +161,7 @@ bun run tauri:windows:build
 ```
 This produces `target/msix/*.msix` and `target/msix/*.msixbundle`.
 
-> **Must be built from a normal clone, not a git worktree.** rolldown-vite's root-finder expects `.git` to be a directory; a worktree's `.git` is a file, so it climbs past the worktree root and resolves paths against the wrong checkout, failing with a `Tsconfig not found` error.
-
-Before submitting an MSIX build to the Microsoft Store, validate it locally with the [Windows App Certification Kit](https://learn.microsoft.com/windows/uwp/debug-test-perf/windows-app-certification-kit) (WACK) — it covers Desktop Bridge/MSIX apps, not just UWP:
-```powershell
-# the un-versioned Microsoft.WindowsSDK id doesn't resolve in winget — find the current versioned id first
-winget search Microsoft.WindowsSDK
-winget install -e --id Microsoft.WindowsSDK.10.0.28000
-
-& "C:\Program Files (x86)\Windows Kits\10\App Certification Kit\appcert.exe" reset
-& "C:\Program Files (x86)\Windows Kits\10\App Certification Kit\appcert.exe" test -appxpackagepath "target\msix\<name>.msix" -reportoutputpath "wack-report.xml"
-```
-WACK must run in an active interactive user session — it won't work from a CI runner or a background/service process.
+> **Must be built from a normal clone, not a git worktree.**
 
 ---
 
