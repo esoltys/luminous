@@ -161,6 +161,43 @@ describe("UpdaterStore", () => {
     expect(updaterStore.lastCheckedAt).toBe(null);
   });
 
+  describe("isStoreManaged", () => {
+    it("is true only for msix installs", () => {
+      updaterStore.installFormat = { format: "msix", human_name: "Microsoft Store", supports_self_update: false };
+      expect(updaterStore.isStoreManaged).toBe(true);
+
+      updaterStore.installFormat = { format: "windows_setup", human_name: "Windows Installer (.exe / .msi)", supports_self_update: true };
+      expect(updaterStore.isStoreManaged).toBe(false);
+    });
+
+    it("init() disables checking and never calls the updater plugin for msix", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      vi.mocked(invoke).mockImplementation((cmd: string) => {
+        if (cmd === "get_install_format") {
+          return Promise.resolve({ format: "msix", human_name: "Microsoft Store", supports_self_update: false });
+        }
+        return Promise.resolve({});
+      });
+
+      await updaterStore.init();
+      await Promise.resolve();
+
+      expect(updaterStore.updateCheckEnabled).toBe(false);
+      expect(updaterStore.isStoreManaged).toBe(true);
+      expect(check).not.toHaveBeenCalled();
+    });
+
+    it("checkForUpdates() is a no-op for msix even if called directly", async () => {
+      updaterStore.installFormat = { format: "msix", human_name: "Microsoft Store", supports_self_update: false };
+      vi.mocked(check).mockResolvedValueOnce(fakeUpdate());
+
+      await updaterStore.checkForUpdates();
+
+      expect(check).not.toHaveBeenCalled();
+      expect(updaterStore.checkStatus).toBe("idle");
+    });
+  });
+
   describe("updatePolicy", () => {
     it("derives never/notify/auto from the underlying toggles", () => {
       updaterStore.updateCheckEnabled = false;
