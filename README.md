@@ -154,9 +154,10 @@ bun run tauri build
 ```
 
 #### 5. Build an MSIX Package (for Microsoft Store)
-The MSIX build goes through [`tauri-cli`](https://crates.io/crates/tauri-cli) directly rather than the npm-wrapped `@tauri-apps/cli`, so install it first:
+The MSIX build goes through [`tauri-cli`](https://crates.io/crates/tauri-cli) directly rather than the npm-wrapped `@tauri-apps/cli`, so install it first. `src-tauri` is a Cargo workspace member, so the compiled binary lands in the repo-root `target/`, not `src-tauri/target/` — set `CARGO_TARGET_DIR` so `tauri-windows-bundle` can find it:
 ```powershell
 cargo install tauri-cli
+$env:CARGO_TARGET_DIR = "$PWD\target"
 bun run tauri:windows:build
 ```
 This produces `target/msix/*.msix` and `target/msix/*.msixbundle`.
