@@ -4,6 +4,9 @@
   "capabilities": {
     "general": [
       "internetClient"
+    ],
+    "restricted": [
+      "broadFileSystemAccess"
     ]
   },
   "extensions": {
