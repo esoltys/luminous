@@ -523,7 +523,7 @@ pub fn run() {
             let media_hwnd: Option<*mut std::ffi::c_void> = app
                 .get_webview_window("main")
                 .and_then(|w| w.hwnd().ok())
-                .map(|h| h.0 as *mut std::ffi::c_void);
+                .map(|h| h.0);
             #[cfg(not(target_os = "windows"))]
             let media_hwnd: Option<*mut std::ffi::c_void> = None;
 

@@ -25,7 +25,8 @@ manual.
 - [ ] `bun run check` — svelte-check / TypeScript
 - [ ] `bun run test:run` — frontend unit tests
 - [ ] `cargo test` (from `src-tauri/`) — Rust unit tests + BDD suites
-- [ ] `cargo clippy --all-targets` (from `src-tauri/`) — no new warnings
+- [ ] `cargo clippy --all-targets` (from `src-tauri/`) — no warnings at all, not just no
+      new ones; fix any pre-existing warnings you encounter rather than leaving them
 - [ ] Run the smoke test — real audio device, real playback, tags, playlists, equalizer:
   ```bash
   cargo test --test smoke_test -- --ignored --nocapture

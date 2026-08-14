@@ -4317,7 +4317,7 @@ mod tests {
             .query_row("SELECT id FROM songs", [], |r| r.get(0))
             .unwrap();
 
-        let reconciled = reconcile_moved_songs(&conn, &[real_path.clone()]).unwrap();
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&real_path)).unwrap();
         assert_eq!(
             reconciled, 1,
             "a case-only rename must be recognized as a repath, not left stale"
