@@ -174,8 +174,19 @@ pub fn write_tags(
     }
 
     if let Some(y) = year {
-        tag.insert_text(lofty::tag::ItemKey::Year, y.to_string());
+        // set_date() writes ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis
+        // DATE) — writing ItemKey::Year directly has no ID3v2 mapping and
+        // silently fails to produce a frame most players/taggers read (#428).
+        tag.set_date(lofty::tag::items::Timestamp {
+            year: y as u16,
+            month: None,
+            day: None,
+            hour: None,
+            minute: None,
+            second: None,
+        });
     } else {
+        tag.remove_date();
         tag.remove_key(lofty::tag::ItemKey::Year);
     }
 
