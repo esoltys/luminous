@@ -49,6 +49,14 @@ class UpdaterStore {
     return this.updateAutoInstall ? "auto" : "notify";
   }
 
+  // Microsoft Store (MSIX) installs are updated by the Store, not by us —
+  // GitHub releases aren't even the same artifact stream. The whole
+  // check/notify/auto-install UI is meaningless there, so callers use this
+  // to hide it rather than rendering a control panel with nothing it can do.
+  get isStoreManaged(): boolean {
+    return this.installFormat.format === "msix";
+  }
+
   installStatus = $state<InstallStatus>("idle");
   downloadProgress = $state<DownloadProgress | null>(null);
 
@@ -61,7 +69,24 @@ class UpdaterStore {
     this.initialized = true;
 
     try {
-      // 1. Load preferences
+      // 1. Fetch install format from backend
+      try {
+        const fmt = await invoke<InstallFormatInfo>("get_install_format");
+        if (fmt) {
+          this.installFormat = fmt;
+        }
+      } catch (err) {
+        console.error("Failed to detect install format:", err);
+      }
+
+      // Store-managed installs never check or install updates themselves —
+      // stored preferences are irrelevant, and there's nothing to poll for.
+      if (this.isStoreManaged) {
+        this.updateCheckEnabled = false;
+        return;
+      }
+
+      // 2. Load preferences
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings?.update_check_enabled === "false") {
         this.updateCheckEnabled = false;
@@ -70,16 +95,6 @@ class UpdaterStore {
       }
       if (settings?.update_auto_install === "true") {
         this.updateAutoInstall = true;
-      }
-
-      // 2. Fetch install format from backend
-      try {
-        const fmt = await invoke<InstallFormatInfo>("get_install_format");
-        if (fmt) {
-          this.installFormat = fmt;
-        }
-      } catch (err) {
-        console.error("Failed to detect install format:", err);
       }
 
       // 3. Perform check & setup interval if enabled
@@ -148,6 +163,8 @@ class UpdaterStore {
   }
 
   async checkForUpdates() {
+    if (this.isStoreManaged) return;
+
     this.checkStatus = "checking";
     this.errorMessage = null;
     this.installStatus = "idle";

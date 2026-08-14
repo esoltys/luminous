@@ -433,6 +433,7 @@
         </div>
       </div>
 
+      {#if !updaterStore.isStoreManaged}
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
         <div class="pb-4 border-b border-brand-border/50 flex items-center justify-between gap-4">
           <div class="flex items-center gap-3 min-w-0">
@@ -580,6 +581,7 @@
           </button>
         </div>
       </div>
+      {/if}
     {:else if settingsTab === "folders"}
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
         <div class="pb-3 flex justify-between items-center">
