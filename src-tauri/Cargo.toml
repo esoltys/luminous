@@ -107,6 +107,11 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 rand = "0.10"
 percent-encoding = "2"
+# Polls the OS for the live Shift-key state at drag-and-drop time. OS file
+# drags don't give the target window keyboard focus while hovering, so DOM
+# keydown/keyup never fire — this reads the physical key state directly
+# instead, independent of window focus.
+device_query = "4.0.1"
 
 # --- Data-parallel tag reading during library scan ---
 rayon = "1"

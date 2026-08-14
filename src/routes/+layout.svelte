@@ -20,6 +20,7 @@
   import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -85,17 +86,29 @@
     }
     // Tracks whether Shift is currently held so a drop can be told apart from
     // a plain drop (replace Queue & play) vs. a Shift-drop (append to Queue).
-    // The native DragDropEvent payload carries no modifier state, so this is
-    // the only signal available — it requires the window to have keyboard
-    // focus while hovering, which is the common case for a drag entering an
-    // already-focused app window.
-    function handleShiftTracking(e: KeyboardEvent) {
-      isShiftHeld = e.shiftKey;
+    // The native DragDropEvent payload carries no modifier state, and an OS
+    // file drag never gives the target window keyboard focus while hovering
+    // — so keydown/keyup here would never fire. Instead this polls the
+    // physical key state via a backend command (is_shift_key_held, queried
+    // from the OS rather than the DOM) while a drag is active, and re-checks
+    // it definitively at drop time.
+    let shiftPollInterval: ReturnType<typeof setInterval> | undefined;
+    async function refreshShiftHeld() {
+      try {
+        isShiftHeld = await invoke<boolean>('is_shift_key_held');
+      } catch (e) {
+        console.warn('Failed to query Shift key state:', e);
+      }
     }
-    window.addEventListener('keydown', handleShiftTracking);
-    window.addEventListener('keyup', handleShiftTracking);
+    function stopShiftPolling() {
+      if (shiftPollInterval) {
+        clearInterval(shiftPollInterval);
+        shiftPollInterval = undefined;
+      }
+    }
 
-    async function handleFilesDropped(paths: string[], append: boolean) {
+    async function handleFilesDropped(paths: string[]) {
+      const append = await invoke<boolean>('is_shift_key_held').catch(() => false);
       if (append) {
         const outcome = await playerStore.addPathsToQueue(paths);
         if (outcome.added > 0) {
@@ -127,12 +140,17 @@
       .onDragDropEvent((event) => {
         if (event.payload.type === 'drop') {
           isDragActive = false;
-          void handleFilesDropped(event.payload.paths, isShiftHeld);
+          stopShiftPolling();
+          void handleFilesDropped(event.payload.paths);
         } else if (event.payload.type === 'leave') {
           isDragActive = false;
-        } else {
-          // 'enter' or 'over'
+          stopShiftPolling();
+        } else if (!isDragActive) {
+          // 'enter' or 'over', first time this hover — start live-polling the
+          // Shift state so the overlay hint tracks it while dragging.
           isDragActive = true;
+          void refreshShiftHeld();
+          shiftPollInterval = setInterval(refreshShiftHeld, 150);
         }
       })
       .then((unlisten) => {
@@ -145,8 +163,7 @@
     window.addEventListener('keydown', handleGlobalHotkeys);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
-      window.removeEventListener('keydown', handleShiftTracking);
-      window.removeEventListener('keyup', handleShiftTracking);
+      stopShiftPolling();
       dragDropUnlisten?.();
     };
   });

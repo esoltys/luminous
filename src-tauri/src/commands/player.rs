@@ -536,6 +536,30 @@ pub async fn add_paths_to_queue(
     })
 }
 
+/// Whether Shift is physically held right now, queried from the OS rather
+/// than the DOM. A native OS file drag doesn't give the target window
+/// keyboard focus while hovering, so the frontend's keydown/keyup listeners
+/// never fire during a drag-and-drop — this is the only reliable way to tell
+/// a plain drop (replace Queue) apart from a Shift-drop (append to Queue).
+/// `DeviceState` isn't `Send`/`Sync` on Linux (it holds an `Rc` for its X11
+/// connection), so it's constructed fresh per call rather than cached —
+/// cheap enough at the once-per-drop, poll-every-~150ms-while-dragging rate
+/// this is actually called at.
+#[tauri::command]
+pub fn is_shift_key_held() -> bool {
+    use device_query::{DeviceQuery, DeviceState, Keycode};
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    // DeviceState::new() panics (rather than returning a Result) if it can't
+    // open an X11 display — the common case on a Wayland session without
+    // XWayland. Degrade to "not held" instead of taking the command down.
+    catch_unwind(AssertUnwindSafe(|| {
+        let keys = DeviceState::new().get_keys();
+        keys.contains(&Keycode::LShift) || keys.contains(&Keycode::RShift)
+    }))
+    .unwrap_or(false)
+}
+
 #[tauri::command]
 pub async fn get_startup_file(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let mut lock = state.startup_file.lock().await;
@@ -618,5 +642,15 @@ mod tests {
 
         assert!(resolved.is_empty());
         assert_eq!(attempted, 2);
+    }
+
+    #[test]
+    fn is_shift_key_held_degrades_to_false_instead_of_panicking() {
+        // In this test environment there's no X11 display, so
+        // DeviceState::new() panics internally — the exact case this needs
+        // to survive. Just asserting it returns rather than panicking is
+        // the meaningful check; the actual boolean depends on real input
+        // state and isn't something a unit test can control either way.
+        let _ = is_shift_key_held();
     }
 }
