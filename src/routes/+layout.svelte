@@ -113,16 +113,16 @@
         const outcome = await playerStore.addPathsToQueue(paths);
         if (outcome.added > 0) {
           const text = outcome.added === 1
-            ? i18n.t('dragDrop.addedTrack', {}, 'Added 1 track to queue')
-            : i18n.t('dragDrop.addedTracks', { count: outcome.added }, `Added ${outcome.added} tracks to queue`);
+            ? i18n.t('dragDrop.addedSong', {}, 'Added 1 song to queue')
+            : i18n.t('dragDrop.addedSongs', { count: outcome.added }, `Added ${outcome.added} songs to queue`);
           toastStore.show(text, 'success');
         }
       } else {
         const outcome = await playerStore.openAndPlay(paths);
         if (outcome.played > 0) {
           const text = outcome.played === 1
-            ? i18n.t('dragDrop.playingTrack', {}, 'Playing 1 track')
-            : i18n.t('dragDrop.playingTracks', { count: outcome.played }, `Playing ${outcome.played} tracks`);
+            ? i18n.t('dragDrop.playingSong', {}, 'Playing 1 song')
+            : i18n.t('dragDrop.playingSongs', { count: outcome.played }, `Playing ${outcome.played} songs`);
           toastStore.show(text, 'success');
         }
       }

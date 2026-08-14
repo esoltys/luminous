@@ -941,10 +941,10 @@ export const en = {
     overlayReplaceHint: "Hold Shift to append instead",
     overlayAppendTitle: "Drop to append to queue",
     overlayAppendHint: "Playback won't be interrupted",
-    playingTrack: "Playing 1 track",
-    playingTracks: "Playing {count} tracks",
-    addedTrack: "Added 1 track to queue",
-    addedTracks: "Added {count} tracks to queue",
+    playingSong: "Playing 1 song",
+    playingSongs: "Playing {count} songs",
+    addedSong: "Added 1 song to queue",
+    addedSongs: "Added {count} songs to queue",
     nothingToAdd: "No supported audio files found to add."
   }
 };

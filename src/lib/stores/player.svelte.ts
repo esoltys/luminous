@@ -223,6 +223,10 @@ export class PlayerStore {
       );
     }
     await playlistsStore.refreshPlaylists();
+    const qPl = playlistsStore.queuePlaylist;
+    if (qPl && playlistsStore.activePlaylistId === qPl.id) {
+      await playlistsStore.selectPlaylist(qPl.id);
+    }
     return outcome;
   }
 
