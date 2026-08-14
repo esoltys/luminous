@@ -79,6 +79,12 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "open_and_play") {
         return { played: 1, skipped: 0 };
       }
+      if (cmd === "add_paths_to_queue") {
+        return { added: 1, skipped: 0 };
+      }
+      if (cmd === "is_shift_key_held") {
+        return false;
+      }
       // The backend bootstraps the built-in Queue playlist at startup, so a
       // playlist listing always contains it — model that guarantee here.
       if (cmd === "get_playlists") {

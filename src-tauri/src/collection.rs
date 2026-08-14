@@ -1811,7 +1811,7 @@ pub(crate) const AUDIO_EXTENSIONS: &[&str] = &[
     "tta", "dsf", "dff", "asf", "wma", "m4b",
 ];
 
-fn is_audio_file(path: &Path) -> bool {
+pub(crate) fn is_audio_file(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| AUDIO_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))

@@ -12,12 +12,15 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
-  import { Music } from 'lucide-svelte';
+  import { Music, UploadCloud } from 'lucide-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
+  import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -30,6 +33,8 @@
   let { children } = $props();
   let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
+  let isDragActive = $state(false);
+  let isShiftHeld = $state(false);
 
   onMount(() => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
@@ -79,9 +84,87 @@
           break;
       }
     }
+    // Tracks whether Shift is currently held so a drop can be told apart from
+    // a plain drop (replace Queue & play) vs. a Shift-drop (append to Queue).
+    // The native DragDropEvent payload carries no modifier state, and an OS
+    // file drag never gives the target window keyboard focus while hovering
+    // — so keydown/keyup here would never fire. Instead this polls the
+    // physical key state via a backend command (is_shift_key_held, queried
+    // from the OS rather than the DOM) while a drag is active, and re-checks
+    // it definitively at drop time.
+    let shiftPollInterval: ReturnType<typeof setInterval> | undefined;
+    async function refreshShiftHeld() {
+      try {
+        isShiftHeld = await invoke<boolean>('is_shift_key_held');
+      } catch (e) {
+        console.warn('Failed to query Shift key state:', e);
+      }
+    }
+    function stopShiftPolling() {
+      if (shiftPollInterval) {
+        clearInterval(shiftPollInterval);
+        shiftPollInterval = undefined;
+      }
+    }
+
+    async function handleFilesDropped(paths: string[]) {
+      const append = await invoke<boolean>('is_shift_key_held').catch(() => false);
+      if (append) {
+        const outcome = await playerStore.addPathsToQueue(paths);
+        if (outcome.added > 0) {
+          const text = outcome.added === 1
+            ? i18n.t('dragDrop.addedSong', {}, 'Added 1 song to queue')
+            : i18n.t('dragDrop.addedSongs', { count: outcome.added }, `Added ${outcome.added} songs to queue`);
+          toastStore.show(text, 'success');
+        }
+      } else {
+        const outcome = await playerStore.openAndPlay(paths);
+        if (outcome.played > 0) {
+          const text = outcome.played === 1
+            ? i18n.t('dragDrop.playingSong', {}, 'Playing 1 song')
+            : i18n.t('dragDrop.playingSongs', { count: outcome.played }, `Playing ${outcome.played} songs`);
+          toastStore.show(text, 'success');
+        }
+      }
+    }
+
+    // Must be getCurrentWebview(), not getCurrentWindow(): the Rust side
+    // (manager/webview.rs's emit_to_webview) emits drag-drop events scoped to
+    // an EventTarget::Webview, but Window.onDragDropEvent() subscribes with
+    // an EventTarget::Window target — a kind mismatch the backend's target
+    // filter never matches, so a Window-level listener silently never fires.
+    // Webview.onDragDropEvent() (and only that one) targets EventTarget::Webview
+    // and actually receives the events.
+    let dragDropUnlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          isDragActive = false;
+          stopShiftPolling();
+          void handleFilesDropped(event.payload.paths);
+        } else if (event.payload.type === 'leave') {
+          isDragActive = false;
+          stopShiftPolling();
+        } else if (!isDragActive) {
+          // 'enter' or 'over', first time this hover — start live-polling the
+          // Shift state so the overlay hint tracks it while dragging.
+          isDragActive = true;
+          void refreshShiftHeld();
+          shiftPollInterval = setInterval(refreshShiftHeld, 150);
+        }
+      })
+      .then((unlisten) => {
+        dragDropUnlisten = unlisten;
+      })
+      .catch((e) => {
+        console.warn('Failed to attach drag-and-drop listener:', e);
+      });
+
     window.addEventListener('keydown', handleGlobalHotkeys);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
+      stopShiftPolling();
+      dragDropUnlisten?.();
     };
   });
 
@@ -348,6 +431,31 @@
         <PlayerBar />
       </div>
     {/if}
+  {/if}
+
+  <!-- Drag-and-drop overlay: shown while the OS reports a file/folder drag
+       hovering the window (native `dragDropEnabled` events, not HTML5 DnD).
+       Purely visual — pointer-events-none so it never intercepts the drop
+       itself, which the window-level listener in onMount handles. -->
+  {#if isDragActive}
+    <div
+      class="absolute inset-0 z-[100] flex items-center justify-center bg-brand-main/85 backdrop-blur-sm border-4 border-dashed border-brand-accent pointer-events-none select-none"
+      transition:fly={{ duration: 150 }}
+    >
+      <div class="flex flex-col items-center gap-3 text-center px-8">
+        <UploadCloud class="w-14 h-14 text-brand-accent" />
+        <p class="text-2xl font-bold text-brand-text-primary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendTitle', {}, 'Drop to append to queue')
+            : i18n.t('dragDrop.overlayReplaceTitle', {}, 'Drop to replace queue & play')}
+        </p>
+        <p class="text-sm text-brand-text-secondary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendHint', {}, "Playback won't be interrupted")
+            : i18n.t('dragDrop.overlayReplaceHint', {}, 'Hold Shift to append instead')}
+        </p>
+      </div>
+    </div>
   {/if}
 </div>
 

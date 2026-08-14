@@ -935,5 +935,16 @@ export const en = {
     contextComplete: "{name} complete",
     queueComplete: "Your Queue is done",
     playlistCreated: "Playlist \"{name}\" created"
+  },
+  dragDrop: {
+    overlayReplaceTitle: "Drop to replace queue & play",
+    overlayReplaceHint: "Hold Shift to append instead",
+    overlayAppendTitle: "Drop to append to queue",
+    overlayAppendHint: "Playback won't be interrupted",
+    playingSong: "Playing 1 song",
+    playingSongs: "Playing {count} songs",
+    addedSong: "Added 1 song to queue",
+    addedSongs: "Added {count} songs to queue",
+    nothingToAdd: "No supported audio files found to add."
   }
 };
