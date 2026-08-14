@@ -19,7 +19,7 @@
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
-  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -115,8 +115,15 @@
       }
     }
 
+    // Must be getCurrentWebview(), not getCurrentWindow(): the Rust side
+    // (manager/webview.rs's emit_to_webview) emits drag-drop events scoped to
+    // an EventTarget::Webview, but Window.onDragDropEvent() subscribes with
+    // an EventTarget::Window target — a kind mismatch the backend's target
+    // filter never matches, so a Window-level listener silently never fires.
+    // Webview.onDragDropEvent() (and only that one) targets EventTarget::Webview
+    // and actually receives the events.
     let dragDropUnlisten: (() => void) | undefined;
-    getCurrentWindow()
+    getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === 'drop') {
           isDragActive = false;
