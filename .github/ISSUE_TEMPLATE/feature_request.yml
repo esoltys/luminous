@@ -1,7 +1,7 @@
 name: ✨ Feature Request
 description: Propose a new feature or improvement for Luminous.
 title: 'Feature: '
-labels: ['needs-triage']
+labels: []
 body:
   - type: checkboxes
     id: prerequisites
