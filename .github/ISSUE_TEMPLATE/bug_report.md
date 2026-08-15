@@ -1,7 +1,7 @@
 ---
 name: 🛠️ Bug (Internal / Dev Template)
 description: Internal template with root cause analysis and affected components
-title: '[BUG]: '
+title: 'Bug: '
 labels: ['bug']
 ---
 

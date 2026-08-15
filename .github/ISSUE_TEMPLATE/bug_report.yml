@@ -1,7 +1,7 @@
 name: 🐛 Bug Report
 description: Report something that isn't working as expected in Luminous.
 title: 'Bug: '
-labels: ['bug', 'needs-triage']
+labels: ['bug']
 body:
   - type: markdown
     attributes:
