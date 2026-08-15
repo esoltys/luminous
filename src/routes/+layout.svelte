@@ -20,6 +20,7 @@
   import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
   import {
     SIDEBAR_MIN_WIDTH_PX,
@@ -41,6 +42,7 @@
     i18n.init();
     prefs.init();
     updaterStore.init();
+    void getCurrentWindow().show().catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;

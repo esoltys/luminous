@@ -170,6 +170,10 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
 
 #[tauri::command]
 pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Value, String> {
+    if window.is_minimized().unwrap_or(false) {
+        return Ok(serde_json::Value::Null);
+    }
+
     let size = window.inner_size().map_err(|e| e.to_string())?;
     let pos = window.outer_position().ok();
     let scale_factor = window.scale_factor().unwrap_or(1.0);
@@ -183,6 +187,15 @@ pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Va
         ),
         None => (None, None),
     };
+
+    // Ignore placeholder minimized sizes (0x0) or Win32 offscreen minimized coordinates (-32000)
+    if width <= 0.0
+        || height <= 0.0
+        || x.map_or(false, |coord| coord <= -10000.0)
+        || y.map_or(false, |coord| coord <= -10000.0)
+    {
+        return Ok(serde_json::Value::Null);
+    }
 
     Ok(serde_json::json!({
         "width": width,

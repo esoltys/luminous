@@ -120,6 +120,26 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
 
+    // On Windows, Chromium's CalculateNativeWinOcclusion feature puts the
+    // WebView2 rendering pipeline into a suspended/discarded state when the
+    // window is minimized or occluded for a period of time. Upon restore,
+    // WebView2 fails to resume/repaint, leaving a blank window. Disabling
+    // native window occlusion calculation keeps the rendering context intact.
+    #[cfg(target_os = "windows")]
+    {
+        let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+        let flag = "--disable-features=CalculateNativeWinOcclusion";
+        let current = std::env::var(key).unwrap_or_default();
+        if !current.contains(flag) {
+            let new_val = if current.is_empty() {
+                flag.to_string()
+            } else {
+                format!("{} {}", current, flag)
+            };
+            std::env::set_var(key, new_val);
+        }
+    }
+
     tauri::Builder::default()
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
@@ -192,7 +212,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
