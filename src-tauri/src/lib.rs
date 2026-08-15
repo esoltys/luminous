@@ -29,6 +29,7 @@ pub mod playlist;
 pub mod playlist_parsers;
 pub mod stats;
 pub mod tageditor;
+pub mod tray;
 pub mod waveform;
 
 use std::sync::Arc;
@@ -191,11 +192,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            tray::restore_main_window(app);
 
             // A file association (or `luminous <file>` invocation) launched a
             // second instance; forward the opened paths to the running app.
@@ -555,6 +552,10 @@ pub fn run() {
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
             app.manage(state);
+
+            if let Err(e) = tray::init(app) {
+                log::warn!("Failed to initialize system tray: {e}");
+            }
 
             let media_shortcuts = [
                 "MediaPlayPause",
