@@ -18,6 +18,7 @@
   import { prefs } from '../lib/stores/prefs.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { onMount } from 'svelte';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -36,6 +37,7 @@
     i18n.init();
     prefs.init();
     updaterStore.init();
+    void getCurrentWindow().show().catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
       if (!(e.ctrlKey || e.metaKey)) return;
