@@ -1,10 +1,11 @@
 //! System tray icon: left-click toggles the main window, right-click shows a
-//! menu with playback controls, and closing the main window hides it instead
-//! of quitting (#tray). The close-to-tray hook is only registered once the
-//! tray itself has been built successfully, so a failed tray init (e.g. no
-//! notification host on a minimal Linux desktop) can't strand the window
-//! with no way to bring it back — the OS close button still quits normally
-//! in that case.
+//! menu with playback controls, and — when the "Minimize to tray" setting is
+//! on (off by default) — closing the main window hides it instead of
+//! quitting. The close-to-tray hook is only registered once the tray itself
+//! has been built successfully, so a failed tray init (e.g. no notification
+//! host on a minimal Linux desktop) can't strand the window with no way to
+//! bring it back — the OS close button always quits normally in that case,
+//! and also quits normally whenever the setting is off.
 //!
 //! Platform note: on Linux, `tray-icon`'s `TrayIconEvent` (including left
 //! click) is not emitted at all — a libappindicator limitation, not
@@ -69,8 +70,14 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
         let app_handle = app.handle().clone();
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                hide_main_window(&app_handle);
+                let minimize_to_tray = app_handle
+                    .state::<AppState>()
+                    .minimize_to_tray
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                if minimize_to_tray {
+                    api.prevent_close();
+                    hide_main_window(&app_handle);
+                }
             }
         });
     }

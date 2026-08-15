@@ -431,6 +431,18 @@
             <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
           </Select>
         </div>
+
+        <div class="flex items-center justify-between gap-4 pt-4 border-t border-brand-border/50">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.minimizeToTrayLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.minimizeToTrayHint')}</p>
+          </div>
+          <Toggle
+            checked={prefs.minimizeToTray}
+            onchange={(v) => prefs.setMinimizeToTray(v)}
+            label={i18n.t('settings.minimizeToTrayLabel')}
+          />
+        </div>
       </div>
 
       {#if !updaterStore.isStoreManaged}
