@@ -24,6 +24,8 @@ class PrefsStore {
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
+  /** Off by default — closing the window quits unless explicitly opted in. */
+  minimizeToTray = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -34,6 +36,7 @@ class PrefsStore {
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
+    this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -83,6 +86,13 @@ class PrefsStore {
   setPlaylistsCustomViewMode(mode: CollectionViewMode) {
     this.playlistsCustomViewMode = mode;
     this.save();
+  }
+
+  /** Not part of `save()` — persisted via its own dedicated command so the
+   * backend's `tray.rs` close handler picks up the change immediately. */
+  setMinimizeToTray(enabled: boolean) {
+    this.minimizeToTray = enabled;
+    invoke("set_minimize_to_tray_enabled", { enabled });
   }
 }
 

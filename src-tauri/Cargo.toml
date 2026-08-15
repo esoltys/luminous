@@ -20,7 +20,9 @@ tauri-build = { version = "2", features = [] }
 # --- Tauri ---
 # "unstable" gates `Manager::get_window`, needed to reach the lower-level
 # `Window::start_resize_dragging` from a `WebviewWindow` command handler.
-tauri = { version = "2", features = ["unstable"] }
+# "tray-icon" is off by default; "image-png" lets tray.rs build the tray
+# icon from an embedded PNG via `Image::from_bytes`.
+tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
 tauri-runtime = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
