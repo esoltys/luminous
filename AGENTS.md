@@ -203,6 +203,13 @@ P2–P4). Don't default new issues to P2/P3 — assign a label using the same cr
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
   5. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
   6. Verify the created issue by running `gh issue view <id>`.
+  7. Before opening a PR that closes/fixes an issue, check that issue's Milestone
+     (`gh issue view <id> --json milestone`): if it's "2.0", branch from and target the PR at
+     `next`, not `main` (see Branching Model above). Everything else targets `main`. Do this even
+     when a branch name was already assigned for the task — the assigned branch name doesn't
+     imply a base branch, and defaulting to `main` for 2.0 work is a real regression risk (it
+     ships unfinished 2.0 work early). If the issue's milestone changes after the PR is opened,
+     re-check whether the base branch still matches and retarget the PR if not.
 - **Releases & Tagging**: When tagging a new release, only create and push a single semantic version tag matching the repository's convention (e.g., `vX.Y.Z` where X.Y.Z matches the project version in `package.json`/`Cargo.toml`) to avoid triggering duplicate build workflows in GitHub Actions.
 
 ## Git Hooks
