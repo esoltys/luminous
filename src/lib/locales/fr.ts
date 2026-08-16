@@ -259,6 +259,7 @@ export const fr = {
     updateInstalledAsFooter: "Installé en tant que {format}",
     updateAutoSupportedFooter: "mise à jour automatique prise en charge",
     updateNotifyOnlyFooter: "notification uniquement, installation manuelle",
+    updateNotifyOnlyAppImageFooter: "notification uniquement, recompiler l'AppImage localement",
     releaseNotesLink: "Notes de version",
     addFolder: "Ajouter un dossier",
     folderItemRecursive: "Analyse récursive active",
