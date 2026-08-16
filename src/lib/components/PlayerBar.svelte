@@ -169,6 +169,7 @@
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
+    collectionStore.exitImmersiveMode();
     const queuePl = await playlistsStore.requireQueue();
     playlistsStore.selectPlaylist(queuePl.id);
     collectionStore.viewPlaylist(queuePl.id);

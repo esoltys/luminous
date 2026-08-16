@@ -4,7 +4,8 @@ import { render, fireEvent } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
-import type { Song } from "../types";
+import { playlistsStore } from "../stores/playlists.svelte";
+import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
@@ -82,6 +83,35 @@ describe("PlayerBar.svelte", () => {
     await fireEvent.click(albumLink);
 
     expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
+  });
+
+  it("exits immersive mode and navigates to the queue when the album cover is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = true;
+
+    const mockQueue: Playlist = {
+      id: 1,
+      name: "Queue",
+      dynamic_enabled: false,
+      created: 0,
+      updated: 0,
+      track_count: 0,
+      is_queue: true,
+    };
+    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
+    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
+    const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist").mockImplementation(() => {});
+
+    const { getByTitle } = render(PlayerBar);
+    const coverButton = getByTitle("Queue");
+    await fireEvent.click(coverButton);
+
+    expect(exitImmersiveModeSpy).toHaveBeenCalled();
+    expect(collectionStore.immersiveMode).toBe(false);
+    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
