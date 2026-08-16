@@ -138,7 +138,7 @@
   }
 
   function startRename() {
-    if (activePlaylist) {
+    if (activePlaylist && !isQueue) {
       editTitleValue = activePlaylist.name;
       isEditingTitle = true;
     }
@@ -782,19 +782,21 @@
           {:else}
             <div class="flex items-center gap-3 group/title">
               <h1
-                ondblclick={startRename}
-                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary hover:text-brand-accent-text transition-colors truncate py-0.5 leading-snug"
-                title={i18n.t("playlists.renamePlaylistTooltip")}
+                ondblclick={isQueue ? undefined : startRename}
+                class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary transition-colors truncate py-0.5 leading-snug {isQueue ? '' : 'hover:text-brand-accent-text'}"
+                title={isQueue ? undefined : i18n.t("playlists.renamePlaylistTooltip")}
               >
                 {activePlaylist.name}
               </h1>
-              <button
-                onclick={startRename}
-                class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-1"
-                title={i18n.t("playlists.renamePlaylistTooltip")}
-              >
-                <Pencil class="w-4 h-4" />
-              </button>
+              {#if !isQueue}
+                <button
+                  onclick={startRename}
+                  class="opacity-0 group-hover/title:opacity-100 text-brand-text-secondary hover:text-brand-text-primary transition-opacity p-1"
+                  title={i18n.t("playlists.renamePlaylistTooltip")}
+                >
+                  <Pencil class="w-4 h-4" />
+                </button>
+              {/if}
             </div>
           {/if}
 
