@@ -396,7 +396,7 @@
             <div class="flex flex-col text-center md:text-left space-y-4 max-w-md">
               {#if playerStore.currentSong}
                 <div>
-                  <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-accent/25 rounded-full select-none">
+                  <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
                     {i18n.t('playerBar.nowPlaying')}
                   </span>
                 </div>
