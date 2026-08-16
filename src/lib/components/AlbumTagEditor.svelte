@@ -1,11 +1,12 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Sliders, Save, X, LoaderCircle, Layers, Lock } from "lucide-svelte";
+  import { Sliders, Save, X, LoaderCircle, Layers, Lock, ImageOff } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
 
@@ -17,6 +18,7 @@
     initialYear?: number | null;
     initialDisc?: number | null;
     initialCompilation?: boolean;
+    hasEmbeddedArt?: boolean;
     onClose: () => void;
     onSave?: () => void;
   }
@@ -29,6 +31,7 @@
     initialYear = null,
     initialDisc = null,
     initialCompilation = false,
+    hasEmbeddedArt = false,
     onClose,
     onSave
   }: Props = $props();
@@ -65,6 +68,28 @@
   }
 
   let isSaving = $state(false);
+  let isClearingArt = $state(false);
+  let showClearArtConfirm = $state(false);
+
+  async function handleClearArt() {
+    isClearingArt = true;
+    try {
+      const count = await invoke<number>("clear_album_cover_art", { songIds });
+
+      await collectionStore.refreshStats();
+      await collectionStore.refreshLibrary();
+
+      toastStore.show(i18n.t("albumTagEditor.clearArtSuccess", { count }), "success");
+      if (onSave) onSave();
+      onClose();
+    } catch (e: any) {
+      console.error("Failed to clear album artwork:", e);
+      toastStore.show(i18n.t("albumTagEditor.clearArtFailedPrefix") + e.toString(), "error");
+    } finally {
+      isClearingArt = false;
+      showClearArtConfirm = false;
+    }
+  }
 
   async function handleSave() {
     isSaving = true;
@@ -184,9 +209,25 @@
     </div>
 
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border bg-brand-main shrink-0">
-      <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
-        <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-        <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
+          <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+          <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
+        </div>
+        <Button
+          onclick={() => { showClearArtConfirm = true; }}
+          disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+          variant="secondary"
+          size="sm"
+        >
+          {#if isClearingArt}
+            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+            <span>{i18n.t('albumTagEditor.clearingArt')}</span>
+          {:else}
+            <ImageOff class="w-3.5 h-3.5" />
+            <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
+          {/if}
+        </Button>
       </div>
 
       <div class="flex items-center gap-3">
@@ -205,3 +246,14 @@
       </div>
     </div>
 </Modal>
+
+{#if showClearArtConfirm}
+  <ConfirmDialog
+    title={i18n.t('albumTagEditor.clearArtConfirmTitle')}
+    message={i18n.t('albumTagEditor.clearArtConfirmMessage')}
+    confirmLabel={i18n.t('albumTagEditor.clearArtBtn')}
+    cancelLabel={i18n.t('albumTagEditor.cancelBtn')}
+    onConfirm={handleClearArt}
+    onCancel={() => { showClearArtConfirm = false; }}
+  />
+{/if}

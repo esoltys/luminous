@@ -1130,6 +1130,7 @@
     initialYear={songs[0].year}
     initialDisc={songs[0].disc}
     initialCompilation={songs[0].compilation}
+    hasEmbeddedArt={songs.some((s) => s.art_embedded)}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />

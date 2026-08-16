@@ -213,6 +213,45 @@ pub fn write_tags(
     Ok(())
 }
 
+/// Remove every embedded cover art picture from `path`'s primary tag,
+/// leaving all other tag fields untouched (#386). A no-op if the file has no
+/// tag, or its tag has no pictures.
+pub fn clear_embedded_art(path: &Path) -> Result<()> {
+    let mut tagged_file = Probe::open(path)
+        .context("failed to open audio file for cover art clearing")?
+        .read()
+        .context("failed to parse audio tags")?;
+
+    let tag = match tagged_file.primary_tag_mut() {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    if tag.pictures().is_empty() {
+        return Ok(());
+    }
+
+    while !tag.pictures().is_empty() {
+        tag.remove_picture(0);
+    }
+
+    let mut attempts = 0;
+    loop {
+        match tagged_file.save_to_path(path, WriteOptions::default()) {
+            Ok(_) => break,
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e)
+                        .context("failed to write tags back to file after multiple attempts");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // AcoustID Fingerprinting Engine
 // ---------------------------------------------------------------------------
@@ -402,6 +441,87 @@ pub async fn lookup_acoustid(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lofty::picture::{MimeType, Picture, PictureType};
+
+    /// Writes a minimal valid WAV file, so tests don't need a binary audio
+    /// fixture checked into the repo.
+    fn write_test_wav(path: &Path) {
+        let sample_rate = 8_000u32;
+        let channels = 1u16;
+        let bits_per_sample = 16u16;
+        let data = vec![0u8; (sample_rate / 10) as usize * 2]; // 100ms of silence
+
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample / 8) as u32;
+        let block_align = channels * (bits_per_sample / 8);
+
+        let mut wav = Vec::with_capacity(44 + data.len());
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVE");
+        wav.extend_from_slice(b"fmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        wav.extend_from_slice(&channels.to_le_bytes());
+        wav.extend_from_slice(&sample_rate.to_le_bytes());
+        wav.extend_from_slice(&byte_rate.to_le_bytes());
+        wav.extend_from_slice(&block_align.to_le_bytes());
+        wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&data);
+
+        std::fs::write(path, wav).expect("failed to write test wav fixture");
+    }
+
+    #[test]
+    fn test_clear_embedded_art_removes_picture_and_keeps_other_tags() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        // Write a tag with a title and an embedded picture.
+        let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag_type = tagged_file.primary_tag_type();
+        let mut tag = Tag::new(tag_type);
+        tag.set_title("Original Title".to_string());
+        let picture = Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+            .pic_type(PictureType::CoverFront)
+            .mime_type(MimeType::Jpeg)
+            .build();
+        tag.push_picture(picture);
+        tagged_file.insert_tag(tag);
+        tagged_file
+            .save_to_path(&path, WriteOptions::default())
+            .expect("failed to write fixture tag");
+
+        // Sanity check: the picture round-tripped.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        assert_eq!(tagged_file.primary_tag().unwrap().pictures().len(), 1);
+        drop(tagged_file);
+
+        clear_embedded_art(&path).expect("clear_embedded_art should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert!(
+            tag.pictures().is_empty(),
+            "embedded picture should be removed"
+        );
+        assert_eq!(
+            tag.title().as_deref(),
+            Some("Original Title"),
+            "clearing artwork must not touch other tag fields"
+        );
+    }
+
+    #[test]
+    fn test_clear_embedded_art_is_noop_without_a_tag() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("untagged.wav");
+        write_test_wav(&path);
+
+        clear_embedded_art(&path).expect("clearing an untagged file should not error");
+    }
 
     #[tokio::test]
     #[ignore]

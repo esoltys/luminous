@@ -665,7 +665,15 @@ export const en = {
     notFound: "Not found",
     acoustidFpcalcError: "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.",
     acoustidApiKeyError: "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.",
-    saveFailedPrefix: "Failed to save tags: "
+    saveFailedPrefix: "Failed to save tags: ",
+    artworkField: "Artwork",
+    artworkEmbedded: "Embedded cover art",
+    artworkNotEmbedded: "No embedded cover art",
+    clearArtBtn: "Clear Artwork",
+    clearArtConfirmTitle: "Clear Embedded Artwork?",
+    clearArtConfirmMessage: "This removes the embedded cover art from the file itself. The song will fall back to folder art or a placeholder.",
+    clearArtSuccess: "Embedded artwork cleared",
+    clearArtFailedPrefix: "Failed to clear artwork: "
   },
   albumTagEditor: {
     title: "Edit Album Tags",
@@ -680,7 +688,13 @@ export const en = {
     saveBtn: "Save Tags",
     saving: "Saving album tags...",
     saveSuccess: "Updated album tags for {count} songs",
-    saveFailedPrefix: "Failed to save album tags: "
+    saveFailedPrefix: "Failed to save album tags: ",
+    clearArtBtn: "Clear Embedded Artwork",
+    clearArtConfirmTitle: "Clear Embedded Artwork?",
+    clearArtConfirmMessage: "This removes the embedded cover art from every track's file in this album. Tracks will fall back to folder art or a placeholder.",
+    clearingArt: "Clearing artwork...",
+    clearArtSuccess: "Cleared embedded artwork for {count} songs",
+    clearArtFailedPrefix: "Failed to clear album artwork: "
   },
   equalizer: {
     title: "10-Band Graphic Equalizer",

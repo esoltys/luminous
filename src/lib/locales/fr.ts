@@ -662,7 +662,15 @@ export const fr = {
     notFound: "Introuvable",
     acoustidFpcalcError: "La recherche AcoustID nécessite l'utilitaire « fpcalc ». Assurez-vous que « libchromaprint-tools » est installé sur votre système Linux, ou configurez « FPCALC_PATH ».",
     acoustidApiKeyError: "La clé API AcoustID est invalide ou a expiré. Veuillez obtenir une clé API client gratuite sur https://acoustid.org/ et exécuter Luminous avec la variable d'environnement « ACOUSTID_API_KEY » définie.",
-    saveFailedPrefix: "Échec de l'enregistrement des tags : "
+    saveFailedPrefix: "Échec de l'enregistrement des tags : ",
+    artworkField: "Pochette",
+    artworkEmbedded: "Pochette intégrée",
+    artworkNotEmbedded: "Aucune pochette intégrée",
+    clearArtBtn: "Effacer la pochette",
+    clearArtConfirmTitle: "Effacer la pochette intégrée ?",
+    clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier lui-même. La chanson utilisera alors la pochette du dossier ou un espace réservé.",
+    clearArtSuccess: "Pochette intégrée effacée",
+    clearArtFailedPrefix: "Échec de l'effacement de la pochette : "
   },
   albumTagEditor: {
     title: "Modifier les tags de l'album",
@@ -677,7 +685,13 @@ export const fr = {
     saveBtn: "Enregistrer",
     saving: "Enregistrement des tags de l'album...",
     saveSuccess: "Tags d'album mis à jour pour {count} chansons",
-    saveFailedPrefix: "Échec de l'enregistrement des tags d'album : "
+    saveFailedPrefix: "Échec de l'enregistrement des tags d'album : ",
+    clearArtBtn: "Effacer la pochette intégrée",
+    clearArtConfirmTitle: "Effacer la pochette intégrée ?",
+    clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier de chaque piste de cet album. Les pistes utiliseront alors la pochette du dossier ou un espace réservé.",
+    clearingArt: "Effacement de la pochette...",
+    clearArtSuccess: "Pochette intégrée effacée pour {count} chansons",
+    clearArtFailedPrefix: "Échec de l'effacement de la pochette de l'album : "
   },
   equalizer: {
     title: "Égaliseur graphique à 10 bandes",
