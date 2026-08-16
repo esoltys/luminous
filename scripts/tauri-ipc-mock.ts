@@ -552,6 +552,11 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     get_songs_by_artist: (args) =>
       library.songs.filter((s) => s.artist === args.artist || s.album_artist === args.artist),
 
+    // The mock library has no compilation-flagged tracks, so this always
+    // resolves empty — matches the real backend's shape (AlbumItem[]) for
+    // an artist with no compilation appearances, rather than null.
+    get_compilations_by_artist: () => [],
+
     get_song_details: (args) => {
       const songId = args.songId as number;
       const song = library.songs.find((s) => s.id === songId) ?? featuredSong;
@@ -594,6 +599,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     sync_genre_auto_playlists: () => null,
     sync_decade_auto_playlists: () => null,
     sync_bpm_auto_playlists: () => null,
+    sync_all_auto_playlists: () => null,
     get_favourite_songs: () => {
       const cannonsSongs = library.songs.filter((s) => s.artist === "Cannons" || s.album_artist === "Cannons");
       return (cannonsSongs.length > 0 ? cannonsSongs : library.songs).slice(0, 20);
@@ -655,8 +661,17 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const songId = args.songId as number;
       const song = library.songs.find((s) => s.id === songId);
       if (song) {
-        if (song.art_manual) return `luminous-art://${song.art_manual}`;
-        if (song.art_automatic) return `luminous-art://${song.art_automatic}`;
+        // art_manual/art_automatic in the mock fixture are already-servable
+        // static paths (e.g. "/fixtures/foo.jpg"), not real filesystem paths —
+        // wrapping those in luminous-art:// makes getCoverArtUrl() treat them
+        // as a local absolute path and route them through the nonexistent
+        // /local-art/ endpoint (404) instead of serving them directly.
+        if (song.art_manual) {
+          return song.art_manual.startsWith("/") ? song.art_manual : `luminous-art://${song.art_manual}`;
+        }
+        if (song.art_automatic) {
+          return song.art_automatic.startsWith("/") ? song.art_automatic : `luminous-art://${song.art_automatic}`;
+        }
         if (song.art_embedded) {
           const albumClean = song.album ? song.album.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
           const artistClean = song.artist ? song.artist.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") : "";
@@ -765,6 +780,11 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // assigns from the echo, so a bare noop would blank the EQ UI.
   commands["apply_equalizer_config"] = (args) => args.config;
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
+  commands["get_minimize_to_tray_enabled"] = () => false;
+  // No update available — matches @tauri-apps/plugin-updater's `check()`
+  // return shape (null when up to date) so updaterStore.checkForUpdates()
+  // resolves cleanly instead of logging an unhandled-command warning.
+  commands["plugin:updater|check"] = () => null;
   commands["get_ui_preferences"] = () => ({
     rating_style: "heart",
     seekbar_mode: "waveform",
@@ -783,7 +803,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
-    "move_window_to_preset", "get_window_geometry",
+    "move_window_to_preset", "get_window_geometry", "plugin:window|show",
     "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;

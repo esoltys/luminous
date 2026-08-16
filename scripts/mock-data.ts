@@ -153,6 +153,22 @@ const ALBUM_SEEDS: AlbumSeed[] = [
       { title: "Someday", lengthSec: 210 },
     ],
   },
+  {
+    // The only 2010s-dated album in the fixture — take-screenshots.ts's
+    // "click-playlist" action clicks a "2010s" decade auto-playlist button,
+    // which needs at least one song in that decade to exist.
+    artist: "OneRepublic",
+    album: "Native",
+    genre: "Pop",
+    year: 2013,
+    art: "onerepublic_human.jpg",
+    bitrate: 950,
+    samplerate: 44100,
+    tracks: [
+      { title: "Counting Stars", lengthSec: 257, playcount: 6 },
+      { title: "If I Lose Myself", lengthSec: 253 },
+    ],
+  },
 ];
 
 let nextId = 1;
@@ -203,6 +219,7 @@ export const FALLBACK_PLAYLISTS: Playlist[] = [
   { id: 3, name: "Acoustic Morning", dynamic_enabled: false, created: 1782820000000, updated: 1782820000000, track_count: 6, is_queue: false },
   { id: 4, name: "Indie Rock", dynamic_enabled: true, dynamic_spec: "Indie Rock", created: 1782830000000, updated: 1782830000000, track_count: 8, is_queue: false },
   { id: 5, name: "Queue", dynamic_enabled: false, created: 1782840000000, updated: 1782840000000, track_count: 4, is_queue: true },
+  { id: 6, name: "2010s", dynamic_enabled: true, dynamic_spec: "decade:2010s", created: 1782850000000, updated: 1782850000000, track_count: 2, is_queue: false },
 ];
 
 export const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me
