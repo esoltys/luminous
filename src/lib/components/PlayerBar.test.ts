@@ -122,7 +122,7 @@ describe("PlayerBar.svelte", () => {
     const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
 
     const { getByTitle } = render(PlayerBar);
-    const coverButton = getByTitle("Toggle Immersive Album Art Screen");
+    const coverButton = getByTitle("Immersive Mode");
     await fireEvent.click(coverButton);
 
     expect(toggleImmersiveModeSpy).toHaveBeenCalled();

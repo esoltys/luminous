@@ -163,7 +163,7 @@
     if (!playerStore.currentSong) return "";
     return collectionStore.immersiveMode
       ? i18n.t('playerBar.queueTitle', {}, 'Queue')
-      : i18n.t('topNav.toggleImmersive', {}, 'Immersive Mode');
+      : i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode');
   });
 
   async function handleCoverClick(e: MouseEvent) {
