@@ -26,7 +26,6 @@
     VolumeX,
     Shuffle,
     Repeat,
-    PanelBottomOpen,
     AudioWaveform,
     Palette,
     PictureInPicture,
@@ -162,17 +161,23 @@
 
   let coverTitle = $derived.by(() => {
     if (!playerStore.currentSong) return "";
-    return i18n.t('playerBar.queueTitle', {}, 'Queue');
+    return collectionStore.immersiveMode
+      ? i18n.t('playerBar.queueTitle', {}, 'Queue')
+      : i18n.t('topNav.toggleImmersive', {}, 'Immersive Mode');
   });
 
   async function handleCoverClick(e: MouseEvent) {
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
-    collectionStore.exitImmersiveMode();
-    const queuePl = await playlistsStore.requireQueue();
-    playlistsStore.selectPlaylist(queuePl.id);
-    collectionStore.viewPlaylist(queuePl.id);
+    if (collectionStore.immersiveMode) {
+      collectionStore.exitImmersiveMode();
+      const queuePl = await playlistsStore.requireQueue();
+      playlistsStore.selectPlaylist(queuePl.id);
+      collectionStore.viewPlaylist(queuePl.id);
+    } else {
+      collectionStore.toggleImmersiveMode();
+    }
   }
 </script>
 
@@ -369,17 +374,6 @@
 
       <PictureInPicture class="w-4.5 h-4.5" />
     </button>
-
-    {#if collectionStore.immersiveMode}
-
-      <button 
-        onclick={() => collectionStore.toggleImmersiveMode()}
-        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors ml-2 p-1.5 rounded hover:bg-brand-main flex-shrink-0"
-        title={i18n.t('playerBar.restoreInterface', {}, 'Restore Full Interface')}
-      >
-        <PanelBottomOpen class="w-4.5 h-4.5" />
-      </button>
-    {/if}
   </div>
 </footer>
 

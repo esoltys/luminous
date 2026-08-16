@@ -114,6 +114,21 @@ describe("PlayerBar.svelte", () => {
     expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
   });
 
+  it("enters immersive mode when the album cover is clicked outside immersive mode", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = false;
+
+    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    const coverButton = getByTitle("Toggle Immersive Album Art Screen");
+    await fireEvent.click(coverButton);
+
+    expect(toggleImmersiveModeSpy).toHaveBeenCalled();
+    expect(collectionStore.immersiveMode).toBe(true);
+  });
+
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "stopped";
