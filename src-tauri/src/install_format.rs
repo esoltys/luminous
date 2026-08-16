@@ -16,7 +16,8 @@ use std::env;
 /// label. `supports_self_update` gates whether the frontend offers in-app
 /// updates (`FoldersView.svelte`) — false for anything managed by an
 /// external package manager (deb/rpm/flatpak/snap), which would just have
-/// its files overwritten out from under it, or reverted, by a self-update.
+/// its files overwritten out from under it, or reverted, by a self-update,
+/// and false for AppImage, which can't be cleanly patched in place either.
 #[derive(Debug, Clone, Serialize)]
 pub struct InstallFormatInfo {
     pub format: String,
@@ -39,10 +40,14 @@ pub fn detect_install_format() -> InstallFormatInfo {
     #[cfg(target_os = "linux")]
     {
         if env::var("APPIMAGE").is_ok() {
+            // AppImages are monolithic binary bundles the user downloaded and
+            // must manually replace; there's no external package manager to
+            // clash with, but there's also no way to patch the running binary
+            // in place, so this behaves like the managed-package formats below.
             return InstallFormatInfo {
                 format: "appimage".to_string(),
                 human_name: "Linux AppImage".to_string(),
-                supports_self_update: true,
+                supports_self_update: false,
             };
         }
 
@@ -150,5 +155,20 @@ mod tests {
         let info = detect_install_format();
         assert!(!info.format.is_empty());
         assert!(!info.human_name.is_empty());
+    }
+
+    // AppImages are standalone bundles the user must manually re-download and
+    // replace; there's no way to patch the running binary in place, so this
+    // must behave like the managed-package formats (deb/rpm/flatpak/snap)
+    // rather than like a real in-app-updatable install (#411).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_appimage_does_not_support_self_update() {
+        env::set_var("APPIMAGE", "/tmp/Luminous.AppImage");
+        let info = detect_install_format();
+        env::remove_var("APPIMAGE");
+
+        assert_eq!(info.format, "appimage");
+        assert!(!info.supports_self_update);
     }
 }
