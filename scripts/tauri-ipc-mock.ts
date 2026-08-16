@@ -485,6 +485,12 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     get_songs: () => library.songs,
 
+    get_library_snapshot: () => ({
+      songs: library.songs,
+      albums: library.albums,
+      artists: library.artists,
+    }),
+
     search_songs: (args) => {
       const q = ((args.query as string) || "").toLowerCase().trim();
       if (!q) return library.songs;
@@ -833,6 +839,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // metadata.currentWindow.label directly — without it every mocked page
     // load logs "Failed to attach window geometry listeners".
     currentWindow: { label: "main" },
+    // getCurrentWebview() (+layout.svelte, drag-drop listener) reads
+    // metadata.currentWebview.label directly — without it it throws
+    // reading 'label' of undefined before the drag-drop listener attaches.
+    currentWebview: { label: "main" },
     unregisterListener: (event: string, eventId: number) => internals.unregisterListener(event, eventId),
   };
   (internals as any).listeners = {
