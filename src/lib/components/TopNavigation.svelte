@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Menu, ChevronLeft, ChevronRight, Search, FolderOpen, PanelRight, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
+  import { Menu, ChevronLeft, ChevronRight, Search, FolderOpen, Info, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
@@ -633,15 +633,13 @@
     {/if}
   </div>
 
-  <div class="flex items-center gap-1.5 bg-brand-main/60 p-1 rounded-lg border border-brand-border/60 ml-auto flex-shrink-0 select-none">
-    <button
-      onclick={() => collectionStore.toggleRightPanel()}
-      class="p-1.5 rounded-md transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
-      title={i18n.t('topNav.toggleRightPanel')}
-    >
-      <PanelRight class="w-4 h-4" />
-    </button>
-  </div>
+  <button
+    onclick={() => collectionStore.toggleRightPanel()}
+    class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+    title={i18n.t('topNav.toggleRightPanel')}
+  >
+    <Info class="w-4 h-4" />
+  </button>
 
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
        which needs overflow-visible for the search dropdown popover) so the
