@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock } from "lucide-svelte";
+  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock, ImageOff } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -10,6 +10,8 @@
   import FormField from "./FormField.svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Modal from "./Modal.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
+  import CoverArt from "./CoverArt.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import Button from "./Button.svelte";
@@ -42,6 +44,10 @@
   // the same "Various Artists" pill here as it does there instead of an
   // editable field that would suggest a per-track override is meaningful.
   let compilation = $state(false);
+  let artEmbedded = $state(false);
+  let coverArtVersion = $state(0);
+  let showClearArtConfirm = $state(false);
+  let isClearingArt = $state(false);
 
   let isLoading = $state(false);
   let isSaving = $state(false);
@@ -74,6 +80,7 @@
         initial_key: string;
         rating: number;
         compilation: boolean;
+        art_embedded: boolean;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -91,6 +98,7 @@
       path = details.path;
       rating = details.rating;
       compilation = details.compilation;
+      artEmbedded = details.art_embedded;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
@@ -202,6 +210,23 @@
     }
   }
 
+  async function handleClearArt() {
+    isClearingArt = true;
+    try {
+      await invoke("clear_song_cover_art", { songId });
+      artEmbedded = false;
+      coverArtVersion++;
+      await collectionStore.refreshLibrary();
+      toastStore.show(i18n.t('tagEditor.clearArtSuccess'), "success");
+    } catch (e: any) {
+      console.error("Failed to clear embedded artwork:", e);
+      toastStore.show(i18n.t('tagEditor.clearArtFailedPrefix') + e.toString(), "error");
+    } finally {
+      isClearingArt = false;
+      showClearArtConfirm = false;
+    }
+  }
+
   onMount(loadMetadata);
 
   function handleKeydown(e: KeyboardEvent) {
@@ -242,6 +267,27 @@
           <div class="flex flex-col gap-1 bg-brand-main border border-brand-border rounded-lg p-2.5">
             <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.locationField')}</span>
             <span class="text-[10px] text-brand-text-secondary break-all select-text font-mono">{path}</span>
+          </div>
+
+          <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
+            {#key coverArtVersion}
+              <CoverArt {songId} sizeClass="w-12 h-12 rounded" />
+            {/key}
+            <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+              <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('tagEditor.artworkField')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-mono">
+                {artEmbedded ? i18n.t('tagEditor.artworkEmbedded') : i18n.t('tagEditor.artworkNotEmbedded')}
+              </span>
+            </div>
+            <Button
+              onclick={() => { showClearArtConfirm = true; }}
+              disabled={!artEmbedded || isSaving || isClearingArt}
+              variant="secondary"
+              size="sm"
+            >
+              <ImageOff class="w-3.5 h-3.5" />
+              {i18n.t('tagEditor.clearArtBtn')}
+            </Button>
           </div>
 
           {#if lookupErrorMsg}
@@ -436,3 +482,14 @@
       </div>
     </div>
 </Modal>
+
+{#if showClearArtConfirm}
+  <ConfirmDialog
+    title={i18n.t('tagEditor.clearArtConfirmTitle')}
+    message={i18n.t('tagEditor.clearArtConfirmMessage')}
+    confirmLabel={i18n.t('tagEditor.clearArtBtn')}
+    cancelLabel={i18n.t('tagEditor.cancelBtn')}
+    onConfirm={handleClearArt}
+    onCancel={() => { showClearArtConfirm = false; }}
+  />
+{/if}

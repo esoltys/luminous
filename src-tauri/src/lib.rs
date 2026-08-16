@@ -803,6 +803,8 @@ pub fn run() {
             commands::tageditor::has_acoustid_env_key,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_album_tags,
+            commands::tageditor::clear_song_cover_art,
+            commands::tageditor::clear_album_cover_art,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

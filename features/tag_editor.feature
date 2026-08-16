@@ -11,3 +11,9 @@ Feature: Tag Editor
     And I click "Save Tags"
     Then it should update the song details in the SQLite database
     And the library views should immediately reflect the updated metadata
+
+  Scenario: Clearing embedded artwork from a mis-tagged track
+    Given I have a song in the library with embedded cover art
+    When I click "Clear Artwork"
+    Then the embedded picture should be removed from the audio file
+    And the song in the database should have "art_embedded" set to false

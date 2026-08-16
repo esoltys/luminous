@@ -38,6 +38,7 @@ describe("TagEditor.svelte", () => {
     initial_key: "Cmaj",
     rating: 3,
     compilation: false,
+    art_embedded: false,
   };
 
   beforeEach(() => {
@@ -53,6 +54,7 @@ describe("TagEditor.svelte", () => {
         };
       }
       if (cmd === "save_song_tags") return null;
+      if (cmd === "clear_song_cover_art") return null;
       if (cmd === "set_song_rating") return 5;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
@@ -129,6 +131,56 @@ describe("TagEditor.svelte", () => {
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it("disables the Clear Artwork button when the song has no embedded art", async () => {
+    const onClose = vi.fn();
+    const { getByRole } = render(TagEditor, { songId: 10, onClose });
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: /clear artwork/i })).toBeDisabled();
+    });
+  });
+
+  it("clears embedded artwork after confirming, and disables the button afterward", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return { ...mockSongDetails, art_embedded: true };
+      if (cmd === "clear_song_cover_art") return null;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const { getByRole, getAllByRole } = render(TagEditor, { songId: 10, onClose });
+
+    const clearBtn = await waitFor(() => {
+      const btn = getByRole("button", { name: /clear artwork/i });
+      expect(btn).not.toBeDisabled();
+      return btn;
+    });
+
+    await fireEvent.click(clearBtn);
+
+    // The confirm dialog's own "Clear Artwork" button is now on top of the
+    // (still-rendered, still-disabled-pending) trigger button, so there are
+    // two matches — the confirm dialog's is the one added last.
+    const confirmBtn = await waitFor(() => {
+      const btns = getAllByRole("button", { name: "Clear Artwork" });
+      expect(btns).toHaveLength(2);
+      return btns[btns.length - 1];
+    });
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_song_cover_art", { songId: 10 });
+    });
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: /clear artwork/i })).toBeDisabled();
+    });
+
+    // The modal itself stays open (unlike Save), so the user can keep editing.
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("handles AcoustID fingerprint lookup to suggest tags", async () => {

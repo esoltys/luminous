@@ -24,6 +24,7 @@ describe("AlbumTagEditor.svelte", () => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "save_album_tags") return 2;
+      if (cmd === "clear_album_cover_art") return 2;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
     });
@@ -214,6 +215,45 @@ describe("AlbumTagEditor.svelte", () => {
         disc: 1,
         compilation: true,
       });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("disables Clear Embedded Artwork when no track in the album has embedded art", async () => {
+    const onClose = vi.fn();
+    const { getByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      hasEmbeddedArt: false,
+      onClose,
+    });
+
+    expect(getByRole("button", { name: /clear embedded artwork/i })).toBeDisabled();
+  });
+
+  it("clears embedded artwork for the whole album after confirming", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByRole, getAllByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      hasEmbeddedArt: true,
+      onClose,
+      onSave,
+    });
+
+    const clearBtn = getByRole("button", { name: /clear embedded artwork/i });
+    expect(clearBtn).not.toBeDisabled();
+    await fireEvent.click(clearBtn);
+
+    const confirmBtn = await waitFor(() => {
+      const btns = getAllByRole("button", { name: /clear embedded artwork/i });
+      expect(btns).toHaveLength(2);
+      return btns[btns.length - 1];
+    });
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_album_cover_art", { songIds: [101, 102] });
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
