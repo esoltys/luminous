@@ -221,8 +221,29 @@ async function main() {
 
     // Inject the mock library data, then the mock Tauri IPC bridge that reads it.
     // emptyLibrary swaps in a zeroed-out library (used for the no-folders-added
-    // welcome/empty-state capture) instead of the real mock data.
-    const emptyLibraryJson = JSON.stringify({ songs: [], albums: [], artists: [], playlists: [], playlistTracks: {}, lyrics: "" });
+    // welcome/empty-state capture) instead of the real mock data. The backend
+    // always bootstraps the built-in Queue playlist at startup regardless of
+    // library state (see PlaylistManager::queue() in AGENTS.md's Architecture
+    // Invariants), so it must still be present here — without it,
+    // PlaylistsStore.init()'s requireQueue() throws "built-in Queue playlist
+    // missing from backend" and the page never finishes loading.
+    const emptyLibraryQueuePlaylist = {
+      id: 1,
+      name: "Queue",
+      dynamic_enabled: false,
+      created: 0,
+      updated: 0,
+      track_count: 0,
+      is_queue: true,
+    };
+    const emptyLibraryJson = JSON.stringify({
+      songs: [],
+      albums: [],
+      artists: [],
+      playlists: [emptyLibraryQueuePlaylist],
+      playlistTracks: {},
+      lyrics: "",
+    });
     await page.addInitScript(`
       window.__LUMINOUS_MOCK_LIBRARY__ = ${emptyLibrary ? emptyLibraryJson : libraryJson};
       window.__LUMINOUS_MOCK_FEATURED__ = ${emptyLibrary ? "{}" : JSON.stringify(featured)};

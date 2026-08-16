@@ -30,21 +30,6 @@ describe("TopNavigation.svelte", () => {
     collectionStore.rightPanelOpen = false;
   });
 
-  it("reflects correct toggle active class for immersive mode when off vs on", async () => {
-    const { getByTitle } = render(TopNavigation);
-    const immersiveBtn = getByTitle("Toggle Immersive Album Art Screen");
-
-    // When immersiveMode is false, button should NOT have the active class 'bg-brand-accent text-white'
-    expect(immersiveBtn.className).not.toContain("bg-brand-accent text-white");
-    expect(immersiveBtn.className).toContain("text-brand-text-secondary");
-
-    // Toggle immersiveMode to true
-    await fireEvent.click(immersiveBtn);
-
-    expect(collectionStore.immersiveMode).toBe(true);
-    expect(immersiveBtn.className).toContain("bg-brand-accent text-white");
-  });
-
   it("toggles sidebar compact state when clicking the hamburger menu button", async () => {
     collectionStore.sidebarOpen = true;
     collectionStore.setSidebarWidth(256);

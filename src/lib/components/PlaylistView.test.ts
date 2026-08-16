@@ -135,6 +135,17 @@ describe("PlaylistView.svelte", () => {
     expect(getByText("Track Three")).toBeInTheDocument();
   });
 
+  it("offers a rename affordance for a regular playlist", () => {
+    const { getAllByTitle } = render(PlaylistView);
+    expect(getAllByTitle("Rename playlist").length).toBeGreaterThan(0);
+  });
+
+  it("hides the rename affordance for the queue", () => {
+    playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
+    const { queryByTitle } = render(PlaylistView);
+    expect(queryByTitle("Rename playlist")).toBeNull();
+  });
+
   it("handles drag and drop reordering of playlist items", async () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
