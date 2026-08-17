@@ -8,7 +8,13 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-.claude
+# Local Claude Code state (session plans, CLAUDE.md, etc.) stays untracked,
+# except the SessionStart hook below, which is committed so remote sessions
+# pick it up (see .claude/hooks/session-start.sh).
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/**
 /.worktrees
 
 # Personal override for the Tauri IPC mock config (scripts/mock-config.json is tracked directly)
