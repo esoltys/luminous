@@ -24,3 +24,21 @@ jobs:
         uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  lockfile_check:
+    name: bun.lock Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Fails if package.json's dependency ranges have moved without bun.lock
+      # being regenerated to match — catches the drift `bun run release`
+      # normally prevents (it runs `bun install` during the version bump).
+      - name: Verify bun.lock is in sync with package.json
+        run: bun install --frozen-lockfile

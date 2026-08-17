@@ -4,6 +4,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,12 @@ function main() {
   } else {
     console.error(`[Error] Cargo.toml not found at ${cargoPath}`);
   }
+
+  // 4. Sync bun.lock — package.json's version bump doesn't touch dependency ranges,
+  // but this keeps the lockfile from silently drifting release over release if it
+  // was already stale (e.g. a prior dependency bump that never got a fresh install).
+  console.log("[Version Bump] Syncing bun.lock...");
+  execSync("bun install", { stdio: "inherit", cwd: rootDir });
 
   console.log("[Version Bump] Completed successfully!");
 }
