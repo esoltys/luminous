@@ -56,6 +56,11 @@ describe("PlayerBar.svelte", () => {
     playerStore.volume = 0.8;
     playerStore.shuffleMode = "off";
     playerStore.repeatMode = "off";
+    // Reset the viewport-driven breakpoint flags so tests that set
+    // viewportWidth narrow (to exercise isImmersiveForced) don't leak into
+    // later tests via the shared collectionStore singleton.
+    collectionStore.viewportWidth = 1280;
+    collectionStore.viewportHeight = 800;
   });
 
   it("renders 'Not Playing' state when currentSong is undefined", () => {
@@ -216,6 +221,42 @@ describe("PlayerBar.svelte", () => {
 
     expect(getAllByTitle(/before moving to a new, randomly selected artist/i).length).toBeGreaterThan(0);
     expect(getAllByTitle(/loop the current queue or playlist indefinitely/i).length).toBeGreaterThan(0);
+  });
+
+  it("does not exit or enter immersive mode from the cover click while width has force-engaged it", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = false;
+    collectionStore.viewportWidth = 500; // below SMALL_BREAKPOINT_WIDTH_PX (640)
+
+    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
+    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    expect(collectionStore.isImmersiveForced).toBe(true);
+    const coverButton = getByTitle("Immersive Mode");
+    await fireEvent.click(coverButton);
+
+    expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
+    expect(exitImmersiveModeSpy).not.toHaveBeenCalled();
+  });
+
+  it("marks secondary controls with the narrow-width responsive classes that hide them first", () => {
+    // jsdom doesn't evaluate CSS media queries, so this checks the
+    // structural markup (the responsive classes are present on the right
+    // elements) rather than actual visibility at a given width — real
+    // breakpoint behavior is covered by manual verification.
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    const { getAllByTitle, container } = render(PlayerBar);
+
+    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
+    expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[560px]:block");
+    expect(repeatBtn.closest(".hidden")).toHaveClass("min-[560px]:block");
+
+    const volumeSlider = container.querySelector('input[type="range"]');
+    expect(volumeSlider).toHaveClass("hidden", "sm:block");
   });
 
   it("handles mute toggle correctly", async () => {

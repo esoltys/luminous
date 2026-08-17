@@ -12,7 +12,7 @@
 
   import { invoke } from "@tauri-apps/api/core";
 
-  let { width = 256 }: { width?: number } = $props();
+  let { width = 256, resizing = false }: { width?: number; resizing?: boolean } = $props();
 
   let showAddDirModal = $state(false);
 
@@ -60,7 +60,7 @@
 
 </script>
 
-<aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
   <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-1 flex flex-col items-center">
     <button
       onclick={() => { collectionStore.activeTab = "home"; }}

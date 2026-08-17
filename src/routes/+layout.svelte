@@ -36,6 +36,13 @@
   let isShortcutsModalOpen = $state(false);
   let isDragActive = $state(false);
   let isShiftHeld = $state(false);
+  let isResizingSidebar = $state(false);
+
+  // Visual-only override: never touches the stored sidebarWidth preference,
+  // so widening the window back out restores exactly the width the user had.
+  let effectiveSidebarWidth = $derived(
+    collectionStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : collectionStore.sidebarWidth
+  );
 
   onMount(() => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
@@ -202,6 +209,7 @@
   // Pointer drag resizing for Sidebar (left-to-right increase)
   function startResizeSidebar(e: PointerEvent) {
     e.preventDefault();
+    isResizingSidebar = true;
     const startX = e.clientX;
     const startWidth = collectionStore.sidebarWidth;
 
@@ -217,6 +225,7 @@
     }
 
     function onPointerUp() {
+      isResizingSidebar = false;
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     }
@@ -287,16 +296,28 @@
     <div class="w-full h-full">
       <Miniplayer />
     </div>
+  {:else if collectionStore.isPlaybarOnlyMode}
+    <!-- Playbar-only mode: the window is too short to show anything else,
+         including the immersive cover view. Renders PlayerBar unconditionally
+         (it already has a graceful "not playing" state) so the user never
+         sees a blank window when it's squashed short. Reuses the same
+         inset-x-4 horizontal insets as the normal floating dock below so
+         PlayerBar's rendered width is identical between the two render sites. -->
+    <div class="relative w-full h-full">
+      <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 z-40">
+        <PlayerBar />
+      </div>
+    </div>
   {:else}
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
     <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
       <!-- Inner Card Wrapper -->
-      <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
-        
+      <div class="w-full h-full relative flip-card" class:flipped={collectionStore.effectiveImmersiveMode}>
+
         <!-- FRONT FACE: Normal App Layout -->
-        <div class="flip-face flip-front flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-front flex flex-col {collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Top Navigation Ribbon -->
           <div class="flex-shrink-0 z-50 overflow-visible">
             <TopNavigation />
@@ -307,25 +328,30 @@
             <!-- Left Sidebar -->
             {#if collectionStore.sidebarOpen}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
-                <Sidebar width={collectionStore.sidebarWidth} />
+                <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
 
-                <!-- Left Resize Handle -->
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                <div 
-                  role="separator"
-                  aria-valuenow={collectionStore.sidebarWidth}
-                  aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
-                  aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
-                  aria-label={i18n.t('topNav.resizeSidebar')}
-                  tabindex="0"
-                  class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
-                  onpointerdown={startResizeSidebar}
-                  onkeydown={handleSidebarKeyDown}
-                >
-                  <!-- Expanded hover/touch area wrapper -->
-                  <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
-                </div>
+                <!-- Left Resize Handle: hidden while auto-collapsed — dragging
+                     from a visually-64px rail would otherwise jump using the
+                     real (larger) stored sidebarWidth as the drag's starting
+                     point. Widening the window is the way out. -->
+                {#if !collectionStore.isSidebarAutoCollapsed}
+                  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <div
+                    role="separator"
+                    aria-valuenow={collectionStore.sidebarWidth}
+                    aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
+                    aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
+                    aria-label={i18n.t('topNav.resizeSidebar')}
+                    tabindex="0"
+                    class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
+                    onpointerdown={startResizeSidebar}
+                    onkeydown={handleSidebarKeyDown}
+                  >
+                    <!-- Expanded hover/touch area wrapper -->
+                    <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+                  </div>
+                {/if}
               </div>
             {/if}
 
@@ -335,7 +361,7 @@
             </main>
 
             <!-- Right Contextual Panel -->
-            {#if collectionStore.rightPanelOpen}
+            {#if collectionStore.rightPanelOpen && !collectionStore.isRightPanelAutoHidden}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <!-- Right Resize Handle -->
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -365,7 +391,7 @@
         <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
-        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-8 pb-32 select-none {!collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Immersive Ambient Blurred Background -->
           {#if playerStore.currentSong}
             <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">

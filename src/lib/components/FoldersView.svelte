@@ -388,7 +388,8 @@
     </div>
   </div>
 
-  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
+  <div class="max-w-3xl mx-auto space-y-6">
     {#if settingsTab === "general"}
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
         <div class="pb-3 flex items-center justify-between">
@@ -1247,5 +1248,6 @@
         </div>
       </div>
     {/if}
+  </div>
   </div>
 </div>

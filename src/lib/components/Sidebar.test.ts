@@ -75,4 +75,14 @@ describe("Sidebar.svelte", () => {
     expect(collectionBtn.parentElement).toHaveClass("items-center");
     expect(playlistsBtn.parentElement).toHaveClass("items-center");
   });
+
+  it("animates width changes by default but suppresses the transition while actively resizing", () => {
+    const { container, rerender } = render(Sidebar, { props: { width: 256, resizing: false } });
+    const aside = container.querySelector("aside");
+    expect(aside).toHaveClass("transition-[width]");
+    expect(aside).not.toHaveClass("transition-none");
+
+    rerender({ width: 200, resizing: true });
+    expect(aside).toHaveClass("transition-none");
+  });
 });

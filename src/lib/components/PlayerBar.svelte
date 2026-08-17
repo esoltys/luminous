@@ -16,6 +16,14 @@
 
   const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
 
+  // Responsive control trimming (issue #413): as this floating bar narrows
+  // toward the app's 480px minWidth, secondary controls drop out in priority
+  // order — mirrors Miniplayer.svelte's compact hover overlay, which already
+  // treats transport + seek as essential and everything else as droppable.
+  // `sm:` (640px) is Tailwind's default breakpoint; `min-[560px]:` below is a
+  // hand-tuned arbitrary-value breakpoint written as a literal string because
+  // Tailwind's class scanner can't resolve an interpolated constants.ts value.
+
 
   import {
     Play,
@@ -170,6 +178,13 @@
     if (!playerStore.currentSong) return;
     e.stopPropagation();
 
+    // While the window is too narrow to show the front face at all
+    // (isImmersiveForced), immersive is engaged regardless of what this
+    // toggles — clicking through to "exit and view Queue" would silently
+    // clear the user's own immersiveMode preference for a screen they can't
+    // actually reach yet, so leave it alone until the window widens back out.
+    if (collectionStore.isImmersiveForced) return;
+
     if (collectionStore.immersiveMode) {
       collectionStore.exitImmersiveMode();
       const queuePl = await playlistsStore.requireQueue();
@@ -181,8 +196,8 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <div class="flex items-center gap-3 w-1/3 min-w-[200px] max-w-xs">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 sm:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+  <div class="hidden min-[560px]:flex items-center gap-3 w-1/3 min-w-[110px] sm:min-w-[200px] max-w-xs">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -239,13 +254,13 @@
     </div>
   </div>
 
-  <div class="flex flex-col items-center gap-1.5 w-1/3 max-w-[600px]">
-    <div class="flex items-center gap-5">
-      <div class="relative">
+  <div class="flex flex-col items-center gap-1.5 flex-1 sm:w-1/3 sm:flex-none max-w-[600px]">
+    <div class="flex items-center gap-3 sm:gap-5">
+      <div class="hidden min-[560px]:block relative">
         {#if playerStore.shuffleMode !== 'off'}
           <button
             onclick={cycleShuffle}
-            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="hidden sm:inline-flex absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
             {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
@@ -290,7 +305,7 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      <div class="relative">
+      <div class="hidden min-[560px]:block relative">
         <button
           onclick={cycleRepeat}
           class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
@@ -305,7 +320,7 @@
         {#if playerStore.repeatMode !== 'off'}
           <button
             onclick={cycleRepeat}
-            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="hidden sm:inline-flex absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
             {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
@@ -340,7 +355,7 @@
     </div>
   </div>
 
-  <div class="flex items-center justify-end gap-3 w-1/3 min-w-[200px] max-w-xs">
+  <div class="flex items-center justify-end gap-1.5 sm:gap-3 w-1/3 min-w-[70px] sm:min-w-[200px] max-w-xs">
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>
@@ -361,7 +376,7 @@
       onchange={releaseVolumeFocus}
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
-      class="volume-slider w-20 h-1 rounded-lg outline-none"
+      class="volume-slider hidden sm:block w-20 h-1 rounded-lg outline-none"
       style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
