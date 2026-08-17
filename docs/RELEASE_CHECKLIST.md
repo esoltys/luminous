@@ -5,6 +5,14 @@ Steps to work through before cutting a Luminous release. `bun run release <versi
 check` + `bun run test:run` + `cargo check` + commit + tag, but everything below it is
 manual.
 
+## Scope
+
+- [ ] Enumerate what's landed since the last tag: `git log <last-tag>..main --oneline`.
+      Confirm every user-facing fix has a linked, `bug`-labeled GitHub issue — PRs
+      occasionally merge without one (e.g. #433 shipped before #453 existed to track it).
+      Create one retroactively and link the PR if it's missing, so the release notes and
+      the post-build issue-closing step below have something to point at.
+
 ## Content
 
 - [ ] Update the user manual (`docs/user-guide/luminous-user-guide-*.dc.html`) for any
@@ -44,7 +52,9 @@ manual.
       locally on the release worktree branch. Don't pass `--push` — that pushes the
       branch straight to `main`, bypassing branch protection and skipping review.
 - [ ] Open a PR from the release branch into `main` and get it reviewed/merged like any
-      other change.
+      other change. If the release only bundles fixes already merged to `main` (a
+      version-bump-only PR), list the issues/PRs it covers in the description so the
+      diff — just version files + release notes — has context.
 - [ ] After the PR merges, `git checkout main && git pull` so `main` includes the merge
       commit, then re-tag `main` at that commit (the local tag from `bun run release`
       still points at the old worktree-branch commit, which is not `main`'s tip once
