@@ -261,6 +261,7 @@ export const en = {
     updateInstalledAsFooter: "Installed as {format}",
     updateAutoSupportedFooter: "auto-update supported",
     updateNotifyOnlyFooter: "notify only, install manually",
+    updateNotifyOnlyAppImageFooter: "notify only, rebuild AppImage locally",
     releaseNotesLink: "Release notes",
     addFolder: "Add Folder",
     folderItemRecursive: "Recursive scanning active",

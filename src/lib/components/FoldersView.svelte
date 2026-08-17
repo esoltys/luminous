@@ -586,7 +586,11 @@
         <div class="flex items-center justify-between gap-4 pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary">
           <span>
             {i18n.t('settings.updateInstalledAsFooter', { format: getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name) })}
-            — {updaterStore.installFormat.supports_self_update ? i18n.t('settings.updateAutoSupportedFooter') : i18n.t('settings.updateNotifyOnlyFooter')}
+            — {updaterStore.installFormat.supports_self_update
+              ? i18n.t('settings.updateAutoSupportedFooter')
+              : updaterStore.installFormat.format === 'appimage'
+                ? i18n.t('settings.updateNotifyOnlyAppImageFooter', {}, 'notify only, rebuild AppImage locally')
+                : i18n.t('settings.updateNotifyOnlyFooter')}
           </span>
           <button onclick={() => openExternalUrl(updaterStore.releaseUrl)} class="text-brand-accent-text hover:underline font-medium shrink-0">
             {i18n.t('settings.releaseNotesLink')}
