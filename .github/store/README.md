@@ -25,3 +25,12 @@ for `pricing`, `-UpdatePublishModeAndVisibility` for `targetPublishMode`/
 [USAGE.md](https://github.com/microsoft/StoreBroker/blob/master/Documentation/USAGE.md#the-easy-way)
 for the full switch list. If a future change adds one of those switches, update
 this file first — it won't reflect the real listing until then.
+
+**No `//` in any string value.** StoreBroker's config loader (`Read-ConfigFile`
+in `PackageTool.ps1`) treats this file as JSON-with-comments: it naively
+splits every line on the first `//` and discards the rest before parsing,
+regardless of whether the `//` is inside a string. A `https://` URL in
+`notesForCertification` broke this exact way — the comment stripper truncated
+the line mid-string, producing invalid JSON (`Unterminated string`). Write
+URLs without a scheme (`github.com/...` instead of `https://github.com/...`)
+or escape the slash (`https:\/\/...`) if a value needs one.

@@ -41,6 +41,6 @@
     "canInstallOnRemovableMedia": false,
     "automaticBackupEnabled": true,
     "isGameDvrEnabled": false,
-    "notesForCertification": "Luminous is an open-source, offline-first local music player. No account or network access is required to install or use it. Source: https://github.com/esoltys/luminous"
+    "notesForCertification": "Luminous is an open-source, offline-first local music player. No account or network access is required to install or use it. Source: github.com/esoltys/luminous"
   }
 }
