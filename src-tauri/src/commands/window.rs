@@ -191,8 +191,8 @@ pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Va
     // Ignore placeholder minimized sizes (0x0) or Win32 offscreen minimized coordinates (-32000)
     if width <= 0.0
         || height <= 0.0
-        || x.map_or(false, |coord| coord <= -10000.0)
-        || y.map_or(false, |coord| coord <= -10000.0)
+        || x.is_some_and(|coord| coord <= -10000.0)
+        || y.is_some_and(|coord| coord <= -10000.0)
     {
         return Ok(serde_json::Value::Null);
     }
