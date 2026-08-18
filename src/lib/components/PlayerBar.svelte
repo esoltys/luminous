@@ -29,13 +29,6 @@
   // Tailwind's class scanner can't resolve an interpolated constants.ts
   // value — don't try to centralize them.
 
-  // `expanded`: used only by the playbar-only layout (+layout.svelte, when
-  // the window is too short for anything else) so the bar grows to fill
-  // most of the available height instead of floating as a small fixed-
-  // height bar with large blank margins above/below it.
-  let { expanded = false }: { expanded?: boolean } = $props();
-
-
   import {
     Play,
     Pause,
@@ -207,7 +200,7 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="{expanded ? 'h-full max-h-48 w-full' : 'h-20'} max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 min-[700px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 min-[700px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
   <div class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}

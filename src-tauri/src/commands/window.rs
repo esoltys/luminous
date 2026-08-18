@@ -125,13 +125,13 @@ pub async fn exit_miniplayer_mode(
     y: Option<f64>,
 ) -> Result<(), String> {
     let target_w = width.unwrap_or(FULL_PLAYER_WIDTH).round().max(320.0);
-    let target_h = height.unwrap_or(FULL_PLAYER_HEIGHT).round().max(200.0);
+    let target_h = height.unwrap_or(FULL_PLAYER_HEIGHT).round().max(120.0);
 
     let _ = window.set_decorations(true);
     let _ = window.set_always_on_top(false);
     let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
         width: 320.0,
-        height: 200.0,
+        height: 120.0,
     })));
     let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
         width: target_w,
