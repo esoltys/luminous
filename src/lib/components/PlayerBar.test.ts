@@ -241,22 +241,38 @@ describe("PlayerBar.svelte", () => {
     expect(exitImmersiveModeSpy).not.toHaveBeenCalled();
   });
 
-  it("marks secondary controls with the narrow-width responsive classes that hide them first", () => {
+  it("marks controls with the Full/Compact/Minimal responsive classes matching their tier", () => {
     // jsdom doesn't evaluate CSS media queries, so this checks the
     // structural markup (the responsive classes are present on the right
     // elements) rather than actual visibility at a given width — real
-    // breakpoint behavior is covered by manual verification.
+    // breakpoint behavior is covered by manual verification. Tiers: Full
+    // (>=700px), Compact (400-700px), Minimal (<400px) — cover art, play/
+    // pause, and skip-next are the constant core shown in all three.
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    const { getAllByTitle, container } = render(PlayerBar);
+    const { getAllByTitle, getByTitle, container } = render(PlayerBar);
 
+    // Gone by Compact (Full-only): shuffle, repeat, volume slider, miniplayer toggle.
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
-    expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[560px]:block");
-    expect(repeatBtn.closest(".hidden")).toHaveClass("min-[560px]:block");
-
+    expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
+    expect(repeatBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
     const volumeSlider = container.querySelector('input[type="range"]');
-    expect(volumeSlider).toHaveClass("hidden", "sm:block");
+    expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
+    expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
+
+    // Gone by Minimal (Compact-and-up only): previous, seek row, right column.
+    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
+    const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
+    expect(seekRow).toHaveClass("hidden", "min-[400px]:flex");
+    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
+    expect(rightColumn).toHaveClass("hidden", "min-[400px]:flex");
+
+    // Never hidden (the constant core): cover art, play/pause, skip-next.
+    const coverButton = getByTitle("Immersive Mode");
+    expect(coverButton.closest(".hidden")).toBeNull();
+    expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
+    expect(getByTitle(/next song/i)).not.toHaveClass("hidden");
   });
 
   it("handles mute toggle correctly", async () => {

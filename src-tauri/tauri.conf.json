@@ -17,7 +17,7 @@
         "visible": false,
         "width": 1280,
         "height": 800,
-        "minWidth": 480,
+        "minWidth": 320,
         "minHeight": 200,
         "decorations": true,
         "transparent": false,

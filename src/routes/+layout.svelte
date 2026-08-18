@@ -391,7 +391,7 @@
         <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
-        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Immersive Ambient Blurred Background -->
           {#if playerStore.currentSong}
             <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
@@ -408,7 +408,7 @@
           <!-- Center Container: Card and Details -->
           <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
             <!-- Floating Cover Art Frame -->
-            <div class="w-72 h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+            <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
               <CoverArt
                 songId={playerStore.currentSong?.id}
                 artEmbedded={playerStore.currentSong?.art_embedded}

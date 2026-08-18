@@ -16,13 +16,16 @@
 
   const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
 
-  // Responsive control trimming (issue #413): as this floating bar narrows
-  // toward the app's 480px minWidth, secondary controls drop out in priority
-  // order — mirrors Miniplayer.svelte's compact hover overlay, which already
-  // treats transport + seek as essential and everything else as droppable.
-  // `sm:` (640px) is Tailwind's default breakpoint; `min-[560px]:` below is a
-  // hand-tuned arbitrary-value breakpoint written as a literal string because
-  // Tailwind's class scanner can't resolve an interpolated constants.ts value.
+  // Responsive control trimming (issue #413): three named tiers as this
+  // floating bar narrows toward the app's 320px minWidth — Full (>=700px),
+  // Compact (400-700px), Minimal (<400px). Cover art, play/pause, and skip-
+  // next are the constant core (shown in all three tiers); everything else
+  // drops out in priority order: expand/shuffle/repeat/volume-slider/seek-
+  // mode-toggle first (gone by Compact), then prev and the seek bar itself
+  // (gone by Minimal). 400/700 are hand-tuned breakpoints specific to this
+  // bar, written as literal `min-[Npx]:` arbitrary-value classes because
+  // Tailwind's class scanner can't resolve an interpolated constants.ts
+  // value — don't try to centralize them.
 
 
   import {
@@ -196,8 +199,8 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 sm:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <div class="hidden min-[560px]:flex items-center gap-3 w-1/3 min-w-[110px] sm:min-w-[200px] max-w-xs">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 min-[700px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+  <div class="flex items-center gap-3 w-1/3 min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-xs">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -254,13 +257,13 @@
     </div>
   </div>
 
-  <div class="flex flex-col items-center gap-1.5 flex-1 sm:w-1/3 sm:flex-none max-w-[600px]">
-    <div class="flex items-center gap-3 sm:gap-5">
-      <div class="hidden min-[560px]:block relative">
+  <div class="flex flex-col items-center gap-1.5 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none max-w-[600px]">
+    <div class="flex items-center gap-3 min-[700px]:gap-5">
+      <div class="hidden min-[700px]:block relative">
         {#if playerStore.shuffleMode !== 'off'}
           <button
             onclick={cycleShuffle}
-            class="hidden sm:inline-flex absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="absolute right-full top-1/2 -translate-y-1/2 mr-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.shuffle')}: ${shuffleModeLabel(playerStore.shuffleMode)} — ${shuffleModeDescription(playerStore.shuffleMode)}`}
           >
             {i18n.t('playerBar.shuffle')} {shuffleModeLabel(playerStore.shuffleMode)}
@@ -279,7 +282,7 @@
         </button>
       </div>
 
-      <button onclick={() => playerStore.previous()} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
+      <button onclick={() => playerStore.previous()} class="hidden min-[400px]:block text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.previous')}>
         <SkipBack class="w-5 h-5 fill-current" />
       </button>
 
@@ -305,7 +308,7 @@
         <SkipForward class="w-5 h-5 fill-current" />
       </button>
 
-      <div class="hidden min-[560px]:block relative">
+      <div class="hidden min-[700px]:block relative">
         <button
           onclick={cycleRepeat}
           class="text-xs transition-colors hover:text-brand-text-primary flex items-center gap-1 p-1 {playerStore.repeatMode !== 'off' ? 'text-brand-accent-text font-bold' : 'text-brand-text-secondary/50'}"
@@ -320,7 +323,7 @@
         {#if playerStore.repeatMode !== 'off'}
           <button
             onclick={cycleRepeat}
-            class="hidden sm:inline-flex absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
+            class="absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-[10px] font-semibold text-brand-accent-text hover:text-brand-text-primary transition-colors uppercase tracking-wide whitespace-nowrap"
             title={`${i18n.t('playerBar.repeat')}: ${repeatModeLabel(playerStore.repeatMode)} — ${repeatModeDescription(playerStore.repeatMode)}`}
           >
             {i18n.t('playerBar.repeat')} {repeatModeLabel(playerStore.repeatMode)}
@@ -330,10 +333,10 @@
 
     </div>
 
-    <div class="flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
+    <div class="hidden min-[400px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
       <!-- Invisible spacer matching the mode-toggle button's footprint, so the
            waveform + timers stay centered instead of skewing left toward it. -->
-      <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
+      <div class="hidden min-[700px]:block w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
       <span>{formatTime(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
@@ -341,7 +344,7 @@
       <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
       <button
         onclick={() => prefs.toggleSeekBarMode()}
-        class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
+        class="hidden min-[700px]:block text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
         title={prefs.seekBarMode === 'waveform'
           ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
           : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
@@ -355,7 +358,7 @@
     </div>
   </div>
 
-  <div class="flex items-center justify-end gap-1.5 sm:gap-3 w-1/3 min-w-[70px] sm:min-w-[200px] max-w-xs">
+  <div class="hidden min-[400px]:flex items-center justify-end gap-1.5 min-[700px]:gap-3 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>
@@ -376,14 +379,14 @@
       onchange={releaseVolumeFocus}
       onpointerup={releaseVolumeFocus}
       onkeyup={releaseVolumeFocus}
-      class="volume-slider hidden sm:block w-20 h-1 rounded-lg outline-none"
+      class="volume-slider hidden min-[700px]:block w-20 h-1 rounded-lg outline-none"
       style={volumeSliderStyle}
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     <button
       onclick={() => collectionStore.toggleMiniplayerMode()}
-      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
+      class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
       title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
     >
 
