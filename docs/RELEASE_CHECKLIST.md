@@ -77,6 +77,12 @@ manual.
       this release" so it also posts as an Announcement in GitHub Discussions, then
       publish it (the workflow creates it as a draft with `prerelease: false`, so it's
       just sitting there until published).
+- [ ] Publishing fires [`publish-store.yml`](../.github/workflows/publish-store.yml),
+      which submits the MSIX to the Microsoft Store. It's a separate workflow from
+      `release.yml` on purpose — it doesn't depend on (and isn't skipped by) the build
+      job, and can be re-run independently via `workflow_dispatch` with a `tag` input if
+      a submission needs to be retried against an already-published release. Watch this
+      run too, not just the build.
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
