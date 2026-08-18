@@ -30,10 +30,14 @@ jobs:
           mkdir -p package
           gh release download "$TAG" --repo "${{ github.repository }}" \
             --pattern "*.msixbundle" --pattern "*.msix" --dir package
-          # Prefer the bundle if both were produced; otherwise fall back to the single .msix.
-          FILE=$(ls package/*.msixbundle 2>/dev/null | head -n1 || true)
+          # Prefer the plain .msix: it's a single x64 package, and StoreBroker's
+          # bundle-metadata reader can't locate the inner package inside the
+          # .msixbundle that tauri-windows-bundle produces (Read-AppPackageBundleMetadata
+          # fails to find the file referenced by the bundle manifest). Fall back to the
+          # bundle only if no plain .msix was uploaded.
+          FILE=$(ls package/*.msix 2>/dev/null | head -n1 || true)
           if [ -z "$FILE" ]; then
-            FILE=$(ls package/*.msix | head -n1)
+            FILE=$(ls package/*.msixbundle | head -n1)
           fi
           echo "Selected package: $FILE"
           echo "path=$FILE" >> "$GITHUB_OUTPUT"
