@@ -388,7 +388,8 @@
     </div>
   </div>
 
-  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6 space-y-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
+  <div bind:this={contentEl} class="flex-1 overflow-y-scroll p-6" class:pb-28={!!playerStore.currentSong} use:rememberScroll={`settings:${settingsTab}`}>
+  <div class="max-w-3xl mx-auto space-y-6">
     {#if settingsTab === "general"}
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6">
         <div class="pb-3 flex items-center justify-between">
@@ -403,8 +404,14 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between gap-4 py-4 border-b border-brand-border/50">
-          <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+        <div class="flex items-center justify-between gap-4 py-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+            <!-- Invisible placeholder matching the description line's height
+                 in the rows below, so this row's control centers at the same
+                 relative position as the ones with an actual description. -->
+            <p class="text-xs invisible" aria-hidden="true">&nbsp;</p>
+          </div>
           <Select
             id="language-select"
             value={i18n.currentLocale}
@@ -416,7 +423,7 @@
           </Select>
         </div>
 
-        <div class="flex items-center justify-between gap-4 pt-4">
+        <div class="flex items-center justify-between gap-4 py-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <label for="rating-style-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.ratingStyle')}</label>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.ratingStyleHint')}</p>
@@ -432,7 +439,7 @@
           </Select>
         </div>
 
-        <div class="flex items-center justify-between gap-4 pt-4 border-t border-brand-border/50">
+        <div class="flex items-center justify-between gap-4 py-4">
           <div class="flex flex-col gap-0.5 min-w-0">
             <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.minimizeToTrayLabel')}</span>
             <p class="text-xs text-brand-text-secondary">{i18n.t('settings.minimizeToTrayHint')}</p>
@@ -1247,5 +1254,6 @@
         </div>
       </div>
     {/if}
+  </div>
   </div>
 </div>

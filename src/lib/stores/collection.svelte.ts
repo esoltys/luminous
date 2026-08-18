@@ -18,7 +18,15 @@ import type {
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
 import { toastStore } from "./toast.svelte";
-import { MAX_RECENT_SEARCHES, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_COLLAPSED_WIDTH_PX } from "../constants";
+import {
+  MAX_RECENT_SEARCHES,
+  SIDEBAR_MIN_WIDTH_PX,
+  SIDEBAR_COLLAPSED_WIDTH_PX,
+  MEDIUM_BREAKPOINT_WIDTH_PX,
+  SMALL_BREAKPOINT_WIDTH_PX,
+  PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
+  DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
+} from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists";
@@ -425,6 +433,14 @@ class CollectionStore {
   miniplayerX = $state<number | null>(null);
   miniplayerY = $state<number | null>(null);
 
+  // Live CSS viewport size, used only to derive responsive breakpoint flags
+  // below — a plain in-memory mirror of window.innerWidth/innerHeight, kept
+  // deliberately separate from the geometry-capture fields above (those
+  // persist native OS window geometry via debounced Tauri onResized/onMoved
+  // for cross-restart restore; this one drives synchronous layout decisions
+  // and touches no IPC or localStorage).
+  viewportWidth = $state<number>(typeof window !== "undefined" ? window.innerWidth : 1280);
+  viewportHeight = $state<number>(typeof window !== "undefined" ? window.innerHeight : 800);
 
   watchFoldersRealtime = $state<boolean>(true);
   scanOnStartup = $state<boolean>(false);
@@ -492,6 +508,7 @@ class CollectionStore {
         // the backend at all (see enter/exitMiniplayerMode, which check
         // isGeometryCaptureSupported() fresh on each toggle).
         this.initWindowGeometryTracking();
+        this.initViewportTracking();
 
         const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
         if (savedIsMiniplayer === "true") {
@@ -1082,6 +1099,22 @@ class CollectionStore {
     }
   }
 
+  // Mirrors window.innerWidth/innerHeight into viewportWidth/viewportHeight
+  // for the responsive breakpoint getters below. Deliberately separate from
+  // initWindowGeometryTracking above: that one debounces and persists native
+  // OS geometry across restarts via IPC; this one is a synchronous, in-memory
+  // reflection of the CSS viewport with no persistence, so layout can react
+  // to every resize immediately.
+  private initViewportTracking() {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      this.viewportWidth = window.innerWidth;
+      this.viewportHeight = window.innerHeight;
+    };
+    update();
+    window.addEventListener("resize", update);
+  }
+
   private async captureCurrentWindowGeometry() {
     if (this.miniplayerTransitionInFlight) return;
     try {
@@ -1121,6 +1154,35 @@ class CollectionStore {
     if (typeof window !== "undefined") {
       localStorage.setItem("layout_rightPanelOpen", this.rightPanelOpen.toString());
     }
+  }
+
+  // Responsive breakpoint flags (issue #413) — pure functions of
+  // viewportWidth/viewportHeight. None of these read or write sidebarOpen,
+  // sidebarWidth, rightPanelOpen, or immersiveMode: they're purely visual
+  // overrides so widening/heightening the window back out always restores
+  // exactly whatever the user had set manually.
+  get isSidebarAutoCollapsed(): boolean {
+    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+  }
+
+  get isRightPanelAutoHidden(): boolean {
+    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+  }
+
+  get isImmersiveForced(): boolean {
+    return this.viewportWidth < SMALL_BREAKPOINT_WIDTH_PX;
+  }
+
+  get effectiveImmersiveMode(): boolean {
+    return this.immersiveMode || this.isImmersiveForced;
+  }
+
+  get isPlaybarOnlyMode(): boolean {
+    return this.viewportHeight < PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX;
+  }
+
+  get isDetailHeaderCollapsed(): boolean {
+    return this.viewportHeight < DETAIL_HEADER_COLLAPSE_HEIGHT_PX;
   }
 
   setSidebarWidth(width: number) {

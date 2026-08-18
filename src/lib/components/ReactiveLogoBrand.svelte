@@ -1,10 +1,10 @@
 <script lang="ts">
   import { themeStore } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
 
   interface Props {
     size?: "sm" | "md" | "lg" | "xl";
@@ -25,6 +25,11 @@
   let midIntensity = $state(0);
   let coronalIntensity = $state(0);
   let unlisten: (() => void) | null = null;
+  // Tracks whether this component currently holds a spectrum acquisition, so
+  // onDestroy/togglePulsing release exactly the acquisitions this instance
+  // made — never more (double-release) or fewer (a leaked hold that keeps
+  // the backend computing spectrum data nobody's listening for anymore).
+  let hasAcquiredSpectrum = false;
 
   // Below this delta, a new intensity reading is visually indistinguishable
   // from the current one. The three intensities each drive an SVG element
@@ -45,9 +50,8 @@
     }
 
     if (isPulsingEnabled) {
-      await invoke("set_spectrum_enabled", { enabled: true }).catch((err) =>
-        console.error("Failed to enable spectrum in logo mount:", err)
-      );
+      acquireSpectrum();
+      hasAcquiredSpectrum = true;
     }
 
     try {
@@ -86,19 +90,26 @@
 
   onDestroy(() => {
     if (unlisten) unlisten();
+    if (hasAcquiredSpectrum) {
+      releaseSpectrum();
+      hasAcquiredSpectrum = false;
+    }
   });
 
-  async function togglePulsing() {
+  function togglePulsing() {
     isPulsingEnabled = !isPulsingEnabled;
     localStorage.setItem("logo_pulsing", String(isPulsingEnabled));
     if (!isPulsingEnabled) {
       bassIntensity = 0;
       midIntensity = 0;
       coronalIntensity = 0;
-    } else {
-      await invoke("set_spectrum_enabled", { enabled: true }).catch((err) =>
-        console.error("Failed to enable spectrum on toggle:", err)
-      );
+      if (hasAcquiredSpectrum) {
+        releaseSpectrum();
+        hasAcquiredSpectrum = false;
+      }
+    } else if (!hasAcquiredSpectrum) {
+      acquireSpectrum();
+      hasAcquiredSpectrum = true;
     }
   }
 

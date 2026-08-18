@@ -222,29 +222,36 @@
 
 <header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <div class="flex items-center gap-2">
-    <button
-      onclick={() => collectionStore.toggleSidebarCompact()}
-      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors"
-      title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
-    >
-      <Menu class="w-5 h-5" />
-    </button>
-    <button
-      onclick={() => collectionStore.goBack()}
-      disabled={!collectionStore.canGoBack}
-      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      title={i18n.t('topNav.goBack')}
-    >
-      <ChevronLeft class="w-5 h-5" />
-    </button>
-    <button
-      onclick={() => collectionStore.goForward()}
-      disabled={!collectionStore.canGoForward}
-      class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      title={i18n.t('topNav.goForward')}
-    >
-      <ChevronRight class="w-5 h-5" />
-    </button>
+    {#if !collectionStore.isSidebarAutoCollapsed}
+      <button
+        onclick={() => collectionStore.toggleSidebarCompact()}
+        class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors"
+        title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
+      >
+        <Menu class="w-5 h-5" />
+      </button>
+    {/if}
+    <!-- Back/forward drop first as the header narrows (issue #413): secondary
+         to search and the sidebar toggle, and browser-history-style nav is
+         least missed when space is tight. -->
+    <div class="hidden md:flex items-center gap-2">
+      <button
+        onclick={() => collectionStore.goBack()}
+        disabled={!collectionStore.canGoBack}
+        class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title={i18n.t('topNav.goBack')}
+      >
+        <ChevronLeft class="w-5 h-5" />
+      </button>
+      <button
+        onclick={() => collectionStore.goForward()}
+        disabled={!collectionStore.canGoForward}
+        class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title={i18n.t('topNav.goForward')}
+      >
+        <ChevronRight class="w-5 h-5" />
+      </button>
+    </div>
   </div>
 
   <div bind:this={searchContainerRef} class="relative flex-1 max-w-2xl">
@@ -633,18 +640,22 @@
     {/if}
   </div>
 
-  <button
-    onclick={() => collectionStore.toggleRightPanel()}
-    class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
-    title={i18n.t('topNav.toggleRightPanel')}
-  >
-    <span class="font-serif font-bold italic text-lg leading-none" aria-hidden="true">i</span>
-  </button>
+  {#if !collectionStore.isRightPanelAutoHidden}
+    <button
+      onclick={() => collectionStore.toggleRightPanel()}
+      class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+      title={i18n.t('topNav.toggleRightPanel')}
+    >
+      <span class="font-serif font-bold italic text-lg leading-none" aria-hidden="true">i</span>
+    </button>
+  {/if}
 
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
        which needs overflow-visible for the search dropdown popover) so the
-       logo's SVG glow filter can never bleed into the sidebar/header layers -->
-  <div class="flex items-center justify-center flex-shrink-0 overflow-hidden isolate">
+       logo's SVG glow filter can never bleed into the sidebar/header layers.
+       Purely decorative, so it's the first thing to drop as the header
+       narrows (issue #413) — hidden from the medium breakpoint down. -->
+  <div class="hidden lg:flex items-center justify-center flex-shrink-0 overflow-hidden isolate">
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>

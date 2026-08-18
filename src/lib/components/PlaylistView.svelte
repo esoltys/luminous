@@ -761,9 +761,10 @@
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto carousel-scroll"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
-    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
+    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
         <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
+          {#if !collectionStore.isDetailHeaderCollapsed}
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -818,8 +819,9 @@
               {/if}
             </span>
           </div>
+          {/if}
 
-          <div class="flex items-center gap-3 mt-3">
+          <div class="flex flex-wrap items-center gap-3 mt-3">
             <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
@@ -863,6 +865,7 @@
             <ColumnSelector align="left" iconOnly />
           </div>
 
+          {#if !collectionStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
             <div class="relative w-full max-w-xs">
               <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
@@ -903,8 +906,10 @@
               </button>
             </div>
           </div>
+          {/if}
         </div>
 
+        {#if !collectionStore.isDetailHeaderCollapsed}
         {#if isQueue}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
             {#key playerStore.currentSong?.id}
@@ -950,6 +955,7 @@
               </div>
             {/each}
           </div>
+        {/if}
         {/if}
       </div>
     </div>

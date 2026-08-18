@@ -311,16 +311,18 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 max-w-xl">
+        {#if !collectionStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
           <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
+        {/if}
 
-        <div class="flex items-center gap-3 mt-3">
+        <div class="flex flex-wrap items-center gap-3 mt-3">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
@@ -332,7 +334,7 @@
         </div>
       </div>
 
-      {#if headerCovers.length > 0}
+      {#if !collectionStore.isDetailHeaderCollapsed && headerCovers.length > 0}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
         </div>
