@@ -200,7 +200,7 @@
 </script>
 
 <footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 min-[700px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
-  <div class="flex items-center gap-3 w-1/3 min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-xs">
+  <div class="flex items-center gap-3 flex-1 min-[400px]:w-1/3 min-[400px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-xs">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -257,7 +257,7 @@
     </div>
   </div>
 
-  <div class="flex flex-col items-center gap-1.5 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none max-w-[600px]">
+  <div class="flex flex-col items-center gap-1.5 min-[400px]:flex-1 min-[700px]:w-1/3 min-[700px]:flex-none max-w-[600px]">
     <div class="flex items-center gap-3 min-[700px]:gap-5">
       <div class="hidden min-[700px]:block relative">
         {#if playerStore.shuffleMode !== 'off'}
