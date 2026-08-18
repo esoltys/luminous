@@ -24,6 +24,61 @@ function variantFilename(baseName: string, suffix: string) {
   return `${stem}.${suffix}.png`;
 }
 
+/**
+ * Area-averaging downsampler with premultiplied alpha.
+ * Integrates pixel overlap areas to ensure fine strokes, glow rings, and highlights
+ * are preserved without point-sampling aliasing or dark alpha-fringe halos.
+ */
+function resizeAreaAverage(src: Image, dstW: number, dstH: number): Image {
+  const dst = new Image(dstW, dstH, { colorModel: "RGBA" });
+  const xRatio = src.width / dstW;
+  const yRatio = src.height / dstH;
+
+  for (let dy = 0; dy < dstH; dy++) {
+    const sy0 = dy * yRatio;
+    const sy1 = (dy + 1) * yRatio;
+    const startY = Math.floor(sy0);
+    const endY = Math.min(Math.ceil(sy1), src.height);
+
+    for (let dx = 0; dx < dstW; dx++) {
+      const sx0 = dx * xRatio;
+      const sx1 = (dx + 1) * xRatio;
+      const startX = Math.floor(sx0);
+      const endX = Math.min(Math.ceil(sx1), src.width);
+
+      let totalWeight = 0;
+      let pR = 0, pG = 0, pB = 0, pA = 0;
+
+      for (let sy = startY; sy < endY; sy++) {
+        const yWeight = Math.min(sy + 1, sy1) - Math.max(sy, sy0);
+        for (let sx = startX; sx < endX; sx++) {
+          const xWeight = Math.min(sx + 1, sx1) - Math.max(sx, sx0);
+          const weight = xWeight * yWeight;
+          const [r, g, b, a] = src.getPixel(sx, sy);
+          const alpha = a / 255;
+          pR += r * alpha * weight;
+          pG += g * alpha * weight;
+          pB += b * alpha * weight;
+          pA += a * weight;
+          totalWeight += weight;
+        }
+      }
+
+      if (totalWeight > 0 && pA > 0) {
+        const finalA = pA / totalWeight;
+        const normA = finalA / 255;
+        const finalR = Math.round(pR / (totalWeight * normA));
+        const finalG = Math.round(pG / (totalWeight * normA));
+        const finalB = Math.round(pB / (totalWeight * normA));
+        dst.setPixel(dx, dy, [finalR, finalG, finalB, Math.round(finalA)]);
+      } else {
+        dst.setPixel(dx, dy, [0, 0, 0, 0]);
+      }
+    }
+  }
+  return dst;
+}
+
 async function generateScaleVariants(sourcePath: string) {
   const source = await read(sourcePath);
   for (const asset of MSIX_ASSETS) {
@@ -33,7 +88,7 @@ async function generateScaleVariants(sourcePath: string) {
     for (const factor of SCALE_FACTORS) {
       const w = Math.round((baseW * factor) / 100);
       const h = Math.round((baseH * factor) / 100);
-      const resized = source.resize({ width: w, height: h });
+      const resized = resizeAreaAverage(source, w, h);
       const outPath = path.join(assetsDir, variantFilename(asset.name, `scale-${factor}`));
       await write(outPath, resized);
     }
@@ -44,7 +99,7 @@ async function generateTargetSizeVariants(sourcePath: string, altform: string | 
   const source = await read(sourcePath);
   const suffixBase = "Square44x44Logo.png";
   for (const size of TARGET_SIZES) {
-    const resized = source.resize({ width: size, height: size });
+    const resized = resizeAreaAverage(source, size, size);
     const suffix = altform ? `targetsize-${size}_altform-${altform}` : `targetsize-${size}`;
     const outPath = path.join(assetsDir, variantFilename(suffixBase, suffix));
     await write(outPath, resized);
@@ -61,8 +116,14 @@ async function generateWideTile(sourceIconsDir: string, outputPath: string) {
         const iconSize = 150;
         const resized = image.resize({ width: iconSize, height: iconSize });
         const canvas = new Image(310, 150, { colorModel: "RGBA" });
-        const x = Math.floor((310 - iconSize) / 2);
-        resized.copyTo(canvas, { origin: { column: x, row: 0 } });
+        canvas.data.fill(0);
+        const xOffset = Math.floor((310 - iconSize) / 2);
+        for (let y = 0; y < iconSize; y++) {
+          for (let x = 0; x < iconSize; x++) {
+            const p = resized.getPixel(x, y);
+            canvas.setPixel(x + xOffset, y, p);
+          }
+        }
         await write(outputPath, canvas);
         return true;
       } catch {
