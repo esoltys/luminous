@@ -78,11 +78,15 @@ manual.
       publish it (the workflow creates it as a draft with `prerelease: false`, so it's
       just sitting there until published).
 - [ ] Publishing fires [`publish-store.yml`](../.github/workflows/publish-store.yml),
-      which submits the MSIX to the Microsoft Store. It's a separate workflow from
-      `release.yml` on purpose — it doesn't depend on (and isn't skipped by) the build
-      job, and can be re-run independently via `workflow_dispatch` with a `tag` input if
-      a submission needs to be retried against an already-published release. Watch this
-      run too, not just the build.
+      which downloads the release's MSIX asset and submits it to the Microsoft Store via
+      [StoreBroker](https://github.com/microsoft/StoreBroker) (see
+      [`.github/store/README.md`](../.github/store/README.md) for how the submission is
+      built). It's a separate workflow from `release.yml` on purpose — it doesn't depend
+      on (and isn't skipped by) the build job, and can be re-run independently via
+      `workflow_dispatch` with a `tag` input if a submission needs to be retried against
+      an already-published release. Watch this run too, not just the build — a green run
+      only means the submission was committed for certification, not that it's live yet;
+      Microsoft's cert pass still has to complete.
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
