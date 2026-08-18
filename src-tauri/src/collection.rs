@@ -882,6 +882,15 @@ impl CollectionScanner {
     /// artist), same as the "by artist" grouping used elsewhere — a plain
     /// `artist` column match would miss compilation tracks credited to a
     /// different per-track artist under a shared album_artist.
+    ///
+    /// `artist` is matched with exact equality against the full (possibly
+    /// multi-value, `; `-delimited) `album_artist`/`artist` column — a song
+    /// crediting two artists on a collab track won't show up under either
+    /// individual artist's page here. Same deliberate scope decision as
+    /// `get_songs_by_genre` (#143): fanning multi-value artists out into
+    /// their own grouping (so a collab track appears on both artists' pages)
+    /// touches every artist/album-artist query in this file and is tracked
+    /// as follow-up work, not attempted in #150.
     pub fn get_songs_by_artist(&self, artist: &str) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
@@ -1240,7 +1249,9 @@ impl CollectionScanner {
 
     /// One aggregated entry per effective artist (album_artist, falling back
     /// to artist) across the library — untyped JSON, see the query below for
-    /// the exact field set.
+    /// the exact field set. Multi-value album_artist/artist columns group as
+    /// one combined pseudo-artist rather than fanning out per individual
+    /// artist — see `get_songs_by_artist` for why that's out of scope here.
     pub fn get_artists(&self) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // Artists are grouped case-insensitively (COLLATE NOCASE) so that tag-casing
@@ -1868,28 +1879,39 @@ fn detect_filetype(path: &Path) -> FileType {
 // Tag reading via lofty
 // ---------------------------------------------------------------------------
 
-/// Reads all genre values from `tag`, joined into the `songs.genre` storage
-/// format (see `models::join_genres`). Uses `get_strings` rather than the
-/// singular `Accessor::genre()` helper, since lofty already splits
-/// ID3v2.4's null-byte-separated `TCON` frame (and native Vorbis/APEv2/MP4
-/// multi-value items) into separate items on read — `Accessor::genre()`
-/// would instead collapse them into one `" / "`-joined display string. Each
-/// resulting value is further split on legacy textual separators (`;`,
-/// `/`), so libraries tagged by tools that joined multiple genres into one
-/// string without a real multi-value mechanism (e.g. Picard's ID3v2.3
-/// fallback, or Mp3tag/Winamp) aren't flattened into one bogus genre.
-fn read_genres(tag: &Tag) -> Option<String> {
+/// Reads all values under `key` from `tag`, joined into the `; `-delimited
+/// storage format shared by `songs.genre`/`artist`/`album_artist`/`composer`
+/// (see `models::join_multi_value`). Uses `get_strings` rather than a
+/// singular `Accessor` helper (e.g. `Accessor::artist()`), since lofty
+/// already splits ID3v2.4's null-byte-separated frames (and native
+/// Vorbis/APEv2/MP4 multi-value items) into separate items on read — the
+/// `Accessor` helpers would instead collapse them into one `" / "`-joined
+/// display string. Each resulting value is further split on legacy textual
+/// separators (`;`, `/`), so libraries tagged by tools that joined multiple
+/// values into one string without a real multi-value mechanism (e.g.
+/// Picard's ID3v2.3 fallback — which applies uniformly to Genre, Artist,
+/// Album Artist, and Composer — TPE1's own long-standing `/`-separated
+/// convention, or Mp3tag/Winamp) aren't flattened into one bogus value.
+///
+/// Genre gets one extra layer of legacy handling on top of this that
+/// Artist/Album Artist/Composer don't need: lofty's own ID3v2 read path
+/// special-cases `TCON` to translate ID3v1 numeric genre IDs (and the
+/// `(4)Eurodisco`-style parenthesized convention) to their textual
+/// equivalents before this function ever sees them — see lofty's
+/// `GenresIter`. Artist/Composer have no such legacy numeric convention, so
+/// `get_strings` returns their raw text with no extra decoding required.
+fn read_multi_value(tag: &Tag, key: ItemKey) -> Option<String> {
     let mut seen = std::collections::HashSet::new();
-    let genres: Vec<String> = tag
-        .get_strings(ItemKey::Genre)
-        .flat_map(models::split_legacy_genre_string)
-        .filter(|g| seen.insert(g.to_lowercase()))
+    let values: Vec<String> = tag
+        .get_strings(key)
+        .flat_map(models::split_legacy_multi_value)
+        .filter(|v| seen.insert(v.to_lowercase()))
         .collect();
 
-    if genres.is_empty() {
+    if values.is_empty() {
         None
     } else {
-        Some(models::join_genres(&genres))
+        Some(models::join_multi_value(&values))
     }
 }
 
@@ -1941,9 +1963,9 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
     if let Some(tag) = tag {
         song.title = tag.title().map(|t| t.to_string());
-        song.artist = tag.artist().map(|a| a.to_string());
+        song.artist = read_multi_value(tag, ItemKey::TrackArtist);
         song.album = tag.album().map(|a| a.to_string());
-        song.genre = read_genres(tag);
+        song.genre = read_multi_value(tag, ItemKey::Genre);
         song.comment = tag.comment().map(|c| c.to_string());
         // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
@@ -1965,7 +1987,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         song.disc = tag.disk().map(|d| d as i32);
 
         // Album artist (various tag formats store this differently)
-        song.album_artist = tag.get_string(ItemKey::AlbumArtist).map(|s| s.to_string());
+        song.album_artist = read_multi_value(tag, ItemKey::AlbumArtist);
 
         // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
         // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
@@ -1974,13 +1996,11 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
             .map(|s| s.trim() == "1")
             .unwrap_or(false);
 
-        song.composer = tag.get_string(ItemKey::Composer).map(|s| s.to_string());
+        song.composer = read_multi_value(tag, ItemKey::Composer);
 
         song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
 
-        song.grouping = tag
-            .get_string(ItemKey::ContentGroup)
-            .map(|s| s.to_string());
+        song.grouping = tag.get_string(ItemKey::ContentGroup).map(|s| s.to_string());
         song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
         // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
         // store it as freeform text — check both generic keys to cover either.
@@ -3031,10 +3051,10 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn test_read_genres_uses_multivalue_items_directly() {
-        // Simulates a file lofty already split into multiple ItemKey::Genre
-        // items on read (e.g. ID3v2.4's null-separated TCON, or Vorbis
-        // Comments' native repeated GENRE= fields) — no further splitting
+    fn test_read_multi_value_uses_multivalue_items_directly() {
+        // Simulates a file lofty already split into multiple ItemKey items
+        // on read (e.g. ID3v2.4's null-separated TCON/TPE1/TPE2/TCOM, or
+        // Vorbis Comments' native repeated fields) — no further splitting
         // should occur.
         let mut tag = Tag::new(lofty::tag::TagType::VorbisComments);
         tag.push(lofty::tag::TagItem::new(
@@ -3046,28 +3066,48 @@ mod tests {
             lofty::tag::ItemValue::Text("Jazz Fusion".to_string()),
         ));
 
-        assert_eq!(read_genres(&tag).as_deref(), Some("Rock; Jazz Fusion"));
+        assert_eq!(
+            read_multi_value(&tag, ItemKey::Genre).as_deref(),
+            Some("Rock; Jazz Fusion")
+        );
     }
 
     #[test]
-    fn test_read_genres_splits_legacy_joined_string() {
+    fn test_read_multi_value_splits_legacy_joined_string() {
         // Simulates a legacy ID3v2.3 file tagged by Picard (default
         // `id3v23_join_with = "/"`) or Mp3tag/Winamp (`;`-joined) — lofty
         // hands back a single item containing the joined string, which
-        // read_genres must still split into a proper multi-genre list.
+        // read_multi_value must still split into a proper multi-value list.
+        // Exercised for both Genre and Artist: Genre has no spec-documented
+        // slash convention (it's purely a tagger habit), while Artist's
+        // `/` split is TPE1's own long-standing "Lead performer(s)/
+        // Soloist(s)" convention — both must fall back the same way.
         let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
         tag.push(lofty::tag::TagItem::new(
             ItemKey::Genre,
             lofty::tag::ItemValue::Text("Rock/Blues".to_string()),
         ));
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::TrackArtist,
+            lofty::tag::ItemValue::Text("Artist A/Artist B".to_string()),
+        ));
 
-        assert_eq!(read_genres(&tag).as_deref(), Some("Rock; Blues"));
+        assert_eq!(
+            read_multi_value(&tag, ItemKey::Genre).as_deref(),
+            Some("Rock; Blues")
+        );
+        assert_eq!(
+            read_multi_value(&tag, ItemKey::TrackArtist).as_deref(),
+            Some("Artist A; Artist B")
+        );
     }
 
     #[test]
-    fn test_read_genres_none_when_no_genre_item() {
+    fn test_read_multi_value_none_when_no_item() {
         let tag = Tag::new(lofty::tag::TagType::Id3v2);
-        assert_eq!(read_genres(&tag), None);
+        assert_eq!(read_multi_value(&tag, ItemKey::Genre), None);
+        assert_eq!(read_multi_value(&tag, ItemKey::AlbumArtist), None);
+        assert_eq!(read_multi_value(&tag, ItemKey::Composer), None);
     }
 
     /// Writes a minimal valid WAV file, so tests don't need a binary audio
@@ -3128,6 +3168,39 @@ mod tests {
 
         let song = read_tags(&path).expect("read_tags should succeed");
         assert_eq!(song.genre.as_deref(), Some("Rock; Jazz Fusion; Live"));
+    }
+
+    #[test]
+    fn test_read_tags_end_to_end_multi_artist_album_artist_composer_round_trip() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        crate::tageditor::write_tags(
+            &path,
+            "Title",
+            "Artist A; Artist B",
+            "Album",
+            "Album Artist A; Album Artist B",
+            "Composer A; Composer B",
+            "",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.artist.as_deref(), Some("Artist A; Artist B"));
+        assert_eq!(
+            song.album_artist.as_deref(),
+            Some("Album Artist A; Album Artist B")
+        );
+        assert_eq!(song.composer.as_deref(), Some("Composer A; Composer B"));
     }
 
     #[test]

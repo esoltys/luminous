@@ -635,18 +635,19 @@ export const en = {
     dragHint: "Drag window"
   },
 
-  genreChipInput: {
-    placeholder: "Add a genre...",
-    removeGenre: "Remove {genre}"
+  chipInput: {
+    removeItem: "Remove {value}"
   },
   tagEditor: {
     title: "Edit Song Tags",
     titleField: "Song Title",
     artistField: "Artist",
+    artistPlaceholder: "Add an artist...",
     albumField: "Album",
     trackField: "Track Number",
     yearField: "Year",
     genreField: "Genre",
+    genrePlaceholder: "Add a genre...",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saveBtnShort: "Save",
@@ -655,8 +656,10 @@ export const en = {
     readFailed: "Failed to read tags",
     locationField: "Location",
     albumArtistField: "Album Artist",
+    albumArtistPlaceholder: "Add an album artist...",
     albumArtistTooltip: "Primary artist credited for the whole album, useful for compilations",
     composerField: "Composer",
+    composerPlaceholder: "Add a composer...",
     discField: "Disc",
     groupingField: "Grouping",
     groupingTooltip: "Groups related tracks together, e.g. movements of a classical work",
@@ -685,7 +688,9 @@ export const en = {
     title: "Edit Album Tags",
     albumField: "Album Title",
     albumArtistField: "Album Artist",
+    albumArtistPlaceholder: "Add an album artist...",
     genreField: "Genre",
+    genrePlaceholder: "Add a genre...",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",

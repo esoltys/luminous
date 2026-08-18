@@ -45,14 +45,14 @@ describe("AlbumTagEditor.svelte", () => {
     expect(getByText("Applies to 2 songs")).toBeInTheDocument();
 
     const albumInput = getByLabelText("Album Title") as HTMLInputElement;
-    const artistInput = getByLabelText("Album Artist") as HTMLInputElement;
     const yearInput = getByLabelText("Release Year") as HTMLInputElement;
     const discInput = getByLabelText("Disc #") as HTMLInputElement;
 
     expect(albumInput.value).toBe("Test Album");
-    expect(artistInput.value).toBe("Test Artist");
-    // Genre is a chip input — the initial genre renders as a chip, not as
-    // the value of the (empty, ready-for-new-input) labeled text field.
+    // Album Artist and Genre are chip inputs — the initial values render as
+    // chips, not as the value of the (empty, ready-for-new-input) labeled
+    // text field.
+    expect(getByText("Test Artist")).toBeInTheDocument();
     expect(getByText("Pop")).toBeInTheDocument();
     expect(yearInput.value).toBe("2024");
     expect(discInput.value).toBe("1");
@@ -223,6 +223,46 @@ describe("AlbumTagEditor.svelte", () => {
     });
   });
 
+  it("adds a chip to the Album Artist field and saves it delimited alongside the original", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, getByText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Artist A",
+      initialGenre: "Rock",
+      initialYear: 2024,
+      initialDisc: 1,
+      onClose,
+      onSave,
+    });
+
+    expect(getByText("Artist A")).toBeInTheDocument();
+
+    const albumArtistInput = getByLabelText("Album Artist") as HTMLInputElement;
+    await fireEvent.input(albumArtistInput, { target: { value: "Artist B" } });
+    await fireEvent.keyDown(albumArtistInput, { key: "Enter" });
+
+    expect(getByText("Artist B")).toBeInTheDocument();
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Test Album",
+        albumArtist: "Artist A; Artist B",
+        genre: "Rock",
+        year: 2024,
+        disc: 1,
+        compilation: false,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
   it("allows clearing the Disc input field to save null disc", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();
@@ -345,7 +385,7 @@ describe("AlbumTagEditor.svelte", () => {
 
   it("unchecking Compilation restores the previous Album Artist value", async () => {
     const onClose = vi.fn();
-    const { getByLabelText, queryByLabelText } = render(AlbumTagEditor, {
+    const { getByLabelText, getByText, queryByLabelText } = render(AlbumTagEditor, {
       songIds: [101],
       initialAlbum: "Test Album",
       initialAlbumArtist: "Artist A",
@@ -357,7 +397,7 @@ describe("AlbumTagEditor.svelte", () => {
     expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
 
     await fireEvent.click(compilationCheckbox);
-    const artistInput = getByLabelText("Album Artist") as HTMLInputElement;
-    expect(artistInput.value).toBe("Artist A");
+    expect(getByLabelText("Album Artist")).toBeInTheDocument();
+    expect(getByText("Artist A")).toBeInTheDocument();
   });
 });

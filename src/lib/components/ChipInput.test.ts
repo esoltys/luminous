@@ -1,23 +1,23 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
-import GenreChipInput from "./GenreChipInput.svelte";
+import ChipInput from "./ChipInput.svelte";
 
-describe("GenreChipInput.svelte", () => {
-  it("renders one chip per genre in the delimited value", () => {
-    const { getByText } = render(GenreChipInput, { value: "Rock; Jazz Fusion; Live" });
+describe("ChipInput.svelte", () => {
+  it("renders one chip per value in the delimited value", () => {
+    const { getByText } = render(ChipInput, { value: "Rock; Jazz Fusion; Live" });
     expect(getByText("Rock")).toBeInTheDocument();
     expect(getByText("Jazz Fusion")).toBeInTheDocument();
     expect(getByText("Live")).toBeInTheDocument();
   });
 
   it("renders no chips for an empty value", () => {
-    const { queryByRole } = render(GenreChipInput, { value: "" });
+    const { queryByRole } = render(ChipInput, { value: "" });
     expect(queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("commits a typed genre on Enter and clears the draft", async () => {
-    const { getByRole, getByText } = render(GenreChipInput, { value: "Rock" });
+  it("commits a typed value on Enter and clears the draft", async () => {
+    const { getByRole, getByText } = render(ChipInput, { value: "Rock" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "Blues" } });
@@ -27,8 +27,8 @@ describe("GenreChipInput.svelte", () => {
     expect(input.value).toBe("");
   });
 
-  it("commits a typed genre on comma", async () => {
-    const { getByRole, getByText } = render(GenreChipInput, { value: "" });
+  it("commits a typed value on comma", async () => {
+    const { getByRole, getByText } = render(ChipInput, { value: "" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "Metal" } });
@@ -39,7 +39,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("commits the draft on blur, not just Enter/comma", async () => {
-    const { getByRole, getByText } = render(GenreChipInput, { value: "" });
+    const { getByRole, getByText } = render(ChipInput, { value: "" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "Ambient" } });
@@ -49,7 +49,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("splits a comma-separated paste into multiple chips at once", async () => {
-    const { getByRole, getByText } = render(GenreChipInput, { value: "" });
+    const { getByRole, getByText } = render(ChipInput, { value: "" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "Rock, Blues, Jazz" } });
@@ -61,7 +61,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("removes a chip when its remove button is clicked", async () => {
-    const { getByRole, getByText, queryByText } = render(GenreChipInput, {
+    const { getByRole, getByText, queryByText } = render(ChipInput, {
       value: "Rock; Blues",
     });
 
@@ -72,7 +72,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("removes the last chip on Backspace when the draft is empty", async () => {
-    const { getByRole, queryByText } = render(GenreChipInput, { value: "Rock; Blues" });
+    const { getByRole, queryByText } = render(ChipInput, { value: "Rock; Blues" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.keyDown(input, { key: "Backspace" });
@@ -81,7 +81,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("does not remove a chip on Backspace while the draft still has text", async () => {
-    const { getByRole, getByText } = render(GenreChipInput, { value: "Rock" });
+    const { getByRole, getByText } = render(ChipInput, { value: "Rock" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "Blu" } });
@@ -91,7 +91,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("deduplicates case-insensitively, keeping the first-seen casing", async () => {
-    const { getByRole, getByText, queryAllByText } = render(GenreChipInput, { value: "Rock" });
+    const { getByRole, getByText, queryAllByText } = render(ChipInput, { value: "Rock" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "rock" } });
@@ -102,7 +102,7 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("does not add an empty chip for whitespace-only input", async () => {
-    const { getByRole, queryByRole } = render(GenreChipInput, { value: "" });
+    const { getByRole, queryByRole } = render(ChipInput, { value: "" });
     const input = getByRole("textbox") as HTMLInputElement;
 
     await fireEvent.input(input, { target: { value: "   " } });
@@ -112,12 +112,27 @@ describe("GenreChipInput.svelte", () => {
   });
 
   it("hides remove buttons and dims the input when disabled", () => {
-    const { getByRole, queryByRole } = render(GenreChipInput, {
+    const { getByRole, queryByRole } = render(ChipInput, {
       value: "Rock",
       disabled: true,
     });
 
     expect(queryByRole("button")).not.toBeInTheDocument();
     expect((getByRole("textbox") as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("is field-agnostic — works the same for a non-genre value list like artists", async () => {
+    const { getByRole, getByText } = render(ChipInput, {
+      value: "Artist A",
+      placeholder: "Add an artist...",
+    });
+    const input = getByRole("textbox") as HTMLInputElement;
+
+    expect(getByText("Artist A")).toBeInTheDocument();
+
+    await fireEvent.input(input, { target: { value: "Artist B" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(getByText("Artist B")).toBeInTheDocument();
   });
 });

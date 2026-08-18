@@ -9,7 +9,7 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import GenreChipInput from "./GenreChipInput.svelte";
+  import ChipInput from "./ChipInput.svelte";
   import CoverArt from "./CoverArt.svelte";
 
   interface Props {
@@ -188,7 +188,13 @@
                 </span>
               </div>
             {:else}
-              <Input id="album-tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+              <ChipInput
+                id="album-tag-albumartist"
+                bind:value={albumArtist}
+                disabled={isSaving}
+                placeholder={i18n.t('albumTagEditor.albumArtistPlaceholder')}
+                class="w-full"
+              />
             {/if}
           </FormField>
 
@@ -205,7 +211,13 @@
           </label>
 
           <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
-            <GenreChipInput id="album-tag-genre" bind:value={genre} disabled={isSaving} class="w-full" />
+            <ChipInput
+              id="album-tag-genre"
+              bind:value={genre}
+              disabled={isSaving}
+              placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+              class="w-full"
+            />
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
