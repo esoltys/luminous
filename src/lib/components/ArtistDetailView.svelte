@@ -320,7 +320,7 @@
           <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, songs: songsText, duration: totalDurationLabel })}</span>
         </div>
 
-        <div class="flex items-center gap-3 mt-3">
+        <div class="flex flex-wrap items-center gap-3 mt-3">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}

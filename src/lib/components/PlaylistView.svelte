@@ -819,7 +819,7 @@
             </span>
           </div>
 
-          <div class="flex items-center gap-3 mt-3">
+          <div class="flex flex-wrap items-center gap-3 mt-3">
             <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
