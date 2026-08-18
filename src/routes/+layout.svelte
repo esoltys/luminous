@@ -300,13 +300,12 @@
     <!-- Playbar-only mode: the window is too short to show anything else,
          including the immersive cover view. Renders PlayerBar unconditionally
          (it already has a graceful "not playing" state) so the user never
-         sees a blank window when it's squashed short. Reuses the same
-         inset-x-4 horizontal insets as the normal floating dock below so
-         PlayerBar's rendered width is identical between the two render sites. -->
-    <div class="relative w-full h-full">
-      <div class="absolute inset-x-4 top-1/2 -translate-y-1/2 z-40">
-        <PlayerBar />
-      </div>
+         sees a blank window when it's squashed short. `expanded` lets the bar
+         grow to fill most of the available height (capped) instead of
+         floating as a small fixed-height bar with large blank margins above
+         and below it. -->
+    <div class="absolute inset-4 z-40 flex items-center justify-center">
+      <PlayerBar expanded />
     </div>
   {:else}
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
@@ -405,22 +404,27 @@
             </div>
           {/if}
 
-          <!-- Center Container: Card and Details -->
+          <!-- Center Container: Card and Details. Below md, the layout would
+               stack the text under the cover art — at that point it's just
+               clutter (the floating PlayerBar dock repeats the same info),
+               so it's hidden and the cover art stands alone. At md+, where
+               there's room to sit it beside the art instead, it stays. -->
           <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
-            <!-- Floating Cover Art Frame -->
-            <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
-              <CoverArt
-                songId={playerStore.currentSong?.id}
-                artEmbedded={playerStore.currentSong?.art_embedded}
-                artAutomatic={playerStore.currentSong?.art_automatic}
-                artManual={playerStore.currentSong?.art_manual}
-                sizeClass="w-full h-full object-cover"
-              />
-            </div>
+            {#if playerStore.currentSong}
+              <!-- Floating Cover Art Frame -->
+              <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+                <CoverArt
+                  songId={playerStore.currentSong?.id}
+                  artEmbedded={playerStore.currentSong?.art_embedded}
+                  artAutomatic={playerStore.currentSong?.art_automatic}
+                  artManual={playerStore.currentSong?.art_manual}
+                  sizeClass="w-full h-full object-cover"
+                />
+              </div>
 
-            <!-- Song Details Info -->
-            <div class="flex flex-col text-center md:text-left space-y-4 max-w-md">
-              {#if playerStore.currentSong}
+              <!-- Song Details Info: hidden below md, where it would stack
+                   under the cover art instead of sitting beside it. -->
+              <div class="hidden md:flex flex-col text-center md:text-left space-y-4 max-w-md">
                 <div>
                   <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
                     {i18n.t('playerBar.nowPlaying')}
@@ -435,14 +439,14 @@
                 <p class="text-sm text-brand-text-secondary/60 italic truncate select-text">
                   {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}
                 </p>
-              {:else}
-                <div class="flex flex-col items-center justify-center text-center">
-                  <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
-                  <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
-                  <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
-                </div>
-              {/if}
-            </div>
+              </div>
+            {:else}
+              <div class="flex flex-col items-center justify-center text-center">
+                <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
+                <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
+                <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
+              </div>
+            {/if}
           </div>
         </div>
 

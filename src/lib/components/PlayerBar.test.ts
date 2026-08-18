@@ -252,7 +252,9 @@ describe("PlayerBar.svelte", () => {
     playerStore.state = "playing";
     const { getAllByTitle, getByTitle, container } = render(PlayerBar);
 
-    // Gone by Compact (Full-only): shuffle, repeat, volume slider, miniplayer toggle.
+    // Gone by Compact (Full-only): shuffle, repeat, and the whole right
+    // column (volume/mute + expand) — the transport+seek block takes the
+    // freed space instead, sticking to the right edge via ml-auto.
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
     expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
@@ -260,19 +262,30 @@ describe("PlayerBar.svelte", () => {
     const volumeSlider = container.querySelector('input[type="range"]');
     expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
     expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
+    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
+    expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
 
-    // Gone by Minimal (Compact-and-up only): previous, seek row, right column.
+    // Gone by Minimal (Compact-and-up only): previous, seek row.
     expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
     expect(seekRow).toHaveClass("hidden", "min-[400px]:flex");
-    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
-    expect(rightColumn).toHaveClass("hidden", "min-[400px]:flex");
 
     // Never hidden (the constant core): cover art, play/pause, skip-next.
     const coverButton = getByTitle("Immersive Mode");
     expect(coverButton.closest(".hidden")).toBeNull();
     expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
     expect(getByTitle(/next song/i)).not.toHaveClass("hidden");
+  });
+
+  it("grows to fill available height when expanded (playbar-only mode), fixed height otherwise", () => {
+    const { container, rerender } = render(PlayerBar, { props: { expanded: false } });
+    const footer = container.querySelector("footer")!;
+    expect(footer).toHaveClass("h-20");
+    expect(footer).not.toHaveClass("h-full");
+
+    rerender({ expanded: true });
+    expect(footer).toHaveClass("h-full", "max-h-48", "w-full");
+    expect(footer).not.toHaveClass("h-20");
   });
 
   it("handles mute toggle correctly", async () => {
