@@ -9,6 +9,7 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import GenreChipInput from "./GenreChipInput.svelte";
 
   interface Props {
     songIds: number[];
@@ -172,7 +173,7 @@
           </label>
 
           <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
-            <Input id="album-tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
+            <GenreChipInput id="album-tag-genre" bind:value={genre} disabled={isSaving} class="w-full" />
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">

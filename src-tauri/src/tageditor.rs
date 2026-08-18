@@ -7,6 +7,7 @@
 //! in `commands/tageditor.rs`). Fingerprinting shells out to the external
 //! `fpcalc` (Chromaprint) binary rather than reimplementing the algorithm.
 
+use crate::models;
 use anyhow::{anyhow, Context, Result};
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -133,7 +134,25 @@ pub fn write_tags(
     tag.set_title(title.to_string());
     tag.set_artist(artist.to_string());
     tag.set_album(album.to_string());
-    tag.set_genre(genre.to_string());
+
+    // Genre is written as one `ItemKey::Genre` item per value rather than a
+    // single `set_genre()` call, so formats with native multi-value support
+    // (Vorbis Comments, APEv2, MP4) and ID3v2.4 — whose `TCON` frame packs
+    // multiple values null-byte-separated per the ID3v2.4 spec — round-trip
+    // correctly with taggers like MusicBrainz Picard instead of collapsing
+    // to one value. Known caveat: if the file's primary tag is a legacy
+    // ID3v2.3 frame, lofty re-encodes multiple genres using the old
+    // ID3v1-style numeric-genre-in-parentheses convention on save rather
+    // than Picard's default `/`-joined string — this only mangles genre
+    // names outside the standard ID3v1 genre list, and is a documented
+    // interop caveat of the legacy format rather than a bug (#143).
+    tag.remove_key(lofty::tag::ItemKey::Genre);
+    for g in models::parse_genres(genre) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::Genre,
+            lofty::tag::ItemValue::Text(g),
+        ));
+    }
 
     tag.insert_text(lofty::tag::ItemKey::AlbumArtist, album_artist.to_string());
     tag.insert_text(lofty::tag::ItemKey::Composer, composer.to_string());
@@ -521,6 +540,80 @@ mod tests {
         write_test_wav(&path);
 
         clear_embedded_art(&path).expect("clearing an untagged file should not error");
+    }
+
+    #[test]
+    fn test_write_tags_round_trips_multiple_genres_as_id3v24_multivalue() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "Album Artist",
+            "Composer",
+            "Rock; Jazz Fusion; Live",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        // WAV's primary tag is ID3v2, so this is a genuine TCON round-trip —
+        // lofty should have written one TCON frame with all three genres
+        // null-byte-separated (the ID3v2.4 multi-value convention Picard
+        // also writes), not a single joined string in one item, and not
+        // only the first genre.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        let genres: Vec<&str> = tag.get_strings(lofty::tag::ItemKey::Genre).collect();
+        assert_eq!(genres, vec!["Rock", "Jazz Fusion", "Live"]);
+    }
+
+    #[test]
+    fn test_write_tags_single_genre_round_trips() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        let genres: Vec<&str> = tag.get_strings(lofty::tag::ItemKey::Genre).collect();
+        assert_eq!(genres, vec!["Metal"]);
+    }
+
+    #[test]
+    fn test_write_tags_empty_genre_clears_field() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
+            false,
+        )
+        .expect("write_tags should succeed");
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+        )
+        .expect("write_tags with empty genre should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::Genre).count(), 0);
     }
 
     #[tokio::test]

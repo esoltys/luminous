@@ -46,13 +46,14 @@ describe("AlbumTagEditor.svelte", () => {
 
     const albumInput = getByLabelText("Album Title") as HTMLInputElement;
     const artistInput = getByLabelText("Album Artist") as HTMLInputElement;
-    const genreInput = getByLabelText("Genre") as HTMLInputElement;
     const yearInput = getByLabelText("Release Year") as HTMLInputElement;
     const discInput = getByLabelText("Disc #") as HTMLInputElement;
 
     expect(albumInput.value).toBe("Test Album");
     expect(artistInput.value).toBe("Test Artist");
-    expect(genreInput.value).toBe("Pop");
+    // Genre is a chip input — the initial genre renders as a chip, not as
+    // the value of the (empty, ready-for-new-input) labeled text field.
+    expect(getByText("Pop")).toBeInTheDocument();
     expect(yearInput.value).toBe("2024");
     expect(discInput.value).toBe("1");
   });
@@ -118,6 +119,8 @@ describe("AlbumTagEditor.svelte", () => {
       onSave,
     });
 
+    // No initial genre means no chips render, and the chip input's own
+    // text field (the one "Genre" labels) starts empty and ready for input.
     const genreInput = getByLabelText("Genre") as HTMLInputElement;
     expect(genreInput.value).toBe("");
 
@@ -132,6 +135,87 @@ describe("AlbumTagEditor.svelte", () => {
         genre: "",
         year: 2024,
         disc: null,
+        compilation: false,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("adds a genre chip alongside the existing one and saves both, delimited", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, getByText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Test Artist",
+      initialGenre: "Rock",
+      initialYear: 2024,
+      initialDisc: 1,
+      onClose,
+      onSave,
+    });
+
+    expect(getByText("Rock")).toBeInTheDocument();
+
+    const genreInput = getByLabelText("Genre") as HTMLInputElement;
+    await fireEvent.input(genreInput, { target: { value: "Jazz Fusion" } });
+    await fireEvent.keyDown(genreInput, { key: "Enter" });
+
+    expect(getByText("Jazz Fusion")).toBeInTheDocument();
+    // The draft field clears once its content becomes a committed chip.
+    expect(genreInput.value).toBe("");
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Test Album",
+        albumArtist: "Test Artist",
+        genre: "Rock; Jazz Fusion",
+        year: 2024,
+        disc: 1,
+        compilation: false,
+      });
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("removes a genre chip via its remove button", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByRole, getByText, queryByText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Test Album",
+      initialAlbumArtist: "Test Artist",
+      initialGenre: "Rock; Blues",
+      initialYear: 2024,
+      initialDisc: 1,
+      onClose,
+      onSave,
+    });
+
+    expect(getByText("Rock")).toBeInTheDocument();
+    expect(getByText("Blues")).toBeInTheDocument();
+
+    await fireEvent.click(getByRole("button", { name: "Remove Rock" }));
+    expect(queryByText("Rock")).not.toBeInTheDocument();
+    expect(getByText("Blues")).toBeInTheDocument();
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+        songIds: [101],
+        album: "Test Album",
+        albumArtist: "Test Artist",
+        genre: "Blues",
+        year: 2024,
+        disc: 1,
         compilation: false,
       });
       expect(onSave).toHaveBeenCalled();

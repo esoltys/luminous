@@ -632,6 +632,11 @@ export const fr = {
     dragHint: "Déplacer la fenêtre"
   },
 
+  genreChipInput: {
+    placeholder: "Ajouter un genre...",
+    removeGenre: "Supprimer {genre}"
+  },
+
   tagEditor: {
     title: "Modifier les tags de la chanson",
     titleField: "Titre de la chanson",

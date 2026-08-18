@@ -4,8 +4,9 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        AlbumItem, BatchPhase, BatchProgress, FileType, HomeItem, LibraryStats, MusicDirectory,
-        Playlist, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song, SongSource,
+        self, AlbumItem, BatchPhase, BatchProgress, FileType, HomeItem, LibraryStats,
+        MusicDirectory, Playlist, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
+        SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -1026,6 +1027,14 @@ impl CollectionScanner {
 
     /// Songs in a genre, selected per `mode`'s bias (see #120), for per-genre
     /// auto-playlists.
+    ///
+    /// `genre` is matched with exact equality against the full (possibly
+    /// multi-value, `; `-delimited) `songs.genre` column — a song tagged
+    /// only `"Rock"` and one tagged `"Rock; Blues"` are treated as
+    /// different genres here, unlike the substring-matching `genre:` Smart
+    /// Playlist filter in `filter_parser.rs`. Deliberately left unsplit for
+    /// #143: fanning multi-value genres out into their own auto-playlists
+    /// is native-tags territory, tracked by #224.
     pub fn get_songs_by_genre(
         &self,
         genre: &str,
@@ -1859,6 +1868,31 @@ fn detect_filetype(path: &Path) -> FileType {
 // Tag reading via lofty
 // ---------------------------------------------------------------------------
 
+/// Reads all genre values from `tag`, joined into the `songs.genre` storage
+/// format (see `models::join_genres`). Uses `get_strings` rather than the
+/// singular `Accessor::genre()` helper, since lofty already splits
+/// ID3v2.4's null-byte-separated `TCON` frame (and native Vorbis/APEv2/MP4
+/// multi-value items) into separate items on read — `Accessor::genre()`
+/// would instead collapse them into one `" / "`-joined display string. Each
+/// resulting value is further split on legacy textual separators (`;`,
+/// `/`), so libraries tagged by tools that joined multiple genres into one
+/// string without a real multi-value mechanism (e.g. Picard's ID3v2.3
+/// fallback, or Mp3tag/Winamp) aren't flattened into one bogus genre.
+fn read_genres(tag: &Tag) -> Option<String> {
+    let mut seen = std::collections::HashSet::new();
+    let genres: Vec<String> = tag
+        .get_strings(ItemKey::Genre)
+        .flat_map(models::split_legacy_genre_string)
+        .filter(|g| seen.insert(g.to_lowercase()))
+        .collect();
+
+    if genres.is_empty() {
+        None
+    } else {
+        Some(models::join_genres(&genres))
+    }
+}
+
 pub(crate) fn read_tags(path: &Path) -> Result<Song> {
     let path_str = path.to_string_lossy().to_string();
     let mtime = get_mtime(path);
@@ -1909,7 +1943,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         song.title = tag.title().map(|t| t.to_string());
         song.artist = tag.artist().map(|a| a.to_string());
         song.album = tag.album().map(|a| a.to_string());
-        song.genre = tag.genre().map(|g| g.to_string());
+        song.genre = read_genres(tag);
         song.comment = tag.comment().map(|c| c.to_string());
         // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
@@ -2995,6 +3029,106 @@ mod tests {
     use super::*;
     use crate::models::{FileType, Song, SongSource};
     use std::sync::Arc;
+
+    #[test]
+    fn test_read_genres_uses_multivalue_items_directly() {
+        // Simulates a file lofty already split into multiple ItemKey::Genre
+        // items on read (e.g. ID3v2.4's null-separated TCON, or Vorbis
+        // Comments' native repeated GENRE= fields) — no further splitting
+        // should occur.
+        let mut tag = Tag::new(lofty::tag::TagType::VorbisComments);
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Genre,
+            lofty::tag::ItemValue::Text("Rock".to_string()),
+        ));
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Genre,
+            lofty::tag::ItemValue::Text("Jazz Fusion".to_string()),
+        ));
+
+        assert_eq!(read_genres(&tag).as_deref(), Some("Rock; Jazz Fusion"));
+    }
+
+    #[test]
+    fn test_read_genres_splits_legacy_joined_string() {
+        // Simulates a legacy ID3v2.3 file tagged by Picard (default
+        // `id3v23_join_with = "/"`) or Mp3tag/Winamp (`;`-joined) — lofty
+        // hands back a single item containing the joined string, which
+        // read_genres must still split into a proper multi-genre list.
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Genre,
+            lofty::tag::ItemValue::Text("Rock/Blues".to_string()),
+        ));
+
+        assert_eq!(read_genres(&tag).as_deref(), Some("Rock; Blues"));
+    }
+
+    #[test]
+    fn test_read_genres_none_when_no_genre_item() {
+        let tag = Tag::new(lofty::tag::TagType::Id3v2);
+        assert_eq!(read_genres(&tag), None);
+    }
+
+    /// Writes a minimal valid WAV file, so tests don't need a binary audio
+    /// fixture checked into the repo. WAV's default primary tag is ID3v2
+    /// (see lofty's `FileType::Wav => TagType::Id3v2` mapping), so this
+    /// exercises a genuine TCON round-trip.
+    fn write_test_wav(path: &Path) {
+        let sample_rate = 8_000u32;
+        let channels = 1u16;
+        let bits_per_sample = 16u16;
+        let data = vec![0u8; (sample_rate / 10) as usize * 2]; // 100ms of silence
+
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample / 8) as u32;
+        let block_align = channels * (bits_per_sample / 8);
+
+        let mut wav = Vec::with_capacity(44 + data.len());
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVE");
+        wav.extend_from_slice(b"fmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        wav.extend_from_slice(&channels.to_le_bytes());
+        wav.extend_from_slice(&sample_rate.to_le_bytes());
+        wav.extend_from_slice(&byte_rate.to_le_bytes());
+        wav.extend_from_slice(&block_align.to_le_bytes());
+        wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&data);
+
+        std::fs::write(path, wav).expect("failed to write test wav fixture");
+    }
+
+    #[test]
+    fn test_read_tags_end_to_end_multi_genre_round_trip() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        crate::tageditor::write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "",
+            "",
+            "Rock; Jazz Fusion; Live",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.genre.as_deref(), Some("Rock; Jazz Fusion; Live"));
+    }
 
     #[test]
     fn test_watcher_ignores_non_mutating_access_events() {
