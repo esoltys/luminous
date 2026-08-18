@@ -221,6 +221,28 @@ describe("CollectionView.svelte", () => {
     expect(getByText("▼ Date Added")).toBeInTheDocument();
   });
 
+  it("renders each artist in a multi-value credit as its own clickable name", async () => {
+    collectionStore.activeSubTab = "songs";
+    collectionStore.songs = [
+      {
+        ...mockSongs[0],
+        artist: "Evergrey; Mikael Stanne",
+        album_artist: "Evergrey",
+      },
+    ];
+
+    const { getByText } = render(CollectionView);
+
+    expect(getByText("Evergrey")).toBeInTheDocument();
+    const stanneButton = getByText("Mikael Stanne").closest("button")!;
+    expect(stanneButton).not.toBeNull();
+
+    // Clicking the second name navigates using just that name, not the
+    // album artist and not the full "Evergrey; Mikael Stanne" credit.
+    await fireEvent.click(stanneButton);
+    expect(collectionStore.selectedArtistName).toBe("Mikael Stanne");
+  });
+
   it("does not use font-mono for the date added column in songs view", () => {
     collectionStore.activeSubTab = "songs";
     collectionStore.visibleColumns.added = true;

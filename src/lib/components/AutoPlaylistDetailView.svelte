@@ -18,6 +18,7 @@
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import { parseMultiValue } from "../utils/multiValue";
   import ColumnSelector from "./ColumnSelector.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -966,15 +967,18 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.artist}
-                <div class="text-brand-text-primary truncate pr-4 min-w-0">
+                <div class="text-brand-text-primary truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
-                    <LinkButton
-                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="text-brand-text-primary truncate min-w-0"
-                      title={i18n.t('collection.filterByArtist', { artist: song.artist })}
-                    >
-                      {song.artist}
-                    </LinkButton>
+                    {#each parseMultiValue(song.artist) as name, i (name)}
+                      {#if i > 0}<span class="text-brand-text-primary/50 shrink-0">,&nbsp;</span>{/if}
+                      <LinkButton
+                        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+                        class="text-brand-text-primary truncate min-w-0"
+                        title={i18n.t('collection.filterByArtist', { artist: name })}
+                      >
+                        {name}
+                      </LinkButton>
+                    {/each}
                   {:else}
                     <span class="text-brand-text-primary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                   {/if}

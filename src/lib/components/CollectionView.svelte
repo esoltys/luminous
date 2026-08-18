@@ -13,6 +13,7 @@
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
+  import { parseMultiValue } from "../utils/multiValue";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -819,13 +820,16 @@
                 {#if collectionStore.visibleColumns.artist}
                   <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
                     {#if song.artist}
-                      <LinkButton
-                        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                        class="text-brand-text-secondary truncate min-w-0"
-                        title={i18n.t('collection.filterByArtist', { artist: song.artist })}
-                      >
-                        {song.artist}
-                      </LinkButton>
+                      {#each parseMultiValue(song.artist) as name, i (name)}
+                        {#if i > 0}<span class="text-brand-text-secondary/50 shrink-0">,&nbsp;</span>{/if}
+                        <LinkButton
+                          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+                          class="text-brand-text-secondary truncate min-w-0"
+                          title={i18n.t('collection.filterByArtist', { artist: name })}
+                        >
+                          {name}
+                        </LinkButton>
+                      {/each}
                     {:else}
                       <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                     {/if}

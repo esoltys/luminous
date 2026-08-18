@@ -124,7 +124,16 @@ pub const MULTI_VALUE_DELIMITER: &str = "; ";
 /// string into a clean, deduped list of individual values, trimming
 /// whitespace and dropping empties. This is the single place that owns the
 /// internal storage delimiter (`;`) — use it anywhere one of these columns
-/// needs to be treated as a list rather than opaque text.
+/// (or a single item read off an on-disk tag, in case some other tool joined
+/// multiple values into one string with `;`, e.g. Mp3tag/Winamp's
+/// convention) needs to be treated as a list rather than opaque text.
+///
+/// Deliberately does *not* also split on `/`, even though that's a
+/// long-standing convention for legacy-joined multi-value fields (TPE1's own
+/// "Lead performer(s)/Soloist(s)" convention, and Picard's default
+/// `id3v23_join_with = "/"` for ID3v2.3) — `/` shows up too often inside a
+/// single legitimate value (band names like "AC/DC", not to mention genre
+/// names) to use as a splitting heuristic without silently corrupting them.
 pub fn parse_multi_value(raw: &str) -> Vec<String> {
     split_and_dedup(raw, &[';'])
 }
@@ -133,21 +142,6 @@ pub fn parse_multi_value(raw: &str) -> Vec<String> {
 /// `artist`/`album_artist`/`composer`.
 pub fn join_multi_value(values: &[String]) -> String {
     values.join(MULTI_VALUE_DELIMITER)
-}
-
-/// Splits a single string read from an on-disk tag into multiple values
-/// using conventional legacy separators (`;`, `/`), for files where a tool
-/// joined multiple values into one string without a real multi-value
-/// mechanism — e.g. Picard's default `id3v23_join_with = "/"` for ID3v2.3
-/// (which applies uniformly to Genre, Artist, Album Artist, and Composer),
-/// TPE1's own long-standing `/`-separated "Lead performer(s)/Soloist(s)"
-/// convention predating any multi-value tagging mechanism, or Mp3tag/
-/// Winamp's `;`-joined convention. This is a lossy heuristic — it can't
-/// distinguish a joined multi-value string from a single value that
-/// legitimately contains `/` or `;` — but it beats collapsing an
-/// already-organized library into one bogus combined value.
-pub fn split_legacy_multi_value(raw: &str) -> Vec<String> {
-    split_and_dedup(raw, &[';', '/'])
 }
 
 /// Splits `raw` on any of `delimiters`, trims, drops empties, and dedupes
@@ -794,11 +788,18 @@ mod tests {
 
     #[test]
     fn test_parse_multi_value_does_not_split_on_slash() {
-        // '/' is only a legacy on-disk fallback separator, not the internal
-        // storage delimiter — a value legitimately containing '/' (e.g. an
-        // "AC/DC"-style artist name) must survive a round trip through the
-        // DB column.
+        // '/' is a real-world legacy multi-value join convention (TPE1,
+        // Picard's ID3v2.3 fallback) but is deliberately *not* treated as a
+        // splitting delimiter here, since it collides with band names that
+        // legitimately contain a slash — "AC/DC" must survive intact rather
+        // than becoming two artists, "AC" and "DC".
         assert_eq!(parse_multi_value("AC/DC"), vec!["AC/DC"]);
+        // A real multi-value string still splits correctly on ';', with the
+        // slash-containing value passing through as one of the items.
+        assert_eq!(
+            parse_multi_value("David Guetta; AC/DC"),
+            vec!["David Guetta", "AC/DC"]
+        );
     }
 
     #[test]
@@ -815,27 +816,6 @@ mod tests {
     fn test_multi_value_round_trips_through_join_and_parse() {
         let values = vec!["Rock".to_string(), "Jazz Fusion".to_string()];
         assert_eq!(parse_multi_value(&join_multi_value(&values)), values);
-    }
-
-    #[test]
-    fn test_split_legacy_multi_value() {
-        // Mp3tag/Winamp-style ';' join.
-        assert_eq!(
-            split_legacy_multi_value("Rock; Blues"),
-            vec!["Rock", "Blues"]
-        );
-        // Picard's default ID3v2.3 '/' join (also TPE1's own long-standing
-        // "Lead performer(s)/Soloist(s)" convention).
-        assert_eq!(
-            split_legacy_multi_value("Rock/Blues"),
-            vec!["Rock", "Blues"]
-        );
-        // Mixed separators and a single unsplit value.
-        assert_eq!(
-            split_legacy_multi_value("Rock/Blues; Jazz"),
-            vec!["Rock", "Blues", "Jazz"]
-        );
-        assert_eq!(split_legacy_multi_value("Metal"), vec!["Metal"]);
     }
 
     #[test]

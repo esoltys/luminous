@@ -878,32 +878,45 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Matches on the *effective* artist (album_artist, falling back to
-    /// artist), same as the "by artist" grouping used elsewhere — a plain
-    /// `artist` column match would miss compilation tracks credited to a
-    /// different per-track artist under a shared album_artist.
+    /// Matches `artist` against either the per-track `artist` column or the
+    /// `album_artist` column (via `multi_value_contains_pattern`), whichever
+    /// contains it as one of its individual `; `-delimited values — not just
+    /// the "effective" (album_artist-preferred) column this used to check
+    /// with a single exact-equality comparison. Checking both columns
+    /// separately, rather than collapsing to one via `COALESCE` first,
+    /// matters for two real cases a single-column check misses:
+    /// - A collab/featured credit on an otherwise normal (non-compilation)
+    ///   album, e.g. artist = "Evergrey; Mikael Stanne", album_artist =
+    ///   "Evergrey" — clicking "Mikael Stanne" only finds this track by
+    ///   checking the raw `artist` column, since `album_artist` alone would
+    ///   win under a `COALESCE` and never mention him.
+    /// - A Various Artists compilation track, e.g. artist = "Artist X",
+    ///   album_artist = "Various Artists" — clicking "Artist X" only finds
+    ///   it by checking `artist` directly (this case was previously only
+    ///   reachable via the separate album-level `get_compilations_by_artist`
+    ///   query, which still exists for the album-card view of the same data).
     ///
-    /// `artist` is matched with exact equality against the full (possibly
-    /// multi-value, `; `-delimited) `album_artist`/`artist` column — a song
-    /// crediting two artists on a collab track won't show up under either
-    /// individual artist's page here. Same deliberate scope decision as
-    /// `get_songs_by_genre` (#143): fanning multi-value artists out into
-    /// their own grouping (so a collab track appears on both artists' pages)
-    /// touches every artist/album-artist query in this file and is tracked
-    /// as follow-up work, not attempted in #150.
+    /// The library-wide Artists browse grouping (`get_artists`) is
+    /// intentionally *not* fanned out the same way — a collab track still
+    /// contributes to one combined "Evergrey; Mikael Stanne" card there
+    /// rather than to both artists' cards/counts. Full fan-out of that
+    /// grouping is tracked as separate follow-up work, same scope decision
+    /// #143 made for genre.
     pub fn get_songs_by_artist(&self, artist: &str) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE COALESCE(NULLIF(album_artist, ''), artist, '') = ?1
+             WHERE ({} OR {})
                AND source IN (1, 2)
                AND unavailable = 0
              ORDER BY album, disc, track",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            multi_value_contains_sql("COALESCE(artist, '')", "?1"),
+            multi_value_contains_sql("COALESCE(album_artist, '')", "?1")
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(params![artist], row_to_song)?
+            .query_map(params![multi_value_contains_pattern(artist)], row_to_song)?
             .filter_map(|r| r.ok())
             .collect();
         Ok(songs)
@@ -911,17 +924,19 @@ impl CollectionScanner {
 
     /// Compilation albums featuring `artist` on at least one track — the
     /// mirror image of `get_songs_by_artist`'s effective-artist match: this
-    /// matches on the *raw per-track* `artist` column, since a Various
-    /// Artists compilation's effective (album-level) artist is never the
-    /// individual track artist, so it would otherwise never surface on that
-    /// artist's own detail page (#343). An album counts as a compilation if
-    /// any track has `compilation = 1`, its tracks disagree on `album_artist`,
-    /// or `album_artist` is literally "Various Artists". Returns the same
+    /// matches on the *raw per-track* `artist` column (via
+    /// `multi_value_contains_pattern`, so a per-track collab credit still
+    /// matches), since a Various Artists compilation's effective
+    /// (album-level) artist is never the individual track artist, so it
+    /// would otherwise never surface on that artist's own detail page
+    /// (#343). An album counts as a compilation if any track has
+    /// `compilation = 1`, its tracks disagree on `album_artist`, or
+    /// `album_artist` is literally "Various Artists". Returns the same
     /// aggregated shape as `get_albums()`, but with `artist` always
     /// "Various Artists" since these are compilations by definition.
     pub fn get_compilations_by_artist(&self, artist: &str) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT
                 album,
                 MIN(year) AS year,
@@ -949,7 +964,7 @@ impl CollectionScanner {
              WHERE source IN (1, 2) AND unavailable = 0 AND album IS NOT NULL
                AND album IN (
                  SELECT album FROM songs s2
-                 WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.artist = ?1
+                 WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND {}
                )
                AND album IN (
                  SELECT album FROM songs s3
@@ -972,9 +987,11 @@ impl CollectionScanner {
                )
              GROUP BY album
              ORDER BY album",
-        )?;
+            multi_value_contains_sql("s2.artist", "?1")
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
-            .query_map(params![artist], |row| {
+            .query_map(params![multi_value_contains_pattern(artist)], |row| {
                 Ok(serde_json::json!({
                     "artist": "Various Artists",
                     "album": row.get::<_, Option<String>>(0)?,
@@ -1886,12 +1903,19 @@ fn detect_filetype(path: &Path) -> FileType {
 /// already splits ID3v2.4's null-byte-separated frames (and native
 /// Vorbis/APEv2/MP4 multi-value items) into separate items on read — the
 /// `Accessor` helpers would instead collapse them into one `" / "`-joined
-/// display string. Each resulting value is further split on legacy textual
-/// separators (`;`, `/`), so libraries tagged by tools that joined multiple
-/// values into one string without a real multi-value mechanism (e.g.
-/// Picard's ID3v2.3 fallback — which applies uniformly to Genre, Artist,
-/// Album Artist, and Composer — TPE1's own long-standing `/`-separated
-/// convention, or Mp3tag/Winamp) aren't flattened into one bogus value.
+/// display string. Each resulting value is further run through
+/// `models::parse_multi_value` in case a tool joined multiple values into
+/// one string with `;` (e.g. Mp3tag/Winamp's convention) without a real
+/// multi-value mechanism.
+///
+/// Deliberately does *not* also split on `/`, despite that being a
+/// real legacy join convention too (TPE1's own "Lead performer(s)/
+/// Soloist(s)" convention, Picard's default `id3v23_join_with = "/"` for
+/// ID3v2.3) — auto-splitting on `/` silently corrupts any value that
+/// legitimately contains one, most visibly band names like "AC/DC" (see
+/// `models::parse_multi_value`'s doc comment). A file relying on that
+/// convention reads back as one combined value instead of being auto-split;
+/// the user can split it into separate chips themselves in the tag editor.
 ///
 /// Genre gets one extra layer of legacy handling on top of this that
 /// Artist/Album Artist/Composer don't need: lofty's own ID3v2 read path
@@ -1904,7 +1928,7 @@ fn read_multi_value(tag: &Tag, key: ItemKey) -> Option<String> {
     let mut seen = std::collections::HashSet::new();
     let values: Vec<String> = tag
         .get_strings(key)
-        .flat_map(models::split_legacy_multi_value)
+        .flat_map(models::parse_multi_value)
         .filter(|v| seen.insert(v.to_lowercase()))
         .collect();
 
@@ -2187,6 +2211,33 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
         ],
     )?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Multi-value "contains this value" matching (artist click-through)
+// ---------------------------------------------------------------------------
+
+/// SQL `WHERE`-clause fragment testing whether `column_expr` (assumed to be
+/// a `; `-delimited multi-value column like `artist`/`album_artist`, or a
+/// `COALESCE`/`NULLIF` expression over one) contains `param` — bound via
+/// `multi_value_contains_pattern` — as one of its individual values, not
+/// merely as a substring. Both sides are wrapped in `;` boundary markers so
+/// a value can't be matched by being a substring of an unrelated, longer
+/// value in the same position (e.g. clicking artist "Stan" must not also
+/// match a song credited only to "Stan Getz").
+fn multi_value_contains_sql(column_expr: &str, param: &str) -> String {
+    format!("(';' || REPLACE({column_expr}, '; ', ';') || ';') LIKE {param} ESCAPE '\\'")
+}
+
+/// Builds the bound LIKE pattern paired with `multi_value_contains_sql`,
+/// escaping `value` so any literal `%`, `_`, or `\` in an artist/composer
+/// name can't be misread as a LIKE wildcard.
+fn multi_value_contains_pattern(value: &str) -> String {
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    format!("%;{escaped};%")
 }
 
 // ---------------------------------------------------------------------------
@@ -3051,6 +3102,23 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
+    fn test_multi_value_contains_pattern_escapes_like_wildcards() {
+        // An artist/composer name containing a literal '%' or '_' must not
+        // be misread as a LIKE wildcard when embedded in the pattern.
+        assert_eq!(multi_value_contains_pattern("50%"), "%;50\\%;%");
+        assert_eq!(
+            multi_value_contains_pattern("Under_score"),
+            "%;Under\\_score;%"
+        );
+        assert_eq!(
+            multi_value_contains_pattern(r"back\slash"),
+            r"%;back\\slash;%"
+        );
+        // The common case: no wildcard characters, just wrapped in ';'.
+        assert_eq!(multi_value_contains_pattern("Evergrey"), "%;Evergrey;%");
+    }
+
+    #[test]
     fn test_read_multi_value_uses_multivalue_items_directly() {
         // Simulates a file lofty already split into multiple ItemKey items
         // on read (e.g. ID3v2.4's null-separated TCON/TPE1/TPE2/TCOM, or
@@ -3073,23 +3141,18 @@ mod tests {
     }
 
     #[test]
-    fn test_read_multi_value_splits_legacy_joined_string() {
-        // Simulates a legacy ID3v2.3 file tagged by Picard (default
-        // `id3v23_join_with = "/"`) or Mp3tag/Winamp (`;`-joined) — lofty
+    fn test_read_multi_value_splits_legacy_semicolon_joined_string() {
+        // Simulates a file tagged by Mp3tag/Winamp (`;`-joined) — lofty
         // hands back a single item containing the joined string, which
         // read_multi_value must still split into a proper multi-value list.
-        // Exercised for both Genre and Artist: Genre has no spec-documented
-        // slash convention (it's purely a tagger habit), while Artist's
-        // `/` split is TPE1's own long-standing "Lead performer(s)/
-        // Soloist(s)" convention — both must fall back the same way.
         let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
         tag.push(lofty::tag::TagItem::new(
             ItemKey::Genre,
-            lofty::tag::ItemValue::Text("Rock/Blues".to_string()),
+            lofty::tag::ItemValue::Text("Rock; Blues".to_string()),
         ));
         tag.push(lofty::tag::TagItem::new(
             ItemKey::TrackArtist,
-            lofty::tag::ItemValue::Text("Artist A/Artist B".to_string()),
+            lofty::tag::ItemValue::Text("Artist A; Artist B".to_string()),
         ));
 
         assert_eq!(
@@ -3099,6 +3162,35 @@ mod tests {
         assert_eq!(
             read_multi_value(&tag, ItemKey::TrackArtist).as_deref(),
             Some("Artist A; Artist B")
+        );
+    }
+
+    #[test]
+    fn test_read_multi_value_does_not_split_slash_joined_legacy_string() {
+        // Regression test: TPE1's own long-standing "Lead performer(s)/
+        // Soloist(s)" convention (and Picard's default `id3v23_join_with =
+        // "/"` for ID3v2.3) is a real legacy multi-value join, but auto-
+        // splitting on `/` collides with slash-containing values that are
+        // one legitimate name, not a join — most visibly a real band name
+        // like "AC/DC", which must read back as a single artist rather than
+        // being torn into "AC" and "DC".
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::TrackArtist,
+            lofty::tag::ItemValue::Text("AC/DC".to_string()),
+        ));
+        tag.push(lofty::tag::TagItem::new(
+            ItemKey::Genre,
+            lofty::tag::ItemValue::Text("Hip-Hop/Rap".to_string()),
+        ));
+
+        assert_eq!(
+            read_multi_value(&tag, ItemKey::TrackArtist).as_deref(),
+            Some("AC/DC")
+        );
+        assert_eq!(
+            read_multi_value(&tag, ItemKey::Genre).as_deref(),
+            Some("Hip-Hop/Rap")
         );
     }
 
@@ -3763,6 +3855,158 @@ mod tests {
             songs.len(),
             1,
             "get_songs_by_artist(\"\") must return the song grouped under the empty-string artist"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for the artist click-through gap found while testing
+    /// #150: `get_songs_by_artist` used to match with exact equality against
+    /// a single "effective" column (album_artist, falling back to artist),
+    /// so a collab track credited to artist = "Evergrey; Mikael Stanne" with
+    /// album_artist = "Evergrey" was unreachable by clicking "Mikael
+    /// Stanne" — the effective column resolved to just "Evergrey" and never
+    /// mentioned him at all, regardless of how the artist column was split.
+    /// Checking the raw `artist` column too (not only the COALESCE'd
+    /// effective one) is what actually fixes this.
+    #[test]
+    fn test_get_songs_by_artist_finds_individual_values_in_a_multi_artist_credit() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_multi_artist_click_through_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("Evergrey; Mikael Stanne".to_string()),
+                album_artist: Some("Evergrey".to_string()),
+                album: Some("Architects Of A New Weave".to_string()),
+                title: Some("A Burning Flame".to_string()),
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\a_burning_flame.flac".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        // A solo Evergrey track, to confirm the match isn't overly broad.
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("Evergrey".to_string()),
+                album_artist: None,
+                album: Some("Escape Of The Phoenix".to_string()),
+                title: Some("Where August Mourns".to_string()),
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\where_august_mourns.flac".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+
+        let evergrey_songs = scanner.get_songs_by_artist("Evergrey").unwrap();
+        assert_eq!(
+            evergrey_songs.len(),
+            2,
+            "clicking Evergrey must surface both the solo track and the collab track"
+        );
+
+        let stanne_songs = scanner.get_songs_by_artist("Mikael Stanne").unwrap();
+        assert_eq!(
+            stanne_songs.len(),
+            1,
+            "clicking Mikael Stanne must surface the collab track"
+        );
+        assert_eq!(stanne_songs[0].title.as_deref(), Some("A Burning Flame"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// A Various Artists compilation track (album_artist = "Various
+    /// Artists", per-track artist = the actual performer) must be reachable
+    /// by clicking the individual track artist, not just via the separate
+    /// `get_compilations_by_artist` album-card query.
+    #[test]
+    fn test_get_songs_by_artist_finds_various_artists_compilation_track() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_compilation_click_through_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("Artist X".to_string()),
+                album_artist: Some("Various Artists".to_string()),
+                album: Some("Now That's What I Call Tests".to_string()),
+                title: Some("Track One".to_string()),
+                compilation: true,
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\track_one.flac".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let songs = scanner.get_songs_by_artist("Artist X").unwrap();
+        assert_eq!(
+            songs.len(),
+            1,
+            "clicking a compilation track's own artist must surface it directly"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// A value that's a substring of a different, unrelated artist's full
+    /// name must not false-positive match — clicking "Stan" (if that were a
+    /// real credited artist) must not also surface a song credited only to
+    /// "Stan Getz".
+    #[test]
+    fn test_get_songs_by_artist_does_not_match_substrings_of_unrelated_names() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_substring_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        upsert_song(
+            &conn,
+            &Song {
+                artist: Some("Stan Getz".to_string()),
+                album_artist: None,
+                album: Some("Getz/Gilberto".to_string()),
+                title: Some("The Girl From Ipanema".to_string()),
+                source: SongSource::LocalFile,
+                path: Some(r"C:\Music\girl_from_ipanema.flac".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let scanner = CollectionScanner::new(db.clone());
+        let songs = scanner.get_songs_by_artist("Stan").unwrap();
+        assert_eq!(
+            songs.len(),
+            0,
+            "\"Stan\" must not match \"Stan Getz\" as a substring"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
