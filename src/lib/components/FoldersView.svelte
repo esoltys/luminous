@@ -405,7 +405,13 @@
         </div>
 
         <div class="flex items-center justify-between gap-4 py-4">
-          <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <label for="language-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.selectLanguage')}</label>
+            <!-- Invisible placeholder matching the description line's height
+                 in the rows below, so this row's control centers at the same
+                 relative position as the ones with an actual description. -->
+            <p class="text-xs invisible" aria-hidden="true">&nbsp;</p>
+          </div>
           <Select
             id="language-select"
             value={i18n.currentLocale}
