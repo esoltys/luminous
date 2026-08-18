@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { themeStore } from "../stores/theme.svelte";
+  import { acquireSpectrum, releaseSpectrum } from "../utils/spectrumEnable";
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let unlisten: (() => void) | null = null;
@@ -79,8 +79,8 @@
   });
 
   onMount(async () => {
+    acquireSpectrum();
     try {
-      await invoke("set_spectrum_enabled", { enabled: true });
       unlisten = await listen<number[]>("spectrum-data", (event) => {
         spectrumData = event.payload;
         draw();
@@ -90,12 +90,8 @@
     }
   });
 
-  onDestroy(async () => {
-    try {
-      await invoke("set_spectrum_enabled", { enabled: false });
-    } catch (e) {
-      console.error("Failed to disable spectrum visualizer:", e);
-    }
+  onDestroy(() => {
+    releaseSpectrum();
     if (unlisten) {
       unlisten();
     }
