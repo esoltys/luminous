@@ -14,7 +14,6 @@ if (-not $env:STORE_TENANT_ID -or -not $env:STORE_CLIENT_ID -or -not $env:STORE_
     throw "STORE_TENANT_ID, STORE_CLIENT_ID, STORE_CLIENT_SECRET and STORE_APP_ID must all be set."
 }
 
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
 Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
 Install-Module -Name StoreBroker -Force -Scope CurrentUser
 
