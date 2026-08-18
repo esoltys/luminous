@@ -48,6 +48,7 @@
   import SortableHeader from "./SortableHeader.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import { parseMultiValue } from "../utils/multiValue";
   import ColumnSelector from "./ColumnSelector.svelte";
   import { Clock } from "lucide-svelte";
   import Button from "./Button.svelte";
@@ -1356,19 +1357,22 @@
             {/if}
 
             {#if collectionStore.visibleColumns.artist}
-              <div class="text-brand-text-primary truncate pr-4 min-w-0">
+              <div class="text-brand-text-primary truncate pr-4 flex items-center min-w-0">
                 {#if trueUnavailable}
                   <span class="text-brand-text-primary italic text-xs">{i18n.t("playlists.fileNotFoundText")}</span>
                 {:else if disconnected}
                   <span class="text-brand-text-primary italic text-xs">{i18n.t("collection.driveDisconnectedText")}</span>
                 {:else if item.song?.artist}
-                  <LinkButton
-                    onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(item.song?.album_artist?.trim() || item.song?.artist || ""); }}
-                    class="text-brand-text-primary truncate min-w-0"
-                    title={i18n.t("collection.filterByArtist", { artist: item.song.artist })}
-                  >
-                    {item.song.artist}
-                  </LinkButton>
+                  {#each parseMultiValue(item.song.artist) as name, i (name)}
+                    {#if i > 0}<span class="text-brand-text-primary/50 shrink-0">,&nbsp;</span>{/if}
+                    <LinkButton
+                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+                      class="text-brand-text-primary truncate min-w-0"
+                      title={i18n.t("collection.filterByArtist", { artist: name })}
+                    >
+                      {name}
+                    </LinkButton>
+                  {/each}
                 {:else}
                   <span class="text-brand-text-primary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
                 {/if}

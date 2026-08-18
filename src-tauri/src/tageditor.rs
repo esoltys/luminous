@@ -132,30 +132,53 @@ pub fn write_tags(
     let original_pictures = tag.pictures().to_vec();
 
     tag.set_title(title.to_string());
-    tag.set_artist(artist.to_string());
     tag.set_album(album.to_string());
 
-    // Genre is written as one `ItemKey::Genre` item per value rather than a
-    // single `set_genre()` call, so formats with native multi-value support
-    // (Vorbis Comments, APEv2, MP4) and ID3v2.4 — whose `TCON` frame packs
-    // multiple values null-byte-separated per the ID3v2.4 spec — round-trip
-    // correctly with taggers like MusicBrainz Picard instead of collapsing
-    // to one value. Known caveat: if the file's primary tag is a legacy
-    // ID3v2.3 frame, lofty re-encodes multiple genres using the old
+    // Genre, Artist, Album Artist, and Composer are all written as one
+    // `TagItem` per value rather than a single `set_*()`/`insert_text()`
+    // call, so formats with native multi-value support (Vorbis Comments,
+    // APEv2, MP4) and ID3v2.4 — whose `TCON`/`TPE1`/`TPE2`/`TCOM` frames
+    // pack multiple values null-byte-separated per the ID3v2.4 spec —
+    // round-trip correctly with taggers like MusicBrainz Picard instead of
+    // collapsing to one value. Known caveat: if the file's primary tag is a
+    // legacy ID3v2.3 frame, lofty re-encodes multiple genres using the old
     // ID3v1-style numeric-genre-in-parentheses convention on save rather
-    // than Picard's default `/`-joined string — this only mangles genre
-    // names outside the standard ID3v1 genre list, and is a documented
-    // interop caveat of the legacy format rather than a bug (#143).
+    // than Picard's default `/`-joined string (#143); Artist/Album Artist/
+    // Composer have no such re-encoding, so their null separators are
+    // written as-is, which is itself invalid ID3v2.3 — both are documented
+    // interop caveats of the legacy format rather than bugs.
+    tag.remove_key(lofty::tag::ItemKey::TrackArtist);
+    for a in models::parse_multi_value(artist) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::TrackArtist,
+            lofty::tag::ItemValue::Text(a),
+        ));
+    }
+
     tag.remove_key(lofty::tag::ItemKey::Genre);
-    for g in models::parse_genres(genre) {
+    for g in models::parse_multi_value(genre) {
         tag.push(lofty::tag::TagItem::new(
             lofty::tag::ItemKey::Genre,
             lofty::tag::ItemValue::Text(g),
         ));
     }
 
-    tag.insert_text(lofty::tag::ItemKey::AlbumArtist, album_artist.to_string());
-    tag.insert_text(lofty::tag::ItemKey::Composer, composer.to_string());
+    tag.remove_key(lofty::tag::ItemKey::AlbumArtist);
+    for aa in models::parse_multi_value(album_artist) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::AlbumArtist,
+            lofty::tag::ItemValue::Text(aa),
+        ));
+    }
+
+    tag.remove_key(lofty::tag::ItemKey::Composer);
+    for c in models::parse_multi_value(composer) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::Composer,
+            lofty::tag::ItemValue::Text(c),
+        ));
+    }
+
     tag.insert_text(lofty::tag::ItemKey::ContentGroup, grouping.to_string());
     tag.insert_text(lofty::tag::ItemKey::InitialKey, initial_key.to_string());
     // TCMP/cpil/COMPILATION "part of a compilation" flag — written as text
@@ -614,6 +637,87 @@ mod tests {
         let tagged_file = Probe::open(&path).unwrap().read().unwrap();
         let tag = tagged_file.primary_tag().unwrap();
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::Genre).count(), 0);
+    }
+
+    #[test]
+    fn test_write_tags_round_trips_multiple_artists_album_artists_and_composers() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist A; Artist B",
+            "Album",
+            "Album Artist A; Album Artist B",
+            "Composer A; Composer B",
+            "",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        // Same ID3v2.4 null-byte-separated multi-value round-trip as genre
+        // (#143) — one TPE1/TPE2/TCOM frame per field with all values, not
+        // a single joined string and not only the first value.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::TrackArtist)
+                .collect::<Vec<_>>(),
+            vec!["Artist A", "Artist B"]
+        );
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::AlbumArtist)
+                .collect::<Vec<_>>(),
+            vec!["Album Artist A", "Album Artist B"]
+        );
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::Composer)
+                .collect::<Vec<_>>(),
+            vec!["Composer A", "Composer B"]
+        );
+    }
+
+    #[test]
+    fn test_write_tags_empty_artist_album_artist_composer_clears_fields() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "Album Artist",
+            "Composer",
+            "",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+        write_tags(
+            &path, "Title", "", "Album", "", "", "", None, None, None, "", None, "", false,
+        )
+        .expect("write_tags with empty artist/album_artist/composer should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::TrackArtist).count(), 0);
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::AlbumArtist).count(), 0);
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::Composer).count(), 0);
     }
 
     #[tokio::test]

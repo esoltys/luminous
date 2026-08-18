@@ -27,7 +27,7 @@ describe("TagEditor.svelte", () => {
     title: "Original Title",
     artist: "Original Artist",
     album: "Original Album",
-    album_artist: "Original Artist",
+    album_artist: "Original Album Artist",
     composer: "Original Composer",
     genre: "Rock",
     track: 3,
@@ -70,12 +70,15 @@ describe("TagEditor.svelte", () => {
     });
 
     const titleInput = getByLabelText("Song Title") as HTMLInputElement;
-    const artistInput = getByLabelText("Artist") as HTMLInputElement;
     const albumInput = getByLabelText("Album") as HTMLInputElement;
 
     expect(titleInput.value).toBe("Original Title");
-    expect(artistInput.value).toBe("Original Artist");
     expect(albumInput.value).toBe("Original Album");
+    // Artist, Album Artist, and Composer are chip inputs — the initial
+    // values render as chips, not as the value of the (empty, ready-for-new-
+    // input) labeled text field.
+    expect(getByText("Original Artist")).toBeInTheDocument();
+    expect(getByText("Original Composer")).toBeInTheDocument();
   });
 
   it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
@@ -127,6 +130,34 @@ describe("TagEditor.svelte", () => {
       expect(invoke).toHaveBeenCalledWith("save_song_tags", expect.objectContaining({
         songId: 10,
         title: "Updated Track Title",
+      }));
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("adds a chip to the Artist field and saves it delimited alongside the original", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, getByText } = render(TagEditor, { songId: 10, onClose, onSave });
+
+    await waitFor(() => {
+      expect(getByText("Original Artist")).toBeInTheDocument();
+    });
+
+    const artistInput = getByLabelText("Artist") as HTMLInputElement;
+    await fireEvent.input(artistInput, { target: { value: "Second Artist" } });
+    await fireEvent.keyDown(artistInput, { key: "Enter" });
+
+    expect(getByText("Second Artist")).toBeInTheDocument();
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_song_tags", expect.objectContaining({
+        songId: 10,
+        artist: "Original Artist; Second Artist",
       }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();

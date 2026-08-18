@@ -14,9 +14,10 @@ pub struct SongDetails {
     pub album: String,
     pub album_artist: String,
     pub composer: String,
-    /// `; `-delimited when the song carries multiple genres — see
-    /// `models::parse_genres`/`join_genres`, the single source of truth for
-    /// this convention.
+    /// `artist`, `album_artist`, `composer`, and `genre` are all `; `-delimited
+    /// when the song carries multiple values — see
+    /// `models::parse_multi_value`/`join_multi_value`, the single source of
+    /// truth for this convention.
     pub genre: String,
     pub track: Option<u32>,
     pub disc: Option<u32>,
@@ -151,14 +152,18 @@ pub async fn save_song_tags(
     // whatever's already in the DB rather than clobbering it.
     let path_clone = path.clone();
     let title_c = title.clone();
-    let artist_c = artist.clone();
+    // Normalize every multi-value field to the canonical `; `-delimited,
+    // trimmed, deduped form before it hits disk or the DB, regardless of
+    // exactly what the chip input sent over the wire.
+    let artist_str = models::join_multi_value(&models::parse_multi_value(&artist));
+    let artist_c = artist_str.clone();
     let album_c = album.clone();
-    let album_artist_c = album_artist.clone();
-    let composer_c = composer.clone();
-    // Normalize to the canonical `; `-delimited, trimmed, deduped form
-    // before it hits disk or the DB, regardless of exactly what the chip
-    // input sent over the wire.
-    let genre_str = models::join_genres(&models::parse_genres(&genre.unwrap_or_default()));
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let album_artist_c = album_artist_str.clone();
+    let composer_str = models::join_multi_value(&models::parse_multi_value(&composer));
+    let composer_c = composer_str.clone();
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
@@ -203,10 +208,10 @@ pub async fn save_song_tags(
          WHERE id = ?13",
         rusqlite::params![
             title,
-            artist,
+            artist_str,
             album,
-            album_artist,
-            composer,
+            album_artist_str,
+            composer_str,
             genre_str,
             track,
             disc,
@@ -281,11 +286,13 @@ pub async fn save_album_tags(
     }
 
     let album_c = album.clone();
-    let album_artist_c = album_artist.clone();
     // Normalize to the canonical `; `-delimited, trimmed, deduped form
     // before it hits disk or the DB, regardless of exactly what the chip
     // input sent over the wire.
-    let genre_str = models::join_genres(&models::parse_genres(&genre.unwrap_or_default()));
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let album_artist_c = album_artist_str.clone();
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
 
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
@@ -330,7 +337,7 @@ pub async fn save_album_tags(
              WHERE id = ?7",
             rusqlite::params![
                 album,
-                album_artist,
+                album_artist_str,
                 genre_str,
                 year,
                 disc,

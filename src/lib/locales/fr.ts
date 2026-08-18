@@ -632,19 +632,20 @@ export const fr = {
     dragHint: "Déplacer la fenêtre"
   },
 
-  genreChipInput: {
-    placeholder: "Ajouter un genre...",
-    removeGenre: "Supprimer {genre}"
+  chipInput: {
+    removeItem: "Supprimer {value}"
   },
 
   tagEditor: {
     title: "Modifier les tags de la chanson",
     titleField: "Titre de la chanson",
     artistField: "Artiste",
+    artistPlaceholder: "Ajouter un artiste...",
     albumField: "Album",
     trackField: "Numéro de piste",
     yearField: "Année",
     genreField: "Genre",
+    genrePlaceholder: "Ajouter un genre...",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
     saveBtnShort: "Enregistrer",
@@ -653,8 +654,10 @@ export const fr = {
     readFailed: "Échec de la lecture des tags",
     locationField: "Emplacement",
     albumArtistField: "Artiste de l'album",
+    albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     albumArtistTooltip: "Artiste principal crédité pour l'album entier, utile pour les compilations",
     composerField: "Compositeur",
+    composerPlaceholder: "Ajouter un compositeur...",
     discField: "Disque",
     groupingField: "Groupement",
     groupingTooltip: "Regroupe des pistes liées, par ex. les mouvements d'une œuvre classique",
@@ -683,7 +686,9 @@ export const fr = {
     title: "Modifier les tags de l'album",
     albumField: "Titre de l'album",
     albumArtistField: "Artiste de l'album",
+    albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     genreField: "Genre",
+    genrePlaceholder: "Ajouter un genre...",
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",

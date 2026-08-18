@@ -110,37 +110,38 @@ impl From<i64> for FileType {
 }
 
 // ---------------------------------------------------------------------------
-// Multi-value genre helpers
+// Multi-value field helpers (genre, artist, album artist, composer)
 // ---------------------------------------------------------------------------
 
-/// Delimiter used to pack multiple genres into `songs.genre` and the tag
-/// editor's genre DTO field, matching the Mp3tag/Winamp `"; "` convention.
-pub const GENRE_DELIMITER: &str = "; ";
+/// Delimiter used to pack multiple values into `songs.genre`/`artist`/
+/// `album_artist`/`composer` and the tag editor's corresponding DTO fields,
+/// matching the Mp3tag/Winamp `"; "` convention. Shared by every multi-value
+/// field so the internal storage format stays consistent regardless of what
+/// on-disk tag convention (if any) a given field's legacy fallback uses.
+pub const MULTI_VALUE_DELIMITER: &str = "; ";
 
-/// Splits a `songs.genre`-style delimited string into a clean, deduped list
-/// of individual genres, trimming whitespace and dropping empties. This is
-/// the single place that owns the internal storage delimiter (`;`) — use it
-/// anywhere `songs.genre` needs to be treated as a list rather than opaque
-/// text.
-pub fn parse_genres(raw: &str) -> Vec<String> {
+/// Splits a `songs.genre`/`artist`/`album_artist`/`composer`-style delimited
+/// string into a clean, deduped list of individual values, trimming
+/// whitespace and dropping empties. This is the single place that owns the
+/// internal storage delimiter (`;`) — use it anywhere one of these columns
+/// (or a single item read off an on-disk tag, in case some other tool joined
+/// multiple values into one string with `;`, e.g. Mp3tag/Winamp's
+/// convention) needs to be treated as a list rather than opaque text.
+///
+/// Deliberately does *not* also split on `/`, even though that's a
+/// long-standing convention for legacy-joined multi-value fields (TPE1's own
+/// "Lead performer(s)/Soloist(s)" convention, and Picard's default
+/// `id3v23_join_with = "/"` for ID3v2.3) — `/` shows up too often inside a
+/// single legitimate value (band names like "AC/DC", not to mention genre
+/// names) to use as a splitting heuristic without silently corrupting them.
+pub fn parse_multi_value(raw: &str) -> Vec<String> {
     split_and_dedup(raw, &[';'])
 }
 
-/// Joins a genre list back into the delimited form stored in `songs.genre`.
-pub fn join_genres(genres: &[String]) -> String {
-    genres.join(GENRE_DELIMITER)
-}
-
-/// Splits a single genre string read from an on-disk tag into multiple
-/// genres using conventional legacy separators (`;`, `/`), for files where
-/// a tool joined multiple genres into one string without a real multi-value
-/// mechanism (e.g. Picard's default `id3v23_join_with = "/"` for ID3v2.3, or
-/// Mp3tag/Winamp's `;`-joined convention). This is a lossy heuristic — it
-/// can't distinguish a joined multi-genre string from a single genre name
-/// that legitimately contains `/` or `;` — but it beats collapsing an
-/// already-organized library into one bogus combined genre.
-pub fn split_legacy_genre_string(raw: &str) -> Vec<String> {
-    split_and_dedup(raw, &[';', '/'])
+/// Joins a value list back into the delimited form stored in `songs.genre`/
+/// `artist`/`album_artist`/`composer`.
+pub fn join_multi_value(values: &[String]) -> String {
+    values.join(MULTI_VALUE_DELIMITER)
 }
 
 /// Splits `raw` on any of `delimiters`, trims, drops empties, and dedupes
@@ -770,63 +771,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_genres_splits_trims_and_dedupes() {
+    fn test_parse_multi_value_splits_trims_and_dedupes() {
         assert_eq!(
-            parse_genres("Rock; Jazz Fusion; Live"),
+            parse_multi_value("Rock; Jazz Fusion; Live"),
             vec!["Rock", "Jazz Fusion", "Live"]
         );
         // Whitespace-only separators still split; empties dropped.
-        assert_eq!(parse_genres("Rock;;  Jazz "), vec!["Rock", "Jazz"]);
+        assert_eq!(parse_multi_value("Rock;;  Jazz "), vec!["Rock", "Jazz"]);
         // Case-insensitive dedup, first-seen casing wins.
-        assert_eq!(parse_genres("Rock; rock; ROCK"), vec!["Rock"]);
-        // A single genre with no delimiter round-trips unchanged.
-        assert_eq!(parse_genres("Metal"), vec!["Metal"]);
-        assert_eq!(parse_genres(""), Vec::<String>::new());
-        assert_eq!(parse_genres("   "), Vec::<String>::new());
+        assert_eq!(parse_multi_value("Rock; rock; ROCK"), vec!["Rock"]);
+        // A single value with no delimiter round-trips unchanged.
+        assert_eq!(parse_multi_value("Metal"), vec!["Metal"]);
+        assert_eq!(parse_multi_value(""), Vec::<String>::new());
+        assert_eq!(parse_multi_value("   "), Vec::<String>::new());
     }
 
     #[test]
-    fn test_parse_genres_does_not_split_on_slash() {
-        // '/' is only a legacy on-disk fallback separator, not the internal
-        // storage delimiter — a genre legitimately containing '/' (or an
-        // artist-style name) must survive a round trip through the DB column.
-        assert_eq!(parse_genres("Hip-Hop/Rap"), vec!["Hip-Hop/Rap"]);
-    }
-
-    #[test]
-    fn test_join_genres() {
+    fn test_parse_multi_value_does_not_split_on_slash() {
+        // '/' is a real-world legacy multi-value join convention (TPE1,
+        // Picard's ID3v2.3 fallback) but is deliberately *not* treated as a
+        // splitting delimiter here, since it collides with band names that
+        // legitimately contain a slash — "AC/DC" must survive intact rather
+        // than becoming two artists, "AC" and "DC".
+        assert_eq!(parse_multi_value("AC/DC"), vec!["AC/DC"]);
+        // A real multi-value string still splits correctly on ';', with the
+        // slash-containing value passing through as one of the items.
         assert_eq!(
-            join_genres(&["Rock".to_string(), "Jazz Fusion".to_string()]),
+            parse_multi_value("David Guetta; AC/DC"),
+            vec!["David Guetta", "AC/DC"]
+        );
+    }
+
+    #[test]
+    fn test_join_multi_value() {
+        assert_eq!(
+            join_multi_value(&["Rock".to_string(), "Jazz Fusion".to_string()]),
             "Rock; Jazz Fusion"
         );
-        assert_eq!(join_genres(&[]), "");
-        assert_eq!(join_genres(&["Metal".to_string()]), "Metal");
+        assert_eq!(join_multi_value(&[]), "");
+        assert_eq!(join_multi_value(&["Metal".to_string()]), "Metal");
     }
 
     #[test]
-    fn test_genres_round_trip_through_join_and_parse() {
-        let genres = vec!["Rock".to_string(), "Jazz Fusion".to_string()];
-        assert_eq!(parse_genres(&join_genres(&genres)), genres);
-    }
-
-    #[test]
-    fn test_split_legacy_genre_string() {
-        // Mp3tag/Winamp-style ';' join.
-        assert_eq!(
-            split_legacy_genre_string("Rock; Blues"),
-            vec!["Rock", "Blues"]
-        );
-        // Picard's default ID3v2.3 '/' join.
-        assert_eq!(
-            split_legacy_genre_string("Rock/Blues"),
-            vec!["Rock", "Blues"]
-        );
-        // Mixed separators and a single unsplit genre.
-        assert_eq!(
-            split_legacy_genre_string("Rock/Blues; Jazz"),
-            vec!["Rock", "Blues", "Jazz"]
-        );
-        assert_eq!(split_legacy_genre_string("Metal"), vec!["Metal"]);
+    fn test_multi_value_round_trips_through_join_and_parse() {
+        let values = vec!["Rock".to_string(), "Jazz Fusion".to_string()];
+        assert_eq!(parse_multi_value(&join_multi_value(&values)), values);
     }
 
     #[test]

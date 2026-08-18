@@ -16,7 +16,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import GenreChipInput from "./GenreChipInput.svelte";
+  import ChipInput from "./ChipInput.svelte";
 
   interface Props {
     songId: number;
@@ -345,12 +345,12 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.artistField')} for="tag-artist">
-              <Input
+              <ChipInput
                 id="tag-artist"
                 bind:value={artist}
                 oninput={() => changedFields.delete("artist")}
                 disabled={isSaving}
-                size="sm"
+                placeholder={i18n.t('tagEditor.artistPlaceholder')}
                 highlighted={changedFields.has('artist')}
                 class="w-full"
               />
@@ -369,7 +369,13 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.composerField')} for="tag-composer">
-              <Input id="tag-composer" bind:value={composer} disabled={isSaving} size="sm" class="w-full" />
+              <ChipInput
+                id="tag-composer"
+                bind:value={composer}
+                disabled={isSaving}
+                placeholder={i18n.t('tagEditor.composerPlaceholder')}
+                class="w-full"
+              />
             </FormField>
 
             <FormField label={i18n.t('tagEditor.albumArtistField')} for="tag-albumartist" tooltip={i18n.t('tagEditor.albumArtistTooltip')}>
@@ -381,7 +387,13 @@
                   </span>
                 </div>
               {:else}
-                <Input id="tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+                <ChipInput
+                  id="tag-albumartist"
+                  bind:value={albumArtist}
+                  disabled={isSaving}
+                  placeholder={i18n.t('tagEditor.albumArtistPlaceholder')}
+                  class="w-full"
+                />
               {/if}
             </FormField>
 
@@ -403,7 +415,13 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre">
-              <GenreChipInput id="tag-genre" bind:value={genre} disabled={isSaving} class="w-full" />
+              <ChipInput
+                id="tag-genre"
+                bind:value={genre}
+                disabled={isSaving}
+                placeholder={i18n.t('tagEditor.genrePlaceholder')}
+                class="w-full"
+              />
             </FormField>
 
             <FormField label={i18n.t('tagEditor.groupingField')} for="tag-grouping" tooltip={i18n.t('tagEditor.groupingTooltip')}>
