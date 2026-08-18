@@ -1135,6 +1135,8 @@
     initialDisc={songs[0].disc}
     initialCompilation={songs[0].compilation}
     hasEmbeddedArt={songs.some((s) => s.art_embedded)}
+    initialArtAutomatic={albumItem?.art_automatic}
+    initialArtManual={albumItem?.art_manual}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />

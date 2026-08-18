@@ -10,6 +10,7 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import GenreChipInput from "./GenreChipInput.svelte";
+  import CoverArt from "./CoverArt.svelte";
 
   interface Props {
     songIds: number[];
@@ -20,6 +21,11 @@
     initialDisc?: number | null;
     initialCompilation?: boolean;
     hasEmbeddedArt?: boolean;
+    /** Album-level art overrides (see AlbumItem.art_automatic/art_manual) — take
+        precedence over any single track's embedded art, same as CoverArt.svelte's
+        own precedence when both are passed through. */
+    initialArtAutomatic?: string | null;
+    initialArtManual?: string | null;
     onClose: () => void;
     onSave?: () => void;
   }
@@ -33,6 +39,8 @@
     initialDisc = null,
     initialCompilation = false,
     hasEmbeddedArt = false,
+    initialArtAutomatic = null,
+    initialArtManual = null,
     onClose,
     onSave
   }: Props = $props();
@@ -142,6 +150,30 @@
 
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       <div class="flex flex-col gap-4">
+        <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
+          <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
+          <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('albumTagEditor.artworkField')}</span>
+            <span class="text-[10px] text-brand-text-secondary font-mono">
+              {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
+            </span>
+          </div>
+          <Button
+            onclick={() => { showClearArtConfirm = true; }}
+            disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+            variant="secondary"
+            size="sm"
+          >
+            {#if isClearingArt}
+              <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+              <span>{i18n.t('albumTagEditor.clearingArt')}</span>
+            {:else}
+              <ImageOff class="w-3.5 h-3.5" />
+              <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
+            {/if}
+          </Button>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
             <Input id="album-tag-album" bind:value={album} disabled={isSaving} size="sm" class="w-full" />
@@ -210,25 +242,9 @@
     </div>
 
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border bg-brand-main shrink-0">
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
-          <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-          <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
-        </div>
-        <Button
-          onclick={() => { showClearArtConfirm = true; }}
-          disabled={!hasEmbeddedArt || isSaving || isClearingArt}
-          variant="secondary"
-          size="sm"
-        >
-          {#if isClearingArt}
-            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-            <span>{i18n.t('albumTagEditor.clearingArt')}</span>
-          {:else}
-            <ImageOff class="w-3.5 h-3.5" />
-            <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
-          {/if}
-        </Button>
+      <div class="flex items-center gap-2 text-xs font-medium text-brand-text-secondary">
+        <Layers class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+        <span>{i18n.t('albumTagEditor.tracksAffected', { count: songIds.length })}</span>
       </div>
 
       <div class="flex items-center gap-3">
