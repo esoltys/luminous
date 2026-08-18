@@ -37,6 +37,9 @@ export const SMALL_BREAKPOINT_WIDTH_PX = 640;
 /** Window height below which the app collapses to showing only the PlayerBar (routes/+layout.svelte, collection.svelte.ts). */
 export const PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX = 360;
 
+/** Window height below which detail-view hero headers (Playlist/Album/Artist) hide, so their song table gets the space instead (collection.svelte.ts). */
+export const DETAIL_HEADER_COLLAPSE_HEIGHT_PX = 600;
+
 /**
  * Per-cover offset/scale/opacity step used to fan out a stack of album
  * covers into a 3D-ish pile, for the "left" stacking direction shared by

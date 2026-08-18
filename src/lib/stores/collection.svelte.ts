@@ -25,6 +25,7 @@ import {
   MEDIUM_BREAKPOINT_WIDTH_PX,
   SMALL_BREAKPOINT_WIDTH_PX,
   PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
+  DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
 } from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
@@ -1178,6 +1179,10 @@ class CollectionStore {
 
   get isPlaybarOnlyMode(): boolean {
     return this.viewportHeight < PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX;
+  }
+
+  get isDetailHeaderCollapsed(): boolean {
+    return this.viewportHeight < DETAIL_HEADER_COLLAPSE_HEIGHT_PX;
   }
 
   setSidebarWidth(width: number) {

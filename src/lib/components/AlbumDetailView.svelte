@@ -504,9 +504,10 @@
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
+        {#if !collectionStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
         </h1>
@@ -549,6 +550,7 @@
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
           {/if}
         </div>
+        {/if}
 
         <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons
@@ -583,6 +585,7 @@
         </div>
       </div>
 
+      {#if !collectionStore.isDetailHeaderCollapsed}
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverArt
@@ -600,6 +603,7 @@
           {/if}
         </div>
       </div>
+      {/if}
     </div>
   </div>
 
