@@ -14,23 +14,36 @@ jobs:
     name: Publish to Microsoft Store
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - name: Extract release version
-        id: get_version
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download MSIX package from release
+        id: download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           TAG="${{ github.event.release.tag_name || inputs.tag }}"
-          VERSION="${TAG#v}"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          # tauri-windows-bundle pads to a four-part version (X.Y.Z -> X.Y.Z.0)
-          # for the MSIX filename.
-          echo "msix_version=${VERSION}.0" >> $GITHUB_OUTPUT
+          mkdir -p package
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "*.msixbundle" --pattern "*.msix" --dir package
+          # Prefer the bundle if both were produced; otherwise fall back to the single .msix.
+          FILE=$(ls package/*.msixbundle 2>/dev/null | head -n1 || true)
+          if [ -z "$FILE" ]; then
+            FILE=$(ls package/*.msix | head -n1)
+          fi
+          echo "Selected package: $FILE"
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
 
       - name: Submit to Microsoft Store
-        uses: microsoft/store-submission@v1
-        with:
-          tenant-id: ${{ secrets.STORE_TENANT_ID }}
-          client-id: ${{ secrets.STORE_CLIENT_ID }}
-          client-secret: ${{ secrets.STORE_CLIENT_SECRET }}
-          app-id: ${{ secrets.STORE_APP_ID }}
-          package-path: "https://github.com/esoltys/luminous/releases/download/v${{ steps.get_version.outputs.version }}/LuminousMusicPlayer_${{ steps.get_version.outputs.msix_version }}_x64.msix"
+        shell: pwsh
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+          STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
+        run: |
+          ./.github/store/Submit-ToMicrosoftStore.ps1 -AppxPath "${{ steps.download.outputs.path }}"
