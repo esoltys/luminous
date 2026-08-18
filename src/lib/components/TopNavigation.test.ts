@@ -28,6 +28,7 @@ describe("TopNavigation.svelte", () => {
     collectionStore.immersiveMode = false;
     collectionStore.sidebarOpen = true;
     collectionStore.rightPanelOpen = false;
+    collectionStore.viewportWidth = 1280;
   });
 
   it("toggles sidebar compact state when clicking the hamburger menu button", async () => {
@@ -41,5 +42,29 @@ describe("TopNavigation.svelte", () => {
 
     await fireEvent.click(hamburgerBtn);
     expect(collectionStore.sidebarWidth).toBe(256);
+  });
+
+  it("hides the right-panel toggle at the same breakpoint that auto-hides the panel itself", () => {
+    collectionStore.viewportWidth = 1280;
+    expect(collectionStore.isRightPanelAutoHidden).toBe(false);
+    const { queryByTitle } = render(TopNavigation);
+    expect(queryByTitle("Show Info Panel")).not.toBeNull();
+
+    collectionStore.viewportWidth = 800;
+    expect(collectionStore.isRightPanelAutoHidden).toBe(true);
+    const { queryByTitle: queryByTitleNarrow } = render(TopNavigation);
+    expect(queryByTitleNarrow("Show Info Panel")).toBeNull();
+  });
+
+  it("hides the sidebar compact/expand toggle at the same breakpoint that auto-collapses it", () => {
+    collectionStore.viewportWidth = 1280;
+    expect(collectionStore.isSidebarAutoCollapsed).toBe(false);
+    const { queryByTitle } = render(TopNavigation);
+    expect(queryByTitle("Toggle sidebar (compact / expanded)")).not.toBeNull();
+
+    collectionStore.viewportWidth = 800;
+    expect(collectionStore.isSidebarAutoCollapsed).toBe(true);
+    const { queryByTitle: queryByTitleNarrow } = render(TopNavigation);
+    expect(queryByTitleNarrow("Toggle sidebar (compact / expanded)")).toBeNull();
   });
 });
