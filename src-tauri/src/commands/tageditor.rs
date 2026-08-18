@@ -1,4 +1,5 @@
 use crate::collection::WatcherPauseGuard;
+use crate::models;
 use crate::tageditor::SuggestedTags;
 use crate::AppState;
 use std::sync::Arc;
@@ -13,6 +14,9 @@ pub struct SongDetails {
     pub album: String,
     pub album_artist: String,
     pub composer: String,
+    /// `; `-delimited when the song carries multiple genres — see
+    /// `models::parse_genres`/`join_genres`, the single source of truth for
+    /// this convention.
     pub genre: String,
     pub track: Option<u32>,
     pub disc: Option<u32>,
@@ -151,7 +155,10 @@ pub async fn save_song_tags(
     let album_c = album.clone();
     let album_artist_c = album_artist.clone();
     let composer_c = composer.clone();
-    let genre_str = genre.unwrap_or_default();
+    // Normalize to the canonical `; `-delimited, trimmed, deduped form
+    // before it hits disk or the DB, regardless of exactly what the chip
+    // input sent over the wire.
+    let genre_str = models::join_genres(&models::parse_genres(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
@@ -275,7 +282,10 @@ pub async fn save_album_tags(
 
     let album_c = album.clone();
     let album_artist_c = album_artist.clone();
-    let genre_str = genre.unwrap_or_default();
+    // Normalize to the canonical `; `-delimited, trimmed, deduped form
+    // before it hits disk or the DB, regardless of exactly what the chip
+    // input sent over the wire.
+    let genre_str = models::join_genres(&models::parse_genres(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
 
     let updated_count = tauri::async_runtime::spawn_blocking(move || {

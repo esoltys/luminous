@@ -16,6 +16,7 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import GenreChipInput from "./GenreChipInput.svelte";
 
   interface Props {
     songId: number;
@@ -402,7 +403,7 @@
             </FormField>
 
             <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre">
-              <Input id="tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
+              <GenreChipInput id="tag-genre" bind:value={genre} disabled={isSaving} class="w-full" />
             </FormField>
 
             <FormField label={i18n.t('tagEditor.groupingField')} for="tag-grouping" tooltip={i18n.t('tagEditor.groupingTooltip')}>

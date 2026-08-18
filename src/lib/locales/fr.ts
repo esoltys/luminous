@@ -632,6 +632,11 @@ export const fr = {
     dragHint: "Déplacer la fenêtre"
   },
 
+  genreChipInput: {
+    placeholder: "Ajouter un genre...",
+    removeGenre: "Supprimer {genre}"
+  },
+
   tagEditor: {
     title: "Modifier les tags de la chanson",
     titleField: "Titre de la chanson",
@@ -688,6 +693,9 @@ export const fr = {
     saving: "Enregistrement des tags de l'album...",
     saveSuccess: "Tags d'album mis à jour pour {count} chansons",
     saveFailedPrefix: "Échec de l'enregistrement des tags d'album : ",
+    artworkField: "Pochette",
+    artworkEmbedded: "Pochette intégrée",
+    artworkNotEmbedded: "Aucune pochette intégrée",
     clearArtBtn: "Effacer la pochette intégrée",
     clearArtConfirmTitle: "Effacer la pochette intégrée ?",
     clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier de chaque piste de cet album. Les pistes utiliseront alors la pochette du dossier ou un espace réservé.",

@@ -5,7 +5,7 @@
 
 use crate::covermanager::CoverManager;
 use crate::db::Database;
-use crate::models::Song;
+use crate::models::{self, Song};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -185,11 +185,15 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         .filter(|s| !s.trim().is_empty())
         .unwrap_or(&file_stem_fallback);
 
-    let genre_str = song
+    // %genre uses the primary (first-listed) genre when a song carries
+    // multiple — there's no single-value slot in a file path for a full
+    // multi-genre list, so the first genre acts as the canonical one, same
+    // convention used by the majority-vote album genre logic below.
+    let primary_genre = song
         .genre
         .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or("Unknown Genre");
+        .and_then(|g| models::parse_genres(g).into_iter().next());
+    let genre_str = primary_genre.as_deref().unwrap_or("Unknown Genre");
 
     let year_str = song.year.map(|y| y.to_string()).unwrap_or_default();
     let disc_str = song
@@ -1266,6 +1270,40 @@ mod tests {
         let template = "%albumartist/%album/%disc-%track %title";
         let expanded = expand_template(template, &song, "flac");
         assert_eq!(expanded, "Imagine Dragons/Night Visions/2-11 Tokyo");
+    }
+
+    #[test]
+    fn test_template_expansion_genre_uses_primary_genre() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            artist: Some("Artist".to_string()),
+            genre: Some("Rock; Jazz Fusion; Live".to_string()),
+            ..Default::default()
+        };
+
+        // %genre has no way to represent a full multi-genre list in a
+        // single path segment, so it falls back to the first-listed
+        // ("primary") genre.
+        assert_eq!(
+            expand_template("%genre/%title", &song, "flac"),
+            "Rock/Tokyo"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_genre_missing_falls_back_to_unknown() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            genre: None,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            expand_template("%genre/%title", &song, "flac"),
+            "Unknown Genre/Tokyo"
+        );
     }
 
     #[test]
