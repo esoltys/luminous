@@ -18,6 +18,7 @@ export interface DownloadProgress {
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const RELEASES_URL = "https://github.com/esoltys/luminous/releases/latest";
+export const MICROSOFT_STORE_URL = "https://apps.microsoft.com/detail/9PNQ2NFSQ7XW";
 
 // Tauri command rejections often surface as a raw string (from a Rust `Err(String)`),
 // not an `Error` instance — `err.message` on a string is always `undefined`.
