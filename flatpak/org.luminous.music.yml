@@ -86,34 +86,37 @@ modules:
         npm_config_cache: /run/build/luminous/flatpak-node/npm-cache
         npm_config_offline: "true"
 
+    # `type: dir` sources land nested under the source directory's own
+    # basename (flatpak-builder's dir-copy is effectively `cp -a src dest/`,
+    # and the module's build root already exists by the time it runs) —
+    # confirmed empirically in CI: repo contents end up at ./luminous/...,
+    # not directly at the build root. Since our checkout is always named
+    # "luminous" (the GitHub repo name), every command below `cd luminous`
+    # first. This quirk is specific to `type: dir`; scripts/submit-flathub.ts
+    # swaps this source for `type: git` for the real submission, which does
+    # NOT nest this way — it also needs to drop these `cd luminous &&`
+    # prefixes when doing that swap.
     build-commands:
-      # TEMP DEBUG: confirm what the `type: dir` source actually copied in.
-      - "echo === pwd/top-level ===; pwd; ls -la"
-      - "echo === flatpak/ ===; ls -la flatpak/ 2>&1 || echo MISSING"
-      - "echo === nested luminous/ ===; ls -la luminous/ 2>&1 || echo NO-NESTED-DIR"
-      - "echo === nested luminous/flatpak/ ===; ls -la luminous/flatpak/ 2>&1 || echo NO-NESTED-FLATPAK-DIR"
-
       # JS dependencies (offline, from node-sources.json)
-      - cp flatpak/package-lock.json package-lock.json
-      - npm ci --offline --legacy-peer-deps
+      - cd luminous && cp flatpak/package-lock.json package-lock.json && npm ci --offline --legacy-peer-deps
 
       # Rust dependencies (offline, from cargo-sources.json)
-      - cargo --offline fetch --manifest-path src-tauri/Cargo.toml
+      - cd luminous && cargo --offline fetch --manifest-path src-tauri/Cargo.toml
 
       # Build the frontend + Rust backend without Tauri's own bundler —
       # this module's install step below does the Flatpak-specific install
       # instead of a .deb/.rpm/AppImage bundle.
-      - NO_STRIP=true bun run tauri build --no-bundle
+      - cd luminous && NO_STRIP=true bun run tauri build --no-bundle
 
-      - install -Dm755 src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
-      - install -Dm644 -t /app/share/metainfo/ src-tauri/icons/org.luminous.music.metainfo.xml
-      - install -Dm644 -t /app/share/applications/ flatpak/org.luminous.music.desktop
+      - install -Dm755 luminous/src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
+      - install -Dm644 -t /app/share/metainfo/ luminous/src-tauri/icons/org.luminous.music.metainfo.xml
+      - install -Dm644 -t /app/share/applications/ luminous/flatpak/org.luminous.music.desktop
 
-      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.luminous.music.png
-      - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/org.luminous.music.png
-      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.luminous.music.png
-      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/org.luminous.music.png
-      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/org.luminous.music.png
+      - install -Dm644 luminous/src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.luminous.music.png
+      - install -Dm644 luminous/src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/org.luminous.music.png
+      - install -Dm644 luminous/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.luminous.music.png
+      - install -Dm644 luminous/src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/org.luminous.music.png
+      - install -Dm644 luminous/src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/org.luminous.music.png
 
     post-install:
-      - install -Dm644 LICENSE /app/share/licenses/org.luminous.music/LICENSE
+      - install -Dm644 luminous/LICENSE /app/share/licenses/org.luminous.music/LICENSE

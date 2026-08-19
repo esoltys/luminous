@@ -81,6 +81,12 @@ async function main() {
     /- type: dir\n\s+path: \.\.\/\.\.\n/,
     `- type: git\n        url: https://github.com/esoltys/luminous.git\n        tag: ${tagArg}\n        commit: ${commit}\n`,
   );
+  // `type: dir` (used for local/CI builds) nests repo contents under
+  // ./luminous/ — see the comment above build-commands in the manifest.
+  // `type: git` clones straight into the build root, so those `cd luminous
+  // &&` prefixes and `luminous/`-prefixed paths need to come back out here.
+  manifest = manifest.replace(/cd luminous && /g, "");
+  manifest = manifest.replace(/(?<![\w/])luminous\//g, "");
 
   const filesToCopy = ["cargo-sources.json", "node-sources.json", "package-lock.json", `${APP_ID}.desktop`];
 
