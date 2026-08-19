@@ -10,3 +10,12 @@ opt-level = "s"   # optimize for size in release builds
 [profile.dev]
 opt-level = 0
 debug = true
+
+# Debug builds leave dependency crates fully unoptimized by default, which is
+# noticeably slow for dependency-heavy code paths (Symphonia audio decoding,
+# rusqlite DB access, serde_json/chrono parsing of large JSON — 10-30x slower
+# unoptimized per #436). Optimize only the dependency graph here; the app's
+# own crate stays at opt-level 0 above for fast incremental compiles and full
+# debug info.
+[profile.dev.package."*"]
+opt-level = 2
