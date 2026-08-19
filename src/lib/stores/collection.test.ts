@@ -169,6 +169,45 @@ describe("CollectionStore", () => {
     expect(collectionStore.filteredArtists[0].name).toBe("The Beatles");
   });
 
+  it("filters artists by tags using artist-tag prefix and general search", () => {
+    collectionStore.artists = [
+      { name: "Shania Twain" } as ArtistItem,
+      { name: "The Beatles" } as ArtistItem,
+      { name: "Celine Dion" } as ArtistItem,
+    ];
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        tags: ["country", "canadian", "pop"],
+        social_links: [],
+      },
+      "celine dion": {
+        artist_key: "Celine Dion",
+        tags: ["pop", "canadian", "ballad"],
+        social_links: [],
+      },
+      "the beatles": {
+        artist_key: "The Beatles",
+        tags: ["rock", "british", "classic"],
+        social_links: [],
+      },
+    };
+
+    // Explicit tag search
+    collectionStore.searchQuery = "artist-tag:canadian";
+    expect(collectionStore.filteredArtists).toHaveLength(2);
+    expect(collectionStore.filteredArtists.map((a) => a.name)).toEqual(["Shania Twain", "Celine Dion"]);
+
+    collectionStore.searchQuery = "tag:country";
+    expect(collectionStore.filteredArtists).toHaveLength(1);
+    expect(collectionStore.filteredArtists[0].name).toBe("Shania Twain");
+
+    // General keyword search matching tag
+    collectionStore.searchQuery = "british";
+    expect(collectionStore.filteredArtists).toHaveLength(1);
+    expect(collectionStore.filteredArtists[0].name).toBe("The Beatles");
+  });
+
   it("handles navigation helpers viewArtist and viewAlbum and clears search terms", () => {
     collectionStore.searchQuery = "some search";
     collectionStore.searchResults = [{ id: 1 } as Song];

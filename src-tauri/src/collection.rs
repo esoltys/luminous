@@ -4,9 +4,9 @@ use crate::{
     covermanager::CoverManager,
     db::Database,
     models::{
-        self, AlbumItem, BatchPhase, BatchProgress, FileType, HomeItem, LibraryStats,
-        MusicDirectory, Playlist, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress, Song,
-        SongSource,
+        self, AlbumItem, ArtistProfile, ArtistSocialLink, BatchPhase, BatchProgress, FileType,
+        HomeItem, LibraryStats, MusicDirectory, Playlist, PruneResult, QueuePopulationMode,
+        ScanPhase, ScanProgress, Song, SongSource,
     },
 };
 use anyhow::{Context, Result};
@@ -748,10 +748,9 @@ impl CollectionScanner {
 
         // Add qualified field filter clauses
         for filter in parsed.field_filters {
+            let param_idx = query_params.len() + 1;
+            let clause = filter.to_sql_clause(param_idx);
             query_params.push(Box::new(filter.value));
-            let param_idx = query_params.len();
-            let op_str = filter.op.to_sql();
-            let clause = format!("{} {} ?{}", filter.sql_column, op_str, param_idx);
             where_clauses.push(clause);
         }
 
@@ -814,10 +813,9 @@ impl CollectionScanner {
         }
 
         for filter in parsed.field_filters {
+            let param_idx = query_params.len() + 1;
+            let clause = filter.to_sql_clause(param_idx);
             query_params.push(Box::new(filter.value));
-            let param_idx = query_params.len();
-            let op_str = filter.op.to_sql();
-            let clause = format!("{} {} ?{}", filter.sql_column, op_str, param_idx);
             where_clauses.push(clause);
         }
 
@@ -1393,6 +1391,25 @@ impl CollectionScanner {
         Ok(artists)
     }
 
+    /// Retrieve the customizable profile (website, tags, social links, bio)
+    /// for an artist (#473). Returns empty/default profile if none saved yet.
+    pub fn get_artist_profile(&self, artist: &str) -> Result<ArtistProfile> {
+        let conn = self.db.pool.get()?;
+        get_artist_profile_conn(&conn, artist)
+    }
+
+    /// Save or update an artist's customizable profile (#473).
+    pub fn set_artist_profile(&self, profile: &ArtistProfile) -> Result<ArtistProfile> {
+        let conn = self.db.pool.get()?;
+        set_artist_profile_conn(&conn, profile)
+    }
+
+    /// Retrieve all custom artist profiles in the library (#473).
+    pub fn get_all_artist_profiles(&self) -> Result<Vec<ArtistProfile>> {
+        let conn = self.db.pool.get()?;
+        get_all_artist_profiles_conn(&conn)
+    }
+
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
         let stats = conn.query_row(
@@ -1693,6 +1710,106 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
         }
     }
     Ok(())
+}
+
+/// Retrieve customizable profile for an artist from SQLite (#473).
+pub fn get_artist_profile_conn(
+    conn: &rusqlite::Connection,
+    artist: &str,
+) -> Result<ArtistProfile> {
+    let mut stmt = conn.prepare(
+        "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
+    )?;
+    let result = stmt.query_row(params![artist], |row| {
+        let artist_key: String = row.get(0)?;
+        let website: Option<String> = row.get(1)?;
+        let tags_json: String = row.get(2)?;
+        let social_links_json: String = row.get(3)?;
+        let bio: Option<String> = row.get(4)?;
+
+        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let social_links: Vec<ArtistSocialLink> =
+            serde_json::from_str(&social_links_json).unwrap_or_default();
+
+        Ok(ArtistProfile {
+            artist_key,
+            website,
+            tags,
+            social_links,
+            bio,
+        })
+    });
+
+    match result {
+        Ok(profile) => Ok(profile),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(ArtistProfile {
+            artist_key: artist.to_string(),
+            website: None,
+            tags: Vec::new(),
+            social_links: Vec::new(),
+            bio: None,
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Upsert an artist profile into SQLite (#473).
+pub fn set_artist_profile_conn(
+    conn: &rusqlite::Connection,
+    profile: &ArtistProfile,
+) -> Result<ArtistProfile> {
+    let tags_json = serde_json::to_string(&profile.tags)?;
+    let social_links_json = serde_json::to_string(&profile.social_links)?;
+
+    conn.execute(
+        "INSERT INTO artist_profiles (artist_key, website, tags, social_links, bio)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(artist_key) DO UPDATE SET
+            website = excluded.website,
+            tags = excluded.tags,
+            social_links = excluded.social_links,
+            bio = excluded.bio",
+        params![
+            profile.artist_key,
+            profile.website,
+            tags_json,
+            social_links_json,
+            profile.bio
+        ],
+    )?;
+
+    Ok(profile.clone())
+}
+
+/// Retrieve all saved artist profiles in SQLite (#473).
+pub fn get_all_artist_profiles_conn(conn: &rusqlite::Connection) -> Result<Vec<ArtistProfile>> {
+    let mut stmt = conn.prepare(
+        "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles ORDER BY artist_key COLLATE NOCASE",
+    )?;
+    let profiles = stmt
+        .query_map([], |row| {
+            let artist_key: String = row.get(0)?;
+            let website: Option<String> = row.get(1)?;
+            let tags_json: String = row.get(2)?;
+            let social_links_json: String = row.get(3)?;
+            let bio: Option<String> = row.get(4)?;
+
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+            let social_links: Vec<ArtistSocialLink> =
+                serde_json::from_str(&social_links_json).unwrap_or_default();
+
+            Ok(ArtistProfile {
+                artist_key,
+                website,
+                tags,
+                social_links,
+                bio,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(profiles)
 }
 
 /// Dedup key for context-aware Recently Played — one entry per album,
@@ -4986,6 +5103,68 @@ mod tests {
                 .all(|p| p.starts_with(&old_dir.to_string_lossy().to_string())),
             "orphan rows must be untouched, got {paths:?}"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_artist_profile_crud() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artist_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let conn = db.pool.get().unwrap();
+
+        // Initially unconfigured artist returns default profile
+        let initial = get_artist_profile_conn(&conn, "Shania Twain").unwrap();
+        assert_eq!(initial.artist_key, "Shania Twain");
+        assert_eq!(initial.website, None);
+        assert!(initial.tags.is_empty());
+        assert!(initial.social_links.is_empty());
+        assert_eq!(initial.bio, None);
+
+        // Save profile
+        let profile = ArtistProfile {
+            artist_key: "Shania Twain".to_string(),
+            website: Some("https://www.shaniatwain.com".to_string()),
+            tags: vec![
+                "pop".to_string(),
+                "country".to_string(),
+                "canadian".to_string(),
+            ],
+            social_links: vec![
+                ArtistSocialLink {
+                    platform: "instagram".to_string(),
+                    handle_or_url: "@shaniatwain".to_string(),
+                },
+                ArtistSocialLink {
+                    platform: "youtube".to_string(),
+                    handle_or_url: "https://youtube.com/@ShaniaTwain".to_string(),
+                },
+            ],
+            bio: Some("Canadian singer-songwriter".to_string()),
+        };
+
+        set_artist_profile_conn(&conn, &profile).unwrap();
+
+        // Retrieve saved profile (case-insensitive key match)
+        let loaded = get_artist_profile_conn(&conn, "shania twain").unwrap();
+        assert_eq!(loaded.artist_key, "Shania Twain");
+        assert_eq!(loaded.website, Some("https://www.shaniatwain.com".to_string()));
+        assert_eq!(loaded.tags, vec!["pop", "country", "canadian"]);
+        assert_eq!(loaded.social_links.len(), 2);
+        assert_eq!(loaded.social_links[0].platform, "instagram");
+        assert_eq!(loaded.social_links[0].handle_or_url, "@shaniatwain");
+        assert_eq!(loaded.bio, Some("Canadian singer-songwriter".to_string()));
+
+        // Get all profiles
+        let all = get_all_artist_profiles_conn(&conn).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].artist_key, "Shania Twain");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

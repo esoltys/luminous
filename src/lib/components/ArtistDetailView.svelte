@@ -17,8 +17,11 @@
   import ColumnSelector from "./ColumnSelector.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
-  import { Play, Plus, Edit3, Clock } from "lucide-svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext } from "../types";
+  import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
+  import SocialIcon from "./SocialIcon.svelte";
+  import { Play, Plus, Edit3, Clock, ExternalLink } from "lucide-svelte";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile } from "../types";
+  import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease, formatTrackNumber } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
@@ -40,6 +43,32 @@
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let editingSongId = $state<number | null>(null);
+  let isEditorOpen = $state(false);
+  let isBioExpanded = $state(false);
+
+  let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
+  let hasWebsite = $derived(!!artistProfile?.website);
+  let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
+  let hasBio = $derived(!!artistProfile?.bio);
+  let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
+  let hasProfileContent = $derived(hasWebsite || hasTags || hasBio || hasSocials);
+
+  function handleTagClick(tag: string) {
+    collectionStore.searchQuery = `artist-tag:${tag}`;
+    collectionStore.selectedArtistName = null;
+    collectionStore.activeTab = "collection";
+    collectionStore.activeSubTab = "artists";
+  }
+
+  async function handleOpenUrl(url: string) {
+    if (!url) return;
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+    } catch {
+      window.open(url, "_blank");
+    }
+  }
 
   function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
     event.preventDefault();
@@ -133,13 +162,17 @@
     Promise.all([
       invoke<Song[]>("get_songs_by_artist", { artist: requested }),
       invoke<Playlist[]>("get_playlists_by_artist", { artist: requested }),
-      invoke<AlbumItem[]>("get_compilations_by_artist", { artist: requested })
+      invoke<AlbumItem[]>("get_compilations_by_artist", { artist: requested }),
+      invoke<ArtistProfile>("get_artist_profile", { artist: requested })
     ])
-      .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations]) => {
+      .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations, fetchedProfile]) => {
         if (requested !== artistName) return;
         songs = fetchedSongs;
         playlists = fetchedPlaylists.filter((p) => !p.is_queue);
         compilations = fetchedCompilations;
+        if (fetchedProfile?.artist_key) {
+          collectionStore.artistProfiles[fetchedProfile.artist_key.toLowerCase()] = fetchedProfile;
+        }
       })
       .catch((err) => {
         console.error("Failed to load artist detail:", err);
@@ -328,6 +361,15 @@
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
+          <button
+            type="button"
+            onclick={() => { isEditorOpen = true; }}
+            class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand-sidebar/80 hover:bg-brand-sidebar text-brand-text-primary border border-brand-border hover:border-brand-accent/40 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            title={i18n.t("artistDetail.editArtistTooltip", {}, "Edit artist details, website, tags, and links")}
+          >
+            <Edit3 class="w-3.5 h-3.5 text-brand-accent" />
+            <span>{i18n.t("artistDetail.editArtist", {}, "Edit")}</span>
+          </button>
           {#if singleSongs.length > 0}
             <ColumnSelector align="left" iconOnly />
           {/if}
@@ -343,6 +385,105 @@
   </div>
 
   <div class="px-6 pt-6 flex flex-col gap-8">
+    <!-- Artist Profile Card (About & Links) -->
+    {#if hasProfileContent && artistProfile}
+      {@const profile = artistProfile}
+      <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all">
+        <!-- About Column (Left) -->
+        <div class="flex-1 flex flex-col gap-3 min-w-0">
+          <h2 class="text-sm sm:text-base font-bold text-brand-text-primary font-heading">
+            {i18n.t("artistDetail.about", {}, "About")}
+          </h2>
+
+          <!-- Tags Pills -->
+          {#if hasTags}
+            <div class="flex flex-wrap gap-1.5 sm:gap-2">
+              {#each profile?.tags ?? [] as tag (tag)}
+                <button
+                  type="button"
+                  onclick={() => handleTagClick(tag)}
+                  class="px-2.5 sm:px-3 py-1 bg-brand-accent/10 hover:bg-brand-accent/25 hover:border-brand-accent/40 text-brand-text-primary rounded-full text-xs font-medium border border-brand-border/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title={`Filter artists tagged "${tag}"`}
+                >
+                  <span>{tag}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- Bio -->
+          {#if hasBio}
+            {@const bioText = profile?.bio ?? ""}
+            {@const isLongBio = bioText.length > 200}
+            <div class="text-xs text-brand-text-secondary leading-relaxed">
+              <p class="{!isBioExpanded && isLongBio ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
+                {bioText}
+              </p>
+              {#if isLongBio}
+                <button
+                  type="button"
+                  onclick={() => { isBioExpanded = !isBioExpanded; }}
+                  class="mt-1 text-xs font-semibold text-brand-accent hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                >
+                  {isBioExpanded ? i18n.t("artistDetail.showLess", {}, "Show less") : i18n.t("artistDetail.showMore", {}, "Show more")}
+                </button>
+              {/if}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Links Column (Right) -->
+        {#if hasWebsite || hasSocials}
+          <div class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3">
+            <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
+              {i18n.t("artistDetail.links", {}, "LINKS")}
+            </h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
+              <!-- Primary Website Link -->
+              {#if hasWebsite}
+                {@const siteUrl = resolveSocialUrl("website", profile?.website ?? "")}
+                <button
+                  type="button"
+                  onclick={() => handleOpenUrl(siteUrl)}
+                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                >
+                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                    <SocialIcon platform="website" size={14} />
+                  </div>
+                  <div class="flex items-center gap-1 min-w-0 flex-1">
+                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                      {formatDisplayLabel("website", profile?.website ?? "")}
+                    </span>
+                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  </div>
+                </button>
+              {/if}
+
+              <!-- Social Links -->
+              {#each profile?.social_links ?? [] as link, idx (idx)}
+                {@const resolvedUrl = resolveSocialUrl(link.platform, link.handle_or_url)}
+                <button
+                  type="button"
+                  onclick={() => handleOpenUrl(resolvedUrl)}
+                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                >
+                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                    <SocialIcon platform={link.platform} size={14} />
+                  </div>
+                  <div class="flex items-center gap-1 min-w-0 flex-1">
+                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                      {formatDisplayLabel(link.platform, link.handle_or_url)}
+                    </span>
+                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  </div>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
     {#if sets.length > 0}
       <HorizontalScrollRow title={i18n.t('artistDetail.setsFilter', { count: sets.length })}>
         {#each sets as album (album.album)}
@@ -971,6 +1112,12 @@
     onSave={handleTagEditorSaved}
   />
 {/if}
+
+<ArtistProfileEditor
+  {artistName}
+  isOpen={isEditorOpen}
+  onClose={() => { isEditorOpen = false; }}
+/>
 
 <style>
   :global(.carousel-scroll) {

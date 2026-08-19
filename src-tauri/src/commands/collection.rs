@@ -1,6 +1,9 @@
 use crate::{
     collection::CollectionScanner,
-    models::{HomeItem, LibraryStats, MusicDirectory, PruneResult, QueuePopulationMode, Song},
+    models::{
+        ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, QueuePopulationMode,
+        Song,
+    },
     AppState,
 };
 use tauri::{AppHandle, State};
@@ -243,5 +246,37 @@ pub async fn get_recently_added(
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .get_recently_added(limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_artist_profile(
+    artist: String,
+    state: State<'_, AppState>,
+) -> Result<ArtistProfile, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_artist_profile(&artist)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_artist_profile(
+    profile: ArtistProfile,
+    state: State<'_, AppState>,
+) -> Result<ArtistProfile, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .set_artist_profile(&profile)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_all_artist_profiles(
+    state: State<'_, AppState>,
+) -> Result<Vec<ArtistProfile>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_all_artist_profiles()
         .map_err(|e| e.to_string())
 }
