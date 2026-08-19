@@ -24,6 +24,8 @@ Grab the latest build from the **[Releases page](https://github.com/esoltys/lumi
 - **Windows**: download `Luminous_{version}_x64-setup.exe` and run it.
 - **Linux**: download the `.deb` or `.rpm` for your distro from the same release and install it as usual.
 
+> **Flathub submission in progress.** A Flatpak manifest is tracked in-repo at [`flatpak/org.luminous.music.yml`](./flatpak/org.luminous.music.yml) and built/linted in CI (see [#419](https://github.com/esoltys/luminous/issues/419)), but Luminous isn't published on Flathub yet — once it is, `flatpak install flathub org.luminous.music` will be added here as a third Linux install option alongside `.deb`/`.rpm`.
+
 > **No AppImage right now.** Tauri's AppImage bundling links against WebKitGTK/Mesa/EGL libraries baked in at build time, and on many host systems that collides with the system's own graphics stack, producing a window that opens fully blank (`Could not create default EGL display: EGL_BAD_PARAMETER`) — this is an [upstream](https://github.com/tauri-apps/tauri/issues/11988) [Tauri/WebKitGTK](https://girishjoshi.io/post/tauri-2.0-appimage-egl-issue-on-wayland/) bug, not something app code can work around, and the only real fix (an experimental, unreleased Tauri bundler branch) isn't stable enough to ship. Use the `.deb`/`.rpm` above, or build your own AppImage locally with `bun run tauri build -b appimage` (see [Building Luminous](#building-luminous)) — a locally built one links against your own system libraries and doesn't hit this.
 
 ---
