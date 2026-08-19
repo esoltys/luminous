@@ -766,6 +766,23 @@ pub enum HomeItem {
     Playlist { playlist: Playlist },
 }
 
+/// A social media or external platform link associated with an artist (#473).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct ArtistSocialLink {
+    pub platform: String,
+    pub handle_or_url: String,
+}
+
+/// Full customizable profile for an artist (#473).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct ArtistProfile {
+    pub artist_key: String,
+    pub website: Option<String>,
+    pub tags: Vec<String>,
+    pub social_links: Vec<ArtistSocialLink>,
+    pub bio: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

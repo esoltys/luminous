@@ -12,6 +12,7 @@ import type {
   BatchProgress,
   AlbumItem,
   ArtistItem,
+  ArtistProfile,
   RecentSearchItem,
   QueuePopulationMode,
 } from "../types";
@@ -138,6 +139,7 @@ class CollectionStore {
   songs = $state<Song[]>([]);
   albums = $state<AlbumItem[]>([]);
   artists = $state<ArtistItem[]>([]);
+  artistProfiles = $state<Record<string, ArtistProfile>>({});
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -783,6 +785,38 @@ class CollectionStore {
     this.songs = snapshot.songs;
     this.albums = snapshot.albums;
     this.artists = snapshot.artists;
+    await this.loadArtistProfiles();
+  }
+
+  async loadArtistProfiles() {
+    try {
+      const profiles = await invoke<ArtistProfile[]>("get_all_artist_profiles");
+      const map: Record<string, ArtistProfile> = {};
+      for (const p of profiles) {
+        if (p.artist_key) {
+          map[p.artist_key.toLowerCase()] = p;
+        }
+      }
+      this.artistProfiles = map;
+    } catch (err) {
+      console.error("Failed to load artist profiles:", err);
+    }
+  }
+
+  getArtistProfile(artistName: string | null | undefined): ArtistProfile | undefined {
+    if (!artistName) return undefined;
+    return this.artistProfiles[artistName.toLowerCase()];
+  }
+
+  async saveArtistProfile(profile: ArtistProfile): Promise<ArtistProfile> {
+    const saved = await invoke<ArtistProfile>("set_artist_profile", { profile });
+    if (saved?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [saved.artist_key.toLowerCase()]: saved,
+      };
+    }
+    return saved;
   }
 
   async addDirectory(path: string) {
@@ -1219,11 +1253,28 @@ class CollectionStore {
   }
 
   get filteredArtists(): ArtistItem[] {
-    const query = this.searchQuery.trim().toLowerCase();
-    if (query === "") return this.artists;
-    return this.artists.filter(artist => 
-      artist.name && artist.name.toLowerCase().includes(query)
-    );
+    const rawQuery = this.searchQuery.trim();
+    if (rawQuery === "") return this.artists;
+
+    // Check if query is structured search with artist-tag or tag
+    const tagMatch = rawQuery.match(/^(?:artist[-_]?tag|tags?):(.+)$/i);
+    if (tagMatch) {
+      const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+      if (!tagQuery) return this.artists;
+      return this.artists.filter((artist) => {
+        if (!artist.name) return false;
+        const profile = this.artistProfiles[artist.name.toLowerCase()];
+        return profile?.tags?.some((t) => t.toLowerCase().includes(tagQuery)) ?? false;
+      });
+    }
+
+    const query = rawQuery.toLowerCase();
+    return this.artists.filter((artist) => {
+      if (!artist.name) return false;
+      if (artist.name.toLowerCase().includes(query)) return true;
+      const profile = this.artistProfiles[artist.name.toLowerCase()];
+      return profile?.tags?.some((t) => t.toLowerCase().includes(query)) ?? false;
+    });
   }
 }
 

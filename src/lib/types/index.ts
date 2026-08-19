@@ -259,6 +259,19 @@ export interface ArtistItem {
   genre?: string | null;
 }
 
+export interface ArtistSocialLink {
+  platform: string;
+  handle_or_url: string;
+}
+
+export interface ArtistProfile {
+  artist_key: string;
+  website?: string | null;
+  tags: string[];
+  social_links: ArtistSocialLink[];
+  bio?: string | null;
+}
+
 /**
  * Converts a custom luminous-art protocol URI (e.g. luminous-art://...)
  * to a platform-appropriate URL (e.g. http://luminous-art.localhost/ on Windows).

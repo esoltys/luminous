@@ -728,6 +728,9 @@ pub fn run() {
             commands::collection::clear_play_history,
             commands::collection::get_most_frequently_played,
             commands::collection::get_recently_added,
+            commands::collection::get_artist_profile,
+            commands::collection::set_artist_profile,
+            commands::collection::get_all_artist_profiles,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

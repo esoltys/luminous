@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 16;
+pub const CURRENT_SCHEMA_VERSION: i32 = 17;
 
 #[derive(Debug)]
 pub struct Database {
@@ -234,6 +234,17 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![16],
+            )?;
+        }
+
+        if version < 17 {
+            log::info!(
+                "Running migration 17: artist_profiles table for customizable artist website, tags, social links, bio (#473)"
+            );
+            conn.execute_batch(MIGRATION_17)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![17],
             )?;
         }
 
@@ -579,6 +590,20 @@ ALTER TABLE waveforms ADD COLUMN style INTEGER NOT NULL DEFAULT 0;
 // "moodbars" no longer describes what it holds.
 const MIGRATION_16: &str = "
 ALTER TABLE moodbars RENAME TO band_waveforms;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 17: artist_profiles — customizable artist website, tags,
+// social links, and bio (#473). Keyed by artist name matching effective_artist.
+// ---------------------------------------------------------------------------
+const MIGRATION_17: &str = "
+CREATE TABLE IF NOT EXISTS artist_profiles (
+    artist_key TEXT PRIMARY KEY,
+    website TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    social_links TEXT NOT NULL DEFAULT '[]',
+    bio TEXT
+);
 ";
 
 #[cfg(test)]
