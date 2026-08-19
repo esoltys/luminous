@@ -110,9 +110,6 @@ modules:
       # Rust dependencies (offline, from cargo-sources.json)
       - cd luminous && cargo --offline fetch --manifest-path src-tauri/Cargo.toml
 
-      # TEMP DEBUG: only kept if the `find`-based bun lookup below still fails.
-      - "echo === bun-dist tree ===; find /run/build/luminous/bun-dist"
-
       # Build the frontend + Rust backend without Tauri's own bundler —
       # this module's install step below does the Flatpak-specific install
       # instead of a .deb/.rpm/AppImage bundle. Exporting PATH inline (rather
@@ -128,7 +125,11 @@ modules:
       # instead of guessing again.
       - "export PATH=\"$(dirname \"$(find /run/build/luminous/bun-dist -type f -name bun)\"):$PATH\" && cd luminous && NO_STRIP=true bun run tauri build --no-bundle"
 
-      - install -Dm755 luminous/src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
+      # This is a Cargo workspace (root Cargo.toml, members = ["src-tauri"]),
+      # so the compiled binary lands in the workspace-root target/ dir, not
+      # src-tauri/target/ — confirmed via the build log's own "Built
+      # application at:" line.
+      - install -Dm755 luminous/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
       - install -Dm644 -t /app/share/metainfo/ luminous/src-tauri/icons/org.luminous.music.metainfo.xml
       - install -Dm644 -t /app/share/applications/ luminous/flatpak/org.luminous.music.desktop
 
