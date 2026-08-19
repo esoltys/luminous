@@ -1,11 +1,22 @@
 <script lang="ts">
+  import { Globe, Link } from "lucide-svelte";
   import {
-    Globe,
-    Link,
-    Music,
-    Disc,
-    BookOpen,
-  } from "lucide-svelte";
+    siThreads,
+    siSpotify,
+    siApplemusic,
+    siBandcamp,
+    siSoundcloud,
+    siYoutube,
+    siInstagram,
+    siX,
+    siFacebook,
+    siBluesky,
+    siTiktok,
+    siMusicbrainz,
+    siDiscogs,
+    siWikipedia,
+    type SimpleIcon,
+  } from "simple-icons";
 
   let {
     platform,
@@ -18,11 +29,32 @@
   } = $props();
 
   const normalized = $derived((platform || "").toLowerCase().trim());
+
+  const BRAND_ICONS: Record<string, SimpleIcon> = {
+    threads: siThreads,
+    spotify: siSpotify,
+    apple_music: siApplemusic,
+    apple: siApplemusic,
+    bandcamp: siBandcamp,
+    soundcloud: siSoundcloud,
+    youtube: siYoutube,
+    instagram: siInstagram,
+    x: siX,
+    twitter: siX,
+    facebook: siFacebook,
+    bluesky: siBluesky,
+    tiktok: siTiktok,
+    musicbrainz: siMusicbrainz,
+    discogs: siDiscogs,
+    wikipedia: siWikipedia,
+  };
+
+  const brandIcon = $derived(BRAND_ICONS[normalized]);
 </script>
 
 {#if normalized === "website"}
   <Globe {size} class={className} />
-{:else if normalized === "youtube"}
+{:else if brandIcon}
   <svg
     width={size}
     height={size}
@@ -31,142 +63,8 @@
     class={className}
     aria-hidden="true"
   >
-    <path
-      d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
-    />
+    <path d={brandIcon.path} />
   </svg>
-{:else if normalized === "instagram"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"
-    />
-  </svg>
-{:else if normalized === "facebook"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
-    />
-  </svg>
-{:else if normalized === "x" || normalized === "twitter"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-    />
-  </svg>
-{:else if normalized === "spotify"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.497 17.306c-.216.353-.674.464-1.027.248-2.812-1.718-6.352-2.107-10.52-1.155-.403.092-.806-.16-.898-.563-.092-.403.16-.806.563-.898 4.567-1.042 8.48-.6 11.634 1.341.353.216.464.674.248 1.027zm1.467-3.26c-.272.443-.852.584-1.295.312-3.219-1.978-8.127-2.55-11.935-1.393-.499.151-1.03-.133-1.181-.632-.151-.499.133-1.03.632-1.181 4.356-1.322 9.776-.682 13.467 1.599.443.272.584.852.312 1.295zm.126-3.41c-3.86-2.292-10.23-2.503-13.914-1.385-.592.18-1.222-.154-1.402-.746-.18-.592.154-1.222.746-1.402 4.237-1.286 11.272-1.04 15.698 1.587.533.316.708 1.008.392 1.541-.316.533-1.008.708-1.52.405z"
-    />
-  </svg>
-{:else if normalized === "apple_music" || normalized === "apple"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.84c.66-.82 1.11-1.96.99-3.1-.96.04-2.13.64-2.82 1.45-.61.71-1.14 1.87-1 2.99 1.07.08 2.17-.52 2.83-1.34z"
-    />
-  </svg>
-{:else if normalized === "bandcamp"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path d="M0 18.75l7.437-13.5H24l-7.438 13.5H0z" />
-  </svg>
-{:else if normalized === "soundcloud"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M11.56 8.87V17h7.22c1.78 0 3.22-1.44 3.22-3.22 0-1.78-1.44-3.22-3.22-3.22-.3 0-.58.04-.85.12C17.47 8.35 15.34 6.6 12.8 6.6c-.43 0-.85.06-1.24.16zm-1.89.58V17H8.38V9.89c.41-.18.84-.33 1.29-.44zm-2.58 1.12V17H5.8v-6.09c.43-.13.86-.25 1.29-.34zm-2.58.55V17H3.22v-5.64c.42-.08.85-.16 1.29-.23zm-2.58.35V17H.65v-5.02c.42-.04.85-.06 1.28-.08z"
-    />
-  </svg>
-{:else if normalized === "bluesky"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 568 501"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M123.12 35.78C180.84 79.24 243.2 175.64 284 255.76C324.8 175.64 387.16 79.24 444.88 35.78C486.32 4.6 568 -24.4 568 54.34C568 70.1 559.76 195.4 554.48 219.74C536.08 304.5 450.48 326.68 375.48 314.12C506.48 336.42 542.48 418.12 481.48 480.6C365.48 599.4 303.48 382.4 284 340.2C264.52 382.4 202.52 599.4 86.52 480.6C25.52 418.12 61.52 336.42 192.52 314.12C117.52 326.68 31.92 304.5 13.52 219.74C8.24 195.4 0 70.1 0 54.34C0 -24.4 81.68 4.6 123.12 35.78Z"
-    />
-  </svg>
-{:else if normalized === "threads"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M12.001 0C5.372 0 0 5.372 0 12.001s5.372 12 12.001 12c4.116 0 7.747-2.072 9.873-5.253-.45-.254-.877-.542-1.272-.858-1.748 2.671-4.78 4.411-8.601 4.411-5.187 0-9.429-3.955-9.878-9.011h19.757c.074-.424.122-.857.122-1.29 0-6.628-5.373-12-12.002-12zm-7.749 10.701c.45-3.864 3.73-6.866 7.749-6.866 4.019 0 7.299 3.002 7.749 6.866H4.252z"
-    />
-  </svg>
-{:else if normalized === "tiktok"}
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    class={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-1.01v8.28c-.01 1.75-.6 3.49-1.74 4.81-1.39 1.61-3.48 2.51-5.61 2.45-2.58-.07-4.99-1.45-6.3-3.66-1.31-2.22-1.3-5.01.03-7.23 1.34-2.21 3.76-3.57 6.36-3.58.54-.01 1.08.05 1.61.18v4.07c-.43-.16-.89-.25-1.35-.25-1.17-.01-2.31.54-3.01 1.48-.71.94-.85 2.19-.38 3.26.47 1.07 1.54 1.78 2.71 1.8 1.25.02 2.44-.71 2.93-1.85.22-.51.32-1.06.31-1.62V.02z"
-    />
-  </svg>
-{:else if normalized === "musicbrainz" || normalized === "discogs"}
-  <Disc {size} class={className} />
-{:else if normalized === "wikipedia"}
-  <BookOpen {size} class={className} />
 {:else}
   <Link {size} class={className} />
 {/if}
