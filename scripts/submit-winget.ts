@@ -209,7 +209,14 @@ function writeManifests(targetDir: string, info: ReleaseInfo) {
 function validateManifest(dir: string) {
   console.log(`\nValidating manifest at ${dir}...`);
   try {
-    execSync(`winget validate --manifest "${dir}"`, { cwd: rootDir, stdio: "inherit" });
+    // `winget validate` throws (nonzero exit) on ANY warning by default, not
+    // just hard errors — e.g. a "schema header URL does not match the
+    // expected pattern" warning when the running winget build's embedded
+    // schema $id doesn't byte-for-byte match our header, which varies by
+    // winget version (seen on GitHub's windows-latest runner but not
+    // locally). --ignore-warnings keeps real errors failing while not
+    // gating on that version-dependent noise.
+    execSync(`winget validate --manifest "${dir}" --ignore-warnings`, { cwd: rootDir, stdio: "inherit" });
   } catch {
     throw new Error("winget manifest validation failed. See output above.");
   }
