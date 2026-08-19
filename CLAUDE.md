@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The imported `AGENTS.md` above is the canonical instructions file for this repo (commands, architecture, invariants, workflow, design conventions) — it is kept up to date and applies to Claude Code equally. Everything below is Claude-Code-specific and supplements it.
 
 ## Release Process
+- If a release is being initiated from a Cloud Environment (not the user's local machine), STOP immediately and notify the user — cutting a release must be done from a local environment.
 - Tag pushes are protected on this repo: Claude cannot push `v*` tags (GitHub returns 403). When a release tag is needed, prepare everything else, then STOP and give the user the exact command to run (e.g. `git tag -a v1.0.0 -m 'Luminous v1.0.0' && git push origin v1.0.0`).
-- After the tag is pushed, resume by watching the release workflow and verifying the Microsoft Store submission actually went through (not just a green workflow).
+- After the tag is pushed, resume by watching the release workflow and verifying the Microsoft Store submission actually went through (not just a green workflow) — check actual certification status with `.github/store/Get-StoreSubmissionStatus.ps1` (requires `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/`STORE_APP_ID` as local env vars), not just that `publish-store.yml` ran green.
 
 ### Definition of Done (releases)
 A release is only complete when **all four** of the following hold. Never report a release as done based on CI status alone.
