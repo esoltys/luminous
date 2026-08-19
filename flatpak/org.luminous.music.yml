@@ -110,6 +110,9 @@ modules:
       # Rust dependencies (offline, from cargo-sources.json)
       - cd luminous && cargo --offline fetch --manifest-path src-tauri/Cargo.toml
 
+      # TEMP DEBUG: only kept if the `find`-based bun lookup below still fails.
+      - "echo === bun-dist tree ===; find /run/build/luminous/bun-dist"
+
       # Build the frontend + Rust backend without Tauri's own bundler —
       # this module's install step below does the Flatpak-specific install
       # instead of a .deb/.rpm/AppImage bundle. Exporting PATH inline (rather
@@ -117,7 +120,13 @@ modules:
       # didn't make bun visible to Tauri's own `beforeBuildCommand`
       # subprocess) since every build-command line is its own shell
       # invocation — an `export` earlier in the list wouldn't carry over.
-      - export PATH="/run/build/luminous/bun-dist/bun-linux-x64:$PATH" && cd luminous && NO_STRIP=true bun run tauri build --no-bundle
+      # Locating the extracted `bun` binary with `find` rather than a
+      # hardcoded bun-dist/bun-linux-x64 subpath: that hardcoded path still
+      # produced "bun: command not found" even with PATH exported inline,
+      # meaning the archive didn't land where the local `unzip -l` listing
+      # suggested it would inside the sandboxed build — find it dynamically
+      # instead of guessing again.
+      - "export PATH=\"$(dirname \"$(find /run/build/luminous/bun-dist -type f -name bun)\"):$PATH\" && cd luminous && NO_STRIP=true bun run tauri build --no-bundle"
 
       - install -Dm755 luminous/src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
       - install -Dm644 -t /app/share/metainfo/ luminous/src-tauri/icons/org.luminous.music.metainfo.xml
