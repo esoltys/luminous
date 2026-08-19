@@ -48,6 +48,9 @@ manual.
 
 ## Cut the release
 
+- [ ] **If this release is being run from a Cloud Environment (not a local machine),
+      stop here and notify the user.** Cutting a release requires local execution —
+      don't proceed with the steps below from a cloud/remote environment.
 - [ ] `bun run release <version>` to bump the version, run checks, commit, and tag
       locally on the release worktree branch. Don't pass `--push` — that pushes the
       branch straight to `main`, bypassing branch protection and skipping review.
@@ -87,6 +90,17 @@ manual.
       an already-published release. Watch this run too, not just the build — a green run
       only means the submission was committed for certification, not that it's live yet;
       Microsoft's cert pass still has to complete.
+- [ ] Check actual certification status with the same StoreBroker credentials used by
+      `publish-store.yml` (set `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/
+      `STORE_APP_ID` as local env vars first, from the values used to create those GitHub
+      secrets):
+  ```powershell
+  ./.github/store/Get-StoreSubmissionStatus.ps1
+  ```
+  Confirm `status` moves from `Certification` to `Published` (or check `statusDetails`
+  for errors if it doesn't). This is what actually satisfies "the Microsoft Store
+  submission went through" — a green `publish-store.yml` run only means the submission
+  was committed, not certified/live.
 - [ ] Download and install the new build on at least one real machine per platform
       (Windows + Linux) — don't just trust the CI build succeeded.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
