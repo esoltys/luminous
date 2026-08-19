@@ -22,7 +22,15 @@ finish-args:
   - --device=dri # WebKitGTK/OpenGL rendering
   - --share=ipc
   - --share=network # LRCLIB / lyrics.ovh / iTunes / AcoustID lookups (all optional, user-triggered)
-  - --filesystem=home # library scanning currently needs arbitrary user-chosen folders under $HOME; see #419 open item for narrowing this to portal-scoped access
+  # No --filesystem=home: flatpak-builder-lint hard-errors on blanket home
+  # access (finish-args-home-filesystem-access) and Flathub review won't
+  # grant an exception for a music player. tauri-plugin-dialog's folder
+  # picker (dialog:default in capabilities/default.json) already goes
+  # through xdg-desktop-portal's FileChooser automatically once sandboxed
+  # (GTK detects /.flatpak-info and switches file-chooser backends with no
+  # app-code change needed); the portal persists access to whatever folder
+  # the user picks as a watched library folder, which is what library
+  # scanning actually needs on an ongoing basis.
   - --talk-name=org.freedesktop.Notifications # tauri-plugin-notification
   - --talk-name=org.kde.StatusNotifierWatcher # tray icon (tray-icon crate / libayatana-appindicator)
   - --own-name=org.mpris.MediaPlayer2.com.luminous.player # souvlaki MPRIS "Now Playing" integration (media_session.rs)
