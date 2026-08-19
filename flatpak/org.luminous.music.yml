@@ -90,6 +90,8 @@ modules:
       # TEMP DEBUG: confirm what the `type: dir` source actually copied in.
       - "echo === pwd/top-level ===; pwd; ls -la"
       - "echo === flatpak/ ===; ls -la flatpak/ 2>&1 || echo MISSING"
+      - "echo === nested luminous/ ===; ls -la luminous/ 2>&1 || echo NO-NESTED-DIR"
+      - "echo === nested luminous/flatpak/ ===; ls -la luminous/flatpak/ 2>&1 || echo NO-NESTED-FLATPAK-DIR"
 
       # JS dependencies (offline, from node-sources.json)
       - cp flatpak/package-lock.json package-lock.json
