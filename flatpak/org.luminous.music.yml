@@ -112,8 +112,12 @@ modules:
 
       # Build the frontend + Rust backend without Tauri's own bundler —
       # this module's install step below does the Flatpak-specific install
-      # instead of a .deb/.rpm/AppImage bundle.
-      - cd luminous && NO_STRIP=true bun run tauri build --no-bundle
+      # instead of a .deb/.rpm/AppImage bundle. Exporting PATH inline (rather
+      # than relying on this build-options block's `append-path`, which
+      # didn't make bun visible to Tauri's own `beforeBuildCommand`
+      # subprocess) since every build-command line is its own shell
+      # invocation — an `export` earlier in the list wouldn't carry over.
+      - export PATH="/run/build/luminous/bun-dist/bun-linux-x64:$PATH" && cd luminous && NO_STRIP=true bun run tauri build --no-bundle
 
       - install -Dm755 luminous/src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
       - install -Dm644 -t /app/share/metainfo/ luminous/src-tauri/icons/org.luminous.music.metainfo.xml
