@@ -453,18 +453,18 @@
 
         <div class="flex items-center gap-3">
           <div class="min-w-0 space-y-1">
-            <h4 class="font-bold text-sm text-brand-text-primary">
-              {#if updaterStore.externallyManagedFormat === 'msix'}
-                {i18n.t('settings.updateManagedByStoreTitle', {}, 'Managed by Microsoft Store')}
-              {:else if updaterStore.externallyManagedFormat === 'flatpak'}
-                {i18n.t('settings.updateManagedByFlatpakTitle', {}, 'Managed by Flatpak')}
-              {:else}
-                {i18n.t('settings.updateManagedByPackageManagerTitle', {}, 'Managed by your package manager')}
-              {/if}
-            </h4>
+            {#if updaterStore.externallyManagedFormat !== 'msix'}
+              <h4 class="font-bold text-sm text-brand-text-primary">
+                {#if updaterStore.externallyManagedFormat === 'flatpak'}
+                  {i18n.t('settings.updateManagedByFlatpakTitle', {}, 'Managed by Flatpak')}
+                {:else}
+                  {i18n.t('settings.updateManagedByPackageManagerTitle', {}, 'Managed by your package manager')}
+                {/if}
+              </h4>
+            {/if}
             <p class="text-xs text-brand-text-secondary leading-relaxed">
               {#if updaterStore.externallyManagedFormat === 'msix'}
-                {i18n.t('settings.updateManagedByStoreDesc', {}, 'The Microsoft Store keeps Luminous up to date automatically.')}
+                {i18n.t('settings.updateManagedByStoreDesc', {}, 'Updates are installed automatically.')}
               {:else if updaterStore.externallyManagedFormat === 'flatpak'}
                 {i18n.t('settings.updateManagedByFlatpakDesc', {}, 'Run flatpak update, or update through your software center.')}
               {:else}
@@ -478,11 +478,11 @@
           <button onclick={() => openExternalUrl(MICROSOFT_STORE_URL)} class="inline-block rounded-md overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent">
             <img src="/microsoft-store-badge.svg" alt={i18n.t('settings.updateViewInStore', {}, 'View in Microsoft Store')} class="h-11 w-auto" />
           </button>
+        {:else}
+          <div class="pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary">
+            {i18n.t('settings.updateInstalledAsFooter', { format: getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name) })}
+          </div>
         {/if}
-
-        <div class="pt-3 border-t border-brand-border/50 text-xs text-brand-text-secondary">
-          {i18n.t('settings.updateInstalledAsFooter', { format: getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name) })}
-        </div>
       </div>
       {:else}
       <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
