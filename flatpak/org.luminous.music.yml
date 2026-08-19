@@ -1,0 +1,105 @@
+id: org.luminous.music
+
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node20
+
+command: LuminousMusicPlayer
+
+# Luminous is local-first (no streaming/cloud), but it does make a handful of
+# outbound calls for optional metadata enrichment — see src-tauri/src/lyrics.rs
+# (LRCLIB, lyrics.ovh), src-tauri/src/covermanager.rs (iTunes cover art
+# fallback), and src-tauri/src/tageditor.rs (AcoustID fingerprint lookup).
+# --share=network is required for those; there is no way to scope Flatpak
+# network access to individual hosts.
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio # cpal audio output
+  - --device=dri # WebKitGTK/OpenGL rendering
+  - --share=ipc
+  - --share=network # LRCLIB / lyrics.ovh / iTunes / AcoustID lookups (all optional, user-triggered)
+  - --filesystem=home # library scanning currently needs arbitrary user-chosen folders under $HOME; see #419 open item for narrowing this to portal-scoped access
+  - --talk-name=org.freedesktop.Notifications # tauri-plugin-notification
+  - --talk-name=org.kde.StatusNotifierWatcher # tray icon (tray-icon crate / libayatana-appindicator)
+  - --own-name=org.mpris.MediaPlayer2.com.luminous.player # souvlaki MPRIS "Now Playing" integration (media_session.rs)
+
+build-options:
+  append-path: /usr/lib/sdk/node20/bin:/usr/lib/sdk/rust-stable/bin
+
+modules:
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: luminous
+    buildsystem: simple
+    sources:
+      # Swapped for a `type: git` (tag + commit) source pointing at a tagged
+      # release by scripts/submit-flathub.ts when preparing a submission to
+      # flathub/flathub; `type: dir` lets this manifest build the current
+      # checkout directly for local iteration and CI (.github/workflows/flatpak.yml).
+      - type: dir
+        path: ../..
+
+      # bun is required at build time: package.json's own "build"/"prepare"
+      # scripts (and scripts/sync-docs.ts) are written to run under `bun`,
+      # not just any Node-compatible runtime. Vendored as a pinned static
+      # binary since neither the GNOME runtime nor freedesktop-sdk ship a
+      # bun extension.
+      - type: archive
+        url: https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip
+        sha256: 8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed
+        dest: bun-dist
+
+      # Generated with:
+      #   flatpak-node-generator npm flatpak/package-lock.json -o flatpak/node-sources.json
+      # flatpak/package-lock.json is an npm-shaped lockfile snapshot of
+      # package.json kept solely so flatpak-node-generator (which doesn't
+      # understand bun.lock) can vendor JS deps for an offline build; it
+      # deliberately drops the `playwright` devDependency (browser-driven
+      # tests aren't run as part of building the app) to avoid the generator
+      # trying to vendor a Chromium download. bun.lock remains the real
+      # lockfile for day-to-day development. Regenerate both whenever
+      # package.json's dependency ranges change.
+      - node-sources.json
+
+      # Generated with:
+      #   flatpak-cargo-generator.py src-tauri/Cargo.lock -o flatpak/cargo-sources.json
+      # Regenerate whenever src-tauri/Cargo.lock changes.
+      - cargo-sources.json
+
+    build-options:
+      append-path: /run/build/luminous/bun-dist/bun-linux-x64
+      env:
+        CARGO_HOME: /run/build/luminous/cargo
+        XDG_CACHE_HOME: /run/build/luminous/flatpak-node/cache
+        npm_config_cache: /run/build/luminous/flatpak-node/npm-cache
+        npm_config_offline: "true"
+
+    build-commands:
+      # JS dependencies (offline, from node-sources.json)
+      - cp flatpak/package-lock.json package-lock.json
+      - npm ci --offline --legacy-peer-deps
+
+      # Rust dependencies (offline, from cargo-sources.json)
+      - cargo --offline fetch --manifest-path src-tauri/Cargo.toml
+
+      # Build the frontend + Rust backend without Tauri's own bundler —
+      # this module's install step below does the Flatpak-specific install
+      # instead of a .deb/.rpm/AppImage bundle.
+      - NO_STRIP=true bun run tauri build --no-bundle
+
+      - install -Dm755 src-tauri/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
+      - install -Dm644 -t /app/share/metainfo/ src-tauri/icons/org.luminous.music.metainfo.xml
+      - install -Dm644 -t /app/share/applications/ flatpak/org.luminous.music.desktop
+
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.luminous.music.png
+      - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/org.luminous.music.png
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.luminous.music.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/org.luminous.music.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/org.luminous.music.png
+
+    post-install:
+      - install -Dm644 LICENSE /app/share/licenses/org.luminous.music/LICENSE

@@ -24,4 +24,9 @@
     <category>Player</category>
   </categories>
   <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.99.7" date="2026-08-18" />
+    <release version="0.99.6" date="2026-08-17" />
+    <release version="0.99.5" date="2026-08-14" />
+  </releases>
 </component>

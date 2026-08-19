@@ -1,0 +1,54 @@
+name: Flatpak
+
+on:
+  push:
+    branches: [ "main", "next" ]
+    paths:
+      - "flatpak/**"
+      - "src-tauri/icons/org.luminous.music.metainfo.xml"
+      - ".github/workflows/flatpak.yml"
+  pull_request:
+    branches: [ "main", "next" ]
+    paths:
+      - "flatpak/**"
+      - "src-tauri/icons/org.luminous.music.metainfo.xml"
+      - ".github/workflows/flatpak.yml"
+
+jobs:
+  lint:
+    name: flatpak-builder-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint manifest
+        run: |
+          docker run --rm -v "$PWD":/mnt ghcr.io/flathub/flatpak-builder-lint:latest \
+            manifest --gha-format /mnt/flatpak/org.luminous.music.yml
+
+      - name: Lint AppStream metainfo
+        run: |
+          docker run --rm -v "$PWD":/mnt ghcr.io/flathub/flatpak-builder-lint:latest \
+            appstream --gha-format /mnt/src-tauri/icons/org.luminous.music.metainfo.xml
+
+  build:
+    name: Build Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: luminous.flatpak
+          manifest-path: flatpak/org.luminous.music.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          build-bundle: true
+          run-tests: false
+          upload-artifact: true
+          artifact-name: luminous-flatpak-${{ github.sha }}
