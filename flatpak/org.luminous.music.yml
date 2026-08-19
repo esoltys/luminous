@@ -77,8 +77,12 @@ modules:
       - node-sources.json
 
       # Generated with:
-      #   flatpak-cargo-generator.py src-tauri/Cargo.lock -o flatpak/cargo-sources.json
-      # Regenerate whenever src-tauri/Cargo.lock changes.
+      #   flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+      # This is a Cargo workspace (root Cargo.toml, members = ["src-tauri"]),
+      # so the root Cargo.lock is the one Cargo actually resolves against —
+      # not src-tauri/Cargo.lock, which is a stale, untracked-by-Cargo
+      # leftover file that happens to also be checked into git. Regenerate
+      # from the root Cargo.lock whenever it changes.
       - cargo-sources.json
 
     build-options:
