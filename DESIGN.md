@@ -1,11 +1,14 @@
 ---
-version: 0.90
+version: 1.0
 name: Luminous
 description: >
-  Dark-first desktop music player UI. Tokens below describe the default
-  "Luminous" theme (see src/lib/stores/theme.svelte.ts LUMINOUS_DARK_COLORS)
-  — the canonical identity the app ships with, one of several runtime-
-  swappable themes (see Overview).
+  Dark-first desktop music player UI (Tauri v2 + Svelte 5 Runes + Tailwind v4).
+  This file is a map, not the source of truth — actual tokens live in
+  src/app.css (@theme + :root) and src/lib/stores/theme.svelte.ts
+  (LUMINOUS_DARK_COLORS, PREDEFINED_THEMES). The values below are a snapshot
+  read from that CSS/TS on 2026-08-19 for quick reference; if this file and
+  the live code ever disagree, the code wins — come re-read it rather than
+  trusting this snapshot.
 colors:
   bg-main: "#08090c"
   bg-sidebar: "#1c1f29"
@@ -16,265 +19,209 @@ colors:
   accent-contrast: "#000000"
   text-primary: "#f1f3f8"
   text-secondary: "#a6adc4"
-  border: "#2c2f3c"
-  accent-gold: "#FFB648"
+  border: "#3d4255"
+  accent-gold: "#ffb648"
 typography:
   display:
-    fontFamily: Inter
-    fontSize: 36px
+    fontFamily: "Expose (font-heading utility; falls back to Inter)"
+    fontSize: "1.875rem (text-3xl)"
     fontWeight: 700
-    lineHeight: 1.15
+    usage: "Home greeting (HomeView h1, text-3xl font-heading font-bold). Confirm hero/detail-view titles against current source before assuming they also use this tier — not verified beyond HomeView this pass."
   headline-lg:
     fontFamily: Inter
-    fontSize: 24px
+    fontSize: "1.5rem (text-2xl)"
     fontWeight: 700
-    lineHeight: 1.2
   headline-md:
     fontFamily: Inter
-    fontSize: 20px
+    fontSize: "1.25rem (text-xl)"
     fontWeight: 600
-    lineHeight: 1.25
   title:
     fontFamily: Inter
-    fontSize: 18px
+    fontSize: "1.125rem (text-lg)"
     fontWeight: 600
-    lineHeight: 1.3
   body-md:
     fontFamily: Inter
-    fontSize: 14px
+    fontSize: "0.875rem (text-sm)"
     fontWeight: 400
-    lineHeight: 1.5
   body-sm:
     fontFamily: Inter
-    fontSize: 12px
+    fontSize: "0.75rem (text-xs)"
     fontWeight: 400
-    lineHeight: 1.5
   label:
     fontFamily: Inter
-    fontSize: 12px
+    fontSize: "0.75rem (text-xs)"
     fontWeight: 600
-    lineHeight: 1.3
   micro-badge:
     fontFamily: Inter
-    fontSize: 9px
+    fontSize: "9px (arbitrary text-[9px] value — a genuine literal px, not a Tailwind rem step)"
     fontWeight: 700
-    lineHeight: 1
     letterSpacing: 0.05em
+    textTransform: uppercase
 rounded:
-  sm: 6px
-  md: 8px
-  lg: 12px
-  xl: 16px
+  sm: "0.375rem (rounded-md)"
+  md: "0.5rem (rounded-lg)"
+  lg: "0.75rem (rounded-xl)"
+  xl: "1rem (rounded-2xl)"
   full: 9999px
+  playerbar-dock: "2rem (rounded-[2rem], PlayerBar dock only)"
 spacing:
-  xs: 4px
-  sm: 8px
-  md: 12px
-  lg: 16px
-  xl: 24px
-  2xl: 32px
+  xs: "0.25rem (1)"
+  sm: "0.5rem (2)"
+  md: "0.75rem (3)"
+  lg: "1rem (4)"
+  xl: "1.5rem (6)"
+  2xl: "2rem (8)"
 components:
   button-primary:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-contrast}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.md}"
-    padding: 12px
-  button-primary-hover:
-    backgroundColor: "{colors.accent-hover}"
+    rounded: full
+    shadow: "shadow-md shadow-brand-accent/20"
   button-secondary:
-    backgroundColor: transparent
+    backgroundColor: "{colors.bg-sidebar}"
+    border: "{colors.border}/60"
     textColor: "{colors.text-primary}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.full}"
-    padding: 12px
+    rounded: full
+  button-accent-soft:
+    border: "{colors.accent}/60"
+    backgroundColor: "{colors.accent}/10"
+    textColor: accent-text
+    rounded: full
+  button-info-warning-destructive:
+    note: "Tinted status buttons using Tailwind purple/amber/red-500 at /10 bg, /30 border, /400 text — NOT theme tokens. Fixed regardless of active theme."
   chip:
     backgroundColor: transparent
     textColor: "{colors.text-secondary}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.full}"
-    padding: 8px
+    rounded: full
+    padding: "px-3 py-1"
   chip-active:
     backgroundColor: "{colors.border}"
     textColor: "{colors.text-primary}"
   badge:
     backgroundColor: "{colors.accent}"
-    textColor: "{colors.accent-text}"
-    typography: "{typography.micro-badge}"
-    rounded: "{rounded.sm}"
+    textColor: accent-contrast
+    rounded: sm
+    typography: micro-badge
   nav-item:
     backgroundColor: transparent
     textColor: "{colors.text-secondary}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
+    rounded: "lg (expanded) / xl (collapsed, square 40x40 or 64x64)"
   nav-item-active:
     backgroundColor: "{colors.accent}"
-    textColor: "{colors.accent-contrast}"
+    textColor: accent-contrast
+    shadow: "shadow-lg shadow-brand-accent/20"
   card:
     backgroundColor: "{colors.bg-sidebar}"
-    rounded: "{rounded.md}"
-    padding: 16px
+    border: "{colors.border}/60"
+    rounded: "lg or xl depending on card type (see Component Inventory)"
+  input:
+    backgroundColor: "bg-main or bg-sidebar (surface prop)"
+    border: "{colors.border}, or accent when highlighted"
+    rounded: "xl (md size) / lg (sm size), or full when pill"
+  toggle:
+    track: "h-6 w-11 rounded-full, accent when on / border color when off"
+    thumb: "h-4 w-4 white circle"
+  modal:
+    backgroundColor: "{colors.bg-sidebar}"
+    border: "{colors.border}"
+    rounded: "2xl"
+    shadow: shadow-2xl
+    backdrop: "black/75 + backdrop-blur-xs"
 ---
 
 # Luminous Design System
 
+## What Claude needs to keep this file current
+
+This file is generated by reading the running app's source, not written by hand — next update should re-read these, in order of how much they drive the tokens above:
+
+1. **`src/app.css`** — the `@theme` block (brand-* → CSS var wiring) and `:root` fallback hex values. Ground truth for every color token.
+2. **`src/lib/stores/theme.svelte.ts`** — `LUMINOUS_DARK_COLORS`/`LUMINOUS_LIGHT_COLORS` (the actual default palette), `PREDEFINED_THEMES` (the full theme list — this drifts often, see Themes below), and `applyActiveTheme()`/`resolvedColors` for how accent-text/accent-contrast/glass vars get derived.
+3. **`src/lib/utils/colorUtils.ts`** — WCAG contrast math (`clampForContrast`, `pickAccessibleOnColor`, `checkWcagCompliance`) backing the "accent-text" contrast guarantee.
+4. **`src/lib/components/*.svelte`** — component markup is the only source of truth for spacing/radius/variant classes; this doc's Component Inventory below was built by reading `Button.svelte`, `Input.svelte`, `Toggle.svelte`, `Modal.svelte`, `CardBadge.svelte`, `FormField.svelte`, `EmptyState.svelte`, `AlbumCard.svelte`, `PlaylistCard.svelte`, `PlayerBar.svelte`, `Sidebar.svelte` directly — re-read a component before describing it rather than trusting this doc, since Tailwind utility classes are the actual spec and this prose is a lossy summary.
+5. **`src/lib/constants.ts`** — named layout constants (sidebar/right-panel widths, player dock clearance, cover-stack fan-out offsets, toast duration) — check here before inventing a pixel value.
+6. **`src/lib/fonts/expose/expose.css`** and `src/app.css`'s `--font-heading` line — the actual heading typeface (see Typography below).
+7. **`package.json`** — confirms current stack versions (Svelte 5.56, Tailwind 4.3, lucide-svelte 1.0) if a token or utility class looks unfamiliar for the installed major version.
+
+When re-syncing, diff the `PREDEFINED_THEMES` list and the `Button`/`Card` variant unions against this doc first — those are the two areas most likely to have drifted.
+
 ## Overview
 
-Luminous is a dense, dark-first desktop music player (Tauri v2 + Svelte 5 Runes). The default aesthetic — codenamed "Luminous Dark" — favors a near-black canvas, muted slate-blue accents, and generous use of soft rounded geometry over hard edges, evoking a calm, focused listening environment rather than a flashy media app.
+Luminous is a dense, dark-first desktop music player. The UI is built from panels: a collapsible **Sidebar** (`Sidebar.svelte`), a **TopNavigation** ribbon, a scrollable content canvas (Home/Collection/Playlists/Lyrics/Settings/Help views), a multi-tab **RightPanel**, and a persistent **PlayerBar** transport dock. All chrome/content read colors from CSS custom properties wired through `@theme` in `src/app.css` — never literal hex in component markup — so themes and dynamic-artwork extraction can swap live.
 
-The UI is built almost entirely from panels: a collapsible **Sidebar**, a **TopNavigation** ribbon, the main content canvas, a multi-tab **RightPanel** (Synced Lyrics, Queue Drawer, Liner Notes), and a persistent **PlayerBar** transport dock. All chrome and content surfaces read colors exclusively from CSS custom properties (`--bg-main`, `--color-accent`, etc., wired through `@theme` in `src/app.css`) rather than literal hex values in components — enabling seamless runtime theme switching and dynamic artwork color extraction.
+## Themes
 
-Theming is **not static**: users can switch between several built-in themes (Luminous, Ruby Red, Nordic Blue, Retro Amber, System light/dark, Dynamic Artwork), derive themes dynamically from playing cover art, or build a custom theme in the in-app Custom Theme Builder (Settings → Themes tab, in `FoldersView.svelte`; the previous standalone `DesignTools.svelte` panel was folded into Settings). Every theme is generated or validated against a **WCAG AA 4.5:1 contrast guarantee** between accent and background (`clampForContrast()` / `generatePaletteFromSeed()` in `src/lib/utils/colorUtils.ts`). This document describes the shipped default theme; treat its *structure and rules* (spacing, radii, elevation approach, contrast discipline) as normative for new UI.
+Theming is runtime-swappable, defined in `PREDEFINED_THEMES` (`theme.svelte.ts`) — currently:
+
+- **✨ Luminous** (id `dynamic-artwork`) — colors derived live from the playing track's cover art (median-cut quantization + WCAG-readability-adjusted lightness).
+- **System** (id `system`) — the default dark palette above, or a light variant when the OS is in light mode.
+- **Ruby Red**, **Nordic Blue** — hand-picked palettes.
+- **Retro Amber** — generated via `generatePaletteFromSeed()` from a single seed hex (`#d97706`), not hand-picked per-token.
+- **Metallic**, **Sabrina** — additional hand-picked palettes (not in the previous DESIGN.md — verify these are still current on next sync, they read like newer/experimental additions).
+
+Every theme (including user-built custom ones from the in-app Theme Builder) gets two derived tokens computed at apply-time, never hand-set: **`accent-contrast`** (best on-accent text/icon color, via `pickAccessibleOnColor`) and **`accent-text`** (the accent hue clamped to WCAG AA 4.5:1 against `bg-main`, via `clampForContrast`). Components must use `accent-text`, never raw `accent`, for text/icons on the main canvas.
+
+All four chrome panels (Sidebar, TopNavigation, RightPanel, PlayerBar) get glassmorphism (`backdrop-filter: blur(20px) saturate(180%)`, `.glass-surface`) on every theme — `themeStore.isGlassTheme` is unconditionally `true`. Per-theme `--glass-*` vars (tinted translucent bg, specular top highlight, elevation shadow, and — PlayerBar only — an accent-colored glow) are recomputed from each theme's own resolved hex in `applyActiveTheme()`. Linux gets an `opaque-linux` fallback (no blur, solid `bg-playerbar`, glow via box-shadow) — see `PlayerBar.svelte`.
 
 ## Colors
 
-- **bg-main (#08090c):** Near-black base canvas behind all content — the quietest, base layer.
-- **bg-sidebar (#1c1f29) / bg-playerbar (#191b23):** Slightly lighter "chrome" tones that separate navigation and transport controls from the content canvas without a hard border.
-- **accent (#6f7ea9) / accent-hover (#8c98ba):** A muted, desaturated slate blue — the hue used for interactive emphasis (active nav item, play button, primary actions, focus/selection states). Never used decoratively.
-- **accent-text (#6f7ea9):** The accent color clamped to WCAG AA 4.5:1 against `bg-main`. This is the *only* accent-derived value allowed on text or icons sitting directly on the main canvas — using raw `accent` for text risks failing contrast on generated or custom themes.
-- **accent-contrast (#000000):** Heuristically derived per-theme text/icon color for content placed *on top of* an accent-colored surface (e.g. the glyph inside a filled play button).
-- **text-primary (#f1f3f8) / text-secondary (#a6adc4):** Primary reads as near-white for titles and active content; secondary is a desaturated blue-gray for metadata, captions, and inactive labels.
-- **border (#2c2f3c):** The sole structural line color, almost always used at reduced opacity (`/40`, `/50`, `/60`) rather than full strength.
-- **accent-gold (#FFB648):** Fixed brand color (not theme-swappable), borrowed from the logo's eclipse ring. Reserved for rare one-off highlight moments — a "Featured" badge, a premium marker, a milestone toast. Never used on buttons, active states, or anything recurring.
-- **artwork-extracted tokens:** `--color-artwork-primary`, `--color-artwork-accent`, etc., dynamically extracted from current album art when Adaptive Dynamic Cover Tinting is enabled.
+- **bg-main (#08090c):** Base canvas.
+- **bg-sidebar (#1c1f29) / bg-playerbar (#191b23):** Chrome tones one step lighter than canvas.
+- **accent (#6f7ea9) / accent-hover (#8c98ba):** Muted slate blue, interactive emphasis only (active nav, play button, focus/selection). Never decorative.
+- **accent-text:** Accent clamped to WCAG AA 4.5:1 against bg-main — the only accent-derived color usable for text/icons on the main canvas.
+- **accent-contrast:** Heuristic best-contrast color for content on top of a solid accent fill.
+- **text-primary (#f1f3f8) / text-secondary (#a6adc4):** Primary near-white; secondary desaturated blue-gray. Do not dilute text-secondary with opacity modifiers (an accessibility pass removed those app-wide) — border opacity modifiers (`/40`–`/60`) are fine and normal.
+- **border (#3d4255):** Sole structural line color, almost always used at reduced opacity.
+- **accent-gold (#ffb648):** Fixed, not theme-swappable. Rare highlight moments only (Featured badge, milestone toast) — never buttons/active states.
+- **Artwork-extracted tokens:** `--color-artwork-primary/sidebar/playerbar/accent/accent-hover/border`, populated by `extractColorsFromImage()` (median-cut + 6 Android-Palette-style archetypes: vibrant/lightVibrant/darkVibrant/muted/lightMuted/darkMuted).
 
 ## Typography
 
-**Inter** (`src/app.css:58`) throughout, falling back to system UI sans. The only secondary face is **Space Grotesk** (700, `font-heading` utility), reserved for the Display tier — hierarchy elsewhere comes from size and weight, not typeface.
+**Inter** for all body/UI text. **Expose** (700 only, custom woff2) is the sole secondary face, via the `font-heading` Tailwind utility — used at minimum for the Home view's time-of-day greeting (`text-3xl font-heading font-bold`). Re-check other hero/detail-view titles before assuming they share this tier; only HomeView was confirmed this pass. Hierarchy elsewhere comes from size/weight, not typeface — don't introduce a third face.
 
-- **Display (36px / 700, Space Grotesk):** Album/artist/playlist hero titles and the home page time-of-day greeting.
-- **Headline (24px–20px / 700–600):** Section headers and dialog titles.
-- **Title (18px / 600):** Card and list-group headers.
-- **Body (14px / 12px, 400):** The workhorse sizes — the large majority of UI text in Luminous is `body-sm` (12px) for metadata-dense lists (folders, tags, playlists) and `body-md` (14px) for primary row labels and buttons.
-- **Label (12px / 600):** Interactive text — buttons, active tab labels, song titles that double as links.
-- **Micro badge (9px–11px / 700, tracked uppercase):** Format/quality tags (e.g. FLAC, 24-bit, Hi-Res) rendered as tiny pills — bold and uppercase for legibility.
+Confirmed Tailwind steps in use: `text-3xl` (home greeting), `text-2xl`/`text-xl` (headline tiers, per previous doc — not re-verified this pass), `text-lg` (title), `text-sm`/`text-xs` (body — the large majority of UI text is `text-xs` for dense metadata lists), arbitrary `text-[9px]`–`text-[11px]` tracked-uppercase (micro badges/quality tags — genuine literal px, not a Tailwind step).
 
-Weight usage: `medium` (500) for inactive nav items, `semibold` (600) for buttons and clickable labels, `bold` (700) for badges and large numerals, `extrabold` (800) reserved for the single active lyric line in `LyricsView`.
+## Layout
 
-## Layout & Adaptive Information Density
-
-Luminous uses Tailwind's default 4px spacing unit:
-
-- **Tight (4–8px):** Icon gaps, chip padding (`px-3 py-1`).
-- **Standard (12–16px):** Button padding (`px-4 py-2`), card gaps.
-- **Generous (24–32px):** Section padding inside large panels (`p-6`, `p-8` in `Equalizer.svelte`).
-
-### Adaptive Information Density Matrix
-
-The viewport layout supports three density modes to accommodate different display sizes and user preferences:
-
-1. **Compact Mode**: 32px padding, hidden cover thumbnails in dense track tables, optimized for data-dense browsing.
-2. **Balanced Mode (Default)**: 48px padding, standard 40px thumbnails, 14px track labels.
-3. **Expanded Mode**: 72px+ detailed layout blocks, enlarged cover art, expanded metadata grid rows.
-
-### Fixed Chrome Architecture
-
-The application uses a fixed viewport shell:
-- **Sidebar**: Fixed width, collapsible to icon-only rail mode.
-- **TopNavigation**: Fixed 80px header housing navigation buttons, universal search, density toggles, and view options.
-- **Content Canvas**: Scrollable central viewport (Personalized Home Hub, Category Explorer, Album Parallax Hero, Artist Hub).
-- **RightPanel**: Collapsible side drawer for `.LRC` Synced Lyrics, Queue Drawer (Playing Next / History), and Liner Notes.
-- **PlayerBar**: Fixed 80px bottom dock housing media transport, volume, visualizer toggles (FFT / Frequency Bands / Waveform), and miniplayer detachment controls.
-
-## Elevation & Depth
-
-Luminous is largely **flat**: hierarchy comes from background tone steps (`bg-main` → `bg-sidebar`/`bg-playerbar`) and low-opacity borders:
-
-- `shadow-sm`/`shadow-xs` mark subtle resting state on interactive chrome.
-- `shadow-md`/`shadow-lg` mark active/hover elevation, tinted with the accent color (`shadow-brand-accent/20`, `shadow-brand-accent/10`) for a soft accent glow.
-- `shadow-xl`/`shadow-2xl` mark modal-like overlays (`TagEditor`, `SmartPlaylistModal`) and hero album art.
-- **Glassmorphism surface**: Applied via `.glass-surface` (`backdrop-filter: blur(20px) saturate(180%)`) on all chrome panels (Sidebar, TopNavigation, RightPanel, PlayerBar, Miniplayer). This is no longer System-theme-exclusive — every theme now gets the glass treatment (`themeStore.isGlassTheme` is unconditionally `true`), with the `--glass-*` custom properties recomputed per-theme from that theme's own resolved hex colors.
+Tailwind's default 0.25rem spacing unit throughout (a Tailwind step, e.g. `gap-4`/`p-6` — not a literal px value). Layout thresholds/offsets that genuinely are literal pixels — because they're JS numbers doing resize-drag/collision math, not CSS classes — live in `src/lib/constants.ts`, e.g.:
+- Sidebar: `SIDEBAR_MIN_WIDTH_PX=180`, `SIDEBAR_MAX_WIDTH_PX=400`, `SIDEBAR_COLLAPSED_WIDTH_PX=64`.
+- Right panel: `RIGHT_PANEL_MIN_WIDTH_PX=220`, `RIGHT_PANEL_MAX_WIDTH_PX=480`.
+- PlayerBar dock clearance for floating UI: `PLAYER_DOCK_CLEARANCE_PX=96` (h-20 + bottom-4 inset).
+- Cover-stack fan-out (used by `CoverStack.svelte` and playlist header art): offset -18px/-10px, -5° rotation, 0.05 scale step, 0.07 opacity step per layer.
+- Toast auto-dismiss: 4000ms.
 
 ## Shapes
 
-Rounded corners scale with component visual weight:
+- **sm (`rounded-md`, 0.375rem):** compact icon-toggle buttons.
+- **md (`rounded-lg`, 0.5rem):** default buttons/rows/thumbnails — largely superseded by `rounded-full` pill buttons in current Button.svelte (see below).
+- **lg (`rounded-xl`, 0.75rem) / xl (`rounded-2xl`, 1rem):** cards, folder rows, modals, hero art, equalizer panel.
+- **full:** all Button.svelte variants (not just circular controls — buttons are pill-shaped, not rounded-rect, per current source), play/pause controls, avatars, filter chips, toggle track.
+- **PlayerBar dock (`rounded-[2rem]`, 2rem):** distinct floating-capsule radius, larger than the xl scale step — also an arbitrary value rather than a named Tailwind step.
 
-- **sm (6px):** Compact icon-toggle buttons.
-- **md (8px):** Default for buttons, list rows, cover thumbnails, form inputs.
-- **lg (12px):** Elevated cards, folder rows, settings tab strips.
-- **xl (16px):** Large containers — hero album art, modal dialogs (`TagEditor`), equalizer panel.
-- **full:** Circular controls (play/pause, avatars, miniplayer buttons) and pill-shaped filter chips/tabs.
-- **PlayerBar dock (32px / 2rem):** Custom radius reading as a distinct floating transport surface.
+## Component Inventory (verified against current `.svelte` source)
 
-## Component Specifications
-
-- **Buttons:** Primary actions use `bg-accent` with `accent-contrast` text, `semibold`, and an accent-tinted shadow glow. Secondary/outline actions use a transparent background with a `border` and hover to `bg-sidebar`. Play controls are always circular (`rounded-full`).
-- **Filter Chips:** `rounded-full`, `px-3 py-1`, `body-sm` weight `medium`. Active state uses `bg-border` + `text-primary` + `semibold`.
-- **Nav items (Sidebar):** `rounded-lg` expanded, `rounded-xl` collapsed. Active item uses `bg-accent` + `accent-contrast` text + accent glow shadow.
-- **Cards (Album/Artist Covers):** `rounded-lg`, half-opacity `border`, hovering to full accent border and accent-tinted glow shadow.
-- **Badges (Audio Quality):** Micro-badge typography, `rounded`, low-opacity accent background (`bg-accent/15`) with low-opacity accent border.
-- **Modals (`TagEditor`, `SmartPlaylistModal`):** `bg-sidebar`, full-opacity `border`, `rounded-2xl`, `shadow-2xl` heavy overlay surface.
+- **Button** (`Button.svelte`) — 6 variants: `primary` (accent fill, accent-contrast text, accent-tinted shadow), `secondary` (bg-sidebar, bordered), `accent-soft` (translucent accent border+bg, fills solid on hover), `info`/`warning`/`destructive` (fixed Tailwind purple/amber/red-500 tints — theme-independent by design, used for non-brand status actions). 2 sizes (`md`/`sm`). Always `rounded-full`.
+- **Input** (`Input.svelte`) — `surface` prop (`main`/`sidebar` bg), `size` (`md`=rounded-xl / `sm`=rounded-lg), `pill` override, `highlighted` swaps border+ring to accent (used to flag auto-filled fields).
+- **Toggle** (`Toggle.svelte`) — track `h-6 w-11 rounded-full` (accent when on, border color when off), white `h-4 w-4` thumb, optional on/off text label.
+- **Modal** (`Modal.svelte`) — portal-rendered, `bg-black/75 backdrop-blur-xs` scrim, dialog `bg-brand-sidebar border-brand-border rounded-2xl shadow-2xl`, Escape-to-close built in.
+- **CardBadge** (`CardBadge.svelte`) — small pill badge absolutely positioned top-right of a card, default accent-fill/accent-contrast, accepts an icon + optional spin animation + custom color class (used for the playlist-family gradient badges).
+- **FormField** (`FormField.svelte`) — uppercase 10px tracked label + optional info-icon tooltip, `span2` for 2-col form grids.
+- **EmptyState** (`EmptyState.svelte`) — icon (pulsing by default) + title (+ optional subtitle); `card` variant wraps it in a dashed-border bg-sidebar/20 box.
+- **AlbumCard / PlaylistCard** (and their Row/Auto variants) — `bg-brand-sidebar border-border/60`, `rounded-b-xl` (album, art-first) or `rounded-xl` (playlist), hover → `border-accent/40`. Playlist cards carry the gradient-family frame + badge system (see Playlist Card System doc) for app-generated playlist types; custom playlists stay flat/frameless by design.
+- **PlayerBar** — fixed `h-20`, floating capsule (`rounded-[2rem]`, `max-w-[1200px] mx-auto`), 3-column flex (now-playing / transport+seek / volume+visualizer+PiP). Custom themed `<input type="range">` thumbs (white fill, accent-colored border ring) for both volume and (in `app.css`) the shared `.themed-range` recipe.
+- **Sidebar** — `rounded-lg` nav items expanded / `rounded-xl` square icon buttons collapsed (`< SIDEBAR_MIN_WIDTH_PX`), active item gets accent fill + accent-tinted shadow glow; sub-tabs (Artists/Albums/Songs, Auto/Custom/Queue) nest under a `border-l-2 border-accent/30` rail.
 
 ## Do's and Don'ts
 
-- Do read all colors from `--color-brand-*` / `--bg-*` custom properties via Tailwind `brand-*` classes — never hardcode theme hex values in components.
-- Do use `accent-text` (contrast-clamped token), not raw `accent`, for text/icons sitting directly on `bg-main`/`bg-sidebar` to guarantee WCAG AA compliance.
-- Do tint elevation shadows with the accent color on interactive elements.
-- Do reserve `rounded-full` for circular controls and pill chips — avoid using it on rectangular cards or panels.
-- Do use full-strength `text-brand-text-secondary` for metadata/captions — never dilute it with opacity modifiers (`/40`–`/90`). An accessibility audit swept these out app-wide because diluted secondary text failed contrast checks; `border` opacity modifiers are unaffected and remain the normal pattern.
-- Don't introduce a second typeface; hierarchy comes strictly from size and weight.
-- Don't add heavy drop shadows to flat chrome panels beyond the standard glass treatment (now applied to all themes, not just System).
-- Do reserve `accent-gold` for rare highlight moments (Featured badge, premium marker, milestone toast) — never on buttons, active states, or anything recurring.
-- Don't put a gradient or colored frame on a custom (user-made) playlist — flat/no-frame is what visually marks a playlist as custom.
-- Don't round the corners of album artwork or crop it — art is always shown square and in its entirety; only the outer card/frame gets corner radius.
-
-## Playlist Card System
-
-Special playlist categories carry a colored gradient identity, distinct from custom (user-made) playlists, which get no color treatment at all. Full reference: `Luminous Playlist Card System.dc.html`.
-
-### Frame color families (playlists with real album art)
-
-- **Blue** (`#2563EB → #38BDF8`) — Decades.
-- **Green** (`#059669 → #34D399`) — Genres.
-- **Orange** (`#C2410C → #F59E0B`) — Smart Rule playlists.
-
-The gradient renders as a thin border framing the stacked album art, plus a matching badge pill ("Auto" for Decades/Genres, "✦ Smart" for Smart Rule playlists). All gradients run 135° (top-left to bottom-right).
-
-### Icon tiles (playlists without stable album art)
-
-Favourites, Recently Added, and Queue have no consistent art to frame, so they get a full-bleed gradient tile with a single glyph instead. Each has its own distinct signature gradient, independent of the frame color families above:
-
-- Favourites (heart): `#DB2777 → #F43F5E` (pink/rose)
-- Recently Added (clock): `#CA8A04 → #FACC15` (gold/amber)
-- Queue (stack): `#4338CA → #7C3AED` (indigo/violet)
-
-### Custom playlists
-
-User-made playlists get no frame and no gradient — plain album art with the standard card border. Gradient is the one visual signal for "the app built this for you"; flat is what marks a playlist as custom.
+- Do read colors from `--color-brand-*` custom properties (Tailwind `brand-*` classes) — never hardcode theme hex in components.
+- Do use `accent-text`, never raw `accent`, for text/icons directly on `bg-main`/`bg-sidebar`.
+- Do tint interactive-element shadows with accent color; reserve the two-layer accent glow (`--glass-glow`) for the PlayerBar dock only.
+- Do reserve `accent-gold` for rare one-off highlights — never buttons or recurring active states.
+- Don't dilute `text-secondary` with opacity modifiers; border opacity modifiers remain fine.
+- Don't introduce a third UI typeface — hierarchy is size/weight, with Expose reserved for the display tier.
+- Don't round or crop album artwork itself — only its outer card/frame gets radius.
+- Don't put a gradient/colored frame on a custom (user-made) playlist — flat/frameless is the "this is yours" signal; gradient is the "the app built this for you" signal (Decades=blue, Genres=green, Smart Rules=orange, plus fixed icon-tile gradients for Favourites/Recently Added/Queue). Full reference: `Luminous Playlist Card System.dc.html`.
 
 ## Brand & Logo
 
-The mark is an eclipse motif — a black disc with a corona flare, seen edge-on. It exists in two modes: **static** (app icon, social avatar, marketing — a fixed "at rest" pose) and **reactive** (embedded in the running app — an audio-visualizer element driven live by the current track's frequency bands). Full reference: `Luminous Logo System.dc.html`; source: `assets/luminous-mark.svg`.
-
-### Layers (back to front)
-
-1. **Ambient glow** — soft blurred halo. Recolors with the active theme (or extracted album-art color). Driven by **mid** frequencies at runtime (radius/opacity).
-2. **Eclipse ring** — thin ring at the disc's edge. Recolors alongside the glow, one step brighter. Driven by **treble** (stroke-width/opacity).
-3. **Black silhouette** — the disc itself. Always `#0A0A0D`, fixed regardless of theme or artwork. Never recolors.
-4. **Coronal burst** — bright flare at the disc's edge (fixed position, upper-right). Always pure white. Driven by **bass** (radius/opacity).
-
-### Brand colors (fixed, outside the swappable UI theme)
-
-- Ink (silhouette): `#0A0A0D`
-- Paper (corona): `#FFFFFF`
-- Primary — Indigo: `#626FE8`
-- Accent — Gold: `#FFB648`
-
-These are the logo's own identity colors for marketing/social/app-icon-at-rest use — independent from the in-app swappable `accent` token. Inside the running app, glow + ring instead re-target to whichever theme (or extracted artwork palette) is active.
-
-### Wordmark
-
-"Luminous" is set in **Space Grotesk** (600–700 weight) — a geometric sans whose circular counters echo the mark. In-app, the same face (700) carries over to the Display typography tier (detail-view hero titles, home greeting); the tagline "Music Player" and all other UI text stay in Inter. Approved lockups: icon alone, icon + wordmark (horizontal), icon + wordmark (stacked), icon + wordmark + "Music Player" tagline (larger/marketing use only). Don't rearrange these relative to each other.
-
-### Two artifacts
-
-- `luminous-mark.svg` — static, crisp, no blur or glow filters. Use for app icons, avatars, favicons, and anywhere the mark must render sharp at small sizes.
-- `luminous-mark-reactive.svg` — lush, heavier blur/glow baked in (bigger ambient glow, blurred rings, blurred burst halo). Use for hero/marketing placements and as the resting frame of the in-app audio-reactive element.
-- Never blur the static mark or crisp up the reactive one — they're distinct assets for distinct contexts, not one file with a toggle.
-
-### Usage rules
-
-- Icon ships mark-only, no container — add a squircle/rounded-square background per-platform only where the OS requires it (e.g. macOS dock).
-- Minimum clearspace: ¼ of the mark's diameter on every side.
-- Below 24px, drop the glow and ring — render silhouette + burst only.
-- Never recolor the black silhouette or white burst; never stretch, skew, or add drop shadows/outlines to the mark.
+Eclipse motif, static (`luminous-mark.svg`) vs reactive/audio-driven (`luminous-mark-reactive.svg`) variants; fixed brand colors Ink `#0a0a0d`, Paper `#ffffff`, Indigo `#626fe8`, Gold `#ffb648`. Per `docs/release-notes/v0.97.0.md`, **Expose replaced Space Grotesk everywhere** (app UI and wordmark) — Space Grotesk is retired, not a marketing-only exception. Full reference: `Luminous Logo System.dc.html`; re-verify against `docs/luminous-mark*.svg` and any wordmark component next time logo work is in scope.
