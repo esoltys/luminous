@@ -9,6 +9,10 @@ on:
         description: "Release tag to submit (e.g. v0.99.7)"
         required: true
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   microsoft-store:
     name: Publish to Microsoft Store
@@ -17,7 +21,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Download MSIX package from release
         id: download
