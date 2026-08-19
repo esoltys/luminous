@@ -77,5 +77,5 @@ jobs:
       - name: Validate winget manifest with winget CLI
         shell: bash
         run: |
-          latest=$(ls -1 winget/manifests/e/EricSoltys/Luminous | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
-          winget validate --manifest "winget/manifests/e/EricSoltys/Luminous/$latest"
+          latest=$(ls -1 winget/manifests/e/EricSoltys/LuminousMusicPlayer | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          winget validate --manifest "winget/manifests/e/EricSoltys/LuminousMusicPlayer/$latest"

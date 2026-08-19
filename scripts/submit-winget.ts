@@ -21,10 +21,19 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
-const manifestsRoot = path.join(rootDir, "winget", "manifests", "e", "EricSoltys", "Luminous");
 
-const PACKAGE_IDENTIFIER = "EricSoltys.Luminous";
-const MANIFEST_VERSION = "1.6.0";
+const PACKAGE_IDENTIFIER = "EricSoltys.LuminousMusicPlayer";
+// Keep in sync with the schema version recommended in microsoft/winget-pkgs's
+// PR template (doc/manifest/README.md lists 1.6.0 as deprecated).
+const MANIFEST_VERSION = "1.12.0";
+
+// winget's manifest layout nests one folder per dot-separated identifier
+// segment under manifests/<first-letter>/, e.g. EricSoltys.LuminousMusicPlayer
+// -> manifests/e/EricSoltys/LuminousMusicPlayer/<version>/. Deriving this
+// from PACKAGE_IDENTIFIER instead of hardcoding it keeps the path in sync if
+// the identifier ever changes again.
+const idSegments = PACKAGE_IDENTIFIER.split(".");
+const manifestsRoot = path.join(rootDir, "winget", "manifests", idSegments[0][0].toLowerCase(), ...idSegments);
 
 function normalizeVersion(v: string): string {
   return v.replace(/^v/, "");
@@ -104,7 +113,9 @@ async function fetchReleaseInfo(version: string): Promise<ReleaseInfo> {
 }
 
 function versionManifest(version: string): string {
-  return `PackageIdentifier: ${PACKAGE_IDENTIFIER}
+  return `# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.${MANIFEST_VERSION}.schema.json
+
+PackageIdentifier: ${PACKAGE_IDENTIFIER}
 PackageVersion: ${version}
 DefaultLocale: en-US
 ManifestType: version
@@ -113,7 +124,9 @@ ManifestVersion: ${MANIFEST_VERSION}
 }
 
 function installerManifest(info: ReleaseInfo): string {
-  return `PackageIdentifier: ${PACKAGE_IDENTIFIER}
+  return `# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.${MANIFEST_VERSION}.schema.json
+
+PackageIdentifier: ${PACKAGE_IDENTIFIER}
 PackageVersion: ${info.version}
 MinimumOSVersion: 10.0.0.0
 InstallerType: nullsoft
@@ -156,7 +169,9 @@ ManifestVersion: ${MANIFEST_VERSION}
 }
 
 function localeManifest(version: string): string {
-  return `PackageIdentifier: ${PACKAGE_IDENTIFIER}
+  return `# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.${MANIFEST_VERSION}.schema.json
+
+PackageIdentifier: ${PACKAGE_IDENTIFIER}
 PackageVersion: ${version}
 PackageLocale: en-US
 Publisher: Eric James Soltys
@@ -197,6 +212,30 @@ function validateManifest(dir: string) {
     execSync(`winget validate --manifest "${dir}"`, { cwd: rootDir, stdio: "inherit" });
   } catch {
     throw new Error("winget manifest validation failed. See output above.");
+  }
+}
+
+// microsoft/winget-pkgs's PR template requires a local install test in
+// addition to `winget validate` — this actually installs (and immediately
+// removes) the package via the local manifest, using --accept-*-agreements
+// so it can run unattended.
+function installTestManifest(dir: string, version: string) {
+  console.log(`\nTest-installing manifest at ${dir}...`);
+  try {
+    execSync(
+      `winget install --manifest "${dir}" --accept-package-agreements --accept-source-agreements --silent`,
+      { cwd: rootDir, stdio: "inherit" }
+    );
+  } catch {
+    throw new Error("winget install test failed. See output above.");
+  }
+  try {
+    execSync(`winget uninstall --id "${PACKAGE_IDENTIFIER}" --version "${version}" --silent`, {
+      cwd: rootDir,
+      stdio: "inherit"
+    });
+  } catch {
+    console.warn("[WARNING] Could not uninstall test install automatically — remove it manually if needed.");
   }
 }
 
@@ -251,17 +290,27 @@ async function submitPR(version: string, targetDir: string) {
     console.log("Fork already exists or succeeded with notice.");
   }
 
-  console.log("Cloning esoltys/winget-pkgs (shallow)...");
-  execSync(`git clone --depth=1 https://github.com/esoltys/winget-pkgs.git "${tmpDir}"`, { stdio: "inherit" });
+  // winget-pkgs has 600k+ manifest files; a normal clone checks all of them
+  // out and can hit Windows' MAX_PATH on unrelated deeply-nested packages.
+  // A blobless, sparse (cone-mode) clone only checks out our package's path.
+  console.log("Cloning esoltys/winget-pkgs (sparse, blobless)...");
+  execSync(
+    `git clone --filter=blob:none --no-checkout --depth=1 https://github.com/esoltys/winget-pkgs.git "${tmpDir}"`,
+    { stdio: "inherit" }
+  );
+  execSync("git sparse-checkout init --cone", { cwd: tmpDir, stdio: "inherit" });
+  const upstreamManifestPath = ["manifests", idSegments[0][0].toLowerCase(), ...idSegments].join("/");
+  execSync(`git sparse-checkout set "${upstreamManifestPath}"`, { cwd: tmpDir, stdio: "inherit" });
+
+  console.log("Syncing with upstream microsoft/winget-pkgs master...");
+  execSync("git remote add upstream https://github.com/microsoft/winget-pkgs.git", { cwd: tmpDir, stdio: "inherit" });
+  execSync("git fetch --depth=1 upstream master", { cwd: tmpDir, stdio: "inherit" });
+  execSync("git checkout -B master upstream/master", { cwd: tmpDir, stdio: "inherit" });
 
   const branchName = `${PACKAGE_IDENTIFIER}-${version}`;
-  try {
-    execSync(`git checkout -b ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
-  } catch {
-    execSync(`git checkout ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
-  }
+  execSync(`git checkout -B ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
 
-  const upstreamTargetDir = path.join(tmpDir, "manifests", "e", "EricSoltys", "Luminous", version);
+  const upstreamTargetDir = path.join(tmpDir, "manifests", idSegments[0][0].toLowerCase(), ...idSegments, version);
   fs.mkdirSync(upstreamTargetDir, { recursive: true });
 
   const files = [`${PACKAGE_IDENTIFIER}.yaml`, `${PACKAGE_IDENTIFIER}.installer.yaml`, `${PACKAGE_IDENTIFIER}.locale.en-US.yaml`];
@@ -280,7 +329,23 @@ async function submitPR(version: string, targetDir: string) {
   execSync(`git push -u origin ${branchName} --force`, { cwd: tmpDir, stdio: "inherit" });
 
   console.log("Creating Pull Request to microsoft/winget-pkgs...");
-  const prCmd = `gh pr create --repo microsoft/winget-pkgs --head esoltys:${branchName} --base master --title "New package: ${PACKAGE_IDENTIFIER} version ${version}" --body "New package submission for Luminous v${version}"`;
+  const prBody = [
+    "## \u{1F4D6} Description",
+    `New package submission for Luminous Music Player v${version}.`,
+    "",
+    "## ✅ Checklist",
+    "- [x] Signed the Contributor License Agreement",
+    "",
+    "## \u{1F4E6} Manifest Checklist",
+    "- [x] Checked that there aren't other open pull requests for the same manifest update/change",
+    "- [x] This PR only modifies one (1) manifest",
+    "- [x] Validated manifest locally with `winget validate --manifest <path>`",
+    "- [x] Tested manifest locally with `winget install --manifest <path>`",
+    `- [x] Manifest conforms to the ${MANIFEST_VERSION} schema`
+  ].join("\n");
+  const prBodyPath = path.join(tmpDir, ".pr-body.md");
+  fs.writeFileSync(prBodyPath, prBody);
+  const prCmd = `gh pr create --repo microsoft/winget-pkgs --head esoltys:${branchName} --base master --title "New package: ${PACKAGE_IDENTIFIER} version ${version}" --body-file "${prBodyPath}"`;
   execSync(prCmd, { cwd: tmpDir, stdio: "inherit" });
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -322,6 +387,16 @@ async function main() {
   if (!isPushEnabled) {
     console.log("\nManifest generated and validated locally. Re-run with --push to submit to microsoft/winget-pkgs.");
     return;
+  }
+
+  // winget-pkgs' PR checklist requires a local install test, not just
+  // `winget validate` — only run it for a real submission, not every
+  // no-op regeneration (it actually installs/uninstalls the package).
+  try {
+    installTestManifest(targetDir, version);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
   }
 
   await submitPR(version, targetDir);
