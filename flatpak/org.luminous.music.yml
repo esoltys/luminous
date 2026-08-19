@@ -87,6 +87,10 @@ modules:
         npm_config_offline: "true"
 
     build-commands:
+      # TEMP DEBUG: confirm what the `type: dir` source actually copied in.
+      - "echo === pwd/top-level ===; pwd; ls -la"
+      - "echo === flatpak/ ===; ls -la flatpak/ 2>&1 || echo MISSING"
+
       # JS dependencies (offline, from node-sources.json)
       - cp flatpak/package-lock.json package-lock.json
       - npm ci --offline --legacy-peer-deps
