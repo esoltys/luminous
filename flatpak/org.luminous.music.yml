@@ -63,14 +63,17 @@ modules:
 
       # Generated with:
       #   flatpak-node-generator npm flatpak/package-lock.json -o flatpak/node-sources.json
-      # flatpak/package-lock.json is an npm-shaped lockfile snapshot of
-      # package.json kept solely so flatpak-node-generator (which doesn't
-      # understand bun.lock) can vendor JS deps for an offline build; it
-      # deliberately drops the `playwright` devDependency (browser-driven
-      # tests aren't run as part of building the app) to avoid the generator
-      # trying to vendor a Chromium download. bun.lock remains the real
-      # lockfile for day-to-day development. Regenerate both whenever
-      # package.json's dependency ranges change.
+      # flatpak/package.json + flatpak/package-lock.json are an npm-shaped
+      # snapshot of the real package.json kept solely so flatpak-node-generator
+      # (which doesn't understand bun.lock) can vendor JS deps for an offline
+      # build; both deliberately drop the `playwright` devDependency
+      # (browser-driven tests aren't run as part of building the app) to
+      # avoid the generator trying to vendor a Chromium download — `npm ci`
+      # needs package.json and package-lock.json to actually agree, so both
+      # files have to be swapped in together, not just the lockfile.
+      # bun.lock + the real package.json remain authoritative for day-to-day
+      # development. Regenerate all three whenever package.json's dependency
+      # ranges change.
       - node-sources.json
 
       # Generated with:
@@ -98,7 +101,7 @@ modules:
     # prefixes when doing that swap.
     build-commands:
       # JS dependencies (offline, from node-sources.json)
-      - cd luminous && cp flatpak/package-lock.json package-lock.json && npm ci --offline --legacy-peer-deps
+      - cd luminous && cp flatpak/package.json package.json && cp flatpak/package-lock.json package-lock.json && npm ci --offline --legacy-peer-deps
 
       # Rust dependencies (offline, from cargo-sources.json)
       - cd luminous && cargo --offline fetch --manifest-path src-tauri/Cargo.toml

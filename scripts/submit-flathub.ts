@@ -88,7 +88,7 @@ async function main() {
   manifest = manifest.replace(/cd luminous && /g, "");
   manifest = manifest.replace(/(?<![\w/])luminous\//g, "");
 
-  const filesToCopy = ["cargo-sources.json", "node-sources.json", "package-lock.json", `${APP_ID}.desktop`];
+  const filesToCopy = ["cargo-sources.json", "node-sources.json", "package.json", "package-lock.json", `${APP_ID}.desktop`];
 
   if (dryRun) {
     console.log("--- Dry run: would write the following to the target repo ---");
