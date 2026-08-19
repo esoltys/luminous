@@ -14,6 +14,9 @@ on:
       - "src-tauri/icons/org.luminous.music.metainfo.xml"
       - ".github/workflows/flatpak.yml"
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: flatpak-builder-lint
@@ -21,6 +24,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Lint manifest
         run: |
@@ -41,6 +46,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
@@ -51,4 +58,3 @@ jobs:
           build-bundle: true
           run-tests: false
           upload-artifact: true
-          artifact-name: luminous-flatpak-${{ github.sha }}
