@@ -4,9 +4,11 @@ on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   create-release:
@@ -19,7 +21,7 @@ jobs:
       release_id: ${{ steps.release.outputs.id }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Determine Release Tag
         id: tag
@@ -64,10 +66,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
 
@@ -82,7 +84,7 @@ jobs:
 
       - name: Cache Tauri bundler tools (NSIS/WiX)
         if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/AppData/Local/tauri/NSIS
@@ -93,13 +95,13 @@ jobs:
       # returns transient 503s, which fails the whole matrix leg. Retry a
       # couple of times before giving up.
       - name: Build and Release
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3.8.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          action: tauri-apps/tauri-action@v0
+          action: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
           attempt_limit: 3
           attempt_delay: 15000
           with: |
@@ -121,7 +123,7 @@ jobs:
 
       - name: Upload MSIX to Release Assets
         if: matrix.platform == 'windows-latest'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ needs.create-release.outputs.tag }}
           # softprops/action-gh-release publishes the release if `draft` is
