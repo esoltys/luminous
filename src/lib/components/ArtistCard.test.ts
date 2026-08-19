@@ -62,7 +62,10 @@ describe("ArtistCard.svelte", () => {
     });
 
     expect(getByText("Dave Hawkins")).toBeInTheDocument();
-    expect(getByText("Rock")).toBeInTheDocument();
+    const genreEl = getByText("Rock");
+    expect(genreEl).toBeInTheDocument();
+    expect(genreEl).toHaveAttribute("title", "Rock");
+    expect(genreEl.className).toContain("truncate");
     expect(getByText("6 songs")).toBeInTheDocument();
   });
 
