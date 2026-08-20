@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft, Music, DiscAlbum } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -37,12 +39,26 @@
     editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
   }
 
-  function handleEditorSaved() {
-    tagsStore.load();
+  function refreshDrillDown() {
     if (selectedTag) {
       tagsStore.getSongsByTag(selectedTag, 500).then((songs) => { drillDownSongs = songs; });
     }
   }
+
+  function handleEditorSaved() {
+    tagsStore.load();
+    refreshDrillDown();
+  }
+
+  // This view mounts/unmounts with the tab (not a persistent singleton like
+  // collectionStore), so the listener must be torn down on unmount — an
+  // uncleaned Tauri listen() here would leak and re-fire once per every past
+  // visit to this tab, compounding on itself.
+  onMount(() => {
+    let unlisten: (() => void) | undefined;
+    listen("library-changed", refreshDrillDown).then((fn) => { unlisten = fn; });
+    return () => unlisten?.();
+  });
 
   function toggleExpanded(mainTag: string) {
     const next = new Set(expandedRoots);
