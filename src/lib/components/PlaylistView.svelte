@@ -96,7 +96,7 @@
     COVER_STACK_OPACITY_STEP,
   } from "../constants";
 
-  const DRAG_RESET_DELAY_MS = 100;
+  const POINTER_DRAG_THRESHOLD_PX = 4;
 
   let editingSongId = $state<number | null>(null);
 
@@ -469,6 +469,7 @@
   }
 
   function handleRowClick(event: MouseEvent, item: PlaylistItem) {
+    if (pointerDragJustEnded) return;
     const actualIndex = playlistsStore.activePlaylistTracks.findIndex((t) => t.uuid === item.uuid);
 
     if (event.shiftKey && lastSelectedIndex !== null && lastSelectedIndex !== -1) {
@@ -567,60 +568,19 @@
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
 
-  function handleDragStart(event: DragEvent, index: number, item: PlaylistItem) {
-    if (isItemUnavailable(item)) return;
-    draggedIndex = index;
+  // Tauri's `dragDropEnabled` window option (required for OS file-drop-to-import) intercepts
+  // drag-and-drop at the webview level, which prevents the native HTML5 Drag and Drop API from
+  // ever firing `dragstart` for in-page elements. Row reordering is implemented with plain
+  // pointer-event tracking instead: pointerdown starts a potential drag, pointermove (once past
+  // a small movement threshold, so plain clicks aren't hijacked) tracks the row under the cursor
+  // via `document.elementFromPoint()`, and pointerup commits the reorder.
+  let pointerDragStartIndex: number | null = null;
+  let pointerDragStartX = 0;
+  let pointerDragStartY = 0;
+  let pointerDragJustEnded = false;
 
-    if (!selectedUuids.has(item.uuid)) {
-      selectedUuids = new Set([item.uuid]);
-      lastSelectedIndex = index;
-    }
-
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", index.toString());
-      event.dataTransfer.setData("text", index.toString());
-      event.dataTransfer.setData("application/x-playlist-index", index.toString());
-    }
-  }
-
-  function handleDragOver(event: DragEvent, index: number) {
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "move";
-    }
-  }
-
-  function handleDragEnter(event: DragEvent, index: number) {
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "move";
-    }
-    dragOverIndex = index;
-  }
-
-  function handleDragLeave(event: DragEvent, index: number) {
-    const currentTarget = event.currentTarget as HTMLElement | null;
-    const relatedTarget = event.relatedTarget as Node | null;
-    if (currentTarget && relatedTarget && currentTarget.contains(relatedTarget)) {
-      return;
-    }
-    if (dragOverIndex === index) {
-      dragOverIndex = null;
-    }
-  }
-
-  function handleDragEnd() {
-    dragOverIndex = null;
-    setTimeout(() => {
-      draggedIndex = null;
-    }, DRAG_RESET_DELAY_MS);
-  }
-
-  function handleDrop(event: DragEvent, targetIndex: number) {
-    event.preventDefault();
+  function commitReorder(targetIndex: number) {
     if (!activePlaylist) return;
-
     const targetTrack = playlistsStore.activePlaylistTracks[targetIndex];
     if (!targetTrack) return;
 
@@ -633,25 +593,64 @@
       if (selectedIndices.length > 0) {
         playlistsStore.reorderItemsBatch(activePlaylist.id, selectedIndices, targetIndex);
       }
-    } else {
-      let sourceUuid: string | null = null;
-      if (draggedIndex !== null && playlistsStore.activePlaylistTracks[draggedIndex]) {
-        sourceUuid = playlistsStore.activePlaylistTracks[draggedIndex].uuid;
-      } else if (event.dataTransfer) {
-        const data = event.dataTransfer.getData("text/plain");
-        if (data) {
-          const parsed = parseInt(data, 10);
-          if (!isNaN(parsed) && playlistsStore.activePlaylistTracks[parsed]) {
-            sourceUuid = playlistsStore.activePlaylistTracks[parsed].uuid;
-          }
-        }
-      }
-
-      if (sourceUuid && sourceUuid !== targetTrack.uuid) {
+    } else if (draggedIndex !== null && playlistsStore.activePlaylistTracks[draggedIndex]) {
+      const sourceUuid = playlistsStore.activePlaylistTracks[draggedIndex].uuid;
+      if (sourceUuid !== targetTrack.uuid) {
         playlistsStore.reorderItemByUuid(activePlaylist.id, sourceUuid, targetTrack.uuid);
       }
     }
+  }
 
+  function handleRowPointerDown(event: PointerEvent, index: number, item: PlaylistItem) {
+    if (isItemUnavailable(item) || event.button !== 0) return;
+    pointerDragStartIndex = index;
+    pointerDragStartX = event.clientX;
+    pointerDragStartY = event.clientY;
+    // With the window's dragDropEnabled option on, WebView2 can hijack an in-progress mouse
+    // gesture into a native OS drag once it crosses the platform's drag threshold, silently
+    // stopping pointermove/pointerup from reaching the DOM. Explicit pointer capture pins
+    // subsequent events to this element (and this JS event loop) instead, preventing that.
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture?.(event.pointerId);
+    window.addEventListener("pointermove", handlePointerDragMove);
+    window.addEventListener("pointerup", handlePointerDragUp);
+  }
+
+  function handlePointerDragMove(event: PointerEvent) {
+    if (pointerDragStartIndex === null) return;
+
+    if (draggedIndex === null) {
+      const dx = event.clientX - pointerDragStartX;
+      const dy = event.clientY - pointerDragStartY;
+      if (Math.hypot(dx, dy) < POINTER_DRAG_THRESHOLD_PX) return;
+
+      draggedIndex = pointerDragStartIndex;
+      const item = playlistsStore.activePlaylistTracks[pointerDragStartIndex];
+      if (item && !selectedUuids.has(item.uuid)) {
+        selectedUuids = new Set([item.uuid]);
+        lastSelectedIndex = pointerDragStartIndex;
+      }
+    }
+
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const row = target instanceof Element ? target.closest<HTMLElement>("[data-playlist-row]") : null;
+    const rowIndex = row?.dataset.index;
+    dragOverIndex = rowIndex !== undefined ? parseInt(rowIndex, 10) : null;
+  }
+
+  function handlePointerDragUp() {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragUp);
+
+    if (draggedIndex !== null && dragOverIndex !== null) {
+      commitReorder(dragOverIndex);
+      pointerDragJustEnded = true;
+      setTimeout(() => {
+        pointerDragJustEnded = false;
+      }, 0);
+    }
+
+    pointerDragStartIndex = null;
     draggedIndex = null;
     dragOverIndex = null;
   }
@@ -1275,16 +1274,11 @@
               if (e.key === 'Enter' && !unavailable) handlePlayPlaylistItem(item);
             }}
             data-playlist-row="true"
-            draggable={!unavailable ? "true" : "false"}
-            ondragstart={(e) => !unavailable && handleDragStart(e, actualIndex, item)}
-            ondragover={(e) => handleDragOver(e, actualIndex)}
-            ondragenter={(e) => handleDragEnter(e, actualIndex)}
-            ondragleave={(e) => handleDragLeave(e, actualIndex)}
-            ondragend={handleDragEnd}
-            ondrop={(e) => handleDrop(e, actualIndex)}
+            data-index={actualIndex}
+            onpointerdown={(e) => handleRowPointerDown(e, actualIndex, item)}
             onclick={(e) => handleRowClick(e, item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
-            ondblclick={() => !unavailable && handlePlayPlaylistItem(item)}
+            ondblclick={() => !unavailable && !pointerDragJustEnded && handlePlayPlaylistItem(item)}
             class="grid items-center py-2.5 px-4 group transition-all duration-150 select-none text-sm border-b border-brand-border/40
               {unavailable
                 ? 'opacity-50 cursor-not-allowed'
