@@ -3491,6 +3491,123 @@ mod tests {
     }
 
     #[test]
+    fn test_read_tags_id3v2_year_round_trip_via_recording_date() {
+        // Regression test for #433: the lofty 0.21->0.25 bump switched year
+        // writes to ItemKey::Year directly, which has no ID3v2 mapping and
+        // silently produced no frame at all for ID3v2-tagged files (nearly
+        // every MP3/WAV). write_tags now goes through set_date(), which
+        // writes ItemKey::RecordingDate (ID3v2 TDRC) — verify the full
+        // write -> read round trip actually preserves the year instead of
+        // silently dropping it, since a subsequent library rescan reading
+        // back None would wipe the year in the database too.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        crate::tageditor::write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "",
+            "",
+            "",
+            None,
+            None,
+            Some(1995),
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(
+            song.year,
+            Some(1995),
+            "year written via write_tags must survive an ID3v2 write/read round trip"
+        );
+    }
+
+    #[test]
+    fn test_read_tags_id3v2_year_cleared_removes_recording_date() {
+        // Companion to the round-trip test above: write_tags's None branch
+        // must clear both ItemKey::RecordingDate (via remove_date()) and the
+        // legacy ItemKey::Year key, or a previously-set year would survive
+        // an edit that's supposed to clear it.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        crate::tageditor::write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "",
+            "",
+            "",
+            None,
+            None,
+            Some(1995),
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+        crate::tageditor::write_tags(
+            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+        )
+        .expect("second write_tags (clearing year) should succeed");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(
+            song.year, None,
+            "clearing the year must remove it, not leave the old value"
+        );
+    }
+
+    #[test]
+    fn test_read_tags_originalyear_from_original_release_date() {
+        // Regression test for #433's second fix: songs.originalyear is read
+        // by decade auto-playlists as a fallback (COALESCE(year,
+        // originalyear)), but read_tags() never assigned it before this fix
+        // — it was permanently NULL for every scanned song regardless of
+        // what the file actually had tagged. ID3v2's TDOR frame surfaces
+        // through lofty as ItemKey::OriginalReleaseDate; write it directly
+        // (write_tags has no originalyear param) and confirm read_tags
+        // actually populates song.originalyear from it.
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        {
+            let mut tagged_file = Probe::open(&path)
+                .expect("probe open")
+                .read()
+                .expect("probe read");
+            let tag_type = tagged_file.primary_tag_type();
+            if tagged_file.primary_tag().is_none() {
+                tagged_file.insert_tag(Tag::new(tag_type));
+            }
+            let tag = tagged_file.primary_tag_mut().expect("primary tag");
+            tag.insert_text(ItemKey::OriginalReleaseDate, "1969".to_string());
+            tagged_file
+                .save_to_path(&path, lofty::config::WriteOptions::default())
+                .expect("save");
+        }
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(
+            song.originalyear,
+            Some(1969),
+            "originalyear must be populated from ItemKey::OriginalReleaseDate"
+        );
+    }
+
+    #[test]
     fn test_watcher_ignores_non_mutating_access_events() {
         use notify::event::{AccessKind, AccessMode};
         use notify::EventKind;

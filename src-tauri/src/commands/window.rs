@@ -168,6 +168,30 @@ pub async fn move_window_to_preset(window: WebviewWindow, position: String) -> R
     window.move_window(pos).map_err(|e| e.to_string())
 }
 
+/// True if `(width, height, x, y)` looks like a minimized-window placeholder
+/// rather than real geometry — either a 0x0 size, or Win32's offscreen
+/// minimized coordinates (around -32000). A pure function of the already-
+/// scaled values, factored out of `get_window_geometry` so the boundary
+/// logic is unit-testable without a live `WebviewWindow`.
+///
+/// Regression test for #441/#442: before this check existed,
+/// `get_window_geometry` happily returned the placeholder geometry for a
+/// minimized window, and the frontend restored the window to that
+/// placeholder (0x0, or offscreen at -32000) on next launch — a
+/// completely blank, invisible app the user had no way to recover without
+/// external tooling.
+fn is_placeholder_minimized_geometry(
+    width: f64,
+    height: f64,
+    x: Option<f64>,
+    y: Option<f64>,
+) -> bool {
+    width <= 0.0
+        || height <= 0.0
+        || x.is_some_and(|coord| coord <= -10000.0)
+        || y.is_some_and(|coord| coord <= -10000.0)
+}
+
 #[tauri::command]
 pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Value, String> {
     if window.is_minimized().unwrap_or(false) {
@@ -189,11 +213,7 @@ pub async fn get_window_geometry(window: WebviewWindow) -> Result<serde_json::Va
     };
 
     // Ignore placeholder minimized sizes (0x0) or Win32 offscreen minimized coordinates (-32000)
-    if width <= 0.0
-        || height <= 0.0
-        || x.is_some_and(|coord| coord <= -10000.0)
-        || y.is_some_and(|coord| coord <= -10000.0)
-    {
+    if is_placeholder_minimized_geometry(width, height, x, y) {
         return Ok(serde_json::Value::Null);
     }
 
@@ -232,4 +252,63 @@ pub async fn start_window_resize(
     let inner = Manager::get_window(&window, window.label())
         .ok_or_else(|| "window not found".to_string())?;
     inner.start_resize_dragging(dir).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normal_geometry_is_not_a_placeholder() {
+        assert!(!is_placeholder_minimized_geometry(
+            1024.0,
+            768.0,
+            Some(100.0),
+            Some(50.0)
+        ));
+    }
+
+    #[test]
+    fn test_normal_geometry_with_no_position_is_not_a_placeholder() {
+        // outer_position() can legitimately fail/be unavailable (e.g. under
+        // Wayland) independent of minimized state — None coordinates alone
+        // must not be treated as a placeholder.
+        assert!(!is_placeholder_minimized_geometry(
+            1024.0, 768.0, None, None
+        ));
+    }
+
+    #[test]
+    fn test_zero_size_is_a_placeholder() {
+        assert!(is_placeholder_minimized_geometry(
+            0.0,
+            0.0,
+            Some(100.0),
+            Some(50.0)
+        ));
+    }
+
+    #[test]
+    fn test_win32_offscreen_minimized_coordinates_are_a_placeholder() {
+        // Win32 parks minimized windows at (-32000, -32000).
+        assert!(is_placeholder_minimized_geometry(
+            160.0,
+            28.0,
+            Some(-32000.0),
+            Some(-32000.0)
+        ));
+    }
+
+    #[test]
+    fn test_negative_but_onscreen_coordinates_are_not_a_placeholder() {
+        // A window can legitimately sit partly off a monitor's top-left edge
+        // (e.g. a multi-monitor setup) without being minimized — only the
+        // extreme Win32 offscreen-parking coordinates should trip this.
+        assert!(!is_placeholder_minimized_geometry(
+            1024.0,
+            768.0,
+            Some(-50.0),
+            Some(-20.0)
+        ));
+    }
 }
