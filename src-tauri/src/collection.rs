@@ -1480,8 +1480,9 @@ impl CollectionScanner {
         // reach `limit` items for a normal-sized library; it isn't a
         // guarantee for pathological cases (e.g. one giant album).
         let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
         let sql = format!(
-            "SELECT {HOME_ITEM_SELECT_COLS}, ph.context_type, ph.playlist_id
+            "SELECT {home_item_select_cols}, ph.context_type, ph.playlist_id
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
              WHERE s.source IN (1, 2) AND s.unavailable = 0
@@ -1621,8 +1622,9 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         // See get_recently_played's identical overfetch-then-group comment.
         let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
         let sql = format!(
-            "SELECT {HOME_ITEM_SELECT_COLS}
+            "SELECT {home_item_select_cols}
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
@@ -1943,7 +1945,8 @@ fn get_songs_by_ids(
         return Ok(std::collections::HashMap::new());
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("SELECT {HOME_ITEM_SELECT_COLS} FROM songs s WHERE s.id IN ({placeholders})");
+    let home_item_select_cols = home_item_select_cols();
+    let sql = format!("SELECT {home_item_select_cols} FROM songs s WHERE s.id IN ({placeholders})");
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
@@ -2084,9 +2087,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         None
     };
 
-    // Use the primary tag (ID3v2, VorbisComment, etc.)
-    let tag: Option<&Tag> = tagged_file.primary_tag();
-
     let mut song = Song {
         source: SongSource::LocalFile,
         filetype,
@@ -2102,68 +2102,121 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         ..Default::default()
     };
 
-    if let Some(tag) = tag {
-        song.title = tag.title().map(|t| t.to_string());
-        song.artist = read_multi_value(tag, ItemKey::TrackArtist);
-        song.album = tag.album().map(|a| a.to_string());
-        song.genre = read_multi_value(tag, ItemKey::Genre);
-        song.comment = tag.comment().map(|c| c.to_string());
+    // Prefer the primary tag (ID3v2, VorbisComment, etc.), but fall back to secondary tags
+    // (ID3v1, APE, etc.) if the primary tag is missing or lacks specific fields.
+    let mut candidate_tags: Vec<&Tag> = Vec::new();
+    if let Some(primary) = tagged_file.primary_tag() {
+        candidate_tags.push(primary);
+    }
+    for t in tagged_file.tags() {
+        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+            candidate_tags.push(t);
+        }
+    }
+
+    for tag in candidate_tags.iter().copied() {
+        if song.title.is_none() {
+            song.title = tag.title().map(|t| t.to_string());
+        }
+        if song.artist.is_none() {
+            song.artist = read_multi_value(tag, ItemKey::TrackArtist);
+        }
+        if song.album.is_none() {
+            song.album = tag.album().map(|a| a.to_string());
+        }
+        if song.genre.is_none() {
+            song.genre = read_multi_value(tag, ItemKey::Genre);
+        }
+        if song.comment.is_none() {
+            song.comment = tag.comment().map(|c| c.to_string());
+        }
         // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
         // silently drops the year for every ID3v2-tagged file (#428).
-        song.year = tag.date().map(|d| d.year as i32);
+        if song.year.is_none() {
+            song.year = tag.date().map(|d| d.year as i32).or_else(|| {
+                tag.get_string(ItemKey::Year)
+                    .and_then(|s| s.trim().parse::<i32>().ok())
+            });
+        }
         // Original release date (ID3v2 TDOR, MP4/Vorbis equivalents) — used by
         // decade auto-playlists as a fallback when `year` (the pressing's own
         // date, e.g. a reissue) isn't set. Parsed the same relaxed way `date()`
         // parses ItemKey::RecordingDate, since lofty has no Accessor helper for it.
-        song.originalyear = tag
-            .get_string(ItemKey::OriginalReleaseDate)
-            .and_then(|s| {
-                Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
-                    .ok()
-                    .flatten()
-            })
-            .map(|d| d.year as i32);
-        song.track = tag.track().map(|t| t as i32);
-        song.disc = tag.disk().map(|d| d as i32);
+        if song.originalyear.is_none() {
+            song.originalyear = tag
+                .get_string(ItemKey::OriginalReleaseDate)
+                .and_then(|s| {
+                    Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
+                        .ok()
+                        .flatten()
+                })
+                .map(|d| d.year as i32);
+        }
+        if song.track.is_none() {
+            song.track = tag.track().map(|t| t as i32);
+        }
+        if song.disc.is_none() {
+            song.disc = tag.disk().map(|d| d as i32);
+        }
 
         // Album artist (various tag formats store this differently)
-        song.album_artist = read_multi_value(tag, ItemKey::AlbumArtist);
+        if song.album_artist.is_none() {
+            song.album_artist = read_multi_value(tag, ItemKey::AlbumArtist);
+        }
 
         // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
         // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
-        song.compilation = tag
-            .get_string(ItemKey::FlagCompilation)
-            .map(|s| s.trim() == "1")
-            .unwrap_or(false);
+        if !song.compilation {
+            song.compilation = tag
+                .get_string(ItemKey::FlagCompilation)
+                .map(|s| s.trim() == "1")
+                .unwrap_or(false);
+        }
 
-        song.composer = read_multi_value(tag, ItemKey::Composer);
+        if song.composer.is_none() {
+            song.composer = read_multi_value(tag, ItemKey::Composer);
+        }
 
-        song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
+        if song.lyrics.is_none() {
+            song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
+        }
 
-        song.grouping = tag.get_string(ItemKey::ContentGroup).map(|s| s.to_string());
-        song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
+        if song.grouping.is_none() {
+            song.grouping = tag
+                .get_string(ItemKey::ContentGroup)
+                .map(|s| s.to_string());
+        }
+        if song.initial_key.is_none() {
+            song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
+        }
         // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
         // store it as freeform text — check both generic keys to cover either.
         // Some taggers write "0" as an "unknown tempo" sentinel rather than
         // omitting the tag — treat that the same as absent, since 0 is never a
         // real tempo.
-        song.bpm = tag
-            .get_string(ItemKey::IntegerBpm)
-            .or_else(|| tag.get_string(ItemKey::Bpm))
-            .and_then(|s| s.trim().parse::<f32>().ok())
-            .filter(|&b| b > 0.0);
+        if song.bpm.is_none() {
+            song.bpm = tag
+                .get_string(ItemKey::IntegerBpm)
+                .or_else(|| tag.get_string(ItemKey::Bpm))
+                .and_then(|s| s.trim().parse::<f32>().ok())
+                .filter(|&b| b > 0.0);
+        }
 
         // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
-        song.replaygain_track_gain = tag
-            .get_string(ItemKey::ReplayGainTrackGain)
-            .and_then(parse_replaygain_db);
-        song.replaygain_album_gain = tag
-            .get_string(ItemKey::ReplayGainAlbumGain)
-            .and_then(parse_replaygain_db);
-
-        song.art_embedded = !tag.pictures().is_empty();
+        if song.replaygain_track_gain.is_none() {
+            song.replaygain_track_gain = tag
+                .get_string(ItemKey::ReplayGainTrackGain)
+                .and_then(parse_replaygain_db);
+        }
+        if song.replaygain_album_gain.is_none() {
+            song.replaygain_album_gain = tag
+                .get_string(ItemKey::ReplayGainAlbumGain)
+                .and_then(parse_replaygain_db);
+        }
     }
+
+    song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
     Ok(song)
 }
@@ -2410,10 +2463,12 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     is_vbr, is_instrumental, added
 ";
 
-/// Song columns qualified with the `s` alias, plus correlated `album_track_count`
-/// and `album_disc_count` subqueries. Shared by the home-screen queries (`get_recently_played`,
-/// `get_most_frequently_played`, `get_recently_added`), which all join on `songs s`.
-const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+/// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
+/// `s` alias for use in joined queries. Keep in sync with `SONG_SELECT_COLS`
+/// and `row_to_song_at`'s field order — `cargo test` in `collection.rs`
+/// exercises every column through `row_to_song`, so a mismatch fails loudly
+/// there instead of silently defaulting a field at a call site.
+pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
     s.title, s.titlesort, s.artist, s.artistsort,
     s.album, s.albumsort, s.album_artist, s.album_artist_sort,
     s.composer, s.composersort, s.performer, s.performersort,
@@ -2427,13 +2482,23 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental, s.added,
+    s.is_vbr, s.is_instrumental, s.added";
+
+/// `SONG_SELECT_COLS_QUALIFIED` plus correlated `album_track_count` and
+/// `album_disc_count` subqueries. Shared by the home-screen queries
+/// (`get_recently_played`, `get_most_frequently_played`, `get_recently_added`),
+/// which all join on `songs s`.
+fn home_item_select_cols() -> String {
+    format!(
+        "{SONG_SELECT_COLS_QUALIFIED},
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
-    ) AS album_disc_count";
+    ) AS album_disc_count"
+    )
+}
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
@@ -2448,63 +2513,76 @@ const SONG_INSERT_PLACEHOLDERS: &str =
     "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
+    row_to_song_at(row, 0)
+}
+
+/// Maps the `SONG_SELECT_COLS`/`SONG_SELECT_COLS_QUALIFIED` block of a row to
+/// a `Song`, starting at `offset` — for queries that select other columns
+/// (e.g. a join table's own fields) before the song columns. This is the
+/// single place that knows the column order those two constants promise;
+/// callers should never hand-roll their own `row.get(n)` mapping, since that
+/// duplication is exactly what lets a new/reordered song column silently
+/// default at one call site while every other stays correct (see the queue
+/// "Date Added" regression this replaced).
+pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Result<Song> {
+    let col = |i: usize| offset + i;
     Ok(Song {
-        id: row.get(0)?,
-        source: row.get::<_, i64>(1).map(SongSource::from)?,
-        filetype: row.get::<_, i64>(2).map(FileType::from)?,
-        path: row.get(3)?,
-        url: row.get(4)?,
-        stream_url: row.get(5)?,
-        title: row.get(6)?,
-        titlesort: row.get(7)?,
-        artist: row.get(8)?,
-        artistsort: row.get(9)?,
-        album: row.get(10)?,
-        albumsort: row.get(11)?,
-        album_artist: row.get(12)?,
-        album_artist_sort: row.get(13)?,
-        composer: row.get(14)?,
-        composersort: row.get(15)?,
-        performer: row.get(16)?,
-        performersort: row.get(17)?,
-        grouping: row.get(18)?,
-        comment: row.get(19)?,
-        lyrics: row.get(20)?,
-        track: row.get(21)?,
-        disc: row.get(22)?,
-        year: row.get(23)?,
-        originalyear: row.get(24)?,
-        genre: row.get(25)?,
-        compilation: row.get(26)?,
-        bpm: row.get(27)?,
-        initial_key: row.get(28)?,
-        length_nanosec: row.get(29)?,
-        beginning_nanosec: row.get::<_, Option<i64>>(30)?.unwrap_or(0),
-        end_nanosec: row.get::<_, Option<i64>>(31)?.unwrap_or(0),
-        bitrate: row.get(32)?,
-        samplerate: row.get(33)?,
-        bitdepth: row.get(34)?,
-        channels: row.get(35)?,
-        filesize: row.get(36)?,
-        mtime: row.get(37)?,
-        rating: row.get::<_, Option<f32>>(38)?.unwrap_or(-1.0),
-        playcount: row.get::<_, Option<i32>>(39)?.unwrap_or(0),
-        skipcount: row.get::<_, Option<i32>>(40)?.unwrap_or(0),
-        lastplayed: row.get(41)?,
-        lastseen: row.get(42)?,
-        art_embedded: row.get(43)?,
-        art_automatic: row.get(44)?,
-        art_manual: row.get(45)?,
-        art_unset: row.get(46)?,
-        cue_path: row.get(47)?,
-        ebur128_integrated_loudness_lufs: row.get(48)?,
-        ebur128_loudness_range_lu: row.get(49)?,
-        unavailable: row.get::<_, Option<bool>>(50)?.unwrap_or(false),
-        replaygain_track_gain: row.get(51)?,
-        replaygain_album_gain: row.get(52)?,
-        is_vbr: row.get(53)?,
-        is_instrumental: row.get::<_, Option<bool>>(54)?.unwrap_or(false),
-        added: row.get(55)?,
+        id: row.get::<_, Option<i64>>(col(0))?.unwrap_or(0),
+        source: row.get::<_, i64>(col(1)).map(SongSource::from)?,
+        filetype: row.get::<_, i64>(col(2)).map(FileType::from)?,
+        path: row.get(col(3))?,
+        url: row.get(col(4))?,
+        stream_url: row.get(col(5))?,
+        title: row.get(col(6))?,
+        titlesort: row.get(col(7))?,
+        artist: row.get(col(8))?,
+        artistsort: row.get(col(9))?,
+        album: row.get(col(10))?,
+        albumsort: row.get(col(11))?,
+        album_artist: row.get(col(12))?,
+        album_artist_sort: row.get(col(13))?,
+        composer: row.get(col(14))?,
+        composersort: row.get(col(15))?,
+        performer: row.get(col(16))?,
+        performersort: row.get(col(17))?,
+        grouping: row.get(col(18))?,
+        comment: row.get(col(19))?,
+        lyrics: row.get(col(20))?,
+        track: row.get(col(21))?,
+        disc: row.get(col(22))?,
+        year: row.get(col(23))?,
+        originalyear: row.get(col(24))?,
+        genre: row.get(col(25))?,
+        compilation: row.get(col(26))?,
+        bpm: row.get(col(27))?,
+        initial_key: row.get(col(28))?,
+        length_nanosec: row.get(col(29))?,
+        beginning_nanosec: row.get::<_, Option<i64>>(col(30))?.unwrap_or(0),
+        end_nanosec: row.get::<_, Option<i64>>(col(31))?.unwrap_or(0),
+        bitrate: row.get(col(32))?,
+        samplerate: row.get(col(33))?,
+        bitdepth: row.get(col(34))?,
+        channels: row.get(col(35))?,
+        filesize: row.get(col(36))?,
+        mtime: row.get(col(37))?,
+        rating: row.get::<_, Option<f32>>(col(38))?.unwrap_or(-1.0),
+        playcount: row.get::<_, Option<i32>>(col(39))?.unwrap_or(0),
+        skipcount: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
+        lastplayed: row.get(col(41))?,
+        lastseen: row.get(col(42))?,
+        art_embedded: row.get(col(43))?,
+        art_automatic: row.get(col(44))?,
+        art_manual: row.get(col(45))?,
+        art_unset: row.get(col(46))?,
+        cue_path: row.get(col(47))?,
+        ebur128_integrated_loudness_lufs: row.get(col(48))?,
+        ebur128_loudness_range_lu: row.get(col(49))?,
+        unavailable: row.get::<_, Option<bool>>(col(50))?.unwrap_or(false),
+        replaygain_track_gain: row.get(col(51))?,
+        replaygain_album_gain: row.get(col(52))?,
+        is_vbr: row.get(col(53))?,
+        is_instrumental: row.get::<_, Option<bool>>(col(54))?.unwrap_or(false),
+        added: row.get(col(55))?,
         ..Default::default()
     })
 }
@@ -3495,6 +3573,109 @@ mod tests {
         }
         std::fs::write(&path, data).unwrap();
         path
+    }
+
+    #[test]
+    fn test_read_tags_id3v1() {
+        let path = std::env::temp_dir().join(format!(
+            "luminous_id3v1_test_{}.mp3",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        // Create 10 valid MPEG-1 Layer 3 frames (128kbps, 44.1kHz, stereo = 417 bytes each)
+        let mut mp3_bytes = Vec::new();
+        let frame_header = [0xFF, 0xFB, 0x90, 0x00];
+        for _ in 0..10 {
+            mp3_bytes.extend_from_slice(&frame_header);
+            mp3_bytes.resize(mp3_bytes.len() + 413, 0);
+        }
+
+        // 128-byte ID3v1.1 tag
+        let mut id3v1 = [0u8; 128];
+        id3v1[0..3].copy_from_slice(b"TAG");
+        // Title (30 bytes)
+        let title = b"Bohemian Rhapsody";
+        id3v1[3..3 + title.len()].copy_from_slice(title);
+        // Artist (30 bytes)
+        let artist = b"Queen";
+        id3v1[33..33 + artist.len()].copy_from_slice(artist);
+        // Album (30 bytes)
+        let album = b"Greatest Hits";
+        id3v1[63..63 + album.len()].copy_from_slice(album);
+        // Year (4 bytes)
+        id3v1[93..97].copy_from_slice(b"1981");
+        // Comment (28 bytes)
+        let comment = b"Rock Classic";
+        id3v1[97..97 + comment.len()].copy_from_slice(comment);
+        // Zero byte separator for ID3v1.1 track number
+        id3v1[125] = 0;
+        // Track number
+        id3v1[126] = 1;
+        // Genre index (17 = Rock)
+        id3v1[127] = 17;
+
+        mp3_bytes.extend_from_slice(&id3v1);
+        std::fs::write(&path, &mp3_bytes).expect("failed to write test mp3 fixture");
+
+        let song = read_tags(&path).expect("read_tags should succeed for ID3v1 MP3");
+        assert_eq!(song.title.as_deref(), Some("Bohemian Rhapsody"));
+        assert_eq!(song.artist.as_deref(), Some("Queen"));
+        assert_eq!(song.album.as_deref(), Some("Greatest Hits"));
+        assert_eq!(song.year, Some(1981));
+        assert_eq!(song.comment.as_deref(), Some("Rock Classic"));
+        assert_eq!(song.track, Some(1));
+        assert_eq!(song.genre.as_deref(), Some("Rock"));
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_read_tags_fallback_to_secondary_tags() {
+        let path = std::env::temp_dir().join(format!(
+            "luminous_id3v1_fallback_test_{}.mp3",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        // Create 10 valid MPEG-1 Layer 3 frames
+        let mut mp3_bytes = Vec::new();
+        let frame_header = [0xFF, 0xFB, 0x90, 0x00];
+        for _ in 0..10 {
+            mp3_bytes.extend_from_slice(&frame_header);
+            mp3_bytes.resize(mp3_bytes.len() + 413, 0);
+        }
+
+        // 128-byte ID3v1.1 tag with year and album
+        let mut id3v1 = [0u8; 128];
+        id3v1[0..3].copy_from_slice(b"TAG");
+        let album = b"Night at the Opera";
+        id3v1[63..63 + album.len()].copy_from_slice(album);
+        id3v1[93..97].copy_from_slice(b"1975");
+        mp3_bytes.extend_from_slice(&id3v1);
+
+        std::fs::write(&path, &mp3_bytes).expect("failed to write test mp3 fixture");
+
+        // Write an ID3v2 tag that has Title and Artist but no Album and no Year
+        let mut id3v2_tag = Tag::new(lofty::tag::TagType::Id3v2);
+        id3v2_tag.set_title("Love of My Life".to_string());
+        id3v2_tag.set_artist("Queen".to_string());
+        id3v2_tag
+            .save_to_path(&path, lofty::config::WriteOptions::default())
+            .expect("should save ID3v2 tag");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.title.as_deref(), Some("Love of My Life"));
+        assert_eq!(song.artist.as_deref(), Some("Queen"));
+        // Album and Year fall back to ID3v1
+        assert_eq!(song.album.as_deref(), Some("Night at the Opera"));
+        assert_eq!(song.year, Some(1975));
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
