@@ -1,13 +1,16 @@
 # CI/CD Pipeline
 
 This documents the actual GitHub Actions pipeline as it exists in `.github/workflows/`.
-There are four workflow files: `audit.yml`, `codeql.yml`, `release.yml`, and
-`publish-store.yml`. There is no separate lint/test/clippy workflow — those checks
-(`bun run check`, `bun run test:run`, `cargo test`, `cargo clippy`) are **not** run by
-GitHub Actions today; they're manual steps in [`docs/RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md)
-that a human runs locally before cutting a release. If you're expecting a CI job to catch
-a failing test or a clippy warning on your PR, it won't — only the two workflows below run
-on PRs.
+There are three workflow files: `audit.yml`, `codeql.yml`, and `release.yml`. There is no
+separate lint/test/clippy workflow — those checks (`bun run check`, `bun run test:run`,
+`cargo test`, `cargo clippy`) are **not** run by GitHub Actions today; they're manual steps
+in [`docs/RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) that a human runs locally before
+cutting a release. If you're expecting a CI job to catch a failing test or a clippy warning
+on your PR, it won't — only the two workflows below run on PRs.
+
+Microsoft Store submission is **not** part of this repo's pipeline — it lives in the
+separate private repo `esoltys/luminous-store`, triggered manually against a published
+`luminous` release tag. See that repo's `README.md` for details.
 
 ## What runs on pull requests (and pushes to `main`/`next`)
 
@@ -71,26 +74,22 @@ auto-generated notes with `docs/release-notes/vX.Y.Z.md`), optionally enables "C
 discussion for this release," and clicks **Publish**. This is a manual GitHub UI action —
 no workflow does it automatically.
 
-### 3. `publish-store.yml` — Publish to Microsoft Store
+### 3. Manual (separate repo): Microsoft Store submission
 
-Triggers: `release: published` (fires the moment the human publishes the draft above), or
-manual `workflow_dispatch` with a required `tag` input (for retrying a submission against
-an already-published release).
+Once the release is published, Store submission is triggered by hand in
+`esoltys/luminous-store` (private):
 
-- Downloads the release's `.msix`/`.msixbundle` asset via `gh release download`, preferring
-  a plain `.msix` over `.msixbundle` (StoreBroker's bundle-metadata reader can't locate the
-  inner package inside a `.msixbundle`).
-- Runs `.github/store/Submit-ToMicrosoftStore.ps1`, which uses Microsoft's StoreBroker
-  PowerShell module to call `Update-ApplicationSubmission -ReplacePackages` against the
-  Microsoft Store submission API, authenticating with `STORE_TENANT_ID` /
-  `STORE_CLIENT_ID` / `STORE_CLIENT_SECRET` / `STORE_APP_ID` secrets.
-- This is a separate workflow from `release.yml` on purpose: it doesn't depend on (and
-  isn't skipped by) the build job, and can be re-run independently.
-- A green run of this workflow only means the submission was **committed for
-  certification** — Microsoft's own cert pass still has to complete before the update is
-  live in the Store. See [`.github/store/README.md`](../.github/store/README.md) for how
-  `sbConfig.json` and the submission script are structured, including a gotcha about
-  `//` in JSON string values breaking StoreBroker's comment stripper.
+```bash
+gh workflow run publish-store.yml -f tag=vX.Y.Z
+```
+
+That repo's `publish-store.yml` downloads the tag's `.msix`/`.msixbundle` asset from this
+repo via `gh release download`, then runs Microsoft's StoreBroker PowerShell module to
+submit it. See `esoltys/luminous-store`'s `README.md` for the full flow, including the
+`-f update_screenshots=true` option for also replacing the live listing text/screenshots.
+This repo (`luminous`) has no visibility into or dependency on that submission — it's
+entirely decoupled, matching the previous in-repo `publish-store.yml`'s design (re-runnable
+independently, doesn't gate or get gated by the build).
 
 ## Trigger graph
 
@@ -102,13 +101,10 @@ flowchart TD
     Schedule2["Schedule: weekly Sat 21:43"]
     TagPush["Push tag v*"]
     ManualDispatch1["Manual workflow_dispatch"]
-    ReleasePublished["Human publishes draft release"]
-    ManualDispatch2["Manual workflow_dispatch (tag input)"]
 
     Audit["audit.yml\nSecurity Audit + bun.lock check"]
     CodeQL["codeql.yml\nCodeQL Advanced"]
     Release["release.yml\nRelease Build (builds + drafts release)"]
-    Store["publish-store.yml\nPublish to Microsoft Store"]
 
     PR --> Audit
     PushMainNext --> Audit
@@ -122,17 +118,12 @@ flowchart TD
     ManualDispatch1 --> Release
 
     Release -->|creates draft GitHub release| HumanPublish["Human edits & publishes draft release"]
-    HumanPublish --> ReleasePublished
-    ReleasePublished --> Store
-    ManualDispatch2 --> Store
-
-    Store -->|submits MSIX via StoreBroker| MSStore["Microsoft Store certification\n(outside GitHub/CI)"]
+    HumanPublish --> ManualStore["Human triggers publish-store.yml\nin esoltys/luminous-store (private, separate repo)"]
+    ManualStore -->|submits MSIX via StoreBroker| MSStore["Microsoft Store certification\n(outside this repo)"]
 ```
 
-One thing worth calling out explicitly since it's easy to miss reading the YAML in
-isolation:
+One thing worth calling out explicitly since it's easy to miss:
 
-- `publish-store.yml` is decoupled from `release.yml` entirely — it only cares about the
-  release being published, not about how it got built. That's deliberate (see
-  `RELEASE_CHECKLIST.md`), and it's why it can be re-run via `workflow_dispatch` without
-  re-running the whole build.
+- Microsoft Store submission lives entirely in `esoltys/luminous-store`, not this repo. It's
+  triggered by hand after a release is published, decoupled from `release.yml`, and can be
+  re-run independently without touching this repo at all.
