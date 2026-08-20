@@ -814,6 +814,8 @@ pub fn run() {
             commands::tags::list_all_tags,
             commands::tags::get_songs_by_tag,
             commands::tags::get_genre_graph,
+            commands::tags::get_songs_by_main_tag,
+            commands::tags::get_songs_by_genre_edge,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

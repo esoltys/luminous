@@ -39,9 +39,22 @@
     editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
   }
 
+  type DrillDownContext =
+    | { kind: "tag"; tag: string }
+    | { kind: "main"; tag: string }
+    | { kind: "edge"; root: string; child: string };
+
+  let drillDownContext = $state<DrillDownContext | null>(null);
+
+  function fetchForContext(ctx: DrillDownContext) {
+    if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag, 500);
+    if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag, 500);
+    return tagsStore.getSongsByGenreEdge(ctx.root, ctx.child, 500);
+  }
+
   function refreshDrillDown() {
-    if (selectedTag) {
-      tagsStore.getSongsByTag(selectedTag, 500).then((songs) => { drillDownSongs = songs; });
+    if (drillDownContext) {
+      fetchForContext(drillDownContext).then((songs) => { drillDownSongs = songs; });
     }
   }
 
@@ -70,14 +83,40 @@
     expandedRoots = next;
   }
 
-  async function openTag(tagName: string) {
-    selectedTag = tagName;
+  async function loadDrillDown(ctx: DrillDownContext, displayTag: string) {
+    drillDownContext = ctx;
+    selectedTag = displayTag;
     drillDownLoading = true;
     try {
-      drillDownSongs = await tagsStore.getSongsByTag(tagName, 500);
+      drillDownSongs = await fetchForContext(ctx);
     } finally {
       drillDownLoading = false;
     }
+  }
+
+  /** Any-position match — flat Tags view, and external "browse this value"
+   * navigation (e.g. a GenreChips chip clicked elsewhere in the app) where
+   * there's no specific root/child relationship to narrow by. */
+  function openTag(tagName: string) {
+    return loadDrillDown({ kind: "tag", tag: tagName }, tagName);
+  }
+
+  /** Strict main-tag match — clicking a root in the Genre view. */
+  function openMainTag(tagName: string) {
+    return loadDrillDown({ kind: "main", tag: tagName }, tagName);
+  }
+
+  /** Exact root/child edge match — clicking a child under a specific root in
+   * the Genre view, so a reordered song (no longer under this root) drops
+   * out immediately, and a tag shared under multiple roots only shows the
+   * songs for *this* relationship. */
+  function openGenreEdge(rootTag: string, childTag: string) {
+    return loadDrillDown({ kind: "edge", root: rootTag, child: childTag }, childTag);
+  }
+
+  function closeDrillDown() {
+    selectedTag = null;
+    drillDownContext = null;
   }
 
   // Consumes collectionStore.viewGenreTag()'s one-shot "open this tag" signal
@@ -92,7 +131,7 @@
 
   function setViewMode(mode: GenreViewMode) {
     prefs.setGenreViewMode(mode);
-    selectedTag = null;
+    closeDrillDown();
   }
 
   async function playAllInTag() {
@@ -111,7 +150,7 @@
   {#if selectedTag !== null}
     <div class="h-9 flex items-center gap-2 mb-3">
       <button
-        onclick={() => { selectedTag = null; }}
+        onclick={closeDrillDown}
         class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors"
       >
         <ArrowLeft class="w-3.5 h-3.5" />
@@ -242,7 +281,7 @@
                 <span class="w-9"></span>
               {/if}
               <button
-                onclick={() => openTag(group.main_tag)}
+                onclick={() => openMainTag(group.main_tag)}
                 class="flex-1 flex items-center justify-between py-2.5 pr-3 text-left"
               >
                 <span class="text-sm font-semibold text-brand-text-primary">{group.main_tag}</span>
@@ -255,7 +294,7 @@
               <div class="pl-9 pb-1.5 flex flex-col">
                 {#each group.children as child (child.name)}
                   <button
-                    onclick={() => openTag(child.name)}
+                    onclick={() => openGenreEdge(group.main_tag, child.name)}
                     class="flex items-center justify-between py-1.5 pr-3 text-left text-brand-text-secondary hover:text-brand-text-primary transition-colors"
                   >
                     <span class="text-xs font-medium">{child.name}</span>

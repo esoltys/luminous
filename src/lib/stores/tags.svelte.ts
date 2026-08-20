@@ -23,8 +23,30 @@ class TagsStore {
     this.loaded = true;
   }
 
+  /** Any-position match — used by the flat Tags view, where a tag click is a
+   * plain search over every song carrying that value anywhere. */
   async getSongsByTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
     return invoke<Song[]>("get_songs_by_tag", { tagName, limit, mode });
+  }
+
+  /** Strict main-tag match — used when drilling into a root of the Genre
+   * view's hierarchy, so a song that's been reordered to have a different
+   * main tag no longer shows up here just because it still carries this
+   * value as a subgenre. */
+  async getSongsByMainTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+    return invoke<Song[]>("get_songs_by_main_tag", { tagName, limit, mode });
+  }
+
+  /** Exact root/child edge match — used when drilling into a specific child
+   * under a specific root in the Genre view, so a tag shared as a child
+   * under multiple roots only shows songs for *this* relationship. */
+  async getSongsByGenreEdge(
+    rootTag: string,
+    childTag: string,
+    limit?: number,
+    mode?: QueuePopulationMode
+  ): Promise<Song[]> {
+    return invoke<Song[]>("get_songs_by_genre_edge", { rootTag, childTag, limit, mode });
   }
 }
 
