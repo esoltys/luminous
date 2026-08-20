@@ -1,12 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 import type { PlaybackState, Playlist, PlaylistItem, Song, ShuffleMode, RepeatMode, PlayState, LoudnessGainSource, PlayContext } from "../types";
+import { getCoverArtUrl } from "../types";
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { themeStore } from "./theme.svelte";
 import { toastStore } from "./toast.svelte";
 import { playlistsStore } from "./playlists.svelte";
 import { i18n } from "./i18n.svelte";
+import { prefs } from "./prefs.svelte";
 
 export class PlayerStore {
   state = $state<PlayState>("stopped");
@@ -83,6 +86,9 @@ export class PlayerStore {
         this.currentSong = event.payload.song || undefined;
         themeStore.updateArtworkColors(this.currentSong);
         await this.syncQueueTrackPosition();
+        if (this.currentSong) {
+          this.notifyTrackChange(this.currentSong);
+        }
       });
 
       // A song couldn't be opened/decoded (e.g. its file just vanished —
@@ -142,6 +148,61 @@ export class PlayerStore {
         "error"
       );
     }
+  }
+
+  /** Native desktop notification on track change (#524) — opt-in via
+   * Settings > General (`prefs.trackNotificationsEnabled`); permission is
+   * requested when the user turns the toggle on (see `prefs.svelte.ts`), so
+   * this only checks that it was actually granted. Best-effort throughout:
+   * a missing preference, ungranted permission, or unresolvable cover art
+   * just means no notification (or an icon-less one) — never an error that
+   * could interrupt playback. */
+  private notifyTrackChange(song: Song) {
+    if (!prefs.trackNotificationsEnabled) return;
+    void (async () => {
+      try {
+        if (!(await isPermissionGranted())) return;
+        const icon = await this.resolveNotificationIcon(song);
+        sendNotification({
+          title: song.title || i18n.t("collection.unknownSong"),
+          body: [song.artist, song.album].filter((v): v is string => !!v).join(" — "),
+          icon: icon ?? undefined,
+        });
+      } catch (err) {
+        console.error("Failed to send track-change notification:", err);
+      }
+    })();
+  }
+
+  /** Mirrors the art-resolution branches in `themeStore.updateArtworkColors`
+   * (manual override → automatic/album art → embedded art via
+   * `get_cover_art_uri`). Kept local rather than shared since it only needs
+   * to produce a best-effort icon URL, not drive theme extraction. */
+  private async resolveNotificationIcon(song: Song): Promise<string | null> {
+    if (song.art_manual) {
+      if (song.art_manual.startsWith("http://") || song.art_manual.startsWith("https://") || song.art_manual.startsWith("/")) {
+        return song.art_manual;
+      }
+      return getCoverArtUrl(`luminous-art://${song.art_manual}`);
+    }
+    if (song.art_automatic) {
+      if (song.art_automatic.startsWith("http://") || song.art_automatic.startsWith("https://") || song.art_automatic.startsWith("/")) {
+        return song.art_automatic;
+      }
+      if (song.art_automatic.startsWith("album-")) {
+        return getCoverArtUrl(`luminous-art://${song.art_automatic}`);
+      }
+      return getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
+    }
+    if (song.art_embedded) {
+      try {
+        const uri = await invoke<string | null>("get_cover_art_uri", { songId: song.id });
+        return uri ? getCoverArtUrl(uri) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   private updateState(state: PlaybackState) {

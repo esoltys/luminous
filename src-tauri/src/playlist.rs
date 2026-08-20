@@ -984,7 +984,10 @@ impl PlaylistManager {
                         candidate_tags.push(primary);
                     }
                     for t in tagged.tags() {
-                        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+                        if !candidate_tags
+                            .iter()
+                            .any(|existing| std::ptr::eq(*existing, t))
+                        {
                             candidate_tags.push(t);
                         }
                     }

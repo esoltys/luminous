@@ -125,6 +125,16 @@ vi.mock("@tauri-apps/plugin-process", () => {
   };
 });
 
+// Mock Tauri notification plugin (desktop notifications on track change, #524) —
+// defaults to "not granted"/no-op; tests override with vi.mocked(...) as needed.
+vi.mock("@tauri-apps/plugin-notification", () => {
+  return {
+    isPermissionGranted: vi.fn().mockResolvedValue(false),
+    requestPermission: vi.fn().mockResolvedValue("granted"),
+    sendNotification: vi.fn(),
+  };
+});
+
 // jsdom doesn't implement canvas rendering, so components that draw to a
 // <canvas> (e.g. WaveformSeekBar) spam "not implemented" console noise on
 // every render. Tests here only mount components, they don't assert on

@@ -276,7 +276,5 @@ pub async fn get_all_artist_profiles(
     state: State<'_, AppState>,
 ) -> Result<Vec<ArtistProfile>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_all_artist_profiles()
-        .map_err(|e| e.to_string())
+    scanner.get_all_artist_profiles().map_err(|e| e.to_string())
 }

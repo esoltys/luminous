@@ -827,6 +827,8 @@ pub fn run() {
             commands::settings::set_fade_settings,
             commands::settings::get_minimize_to_tray_enabled,
             commands::settings::set_minimize_to_tray_enabled,
+            commands::settings::get_track_notifications_enabled,
+            commands::settings::set_track_notifications_enabled,
             install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,

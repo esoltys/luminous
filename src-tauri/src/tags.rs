@@ -73,13 +73,17 @@ impl TagManager {
         for values in lists {
             let Some(root) = values.first() else { continue };
             let root_key = root.to_lowercase();
-            let root_entry = root_counts.entry(root_key.clone()).or_insert_with(|| (root.clone(), 0));
+            let root_entry = root_counts
+                .entry(root_key.clone())
+                .or_insert_with(|| (root.clone(), 0));
             root_entry.1 += 1;
 
             let children = child_counts.entry(root_key).or_default();
             for child in &values[1..] {
                 let child_key = child.to_lowercase();
-                let child_entry = children.entry(child_key).or_insert_with(|| (child.clone(), 0));
+                let child_entry = children
+                    .entry(child_key)
+                    .or_insert_with(|| (child.clone(), 0));
                 child_entry.1 += 1;
             }
         }
@@ -157,7 +161,11 @@ impl TagManager {
     }
 
     /// Songs with no genre value at all — the "No Genre" browsable group.
-    pub fn get_songs_without_genre(&self, limit: i64, mode: QueuePopulationMode) -> Result<Vec<Song>> {
+    pub fn get_songs_without_genre(
+        &self,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
@@ -313,9 +321,7 @@ impl TagManager {
                     return false;
                 };
                 main.to_lowercase() == root_target
-                    && values[1..]
-                        .iter()
-                        .any(|v| v.to_lowercase() == child_target)
+                    && values[1..].iter().any(|v| v.to_lowercase() == child_target)
             })
             .take(limit.max(0) as usize)
             .collect();
@@ -359,7 +365,10 @@ mod tests {
         let manager = TagManager::new(db.clone());
         let tags = manager.list_all_tags().unwrap();
         assert_eq!(tags.len(), 2);
-        let metal = tags.iter().find(|t| t.name.eq_ignore_ascii_case("metal")).unwrap();
+        let metal = tags
+            .iter()
+            .find(|t| t.name.eq_ignore_ascii_case("metal"))
+            .unwrap();
         assert_eq!(metal.song_count, 2);
 
         let _ = std::fs::remove_dir_all(dir);
@@ -433,7 +442,10 @@ mod tests {
         let metal = graph.iter().find(|g| g.main_tag == "Metal").unwrap();
         assert!(metal.children.iter().any(|c| c.name == "Symphonic Metal"));
         let classical = graph.iter().find(|g| g.main_tag == "Classical").unwrap();
-        assert!(classical.children.iter().any(|c| c.name == "Symphonic Metal"));
+        assert!(classical
+            .children
+            .iter()
+            .any(|c| c.name == "Symphonic Metal"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -471,7 +483,11 @@ mod tests {
         let by_main = manager
             .get_songs_by_main_tag("Ambient Folk", 50, QueuePopulationMode::All)
             .unwrap();
-        assert_eq!(by_main.len(), 1, "main-tag match excludes the subgenre-only song");
+        assert_eq!(
+            by_main.len(),
+            1,
+            "main-tag match excludes the subgenre-only song"
+        );
         assert_eq!(by_main[0].genre.as_deref(), Some("Ambient Folk"));
 
         let _ = std::fs::remove_dir_all(dir);
@@ -490,13 +506,19 @@ mod tests {
             .get_songs_by_genre_edge("Metal", "Symphonic Metal", 50, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(under_metal.len(), 1);
-        assert_eq!(under_metal[0].genre.as_deref(), Some("Metal; Symphonic Metal"));
+        assert_eq!(
+            under_metal[0].genre.as_deref(),
+            Some("Metal; Symphonic Metal")
+        );
 
         let under_classical = manager
             .get_songs_by_genre_edge("Classical", "Symphonic Metal", 50, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(under_classical.len(), 1);
-        assert_eq!(under_classical[0].genre.as_deref(), Some("Classical; Symphonic Metal"));
+        assert_eq!(
+            under_classical[0].genre.as_deref(),
+            Some("Classical; Symphonic Metal")
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }

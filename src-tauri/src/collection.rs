@@ -1715,10 +1715,7 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
 }
 
 /// Retrieve customizable profile for an artist from SQLite (#473).
-pub fn get_artist_profile_conn(
-    conn: &rusqlite::Connection,
-    artist: &str,
-) -> Result<ArtistProfile> {
+pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Result<ArtistProfile> {
     let mut stmt = conn.prepare(
         "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
     )?;
@@ -2109,7 +2106,10 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         candidate_tags.push(primary);
     }
     for t in tagged_file.tags() {
-        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+        if !candidate_tags
+            .iter()
+            .any(|existing| std::ptr::eq(*existing, t))
+        {
             candidate_tags.push(t);
         }
     }
@@ -2183,9 +2183,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         }
 
         if song.grouping.is_none() {
-            song.grouping = tag
-                .get_string(ItemKey::ContentGroup)
-                .map(|s| s.to_string());
+            song.grouping = tag.get_string(ItemKey::ContentGroup).map(|s| s.to_string());
         }
         if song.initial_key.is_none() {
             song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
@@ -2468,7 +2466,8 @@ pub(crate) const SONG_SELECT_COLS: &str = "
 /// and `row_to_song_at`'s field order — `cargo test` in `collection.rs`
 /// exercises every column through `row_to_song`, so a mismatch fails loudly
 /// there instead of silently defaulting a field at a call site.
-pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
+    "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
     s.title, s.titlesort, s.artist, s.artistsort,
     s.album, s.albumsort, s.album_artist, s.album_artist_sort,
     s.composer, s.composersort, s.performer, s.performersort,
@@ -5335,7 +5334,10 @@ mod tests {
         // Retrieve saved profile (case-insensitive key match)
         let loaded = get_artist_profile_conn(&conn, "shania twain").unwrap();
         assert_eq!(loaded.artist_key, "Shania Twain");
-        assert_eq!(loaded.website, Some("https://www.shaniatwain.com".to_string()));
+        assert_eq!(
+            loaded.website,
+            Some("https://www.shaniatwain.com".to_string())
+        );
         assert_eq!(loaded.tags, vec!["pop", "country", "canadian"]);
         assert_eq!(loaded.social_links.len(), 2);
         assert_eq!(loaded.social_links[0].platform, "instagram");

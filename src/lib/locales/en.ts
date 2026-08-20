@@ -222,6 +222,8 @@ export const en = {
     ratingStyleHint: "Choose Heart to mark songs as favourites, or 5-star for half-step ratings — both save to the same rating.",
     minimizeToTrayLabel: "Minimize to tray",
     minimizeToTrayHint: "Closing the window hides Luminous to the system tray instead of quitting.",
+    trackNotificationsLabel: "Song change notifications",
+    trackNotificationsHint: "Show a desktop notification when a new track begins playing",
     appAndUpdatesTitle: "Application & Updates",
     updateCheckNowBtn: "Check for Updates",
     updateChecking: "Checking...",

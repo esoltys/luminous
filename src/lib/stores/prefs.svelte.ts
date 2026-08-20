@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
 export type RatingStyle = "heart" | "stars";
 export type SeekBarMode = "waveform" | "bands";
@@ -29,6 +30,9 @@ class PrefsStore {
   genreViewMode = $state<GenreViewMode>("genre");
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
+  /** Off by default — desktop notifications are opt-in and request OS
+   * permission the first time they're enabled (#524). */
+  trackNotificationsEnabled = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -41,6 +45,7 @@ class PrefsStore {
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
     this.genreViewMode = prefs.genre_view_mode;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
+    this.trackNotificationsEnabled = await invoke<boolean>("get_track_notifications_enabled");
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -103,6 +108,26 @@ class PrefsStore {
   setMinimizeToTray(enabled: boolean) {
     this.minimizeToTray = enabled;
     invoke("set_minimize_to_tray_enabled", { enabled });
+  }
+
+  /** Not part of `save()` — persisted via its own dedicated command (see
+   * `setMinimizeToTray`). Requests OS notification permission the moment
+   * the user opts in, so the very next track change can notify without a
+   * second round-trip; declining permission just means notifications stay
+   * silent until the user grants it via the OS, not a hard failure. */
+  async setTrackNotificationsEnabled(enabled: boolean) {
+    this.trackNotificationsEnabled = enabled;
+    invoke("set_track_notifications_enabled", { enabled });
+    if (enabled) {
+      try {
+        const granted = await isPermissionGranted();
+        if (!granted) {
+          await requestPermission();
+        }
+      } catch (err) {
+        console.error("Failed to request notification permission:", err);
+      }
+    }
   }
 }
 

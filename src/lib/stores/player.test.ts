@@ -3,6 +3,8 @@ import { PlayerStore } from "./player.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsStore } from "./playlists.svelte";
+import { prefs } from "./prefs.svelte";
+import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 
 describe("PlayerStore", () => {
   let store: PlayerStore;
@@ -165,5 +167,82 @@ describe("PlayerStore", () => {
     expect(store.currentSong).toBeUndefined();
 
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
+
+  describe("track-change desktop notifications (#524)", () => {
+    it("sends a notification with title/artist/album when enabled and permitted", async () => {
+      prefs.trackNotificationsEnabled = true;
+      vi.mocked(isPermissionGranted).mockResolvedValueOnce(true);
+
+      const originalListenImpl = vi.mocked(listen).getMockImplementation();
+      let trackChangedCallback: ((event: { payload: { song: unknown } }) => void) | undefined;
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "track-changed") trackChangedCallback = callback;
+        return () => {};
+      });
+
+      store = new PlayerStore();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      trackChangedCallback?.({
+        payload: { song: { id: 1, title: "Test Song", artist: "Test Artist", album: "Test Album" } },
+      });
+      // Flush the fire-and-forget notifyTrackChange() microtask chain.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Test Song", body: "Test Artist — Test Album" })
+      );
+
+      prefs.trackNotificationsEnabled = false;
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    });
+
+    it("does not send a notification when the preference is disabled", async () => {
+      prefs.trackNotificationsEnabled = false;
+
+      const originalListenImpl = vi.mocked(listen).getMockImplementation();
+      let trackChangedCallback: ((event: { payload: { song: unknown } }) => void) | undefined;
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "track-changed") trackChangedCallback = callback;
+        return () => {};
+      });
+
+      store = new PlayerStore();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      trackChangedCallback?.({ payload: { song: { id: 1, title: "Test Song" } } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendNotification).not.toHaveBeenCalled();
+
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    });
+
+    it("does not send a notification when enabled but OS permission isn't granted", async () => {
+      prefs.trackNotificationsEnabled = true;
+      vi.mocked(isPermissionGranted).mockResolvedValueOnce(false);
+
+      const originalListenImpl = vi.mocked(listen).getMockImplementation();
+      let trackChangedCallback: ((event: { payload: { song: unknown } }) => void) | undefined;
+      vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+        if (event === "track-changed") trackChangedCallback = callback;
+        return () => {};
+      });
+
+      store = new PlayerStore();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      trackChangedCallback?.({ payload: { song: { id: 1, title: "Test Song" } } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendNotification).not.toHaveBeenCalled();
+
+      prefs.trackNotificationsEnabled = false;
+      if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+    });
   });
 });

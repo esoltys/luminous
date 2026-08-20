@@ -76,6 +76,11 @@ pub async fn get_songs_by_genre_edge(
 ) -> Result<Vec<Song>, String> {
     let manager = TagManager::new(state.db.clone());
     manager
-        .get_songs_by_genre_edge(&root_tag, &child_tag, limit.unwrap_or(50), mode.unwrap_or_default())
+        .get_songs_by_genre_edge(
+            &root_tag,
+            &child_tag,
+            limit.unwrap_or(50),
+            mode.unwrap_or_default(),
+        )
         .map_err(|e| e.to_string())
 }

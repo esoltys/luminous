@@ -450,6 +450,18 @@
             label={i18n.t('settings.minimizeToTrayLabel')}
           />
         </div>
+
+        <div class="flex items-center justify-between gap-4 py-4">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.trackNotificationsLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('settings.trackNotificationsHint')}</p>
+          </div>
+          <Toggle
+            checked={prefs.trackNotificationsEnabled}
+            onchange={(v) => prefs.setTrackNotificationsEnabled(v)}
+            label={i18n.t('settings.trackNotificationsLabel')}
+          />
+        </div>
       </div>
 
       {#if updaterStore.isExternallyManaged}

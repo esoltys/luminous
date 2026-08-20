@@ -193,6 +193,43 @@ pub async fn set_minimize_to_tray_enabled(
     Ok(())
 }
 
+/// Reads the persisted preference directly from the DB — unlike
+/// [`get_minimize_to_tray_enabled`] this has no in-memory mirror because
+/// nothing on the Rust side needs to act on it; the frontend alone decides
+/// whether to send a notification on track change.
+#[tauri::command]
+pub fn get_track_notifications_enabled(state: State<'_, AppState>) -> bool {
+    let Ok(conn) = state.db.pool.get() else {
+        return false;
+    };
+    conn.query_row(
+        "SELECT value FROM app_state WHERE key = 'track_notifications_enabled'",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .map(|v| v == "true")
+    .unwrap_or(false)
+}
+
+/// Fire-and-forget like [`set_app_setting`] — always `Ok`.
+#[tauri::command]
+pub async fn set_track_notifications_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let Ok(conn) = state.db.pool.get() else {
+        log::error!("Failed to persist track_notifications_enabled setting: no DB connection");
+        return Ok(());
+    };
+    if let Err(e) = conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('track_notifications_enabled', ?1)",
+        rusqlite::params![enabled.to_string()],
+    ) {
+        log::error!("Failed to persist track_notifications_enabled setting: {e}");
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_commit_hash() -> String {
     option_env!("BUILD_COMMIT_HASH").unwrap_or("").to_string()
