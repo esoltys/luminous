@@ -972,7 +972,16 @@ impl PlaylistManager {
                 if let Ok(tagged) = lofty::read_from_path(&cleaned_path) {
                     use lofty::file::TaggedFileExt;
                     use lofty::tag::Accessor;
-                    if let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) {
+                    let mut candidate_tags: Vec<&lofty::tag::Tag> = Vec::new();
+                    if let Some(primary) = tagged.primary_tag() {
+                        candidate_tags.push(primary);
+                    }
+                    for t in tagged.tags() {
+                        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+                            candidate_tags.push(t);
+                        }
+                    }
+                    for tag in candidate_tags {
                         if title.is_none() {
                             title = tag.title().map(|s| s.to_string());
                         }

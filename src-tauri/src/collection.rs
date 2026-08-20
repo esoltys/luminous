@@ -1887,9 +1887,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         None
     };
 
-    // Use the primary tag (ID3v2, VorbisComment, etc.)
-    let tag: Option<&Tag> = tagged_file.primary_tag();
-
     let mut song = Song {
         source: SongSource::LocalFile,
         filetype,
@@ -1905,70 +1902,121 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         ..Default::default()
     };
 
-    if let Some(tag) = tag {
-        song.title = tag.title().map(|t| t.to_string());
-        song.artist = tag.artist().map(|a| a.to_string());
-        song.album = tag.album().map(|a| a.to_string());
-        song.genre = tag.genre().map(|g| g.to_string());
-        song.comment = tag.comment().map(|c| c.to_string());
+    // Prefer the primary tag (ID3v2, VorbisComment, etc.), but fall back to secondary tags
+    // (ID3v1, APE, etc.) if the primary tag is missing or lacks specific fields.
+    let mut candidate_tags: Vec<&Tag> = Vec::new();
+    if let Some(primary) = tagged_file.primary_tag() {
+        candidate_tags.push(primary);
+    }
+    for t in tagged_file.tags() {
+        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+            candidate_tags.push(t);
+        }
+    }
+
+    for tag in &candidate_tags {
+        if song.title.is_none() {
+            song.title = tag.title().map(|t| t.to_string());
+        }
+        if song.artist.is_none() {
+            song.artist = tag.artist().map(|a| a.to_string());
+        }
+        if song.album.is_none() {
+            song.album = tag.album().map(|a| a.to_string());
+        }
+        if song.genre.is_none() {
+            song.genre = tag.genre().map(|g| g.to_string());
+        }
+        if song.comment.is_none() {
+            song.comment = tag.comment().map(|c| c.to_string());
+        }
         // `date()` checks ItemKey::RecordingDate (ID3v2 TDRC, MP4, Vorbis DATE)
         // before falling back to ItemKey::Year (ID3v1 only) — using Year alone
         // silently drops the year for every ID3v2-tagged file (#428).
-        song.year = tag.date().map(|d| d.year as i32);
+        if song.year.is_none() {
+            song.year = tag.date().map(|d| d.year as i32).or_else(|| {
+                tag.get_string(ItemKey::Year)
+                    .and_then(|s| s.trim().parse::<i32>().ok())
+            });
+        }
         // Original release date (ID3v2 TDOR, MP4/Vorbis equivalents) — used by
         // decade auto-playlists as a fallback when `year` (the pressing's own
         // date, e.g. a reissue) isn't set. Parsed the same relaxed way `date()`
         // parses ItemKey::RecordingDate, since lofty has no Accessor helper for it.
-        song.originalyear = tag
-            .get_string(ItemKey::OriginalReleaseDate)
-            .and_then(|s| {
-                Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
-                    .ok()
-                    .flatten()
-            })
-            .map(|d| d.year as i32);
-        song.track = tag.track().map(|t| t as i32);
-        song.disc = tag.disk().map(|d| d as i32);
+        if song.originalyear.is_none() {
+            song.originalyear = tag
+                .get_string(ItemKey::OriginalReleaseDate)
+                .and_then(|s| {
+                    Timestamp::parse(&mut s.as_bytes(), ParsingMode::Relaxed)
+                        .ok()
+                        .flatten()
+                })
+                .map(|d| d.year as i32);
+        }
+        if song.track.is_none() {
+            song.track = tag.track().map(|t| t as i32);
+        }
+        if song.disc.is_none() {
+            song.disc = tag.disk().map(|d| d as i32);
+        }
 
         // Album artist (various tag formats store this differently)
-        song.album_artist = tag.get_string(ItemKey::AlbumArtist).map(|s| s.to_string());
+        if song.album_artist.is_none() {
+            song.album_artist = tag.get_string(ItemKey::AlbumArtist).map(|s| s.to_string());
+        }
 
         // TCMP/cpil/COMPILATION "part of a compilation" flag — stored as text
         // "1"/"0" across every format lofty supports (ID3v2, MP4, Vorbis/APE).
-        song.compilation = tag
-            .get_string(ItemKey::FlagCompilation)
-            .map(|s| s.trim() == "1")
-            .unwrap_or(false);
+        if !song.compilation {
+            song.compilation = tag
+                .get_string(ItemKey::FlagCompilation)
+                .map(|s| s.trim() == "1")
+                .unwrap_or(false);
+        }
 
-        song.composer = tag.get_string(ItemKey::Composer).map(|s| s.to_string());
+        if song.composer.is_none() {
+            song.composer = tag.get_string(ItemKey::Composer).map(|s| s.to_string());
+        }
 
-        song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
+        if song.lyrics.is_none() {
+            song.lyrics = tag.get_string(ItemKey::Lyrics).map(|s| s.to_string());
+        }
 
-        song.grouping = tag
-            .get_string(ItemKey::ContentGroup)
-            .map(|s| s.to_string());
-        song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
+        if song.grouping.is_none() {
+            song.grouping = tag
+                .get_string(ItemKey::ContentGroup)
+                .map(|s| s.to_string());
+        }
+        if song.initial_key.is_none() {
+            song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
+        }
         // ID3v2 (TBPM) and MP4 (tmpo) store BPM as an integer field; Vorbis/APE
         // store it as freeform text — check both generic keys to cover either.
         // Some taggers write "0" as an "unknown tempo" sentinel rather than
         // omitting the tag — treat that the same as absent, since 0 is never a
         // real tempo.
-        song.bpm = tag
-            .get_string(ItemKey::IntegerBpm)
-            .or_else(|| tag.get_string(ItemKey::Bpm))
-            .and_then(|s| s.trim().parse::<f32>().ok())
-            .filter(|&b| b > 0.0);
+        if song.bpm.is_none() {
+            song.bpm = tag
+                .get_string(ItemKey::IntegerBpm)
+                .or_else(|| tag.get_string(ItemKey::Bpm))
+                .and_then(|s| s.trim().parse::<f32>().ok())
+                .filter(|&b| b > 0.0);
+        }
 
         // ReplayGain 2.0 tags (#77) — fallback gain until R128 analysis runs.
-        song.replaygain_track_gain = tag
-            .get_string(ItemKey::ReplayGainTrackGain)
-            .and_then(parse_replaygain_db);
-        song.replaygain_album_gain = tag
-            .get_string(ItemKey::ReplayGainAlbumGain)
-            .and_then(parse_replaygain_db);
-
-        song.art_embedded = !tag.pictures().is_empty();
+        if song.replaygain_track_gain.is_none() {
+            song.replaygain_track_gain = tag
+                .get_string(ItemKey::ReplayGainTrackGain)
+                .and_then(parse_replaygain_db);
+        }
+        if song.replaygain_album_gain.is_none() {
+            song.replaygain_album_gain = tag
+                .get_string(ItemKey::ReplayGainAlbumGain)
+                .and_then(parse_replaygain_db);
+        }
     }
+
+    song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
     Ok(song)
 }
@@ -3079,6 +3127,109 @@ mod tests {
         }
         std::fs::write(&path, data).unwrap();
         path
+    }
+
+    #[test]
+    fn test_read_tags_id3v1() {
+        let path = std::env::temp_dir().join(format!(
+            "luminous_id3v1_test_{}.mp3",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        // Create 10 valid MPEG-1 Layer 3 frames (128kbps, 44.1kHz, stereo = 417 bytes each)
+        let mut mp3_bytes = Vec::new();
+        let frame_header = [0xFF, 0xFB, 0x90, 0x00];
+        for _ in 0..10 {
+            mp3_bytes.extend_from_slice(&frame_header);
+            mp3_bytes.resize(mp3_bytes.len() + 413, 0);
+        }
+
+        // 128-byte ID3v1.1 tag
+        let mut id3v1 = [0u8; 128];
+        id3v1[0..3].copy_from_slice(b"TAG");
+        // Title (30 bytes)
+        let title = b"Bohemian Rhapsody";
+        id3v1[3..3 + title.len()].copy_from_slice(title);
+        // Artist (30 bytes)
+        let artist = b"Queen";
+        id3v1[33..33 + artist.len()].copy_from_slice(artist);
+        // Album (30 bytes)
+        let album = b"Greatest Hits";
+        id3v1[63..63 + album.len()].copy_from_slice(album);
+        // Year (4 bytes)
+        id3v1[93..97].copy_from_slice(b"1981");
+        // Comment (28 bytes)
+        let comment = b"Rock Classic";
+        id3v1[97..97 + comment.len()].copy_from_slice(comment);
+        // Zero byte separator for ID3v1.1 track number
+        id3v1[125] = 0;
+        // Track number
+        id3v1[126] = 1;
+        // Genre index (17 = Rock)
+        id3v1[127] = 17;
+
+        mp3_bytes.extend_from_slice(&id3v1);
+        std::fs::write(&path, &mp3_bytes).expect("failed to write test mp3 fixture");
+
+        let song = read_tags(&path).expect("read_tags should succeed for ID3v1 MP3");
+        assert_eq!(song.title.as_deref(), Some("Bohemian Rhapsody"));
+        assert_eq!(song.artist.as_deref(), Some("Queen"));
+        assert_eq!(song.album.as_deref(), Some("Greatest Hits"));
+        assert_eq!(song.year, Some(1981));
+        assert_eq!(song.comment.as_deref(), Some("Rock Classic"));
+        assert_eq!(song.track, Some(1));
+        assert_eq!(song.genre.as_deref(), Some("Rock"));
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_read_tags_fallback_to_secondary_tags() {
+        let path = std::env::temp_dir().join(format!(
+            "luminous_id3v1_fallback_test_{}.mp3",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        // Create 10 valid MPEG-1 Layer 3 frames
+        let mut mp3_bytes = Vec::new();
+        let frame_header = [0xFF, 0xFB, 0x90, 0x00];
+        for _ in 0..10 {
+            mp3_bytes.extend_from_slice(&frame_header);
+            mp3_bytes.resize(mp3_bytes.len() + 413, 0);
+        }
+
+        // 128-byte ID3v1.1 tag with year and album
+        let mut id3v1 = [0u8; 128];
+        id3v1[0..3].copy_from_slice(b"TAG");
+        let album = b"Night at the Opera";
+        id3v1[63..63 + album.len()].copy_from_slice(album);
+        id3v1[93..97].copy_from_slice(b"1975");
+        mp3_bytes.extend_from_slice(&id3v1);
+
+        std::fs::write(&path, &mp3_bytes).expect("failed to write test mp3 fixture");
+
+        // Write an ID3v2 tag that has Title and Artist but no Album and no Year
+        let mut id3v2_tag = Tag::new(lofty::tag::TagType::Id3v2);
+        id3v2_tag.set_title("Love of My Life".to_string());
+        id3v2_tag.set_artist("Queen".to_string());
+        id3v2_tag
+            .save_to_path(&path, lofty::config::WriteOptions::default())
+            .expect("should save ID3v2 tag");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.title.as_deref(), Some("Love of My Life"));
+        assert_eq!(song.artist.as_deref(), Some("Queen"));
+        // Album and Year fall back to ID3v1
+        assert_eq!(song.album.as_deref(), Some("Night at the Opera"));
+        assert_eq!(song.year, Some(1975));
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

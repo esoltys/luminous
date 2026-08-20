@@ -105,12 +105,17 @@ impl CoverManager {
             .read()
             .context("failed to read audio file tags")?;
 
-        let tag = match tagged_file.primary_tag() {
-            Some(t) => t,
-            None => return Ok(None),
-        };
+        let picture = tagged_file
+            .primary_tag()
+            .and_then(|t| t.pictures().first())
+            .or_else(|| {
+                tagged_file
+                    .tags()
+                    .iter()
+                    .find_map(|t| t.pictures().first())
+            });
 
-        let picture = match tag.pictures().first() {
+        let picture = match picture {
             Some(p) => p,
             None => return Ok(None),
         };
