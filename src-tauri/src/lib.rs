@@ -108,18 +108,54 @@ fn build_prevent_default_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlug
     builder.build()
 }
 
+/// Env vars that must be set before any WebKitGTK webview is created, to
+/// avoid a blank-window rendering failure the release AppImage hit when its
+/// bundled WebKitGTK (built on the CI runner, older than most users' system
+/// WebKitGTK) ran its accelerated compositing path against newer Mesa/
+/// Wayland stacks (#370, #383). Kept as a table (rather than inline
+/// `set_var` calls) so the exact set of vars is a single assertable source
+/// of truth instead of only being verifiable by launching a real WebKitGTK
+/// webview.
+#[cfg(target_os = "linux")]
+const LINUX_WEBKITGTK_RENDERING_ENV_VARS: &[(&str, &str)] = &[
+    ("WEBKIT_DISABLE_COMPOSITING_MODE", "1"),
+    ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
+];
+
+/// Appends WebView2's occlusion-calculation-disabling flag to an existing
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating it if
+/// already present. Factored out of `run()`'s `cfg(target_os = "windows")`
+/// block as a pure string function so it's unit-testable on any host.
+///
+/// Regression test for the Windows "blank app after being minimized/
+/// occluded" failure: Chromium's CalculateNativeWinOcclusion feature
+/// suspends WebView2's rendering pipeline when the window is minimized or
+/// occluded, and it can fail to resume/repaint on restore. Without this
+/// flag set before the webview is created, restoring the window shows a
+/// blank surface.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn with_webview2_occlusion_disabled(current: &str) -> String {
+    let flag = "--disable-features=CalculateNativeWinOcclusion";
+    if current.contains(flag) {
+        current.to_string()
+    } else if current.is_empty() {
+        flag.to_string()
+    } else {
+        format!("{} {}", current, flag)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
     // blank window against newer Mesa/Wayland stacks; disabling compositing
-    // mode avoids that without touching DMA-BUF handling, which the line
-    // below already covers separately (#370).
+    // mode avoids that without touching DMA-BUF handling (#370, #383).
     #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    for (key, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+        std::env::set_var(key, value);
+    }
 
     // On Windows, Chromium's CalculateNativeWinOcclusion feature puts the
     // WebView2 rendering pipeline into a suspended/discarded state when the
@@ -129,16 +165,8 @@ pub fn run() {
     #[cfg(target_os = "windows")]
     {
         let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
-        let flag = "--disable-features=CalculateNativeWinOcclusion";
         let current = std::env::var(key).unwrap_or_default();
-        if !current.contains(flag) {
-            let new_val = if current.is_empty() {
-                flag.to_string()
-            } else {
-                format!("{} {}", current, flag)
-            };
-            std::env::set_var(key, new_val);
-        }
+        std::env::set_var(key, with_webview2_occlusion_disabled(&current));
     }
 
     tauri::Builder::default()
@@ -845,4 +873,56 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");
+}
+
+#[cfg(test)]
+mod startup_rendering_workaround_tests {
+    use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_disable_compositing_and_dmabuf() {
+        // Regression test for #383: both mitigations for the AppImage's
+        // bundled-WebKitGTK blank-window bug must stay set, or the
+        // regression (silently dropping one on a future edit) would only
+        // surface as a hard-to-reproduce rendering bug on specific Mesa/
+        // Wayland stacks, not a test failure.
+        let keys: Vec<&str> = LINUX_WEBKITGTK_RENDERING_ENV_VARS
+            .iter()
+            .map(|(k, _)| *k)
+            .collect();
+        assert!(keys.contains(&"WEBKIT_DISABLE_COMPOSITING_MODE"));
+        assert!(keys.contains(&"WEBKIT_DISABLE_DMABUF_RENDERER"));
+        for (_, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+            assert_eq!(*value, "1");
+        }
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_added_to_empty_value() {
+        assert_eq!(
+            with_webview2_occlusion_disabled(""),
+            "--disable-features=CalculateNativeWinOcclusion"
+        );
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_appended_to_existing_args() {
+        assert_eq!(
+            with_webview2_occlusion_disabled("--some-other-flag"),
+            "--some-other-flag --disable-features=CalculateNativeWinOcclusion"
+        );
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_not_duplicated_if_already_present() {
+        let already_set = "--disable-features=CalculateNativeWinOcclusion";
+        assert_eq!(with_webview2_occlusion_disabled(already_set), already_set);
+
+        let already_set_with_other = "--foo --disable-features=CalculateNativeWinOcclusion --bar";
+        assert_eq!(
+            with_webview2_occlusion_disabled(already_set_with_other),
+            already_set_with_other
+        );
+    }
 }

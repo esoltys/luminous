@@ -102,37 +102,9 @@ pub fn detect_install_format() -> InstallFormatInfo {
 
     #[cfg(target_os = "windows")]
     {
-        if let Ok(exe_path) = env::current_exe() {
-            let path_lower = exe_path.to_string_lossy().to_lowercase();
-            // MSIX/Store installs live under `...\WindowsApps\<PackageFamilyName>_...\`,
-            // a system-protected, read-only directory the in-app updater can't write to.
-            // The Store owns updates for these installs, so the downloaded installer can
-            // never actually take effect — without this check the app would keep seeing
-            // itself as out-of-date and re-download/re-"install" the same build on every
-            // launch.
-            if path_lower.contains("\\windowsapps\\") {
-                return InstallFormatInfo {
-                    format: "msix".to_string(),
-                    human_name: "Microsoft Store".to_string(),
-                    supports_self_update: false,
-                };
-            }
-
-            if path_lower.contains("appdata\\local\\programs")
-                || path_lower.contains("program files")
-            {
-                return InstallFormatInfo {
-                    format: "windows_setup".to_string(),
-                    human_name: "Windows Installer (.exe / .msi)".to_string(),
-                    supports_self_update: true,
-                };
-            }
-        }
-
-        InstallFormatInfo {
-            format: "windows_setup".to_string(),
-            human_name: "Windows Installer (.exe / .msi)".to_string(),
-            supports_self_update: true,
+        match env::current_exe() {
+            Ok(exe_path) => classify_windows_install_path(&exe_path.to_string_lossy()),
+            Err(_) => classify_windows_install_path(""),
         }
     }
 
@@ -143,6 +115,46 @@ pub fn detect_install_format() -> InstallFormatInfo {
             human_name: "Desktop Application".to_string(),
             supports_self_update: false,
         }
+    }
+}
+
+/// Pure classification of a Windows executable path into an install format —
+/// factored out of `detect_install_format`'s `cfg(target_os = "windows")`
+/// branch so it can be unit tested on any host, not just a live Windows
+/// machine. `exe_path_lossy` is expected to already be lowercased-or-not; the
+/// comparisons below lowercase it themselves.
+///
+/// Regression test for #416: this used to be missing entirely — every
+/// Windows path resolved to `windows_setup`/`supports_self_update: true`,
+/// including MSIX/Store installs living under the system-protected,
+/// read-only `...\WindowsApps\<PackageFamilyName>_...\` directory. Store
+/// installs can't be overwritten by the in-app updater's downloaded
+/// installer, so the app kept seeing itself as out-of-date and
+/// re-"installing" the same build on every launch.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn classify_windows_install_path(exe_path_lossy: &str) -> InstallFormatInfo {
+    let path_lower = exe_path_lossy.to_lowercase();
+
+    if path_lower.contains("\\windowsapps\\") {
+        return InstallFormatInfo {
+            format: "msix".to_string(),
+            human_name: "Microsoft Store".to_string(),
+            supports_self_update: false,
+        };
+    }
+
+    if path_lower.contains("appdata\\local\\programs") || path_lower.contains("program files") {
+        return InstallFormatInfo {
+            format: "windows_setup".to_string(),
+            human_name: "Windows Installer (.exe / .msi)".to_string(),
+            supports_self_update: true,
+        };
+    }
+
+    InstallFormatInfo {
+        format: "windows_setup".to_string(),
+        human_name: "Windows Installer (.exe / .msi)".to_string(),
+        supports_self_update: true,
     }
 }
 
@@ -169,6 +181,49 @@ mod tests {
         env::remove_var("APPIMAGE");
 
         assert_eq!(info.format, "appimage");
+        assert!(!info.supports_self_update);
+    }
+
+    // Regression tests for #416 — these run on every host (not gated behind
+    // `cfg(target_os = "windows")`) because `classify_windows_install_path`
+    // is a pure function of a path string, not the live filesystem.
+    #[test]
+    fn test_windowsapps_path_is_msix_and_not_self_updatable() {
+        let info = classify_windows_install_path(
+            r"C:\Program Files\WindowsApps\EricSoltys.LuminousMusicPlayer_1.0.0.0_x64__8wekyb3d8bbwe\Luminous.exe",
+        );
+        assert_eq!(info.format, "msix");
+        assert!(
+            !info.supports_self_update,
+            "Store/MSIX installs live in a read-only, Store-managed directory; the in-app \
+             updater's downloaded installer can never take effect there"
+        );
+    }
+
+    #[test]
+    fn test_program_files_path_is_windows_setup_and_self_updatable() {
+        let info = classify_windows_install_path(r"C:\Program Files\Luminous\Luminous.exe");
+        assert_eq!(info.format, "windows_setup");
+        assert!(info.supports_self_update);
+    }
+
+    #[test]
+    fn test_appdata_local_programs_path_is_windows_setup_and_self_updatable() {
+        let info = classify_windows_install_path(
+            r"C:\Users\alice\AppData\Local\Programs\Luminous\Luminous.exe",
+        );
+        assert_eq!(info.format, "windows_setup");
+        assert!(info.supports_self_update);
+    }
+
+    #[test]
+    fn test_windowsapps_check_is_case_insensitive() {
+        // Windows paths are case-insensitive; \current_exe() casing isn't
+        // guaranteed, so the WindowsApps check must not depend on it.
+        let info = classify_windows_install_path(
+            r"C:\Program Files\WINDOWSAPPS\EricSoltys.LuminousMusicPlayer_1.0.0.0_x64__8wekyb3d8bbwe\Luminous.exe",
+        );
+        assert_eq!(info.format, "msix");
         assert!(!info.supports_self_update);
     }
 }
