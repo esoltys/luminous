@@ -37,3 +37,8 @@ A release is only complete when **all three** of the following hold. Never repor
 - Use the tools in this harness (Read/Edit/Grep/Glob) instead of shelling out to `cat`/`sed`/`grep`/`find`.
 - Do not run `bun run tauri dev` as a background task — it does not work as expected in this harness. Ask the user to run it themselves and verify manually (AGENTS.md's Version Control section covers the full worktree → walkthrough → approval → merge → close workflow).
 - This project's dedicated worktree convention (`.claude/worktrees/` for Claude, `.worktrees/<name>/` for other assistants) is documented in AGENTS.md under Version Control — follow it for any bug/feature work.
+
+## Scope Control
+
+- Match the size of the edit to the size of the request. For README/docs changes, propose the diff in chat before writing if it exceeds ~10 lines.
+- Do not add explanatory prose, extra sections, or intermediary files that were not asked for.
