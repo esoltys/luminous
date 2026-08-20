@@ -210,7 +210,7 @@
             {i18n.t('albumTagEditor.compilationField')}
           </label>
 
-          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
+          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2 tooltip={i18n.t('albumTagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
             <ChipInput
               id="album-tag-genre"
               bind:value={genre}

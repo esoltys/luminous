@@ -152,6 +152,18 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 2. Increment the migration version.
 3. Keep queries backwards-compatible during rollout.
 
+## Bug Handling
+
+When work on one task surfaces a defect that isn't part of that task — a broken script, a stale
+doc, a misconfigured or missing dependency, a UI bug spotted while testing something else, a test
+failure unrelated to the change at hand — don't silently label it "pre-existing" or "unrelated" and
+move on without telling the user. Surface it plainly (what's broken, what you observed, why you
+think it's unrelated to the current change) and ask whether they want it fixed now or filed as a
+tracked issue (`gh issue create`, following the Version Control section's issue-creation steps).
+Only proceed without asking if the user has already given standing instructions for this exact
+situation. This applies even when the defect seems clearly out of scope — "unrelated" is a claim to
+verify with the user, not a reason to skip telling them.
+
 ## Performance Notes
 
 - Virtualize large lists (collections, playlists) with `svelte-virtual-list-ts`.

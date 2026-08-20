@@ -18,7 +18,6 @@
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import GenreBrowseView from "./GenreBrowseView.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import SongTagsModal from "./SongTagsModal.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
@@ -40,7 +39,6 @@
   // activeSubTab and activeTab are managed globally via collectionStore
 
   let editingSongId = $state<number | null>(null);
-  let manageTagsSong = $state<Song | null>(null);
   let showColumnsMenu = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
@@ -1167,14 +1165,6 @@
   />
 {/if}
 
-{#if manageTagsSong !== null}
-  <SongTagsModal
-    songId={manageTagsSong.id}
-    songTitle={manageTagsSong.title}
-    onClose={() => { manageTagsSong = null; }}
-  />
-{/if}
-
 {#if contextMenuState}
   {@const song = contextMenuState.song}
   <SongContextMenu
@@ -1200,7 +1190,6 @@
     onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
-    onManageTags={() => { manageTagsSong = song; }}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

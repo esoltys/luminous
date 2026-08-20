@@ -21,10 +21,6 @@ describe("TagsStore", () => {
           return mockTags;
         case "get_genre_graph":
           return mockGraph;
-        case "get_song_tags":
-          return ["Metal", "Symphonic Metal"];
-        case "set_song_tags":
-          return undefined;
         case "get_songs_by_tag":
           return [{ id: 1, title: "Song A" }];
         default:
@@ -38,19 +34,6 @@ describe("TagsStore", () => {
     expect(tagsStore.allTags).toEqual(mockTags);
     expect(tagsStore.genreGraph).toEqual(mockGraph);
     expect(tagsStore.loaded).toBe(true);
-  });
-
-  it("fetches a song's tags in order", async () => {
-    const tags = await tagsStore.getSongTags(42);
-    expect(invoke).toHaveBeenCalledWith("get_song_tags", { songId: 42 });
-    expect(tags).toEqual(["Metal", "Symphonic Metal"]);
-  });
-
-  it("sets a song's tags and refreshes the cached lists", async () => {
-    await tagsStore.setSongTags(42, ["Metal", "Symphonic Metal"]);
-    expect(invoke).toHaveBeenCalledWith("set_song_tags", { songId: 42, tagNames: ["Metal", "Symphonic Metal"] });
-    expect(invoke).toHaveBeenCalledWith("list_all_tags");
-    expect(invoke).toHaveBeenCalledWith("get_genre_graph");
   });
 
   it("fetches songs by tag", async () => {

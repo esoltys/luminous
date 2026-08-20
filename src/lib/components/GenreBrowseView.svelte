@@ -1,19 +1,31 @@
 <script lang="ts">
   import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft } from "lucide-svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { tagsStore } from "../stores/tags.svelte";
   import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
   import EmptyState from "./EmptyState.svelte";
-  import HomeRowList from "./HomeRowList.svelte";
-  import type { Song, HomeItem } from "../types";
+  import CoverArt from "./CoverArt.svelte";
+  import SongRating from "./SongRating.svelte";
+  import SongContextMenu from "./SongContextMenu.svelte";
+  import type { Song } from "../types";
 
   let expandedRoots = $state<Set<string>>(new Set());
   let selectedTag = $state<string | null>(null);
   let drillDownSongs = $state<Song[]>([]);
   let drillDownLoading = $state(false);
+  let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
-  let drillDownItems = $derived<HomeItem[]>(drillDownSongs.map((song) => ({ type: "song", song })));
+  async function rateSong(song: Song, rating: number) {
+    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
+  }
+
+  function handleContextMenu(e: MouseEvent, song: Song) {
+    e.preventDefault();
+    contextMenuState = { x: e.clientX, y: e.clientY, song };
+  }
 
   function toggleExpanded(mainTag: string) {
     const next = new Set(expandedRoots);
@@ -77,7 +89,40 @@
           {i18n.t("songTags.playAll", { count: drillDownSongs.length }, `Play all ${drillDownSongs.length} songs`)}
         </button>
       {/if}
-      <HomeRowList items={drillDownItems} variant="added" />
+      <div class="flex flex-col gap-2">
+        {#each drillDownSongs as song (song.id)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            role="button"
+            tabindex="0"
+            onclick={() => playerStore.playSong(song.id)}
+            oncontextmenu={(e) => handleContextMenu(e, song)}
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playerStore.playSong(song.id); } }}
+            class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+          >
+            <CoverArt
+              songId={song.id}
+              artEmbedded={song.art_embedded}
+              artAutomatic={song.art_automatic}
+              artManual={song.art_manual}
+              sizeClass="w-11 h-11 shrink-0"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <p class="truncate text-sm font-semibold text-brand-text-primary">{song.title || i18n.t('collection.unknownSong')}</p>
+                <span class="shrink-0">
+                  <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
+                </span>
+              </div>
+              <p class="truncate text-xs text-brand-text-secondary font-medium">{song.artist || i18n.t('collection.unknownArtist')}</p>
+            </div>
+            <div class="shrink-0 max-w-[45%] text-right">
+              <p class="text-xs text-brand-text-secondary whitespace-normal">{song.genre || ""}</p>
+            </div>
+          </div>
+        {/each}
+      </div>
     {/if}
   {:else}
     <div class="h-9 flex items-center justify-between mb-3">
@@ -110,7 +155,7 @@
           subtitle={i18n.t(
             "songTags.emptySubtitle",
             {},
-            "Right-click a song and choose Manage Tags to start organizing your library your way."
+            "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres."
           )}
         />
       </div>
@@ -179,3 +224,16 @@
     {/if}
   {/if}
 </div>
+
+{#if contextMenuState}
+  {@const song = contextMenuState.song}
+  <SongContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    {song}
+    onPlay={() => playerStore.playSong(song.id)}
+    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onClose={() => { contextMenuState = null; }}
+  />
+{/if}

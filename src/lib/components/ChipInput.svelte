@@ -31,6 +31,41 @@
 
   let chips = $derived(parseMultiValue(value));
   let draft = $state("");
+  let draggedIndex = $state<number | null>(null);
+  let dragOverIndex = $state<number | null>(null);
+
+  function reorderChip(fromIndex: number, toIndex: number) {
+    if (disabled || fromIndex === toIndex) return;
+    const next = [...chips];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    value = joinMultiValue(next);
+  }
+
+  function handleChipDragStart(e: DragEvent, index: number) {
+    if (disabled) return;
+    draggedIndex = index;
+    e.dataTransfer?.setData("text/plain", "");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleChipDragOver(e: DragEvent, index: number) {
+    if (draggedIndex === null) return;
+    e.preventDefault();
+    dragOverIndex = index;
+  }
+
+  function handleChipDrop(e: DragEvent, index: number) {
+    e.preventDefault();
+    if (draggedIndex !== null) reorderChip(draggedIndex, index);
+    draggedIndex = null;
+    dragOverIndex = null;
+  }
+
+  function handleChipDragEnd() {
+    draggedIndex = null;
+    dragOverIndex = null;
+  }
 
   function commitDraft() {
     // A single keystroke can contain more than one value (comma-separated
@@ -74,7 +109,16 @@
   class="flex flex-wrap items-center gap-1.5 border rounded-lg bg-brand-main px-2 py-1.5 min-h-9 focus-within:border-brand-accent transition-colors {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {disabled ? 'opacity-50' : ''} {className}"
 >
   {#each chips as chip, i (chip)}
-    <span class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text text-xs font-medium">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <span
+      draggable={!disabled}
+      ondragstart={(e) => handleChipDragStart(e, i)}
+      ondragover={(e) => handleChipDragOver(e, i)}
+      ondrop={(e) => handleChipDrop(e, i)}
+      ondragend={handleChipDragEnd}
+      title={i18n.t('chipInput.dragToReorder', {}, 'Drag to reorder')}
+      class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text text-xs font-medium transition-[opacity,box-shadow] {disabled ? '' : 'cursor-grab active:cursor-grabbing'} {draggedIndex === i ? 'opacity-40' : ''} {dragOverIndex === i && draggedIndex !== null && draggedIndex !== i ? 'ring-2 ring-brand-accent' : ''}"
+    >
       {chip}
       {#if !disabled}
         <button

@@ -12,27 +12,6 @@ pub async fn list_all_tags(state: State<'_, AppState>) -> Result<Vec<Tag>, Strin
 }
 
 #[tauri::command]
-pub async fn get_song_tags(
-    song_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager.get_song_tags(song_id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn set_song_tags(
-    song_id: i64,
-    tag_names: Vec<String>,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .set_song_tags(song_id, &tag_names)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn get_songs_by_tag(
     tag_name: String,
     limit: Option<i64>,

@@ -1,7 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { GenreGroup, QueuePopulationMode, Song, Tag } from "../types";
 
-/** Luminous-native song tags (#224) — independent of the embedded `Song.genre`. */
+/**
+ * Genre/tag browsing (#224). Reads the existing `Song.genre` column — genre
+ * *is* the tag system, there's no separate Luminous-native tag store.
+ * Editing a song's genre (and therefore its tags) goes through the existing
+ * full tag editor (`save_song_tags`), which already writes both the embedded
+ * file tag and the DB column; this store only refreshes afterward.
+ */
 class TagsStore {
   allTags = $state<Tag[]>([]);
   genreGraph = $state<GenreGroup[]>([]);
@@ -15,18 +21,6 @@ class TagsStore {
     this.allTags = allTags;
     this.genreGraph = genreGraph;
     this.loaded = true;
-  }
-
-  async getSongTags(songId: number): Promise<string[]> {
-    return invoke<string[]>("get_song_tags", { songId });
-  }
-
-  /** Replaces a song's whole tag list, in order — the first tag is treated
-   * as its main category for the Genre browse view. Refreshes the cached
-   * tag/genre lists afterward so the browse view reflects the change. */
-  async setSongTags(songId: number, tags: string[]) {
-    await invoke("set_song_tags", { songId, tagNames: tags });
-    await this.load();
   }
 
   async getSongsByTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {

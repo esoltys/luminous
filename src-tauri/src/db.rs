@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 18;
+pub const CURRENT_SCHEMA_VERSION: i32 = 17;
 
 #[derive(Debug)]
 pub struct Database {
@@ -245,17 +245,6 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![17],
-            )?;
-        }
-
-        if version < 18 {
-            log::info!(
-                "Running migration 18: tags/song_tags tables for Luminous-native song tagging (#224)"
-            );
-            conn.execute_batch(MIGRATION_18)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![18],
             )?;
         }
 
@@ -615,32 +604,6 @@ CREATE TABLE IF NOT EXISTS artist_profiles (
     social_links TEXT NOT NULL DEFAULT '[]',
     bio TEXT
 );
-";
-
-// ---------------------------------------------------------------------------
-// Migration 18: Luminous-native song tags (#224), independent of the
-// embedded songs.genre column. `position` preserves the order tags were
-// entered in — position 0 is a song's \"main category\" tag, used to derive
-// an emergent genre hierarchy (see commands/tags.rs::get_genre_graph)
-// without a bundled taxonomy.
-// ---------------------------------------------------------------------------
-
-const MIGRATION_18: &str = "
-CREATE TABLE IF NOT EXISTS tags (
-    id   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL COLLATE NOCASE
-);
-
-CREATE TABLE IF NOT EXISTS song_tags (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    song_id  INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
-    tag_id   INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(song_id, tag_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_song_tags_song ON song_tags(song_id, position);
-CREATE INDEX IF NOT EXISTS idx_song_tags_tag ON song_tags(tag_id);
 ";
 
 #[cfg(test)]

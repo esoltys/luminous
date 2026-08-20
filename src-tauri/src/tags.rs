@@ -1,14 +1,19 @@
-//! Luminous-native song tags (#224) — a many-to-many tag system independent
-//! of the embedded `songs.genre` column (see `tageditor.rs`/`collection.rs`
-//! for that). No bundled genre taxonomy: the "Genre" browse view's hierarchy
-//! is derived purely from how the user orders each song's own tags — the
-//! first tag entered on a song is treated as its main category, every other
-//! tag on that song as a subgenre of it (see `get_genre_graph`).
+//! Genre/tag browsing (#224) — reads the existing `songs.genre` column
+//! (already multi-value, `; `-delimited, since #143) rather than a separate
+//! tags table. Genre *is* the tag system; there is no parallel DB-native tag
+//! concept distinct from it. Editing a song's genre (and therefore its tags)
+//! goes through the existing full tag editor (`tageditor.rs`/`save_song_tags`),
+//! which already writes both the embedded file tag and this column.
+//!
+//! No bundled genre taxonomy: the "Genre" browse view's hierarchy is derived
+//! purely from how the user orders each song's own genre values — the first
+//! value is treated as the song's main category, every other value on that
+//! song as a subgenre of it (see `get_genre_graph`).
 
 use crate::{
     collection::{mode_query_fragments, row_to_song, SONG_SELECT_COLS},
     db::Database,
-    models::{GenreGroup, QueuePopulationMode, Song, Tag, TagCount},
+    models::{parse_multi_value, GenreGroup, QueuePopulationMode, Song, Tag, TagCount},
 };
 use anyhow::Result;
 use rusqlite::params;
@@ -24,93 +29,98 @@ impl TagManager {
         Self { db }
     }
 
-    /// Every tag currently in use, with how many songs carry it (at any
-    /// position), ordered by name.
+    /// Every non-empty `songs.genre` value in the library, in storage order,
+    /// for scanned/local songs that are currently available.
+    fn all_song_genre_lists(&self) -> Result<Vec<Vec<String>>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT genre FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND genre IS NOT NULL
+               AND genre != ''",
+        )?;
+        let lists = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .map(|raw| parse_multi_value(&raw))
+            .filter(|values| !values.is_empty())
+            .collect();
+        Ok(lists)
+    }
+
+    /// Every distinct genre/tag value in use, with how many songs carry it
+    /// (at any position in their genre list), ordered by name.
     pub fn list_all_tags(&self) -> Result<Vec<Tag>> {
-        let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT t.name, COUNT(st.song_id)
-             FROM tags t
-             JOIN song_tags st ON st.tag_id = t.id
-             GROUP BY t.id
-             ORDER BY t.name COLLATE NOCASE",
-        )?;
-        let tags = stmt
-            .query_map([], |row| {
-                Ok(Tag {
-                    name: row.get(0)?,
-                    song_count: row.get(1)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
+        let mut counts: HashMap<String, (String, i64)> = HashMap::new();
+        for values in self.all_song_genre_lists()? {
+            for value in values {
+                let key = value.to_lowercase();
+                let entry = counts.entry(key).or_insert((value, 0));
+                entry.1 += 1;
+            }
+        }
+        let mut tags: Vec<Tag> = counts
+            .into_values()
+            .map(|(name, song_count)| Tag { name, song_count })
             .collect();
+        tags.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         Ok(tags)
     }
 
-    /// A song's tags in stored order — position 0 is its main-category tag.
-    pub fn get_song_tags(&self, song_id: i64) -> Result<Vec<String>> {
-        let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
-            "SELECT t.name
-             FROM song_tags st
-             JOIN tags t ON t.id = st.tag_id
-             WHERE st.song_id = ?1
-             ORDER BY st.position",
-        )?;
-        let tags = stmt
-            .query_map(params![song_id], |row| row.get::<_, String>(0))?
-            .filter_map(|r| r.ok())
+    /// The emergent genre hierarchy: one [`GenreGroup`] per genre value that
+    /// has ever appeared *first* in a song's genre list (its main category),
+    /// each carrying every value seen as a subgenre of it (later in the same
+    /// song's list) across the library, aggregated with counts. A value can
+    /// appear as a child under more than one group if different songs
+    /// disagree about its main category — both relationships are real and
+    /// both are returned.
+    pub fn get_genre_graph(&self) -> Result<Vec<GenreGroup>> {
+        let mut root_counts: HashMap<String, (String, i64)> = HashMap::new();
+        let mut child_counts: HashMap<String, HashMap<String, (String, i64)>> = HashMap::new();
+
+        for values in self.all_song_genre_lists()? {
+            let Some(root) = values.first() else { continue };
+            let root_key = root.to_lowercase();
+            let root_entry = root_counts.entry(root_key.clone()).or_insert((root.clone(), 0));
+            root_entry.1 += 1;
+
+            let children = child_counts.entry(root_key).or_default();
+            for child in &values[1..] {
+                let child_key = child.to_lowercase();
+                let child_entry = children.entry(child_key).or_insert((child.clone(), 0));
+                child_entry.1 += 1;
+            }
+        }
+
+        let mut groups: Vec<GenreGroup> = root_counts
+            .into_iter()
+            .map(|(root_key, (main_tag, song_count))| {
+                let mut children: Vec<TagCount> = child_counts
+                    .remove(&root_key)
+                    .map(|m| {
+                        m.into_values()
+                            .map(|(name, song_count)| TagCount { name, song_count })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                children.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                GenreGroup {
+                    main_tag,
+                    song_count,
+                    children,
+                }
+            })
             .collect();
-        Ok(tags)
+        groups.sort_by(|a, b| a.main_tag.to_lowercase().cmp(&b.main_tag.to_lowercase()));
+        Ok(groups)
     }
 
-    /// Replaces a song's whole tag list with `tag_names`, in the given order
-    /// (position 0 = main category). Blank/whitespace-only names are
-    /// dropped; a name repeated within the list keeps only its first
-    /// position. Reuses an existing tag case-insensitively rather than
-    /// creating a duplicate (`tags.name` is `COLLATE NOCASE UNIQUE`).
-    pub fn set_song_tags(&self, song_id: i64, tag_names: &[String]) -> Result<()> {
-        let mut ordered: Vec<String> = Vec::with_capacity(tag_names.len());
-        for name in tag_names {
-            let trimmed = name.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            if !ordered
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(trimmed))
-            {
-                ordered.push(trimmed.to_string());
-            }
-        }
-
-        let mut conn = self.db.pool.get()?;
-        let tx = conn.transaction()?;
-        tx.execute(
-            "DELETE FROM song_tags WHERE song_id = ?1",
-            params![song_id],
-        )?;
-        for (position, name) in ordered.iter().enumerate() {
-            tx.execute(
-                "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
-                params![name],
-            )?;
-            let tag_id: i64 = tx.query_row(
-                "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
-                params![name],
-                |row| row.get(0),
-            )?;
-            tx.execute(
-                "INSERT INTO song_tags (song_id, tag_id, position) VALUES (?1, ?2, ?3)",
-                params![song_id, tag_id, position as i64],
-            )?;
-        }
-        tx.commit()?;
-        Ok(())
-    }
-
-    /// Songs carrying `tag_name` at any position. Mirrors
-    /// `CollectionScanner::get_songs_by_genre`'s signature/shape.
+    /// Songs whose genre list contains `tag_name` at any position
+    /// (case-insensitive, exact component match — not a substring match).
+    /// Mirrors `CollectionScanner::get_songs_by_genre`'s signature/shape, but
+    /// matches component-wise rather than requiring an exact full-column
+    /// match.
     pub fn get_songs_by_tag(
         &self,
         tag_name: &str,
@@ -119,89 +129,40 @@ impl TagManager {
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
+        // LIKE is just a cheap index-assisted pre-filter (genre is indexed);
+        // the real match is the exact, case-insensitive component check
+        // below, which is what avoids "Rock" incorrectly matching "Prog Rock".
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE id IN (
-                 SELECT st.song_id FROM song_tags st
-                 JOIN tags t ON t.id = st.tag_id
-                 WHERE t.name = ?1 COLLATE NOCASE
-             )
+             WHERE genre LIKE '%' || ?1 || '%'
                AND source IN (1, 2)
                AND unavailable = 0
                {extra_where}
-             ORDER BY {order_by}
-             LIMIT ?2",
+             ORDER BY {order_by}",
             SONG_SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
-        let songs = stmt
-            .query_map(params![tag_name, limit], row_to_song)?
+        let candidates: Vec<Song> = stmt
+            .query_map(params![tag_name], row_to_song)?
             .filter_map(|r| r.ok())
+            .collect();
+
+        let target = tag_name.to_lowercase();
+        let songs = candidates
+            .into_iter()
+            .filter(|song| {
+                song.genre
+                    .as_deref()
+                    .map(|g| {
+                        parse_multi_value(g)
+                            .iter()
+                            .any(|v| v.to_lowercase() == target)
+                    })
+                    .unwrap_or(false)
+            })
+            .take(limit.max(0) as usize)
             .collect();
         Ok(songs)
-    }
-
-    /// The emergent genre hierarchy: one [`GenreGroup`] per tag that has ever
-    /// appeared at position 0 (a song's main category), each carrying every
-    /// tag seen as a subgenre of it (position > 0 on the same song) across
-    /// the whole library, aggregated with counts. A tag can appear as a
-    /// child under more than one group if different songs disagree about its
-    /// main category — both relationships are real and both are returned.
-    pub fn get_genre_graph(&self) -> Result<Vec<GenreGroup>> {
-        let conn = self.db.pool.get()?;
-
-        let mut roots_stmt = conn.prepare(
-            "SELECT t.name, COUNT(DISTINCT st.song_id)
-             FROM song_tags st
-             JOIN tags t ON t.id = st.tag_id
-             WHERE st.position = 0
-             GROUP BY t.id
-             ORDER BY t.name COLLATE NOCASE",
-        )?;
-        let mut groups: Vec<GenreGroup> = roots_stmt
-            .query_map([], |row| {
-                Ok(GenreGroup {
-                    main_tag: row.get(0)?,
-                    song_count: row.get(1)?,
-                    children: Vec::new(),
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        let mut children_by_root: HashMap<String, Vec<TagCount>> = HashMap::new();
-        let mut edges_stmt = conn.prepare(
-            "SELECT root_tag.name, child_tag.name, COUNT(DISTINCT root.song_id)
-             FROM song_tags root
-             JOIN song_tags child ON child.song_id = root.song_id AND child.position > 0
-             JOIN tags root_tag ON root_tag.id = root.tag_id
-             JOIN tags child_tag ON child_tag.id = child.tag_id
-             WHERE root.position = 0
-             GROUP BY root_tag.id, child_tag.id
-             ORDER BY child_tag.name COLLATE NOCASE",
-        )?;
-        let edges = edges_stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i64>(2)?,
-            ))
-        })?;
-        for edge in edges.filter_map(|r| r.ok()) {
-            let (root, child, count) = edge;
-            children_by_root.entry(root).or_default().push(TagCount {
-                name: child,
-                song_count: count,
-            });
-        }
-
-        for group in &mut groups {
-            if let Some(children) = children_by_root.remove(&group.main_tag) {
-                group.children = children;
-            }
-        }
-
-        Ok(groups)
     }
 }
 
@@ -222,53 +183,27 @@ mod tests {
         (Arc::new(db), dir)
     }
 
-    fn insert_song(db: &Database, path: &str) -> i64 {
+    fn insert_song(db: &Database, path: &str, genre: &str) -> i64 {
         let conn = db.pool.get().unwrap();
         conn.execute(
-            "INSERT INTO songs (source, filetype, path) VALUES (1, 0, ?1)",
-            params![path],
+            "INSERT INTO songs (source, filetype, path, genre) VALUES (1, 0, ?1, ?2)",
+            params![path, genre],
         )
         .unwrap();
         conn.last_insert_rowid()
     }
 
     #[test]
-    fn test_set_song_tags_creates_and_reuses_case_insensitively() {
+    fn test_list_all_tags_splits_and_dedupes_case_insensitively() {
         let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
+        insert_song(&db, "/b.mp3", "metal");
+
         let manager = TagManager::new(db.clone());
-        let song_id = insert_song(&db, "/a.mp3");
-
-        manager
-            .set_song_tags(song_id, &["Metal".into(), "Symphonic Metal".into()])
-            .unwrap();
-        assert_eq!(
-            manager.get_song_tags(song_id).unwrap(),
-            vec!["Metal", "Symphonic Metal"]
-        );
-
-        let song_id_2 = insert_song(&db, "/b.mp3");
-        manager
-            .set_song_tags(song_id_2, &["metal".into()])
-            .unwrap();
-        // Reused the existing "Metal" tag rather than creating a duplicate.
-        assert_eq!(manager.list_all_tags().unwrap().len(), 2);
-
-        let _ = std::fs::remove_dir_all(dir);
-    }
-
-    #[test]
-    fn test_set_song_tags_replaces_order_and_drops_blanks() {
-        let (db, dir) = test_db();
-        let manager = TagManager::new(db.clone());
-        let song_id = insert_song(&db, "/a.mp3");
-
-        manager
-            .set_song_tags(song_id, &["Metal".into(), "Symphonic Metal".into()])
-            .unwrap();
-        manager
-            .set_song_tags(song_id, &["  ".into(), "Classical".into()])
-            .unwrap();
-        assert_eq!(manager.get_song_tags(song_id).unwrap(), vec!["Classical"]);
+        let tags = manager.list_all_tags().unwrap();
+        assert_eq!(tags.len(), 2);
+        let metal = tags.iter().find(|t| t.name.eq_ignore_ascii_case("metal")).unwrap();
+        assert_eq!(metal.song_count, 2);
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -276,24 +211,12 @@ mod tests {
     #[test]
     fn test_genre_graph_star_relationship_and_lone_root() {
         let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal; Symphonic Metal");
+        insert_song(&db, "/b.mp3", "Ambient");
+
         let manager = TagManager::new(db.clone());
-
-        let s1 = insert_song(&db, "/a.mp3");
-        manager
-            .set_song_tags(
-                s1,
-                &[
-                    "Metal".into(),
-                    "Progressive Metal".into(),
-                    "Symphonic Metal".into(),
-                ],
-            )
-            .unwrap();
-
-        let s2 = insert_song(&db, "/b.mp3");
-        manager.set_song_tags(s2, &["Ambient".into()]).unwrap();
-
         let graph = manager.get_genre_graph().unwrap();
+
         let metal = graph.iter().find(|g| g.main_tag == "Metal").unwrap();
         assert_eq!(metal.song_count, 1);
         let child_names: Vec<&str> = metal.children.iter().map(|c| c.name.as_str()).collect();
@@ -310,42 +233,32 @@ mod tests {
     #[test]
     fn test_genre_graph_same_tag_under_multiple_parents() {
         let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
+        insert_song(&db, "/b.mp3", "Classical; Symphonic Metal");
+
         let manager = TagManager::new(db.clone());
-
-        let s1 = insert_song(&db, "/a.mp3");
-        manager
-            .set_song_tags(s1, &["Metal".into(), "Symphonic Metal".into()])
-            .unwrap();
-        let s2 = insert_song(&db, "/b.mp3");
-        manager
-            .set_song_tags(s2, &["Classical".into(), "Symphonic Metal".into()])
-            .unwrap();
-
         let graph = manager.get_genre_graph().unwrap();
+
         let metal = graph.iter().find(|g| g.main_tag == "Metal").unwrap();
         assert!(metal.children.iter().any(|c| c.name == "Symphonic Metal"));
         let classical = graph.iter().find(|g| g.main_tag == "Classical").unwrap();
-        assert!(classical
-            .children
-            .iter()
-            .any(|c| c.name == "Symphonic Metal"));
+        assert!(classical.children.iter().any(|c| c.name == "Symphonic Metal"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
-    fn test_get_songs_by_tag_matches_any_position() {
+    fn test_get_songs_by_tag_matches_exact_component_not_substring() {
         let (db, dir) = test_db();
-        let manager = TagManager::new(db.clone());
-        let s1 = insert_song(&db, "/a.mp3");
-        manager
-            .set_song_tags(s1, &["Metal".into(), "Symphonic Metal".into()])
-            .unwrap();
+        insert_song(&db, "/a.mp3", "Rock");
+        insert_song(&db, "/b.mp3", "Prog Rock");
 
+        let manager = TagManager::new(db.clone());
         let songs = manager
-            .get_songs_by_tag("symphonic metal", 50, QueuePopulationMode::All)
+            .get_songs_by_tag("rock", 50, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].genre.as_deref(), Some("Rock"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

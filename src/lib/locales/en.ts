@@ -643,7 +643,8 @@ export const en = {
   },
 
   chipInput: {
-    removeItem: "Remove {value}"
+    removeItem: "Remove {value}",
+    dragToReorder: "Drag to reorder"
   },
   tagEditor: {
     title: "Edit Song Tags",
@@ -655,6 +656,7 @@ export const en = {
     yearField: "Year",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saveBtnShort: "Save",
@@ -698,6 +700,7 @@ export const en = {
     albumArtistPlaceholder: "Add an album artist...",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
@@ -859,23 +862,17 @@ export const en = {
     toggleLogoPulsing: "Toggle Luminous logo pulsing",
     on: "On",
     off: "Off",
-    cancel: "Cancel",
-    save: "Save",
     back: "Back",
     loading: "Loading…",
     expand: "Expand",
     collapse: "Collapse"
   },
   songTags: {
-    title: "Edit Tags",
-    placeholder: "Add a tag and press Enter",
-    hint: "First tag is the main category; the rest are subgenres of it.",
-    contextMenuLabel: "Manage Tags",
     genresTabDescription: "Browse songs by tags you've added",
     viewGenre: "Genre",
     viewTags: "Tags",
     emptyTitle: "No tags yet",
-    emptySubtitle: "Right-click a song and choose Manage Tags to start organizing your library your way.",
+    emptySubtitle: "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
     songCount: "{count} songs",
     playAll: "Play all {count} songs"
   },
