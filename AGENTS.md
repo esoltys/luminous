@@ -172,10 +172,16 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 - When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
   new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
 
-## Issue Priority Labels
+## Issue Priority
 
-Open issues in the "2.0" milestone carry a `P1`–`P4` label indicating priority for work after
-1.0 ships. Use this scheme when picking up 2.0 work or triaging a new issue into it:
+**NEVER apply a `P1`/`P2`/`P3`/`P4` label to an issue, and never pass `--label P1` (or P2–P4) to
+`gh issue create` or `gh issue edit`.** This has happened repeatedly — priority is not a label in
+this repo. Open issues in the "2.0" milestone have a priority (P1–P4) indicating when they should
+be worked on after 1.0 ships, tracked exclusively as a field on the "Luminous Music Player" GitHub
+Project. If you determine an issue's priority, set it via the Project board (or leave it for the
+user to set) — do not create a `P1`–`P4` label as a substitute, even if no priority field is
+readily settable through the `gh` CLI. Use this scheme when picking up 2.0 work or triaging a new
+issue into it:
 
 - **P1** — real (non-cosmetic) bugs, plus foundational/first-run work that other issues depend on.
 - **P2** — features touched often, expected for parity with comparable desktop music players, or
@@ -184,8 +190,7 @@ Open issues in the "2.0" milestone carry a `P1`–`P4` label indicating priority
 - **P3** — lower-frequency or power-user features, and cosmetic/low-severity bugs.
 - **P4** — speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
 
-Pull current state with `gh issue list --milestone "2.0" --label P1` (swap the label for
-P2–P4). Don't default new issues to P2/P3 — assign a label using the same criteria above.
+Don't default new issues to P2/P3 — assign a priority using the same criteria above.
 
 ## Version Control
 
@@ -201,7 +206,11 @@ P2–P4). Don't default new issues to P2/P3 — assign a label using the same cr
   2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
   3. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
-  5. Create the issue using the GitHub CLI: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "<Label>" --milestone "<Milestone>"`.
+  5. Create the issue using the GitHub CLI:
+     - For bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
+     - For features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed)
+     - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
+       field, not a label.
   6. Verify the created issue by running `gh issue view <id>`.
   7. Before opening a PR that closes/fixes an issue, check that issue's Milestone
      (`gh issue view <id> --json milestone`): if it's "2.0", branch from and target the PR at
