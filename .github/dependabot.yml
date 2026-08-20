@@ -11,3 +11,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    ignore:
+      # svelte-check's --tsgo mode requires typescript@~6.x installed
+      # alongside @typescript/native-preview@~7.x (the tsgo binary) - bumping
+      # typescript itself past 6.x breaks that dual-version pairing. See #522.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
