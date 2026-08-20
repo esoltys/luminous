@@ -67,11 +67,12 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 Required before `cargo check` / `bun run tauri dev`:
 
 ```bash
-pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
+pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appindicator3-dev
 ```
 
 - `libasound2-dev` — ALSA headers needed by the `cpal` audio crate
 - `libssl-dev` — OpenSSL headers (needed by some Tauri transitive deps)
+- `libayatana-appindicator3-dev` — links the system tray icon (`tray-icon` Cargo feature)
 - `pkg-config` — used by build scripts to locate system libraries
 
 ## Quick Start Commands
@@ -151,6 +152,18 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
 2. Increment the migration version.
 3. Keep queries backwards-compatible during rollout.
 
+## Bug Handling
+
+When work on one task surfaces a defect that isn't part of that task — a broken script, a stale
+doc, a misconfigured or missing dependency, a UI bug spotted while testing something else, a test
+failure unrelated to the change at hand — don't silently label it "pre-existing" or "unrelated" and
+move on without telling the user. Surface it plainly (what's broken, what you observed, why you
+think it's unrelated to the current change) and ask whether they want it fixed now or filed as a
+tracked issue (`gh issue create`, following the Version Control section's issue-creation steps).
+Only proceed without asking if the user has already given standing instructions for this exact
+situation. This applies even when the defect seems clearly out of scope — "unrelated" is a claim to
+verify with the user, not a reason to skip telling them.
+
 ## Performance Notes
 
 - Virtualize large lists (collections, playlists) with `svelte-virtual-list-ts`.
@@ -171,6 +184,17 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config
   eventually merging `next` back into `main`.
 - When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
   new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
+- **Interim releases**: 2.0 work that's already done and stable doesn't have to wait for the
+  *entire* 2.0 Milestone to finish. It can ship early as a rolling 1.x release (e.g. "1.5") by
+  syncing `main` into `next`, merging `next` into `main` via PR, and rolling `main`'s
+  `package.json`/`Cargo.toml` version back down to the 1.x line (`next`'s own version, e.g.
+  `2.0.0`, stays as-is or gets bumped once `main` no longer matches it). `next` is **not**
+  retired by this — it keeps living as the home for whatever 2.0 issues are still open. On
+  GitHub, create a milestone matching the release (e.g. "1.5") and move the completed issues'
+  milestone from "2.0" to it; issues that are done but belong to a still-open epic can move
+  individually while the epic itself stays in "2.0" (split is fine pre-release, since nothing
+  user-facing observes the milestone). Repeat this pattern for future interim releases as more
+  2.0 work completes ahead of the full 2.0 cut.
 
 ## Issue Priority
 
@@ -242,3 +266,5 @@ Don't default new issues to P2/P3 — assign a priority using the same criteria 
 - **Frontend type errors after a dependency update**: run `bun run check`. Svelte 5 Runes don't need destructuring (`$`-prefixed variables are already reactive).
 - **Audio playback crackling/stuttering**: verify no allocations happen in the `audio.rs` playback loop; profile with `cargo flamegraph` if CPU-bound.
 - **Tests fail in CI but pass locally**: Vitest in CI uses jsdom (not a browser) — confirm jsdom-compatible selectors; for Rust, check for platform-specific code (especially file paths).
+- **`bun run take-screenshots` (`scripts/take-screenshots.ts`)**: regenerates `docs/user-guide/screenshots/*.png` by driving the app in Playwright against the mocked Tauri IPC bridge (`scripts/tauri-ipc-mock.ts`). In a remote/sandboxed environment where Playwright's own downloaded browser is unavailable and a Chromium is pre-installed at a fixed path instead, `chromium.launch()` needs `executablePath` pointed at it to run at all — but that path is environment-specific, so never commit it; apply it locally, capture, then revert before committing. If the mock is missing a command the app now calls, `invoke()` warns `[Tauri Mock] Unhandled command: ...` in the page console and returns `null` rather than failing capture outright — but a command whose *return value* the store actually reads (e.g. `get_library_snapshot`) will throw and abort store init instead, so treat any "Unhandled command" warning during a screenshot run as something to add a handler for in `tauri-ipc-mock.ts`, not just noise.
+- **Do not commit `docs/user-guide/screenshots/*.png` output from `take-screenshots.ts`.** The committed screenshots are captured manually against a real library, not the mocked fixture data — running the script is for verifying the capture flow itself still works (dev server boots, every page renders, every mock command resolves), not for producing docs assets. If you run it while debugging the script or the mock, revert the resulting `docs/user-guide/screenshots/*.png` changes before committing.

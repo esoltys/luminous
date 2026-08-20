@@ -1,11 +1,10 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
   import { Music, Clock } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
-  import LinkButton from "./LinkButton.svelte";
+  import GenreChips from "./GenreChips.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -59,33 +58,6 @@
 >
   <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
     {#if currentSong}
-      <div class="space-y-3">
-        <div class="space-y-1">
-          <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.songLabel', {}, 'Song')}</p>
-          <p class="text-sm font-semibold text-brand-text-primary break-words">{currentSong.title || i18n.t('collection.unknownSong')}</p>
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.artistLabel', {}, 'Artist')}</p>
-          {#if currentSong.artist}
-            <LinkButton
-              onclick={() => collectionStore.viewArtist(currentSong.album_artist?.trim() || currentSong.artist || "")}
-              class="text-sm text-brand-text-secondary break-words w-full"
-              title={i18n.t('collection.filterByArtist', { artist: currentSong.artist })}
-            >
-              {currentSong.artist}
-            </LinkButton>
-          {:else}
-            <p class="text-sm text-brand-text-secondary break-words">{i18n.t('collection.unknownArtist')}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs text-brand-text-secondary/60 uppercase tracking-wide">{i18n.t('playerBar.albumLabel', {}, 'Album')}</p>
-          <p class="text-sm text-brand-text-secondary break-words">{currentSong.album || i18n.t('collection.unknownAlbum')}</p>
-        </div>
-      </div>
-
       <div class="space-y-2">
         {#if currentSong.filetype}
           <div class="flex items-start justify-between gap-3 text-xs">
@@ -133,7 +105,9 @@
         {#if currentSong.genre}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
-            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.genre}</span>
+            <div class="min-w-0 flex justify-end">
+              <GenreChips genre={currentSong.genre} variant="full" />
+            </div>
           </div>
         {/if}
         {#if currentSong.composer}

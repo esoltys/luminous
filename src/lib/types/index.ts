@@ -259,6 +259,43 @@ export interface ArtistItem {
   genre?: string | null;
 }
 
+export interface ArtistSocialLink {
+  platform: string;
+  handle_or_url: string;
+}
+
+export interface ArtistProfile {
+  artist_key: string;
+  website?: string | null;
+  tags: string[];
+  social_links: ArtistSocialLink[];
+  bio?: string | null;
+}
+
+/** A Luminous-native song tag (#224), independent of the embedded `Song.genre`. */
+export interface Tag {
+  name: string;
+  song_count: number;
+}
+
+/** One child entry under a {@link GenreGroup}'s main tag. */
+export interface TagCount {
+  name: string;
+  song_count: number;
+}
+
+/**
+ * One node of the emergent tag-hierarchy graph — a tag that has appeared as
+ * a song's first ("main category") tag on at least one song, with every tag
+ * seen as a subgenre of it. A tag can appear as a child under more than one
+ * group if different songs disagree about its main category.
+ */
+export interface GenreGroup {
+  main_tag: string;
+  song_count: number;
+  children: TagCount[];
+}
+
 /**
  * Converts a custom luminous-art protocol URI (e.g. luminous-art://...)
  * to a platform-appropriate URL (e.g. http://luminous-art.localhost/ on Windows).

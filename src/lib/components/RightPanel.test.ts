@@ -51,13 +51,10 @@ describe("RightPanel.svelte", () => {
     expect(getByText(/nothing playing/i)).toBeInTheDocument();
   });
 
-  it("renders song title, artist, album, format and bitrate when song is set", () => {
+  it("renders format when song is set", () => {
     playerStore.currentSong = mockSong;
     const { getByText } = render(RightPanel);
 
-    expect(getByText("Test Track Title")).toBeInTheDocument();
-    expect(getByText("Test Artist")).toBeInTheDocument();
-    expect(getByText("Test Album")).toBeInTheDocument();
     expect(getByText("FLAC")).toBeInTheDocument();
   });
 

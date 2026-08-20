@@ -58,6 +58,10 @@ jobs:
     if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
+    env:
+      # Pinned so the tauri-cli cache key (below) stays stable across runs -
+      # bump this deliberately when we want a newer tauri-cli.
+      TAURI_CLI_VERSION: "2.11.4"
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +71,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Caches ~/.cargo/registry, ~/.cargo/git and the workspace target/ dir
+      # (keyed on Cargo.lock + rustc version), so the Windows leg's two full
+      # release compiles (NSIS build, then MSIX build) don't each start from
+      # scratch on every run.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -110,6 +121,25 @@ jobs:
             releaseDraft: true
             prerelease: false
 
+      # cargo tracks installed-binary versions in .crates.toml/.crates2.json,
+      # so caching those alongside the binary lets `cargo install` below
+      # no-op on a cache hit instead of recompiling tauri-cli (and its
+      # dependency tree - clap, tauri-bundler, resvg, usvg, jsonschema, etc.)
+      # from source on every run.
+      - name: Cache tauri-cli binary (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri.exe
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: tauri-cli-windows-${{ env.TAURI_CLI_VERSION }}
+
+      - name: Install tauri-cli (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: cargo install tauri-cli --version "${{ env.TAURI_CLI_VERSION }}"
+
       - name: Build MSIX Package (Windows)
         if: matrix.platform == 'windows-latest'
         # src-tauri is a workspace member (see root Cargo.toml), so Cargo's
@@ -117,9 +147,7 @@ jobs:
         # tauri-windows-bundle assumes the latter unless told otherwise.
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
-        run: |
-          cargo install tauri-cli
-          bun run tauri:windows:build
+        run: bun run tauri:windows:build
 
       - name: Upload MSIX to Release Assets
         if: matrix.platform == 'windows-latest'

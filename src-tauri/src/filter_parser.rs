@@ -77,6 +77,20 @@ pub struct FieldFilter {
     pub value: FilterValue,
 }
 
+impl FieldFilter {
+    pub fn to_sql_clause(&self, param_idx: usize) -> String {
+        if self.sql_column == "artist_tag" {
+            format!(
+                "COALESCE(NULLIF(album_artist, ''), artist) IN (SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags) WHERE json_each.value {} ?{})",
+                self.op.to_sql(),
+                param_idx
+            )
+        } else {
+            format!("{} {} ?{}", self.sql_column, self.op.to_sql(), param_idx)
+        }
+    }
+}
+
 /// A query split into its two independent match modes: `bare_terms` (ANDed
 /// full-text substring matches against title/artist/album) and
 /// `field_filters` (ANDed structured comparisons). Both lists apply
@@ -175,6 +189,9 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         "bitdepth" | "bit_depth" => ("bitdepth", true),
         "channels" => ("channels", true),
         "compilation" => ("compilation", true),
+        "artist_tag" | "artist-tag" | "artisttag" | "artist_tags" | "tag" | "tags" => {
+            ("artist_tag", false)
+        }
         _ => return None,
     };
 
@@ -309,5 +326,25 @@ mod tests {
         assert_eq!(parse_duration_ns("3:45"), Some(225_000_000_000));
         assert_eq!(parse_duration_ns("1:02:03"), Some(3_723_000_000_000));
         assert_eq!(parse_duration_ns("180"), Some(180_000_000_000));
+    }
+
+    #[test]
+    fn test_parse_artist_tag_filter() {
+        let q = parse_query("artist-tag:canadian tag:country");
+        assert_eq!(q.field_filters.len(), 2);
+        assert_eq!(q.field_filters[0].field, "artist-tag");
+        assert_eq!(q.field_filters[0].sql_column, "artist_tag");
+        assert_eq!(q.field_filters[0].op, Op::Contains);
+        assert_eq!(
+            q.field_filters[0].value,
+            FilterValue::Text("%canadian%".to_string())
+        );
+        assert_eq!(
+            q.field_filters[0].to_sql_clause(1),
+            "COALESCE(NULLIF(album_artist, ''), artist) IN (SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags) WHERE json_each.value LIKE ?1)"
+        );
+
+        assert_eq!(q.field_filters[1].field, "tag");
+        assert_eq!(q.field_filters[1].sql_column, "artist_tag");
     }
 }

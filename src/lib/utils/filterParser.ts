@@ -70,6 +70,12 @@ export function parseSearchRules(query: string): Rule[] {
           "composer",
           "key",
           "initial_key",
+          "artist_tag",
+          "artist-tag",
+          "artisttag",
+          "artist_tags",
+          "tag",
+          "tags",
         ].includes(field)
       ) {
         op = "contains";

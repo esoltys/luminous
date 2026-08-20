@@ -4,7 +4,8 @@ import { render, fireEvent } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
-import type { Song } from "../types";
+import { playlistsStore } from "../stores/playlists.svelte";
+import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
@@ -55,6 +56,11 @@ describe("PlayerBar.svelte", () => {
     playerStore.volume = 0.8;
     playerStore.shuffleMode = "off";
     playerStore.repeatMode = "off";
+    // Reset the viewport-driven breakpoint flags so tests that set
+    // viewportWidth narrow (to exercise isImmersiveForced) don't leak into
+    // later tests via the shared collectionStore singleton.
+    collectionStore.viewportWidth = 1280;
+    collectionStore.viewportHeight = 800;
   });
 
   it("renders 'Not Playing' state when currentSong is undefined", () => {
@@ -82,6 +88,50 @@ describe("PlayerBar.svelte", () => {
     await fireEvent.click(albumLink);
 
     expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
+  });
+
+  it("exits immersive mode and navigates to the queue when the album cover is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = true;
+
+    const mockQueue: Playlist = {
+      id: 1,
+      name: "Queue",
+      dynamic_enabled: false,
+      created: 0,
+      updated: 0,
+      track_count: 0,
+      is_queue: true,
+    };
+    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
+    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
+    const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist").mockImplementation(() => {});
+
+    const { getByTitle } = render(PlayerBar);
+    const coverButton = getByTitle("Queue");
+    await fireEvent.click(coverButton);
+
+    expect(exitImmersiveModeSpy).toHaveBeenCalled();
+    expect(collectionStore.immersiveMode).toBe(false);
+    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+  });
+
+  it("enters immersive mode when the album cover is clicked outside immersive mode", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = false;
+
+    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    const coverButton = getByTitle("Immersive Mode");
+    await fireEvent.click(coverButton);
+
+    expect(toggleImmersiveModeSpy).toHaveBeenCalled();
+    expect(collectionStore.immersiveMode).toBe(true);
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
@@ -171,6 +221,60 @@ describe("PlayerBar.svelte", () => {
 
     expect(getAllByTitle(/before moving to a new, randomly selected artist/i).length).toBeGreaterThan(0);
     expect(getAllByTitle(/loop the current queue or playlist indefinitely/i).length).toBeGreaterThan(0);
+  });
+
+  it("does not exit or enter immersive mode from the cover click while width has force-engaged it", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    collectionStore.immersiveMode = false;
+    collectionStore.viewportWidth = 500; // below SMALL_BREAKPOINT_WIDTH_PX (640)
+
+    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
+    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    expect(collectionStore.isImmersiveForced).toBe(true);
+    const coverButton = getByTitle("Immersive Mode");
+    await fireEvent.click(coverButton);
+
+    expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
+    expect(exitImmersiveModeSpy).not.toHaveBeenCalled();
+  });
+
+  it("marks controls with the Full/Compact/Minimal responsive classes matching their tier", () => {
+    // jsdom doesn't evaluate CSS media queries, so this checks the
+    // structural markup (the responsive classes are present on the right
+    // elements) rather than actual visibility at a given width — real
+    // breakpoint behavior is covered by manual verification. Tiers: Full
+    // (>=700px), Compact (400-700px), Minimal (<400px) — cover art, play/
+    // pause, and skip-next are the constant core shown in all three.
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    const { getAllByTitle, getByTitle, container } = render(PlayerBar);
+
+    // Gone by Compact (Full-only): shuffle, repeat, and the whole right
+    // column (volume/mute + expand) — the transport+seek block takes the
+    // freed space instead, sticking to the right edge via ml-auto.
+    const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
+    const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
+    expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
+    expect(repeatBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
+    const volumeSlider = container.querySelector('input[type="range"]');
+    expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
+    expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
+    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
+    expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
+
+    // Gone by Minimal (Compact-and-up only): previous, seek row.
+    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
+    const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
+    expect(seekRow).toHaveClass("hidden", "min-[400px]:flex");
+
+    // Never hidden (the constant core): cover art, play/pause, skip-next.
+    const coverButton = getByTitle("Immersive Mode");
+    expect(coverButton.closest(".hidden")).toBeNull();
+    expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
+    expect(getByTitle(/next song/i)).not.toHaveClass("hidden");
   });
 
   it("handles mute toggle correctly", async () => {

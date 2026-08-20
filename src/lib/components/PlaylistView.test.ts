@@ -135,49 +135,52 @@ describe("PlaylistView.svelte", () => {
     expect(getByText("Track Three")).toBeInTheDocument();
   });
 
-  it("handles drag and drop reordering of playlist items", async () => {
+  it("offers a rename affordance for a regular playlist", () => {
+    const { getAllByTitle } = render(PlaylistView);
+    expect(getAllByTitle("Rename playlist").length).toBeGreaterThan(0);
+  });
+
+  it("hides the rename affordance for the queue", () => {
+    playlistsStore.playlists = [{ ...mockPlaylist, name: "Queue", is_queue: true }];
+    const { queryByTitle } = render(PlaylistView);
+    expect(queryByTitle("Rename playlist")).toBeNull();
+  });
+
+  it("handles pointer-based drag reordering of playlist items", async () => {
+    // Tauri's dragDropEnabled window option blocks native HTML5 drag events, so reordering
+    // is implemented with pointer events instead (see PlaylistView.svelte handleRowPointerDown).
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
 
-    const dataTransfer = {
-      setData: vi.fn(),
-      getData: vi.fn().mockReturnValue("0"),
-      effectAllowed: "",
-      dropEffect: "",
-    };
+    document.elementFromPoint = vi.fn().mockReturnValue(rowThree);
 
-    // Drag start on row 0
-    await fireEvent.dragStart(rowOne, { dataTransfer });
-    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "0");
+    await fireEvent.pointerDown(rowOne, { button: 0, clientX: 0, clientY: 0 });
+    // Move past the drag threshold so it registers as a drag rather than a click.
+    await fireEvent.pointerMove(window, { clientX: 0, clientY: 20 });
+    await fireEvent.pointerUp(window);
 
-    // Drag over row 2
-    await fireEvent.dragOver(rowThree, { dataTransfer });
-    expect(dataTransfer.dropEffect).toBe("move");
-
-    // Drop on row 2
-    await fireEvent.drop(rowThree, { dataTransfer });
     expect(reorderSpy).toHaveBeenCalledWith(1, "uuid-1", "uuid-3");
   });
 
-  it("falls back to dataTransfer string data on drop if draggedIndex was cleared", async () => {
+  it("does not reorder when pointer movement stays below the drag threshold", async () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowTwo = getByText("Track Two").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
 
-    const dataTransfer = {
-      setData: vi.fn(),
-      getData: vi.fn().mockReturnValue("0"),
-      effectAllowed: "",
-      dropEffect: "",
-    };
+    const elementFromPointMock = vi.fn().mockReturnValue(rowThree);
+    document.elementFromPoint = elementFromPointMock;
 
-    // Trigger drop directly with text/plain data = 0 on row index 1
-    await fireEvent.drop(rowTwo, { dataTransfer });
-    expect(reorderSpy).toHaveBeenCalledWith(1, "uuid-1", "uuid-2");
+    await fireEvent.pointerDown(rowOne, { button: 0, clientX: 0, clientY: 0 });
+    await fireEvent.pointerMove(window, { clientX: 0, clientY: 1 });
+    await fireEvent.pointerUp(window);
+
+    expect(elementFromPointMock).not.toHaveBeenCalled();
+    expect(reorderSpy).not.toHaveBeenCalled();
   });
 
   it("filters tracks by title or artist using the filter search input", async () => {

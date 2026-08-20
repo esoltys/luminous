@@ -1,6 +1,6 @@
 [package]
 name = "luminous"
-version = "1.0.1"
+version = "1.5.0"
 description = "A high-performance home for the music you already own"
 authors = ["Eric James Soltys <ericjamessoltys@outlook.com>"]
 edition = "2021"
@@ -20,7 +20,9 @@ tauri-build = { version = "2", features = [] }
 # --- Tauri ---
 # "unstable" gates `Manager::get_window`, needed to reach the lower-level
 # `Window::start_resize_dragging` from a `WebviewWindow` command handler.
-tauri = { version = "2", features = ["unstable"] }
+# "tray-icon" is off by default; "image-png" lets tray.rs build the tray
+# icon from an embedded PNG via `Image::from_bytes`.
+tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
 tauri-runtime = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
@@ -107,6 +109,11 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 rand = "0.10"
 percent-encoding = "2"
+# Polls the OS for the live Shift-key state at drag-and-drop time. OS file
+# drags don't give the target window keyboard focus while hovering, so DOM
+# keydown/keyup never fire — this reads the physical key state directly
+# instead, independent of window focus.
+device_query = "4.0.1"
 
 # --- Data-parallel tag reading during library scan ---
 rayon = "1"

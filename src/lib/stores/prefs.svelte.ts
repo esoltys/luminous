@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 export type RatingStyle = "heart" | "stars";
 export type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
+export type GenreViewMode = "genre" | "tags";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
@@ -14,6 +15,7 @@ interface UiPreferences {
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
   playlists_custom_view_mode: CollectionViewMode;
+  genre_view_mode: GenreViewMode;
 }
 
 class PrefsStore {
@@ -24,6 +26,9 @@ class PrefsStore {
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
+  genreViewMode = $state<GenreViewMode>("genre");
+  /** Off by default — closing the window quits unless explicitly opted in. */
+  minimizeToTray = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -34,6 +39,8 @@ class PrefsStore {
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
+    this.genreViewMode = prefs.genre_view_mode;
+    this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -46,6 +53,7 @@ class PrefsStore {
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
       playlists_custom_view_mode: this.playlistsCustomViewMode,
+      genre_view_mode: this.genreViewMode,
     };
     invoke("set_ui_preferences", { prefs });
   }
@@ -83,6 +91,18 @@ class PrefsStore {
   setPlaylistsCustomViewMode(mode: CollectionViewMode) {
     this.playlistsCustomViewMode = mode;
     this.save();
+  }
+
+  setGenreViewMode(mode: GenreViewMode) {
+    this.genreViewMode = mode;
+    this.save();
+  }
+
+  /** Not part of `save()` — persisted via its own dedicated command so the
+   * backend's `tray.rs` close handler picks up the change immediately. */
+  setMinimizeToTray(enabled: boolean) {
+    this.minimizeToTray = enabled;
+    invoke("set_minimize_to_tray_enabled", { enabled });
   }
 }
 

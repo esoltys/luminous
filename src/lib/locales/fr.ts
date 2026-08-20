@@ -9,6 +9,7 @@ export const fr = {
     artists: "Artistes",
     albums: "Albums",
     songs: "Chansons",
+    genres: "Genres",
     playlistsAuto: "Automatiques",
     playlistsCustom: "Personnalisées",
     create: "Créer",
@@ -34,7 +35,7 @@ export const fr = {
     toggleSidebar: "Basculer le menu latéral",
     toggleSidebarCompact: "Basculer la barre latérale (compacte / étendue)",
     toggleImmersive: "Basculer l'écran de pochette immersif",
-    toggleRightPanel: "Basculer le panneau de détails",
+    toggleRightPanel: "Afficher le panneau d'infos",
     resizeSidebar: "Redimensionner la barre latérale gauche",
     resizeRightPanel: "Redimensionner le panneau droit",
     searchQuerySubtitle: "Recherche",
@@ -219,6 +220,8 @@ export const fr = {
     ratingStyleHeart: "Cœur (favori)",
     ratingStyleStars: "5 étoiles",
     ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, ou 5 étoiles pour des notes par demi-étoile — les deux utilisent la même note.",
+    minimizeToTrayLabel: "Réduire dans la barre système",
+    minimizeToTrayHint: "Fermer la fenêtre masque Luminous dans la barre système au lieu de quitter l'application.",
     appAndUpdatesTitle: "Application & Mises à jour",
     updateCheckNowBtn: "Rechercher des mises à jour",
     updateChecking: "Vérification...",
@@ -584,6 +587,7 @@ export const fr = {
     volumeSlider: "Curseur de volume",
     volumeWithValue: "Volume : {value}%",
     queueTitle: "File d'attente",
+    immersiveTitle: "Mode immersif",
     historyTitle: "Historique d'écoute",
     queueTab: "File ({count})",
     historyTab: "Historique ({count})",
@@ -635,14 +639,36 @@ export const fr = {
     dragHint: "Déplacer la fenêtre"
   },
 
+  chipInput: {
+    removeItem: "Supprimer {value}",
+    dragToReorder: "Glisser pour réorganiser"
+  },
+
+  songTags: {
+    genresTabDescription: "Parcourir les chansons par tags que vous avez ajoutés",
+    viewGenre: "Genre",
+    viewTags: "Tags",
+    emptyTitle: "Aucun tag pour l'instant",
+    emptySubtitle: "Faites un clic droit sur une chanson et choisissez Modifier les tags pour lui donner un genre — la première valeur est sa catégorie principale, les autres sont des sous-genres.",
+    songCount: "{count} chansons",
+    playAll: "Lire les {count} chansons",
+    editSongTooltip: "Modifier la chanson",
+    editAlbumTooltip: "Modifier l'album",
+    goToGenreTooltip: "Parcourir {genre}",
+    noGenre: "Sans genre"
+  },
+
   tagEditor: {
     title: "Modifier les tags de la chanson",
     titleField: "Titre de la chanson",
     artistField: "Artiste",
+    artistPlaceholder: "Ajouter un artiste...",
     albumField: "Album",
     trackField: "Numéro de piste",
     yearField: "Année",
     genreField: "Genre",
+    genrePlaceholder: "Ajouter un genre...",
+    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
     saveBtnShort: "Enregistrer",
@@ -651,8 +677,10 @@ export const fr = {
     readFailed: "Échec de la lecture des tags",
     locationField: "Emplacement",
     albumArtistField: "Artiste de l'album",
+    albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     albumArtistTooltip: "Artiste principal crédité pour l'album entier, utile pour les compilations",
     composerField: "Compositeur",
+    composerPlaceholder: "Ajouter un compositeur...",
     discField: "Disque",
     groupingField: "Groupement",
     groupingTooltip: "Regroupe des pistes liées, par ex. les mouvements d'une œuvre classique",
@@ -667,13 +695,24 @@ export const fr = {
     notFound: "Introuvable",
     acoustidFpcalcError: "La recherche AcoustID nécessite l'utilitaire « fpcalc ». Assurez-vous que « libchromaprint-tools » est installé sur votre système Linux, ou configurez « FPCALC_PATH ».",
     acoustidApiKeyError: "La clé API AcoustID est invalide ou a expiré. Veuillez obtenir une clé API client gratuite sur https://acoustid.org/ et exécuter Luminous avec la variable d'environnement « ACOUSTID_API_KEY » définie.",
-    saveFailedPrefix: "Échec de l'enregistrement des tags : "
+    saveFailedPrefix: "Échec de l'enregistrement des tags : ",
+    artworkField: "Pochette",
+    artworkEmbedded: "Pochette intégrée",
+    artworkNotEmbedded: "Aucune pochette intégrée",
+    clearArtBtn: "Effacer la pochette",
+    clearArtConfirmTitle: "Effacer la pochette intégrée ?",
+    clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier lui-même. La chanson utilisera alors la pochette du dossier ou un espace réservé.",
+    clearArtSuccess: "Pochette intégrée effacée",
+    clearArtFailedPrefix: "Échec de l'effacement de la pochette : "
   },
   albumTagEditor: {
     title: "Modifier les tags de l'album",
     albumField: "Titre de l'album",
     albumArtistField: "Artiste de l'album",
+    albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     genreField: "Genre",
+    genrePlaceholder: "Ajouter un genre...",
+    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",
@@ -682,7 +721,16 @@ export const fr = {
     saveBtn: "Enregistrer",
     saving: "Enregistrement des tags de l'album...",
     saveSuccess: "Tags d'album mis à jour pour {count} chansons",
-    saveFailedPrefix: "Échec de l'enregistrement des tags d'album : "
+    saveFailedPrefix: "Échec de l'enregistrement des tags d'album : ",
+    artworkField: "Pochette",
+    artworkEmbedded: "Pochette intégrée",
+    artworkNotEmbedded: "Aucune pochette intégrée",
+    clearArtBtn: "Effacer la pochette intégrée",
+    clearArtConfirmTitle: "Effacer la pochette intégrée ?",
+    clearArtConfirmMessage: "Ceci supprime la pochette intégrée du fichier de chaque piste de cet album. Les pistes utiliseront alors la pochette du dossier ou un espace réservé.",
+    clearingArt: "Effacement de la pochette...",
+    clearArtSuccess: "Pochette intégrée effacée pour {count} chansons",
+    clearArtFailedPrefix: "Échec de l'effacement de la pochette de l'album : "
   },
   equalizer: {
     title: "Égaliseur graphique à 10 bandes",
@@ -757,9 +805,16 @@ export const fr = {
     statsLine: "{genre} · {songs} • {duration} au total",
     playAll: "Lire",
     shuffleAndPlay: "Lecture aléatoire",
-    discography: "Discographie",
+    editArtist: "Modifier",
+    editArtistTooltip: "Modifier les détails de l'artiste, site web, tags et liens",
+    about: "À propos",
+    links: "LIENS",
+    showMore: "Afficher plus",
     showLess: "Afficher moins",
     showAll: "Afficher tout",
+    tags: "Tags",
+    addTag: "Ajouter un tag",
+    discography: "Discographie",
     setsFilter: "Coffrets ({count})",
     albumsFilter: "Albums ({count})",
     epsFilter: "EPs ({count})",
@@ -768,6 +823,25 @@ export const fr = {
     noReleasesFound: "Aucune sortie trouvée.",
     playlistsFeaturing: "Listes de lecture avec {artist}",
     compilationsFeaturing: "Compilations avec {artist}"
+  },
+  artistProfileEditor: {
+    title: "Modifier l'artiste",
+    website: "Site web",
+    websitePlaceholder: "https://www.artiste.com ou www.artiste.com",
+    bio: "À propos / Biographie",
+    bioPlaceholder: "Ajouter une biographie ou des notes pour cet artiste...",
+    tags: "Tags",
+    tagInputPlaceholder: "Ajouter un tag et appuyer sur Entrée...",
+    addTagBtn: "Ajouter",
+    socialLinks: "Liens",
+    addLinkBtn: "Ajouter un lien",
+    platform: "Plateforme",
+    linkValue: "Identifiant ou URL",
+    save: "Enregistrer",
+    cancel: "Annuler",
+    savedSuccess: "Profil de l'artiste mis à jour",
+    removeTagTooltip: "Supprimer le tag {tag}",
+    removeLinkTooltip: "Supprimer le lien"
   },
   albumDetail: {
     backToAlbums: "Retour aux albums",
@@ -778,8 +852,7 @@ export const fr = {
     editInfoTooltip: "Modifier les infos de l'album",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
-    refreshError: "Échec de l'actualisation de l'album",
-    goToGenrePlaylistTooltip: "Aller à la playlist automatique {genre}"
+    refreshError: "Échec de l'actualisation de l'album"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
@@ -799,7 +872,11 @@ export const fr = {
     disableLogoPulse: "Cliquez pour désactiver la pulsation du logo",
     toggleLogoPulsing: "Basculer la pulsation du logo Luminous",
     on: "Activé",
-    off: "Désactivé"
+    off: "Désactivé",
+    back: "Retour",
+    loading: "Chargement…",
+    expand: "Développer",
+    collapse: "Réduire"
   },
   organizer: {
     title: "Organiser les fichiers",
@@ -939,5 +1016,16 @@ export const fr = {
     contextComplete: "{name} terminé",
     queueComplete: "Votre file d'attente est terminée",
     playlistCreated: "Liste de lecture « {name} » créée"
+  },
+  dragDrop: {
+    overlayReplaceTitle: "Déposer pour remplacer la file d'attente et lire",
+    overlayReplaceHint: "Maintenez Maj pour ajouter à la place",
+    overlayAppendTitle: "Déposer pour ajouter à la file d'attente",
+    overlayAppendHint: "La lecture ne sera pas interrompue",
+    playingSong: "Lecture d'1 chanson",
+    playingSongs: "Lecture de {count} chansons",
+    addedSong: "1 chanson ajoutée à la file d'attente",
+    addedSongs: "{count} chansons ajoutées à la file d'attente",
+    nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter."
   }
 };

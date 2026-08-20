@@ -27,7 +27,7 @@ describe("TagEditor.svelte", () => {
     title: "Original Title",
     artist: "Original Artist",
     album: "Original Album",
-    album_artist: "Original Artist",
+    album_artist: "Original Album Artist",
     composer: "Original Composer",
     genre: "Rock",
     track: 3,
@@ -38,6 +38,7 @@ describe("TagEditor.svelte", () => {
     initial_key: "Cmaj",
     rating: 3,
     compilation: false,
+    art_embedded: false,
   };
 
   beforeEach(() => {
@@ -53,6 +54,7 @@ describe("TagEditor.svelte", () => {
         };
       }
       if (cmd === "save_song_tags") return null;
+      if (cmd === "clear_song_cover_art") return null;
       if (cmd === "set_song_rating") return 5;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
       return null;
@@ -68,12 +70,15 @@ describe("TagEditor.svelte", () => {
     });
 
     const titleInput = getByLabelText("Song Title") as HTMLInputElement;
-    const artistInput = getByLabelText("Artist") as HTMLInputElement;
     const albumInput = getByLabelText("Album") as HTMLInputElement;
 
     expect(titleInput.value).toBe("Original Title");
-    expect(artistInput.value).toBe("Original Artist");
     expect(albumInput.value).toBe("Original Album");
+    // Artist, Album Artist, and Composer are chip inputs — the initial
+    // values render as chips, not as the value of the (empty, ready-for-new-
+    // input) labeled text field.
+    expect(getByText("Original Artist")).toBeInTheDocument();
+    expect(getByText("Original Composer")).toBeInTheDocument();
   });
 
   it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
@@ -129,6 +134,84 @@ describe("TagEditor.svelte", () => {
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  it("adds a chip to the Artist field and saves it delimited alongside the original", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, getByText } = render(TagEditor, { songId: 10, onClose, onSave });
+
+    await waitFor(() => {
+      expect(getByText("Original Artist")).toBeInTheDocument();
+    });
+
+    const artistInput = getByLabelText("Artist") as HTMLInputElement;
+    await fireEvent.input(artistInput, { target: { value: "Second Artist" } });
+    await fireEvent.keyDown(artistInput, { key: "Enter" });
+
+    expect(getByText("Second Artist")).toBeInTheDocument();
+
+    const saveBtn = getByRole("button", { name: /save tags/i });
+    await fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("save_song_tags", expect.objectContaining({
+        songId: 10,
+        artist: "Original Artist; Second Artist",
+      }));
+      expect(onSave).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it("disables the Clear Artwork button when the song has no embedded art", async () => {
+    const onClose = vi.fn();
+    const { getByRole } = render(TagEditor, { songId: 10, onClose });
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: /clear artwork/i })).toBeDisabled();
+    });
+  });
+
+  it("clears embedded artwork after confirming, and disables the button afterward", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") return { ...mockSongDetails, art_embedded: true };
+      if (cmd === "clear_song_cover_art") return null;
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const { getByRole, getAllByRole } = render(TagEditor, { songId: 10, onClose });
+
+    const clearBtn = await waitFor(() => {
+      const btn = getByRole("button", { name: /clear artwork/i });
+      expect(btn).not.toBeDisabled();
+      return btn;
+    });
+
+    await fireEvent.click(clearBtn);
+
+    // The confirm dialog's own "Clear Artwork" button is now on top of the
+    // (still-rendered, still-disabled-pending) trigger button, so there are
+    // two matches — the confirm dialog's is the one added last.
+    const confirmBtn = await waitFor(() => {
+      const btns = getAllByRole("button", { name: "Clear Artwork" });
+      expect(btns).toHaveLength(2);
+      return btns[btns.length - 1];
+    });
+    await fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_song_cover_art", { songId: 10 });
+    });
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: /clear artwork/i })).toBeDisabled();
+    });
+
+    // The modal itself stays open (unlike Save), so the user can keep editing.
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("handles AcoustID fingerprint lookup to suggest tags", async () => {

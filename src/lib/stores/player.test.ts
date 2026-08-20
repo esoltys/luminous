@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PlayerStore } from "./player.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { playlistsStore } from "./playlists.svelte";
 
 describe("PlayerStore", () => {
   let store: PlayerStore;
@@ -116,10 +117,32 @@ describe("PlayerStore", () => {
     expect(invoke).toHaveBeenCalledWith("set_volume", { volume: 0 });
   });
 
-  it("should trigger open_and_play invoke on openAndPlay", async () => {
+  it("should trigger open_and_play invoke on openAndPlay and return its outcome", async () => {
     const testPaths = ["/path/to/song.mp3", "/path/to/playlist.m3u"];
-    await store.openAndPlay(testPaths);
+    const outcome = await store.openAndPlay(testPaths);
     expect(invoke).toHaveBeenCalledWith("open_and_play", { paths: testPaths });
+    expect(outcome).toEqual({ played: 1, skipped: 0 });
+  });
+
+  it("should trigger add_paths_to_queue invoke on addPathsToQueue and return its outcome", async () => {
+    const testPaths = ["/path/to/song.mp3", "/path/to/dropped-folder"];
+    const outcome = await store.addPathsToQueue(testPaths);
+    expect(invoke).toHaveBeenCalledWith("add_paths_to_queue", { paths: testPaths });
+    expect(outcome).toEqual({ added: 1, skipped: 0 });
+  });
+
+  it("should refresh the currently-viewed Queue track list after addPathsToQueue", async () => {
+    await playlistsStore.refreshPlaylists();
+    const queueId = playlistsStore.queuePlaylist!.id;
+    playlistsStore.activePlaylistId = queueId;
+    vi.mocked(invoke).mockClear();
+
+    await store.addPathsToQueue(["/path/to/song.mp3"]);
+
+    // Without this, the Queue view only shows newly-added tracks after
+    // navigating away and back — refreshPlaylists() alone only updates
+    // playlist metadata/counts, not the currently-displayed track list.
+    expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: queueId });
   });
 
   it("should clear currentSong when track-changed reports no song", async () => {

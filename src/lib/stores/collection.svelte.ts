@@ -12,16 +12,26 @@ import type {
   BatchProgress,
   AlbumItem,
   ArtistItem,
+  ArtistProfile,
   RecentSearchItem,
   QueuePopulationMode,
 } from "../types";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
+import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
-import { MAX_RECENT_SEARCHES, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_COLLAPSED_WIDTH_PX } from "../constants";
+import {
+  MAX_RECENT_SEARCHES,
+  SIDEBAR_MIN_WIDTH_PX,
+  SIDEBAR_COLLAPSED_WIDTH_PX,
+  MEDIUM_BREAKPOINT_WIDTH_PX,
+  SMALL_BREAKPOINT_WIDTH_PX,
+  PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX,
+  DETAIL_HEADER_COLLAPSE_HEIGHT_PX,
+} from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
-export type ActiveSubTab = "songs" | "albums" | "artists";
+export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 export type PlaylistsSubTab = "auto" | "custom";
@@ -130,6 +140,7 @@ class CollectionStore {
   songs = $state<Song[]>([]);
   albums = $state<AlbumItem[]>([]);
   artists = $state<ArtistItem[]>([]);
+  artistProfiles = $state<Record<string, ArtistProfile>>({});
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -425,6 +436,14 @@ class CollectionStore {
   miniplayerX = $state<number | null>(null);
   miniplayerY = $state<number | null>(null);
 
+  // Live CSS viewport size, used only to derive responsive breakpoint flags
+  // below — a plain in-memory mirror of window.innerWidth/innerHeight, kept
+  // deliberately separate from the geometry-capture fields above (those
+  // persist native OS window geometry via debounced Tauri onResized/onMoved
+  // for cross-restart restore; this one drives synchronous layout decisions
+  // and touches no IPC or localStorage).
+  viewportWidth = $state<number>(typeof window !== "undefined" ? window.innerWidth : 1280);
+  viewportHeight = $state<number>(typeof window !== "undefined" ? window.innerHeight : 800);
 
   watchFoldersRealtime = $state<boolean>(true);
   scanOnStartup = $state<boolean>(false);
@@ -492,6 +511,7 @@ class CollectionStore {
         // the backend at all (see enter/exitMiniplayerMode, which check
         // isGeometryCaptureSupported() fresh on each toggle).
         this.initWindowGeometryTracking();
+        this.initViewportTracking();
 
         const savedIsMiniplayer = localStorage.getItem("layout_isMiniplayer");
         if (savedIsMiniplayer === "true") {
@@ -655,6 +675,9 @@ class CollectionStore {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
+        tagsStore.load().catch((err) => {
+          console.error("Failed to refresh tags after library change:", err);
+        });
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
         });
@@ -766,6 +789,38 @@ class CollectionStore {
     this.songs = snapshot.songs;
     this.albums = snapshot.albums;
     this.artists = snapshot.artists;
+    await this.loadArtistProfiles();
+  }
+
+  async loadArtistProfiles() {
+    try {
+      const profiles = await invoke<ArtistProfile[]>("get_all_artist_profiles");
+      const map: Record<string, ArtistProfile> = {};
+      for (const p of profiles) {
+        if (p.artist_key) {
+          map[p.artist_key.toLowerCase()] = p;
+        }
+      }
+      this.artistProfiles = map;
+    } catch (err) {
+      console.error("Failed to load artist profiles:", err);
+    }
+  }
+
+  getArtistProfile(artistName: string | null | undefined): ArtistProfile | undefined {
+    if (!artistName) return undefined;
+    return this.artistProfiles[artistName.toLowerCase()];
+  }
+
+  async saveArtistProfile(profile: ArtistProfile): Promise<ArtistProfile> {
+    const saved = await invoke<ArtistProfile>("set_artist_profile", { profile });
+    if (saved?.artist_key) {
+      this.artistProfiles = {
+        ...this.artistProfiles,
+        [saved.artist_key.toLowerCase()]: saved,
+      };
+    }
+    return saved;
   }
 
   async addDirectory(path: string) {
@@ -888,6 +943,22 @@ class CollectionStore {
   clearRecentSearches() {
     this.recentSearches = [];
     this.saveRecentSearches();
+  }
+
+  /** One-shot "open this tag in the Genres tab" signal — set by viewGenreTag(),
+   * consumed and cleared by GenreBrowseView on pickup. Deliberately not
+   * persisted/history-tracked like selectedArtistName/selectedAlbumName: it's
+   * a fire-once navigation command, not durable "where the user is" state. */
+  pendingGenreTag = $state<string | null>(null);
+
+  viewGenreTag(tag: string) {
+    this.searchQuery = "";
+    this.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    this.activeTab = "collection";
+    this.activeSubTab = "genres";
+    this.pendingGenreTag = tag;
   }
 
   viewArtist(name: string) {
@@ -1082,6 +1153,22 @@ class CollectionStore {
     }
   }
 
+  // Mirrors window.innerWidth/innerHeight into viewportWidth/viewportHeight
+  // for the responsive breakpoint getters below. Deliberately separate from
+  // initWindowGeometryTracking above: that one debounces and persists native
+  // OS geometry across restarts via IPC; this one is a synchronous, in-memory
+  // reflection of the CSS viewport with no persistence, so layout can react
+  // to every resize immediately.
+  private initViewportTracking() {
+    if (typeof window === "undefined") return;
+    const update = () => {
+      this.viewportWidth = window.innerWidth;
+      this.viewportHeight = window.innerHeight;
+    };
+    update();
+    window.addEventListener("resize", update);
+  }
+
   private async captureCurrentWindowGeometry() {
     if (this.miniplayerTransitionInFlight) return;
     try {
@@ -1123,6 +1210,35 @@ class CollectionStore {
     }
   }
 
+  // Responsive breakpoint flags (issue #413) — pure functions of
+  // viewportWidth/viewportHeight. None of these read or write sidebarOpen,
+  // sidebarWidth, rightPanelOpen, or immersiveMode: they're purely visual
+  // overrides so widening/heightening the window back out always restores
+  // exactly whatever the user had set manually.
+  get isSidebarAutoCollapsed(): boolean {
+    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+  }
+
+  get isRightPanelAutoHidden(): boolean {
+    return this.viewportWidth < MEDIUM_BREAKPOINT_WIDTH_PX;
+  }
+
+  get isImmersiveForced(): boolean {
+    return this.viewportWidth < SMALL_BREAKPOINT_WIDTH_PX;
+  }
+
+  get effectiveImmersiveMode(): boolean {
+    return this.immersiveMode || this.isImmersiveForced;
+  }
+
+  get isPlaybarOnlyMode(): boolean {
+    return this.viewportHeight < PLAYBAR_ONLY_HEIGHT_BREAKPOINT_PX;
+  }
+
+  get isDetailHeaderCollapsed(): boolean {
+    return this.viewportHeight < DETAIL_HEADER_COLLAPSE_HEIGHT_PX;
+  }
+
   setSidebarWidth(width: number) {
     this.sidebarWidth = width;
     if (width >= SIDEBAR_MIN_WIDTH_PX) {
@@ -1157,11 +1273,28 @@ class CollectionStore {
   }
 
   get filteredArtists(): ArtistItem[] {
-    const query = this.searchQuery.trim().toLowerCase();
-    if (query === "") return this.artists;
-    return this.artists.filter(artist => 
-      artist.name && artist.name.toLowerCase().includes(query)
-    );
+    const rawQuery = this.searchQuery.trim();
+    if (rawQuery === "") return this.artists;
+
+    // Check if query is structured search with artist-tag or tag
+    const tagMatch = rawQuery.match(/^(?:artist[-_]?tag|tags?):(.+)$/i);
+    if (tagMatch) {
+      const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+      if (!tagQuery) return this.artists;
+      return this.artists.filter((artist) => {
+        if (!artist.name) return false;
+        const profile = this.artistProfiles[artist.name.toLowerCase()];
+        return profile?.tags?.some((t) => t.toLowerCase().includes(tagQuery)) ?? false;
+      });
+    }
+
+    const query = rawQuery.toLowerCase();
+    return this.artists.filter((artist) => {
+      if (!artist.name) return false;
+      if (artist.name.toLowerCase().includes(query)) return true;
+      const profile = this.artistProfiles[artist.name.toLowerCase()];
+      return profile?.tags?.some((t) => t.toLowerCase().includes(query)) ?? false;
+    });
   }
 }
 

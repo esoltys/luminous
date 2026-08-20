@@ -12,13 +12,17 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
-  import { Music } from 'lucide-svelte';
+  import { Music, UploadCloud } from 'lucide-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
+  import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
+  import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { invoke } from '@tauri-apps/api/core';
   import {
     SIDEBAR_MIN_WIDTH_PX,
     SIDEBAR_MAX_WIDTH_PX,
@@ -31,11 +35,21 @@
   let { children } = $props();
   let isLinux = $state(false);
   let isShortcutsModalOpen = $state(false);
+  let isDragActive = $state(false);
+  let isShiftHeld = $state(false);
+  let isResizingSidebar = $state(false);
+
+  // Visual-only override: never touches the stored sidebarWidth preference,
+  // so widening the window back out restores exactly the width the user had.
+  let effectiveSidebarWidth = $derived(
+    collectionStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : collectionStore.sidebarWidth
+  );
 
   onMount(() => {
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
     i18n.init();
     prefs.init();
+    tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     void getCurrentWindow().show().catch(() => {});
 
@@ -81,9 +95,87 @@
           break;
       }
     }
+    // Tracks whether Shift is currently held so a drop can be told apart from
+    // a plain drop (replace Queue & play) vs. a Shift-drop (append to Queue).
+    // The native DragDropEvent payload carries no modifier state, and an OS
+    // file drag never gives the target window keyboard focus while hovering
+    // — so keydown/keyup here would never fire. Instead this polls the
+    // physical key state via a backend command (is_shift_key_held, queried
+    // from the OS rather than the DOM) while a drag is active, and re-checks
+    // it definitively at drop time.
+    let shiftPollInterval: ReturnType<typeof setInterval> | undefined;
+    async function refreshShiftHeld() {
+      try {
+        isShiftHeld = await invoke<boolean>('is_shift_key_held');
+      } catch (e) {
+        console.warn('Failed to query Shift key state:', e);
+      }
+    }
+    function stopShiftPolling() {
+      if (shiftPollInterval) {
+        clearInterval(shiftPollInterval);
+        shiftPollInterval = undefined;
+      }
+    }
+
+    async function handleFilesDropped(paths: string[]) {
+      const append = await invoke<boolean>('is_shift_key_held').catch(() => false);
+      if (append) {
+        const outcome = await playerStore.addPathsToQueue(paths);
+        if (outcome.added > 0) {
+          const text = outcome.added === 1
+            ? i18n.t('dragDrop.addedSong', {}, 'Added 1 song to queue')
+            : i18n.t('dragDrop.addedSongs', { count: outcome.added }, `Added ${outcome.added} songs to queue`);
+          toastStore.show(text, 'success');
+        }
+      } else {
+        const outcome = await playerStore.openAndPlay(paths);
+        if (outcome.played > 0) {
+          const text = outcome.played === 1
+            ? i18n.t('dragDrop.playingSong', {}, 'Playing 1 song')
+            : i18n.t('dragDrop.playingSongs', { count: outcome.played }, `Playing ${outcome.played} songs`);
+          toastStore.show(text, 'success');
+        }
+      }
+    }
+
+    // Must be getCurrentWebview(), not getCurrentWindow(): the Rust side
+    // (manager/webview.rs's emit_to_webview) emits drag-drop events scoped to
+    // an EventTarget::Webview, but Window.onDragDropEvent() subscribes with
+    // an EventTarget::Window target — a kind mismatch the backend's target
+    // filter never matches, so a Window-level listener silently never fires.
+    // Webview.onDragDropEvent() (and only that one) targets EventTarget::Webview
+    // and actually receives the events.
+    let dragDropUnlisten: (() => void) | undefined;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          isDragActive = false;
+          stopShiftPolling();
+          void handleFilesDropped(event.payload.paths);
+        } else if (event.payload.type === 'leave') {
+          isDragActive = false;
+          stopShiftPolling();
+        } else if (!isDragActive) {
+          // 'enter' or 'over', first time this hover — start live-polling the
+          // Shift state so the overlay hint tracks it while dragging.
+          isDragActive = true;
+          void refreshShiftHeld();
+          shiftPollInterval = setInterval(refreshShiftHeld, 150);
+        }
+      })
+      .then((unlisten) => {
+        dragDropUnlisten = unlisten;
+      })
+      .catch((e) => {
+        console.warn('Failed to attach drag-and-drop listener:', e);
+      });
+
     window.addEventListener('keydown', handleGlobalHotkeys);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
+      stopShiftPolling();
+      dragDropUnlisten?.();
     };
   });
 
@@ -119,6 +211,7 @@
   // Pointer drag resizing for Sidebar (left-to-right increase)
   function startResizeSidebar(e: PointerEvent) {
     e.preventDefault();
+    isResizingSidebar = true;
     const startX = e.clientX;
     const startWidth = collectionStore.sidebarWidth;
 
@@ -134,6 +227,7 @@
     }
 
     function onPointerUp() {
+      isResizingSidebar = false;
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     }
@@ -204,16 +298,28 @@
     <div class="w-full h-full">
       <Miniplayer />
     </div>
+  {:else if collectionStore.isPlaybarOnlyMode}
+    <!-- Playbar-only mode: the window is too short to show anything else,
+         including the immersive cover view. Renders PlayerBar unconditionally
+         (it already has a graceful "not playing" state) so the user never
+         sees a blank window when it's squashed short. The bar keeps its
+         normal fixed height and is simply centered in whatever room is left
+         — the window's own minimum height is low enough that a user can
+         shrink it down until it snugly fits the bar, rather than the bar
+         stretching to fill a taller window. -->
+    <div class="absolute inset-4 z-40 flex items-center justify-center">
+      <PlayerBar />
+    </div>
   {:else}
     <!-- 3D Flip Container fills the full window height; the PlayerBar floats
          on top of it (absolute, below) so scrolled content passes underneath
          the glass footer instead of stopping above it. -->
     <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
       <!-- Inner Card Wrapper -->
-      <div class="w-full h-full relative flip-card" class:flipped={collectionStore.immersiveMode}>
-        
+      <div class="w-full h-full relative flip-card" class:flipped={collectionStore.effectiveImmersiveMode}>
+
         <!-- FRONT FACE: Normal App Layout -->
-        <div class="flip-face flip-front flex flex-col {collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-front flex flex-col {collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Top Navigation Ribbon -->
           <div class="flex-shrink-0 z-50 overflow-visible">
             <TopNavigation />
@@ -224,25 +330,30 @@
             <!-- Left Sidebar -->
             {#if collectionStore.sidebarOpen}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
-                <Sidebar width={collectionStore.sidebarWidth} />
+                <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
 
-                <!-- Left Resize Handle -->
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                <div 
-                  role="separator"
-                  aria-valuenow={collectionStore.sidebarWidth}
-                  aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
-                  aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
-                  aria-label={i18n.t('topNav.resizeSidebar')}
-                  tabindex="0"
-                  class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
-                  onpointerdown={startResizeSidebar}
-                  onkeydown={handleSidebarKeyDown}
-                >
-                  <!-- Expanded hover/touch area wrapper -->
-                  <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
-                </div>
+                <!-- Left Resize Handle: hidden while auto-collapsed — dragging
+                     from a visually-64px rail would otherwise jump using the
+                     real (larger) stored sidebarWidth as the drag's starting
+                     point. Widening the window is the way out. -->
+                {#if !collectionStore.isSidebarAutoCollapsed}
+                  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                  <div
+                    role="separator"
+                    aria-valuenow={collectionStore.sidebarWidth}
+                    aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
+                    aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
+                    aria-label={i18n.t('topNav.resizeSidebar')}
+                    tabindex="0"
+                    class="relative w-1 bg-brand-border hover:bg-brand-accent/50 active:bg-brand-accent cursor-col-resize transition-colors self-stretch flex-shrink-0 z-30 touch-none focus:outline-none focus:bg-brand-accent"
+                    onpointerdown={startResizeSidebar}
+                    onkeydown={handleSidebarKeyDown}
+                  >
+                    <!-- Expanded hover/touch area wrapper -->
+                    <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
+                  </div>
+                {/if}
               </div>
             {/if}
 
@@ -252,7 +363,7 @@
             </main>
 
             <!-- Right Contextual Panel -->
-            {#if collectionStore.rightPanelOpen}
+            {#if collectionStore.rightPanelOpen && !collectionStore.isRightPanelAutoHidden}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <!-- Right Resize Handle -->
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -282,7 +393,7 @@
         <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
-        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-8 pb-32 select-none {!collectionStore.immersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Immersive Ambient Blurred Background -->
           {#if playerStore.currentSong}
             <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
@@ -296,24 +407,29 @@
             </div>
           {/if}
 
-          <!-- Center Container: Card and Details -->
+          <!-- Center Container: Card and Details. Below md, the layout would
+               stack the text under the cover art — at that point it's just
+               clutter (the floating PlayerBar dock repeats the same info),
+               so it's hidden and the cover art stands alone. At md+, where
+               there's room to sit it beside the art instead, it stays. -->
           <div class="relative z-10 flex flex-col md:flex-row items-center gap-12 max-w-4xl w-full justify-center">
-            <!-- Floating Cover Art Frame -->
-            <div class="w-72 h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
-              <CoverArt
-                songId={playerStore.currentSong?.id}
-                artEmbedded={playerStore.currentSong?.art_embedded}
-                artAutomatic={playerStore.currentSong?.art_automatic}
-                artManual={playerStore.currentSong?.art_manual}
-                sizeClass="w-full h-full object-cover"
-              />
-            </div>
+            {#if playerStore.currentSong}
+              <!-- Floating Cover Art Frame -->
+              <div class="w-56 h-56 min-[420px]:w-72 min-[420px]:h-72 md:w-[380px] md:h-[380px] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-brand-border/40 hover:scale-[1.02] transition-transform duration-500 bg-brand-sidebar flex items-center justify-center relative select-none">
+                <CoverArt
+                  songId={playerStore.currentSong?.id}
+                  artEmbedded={playerStore.currentSong?.art_embedded}
+                  artAutomatic={playerStore.currentSong?.art_automatic}
+                  artManual={playerStore.currentSong?.art_manual}
+                  sizeClass="w-full h-full object-cover"
+                />
+              </div>
 
-            <!-- Song Details Info -->
-            <div class="flex flex-col text-center md:text-left space-y-4 max-w-md">
-              {#if playerStore.currentSong}
+              <!-- Song Details Info: hidden below md, where it would stack
+                   under the cover art instead of sitting beside it. -->
+              <div class="hidden md:flex flex-col text-center md:text-left space-y-4 max-w-md">
                 <div>
-                  <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-accent/25 rounded-full select-none">
+                  <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
                     {i18n.t('playerBar.nowPlaying')}
                   </span>
                 </div>
@@ -326,14 +442,14 @@
                 <p class="text-sm text-brand-text-secondary/60 italic truncate select-text">
                   {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}
                 </p>
-              {:else}
-                <div class="flex flex-col items-center justify-center text-center">
-                  <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
-                  <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
-                  <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
-                </div>
-              {/if}
-            </div>
+              </div>
+            {:else}
+              <div class="flex flex-col items-center justify-center text-center">
+                <Music class="w-16 h-16 text-brand-text-secondary/20 mb-4 animate-pulse" />
+                <h2 class="text-2xl font-bold text-brand-text-primary">{i18n.t('playerBar.notPlaying')}</h2>
+                <p class="text-sm text-brand-text-secondary/60 mt-1">{i18n.t('immersive.emptyStateText')}</p>
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -350,6 +466,31 @@
         <PlayerBar />
       </div>
     {/if}
+  {/if}
+
+  <!-- Drag-and-drop overlay: shown while the OS reports a file/folder drag
+       hovering the window (native `dragDropEnabled` events, not HTML5 DnD).
+       Purely visual — pointer-events-none so it never intercepts the drop
+       itself, which the window-level listener in onMount handles. -->
+  {#if isDragActive}
+    <div
+      class="absolute inset-0 z-[100] flex items-center justify-center bg-brand-main/85 backdrop-blur-sm border-4 border-dashed border-brand-accent pointer-events-none select-none"
+      transition:fly={{ duration: 150 }}
+    >
+      <div class="flex flex-col items-center gap-3 text-center px-8">
+        <UploadCloud class="w-14 h-14 text-brand-accent" />
+        <p class="text-2xl font-bold text-brand-text-primary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendTitle', {}, 'Drop to append to queue')
+            : i18n.t('dragDrop.overlayReplaceTitle', {}, 'Drop to replace queue & play')}
+        </p>
+        <p class="text-sm text-brand-text-secondary">
+          {isShiftHeld
+            ? i18n.t('dragDrop.overlayAppendHint', {}, "Playback won't be interrupted")
+            : i18n.t('dragDrop.overlayReplaceHint', {}, 'Hold Shift to append instead')}
+        </p>
+      </div>
+    </div>
   {/if}
 </div>
 

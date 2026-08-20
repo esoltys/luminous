@@ -1,13 +1,16 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Sliders, Save, X, LoaderCircle, Layers, Lock } from "lucide-svelte";
+  import { Sliders, Save, X, LoaderCircle, Layers, Lock, ImageOff } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import FormField from "./FormField.svelte";
   import Modal from "./Modal.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import ChipInput from "./ChipInput.svelte";
+  import CoverArt from "./CoverArt.svelte";
 
   interface Props {
     songIds: number[];
@@ -17,6 +20,12 @@
     initialYear?: number | null;
     initialDisc?: number | null;
     initialCompilation?: boolean;
+    hasEmbeddedArt?: boolean;
+    /** Album-level art overrides (see AlbumItem.art_automatic/art_manual) — take
+        precedence over any single track's embedded art, same as CoverArt.svelte's
+        own precedence when both are passed through. */
+    initialArtAutomatic?: string | null;
+    initialArtManual?: string | null;
     onClose: () => void;
     onSave?: () => void;
   }
@@ -29,6 +38,9 @@
     initialYear = null,
     initialDisc = null,
     initialCompilation = false,
+    hasEmbeddedArt = false,
+    initialArtAutomatic = null,
+    initialArtManual = null,
     onClose,
     onSave
   }: Props = $props();
@@ -65,6 +77,28 @@
   }
 
   let isSaving = $state(false);
+  let isClearingArt = $state(false);
+  let showClearArtConfirm = $state(false);
+
+  async function handleClearArt() {
+    isClearingArt = true;
+    try {
+      const count = await invoke<number>("clear_album_cover_art", { songIds });
+
+      await collectionStore.refreshStats();
+      await collectionStore.refreshLibrary();
+
+      toastStore.show(i18n.t("albumTagEditor.clearArtSuccess", { count }), "success");
+      if (onSave) onSave();
+      onClose();
+    } catch (e: any) {
+      console.error("Failed to clear album artwork:", e);
+      toastStore.show(i18n.t("albumTagEditor.clearArtFailedPrefix") + e.toString(), "error");
+    } finally {
+      isClearingArt = false;
+      showClearArtConfirm = false;
+    }
+  }
 
   async function handleSave() {
     isSaving = true;
@@ -116,6 +150,30 @@
 
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       <div class="flex flex-col gap-4">
+        <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
+          <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
+          <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+            <span class="text-[9px] font-bold text-brand-text-secondary/60 uppercase font-mono">{i18n.t('albumTagEditor.artworkField')}</span>
+            <span class="text-[10px] text-brand-text-secondary font-mono">
+              {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
+            </span>
+          </div>
+          <Button
+            onclick={() => { showClearArtConfirm = true; }}
+            disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+            variant="secondary"
+            size="sm"
+          >
+            {#if isClearingArt}
+              <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+              <span>{i18n.t('albumTagEditor.clearingArt')}</span>
+            {:else}
+              <ImageOff class="w-3.5 h-3.5" />
+              <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
+            {/if}
+          </Button>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <FormField label={i18n.t('albumTagEditor.albumField')} for="album-tag-album" span2>
             <Input id="album-tag-album" bind:value={album} disabled={isSaving} size="sm" class="w-full" />
@@ -130,7 +188,13 @@
                 </span>
               </div>
             {:else}
-              <Input id="album-tag-albumartist" bind:value={albumArtist} disabled={isSaving} size="sm" class="w-full" />
+              <ChipInput
+                id="album-tag-albumartist"
+                bind:value={albumArtist}
+                disabled={isSaving}
+                placeholder={i18n.t('albumTagEditor.albumArtistPlaceholder')}
+                class="w-full"
+              />
             {/if}
           </FormField>
 
@@ -146,8 +210,14 @@
             {i18n.t('albumTagEditor.compilationField')}
           </label>
 
-          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2>
-            <Input id="album-tag-genre" bind:value={genre} disabled={isSaving} size="sm" class="w-full" />
+          <FormField label={i18n.t('albumTagEditor.genreField')} for="album-tag-genre" span2 tooltip={i18n.t('albumTagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
+            <ChipInput
+              id="album-tag-genre"
+              bind:value={genre}
+              disabled={isSaving}
+              placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+              class="w-full"
+            />
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.yearField')} for="album-tag-year">
@@ -205,3 +275,14 @@
       </div>
     </div>
 </Modal>
+
+{#if showClearArtConfirm}
+  <ConfirmDialog
+    title={i18n.t('albumTagEditor.clearArtConfirmTitle')}
+    message={i18n.t('albumTagEditor.clearArtConfirmMessage')}
+    confirmLabel={i18n.t('albumTagEditor.clearArtBtn')}
+    cancelLabel={i18n.t('albumTagEditor.cancelBtn')}
+    onConfirm={handleClearArt}
+    onCancel={() => { showClearArtConfirm = false; }}
+  />
+{/if}

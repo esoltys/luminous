@@ -44,6 +44,7 @@ pub struct UiPreferences {
     pub artists_view_mode: String,
     pub playlists_auto_view_mode: String,
     pub playlists_custom_view_mode: String,
+    pub genre_view_mode: String,
 }
 
 impl Default for UiPreferences {
@@ -56,6 +57,7 @@ impl Default for UiPreferences {
             artists_view_mode: "cards".into(),
             playlists_auto_view_mode: "cards".into(),
             playlists_custom_view_mode: "cards".into(),
+            genre_view_mode: "genre".into(),
         }
     }
 }
@@ -63,10 +65,11 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 7] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 8] {
         const RATING: &[&str] = &["heart", "stars"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
+        const GENRE_VIEW: &[&str] = &["genre", "tags"];
         const ANY: &[&str] = &[];
         [
             ("rating_style", &mut self.rating_style, RATING),
@@ -84,6 +87,7 @@ impl UiPreferences {
                 &mut self.playlists_custom_view_mode,
                 VIEW,
             ),
+            ("genre_view_mode", &mut self.genre_view_mode, GENRE_VIEW),
         ]
     }
 }
@@ -154,6 +158,39 @@ pub async fn get_all_app_settings(
         settings.insert(k, v);
     }
     Ok(settings)
+}
+
+/// Reads the in-memory flag `tray.rs` already keeps in sync with the
+/// `app_state` row of the same name — no DB round-trip needed for the read.
+#[tauri::command]
+pub fn get_minimize_to_tray_enabled(state: State<'_, AppState>) -> bool {
+    state
+        .minimize_to_tray
+        .load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Persists the setting and updates the in-memory flag `tray.rs`'s
+/// `CloseRequested` handler reads, so the new value takes effect on the
+/// very next window close — not just after a restart.
+#[tauri::command]
+pub async fn set_minimize_to_tray_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    state
+        .minimize_to_tray
+        .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    let Ok(conn) = state.db.pool.get() else {
+        log::error!("Failed to persist minimize_to_tray setting: no DB connection");
+        return Ok(());
+    };
+    if let Err(e) = conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('minimize_to_tray', ?1)",
+        rusqlite::params![enabled.to_string()],
+    ) {
+        log::error!("Failed to persist minimize_to_tray setting: {e}");
+    }
+    Ok(())
 }
 
 #[tauri::command]

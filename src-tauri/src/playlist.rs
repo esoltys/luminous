@@ -367,6 +367,13 @@ impl PlaylistManager {
     /// old, and prunes rows for genres no longer present in the library.
     /// `updated` doubles as the "last (re)generated at" timestamp shown in
     /// the UI.
+    ///
+    /// One auto-playlist is created per *distinct `songs.genre` value*, not
+    /// per individual genre — a song tagged with multiple genres (e.g.
+    /// `"Rock; Blues"`) gets its own auto-playlist for that exact
+    /// combination rather than being folded into separate "Rock" and
+    /// "Blues" auto-playlists. Fanning multi-value genres out is native-tags
+    /// territory (#224); left unsplit here deliberately for #143.
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 

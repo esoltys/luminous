@@ -110,6 +110,53 @@ impl From<i64> for FileType {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-value field helpers (genre, artist, album artist, composer)
+// ---------------------------------------------------------------------------
+
+/// Delimiter used to pack multiple values into `songs.genre`/`artist`/
+/// `album_artist`/`composer` and the tag editor's corresponding DTO fields,
+/// matching the Mp3tag/Winamp `"; "` convention. Shared by every multi-value
+/// field so the internal storage format stays consistent regardless of what
+/// on-disk tag convention (if any) a given field's legacy fallback uses.
+pub const MULTI_VALUE_DELIMITER: &str = "; ";
+
+/// Splits a `songs.genre`/`artist`/`album_artist`/`composer`-style delimited
+/// string into a clean, deduped list of individual values, trimming
+/// whitespace and dropping empties. This is the single place that owns the
+/// internal storage delimiter (`;`) — use it anywhere one of these columns
+/// (or a single item read off an on-disk tag, in case some other tool joined
+/// multiple values into one string with `;`, e.g. Mp3tag/Winamp's
+/// convention) needs to be treated as a list rather than opaque text.
+///
+/// Deliberately does *not* also split on `/`, even though that's a
+/// long-standing convention for legacy-joined multi-value fields (TPE1's own
+/// "Lead performer(s)/Soloist(s)" convention, and Picard's default
+/// `id3v23_join_with = "/"` for ID3v2.3) — `/` shows up too often inside a
+/// single legitimate value (band names like "AC/DC", not to mention genre
+/// names) to use as a splitting heuristic without silently corrupting them.
+pub fn parse_multi_value(raw: &str) -> Vec<String> {
+    split_and_dedup(raw, &[';'])
+}
+
+/// Joins a value list back into the delimited form stored in `songs.genre`/
+/// `artist`/`album_artist`/`composer`.
+pub fn join_multi_value(values: &[String]) -> String {
+    values.join(MULTI_VALUE_DELIMITER)
+}
+
+/// Splits `raw` on any of `delimiters`, trims, drops empties, and dedupes
+/// case-insensitively while preserving first-seen casing and order.
+fn split_and_dedup(raw: &str, delimiters: &[char]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    raw.split(delimiters)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter(|s| seen.insert(s.to_lowercase()))
+        .map(|s| s.to_string())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Song — central data model
 // ---------------------------------------------------------------------------
 
@@ -719,9 +766,103 @@ pub enum HomeItem {
     Playlist { playlist: Playlist },
 }
 
+/// A social media or external platform link associated with an artist (#473).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct ArtistSocialLink {
+    pub platform: String,
+    pub handle_or_url: String,
+}
+
+/// Full customizable profile for an artist (#473).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct ArtistProfile {
+    pub artist_key: String,
+    pub website: Option<String>,
+    pub tags: Vec<String>,
+    pub social_links: Vec<ArtistSocialLink>,
+    pub bio: Option<String>,
+}
+
+/// A Luminous-native song tag (#224), independent of the embedded
+/// `songs.genre` column. `song_count` is the number of songs currently
+/// carrying this tag, at any position.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct Tag {
+    pub name: String,
+    pub song_count: i64,
+}
+
+/// One child entry under a [`GenreGroup`]'s main tag.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagCount {
+    pub name: String,
+    pub song_count: i64,
+}
+
+/// One node of the emergent tag-hierarchy graph: a tag that has appeared as a
+/// song's *first* (position 0, "main category") tag on at least one song,
+/// together with every tag seen as a subgenre of it across the library. A tag
+/// can appear as a child under more than one `GenreGroup` if different songs
+/// disagree about its main category — that disagreement is preserved rather
+/// than resolved (see `tags::get_genre_graph`).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct GenreGroup {
+    pub main_tag: String,
+    pub song_count: i64,
+    pub children: Vec<TagCount>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_multi_value_splits_trims_and_dedupes() {
+        assert_eq!(
+            parse_multi_value("Rock; Jazz Fusion; Live"),
+            vec!["Rock", "Jazz Fusion", "Live"]
+        );
+        // Whitespace-only separators still split; empties dropped.
+        assert_eq!(parse_multi_value("Rock;;  Jazz "), vec!["Rock", "Jazz"]);
+        // Case-insensitive dedup, first-seen casing wins.
+        assert_eq!(parse_multi_value("Rock; rock; ROCK"), vec!["Rock"]);
+        // A single value with no delimiter round-trips unchanged.
+        assert_eq!(parse_multi_value("Metal"), vec!["Metal"]);
+        assert_eq!(parse_multi_value(""), Vec::<String>::new());
+        assert_eq!(parse_multi_value("   "), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_parse_multi_value_does_not_split_on_slash() {
+        // '/' is a real-world legacy multi-value join convention (TPE1,
+        // Picard's ID3v2.3 fallback) but is deliberately *not* treated as a
+        // splitting delimiter here, since it collides with band names that
+        // legitimately contain a slash — "AC/DC" must survive intact rather
+        // than becoming two artists, "AC" and "DC".
+        assert_eq!(parse_multi_value("AC/DC"), vec!["AC/DC"]);
+        // A real multi-value string still splits correctly on ';', with the
+        // slash-containing value passing through as one of the items.
+        assert_eq!(
+            parse_multi_value("David Guetta; AC/DC"),
+            vec!["David Guetta", "AC/DC"]
+        );
+    }
+
+    #[test]
+    fn test_join_multi_value() {
+        assert_eq!(
+            join_multi_value(&["Rock".to_string(), "Jazz Fusion".to_string()]),
+            "Rock; Jazz Fusion"
+        );
+        assert_eq!(join_multi_value(&[]), "");
+        assert_eq!(join_multi_value(&["Metal".to_string()]), "Metal");
+    }
+
+    #[test]
+    fn test_multi_value_round_trips_through_join_and_parse() {
+        let values = vec!["Rock".to_string(), "Jazz Fusion".to_string()];
+        assert_eq!(parse_multi_value(&join_multi_value(&values)), values);
+    }
 
     #[test]
     fn test_is_same_album_or_cue_sibling() {

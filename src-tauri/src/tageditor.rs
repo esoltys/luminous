@@ -7,6 +7,7 @@
 //! in `commands/tageditor.rs`). Fingerprinting shells out to the external
 //! `fpcalc` (Chromaprint) binary rather than reimplementing the algorithm.
 
+use crate::models;
 use anyhow::{anyhow, Context, Result};
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -131,12 +132,53 @@ pub fn write_tags(
     let original_pictures = tag.pictures().to_vec();
 
     tag.set_title(title.to_string());
-    tag.set_artist(artist.to_string());
     tag.set_album(album.to_string());
-    tag.set_genre(genre.to_string());
 
-    tag.insert_text(lofty::tag::ItemKey::AlbumArtist, album_artist.to_string());
-    tag.insert_text(lofty::tag::ItemKey::Composer, composer.to_string());
+    // Genre, Artist, Album Artist, and Composer are all written as one
+    // `TagItem` per value rather than a single `set_*()`/`insert_text()`
+    // call, so formats with native multi-value support (Vorbis Comments,
+    // APEv2, MP4) and ID3v2.4 — whose `TCON`/`TPE1`/`TPE2`/`TCOM` frames
+    // pack multiple values null-byte-separated per the ID3v2.4 spec —
+    // round-trip correctly with taggers like MusicBrainz Picard instead of
+    // collapsing to one value. Known caveat: if the file's primary tag is a
+    // legacy ID3v2.3 frame, lofty re-encodes multiple genres using the old
+    // ID3v1-style numeric-genre-in-parentheses convention on save rather
+    // than Picard's default `/`-joined string (#143); Artist/Album Artist/
+    // Composer have no such re-encoding, so their null separators are
+    // written as-is, which is itself invalid ID3v2.3 — both are documented
+    // interop caveats of the legacy format rather than bugs.
+    tag.remove_key(lofty::tag::ItemKey::TrackArtist);
+    for a in models::parse_multi_value(artist) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::TrackArtist,
+            lofty::tag::ItemValue::Text(a),
+        ));
+    }
+
+    tag.remove_key(lofty::tag::ItemKey::Genre);
+    for g in models::parse_multi_value(genre) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::Genre,
+            lofty::tag::ItemValue::Text(g),
+        ));
+    }
+
+    tag.remove_key(lofty::tag::ItemKey::AlbumArtist);
+    for aa in models::parse_multi_value(album_artist) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::AlbumArtist,
+            lofty::tag::ItemValue::Text(aa),
+        ));
+    }
+
+    tag.remove_key(lofty::tag::ItemKey::Composer);
+    for c in models::parse_multi_value(composer) {
+        tag.push(lofty::tag::TagItem::new(
+            lofty::tag::ItemKey::Composer,
+            lofty::tag::ItemValue::Text(c),
+        ));
+    }
+
     tag.insert_text(lofty::tag::ItemKey::ContentGroup, grouping.to_string());
     tag.insert_text(lofty::tag::ItemKey::InitialKey, initial_key.to_string());
     // TCMP/cpil/COMPILATION "part of a compilation" flag — written as text
@@ -194,6 +236,45 @@ pub fn write_tags(
         for picture in original_pictures {
             tag.push_picture(picture);
         }
+    }
+
+    let mut attempts = 0;
+    loop {
+        match tagged_file.save_to_path(path, WriteOptions::default()) {
+            Ok(_) => break,
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 5 {
+                    return Err(e)
+                        .context("failed to write tags back to file after multiple attempts");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Remove every embedded cover art picture from `path`'s primary tag,
+/// leaving all other tag fields untouched (#386). A no-op if the file has no
+/// tag, or its tag has no pictures.
+pub fn clear_embedded_art(path: &Path) -> Result<()> {
+    let mut tagged_file = Probe::open(path)
+        .context("failed to open audio file for cover art clearing")?
+        .read()
+        .context("failed to parse audio tags")?;
+
+    let tag = match tagged_file.primary_tag_mut() {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    if tag.pictures().is_empty() {
+        return Ok(());
+    }
+
+    while !tag.pictures().is_empty() {
+        tag.remove_picture(0);
     }
 
     let mut attempts = 0;
@@ -402,6 +483,242 @@ pub async fn lookup_acoustid(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lofty::picture::{MimeType, Picture, PictureType};
+
+    /// Writes a minimal valid WAV file, so tests don't need a binary audio
+    /// fixture checked into the repo.
+    fn write_test_wav(path: &Path) {
+        let sample_rate = 8_000u32;
+        let channels = 1u16;
+        let bits_per_sample = 16u16;
+        let data = vec![0u8; (sample_rate / 10) as usize * 2]; // 100ms of silence
+
+        let byte_rate = sample_rate * channels as u32 * (bits_per_sample / 8) as u32;
+        let block_align = channels * (bits_per_sample / 8);
+
+        let mut wav = Vec::with_capacity(44 + data.len());
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(b"WAVE");
+        wav.extend_from_slice(b"fmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        wav.extend_from_slice(&channels.to_le_bytes());
+        wav.extend_from_slice(&sample_rate.to_le_bytes());
+        wav.extend_from_slice(&byte_rate.to_le_bytes());
+        wav.extend_from_slice(&block_align.to_le_bytes());
+        wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        wav.extend_from_slice(&data);
+
+        std::fs::write(path, wav).expect("failed to write test wav fixture");
+    }
+
+    #[test]
+    fn test_clear_embedded_art_removes_picture_and_keeps_other_tags() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        // Write a tag with a title and an embedded picture.
+        let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag_type = tagged_file.primary_tag_type();
+        let mut tag = Tag::new(tag_type);
+        tag.set_title("Original Title".to_string());
+        let picture = Picture::unchecked(vec![0xFF, 0xD8, 0xFF, 0xE0])
+            .pic_type(PictureType::CoverFront)
+            .mime_type(MimeType::Jpeg)
+            .build();
+        tag.push_picture(picture);
+        tagged_file.insert_tag(tag);
+        tagged_file
+            .save_to_path(&path, WriteOptions::default())
+            .expect("failed to write fixture tag");
+
+        // Sanity check: the picture round-tripped.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        assert_eq!(tagged_file.primary_tag().unwrap().pictures().len(), 1);
+        drop(tagged_file);
+
+        clear_embedded_art(&path).expect("clear_embedded_art should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert!(
+            tag.pictures().is_empty(),
+            "embedded picture should be removed"
+        );
+        assert_eq!(
+            tag.title().as_deref(),
+            Some("Original Title"),
+            "clearing artwork must not touch other tag fields"
+        );
+    }
+
+    #[test]
+    fn test_clear_embedded_art_is_noop_without_a_tag() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("untagged.wav");
+        write_test_wav(&path);
+
+        clear_embedded_art(&path).expect("clearing an untagged file should not error");
+    }
+
+    #[test]
+    fn test_write_tags_round_trips_multiple_genres_as_id3v24_multivalue() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "Album Artist",
+            "Composer",
+            "Rock; Jazz Fusion; Live",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        // WAV's primary tag is ID3v2, so this is a genuine TCON round-trip —
+        // lofty should have written one TCON frame with all three genres
+        // null-byte-separated (the ID3v2.4 multi-value convention Picard
+        // also writes), not a single joined string in one item, and not
+        // only the first genre.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        let genres: Vec<&str> = tag.get_strings(lofty::tag::ItemKey::Genre).collect();
+        assert_eq!(genres, vec!["Rock", "Jazz Fusion", "Live"]);
+    }
+
+    #[test]
+    fn test_write_tags_single_genre_round_trips() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        let genres: Vec<&str> = tag.get_strings(lofty::tag::ItemKey::Genre).collect();
+        assert_eq!(genres, vec!["Metal"]);
+    }
+
+    #[test]
+    fn test_write_tags_empty_genre_clears_field() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
+            false,
+        )
+        .expect("write_tags should succeed");
+        write_tags(
+            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+        )
+        .expect("write_tags with empty genre should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::Genre).count(), 0);
+    }
+
+    #[test]
+    fn test_write_tags_round_trips_multiple_artists_album_artists_and_composers() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist A; Artist B",
+            "Album",
+            "Album Artist A; Album Artist B",
+            "Composer A; Composer B",
+            "",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        // Same ID3v2.4 null-byte-separated multi-value round-trip as genre
+        // (#143) — one TPE1/TPE2/TCOM frame per field with all values, not
+        // a single joined string and not only the first value.
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::TrackArtist)
+                .collect::<Vec<_>>(),
+            vec!["Artist A", "Artist B"]
+        );
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::AlbumArtist)
+                .collect::<Vec<_>>(),
+            vec!["Album Artist A", "Album Artist B"]
+        );
+        assert_eq!(
+            tag.get_strings(lofty::tag::ItemKey::Composer)
+                .collect::<Vec<_>>(),
+            vec!["Composer A", "Composer B"]
+        );
+    }
+
+    #[test]
+    fn test_write_tags_empty_artist_album_artist_composer_clears_fields() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "Title",
+            "Artist",
+            "Album",
+            "Album Artist",
+            "Composer",
+            "",
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+        write_tags(
+            &path, "Title", "", "Album", "", "", "", None, None, None, "", None, "", false,
+        )
+        .expect("write_tags with empty artist/album_artist/composer should succeed");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::TrackArtist).count(), 0);
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::AlbumArtist).count(), 0);
+        assert_eq!(tag.get_strings(lofty::tag::ItemKey::Composer).count(), 0);
+    }
 
     #[tokio::test]
     #[ignore]

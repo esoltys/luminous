@@ -29,6 +29,9 @@ A release is only complete when **all three** of the following hold. Never repor
 ## Workflows
 - This repo's `.github/workflows/` must not have overlapping triggers: check for duplicate `on:` conditions (e.g. both `push: tags` and `release: published`) before adding or editing a workflow.
 
+## GitHub issue/PR body formatting
+- GitHub renders a single `\n` within a paragraph as a hard line break (not CommonMark's soft-wrap-to-space behavior). Never hand-wrap prose paragraphs in an issue/PR body at ~80-100 cols like source code — write each paragraph and each bullet as one unwrapped line, or the rendered body shows spurious mid-sentence line breaks.
+
 ## Claude Code specifics
 
 - Use the tools in this harness (Read/Edit/Grep/Glob) instead of shelling out to `cat`/`sed`/`grep`/`find`.

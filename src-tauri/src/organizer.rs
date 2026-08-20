@@ -5,7 +5,7 @@
 
 use crate::covermanager::CoverManager;
 use crate::db::Database;
-use crate::models::Song;
+use crate::models::{self, Song};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -160,18 +160,24 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
         .unwrap_or_else(|| "Unknown Title".to_string());
 
-    let artist_str = song
+    // %artist/%albumartist use the primary (first-listed) value when a song
+    // carries multiple — there's no single-value slot in a file path for a
+    // full multi-artist list, so the first artist acts as the canonical
+    // one, same convention used for %genre below.
+    let primary_artist = song
         .artist
         .as_deref()
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or("Unknown Artist");
+        .and_then(|a| models::parse_multi_value(a).into_iter().next());
+    let artist_str = primary_artist.as_deref().unwrap_or("Unknown Artist");
 
-    let album_artist_str = song
+    let primary_album_artist = song
         .album_artist
         .as_deref()
         .filter(|s| !s.trim().is_empty())
-        .or_else(|| song.artist.as_deref().filter(|s| !s.trim().is_empty()))
-        .unwrap_or("Unknown Artist");
+        .and_then(|a| models::parse_multi_value(a).into_iter().next())
+        .or_else(|| primary_artist.clone());
+    let album_artist_str = primary_album_artist.as_deref().unwrap_or("Unknown Artist");
 
     let album_str = song
         .album
@@ -185,11 +191,15 @@ pub fn expand_template(template: &str, song: &Song, ext: &str) -> String {
         .filter(|s| !s.trim().is_empty())
         .unwrap_or(&file_stem_fallback);
 
-    let genre_str = song
+    // %genre uses the primary (first-listed) genre when a song carries
+    // multiple — there's no single-value slot in a file path for a full
+    // multi-genre list, so the first genre acts as the canonical one, same
+    // convention used by the majority-vote album genre logic below.
+    let primary_genre = song
         .genre
         .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or("Unknown Genre");
+        .and_then(|g| models::parse_multi_value(g).into_iter().next());
+    let genre_str = primary_genre.as_deref().unwrap_or("Unknown Genre");
 
     let year_str = song.year.map(|y| y.to_string()).unwrap_or_default();
     let disc_str = song
@@ -1266,6 +1276,78 @@ mod tests {
         let template = "%albumartist/%album/%disc-%track %title";
         let expanded = expand_template(template, &song, "flac");
         assert_eq!(expanded, "Imagine Dragons/Night Visions/2-11 Tokyo");
+    }
+
+    #[test]
+    fn test_template_expansion_artist_uses_primary_artist() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            artist: Some("Artist A; Artist B".to_string()),
+            album_artist: Some("Album Artist A; Album Artist B".to_string()),
+            ..Default::default()
+        };
+
+        // %artist/%albumartist have no way to represent a full multi-value
+        // list in a single path segment, so they fall back to the
+        // first-listed ("primary") value, same convention as %genre.
+        assert_eq!(
+            expand_template("%albumartist/%artist/%title", &song, "flac"),
+            "Album Artist A/Artist A/Tokyo"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_album_artist_falls_back_to_primary_artist() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            artist: Some("Artist A; Artist B".to_string()),
+            album_artist: None,
+            ..Default::default()
+        };
+
+        // With no album artist tagged, %albumartist falls back to the
+        // primary (first-listed) artist rather than the raw multi-value
+        // artist string.
+        assert_eq!(
+            expand_template("%albumartist/%title", &song, "flac"),
+            "Artist A/Tokyo"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_genre_uses_primary_genre() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            artist: Some("Artist".to_string()),
+            genre: Some("Rock; Jazz Fusion; Live".to_string()),
+            ..Default::default()
+        };
+
+        // %genre has no way to represent a full multi-genre list in a
+        // single path segment, so it falls back to the first-listed
+        // ("primary") genre.
+        assert_eq!(
+            expand_template("%genre/%title", &song, "flac"),
+            "Rock/Tokyo"
+        );
+    }
+
+    #[test]
+    fn test_template_expansion_genre_missing_falls_back_to_unknown() {
+        let song = Song {
+            id: 1,
+            title: Some("Tokyo".to_string()),
+            genre: None,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            expand_template("%genre/%title", &song, "flac"),
+            "Unknown Genre/Tokyo"
+        );
     }
 
     #[test]

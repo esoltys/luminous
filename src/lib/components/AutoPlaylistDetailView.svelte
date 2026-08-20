@@ -10,6 +10,8 @@
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
@@ -18,6 +20,7 @@
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import IconActionButton from "./IconActionButton.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import { parseMultiValue } from "../utils/multiValue";
   import ColumnSelector from "./ColumnSelector.svelte";
   import Input from "./Input.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -376,6 +379,7 @@ import { shuffleArray } from "../utils/shuffle";
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
     loading = true;
     fetchSongs(kind, genre, decade, bpm, playlistId)
       .then((fetchedSongs) => {
@@ -966,15 +970,18 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.artist}
-                <div class="text-brand-text-primary truncate pr-4 min-w-0">
+                <div class="text-brand-text-primary truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
-                    <LinkButton
-                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="text-brand-text-primary truncate min-w-0"
-                      title={i18n.t('collection.filterByArtist', { artist: song.artist })}
-                    >
-                      {song.artist}
-                    </LinkButton>
+                    {#each parseMultiValue(song.artist) as name, i (name)}
+                      {#if i > 0}<span class="text-brand-text-primary/50 shrink-0">,&nbsp;</span>{/if}
+                      <LinkButton
+                        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+                        class="text-brand-text-primary truncate min-w-0"
+                        title={i18n.t('collection.filterByArtist', { artist: name })}
+                      >
+                        {name}
+                      </LinkButton>
+                    {/each}
                   {:else}
                     <span class="text-brand-text-primary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
@@ -1017,8 +1024,12 @@ import { shuffleArray } from "../utils/shuffle";
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.genre}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                  {song.genre || "—"}
+                <div class="truncate pr-2 min-w-0" title={song.genre}>
+                  {#if song.genre}
+                    <GenreChips genre={song.genre} />
+                  {:else}
+                    <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                  {/if}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.grouping}

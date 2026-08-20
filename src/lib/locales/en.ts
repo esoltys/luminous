@@ -9,6 +9,7 @@ export const en = {
     artists: "Artists",
     albums: "Albums",
     songs: "Songs",
+    genres: "Genres",
     playlistsAuto: "Auto",
     playlistsCustom: "Custom",
     create: "Create",
@@ -34,7 +35,7 @@ export const en = {
     toggleSidebar: "Toggle Menu Sidebar",
     toggleSidebarCompact: "Toggle sidebar (compact / expanded)",
     toggleImmersive: "Toggle Immersive Album Art Screen",
-    toggleRightPanel: "Toggle Detail Panel",
+    toggleRightPanel: "Show Info Panel",
     resizeSidebar: "Resize Left Sidebar",
     resizeRightPanel: "Resize Right Panel",
     searchQuerySubtitle: "Search query",
@@ -219,6 +220,8 @@ export const en = {
     ratingStyleHeart: "Heart (favourite)",
     ratingStyleStars: "5-star",
     ratingStyleHint: "Choose Heart to mark songs as favourites, or 5-star for half-step ratings — both save to the same rating.",
+    minimizeToTrayLabel: "Minimize to tray",
+    minimizeToTrayHint: "Closing the window hides Luminous to the system tray instead of quitting.",
     appAndUpdatesTitle: "Application & Updates",
     updateCheckNowBtn: "Check for Updates",
     updateChecking: "Checking...",
@@ -585,6 +588,7 @@ export const en = {
     volumeSlider: "Volume Slider",
     volumeWithValue: "Volume: {value}%",
     queueTitle: "Queue",
+    immersiveTitle: "Immersive Mode",
     historyTitle: "Play History",
     queueTab: "Queue ({count})",
     historyTab: "History ({count})",
@@ -638,14 +642,21 @@ export const en = {
     dragHint: "Drag window"
   },
 
+  chipInput: {
+    removeItem: "Remove {value}",
+    dragToReorder: "Drag to reorder"
+  },
   tagEditor: {
     title: "Edit Song Tags",
     titleField: "Song Title",
     artistField: "Artist",
+    artistPlaceholder: "Add an artist...",
     albumField: "Album",
     trackField: "Track Number",
     yearField: "Year",
     genreField: "Genre",
+    genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saveBtnShort: "Save",
@@ -654,8 +665,10 @@ export const en = {
     readFailed: "Failed to read tags",
     locationField: "Location",
     albumArtistField: "Album Artist",
+    albumArtistPlaceholder: "Add an album artist...",
     albumArtistTooltip: "Primary artist credited for the whole album, useful for compilations",
     composerField: "Composer",
+    composerPlaceholder: "Add a composer...",
     discField: "Disc",
     groupingField: "Grouping",
     groupingTooltip: "Groups related tracks together, e.g. movements of a classical work",
@@ -670,13 +683,24 @@ export const en = {
     notFound: "Not found",
     acoustidFpcalcError: "AcoustID lookup requires the 'fpcalc' utility. Please make sure 'libchromaprint-tools' is installed on your Linux system, or configure 'FPCALC_PATH'.",
     acoustidApiKeyError: "AcoustID API key is invalid or has expired. Please obtain a free client API key from https://acoustid.org/ and run Luminous with the 'ACOUSTID_API_KEY' environment variable set.",
-    saveFailedPrefix: "Failed to save tags: "
+    saveFailedPrefix: "Failed to save tags: ",
+    artworkField: "Artwork",
+    artworkEmbedded: "Embedded cover art",
+    artworkNotEmbedded: "No embedded cover art",
+    clearArtBtn: "Clear Artwork",
+    clearArtConfirmTitle: "Clear Embedded Artwork?",
+    clearArtConfirmMessage: "This removes the embedded cover art from the file itself. The song will fall back to folder art or a placeholder.",
+    clearArtSuccess: "Embedded artwork cleared",
+    clearArtFailedPrefix: "Failed to clear artwork: "
   },
   albumTagEditor: {
     title: "Edit Album Tags",
     albumField: "Album Title",
     albumArtistField: "Album Artist",
+    albumArtistPlaceholder: "Add an album artist...",
     genreField: "Genre",
+    genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
@@ -685,7 +709,16 @@ export const en = {
     saveBtn: "Save Tags",
     saving: "Saving album tags...",
     saveSuccess: "Updated album tags for {count} songs",
-    saveFailedPrefix: "Failed to save album tags: "
+    saveFailedPrefix: "Failed to save album tags: ",
+    artworkField: "Artwork",
+    artworkEmbedded: "Embedded cover art",
+    artworkNotEmbedded: "No embedded cover art",
+    clearArtBtn: "Clear Embedded Artwork",
+    clearArtConfirmTitle: "Clear Embedded Artwork?",
+    clearArtConfirmMessage: "This removes the embedded cover art from every track's file in this album. Tracks will fall back to folder art or a placeholder.",
+    clearingArt: "Clearing artwork...",
+    clearArtSuccess: "Cleared embedded artwork for {count} songs",
+    clearArtFailedPrefix: "Failed to clear album artwork: "
   },
   equalizer: {
     title: "10-Band Graphic Equalizer",
@@ -760,9 +793,16 @@ export const en = {
     statsLine: "{genre} · {songs} • {duration} total",
     playAll: "Play",
     shuffleAndPlay: "Shuffle Play",
-    discography: "Discography",
+    editArtist: "Edit",
+    editArtistTooltip: "Edit artist details, website, tags, and links",
+    about: "About",
+    links: "LINKS",
+    showMore: "Show more",
     showLess: "Show less",
     showAll: "Show all",
+    tags: "Tags",
+    addTag: "Add Tag",
+    discography: "Discography",
     setsFilter: "Sets ({count})",
     albumsFilter: "Albums ({count})",
     epsFilter: "EPs ({count})",
@@ -771,6 +811,25 @@ export const en = {
     noReleasesFound: "No releases found.",
     playlistsFeaturing: "Playlists featuring {artist}",
     compilationsFeaturing: "Compilations featuring {artist}"
+  },
+  artistProfileEditor: {
+    title: "Edit Artist Details",
+    website: "Website",
+    websitePlaceholder: "https://www.artist.com or www.artist.com",
+    bio: "About / Biography",
+    bioPlaceholder: "Add a bio or background notes for this artist...",
+    tags: "Tags",
+    tagInputPlaceholder: "Add a tag and press Enter...",
+    addTagBtn: "Add",
+    socialLinks: "Links",
+    addLinkBtn: "Add Link",
+    platform: "Platform",
+    linkValue: "Handle or URL",
+    save: "Save",
+    cancel: "Cancel",
+    savedSuccess: "Artist profile updated",
+    removeTagTooltip: "Remove tag {tag}",
+    removeLinkTooltip: "Remove link"
   },
   albumDetail: {
     backToAlbums: "Back to Albums",
@@ -781,8 +840,7 @@ export const en = {
     editInfoTooltip: "Edit album info",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
-    refreshError: "Failed to refresh album metadata",
-    goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
+    refreshError: "Failed to refresh album metadata"
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
@@ -802,7 +860,24 @@ export const en = {
     disableLogoPulse: "Click to disable logo pulsing",
     toggleLogoPulsing: "Toggle Luminous logo pulsing",
     on: "On",
-    off: "Off"
+    off: "Off",
+    back: "Back",
+    loading: "Loading…",
+    expand: "Expand",
+    collapse: "Collapse"
+  },
+  songTags: {
+    genresTabDescription: "Browse songs by tags you've added",
+    viewGenre: "Genre",
+    viewTags: "Tags",
+    emptyTitle: "No tags yet",
+    emptySubtitle: "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
+    songCount: "{count} songs",
+    playAll: "Play all {count} songs",
+    editSongTooltip: "Edit Song",
+    editAlbumTooltip: "Edit Album",
+    goToGenreTooltip: "Browse {genre}",
+    noGenre: "No Genre"
   },
   organizer: {
     title: "Organize Files",
@@ -942,5 +1017,16 @@ export const en = {
     contextComplete: "{name} complete",
     queueComplete: "Your Queue is done",
     playlistCreated: "Playlist \"{name}\" created"
+  },
+  dragDrop: {
+    overlayReplaceTitle: "Drop to replace queue & play",
+    overlayReplaceHint: "Hold Shift to append instead",
+    overlayAppendTitle: "Drop to append to queue",
+    overlayAppendHint: "Playback won't be interrupted",
+    playingSong: "Playing 1 song",
+    playingSongs: "Playing {count} songs",
+    addedSong: "Added 1 song to queue",
+    addedSongs: "Added {count} songs to queue",
+    nothingToAdd: "No supported audio files found to add."
   }
 };

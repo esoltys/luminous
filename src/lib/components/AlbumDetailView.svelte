@@ -13,6 +13,8 @@
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import EmptyState from "./EmptyState.svelte";
@@ -27,6 +29,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
+  import { parseMultiValue } from "../utils/multiValue";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -227,27 +230,6 @@
 
   let genreLabel = $derived(rawGenre || i18n.t('albumDetail.unknownGenre'));
 
-  // The materialized genre auto-playlist row backing this genre, if it's been
-  // generated yet (see PlaylistsCollectionView's identical genre/decade split).
-  let genrePlaylist = $derived.by(() => {
-    if (!rawGenre) return null;
-    return (
-      playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:") && p.dynamic_spec === rawGenre
-      ) ?? null
-    );
-  });
-
-  function openGenrePlaylist() {
-    if (!rawGenre) return;
-    collectionStore.viewAutoPlaylist({
-      kind: "genre",
-      genre: rawGenre,
-      playlistId: genrePlaylist?.id,
-      updated: genrePlaylist?.updated,
-    });
-  }
-
   let yearLabel = $derived.by(() => {
     if (albumItem?.year) return albumItem.year;
     if (songs.length > 0 && songs[0].year) return songs[0].year;
@@ -419,6 +401,7 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
     loading = true;
     invoke<Song[]>("get_songs_by_album", { album: albumName })
       .then((fetchedSongs) => {
@@ -504,9 +487,10 @@
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
+        {#if !collectionStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
         </h1>
@@ -526,13 +510,7 @@
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           {#if rawGenre}
-            <button
-              onclick={openGenrePlaylist}
-              class="hover:underline hover:text-brand-accent-text transition-colors"
-              title={i18n.t('albumDetail.goToGenrePlaylistTooltip', { genre: rawGenre })}
-            >
-              {genreLabel}
-            </button>
+            <GenreChips genre={rawGenre} variant="full" />
           {:else}
             <span>{genreLabel}</span>
           {/if}
@@ -549,8 +527,9 @@
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
           {/if}
         </div>
+        {/if}
 
-        <div class="flex items-center gap-3 mt-3 select-none">
+        <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
@@ -583,6 +562,7 @@
         </div>
       </div>
 
+      {#if !collectionStore.isDetailHeaderCollapsed}
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverArt
@@ -600,6 +580,7 @@
           {/if}
         </div>
       </div>
+      {/if}
     </div>
   </div>
 
@@ -961,13 +942,16 @@
               {#if collectionStore.visibleColumns.artist}
                 <div class="text-brand-text-primary truncate pr-4 flex items-center min-w-0">
                   {#if song.artist}
-                    <LinkButton
-                      onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(song.album_artist?.trim() || song.artist || ""); }}
-                      class="text-brand-text-primary truncate min-w-0"
-                      title={i18n.t('collection.filterByArtist', { artist: song.artist })}
-                    >
-                      {song.artist}
-                    </LinkButton>
+                    {#each parseMultiValue(song.artist) as name, i (name)}
+                      {#if i > 0}<span class="text-brand-text-primary/50 shrink-0">,&nbsp;</span>{/if}
+                      <LinkButton
+                        onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+                        class="text-brand-text-primary truncate min-w-0"
+                        title={i18n.t('collection.filterByArtist', { artist: name })}
+                      >
+                        {name}
+                      </LinkButton>
+                    {/each}
                   {:else}
                     <span class="text-brand-text-primary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
                   {/if}
@@ -1001,8 +985,12 @@
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.genre}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                  {song.genre || "—"}
+                <div class="truncate pr-2 min-w-0" title={song.genre}>
+                  {#if song.genre}
+                    <GenreChips genre={song.genre} />
+                  {:else}
+                    <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                  {/if}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.grouping}
@@ -1130,6 +1118,9 @@
     initialYear={songs[0].year}
     initialDisc={songs[0].disc}
     initialCompilation={songs[0].compilation}
+    hasEmbeddedArt={songs.some((s) => s.art_embedded)}
+    initialArtAutomatic={albumItem?.art_automatic}
+    initialArtManual={albumItem?.art_manual}
     onClose={() => { showAlbumTagEditor = false; }}
     onSave={handleTagEditorSaved}
   />

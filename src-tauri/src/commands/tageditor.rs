@@ -1,4 +1,5 @@
 use crate::collection::WatcherPauseGuard;
+use crate::models;
 use crate::tageditor::SuggestedTags;
 use crate::AppState;
 use std::sync::Arc;
@@ -13,6 +14,10 @@ pub struct SongDetails {
     pub album: String,
     pub album_artist: String,
     pub composer: String,
+    /// `artist`, `album_artist`, `composer`, and `genre` are all `; `-delimited
+    /// when the song carries multiple values — see
+    /// `models::parse_multi_value`/`join_multi_value`, the single source of
+    /// truth for this convention.
     pub genre: String,
     pub track: Option<u32>,
     pub disc: Option<u32>,
@@ -22,6 +27,7 @@ pub struct SongDetails {
     pub initial_key: String,
     pub rating: f32,
     pub compilation: bool,
+    pub art_embedded: bool,
 }
 
 #[tauri::command]
@@ -32,7 +38,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year,
-                grouping, bpm, initial_key, rating, compilation
+                grouping, bpm, initial_key, rating, compilation, art_embedded
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -53,6 +59,7 @@ pub async fn get_song_details(
                 initial_key: row.get(13).unwrap_or_default(),
                 rating: row.get(14).unwrap_or(crate::stats::RATING_UNRATED),
                 compilation: row.get(15).unwrap_or(false),
+                art_embedded: row.get(16).unwrap_or(false),
             })
         },
     )
@@ -145,11 +152,18 @@ pub async fn save_song_tags(
     // whatever's already in the DB rather than clobbering it.
     let path_clone = path.clone();
     let title_c = title.clone();
-    let artist_c = artist.clone();
+    // Normalize every multi-value field to the canonical `; `-delimited,
+    // trimmed, deduped form before it hits disk or the DB, regardless of
+    // exactly what the chip input sent over the wire.
+    let artist_str = models::join_multi_value(&models::parse_multi_value(&artist));
+    let artist_c = artist_str.clone();
     let album_c = album.clone();
-    let album_artist_c = album_artist.clone();
-    let composer_c = composer.clone();
-    let genre_str = genre.unwrap_or_default();
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let album_artist_c = album_artist_str.clone();
+    let composer_str = models::join_multi_value(&models::parse_multi_value(&composer));
+    let composer_c = composer_str.clone();
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
@@ -194,10 +208,10 @@ pub async fn save_song_tags(
          WHERE id = ?13",
         rusqlite::params![
             title,
-            artist,
+            artist_str,
             album,
-            album_artist,
-            composer,
+            album_artist_str,
+            composer_str,
             genre_str,
             track,
             disc,
@@ -272,8 +286,13 @@ pub async fn save_album_tags(
     }
 
     let album_c = album.clone();
-    let album_artist_c = album_artist.clone();
-    let genre_str = genre.unwrap_or_default();
+    // Normalize to the canonical `; `-delimited, trimmed, deduped form
+    // before it hits disk or the DB, regardless of exactly what the chip
+    // input sent over the wire.
+    let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
+    let album_artist_c = album_artist_str.clone();
+    let genre_str =
+        models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
 
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
@@ -318,7 +337,7 @@ pub async fn save_album_tags(
              WHERE id = ?7",
             rusqlite::params![
                 album,
-                album_artist,
+                album_artist_str,
                 genre_str,
                 year,
                 disc,
@@ -331,4 +350,97 @@ pub async fn save_album_tags(
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(updated_count)
+}
+
+/// Clear a single song's embedded cover art (#386) — removes the picture(s)
+/// from the file's tag on disk, then re-resolves the song's automatic art to
+/// folder art (if any exists next to the file) so the UI doesn't briefly
+/// show nothing before the collection's normal remote-lookup fallback kicks
+/// in. A manually-picked cover (`art_manual`) always takes precedence over
+/// automatic art regardless, so it's left untouched.
+#[tauri::command]
+pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> Result<(), String> {
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let path_str: String = conn
+        .query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Song not found in library".to_string())?;
+
+    let path = std::path::PathBuf::from(path_str);
+    let path_clone = path.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+
+    let folder_art = state
+        .cover_manager
+        .scan_folder_art(&path)
+        .map(|p| p.to_string_lossy().to_string());
+
+    conn.execute(
+        "UPDATE songs SET art_embedded = 0, art_automatic = ?1, art_unset = 0 WHERE id = ?2",
+        rusqlite::params![folder_art, song_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Bulk version of `clear_song_cover_art` for clearing an entire album's
+/// embedded artwork at once (#386). Skips (rather than fails) songs whose
+/// file couldn't be cleared, returning the count that actually succeeded.
+#[tauri::command]
+pub async fn clear_album_cover_art(
+    state: State<'_, AppState>,
+    song_ids: Vec<i64>,
+) -> Result<u32, String> {
+    if song_ids.is_empty() {
+        return Ok(0);
+    }
+
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+
+    let mut paths = Vec::with_capacity(song_ids.len());
+    for &song_id in &song_ids {
+        if let Ok(path_str) = conn.query_row(
+            "SELECT path FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| row.get::<_, String>(0),
+        ) {
+            paths.push((song_id, std::path::PathBuf::from(path_str)));
+        }
+    }
+
+    let cleared: Vec<(i64, std::path::PathBuf)> = tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .into_iter()
+            .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for (song_id, path) in &cleared {
+        let folder_art = state
+            .cover_manager
+            .scan_folder_art(path)
+            .map(|p| p.to_string_lossy().to_string());
+        tx.execute(
+            "UPDATE songs SET art_embedded = 0, art_automatic = ?1, art_unset = 0 WHERE id = ?2",
+            rusqlite::params![folder_art, song_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(cleared.len() as u32)
 }

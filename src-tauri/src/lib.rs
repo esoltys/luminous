@@ -29,6 +29,8 @@ pub mod playlist;
 pub mod playlist_parsers;
 pub mod stats;
 pub mod tageditor;
+pub mod tags;
+pub mod tray;
 pub mod waveform;
 
 use std::sync::Arc;
@@ -62,6 +64,12 @@ pub struct AppState {
     /// integration failed to initialize (unsupported desktop, no session
     /// bus, etc), in which case Luminous simply runs without it.
     pub media_session: Option<media_session::MediaSessionHandle>,
+    /// Whether closing the main window hides it to the tray instead of
+    /// quitting (off by default — see `tray.rs`). An atomic rather than a DB
+    /// read on every close event, since `tray.rs`'s `CloseRequested` handler
+    /// needs this synchronously; kept in sync with the `app_state` row of
+    /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
+    pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -218,11 +226,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            tray::restore_main_window(app);
 
             // A file association (or `luminous <file>` invocation) launched a
             // second instance; forward the opened paths to the running app.
@@ -303,6 +307,18 @@ pub fn run() {
             }
 
             let audio = Arc::new(Mutex::new(audio_engine));
+
+            let minimize_to_tray = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            if let Ok(conn) = db.pool.get() {
+                if let Ok(value) = conn.query_row(
+                    "SELECT value FROM app_state WHERE key = 'minimize_to_tray'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    minimize_to_tray
+                        .store(value == "true", std::sync::atomic::Ordering::Relaxed);
+                }
+            }
 
             let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
             let volume_before_mute = Arc::new(Mutex::new(1.0));
@@ -574,6 +590,7 @@ pub fn run() {
                 watcher_paused,
                 startup_file: Mutex::new(startup_path),
                 media_session,
+                minimize_to_tray,
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -582,6 +599,10 @@ pub fn run() {
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
             app.manage(state);
+
+            if let Err(e) = tray::init(app) {
+                log::warn!("Failed to initialize system tray: {e}");
+            }
 
             let media_shortcuts = [
                 "MediaPlayPause",
@@ -708,6 +729,9 @@ pub fn run() {
             commands::collection::clear_play_history,
             commands::collection::get_most_frequently_played,
             commands::collection::get_recently_added,
+            commands::collection::get_artist_profile,
+            commands::collection::set_artist_profile,
+            commands::collection::get_all_artist_profiles,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,
@@ -716,6 +740,8 @@ pub fn run() {
             commands::player::open_and_play,
             commands::player::get_startup_file,
             commands::player::add_songs_to_queue,
+            commands::player::add_paths_to_queue,
+            commands::player::is_shift_key_held,
             commands::player::pause,
             commands::player::resume,
             commands::player::stop,
@@ -781,6 +807,15 @@ pub fn run() {
             commands::tageditor::has_acoustid_env_key,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_album_tags,
+            commands::tageditor::clear_song_cover_art,
+            commands::tageditor::clear_album_cover_art,
+            // Genre/tag browsing commands (#224) — read the existing
+            // songs.genre column above; editing goes through save_song_tags.
+            commands::tags::get_songs_by_tag,
+            commands::tags::get_tags_overview,
+            commands::tags::get_songs_by_main_tag,
+            commands::tags::get_songs_by_genre_edge,
+            commands::tags::get_songs_without_genre,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
@@ -790,6 +825,8 @@ pub fn run() {
             commands::settings::get_db_schema_status,
             commands::settings::get_fade_settings,
             commands::settings::set_fade_settings,
+            commands::settings::get_minimize_to_tray_enabled,
+            commands::settings::set_minimize_to_tray_enabled,
             install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,
