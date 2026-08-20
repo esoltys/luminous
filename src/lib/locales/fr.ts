@@ -210,7 +210,7 @@ export const fr = {
     aboutTechRust: "Cœur natif haute performance, pipeline audio multi-thread, pool de connexions SQLite et intégration système.",
     aboutTechSvelte: "Gestion d'état réactive Svelte 5 Runes, rendu de liste virtuelle et styles Tailwind CSS v4.",
     aboutTechSymphonia: "Décodage audio sans allocation mémoire et sortie audio à faible latence.",
-    aboutTechRubato: "Convertisseur de taux d'échantillonnage audio et normalisation du volume EBU R128.",
+    aboutTechBs1770: "Normalisation du volume EBU R128 / ITU BS.1770.",
     aboutTechRustfft: "Analyse spectrale en temps réel, bandes de fréquences et lecture/écriture de tags audio.",
     generalTitle: "Paramètres généraux",
     selectLanguage: "Langue / Language",

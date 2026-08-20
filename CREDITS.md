@@ -17,7 +17,6 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 ### Audio Engine & Signal Processing
 - **Audio Decoding**: [Symphonia](https://github.com/pdeljanov/Symphonia)
 - **Audio Output**: [CPAL (Cross-Platform Audio Layer)](https://github.com/RustAudio/cpal)
-- **Audio Resampling**: [rubato](https://github.com/HEnquist/rubato)
 - **Loudness Analysis**: `bs1770` (EBU R128 / ITU BS.1770 loudness measurement)
 - **Spectrum Analysis & Band Waveforms**: [rustfft](https://github.com/ejmahler/RustFFT)
 
