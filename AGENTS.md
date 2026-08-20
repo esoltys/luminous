@@ -184,6 +184,17 @@ verify with the user, not a reason to skip telling them.
   eventually merging `next` back into `main`.
 - When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
   new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
+- **Interim releases**: 2.0 work that's already done and stable doesn't have to wait for the
+  *entire* 2.0 Milestone to finish. It can ship early as a rolling 1.x release (e.g. "1.5") by
+  syncing `main` into `next`, merging `next` into `main` via PR, and rolling `main`'s
+  `package.json`/`Cargo.toml` version back down to the 1.x line (`next`'s own version, e.g.
+  `2.0.0`, stays as-is or gets bumped once `main` no longer matches it). `next` is **not**
+  retired by this — it keeps living as the home for whatever 2.0 issues are still open. On
+  GitHub, create a milestone matching the release (e.g. "1.5") and move the completed issues'
+  milestone from "2.0" to it; issues that are done but belong to a still-open epic can move
+  individually while the epic itself stays in "2.0" (split is fine pre-release, since nothing
+  user-facing observes the milestone). Repeat this pattern for future interim releases as more
+  2.0 work completes ahead of the full 2.0 cut.
 
 ## Issue Priority
 
