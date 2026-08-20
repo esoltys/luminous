@@ -1426,8 +1426,9 @@ impl CollectionScanner {
         // reach `limit` items for a normal-sized library; it isn't a
         // guarantee for pathological cases (e.g. one giant album).
         let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
         let sql = format!(
-            "SELECT {HOME_ITEM_SELECT_COLS}, ph.context_type, ph.playlist_id
+            "SELECT {home_item_select_cols}, ph.context_type, ph.playlist_id
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
              WHERE s.source IN (1, 2) AND s.unavailable = 0
@@ -1567,8 +1568,9 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         // See get_recently_played's identical overfetch-then-group comment.
         let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
         let sql = format!(
-            "SELECT {HOME_ITEM_SELECT_COLS}
+            "SELECT {home_item_select_cols}
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
@@ -1789,7 +1791,8 @@ fn get_songs_by_ids(
         return Ok(std::collections::HashMap::new());
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql = format!("SELECT {HOME_ITEM_SELECT_COLS} FROM songs s WHERE s.id IN ({placeholders})");
+    let home_item_select_cols = home_item_select_cols();
+    let sql = format!("SELECT {home_item_select_cols} FROM songs s WHERE s.id IN ({placeholders})");
     let mut stmt = conn.prepare(&sql)?;
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
@@ -2236,10 +2239,12 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     is_vbr, is_instrumental, added
 ";
 
-/// Song columns qualified with the `s` alias, plus correlated `album_track_count`
-/// and `album_disc_count` subqueries. Shared by the home-screen queries (`get_recently_played`,
-/// `get_most_frequently_played`, `get_recently_added`), which all join on `songs s`.
-const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+/// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
+/// `s` alias for use in joined queries. Keep in sync with `SONG_SELECT_COLS`
+/// and `row_to_song_at`'s field order — `cargo test` in `collection.rs`
+/// exercises every column through `row_to_song`, so a mismatch fails loudly
+/// there instead of silently defaulting a field at a call site.
+pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
     s.title, s.titlesort, s.artist, s.artistsort,
     s.album, s.albumsort, s.album_artist, s.album_artist_sort,
     s.composer, s.composersort, s.performer, s.performersort,
@@ -2253,13 +2258,23 @@ const HOME_ITEM_SELECT_COLS: &str = "s.id, s.source, s.filetype, s.path, s.url, 
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental, s.added,
+    s.is_vbr, s.is_instrumental, s.added";
+
+/// `SONG_SELECT_COLS_QUALIFIED` plus correlated `album_track_count` and
+/// `album_disc_count` subqueries. Shared by the home-screen queries
+/// (`get_recently_played`, `get_most_frequently_played`, `get_recently_added`),
+/// which all join on `songs s`.
+fn home_item_select_cols() -> String {
+    format!(
+        "{SONG_SELECT_COLS_QUALIFIED},
     (SELECT COUNT(*) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
      WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND s2.album = s.album
-    ) AS album_disc_count";
+    ) AS album_disc_count"
+    )
+}
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, artist, album, album_artist,
@@ -2274,63 +2289,76 @@ const SONG_INSERT_PLACEHOLDERS: &str =
     "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
+    row_to_song_at(row, 0)
+}
+
+/// Maps the `SONG_SELECT_COLS`/`SONG_SELECT_COLS_QUALIFIED` block of a row to
+/// a `Song`, starting at `offset` — for queries that select other columns
+/// (e.g. a join table's own fields) before the song columns. This is the
+/// single place that knows the column order those two constants promise;
+/// callers should never hand-roll their own `row.get(n)` mapping, since that
+/// duplication is exactly what lets a new/reordered song column silently
+/// default at one call site while every other stays correct (see the queue
+/// "Date Added" regression this replaced).
+pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Result<Song> {
+    let col = |i: usize| offset + i;
     Ok(Song {
-        id: row.get(0)?,
-        source: row.get::<_, i64>(1).map(SongSource::from)?,
-        filetype: row.get::<_, i64>(2).map(FileType::from)?,
-        path: row.get(3)?,
-        url: row.get(4)?,
-        stream_url: row.get(5)?,
-        title: row.get(6)?,
-        titlesort: row.get(7)?,
-        artist: row.get(8)?,
-        artistsort: row.get(9)?,
-        album: row.get(10)?,
-        albumsort: row.get(11)?,
-        album_artist: row.get(12)?,
-        album_artist_sort: row.get(13)?,
-        composer: row.get(14)?,
-        composersort: row.get(15)?,
-        performer: row.get(16)?,
-        performersort: row.get(17)?,
-        grouping: row.get(18)?,
-        comment: row.get(19)?,
-        lyrics: row.get(20)?,
-        track: row.get(21)?,
-        disc: row.get(22)?,
-        year: row.get(23)?,
-        originalyear: row.get(24)?,
-        genre: row.get(25)?,
-        compilation: row.get(26)?,
-        bpm: row.get(27)?,
-        initial_key: row.get(28)?,
-        length_nanosec: row.get(29)?,
-        beginning_nanosec: row.get::<_, Option<i64>>(30)?.unwrap_or(0),
-        end_nanosec: row.get::<_, Option<i64>>(31)?.unwrap_or(0),
-        bitrate: row.get(32)?,
-        samplerate: row.get(33)?,
-        bitdepth: row.get(34)?,
-        channels: row.get(35)?,
-        filesize: row.get(36)?,
-        mtime: row.get(37)?,
-        rating: row.get::<_, Option<f32>>(38)?.unwrap_or(-1.0),
-        playcount: row.get::<_, Option<i32>>(39)?.unwrap_or(0),
-        skipcount: row.get::<_, Option<i32>>(40)?.unwrap_or(0),
-        lastplayed: row.get(41)?,
-        lastseen: row.get(42)?,
-        art_embedded: row.get(43)?,
-        art_automatic: row.get(44)?,
-        art_manual: row.get(45)?,
-        art_unset: row.get(46)?,
-        cue_path: row.get(47)?,
-        ebur128_integrated_loudness_lufs: row.get(48)?,
-        ebur128_loudness_range_lu: row.get(49)?,
-        unavailable: row.get::<_, Option<bool>>(50)?.unwrap_or(false),
-        replaygain_track_gain: row.get(51)?,
-        replaygain_album_gain: row.get(52)?,
-        is_vbr: row.get(53)?,
-        is_instrumental: row.get::<_, Option<bool>>(54)?.unwrap_or(false),
-        added: row.get(55)?,
+        id: row.get::<_, Option<i64>>(col(0))?.unwrap_or(0),
+        source: row.get::<_, i64>(col(1)).map(SongSource::from)?,
+        filetype: row.get::<_, i64>(col(2)).map(FileType::from)?,
+        path: row.get(col(3))?,
+        url: row.get(col(4))?,
+        stream_url: row.get(col(5))?,
+        title: row.get(col(6))?,
+        titlesort: row.get(col(7))?,
+        artist: row.get(col(8))?,
+        artistsort: row.get(col(9))?,
+        album: row.get(col(10))?,
+        albumsort: row.get(col(11))?,
+        album_artist: row.get(col(12))?,
+        album_artist_sort: row.get(col(13))?,
+        composer: row.get(col(14))?,
+        composersort: row.get(col(15))?,
+        performer: row.get(col(16))?,
+        performersort: row.get(col(17))?,
+        grouping: row.get(col(18))?,
+        comment: row.get(col(19))?,
+        lyrics: row.get(col(20))?,
+        track: row.get(col(21))?,
+        disc: row.get(col(22))?,
+        year: row.get(col(23))?,
+        originalyear: row.get(col(24))?,
+        genre: row.get(col(25))?,
+        compilation: row.get(col(26))?,
+        bpm: row.get(col(27))?,
+        initial_key: row.get(col(28))?,
+        length_nanosec: row.get(col(29))?,
+        beginning_nanosec: row.get::<_, Option<i64>>(col(30))?.unwrap_or(0),
+        end_nanosec: row.get::<_, Option<i64>>(col(31))?.unwrap_or(0),
+        bitrate: row.get(col(32))?,
+        samplerate: row.get(col(33))?,
+        bitdepth: row.get(col(34))?,
+        channels: row.get(col(35))?,
+        filesize: row.get(col(36))?,
+        mtime: row.get(col(37))?,
+        rating: row.get::<_, Option<f32>>(col(38))?.unwrap_or(-1.0),
+        playcount: row.get::<_, Option<i32>>(col(39))?.unwrap_or(0),
+        skipcount: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
+        lastplayed: row.get(col(41))?,
+        lastseen: row.get(col(42))?,
+        art_embedded: row.get(col(43))?,
+        art_automatic: row.get(col(44))?,
+        art_manual: row.get(col(45))?,
+        art_unset: row.get(col(46))?,
+        cue_path: row.get(col(47))?,
+        ebur128_integrated_loudness_lufs: row.get(col(48))?,
+        ebur128_loudness_range_lu: row.get(col(49))?,
+        unavailable: row.get::<_, Option<bool>>(col(50))?.unwrap_or(false),
+        replaygain_track_gain: row.get(col(51))?,
+        replaygain_album_gain: row.get(col(52))?,
+        is_vbr: row.get(col(53))?,
+        is_instrumental: row.get::<_, Option<bool>>(col(54))?.unwrap_or(false),
+        added: row.get(col(55))?,
         ..Default::default()
     })
 }
