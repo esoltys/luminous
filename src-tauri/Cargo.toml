@@ -67,10 +67,6 @@ symphonia = { version = "0.6", features = ["all"] }
 cpal = "0.18"
 ringbuf = "0.5"
 
-
-# --- Audio resampling ---
-rubato = "4.0"
-
 # --- Tag reading/writing ---
 lofty = "0.25"
 

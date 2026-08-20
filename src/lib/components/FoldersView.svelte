@@ -1283,8 +1283,8 @@
               <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechSymphonia')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
-              <p class="font-bold text-brand-text-primary">rubato & bs1770</p>
-              <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechRubato')}</p>
+              <p class="font-bold text-brand-text-primary">bs1770</p>
+              <p class="text-xs text-brand-text-secondary mt-0.5">{i18n.t('settings.aboutTechBs1770')}</p>
             </div>
             <div class="bg-brand-main/40 border border-brand-border/60 rounded-xl p-3">
               <p class="font-bold text-brand-text-primary">rustfft & Lofty</p>
