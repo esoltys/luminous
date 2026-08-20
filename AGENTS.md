@@ -225,8 +225,9 @@ verify with the user, not a reason to skip telling them.
 **NEVER apply a `P1`/`P2`/`P3`/`P4` label to an issue, and never pass `--label P1` (or P2–P4) to
 `gh issue create` or `gh issue edit`.** This has happened repeatedly — priority is not a label in
 this repo; it's tracked exclusively as a field on the "Luminous Music Player" GitHub Project. See
-[docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the P1–P4 scheme used when picking up 2.0
-work or triaging a new issue into it.
+[docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the P1–P4 scheme, and for the `gh project`
+commands (with field/option IDs) to read and set both Priority and Status directly — no need to
+punt either to the user.
 
 ## Version Control
 
@@ -235,8 +236,9 @@ work or triaging a new issue into it.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
 - When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not merge the temporary branch or delete the worktree until the user has approved the changes.
+- As soon as you start working a tracked issue, set its Status to "In Progress" on the Project board (see [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the `gh project item-edit` command) — don't leave it sitting at "Todo" while work is underway.
 - Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before merging. Do NOT run `bun run tauri dev` as a background task (it does not work as expected). Ask the user to run the dev server (`bun run tauri dev`) and check manually.
-- Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
+- Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool — and set each issue's Status to "Done" on the Project board at the same time, so it doesn't stay stuck at "In Progress" after closing. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
 - **Creating Issues & Pull Requests**:
   1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`) when creating issues.
   2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
@@ -248,7 +250,11 @@ work or triaging a new issue into it.
      - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
        field, not a label.
   6. Verify the created issue by running `gh issue view <id>`.
-  7. Before opening a PR that closes/fixes an issue, check that issue's Milestone
+  7. Add the issue to the "Luminous Music Player" Project board, set Status to "Todo", and assign
+     a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which also
+     has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
+     bug or feature issue you create — don't leave the fields unset or punt them to the user.
+  8. Before opening a PR that closes/fixes an issue, check that issue's Milestone
      (`gh issue view <id> --json milestone`): if it's "2.0", branch from and target the PR at
      `next`, not `main` (see Branching Model above). Everything else targets `main`. Do this even
      when a branch name was already assigned for the task — the assigned branch name doesn't
