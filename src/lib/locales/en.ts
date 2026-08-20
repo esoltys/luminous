@@ -9,6 +9,7 @@ export const en = {
     artists: "Artists",
     albums: "Albums",
     songs: "Songs",
+    genres: "Genres",
     playlistsAuto: "Auto",
     playlistsCustom: "Custom",
     create: "Create",
@@ -857,7 +858,26 @@ export const en = {
     disableLogoPulse: "Click to disable logo pulsing",
     toggleLogoPulsing: "Toggle Luminous logo pulsing",
     on: "On",
-    off: "Off"
+    off: "Off",
+    cancel: "Cancel",
+    save: "Save",
+    back: "Back",
+    loading: "Loading…",
+    expand: "Expand",
+    collapse: "Collapse"
+  },
+  songTags: {
+    title: "Edit Tags",
+    placeholder: "Add a tag and press Enter",
+    hint: "First tag is the main category; the rest are subgenres of it.",
+    contextMenuLabel: "Manage Tags",
+    genresTabDescription: "Browse songs by tags you've added",
+    viewGenre: "Genre",
+    viewTags: "Tags",
+    emptyTitle: "No tags yet",
+    emptySubtitle: "Right-click a song and choose Manage Tags to start organizing your library your way.",
+    songCount: "{count} songs",
+    playAll: "Play all {count} songs"
   },
   organizer: {
     title: "Organize Files",

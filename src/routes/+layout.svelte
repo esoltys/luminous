@@ -16,6 +16,7 @@
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
+  import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { onMount } from 'svelte';
@@ -48,6 +49,7 @@
     isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
     i18n.init();
     prefs.init();
+    tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     void getCurrentWindow().show().catch(() => {});
 

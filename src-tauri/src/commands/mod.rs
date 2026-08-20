@@ -9,5 +9,6 @@ pub mod playlist;
 pub mod settings;
 pub mod stats;
 pub mod tageditor;
+pub mod tags;
 pub mod visualizer;
 pub mod window;

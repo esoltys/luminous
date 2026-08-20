@@ -44,6 +44,7 @@ pub struct UiPreferences {
     pub artists_view_mode: String,
     pub playlists_auto_view_mode: String,
     pub playlists_custom_view_mode: String,
+    pub genre_view_mode: String,
 }
 
 impl Default for UiPreferences {
@@ -56,6 +57,7 @@ impl Default for UiPreferences {
             artists_view_mode: "cards".into(),
             playlists_auto_view_mode: "cards".into(),
             playlists_custom_view_mode: "cards".into(),
+            genre_view_mode: "genre".into(),
         }
     }
 }
@@ -63,10 +65,11 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 7] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 8] {
         const RATING: &[&str] = &["heart", "stars"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
+        const GENRE_VIEW: &[&str] = &["genre", "tags"];
         const ANY: &[&str] = &[];
         [
             ("rating_style", &mut self.rating_style, RATING),
@@ -84,6 +87,7 @@ impl UiPreferences {
                 &mut self.playlists_custom_view_mode,
                 VIEW,
             ),
+            ("genre_view_mode", &mut self.genre_view_mode, GENRE_VIEW),
         ]
     }
 }

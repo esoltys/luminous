@@ -29,6 +29,7 @@ pub mod playlist;
 pub mod playlist_parsers;
 pub mod stats;
 pub mod tageditor;
+pub mod tags;
 pub mod tray;
 pub mod waveform;
 
@@ -808,6 +809,13 @@ pub fn run() {
             commands::tageditor::save_album_tags,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
+            // Native Tag commands (#224) — Luminous-native song tags, distinct
+            // from the embedded file-genre editing above.
+            commands::tags::list_all_tags,
+            commands::tags::get_song_tags,
+            commands::tags::set_song_tags,
+            commands::tags::get_songs_by_tag,
+            commands::tags::get_genre_graph,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

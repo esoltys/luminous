@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers } from "lucide-svelte";
+  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers, Tag } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -21,6 +21,7 @@
     onGoToArtist,
     onGoToAlbum,
     onEditTags,
+    onManageTags,
     onOrganizeFiles,
     onClose,
   }: {
@@ -35,6 +36,7 @@
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onEditTags?: () => void;
+    onManageTags?: () => void;
     onOrganizeFiles?: () => void;
     onClose: () => void;
   } = $props();
@@ -121,6 +123,14 @@
       icon={Edit3}
       label={i18n.t("collection.editTagsTooltip")}
       onclick={() => { onEditTags?.(); onClose(); }}
+    />
+  {/if}
+
+  {#if selectedCount === 1 && onManageTags}
+    <ContextMenuItem
+      icon={Tag}
+      label={i18n.t("songTags.contextMenuLabel", {}, "Manage Tags")}
+      onclick={() => { onManageTags?.(); onClose(); }}
     />
   {/if}
 </ContextMenu>

@@ -2371,7 +2371,7 @@ fn multi_value_contains_pattern(value: &str) -> String {
 /// `RANDOM() * weight` key for `Familiar`/`Discover` — a lightweight, easy-
 /// to-audit approximation of weighted random sampling: good enough to bias
 /// selection without returning the same deterministic block every time.
-fn mode_query_fragments(mode: QueuePopulationMode) -> (&'static str, &'static str) {
+pub(crate) fn mode_query_fragments(mode: QueuePopulationMode) -> (&'static str, &'static str) {
     match mode {
         QueuePopulationMode::All => ("", "RANDOM()"),
         QueuePopulationMode::Favourites => (" AND rating >= 4", "RANDOM()"),

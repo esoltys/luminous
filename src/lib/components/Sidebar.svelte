@@ -5,7 +5,8 @@
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
-  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, ArrowUp, HelpCircle, Layers } from "lucide-svelte";
+  import { tagsStore } from "../stores/tags.svelte";
+  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, Tag, ArrowUp, HelpCircle, Layers } from "lucide-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";
@@ -86,6 +87,8 @@
           <DiscAlbum class="w-5 h-5" />
         {:else if isCollapsed && collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'songs'}
           <Music class="w-5 h-5" />
+        {:else if isCollapsed && collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'genres'}
+          <Tag class="w-5 h-5" />
         {:else}
           <Library class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
         {/if}
@@ -132,6 +135,19 @@
             </div>
             <span class="text-[10px] text-brand-text-secondary/60 ml-1">
               ({collectionStore.searchQuery.trim() !== "" ? collectionStore.filteredSongs.length : collectionStore.stats.total_songs})
+            </span>
+          </button>
+
+          <button
+            onclick={() => { collectionStore.activeTab = "collection"; collectionStore.activeSubTab = "genres"; collectionStore.selectedArtistName = null; collectionStore.selectedAlbumName = null; }}
+            class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors {collectionStore.activeTab === 'collection' && collectionStore.activeSubTab === 'genres' && !collectionStore.selectedArtistName && !collectionStore.selectedAlbumName ? 'bg-brand-accent/20 text-brand-accent-text font-semibold' : 'text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10'}"
+          >
+            <div class="flex items-center gap-2 truncate">
+              <Tag class="w-3.5 h-3.5" />
+              <span class="truncate">{i18n.t('sidebar.genres')}</span>
+            </div>
+            <span class="text-[10px] text-brand-text-secondary/60 ml-1">
+              ({tagsStore.allTags.length})
             </span>
           </button>
         </div>
