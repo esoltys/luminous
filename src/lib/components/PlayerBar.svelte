@@ -171,13 +171,38 @@
     }
   }
 
-  let coverTitle = $derived.by(() => {
-    if (!playerStore.currentSong) return "";
-    return collectionStore.immersiveMode
-      ? i18n.t('playerBar.queueTitle', {}, 'Queue')
-      : i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode');
+  // True only when the user is already looking at the Queue itself (not
+  // immersive, on the Playlists tab's custom-playlists sub-tab, with the
+  // Queue playlist selected) — distinguishes "viewing the Queue" from
+  // "viewing any other collection/playlist", which the cover-art click
+  // handler below needs in order to pick the right next state (#523).
+  let isViewingQueue = $derived.by(() => {
+    if (collectionStore.immersiveMode) return false;
+    const queuePl = playlistsStore.queuePlaylist;
+    if (!queuePl) return false;
+    return (
+      collectionStore.activeTab === 'playlists' &&
+      collectionStore.playlistsSubTab === 'custom' &&
+      collectionStore.selectedPlaylistId === queuePl.id
+    );
   });
 
+  let coverTitle = $derived.by(() => {
+    if (!playerStore.currentSong) return "";
+    return isViewingQueue
+      ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode')
+      : i18n.t('playerBar.queueTitle', {}, 'Queue');
+  });
+
+  async function navigateToQueue() {
+    const queuePl = await playlistsStore.requireQueue();
+    playlistsStore.selectPlaylist(queuePl.id);
+    collectionStore.viewPlaylist(queuePl.id);
+  }
+
+  // Three-state navigation flow (#523): from any collection/playlist view,
+  // clicking goes to the Queue; from the Queue, it flips into Immersive
+  // Mode; from Immersive Mode, it flips back to the Queue.
   async function handleCoverClick(e: MouseEvent) {
     if (!playerStore.currentSong) return;
     e.stopPropagation();
@@ -191,11 +216,11 @@
 
     if (collectionStore.immersiveMode) {
       collectionStore.exitImmersiveMode();
-      const queuePl = await playlistsStore.requireQueue();
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
-    } else {
+      await navigateToQueue();
+    } else if (isViewingQueue) {
       collectionStore.toggleImmersiveMode();
+    } else {
+      await navigateToQueue();
     }
   }
 </script>
