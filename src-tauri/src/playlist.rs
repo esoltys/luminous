@@ -1137,91 +1137,29 @@ impl PlaylistManager {
         conn: &rusqlite::Connection,
         playlist_id: i64,
     ) -> Result<Vec<PlaylistItem>> {
-        let mut stmt = conn.prepare(
+        // Song columns start right after these `pi.*` columns — passed as the
+        // offset into the shared `row_to_song_at`, so this query's song
+        // fields can never drift out of sync with `SONG_SELECT_COLS_QUALIFIED`.
+        const PI_COLS_LEN: usize = 9;
+
+        let mut stmt = conn.prepare(&format!(
             "SELECT pi.id, pi.playlist_id, pi.song_id, pi.position,
                          pi.uuid, pi.type, pi.url, pi.stream_url,
                          pi.additional_metadata,
-                         -- song fields
-                         s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
-                         s.title, s.titlesort, s.artist, s.artistsort,
-                         s.album, s.albumsort, s.album_artist, s.album_artist_sort,
-                         s.composer, s.composersort, s.performer, s.performersort,
-                         s.grouping, s.comment, s.lyrics,
-                         s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
-                         s.bpm, s.initial_key,
-                         s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
-                         s.bitrate, s.samplerate, s.bitdepth, s.channels,
-                         s.filesize, s.mtime, s.rating, s.playcount, s.skipcount,
-                         s.lastplayed, s.lastseen, s.art_embedded,
-                         s.art_automatic, s.art_manual, s.art_unset,
-                         s.unavailable, s.replaygain_track_gain,
-                         s.replaygain_album_gain, s.is_vbr, s.is_instrumental
+                         {}
                   FROM playlist_items pi
                   LEFT JOIN songs s ON s.id = pi.song_id
                   WHERE pi.playlist_id = ?1
                   ORDER BY pi.position",
-        )?;
+            crate::collection::SONG_SELECT_COLS_QUALIFIED
+        ))?;
 
         let items = stmt
             .query_map(params![playlist_id], |row| {
                 let additional_meta_str: Option<String> = row.get(8)?;
 
                 let song = if row.get::<_, Option<i64>>(2)?.is_some() {
-                    Some(Song {
-                        id: row.get::<_, Option<i64>>(9)?.unwrap_or(0),
-                        source: row.get::<_, i64>(10).map(crate::models::SongSource::from)?,
-                        filetype: row.get::<_, i64>(11).map(crate::models::FileType::from)?,
-                        path: row.get(12)?,
-                        url: row.get(13)?,
-                        stream_url: row.get(14)?,
-                        title: row.get(15)?,
-                        titlesort: row.get(16)?,
-                        artist: row.get(17)?,
-                        artistsort: row.get(18)?,
-                        album: row.get(19)?,
-                        albumsort: row.get(20)?,
-                        album_artist: row.get(21)?,
-                        album_artist_sort: row.get(22)?,
-                        composer: row.get(23)?,
-                        composersort: row.get(24)?,
-                        performer: row.get(25)?,
-                        performersort: row.get(26)?,
-                        grouping: row.get(27)?,
-                        comment: row.get(28)?,
-                        lyrics: row.get(29)?,
-                        track: row.get(30)?,
-                        disc: row.get(31)?,
-                        year: row.get(32)?,
-                        originalyear: row.get(33)?,
-                        genre: row.get(34)?,
-                        compilation: row.get(35)?,
-                        bpm: row.get(36)?,
-                        initial_key: row.get(37)?,
-                        length_nanosec: row.get(38)?,
-                        beginning_nanosec: row.get::<_, Option<i64>>(39)?.unwrap_or(0),
-                        end_nanosec: row.get::<_, Option<i64>>(40)?.unwrap_or(0),
-                        bitrate: row.get(41)?,
-                        samplerate: row.get(42)?,
-                        bitdepth: row.get(43)?,
-                        channels: row.get(44)?,
-                        filesize: row.get(45)?,
-                        mtime: row.get(46)?,
-                        rating: row.get::<_, Option<f32>>(47)?.unwrap_or(-1.0),
-                        playcount: row.get::<_, Option<i32>>(48)?.unwrap_or(0),
-                        skipcount: row.get::<_, Option<i32>>(49)?.unwrap_or(0),
-                        lastplayed: row.get(50)?,
-                        lastseen: row.get(51)?,
-                        art_embedded: row.get(52)?,
-                        art_automatic: row.get(53)?,
-                        art_manual: row.get(54)?,
-                        art_unset: row.get(55)?,
-                        unavailable: row.get::<_, Option<bool>>(56)?.unwrap_or(false),
-                        replaygain_track_gain: row.get(57)?,
-                        replaygain_album_gain: row.get(58)?,
-                        is_vbr: row.get(59)?,
-                        is_instrumental: row.get::<_, Option<bool>>(60)?.unwrap_or(false),
-                        ..Default::default()
-                    })
+                    Some(crate::collection::row_to_song_at(row, PI_COLS_LEN)?)
                 } else if let Some(ref meta_json) = additional_meta_str {
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(meta_json) {
                         let title = val
@@ -2245,6 +2183,37 @@ mod tests {
         // No duplicates left — a second pass is a no-op.
         let removed_again = manager.deduplicate_playlist(pl.id).unwrap();
         assert!(removed_again.is_empty());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_playlist_tracks_includes_song_added_timestamp() {
+        // Regression test: get_playlist_tracks_from_conn used to hand-roll its
+        // own song column list and row mapping, which silently omitted
+        // `added` (and other trailing Song columns) instead of failing —
+        // the Queue view showed "—" in the Added column while the Collection
+        // view (backed by a different, complete query) showed a real date
+        // for the exact same songs.
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute("INSERT INTO songs (id, title) VALUES (1, 'Song 1')", [])
+                .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        let pl = manager.create_playlist("Added Column Test").unwrap();
+        manager.add_songs_to_playlist(pl.id, &[1]).unwrap();
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert!(
+            tracks[0].song.as_ref().unwrap().added.is_some(),
+            "song.added should be populated from the `songs.added` column, not left at its Default::default() of None"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
