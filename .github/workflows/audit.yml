@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Every Sunday at midnight
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   checks: write
@@ -18,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Security audit Cargo.lock
-        uses: rustsec/audit-check@v2
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # These are informational "unmaintained"/"unsound" advisories, not
@@ -58,10 +62,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: latest
 
@@ -70,3 +74,41 @@ jobs:
       # normally prevents (it runs `bun install` during the version bump).
       - name: Verify bun.lock is in sync with package.json
         run: bun install --frozen-lockfile
+
+  winget_manifest_check:
+    name: winget Manifest Drift Check
+    # winget.exe (used to validate the manifest folder) is Windows-only.
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Regenerates the manifest for the latest committed version from the
+      # matching GitHub release and diffs it against what's checked in —
+      # catches drift from a release whose winget sync step (release.ts) was
+      # skipped or failed, without depending on someone noticing by hand.
+      - name: Check winget manifest matches latest release
+        run: bun run scripts/submit-winget.ts --check
+
+      # winget validate needs the multi-file manifest pointed at its version
+      # folder, not an individual file — see #477. --ignore-warnings because
+      # winget validate exits non-zero on ANY warning by default, including a
+      # "schema header URL does not match expected pattern" warning that
+      # depends on the runner's own winget build having our exact schema $id
+      # baked in — a real mismatch/error still fails without --ignore-warnings.
+      - name: Validate winget manifest with winget CLI
+        shell: bash
+        run: |
+          winget --version
+          latest=$(ls -1 winget/manifests/e/EricSoltys/LuminousMusicPlayer | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          winget validate --manifest "winget/manifests/e/EricSoltys/LuminousMusicPlayer/$latest" --ignore-warnings

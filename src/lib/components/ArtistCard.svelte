@@ -48,11 +48,15 @@
   >
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
-  <div class="flex gap-2 justify-center mt-2 text-xs text-brand-text-secondary font-medium">
-    <span>{genreLabel}</span>
-    <span>•</span>
-    <span>{i18n.t('playlists.songsCount', { count: artist.song_count })}</span>
-  </div>
+  <span
+    class="text-xs text-brand-text-secondary font-medium truncate w-full mt-1.5 text-center"
+    title={genreLabel}
+  >
+    {genreLabel}
+  </span>
+  <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-center">
+    {i18n.t('playlists.songsCount', { count: artist.song_count })}
+  </span>
 </div>
 
 <style>

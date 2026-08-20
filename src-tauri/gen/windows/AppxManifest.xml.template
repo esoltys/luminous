@@ -40,8 +40,219 @@
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
       </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="mp3audio">
+            <uap:DisplayName>MP3 Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-mp3.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.mp3</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
 
-{{EXTENSIONS}}
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="flacaudio">
+            <uap:DisplayName>FLAC Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-flac.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.flac</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="oggaudio">
+            <uap:DisplayName>Ogg Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-ogg.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.ogg</uap:FileType>
+              <uap:FileType>.opus</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="m4aaudio">
+            <uap:DisplayName>M4A Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-m4a.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.m4a</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="alacaudio">
+            <uap:DisplayName>ALAC Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-alac.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.alac</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="aacaudio">
+            <uap:DisplayName>AAC Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-aac.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.aac</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="wavaudio">
+            <uap:DisplayName>WAV Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-wav.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.wav</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="aiffaudio">
+            <uap:DisplayName>AIFF Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.aiff</uap:FileType>
+              <uap:FileType>.aif</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="wavpackaudio">
+            <uap:DisplayName>WavPack Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.wv</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="musepackaudio">
+            <uap:DisplayName>Musepack Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.mpc</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="monkeysaudio">
+            <uap:DisplayName>Monkey's Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.ape</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="trueaudio">
+            <uap:DisplayName>True Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.tta</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="dsdstreamfile">
+            <uap:DisplayName>DSD Stream File</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.dsf</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="dsdiffaudio">
+            <uap:DisplayName>DSDIFF Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.dff</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="advancedsystemsformat">
+            <uap:DisplayName>Advanced Systems Format</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.asf</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="windowsmediaaudio">
+            <uap:DisplayName>Windows Media Audio</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.wma</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="aacaudiobook">
+            <uap:DisplayName>AAC Audiobook</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.m4b</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="m3uplaylist">
+            <uap:DisplayName>M3U Playlist</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-m3u.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.m3u</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="m3u8playlist">
+            <uap:DisplayName>M3U8 Playlist</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-m3u8.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.m3u8</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="plsplaylist">
+            <uap:DisplayName>PLS Playlist</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.pls</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="xspfplaylist">
+            <uap:DisplayName>XSPF Playlist</uap:DisplayName>
+            <uap:Logo>icons\filetypes\luminous-file-generic.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.xspf</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
 
