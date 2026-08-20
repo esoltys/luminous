@@ -11,6 +11,7 @@
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import GenreChips from "./GenreChips.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
@@ -193,9 +194,11 @@
             <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
           </div>
 
-          <div class="shrink-0 max-w-40 text-right">
+          <div class="shrink-0 max-w-40 flex flex-col items-end gap-0.5">
             <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
-            {#if genreFor(item)}
+            {#if item.type === "song" && item.song.genre}
+              <GenreChips genre={item.song.genre} />
+            {:else if genreFor(item)}
               <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
             {/if}
             {#if addedDateFor(item)}

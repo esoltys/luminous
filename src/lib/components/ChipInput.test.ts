@@ -121,6 +121,33 @@ describe("ChipInput.svelte", () => {
     expect((getByRole("textbox") as HTMLInputElement).disabled).toBe(true);
   });
 
+  it("reorders chips by dragging one onto another (pointer-based, not native HTML5 DnD)", async () => {
+    // Chip reordering uses pointer events rather than draggable/dragstart —
+    // native HTML5 DnD never fires inside the app's Tauri webview (see the
+    // comment in ChipInput.svelte), so that's the behavior worth locking in.
+    const { getByText } = render(ChipInput, { value: "Metal; Progressive Metal; Symphonic Metal" });
+
+    const dragged = getByText("Symphonic Metal").closest("span")!;
+    const target = getByText("Metal").closest("span")!;
+
+    // jsdom doesn't implement elementFromPoint; stub it to resolve to our
+    // drop target regardless of coordinates.
+    const originalElementFromPoint = document.elementFromPoint;
+    document.elementFromPoint = () => target;
+
+    await fireEvent.pointerDown(dragged);
+    await fireEvent.pointerMove(window, { clientX: 10, clientY: 10 });
+    await fireEvent.pointerUp(window);
+
+    document.elementFromPoint = originalElementFromPoint;
+
+    const chipTexts = Array.from(document.querySelectorAll("span")).map((el) => el.textContent?.trim());
+    const order = chipTexts.filter((t): t is string =>
+      ["Metal", "Progressive Metal", "Symphonic Metal"].includes(t ?? "")
+    );
+    expect(order).toEqual(["Symphonic Metal", "Metal", "Progressive Metal"]);
+  });
+
   it("is field-agnostic — works the same for a non-genre value list like artists", async () => {
     const { getByRole, getByText } = render(ChipInput, {
       value: "Artist A",

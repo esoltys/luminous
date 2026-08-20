@@ -414,7 +414,7 @@
               />
             </FormField>
 
-            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre">
+            <FormField label={i18n.t('tagEditor.genreField')} for="tag-genre" span2 tooltip={i18n.t('tagEditor.genreTooltip', {}, 'Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.')}>
               <ChipInput
                 id="tag-genre"
                 bind:value={genre}

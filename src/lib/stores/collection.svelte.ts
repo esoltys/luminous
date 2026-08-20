@@ -18,6 +18,7 @@ import type {
 } from "../types";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { playlistsStore } from "./playlists.svelte";
+import { tagsStore } from "./tags.svelte";
 import { toastStore } from "./toast.svelte";
 import {
   MAX_RECENT_SEARCHES,
@@ -30,7 +31,7 @@ import {
 } from "../constants";
 
 export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
-export type ActiveSubTab = "songs" | "albums" | "artists";
+export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
 export type PlaylistsSubTab = "auto" | "custom";
@@ -674,6 +675,9 @@ class CollectionStore {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
+        tagsStore.load().catch((err) => {
+          console.error("Failed to refresh tags after library change:", err);
+        });
         invoke("refresh_playback_queue").catch((err) => {
           console.error("Failed to refresh playback queue after library change:", err);
         });
@@ -939,6 +943,22 @@ class CollectionStore {
   clearRecentSearches() {
     this.recentSearches = [];
     this.saveRecentSearches();
+  }
+
+  /** One-shot "open this tag in the Genres tab" signal — set by viewGenreTag(),
+   * consumed and cleared by GenreBrowseView on pickup. Deliberately not
+   * persisted/history-tracked like selectedArtistName/selectedAlbumName: it's
+   * a fire-once navigation command, not durable "where the user is" state. */
+  pendingGenreTag = $state<string | null>(null);
+
+  viewGenreTag(tag: string) {
+    this.searchQuery = "";
+    this.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    this.activeTab = "collection";
+    this.activeSubTab = "genres";
+    this.pendingGenreTag = tag;
   }
 
   viewArtist(name: string) {

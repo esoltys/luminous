@@ -40,6 +40,8 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
   import PlaylistContextMenu from "./PlaylistContextMenu.svelte";
@@ -207,6 +209,7 @@
   }
 
   function handleTagEditorSaved() {
+    tagsStore.load();
     if (playlistsStore.activePlaylistId !== null) {
       playlistsStore.selectPlaylist(playlistsStore.activePlaylistId);
     }
@@ -1418,8 +1421,12 @@
               </div>
             {/if}
             {#if collectionStore.visibleColumns.genre}
-              <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={item.song?.genre}>
-                {item.song?.genre || "—"}
+              <div class="truncate pr-2 min-w-0" title={item.song?.genre}>
+                {#if item.song?.genre}
+                  <GenreChips genre={item.song.genre} />
+                {:else}
+                  <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                {/if}
               </div>
             {/if}
             {#if collectionStore.visibleColumns.grouping}

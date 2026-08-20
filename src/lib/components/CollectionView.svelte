@@ -16,6 +16,9 @@
   import { parseMultiValue } from "../utils/multiValue";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
+  import GenreBrowseView from "./GenreBrowseView.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
@@ -142,6 +145,7 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
   }
 
   function getArtistAlbumsFor(name: string | null): AlbumItem[] {
@@ -871,8 +875,12 @@
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.genre}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                    {song.genre || "—"}
+                  <div class="truncate pr-2 min-w-0" title={song.genre}>
+                    {#if song.genre}
+                      <GenreChips genre={song.genre} />
+                    {:else}
+                      <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                    {/if}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.grouping}
@@ -977,6 +985,8 @@
       </div>
     </div>
 
+  {:else if collectionStore.activeSubTab === "genres"}
+    <GenreBrowseView />
   {:else}
     <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${collectionStore.activeSubTab}`}>
       <div class="sticky top-0 z-20 bg-brand-main pt-3">

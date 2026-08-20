@@ -4,6 +4,7 @@
   import { Music, Clock } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
+  import GenreChips from "./GenreChips.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -104,7 +105,9 @@
         {#if currentSong.genre}
           <div class="flex items-start justify-between gap-3">
             <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
-            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.genre}</span>
+            <div class="min-w-0 flex justify-end">
+              <GenreChips genre={currentSong.genre} variant="full" />
+            </div>
           </div>
         {/if}
         {#if currentSong.composer}

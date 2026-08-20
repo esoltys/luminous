@@ -783,6 +783,35 @@ pub struct ArtistProfile {
     pub bio: Option<String>,
 }
 
+/// A Luminous-native song tag (#224), independent of the embedded
+/// `songs.genre` column. `song_count` is the number of songs currently
+/// carrying this tag, at any position.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct Tag {
+    pub name: String,
+    pub song_count: i64,
+}
+
+/// One child entry under a [`GenreGroup`]'s main tag.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagCount {
+    pub name: String,
+    pub song_count: i64,
+}
+
+/// One node of the emergent tag-hierarchy graph: a tag that has appeared as a
+/// song's *first* (position 0, "main category") tag on at least one song,
+/// together with every tag seen as a subgenre of it across the library. A tag
+/// can appear as a child under more than one `GenreGroup` if different songs
+/// disagree about its main category — that disagreement is preserved rather
+/// than resolved (see `tags::get_genre_graph`).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct GenreGroup {
+    pub main_tag: String,
+    pub song_count: i64,
+    pub children: Vec<TagCount>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

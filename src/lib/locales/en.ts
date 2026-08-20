@@ -9,6 +9,7 @@ export const en = {
     artists: "Artists",
     albums: "Albums",
     songs: "Songs",
+    genres: "Genres",
     playlistsAuto: "Auto",
     playlistsCustom: "Custom",
     create: "Create",
@@ -642,7 +643,8 @@ export const en = {
   },
 
   chipInput: {
-    removeItem: "Remove {value}"
+    removeItem: "Remove {value}",
+    dragToReorder: "Drag to reorder"
   },
   tagEditor: {
     title: "Edit Song Tags",
@@ -654,6 +656,7 @@ export const en = {
     yearField: "Year",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     cancelBtn: "Cancel",
     saveBtn: "Save Tags",
     saveBtnShort: "Save",
@@ -697,6 +700,7 @@ export const en = {
     albumArtistPlaceholder: "Add an album artist...",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
+    genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",
     compilationField: "Compilation (mark as Various Artists)",
     yearField: "Release Year",
     discField: "Disc #",
@@ -836,8 +840,7 @@ export const en = {
     editInfoTooltip: "Edit album info",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
-    refreshError: "Failed to refresh album metadata",
-    goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
+    refreshError: "Failed to refresh album metadata"
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
@@ -857,7 +860,24 @@ export const en = {
     disableLogoPulse: "Click to disable logo pulsing",
     toggleLogoPulsing: "Toggle Luminous logo pulsing",
     on: "On",
-    off: "Off"
+    off: "Off",
+    back: "Back",
+    loading: "Loading…",
+    expand: "Expand",
+    collapse: "Collapse"
+  },
+  songTags: {
+    genresTabDescription: "Browse songs by tags you've added",
+    viewGenre: "Genre",
+    viewTags: "Tags",
+    emptyTitle: "No tags yet",
+    emptySubtitle: "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
+    songCount: "{count} songs",
+    playAll: "Play all {count} songs",
+    editSongTooltip: "Edit Song",
+    editAlbumTooltip: "Edit Album",
+    goToGenreTooltip: "Browse {genre}",
+    noGenre: "No Genre"
   },
   organizer: {
     title: "Organize Files",
