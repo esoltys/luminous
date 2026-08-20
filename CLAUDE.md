@@ -9,14 +9,18 @@ The imported `AGENTS.md` above is the canonical instructions file for this repo 
 ## Release Process
 - If a release is being initiated from a Cloud Environment (not the user's local machine), STOP immediately and notify the user — cutting a release must be done from a local environment.
 - Tag pushes are protected on this repo: Claude cannot push `v*` tags (GitHub returns 403). When a release tag is needed, prepare everything else, then STOP and give the user the exact command to run (e.g. `git tag -a v1.0.0 -m 'Luminous v1.0.0' && git push origin v1.0.0`).
-- After the tag is pushed, resume by watching the release workflow and verifying the Microsoft Store submission actually went through (not just a green workflow) — check actual certification status with `.github/store/Get-StoreSubmissionStatus.ps1` (requires `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/`STORE_APP_ID` as local env vars), not just that `publish-store.yml` ran green.
+- Microsoft Store submission is **not** part of this repo's release pipeline — it lives in the
+  separate private repo `esoltys/luminous-store` (cloned locally at `~/source/luminous-store`),
+  triggered manually (`gh workflow run publish-store.yml -f tag=vX.Y.Z`) against a `luminous`
+  release tag once it's published here. `luminous`'s own release is done once the four items
+  below hold; Store certification is tracked and verified separately in `luminous-store`.
 
 ### Definition of Done (releases)
-A release is only complete when **all four** of the following hold. Never report a release as done based on CI status alone.
+A release is only complete when **all three** of the following hold. Never report a release as done based on CI status alone.
 1. The release GitHub Actions workflow is green.
-2. A Microsoft Store submission exists and has a submission ID.
-3. The submission version matches the pushed tag.
-4. The GitHub release has the expected artifacts attached.
+2. The pushed tag matches the version in `package.json`/`Cargo.toml`.
+3. The GitHub release has the expected artifacts attached (including a `.msix`/`.msixbundle` for
+   Store submission).
 
 ## CI Monitoring
 - Use `gh run watch <run-id> --exit-status` to monitor a run instead of polling with repeated `gh run list`/API calls. Only fall back to scheduled re-checks for waits expected to exceed 15 minutes.

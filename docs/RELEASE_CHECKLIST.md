@@ -80,22 +80,21 @@ manual.
       this release" so it also posts as an Announcement in GitHub Discussions, then
       publish it (the workflow creates it as a draft with `prerelease: false`, so it's
       just sitting there until published).
-- [ ] Publishing fires [`publish-store.yml`](../.github/workflows/publish-store.yml),
-      which downloads the release's MSIX asset and submits it to the Microsoft Store via
-      [StoreBroker](https://github.com/microsoft/StoreBroker) (see
-      [`.github/store/README.md`](../.github/store/README.md) for how the submission is
-      built). It's a separate workflow from `release.yml` on purpose — it doesn't depend
-      on (and isn't skipped by) the build job, and can be re-run independently via
-      `workflow_dispatch` with a `tag` input if a submission needs to be retried against
-      an already-published release. Watch this run too, not just the build — a green run
-      only means the submission was committed for certification, not that it's live yet;
-      Microsoft's cert pass still has to complete.
-- [ ] Check actual certification status with the same StoreBroker credentials used by
-      `publish-store.yml` (set `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/
-      `STORE_APP_ID` as local env vars first, from the values used to create those GitHub
-      secrets):
+- [ ] Microsoft Store submission is a separate, manual step in the private
+      `esoltys/luminous-store` repo (not part of this repo's pipeline). After publishing,
+      trigger it there:
+  ```bash
+  gh workflow run publish-store.yml -f tag=vX.Y.Z
+  ```
+  (add `-f update_screenshots=true` to also replace the live listing text/screenshots —
+  see that repo's `README.md`). Watch this run too, not just the build — a green run
+  only means the submission was committed for certification, not that it's live yet;
+  Microsoft's cert pass still has to complete.
+- [ ] Check actual certification status from `~/source/luminous-store` (set
+      `STORE_TENANT_ID`/`STORE_CLIENT_ID`/`STORE_CLIENT_SECRET`/`STORE_APP_ID` as local env
+      vars first, from the values used to create that repo's GitHub secrets):
   ```powershell
-  ./.github/store/Get-StoreSubmissionStatus.ps1
+  ./Get-StoreSubmissionStatus.ps1
   ```
   Confirm `status` moves from `Certification` to `Published` (or check `statusDetails`
   for errors if it doesn't). This is what actually satisfies "the Microsoft Store
