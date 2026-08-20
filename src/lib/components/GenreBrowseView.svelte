@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft } from "lucide-svelte";
+  import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft, Music, DiscAlbum } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { tagsStore } from "../stores/tags.svelte";
   import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { parseMultiValue } from "../utils/multiValue";
   import EmptyState from "./EmptyState.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import TagEditor from "./TagEditor.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import type { Song } from "../types";
 
   let expandedRoots = $state<Set<string>>(new Set());
@@ -17,6 +20,8 @@
   let drillDownSongs = $state<Song[]>([]);
   let drillDownLoading = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+  let editingSongId = $state<number | null>(null);
+  let editingAlbumSongs = $state<Song[] | null>(null);
 
   async function rateSong(song: Song, rating: number) {
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
@@ -25,6 +30,23 @@
   function handleContextMenu(e: MouseEvent, song: Song) {
     e.preventDefault();
     contextMenuState = { x: e.clientX, y: e.clientY, song };
+  }
+
+  function mainGenreTag(song: Song): { main: string; extraCount: number } {
+    const values = parseMultiValue(song.genre || "");
+    return { main: values[0] ?? "", extraCount: Math.max(0, values.length - 1) };
+  }
+
+  async function openAlbumEditor(song: Song) {
+    if (!song.album) return;
+    editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
+  }
+
+  function handleEditorSaved() {
+    tagsStore.load();
+    if (selectedTag) {
+      tagsStore.getSongsByTag(selectedTag, 500).then((songs) => { drillDownSongs = songs; });
+    }
   }
 
   function toggleExpanded(mainTag: string) {
@@ -91,6 +113,7 @@
       {/if}
       <div class="flex flex-col gap-2">
         {#each drillDownSongs as song (song.id)}
+          {@const genreTag = mainGenreTag(song)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
@@ -117,8 +140,32 @@
               </div>
               <p class="truncate text-xs text-brand-text-secondary font-medium">{song.artist || i18n.t('collection.unknownArtist')}</p>
             </div>
-            <div class="shrink-0 max-w-[45%] text-right">
-              <p class="text-xs text-brand-text-secondary whitespace-normal">{song.genre || ""}</p>
+            {#if genreTag.main}
+              <div class="shrink-0 hidden sm:flex items-center">
+                <span class="inline-flex items-center gap-1 pl-2 pr-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 text-xs font-medium">
+                  {genreTag.main}
+                  {#if genreTag.extraCount > 0}
+                    <span class="text-brand-text-secondary">+{genreTag.extraCount}</span>
+                  {/if}
+                </span>
+              </div>
+            {/if}
+            <div class="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onclick={(e) => { e.stopPropagation(); editingSongId = song.id; }}
+                class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
+                title={i18n.t('songTags.editSongTooltip', {}, 'Edit Song')}
+              >
+                <Music class="w-4 h-4" />
+              </button>
+              <button
+                onclick={(e) => { e.stopPropagation(); openAlbumEditor(song); }}
+                class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={!song.album}
+                title={i18n.t('songTags.editAlbumTooltip', {}, 'Edit Album')}
+              >
+                <DiscAlbum class="w-4 h-4" />
+              </button>
             </div>
           </div>
         {/each}
@@ -234,6 +281,30 @@
     onPlay={() => playerStore.playSong(song.id)}
     onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onEditTags={() => { editingSongId = song.id; }}
     onClose={() => { contextMenuState = null; }}
+  />
+{/if}
+
+{#if editingSongId !== null}
+  <TagEditor
+    songId={editingSongId}
+    onClose={() => { editingSongId = null; }}
+    onSave={handleEditorSaved}
+  />
+{/if}
+
+{#if editingAlbumSongs !== null && editingAlbumSongs.length > 0}
+  <AlbumTagEditor
+    songIds={editingAlbumSongs.map((s) => s.id)}
+    initialAlbum={editingAlbumSongs[0].album}
+    initialAlbumArtist={editingAlbumSongs[0].album_artist || editingAlbumSongs[0].artist}
+    initialGenre={editingAlbumSongs[0].genre}
+    initialYear={editingAlbumSongs[0].year}
+    initialDisc={editingAlbumSongs[0].disc}
+    initialCompilation={editingAlbumSongs[0].compilation}
+    hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
+    onClose={() => { editingAlbumSongs = null; }}
+    onSave={handleEditorSaved}
   />
 {/if}

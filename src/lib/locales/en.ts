@@ -874,7 +874,9 @@ export const en = {
     emptyTitle: "No tags yet",
     emptySubtitle: "Right-click a song and choose Edit Tags to give it a genre — the first value is its main category, the rest are subgenres.",
     songCount: "{count} songs",
-    playAll: "Play all {count} songs"
+    playAll: "Play all {count} songs",
+    editSongTooltip: "Edit Song",
+    editAlbumTooltip: "Edit Album"
   },
   organizer: {
     title: "Organize Files",

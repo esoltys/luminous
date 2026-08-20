@@ -42,27 +42,35 @@
     value = joinMultiValue(next);
   }
 
-  function handleChipDragStart(e: DragEvent, index: number) {
+  // Chip reordering deliberately does NOT use the native HTML5 drag-and-drop
+  // API (dragstart/dragover/drop). Tauri's window has dragDropEnabled: true
+  // (needed for OS file-drop-to-import elsewhere in the app), and per Tauri's
+  // documented behavior that intercepts native OS drag-drop at the webview
+  // level in a way that prevents HTML5 DnD events from ever firing in-page —
+  // dragstart never dispatches, so no amount of dragover/drop handling here
+  // would help. Plain pointer-event tracking sidesteps that entirely.
+  function handleChipPointerDown(e: PointerEvent, index: number) {
     if (disabled) return;
+    // Let the remove button's own click handler run normally instead of
+    // hijacking it into a drag.
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
     draggedIndex = index;
-    e.dataTransfer?.setData("text/plain", "");
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   }
 
-  function handleChipDragOver(e: DragEvent, index: number) {
+  function handlePointerMove(e: PointerEvent) {
     if (draggedIndex === null) return;
-    e.preventDefault();
-    dragOverIndex = index;
+    const target = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(
+      "[data-chip-index]"
+    );
+    const index = target ? Number(target.getAttribute("data-chip-index")) : null;
+    dragOverIndex = index !== null && !Number.isNaN(index) ? index : null;
   }
 
-  function handleChipDrop(e: DragEvent, index: number) {
-    e.preventDefault();
-    if (draggedIndex !== null) reorderChip(draggedIndex, index);
-    draggedIndex = null;
-    dragOverIndex = null;
-  }
-
-  function handleChipDragEnd() {
+  function handlePointerUp() {
+    if (draggedIndex !== null && dragOverIndex !== null) {
+      reorderChip(draggedIndex, dragOverIndex);
+    }
     draggedIndex = null;
     dragOverIndex = null;
   }
@@ -105,26 +113,28 @@
   }
 </script>
 
+<svelte:window
+  onpointermove={handlePointerMove}
+  onpointerup={handlePointerUp}
+/>
+
 <div
   class="flex flex-wrap items-center gap-1.5 border rounded-lg bg-brand-main px-2 py-1.5 min-h-9 focus-within:border-brand-accent transition-colors {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {disabled ? 'opacity-50' : ''} {className}"
 >
   {#each chips as chip, i (chip)}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <span
-      draggable={!disabled}
-      ondragstart={(e) => handleChipDragStart(e, i)}
-      ondragover={(e) => handleChipDragOver(e, i)}
-      ondrop={(e) => handleChipDrop(e, i)}
-      ondragend={handleChipDragEnd}
+      data-chip-index={i}
+      onpointerdown={(e) => handleChipPointerDown(e, i)}
       title={i18n.t('chipInput.dragToReorder', {}, 'Drag to reorder')}
-      class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-brand-accent/15 text-brand-accent-text text-xs font-medium transition-[opacity,box-shadow] {disabled ? '' : 'cursor-grab active:cursor-grabbing'} {draggedIndex === i ? 'opacity-40' : ''} {dragOverIndex === i && draggedIndex !== null && draggedIndex !== i ? 'ring-2 ring-brand-accent' : ''}"
+      class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {disabled ? '' : 'cursor-grab active:cursor-grabbing'} {draggedIndex === i ? 'opacity-40' : ''} {dragOverIndex === i && draggedIndex !== null && draggedIndex !== i ? 'ring-2 ring-brand-accent' : ''}"
     >
       {chip}
       {#if !disabled}
         <button
           type="button"
           onclick={() => removeChip(i)}
-          class="text-brand-accent-text/70 hover:text-red-400 transition-colors"
+          class="text-brand-text-secondary hover:text-red-400 transition-colors"
           aria-label={i18n.t('chipInput.removeItem', { value: chip })}
         >
           <X class="w-3 h-3" />
