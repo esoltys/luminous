@@ -18,6 +18,7 @@ export interface DownloadProgress {
 
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const RELEASES_URL = "https://github.com/esoltys/luminous/releases/latest";
+export const MICROSOFT_STORE_URL = "https://apps.microsoft.com/detail/9PNQ2NFSQ7XW";
 
 // Tauri command rejections often surface as a raw string (from a Rust `Err(String)`),
 // not an `Error` instance — `err.message` on a string is always `undefined`.
@@ -49,12 +50,25 @@ class UpdaterStore {
     return this.updateAutoInstall ? "auto" : "notify";
   }
 
-  // Microsoft Store (MSIX) installs are updated by the Store, not by us —
-  // GitHub releases aren't even the same artifact stream. The whole
-  // check/notify/auto-install UI is meaningless there, so callers use this
-  // to hide it rather than rendering a control panel with nothing it can do.
-  get isStoreManaged(): boolean {
-    return this.installFormat.format === "msix";
+  // Flatpak, deb/rpm, and MSIX installs are all updated by something other
+  // than us — Flatpak/apt/dnf or the Microsoft Store — and GitHub releases
+  // aren't even the same artifact stream. The check/notify/auto-install UI
+  // is meaningless there, so callers use this to swap in "managed by X"
+  // messaging instead of a control panel with nothing it can do.
+  get externallyManagedFormat(): "flatpak" | "deb" | "rpm" | "msix" | null {
+    switch (this.installFormat.format) {
+      case "flatpak":
+      case "deb":
+      case "rpm":
+      case "msix":
+        return this.installFormat.format;
+      default:
+        return null;
+    }
+  }
+
+  get isExternallyManaged(): boolean {
+    return this.externallyManagedFormat !== null;
   }
 
   installStatus = $state<InstallStatus>("idle");
@@ -79,9 +93,9 @@ class UpdaterStore {
         console.error("Failed to detect install format:", err);
       }
 
-      // Store-managed installs never check or install updates themselves —
+      // Externally-managed installs never check or install updates themselves —
       // stored preferences are irrelevant, and there's nothing to poll for.
-      if (this.isStoreManaged) {
+      if (this.isExternallyManaged) {
         this.updateCheckEnabled = false;
         return;
       }
@@ -163,7 +177,7 @@ class UpdaterStore {
   }
 
   async checkForUpdates() {
-    if (this.isStoreManaged) return;
+    if (this.isExternallyManaged) return;
 
     this.checkStatus = "checking";
     this.errorMessage = null;

@@ -1,0 +1,57 @@
+name: "Publish to Microsoft Store"
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to submit (e.g. v0.99.7)"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  microsoft-store:
+    name: Publish to Microsoft Store
+    permissions:
+      contents: read
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Download MSIX package from release
+        id: download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          mkdir -p package
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "*.msixbundle" --pattern "*.msix" --dir package
+          # Prefer the plain .msix: it's a single x64 package, and StoreBroker's
+          # bundle-metadata reader can't locate the inner package inside the
+          # .msixbundle that tauri-windows-bundle produces (Read-AppPackageBundleMetadata
+          # fails to find the file referenced by the bundle manifest). Fall back to the
+          # bundle only if no plain .msix was uploaded.
+          FILE=$(ls package/*.msix 2>/dev/null | head -n1 || true)
+          if [ -z "$FILE" ]; then
+            FILE=$(ls package/*.msixbundle | head -n1)
+          fi
+          echo "Selected package: $FILE"
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Submit to Microsoft Store
+        shell: pwsh
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+          STORE_APP_ID: ${{ secrets.STORE_APP_ID }}
+        run: |
+          ./.github/store/Submit-ToMicrosoftStore.ps1 -AppxPath "${{ steps.download.outputs.path }}"

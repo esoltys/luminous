@@ -161,16 +161,22 @@ describe("UpdaterStore", () => {
     expect(updaterStore.lastCheckedAt).toBe(null);
   });
 
-  describe("isStoreManaged", () => {
-    it("is true only for msix installs", () => {
-      updaterStore.installFormat = { format: "msix", human_name: "Microsoft Store", supports_self_update: false };
-      expect(updaterStore.isStoreManaged).toBe(true);
+  describe("externallyManagedFormat / isExternallyManaged", () => {
+    it("is set for flatpak, deb, rpm, and msix installs, and null otherwise", () => {
+      for (const format of ["flatpak", "deb", "rpm", "msix"] as const) {
+        updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
+        expect(updaterStore.externallyManagedFormat).toBe(format);
+        expect(updaterStore.isExternallyManaged).toBe(true);
+      }
 
-      updaterStore.installFormat = { format: "windows_setup", human_name: "Windows Installer (.exe / .msi)", supports_self_update: true };
-      expect(updaterStore.isStoreManaged).toBe(false);
+      for (const format of ["windows_setup", "appimage", "snap", "system_pkg", "linux_generic", "unknown"]) {
+        updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
+        expect(updaterStore.externallyManagedFormat).toBe(null);
+        expect(updaterStore.isExternallyManaged).toBe(false);
+      }
     });
 
-    it("init() disables checking and never calls the updater plugin for msix", async () => {
+    it("init() disables checking and never calls the updater plugin for externally-managed formats", async () => {
       const { invoke } = await import("@tauri-apps/api/core");
       vi.mocked(invoke).mockImplementation((cmd: string) => {
         if (cmd === "get_install_format") {
@@ -183,18 +189,21 @@ describe("UpdaterStore", () => {
       await Promise.resolve();
 
       expect(updaterStore.updateCheckEnabled).toBe(false);
-      expect(updaterStore.isStoreManaged).toBe(true);
+      expect(updaterStore.isExternallyManaged).toBe(true);
       expect(check).not.toHaveBeenCalled();
     });
 
-    it("checkForUpdates() is a no-op for msix even if called directly", async () => {
-      updaterStore.installFormat = { format: "msix", human_name: "Microsoft Store", supports_self_update: false };
-      vi.mocked(check).mockResolvedValueOnce(fakeUpdate());
+    it("checkForUpdates() is a no-op for externally-managed formats even if called directly", async () => {
+      for (const format of ["flatpak", "deb", "rpm", "msix"] as const) {
+        updaterStore.installFormat = { format, human_name: format, supports_self_update: false };
+        updaterStore.checkStatus = "idle";
+        vi.mocked(check).mockResolvedValueOnce(fakeUpdate());
 
-      await updaterStore.checkForUpdates();
+        await updaterStore.checkForUpdates();
 
-      expect(check).not.toHaveBeenCalled();
-      expect(updaterStore.checkStatus).toBe("idle");
+        expect(check).not.toHaveBeenCalled();
+        expect(updaterStore.checkStatus).toBe("idle");
+      }
     });
   });
 

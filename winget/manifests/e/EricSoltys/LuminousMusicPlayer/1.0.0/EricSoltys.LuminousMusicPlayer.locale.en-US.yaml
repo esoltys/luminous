@@ -1,5 +1,7 @@
-PackageIdentifier: EricSoltys.Luminous
-PackageVersion: 0.99.2
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+PackageIdentifier: EricSoltys.LuminousMusicPlayer
+PackageVersion: 1.0.0
 PackageLocale: en-US
 Publisher: Eric James Soltys
 PublisherUrl: https://esoltys.dev/luminous/
@@ -22,4 +24,4 @@ Tags:
   - flac
   - tauri
 ManifestType: defaultLocale
-ManifestVersion: 1.6.0
+ManifestVersion: 1.12.0

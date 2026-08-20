@@ -19,10 +19,10 @@ Luminous is a fast, local-first player for your own audio library — no streami
 
 ## Quick Install
 
-Grab the latest build from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)**.
+[<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW?launch=true&mode=full)
 
-- **Windows**: download `Luminous_{version}_x64-setup.exe` and run it.
-- **Linux**: download the `.deb` or `.rpm` for your distro from the same release and install it as usual.
+- **Windows**: get it from the **[Microsoft Store](https://apps.microsoft.com/detail/9PNQ2NFSQ7XW)** (recommended — installs and updates automatically), or grab `Luminous_{version}_x64-setup.exe` (or the `.msix`) from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** for a manual/sideloaded install.
+- **Linux**: download the `.deb` or `.rpm` for your distro from the **[Releases page](https://github.com/esoltys/luminous/releases/latest)** and install it as usual.
 
 > **Flathub submission in progress.** A Flatpak manifest is tracked in-repo at [`flatpak/org.luminous.music.yml`](./flatpak/org.luminous.music.yml) and built/linted in CI (see [#419](https://github.com/esoltys/luminous/issues/419)), but Luminous isn't published on Flathub yet — once it is, `flatpak install flathub org.luminous.music` will be added here as a third Linux install option alongside `.deb`/`.rpm`.
 
