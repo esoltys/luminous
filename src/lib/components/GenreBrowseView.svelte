@@ -6,8 +6,8 @@
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
-  import { parseMultiValue } from "../utils/multiValue";
   import EmptyState from "./EmptyState.svelte";
+  import GenreChips from "./GenreChips.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -30,11 +30,6 @@
   function handleContextMenu(e: MouseEvent, song: Song) {
     e.preventDefault();
     contextMenuState = { x: e.clientX, y: e.clientY, song };
-  }
-
-  function mainGenreTag(song: Song): { main: string; extraCount: number } {
-    const values = parseMultiValue(song.genre || "");
-    return { main: values[0] ?? "", extraCount: Math.max(0, values.length - 1) };
   }
 
   async function openAlbumEditor(song: Song) {
@@ -68,6 +63,16 @@
       drillDownLoading = false;
     }
   }
+
+  // Consumes collectionStore.viewGenreTag()'s one-shot "open this tag" signal
+  // — e.g. a genre chip clicked elsewhere in the app.
+  $effect(() => {
+    const tag = collectionStore.pendingGenreTag;
+    if (tag) {
+      collectionStore.pendingGenreTag = null;
+      openTag(tag);
+    }
+  });
 
   function setViewMode(mode: GenreViewMode) {
     prefs.setGenreViewMode(mode);
@@ -113,7 +118,6 @@
       {/if}
       <div class="flex flex-col gap-2">
         {#each drillDownSongs as song (song.id)}
-          {@const genreTag = mainGenreTag(song)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
@@ -140,14 +144,9 @@
               </div>
               <p class="truncate text-xs text-brand-text-secondary font-medium">{song.artist || i18n.t('collection.unknownArtist')}</p>
             </div>
-            {#if genreTag.main}
-              <div class="shrink-0 hidden sm:flex items-center">
-                <span class="inline-flex items-center gap-1 pl-2 pr-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 text-xs font-medium">
-                  {genreTag.main}
-                  {#if genreTag.extraCount > 0}
-                    <span class="text-brand-text-secondary">+{genreTag.extraCount}</span>
-                  {/if}
-                </span>
+            {#if song.genre}
+              <div class="shrink-0 hidden sm:flex items-center max-w-40">
+                <GenreChips genre={song.genre} />
               </div>
             {/if}
             <div class="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">

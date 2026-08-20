@@ -945,6 +945,22 @@ class CollectionStore {
     this.saveRecentSearches();
   }
 
+  /** One-shot "open this tag in the Genres tab" signal — set by viewGenreTag(),
+   * consumed and cleared by GenreBrowseView on pickup. Deliberately not
+   * persisted/history-tracked like selectedArtistName/selectedAlbumName: it's
+   * a fire-once navigation command, not durable "where the user is" state. */
+  pendingGenreTag = $state<string | null>(null);
+
+  viewGenreTag(tag: string) {
+    this.searchQuery = "";
+    this.searchResults = [];
+    this.selectedArtistName = null;
+    this.selectedAlbumName = null;
+    this.activeTab = "collection";
+    this.activeSubTab = "genres";
+    this.pendingGenreTag = tag;
+  }
+
   viewArtist(name: string) {
     this.searchQuery = "";
     this.searchResults = [];

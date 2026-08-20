@@ -13,6 +13,8 @@
   import TagEditor from "./TagEditor.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import EmptyState from "./EmptyState.svelte";
@@ -228,27 +230,6 @@
 
   let genreLabel = $derived(rawGenre || i18n.t('albumDetail.unknownGenre'));
 
-  // The materialized genre auto-playlist row backing this genre, if it's been
-  // generated yet (see PlaylistsCollectionView's identical genre/decade split).
-  let genrePlaylist = $derived.by(() => {
-    if (!rawGenre) return null;
-    return (
-      playlistsStore.playlists.find(
-        (p) => p.dynamic_enabled && !p.dynamic_spec?.startsWith("decade:") && p.dynamic_spec === rawGenre
-      ) ?? null
-    );
-  });
-
-  function openGenrePlaylist() {
-    if (!rawGenre) return;
-    collectionStore.viewAutoPlaylist({
-      kind: "genre",
-      genre: rawGenre,
-      playlistId: genrePlaylist?.id,
-      updated: genrePlaylist?.updated,
-    });
-  }
-
   let yearLabel = $derived.by(() => {
     if (albumItem?.year) return albumItem.year;
     if (songs.length > 0 && songs[0].year) return songs[0].year;
@@ -420,6 +401,7 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
     loading = true;
     invoke<Song[]>("get_songs_by_album", { album: albumName })
       .then((fetchedSongs) => {
@@ -528,13 +510,7 @@
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           {#if rawGenre}
-            <button
-              onclick={openGenrePlaylist}
-              class="hover:underline hover:text-brand-accent-text transition-colors"
-              title={i18n.t('albumDetail.goToGenrePlaylistTooltip', { genre: rawGenre })}
-            >
-              {genreLabel}
-            </button>
+            <GenreChips genre={rawGenre} variant="full" />
           {:else}
             <span>{genreLabel}</span>
           {/if}
@@ -1009,8 +985,12 @@
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.genre}
-                <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                  {song.genre || "—"}
+                <div class="truncate pr-2 min-w-0" title={song.genre}>
+                  {#if song.genre}
+                    <GenreChips genre={song.genre} />
+                  {:else}
+                    <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                  {/if}
                 </div>
               {/if}
               {#if collectionStore.visibleColumns.grouping}

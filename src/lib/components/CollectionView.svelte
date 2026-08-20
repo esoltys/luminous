@@ -17,6 +17,8 @@
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import GenreBrowseView from "./GenreBrowseView.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import AlbumCard from "./AlbumCard.svelte";
@@ -143,6 +145,7 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
   }
 
   function getArtistAlbumsFor(name: string | null): AlbumItem[] {
@@ -872,8 +875,12 @@
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.genre}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                    {song.genre || "—"}
+                  <div class="truncate pr-2 min-w-0" title={song.genre}>
+                    {#if song.genre}
+                      <GenreChips genre={song.genre} />
+                    {:else}
+                      <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                    {/if}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.grouping}

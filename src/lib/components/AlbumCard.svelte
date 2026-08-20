@@ -9,6 +9,7 @@
   import { queueAlbumAsPlaylist } from "../utils/playlist";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
+  import GenreChips from "./GenreChips.svelte";
  
   interface Props {
     album: AlbumItem;
@@ -101,8 +102,8 @@
       {/if}
       <span class="text-xs text-brand-text-secondary font-medium shrink-0">{album.year || ""}</span>
     </div>
-    <div class="flex items-center justify-between mt-0.5 text-xs text-brand-text-secondary font-medium gap-2">
-      <span class="truncate min-w-0">{album.genre || ""}</span>
+    <div class="flex items-center justify-between mt-0.5 gap-2">
+      <div class="min-w-0"><GenreChips genre={album.genre} /></div>
       <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>

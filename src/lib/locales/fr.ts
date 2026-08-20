@@ -9,6 +9,7 @@ export const fr = {
     artists: "Artistes",
     albums: "Albums",
     songs: "Chansons",
+    genres: "Genres",
     playlistsAuto: "Automatiques",
     playlistsCustom: "Personnalisées",
     create: "Créer",
@@ -639,7 +640,21 @@ export const fr = {
   },
 
   chipInput: {
-    removeItem: "Supprimer {value}"
+    removeItem: "Supprimer {value}",
+    dragToReorder: "Glisser pour réorganiser"
+  },
+
+  songTags: {
+    genresTabDescription: "Parcourir les chansons par tags que vous avez ajoutés",
+    viewGenre: "Genre",
+    viewTags: "Tags",
+    emptyTitle: "Aucun tag pour l'instant",
+    emptySubtitle: "Faites un clic droit sur une chanson et choisissez Modifier les tags pour lui donner un genre — la première valeur est sa catégorie principale, les autres sont des sous-genres.",
+    songCount: "{count} chansons",
+    playAll: "Lire les {count} chansons",
+    editSongTooltip: "Modifier la chanson",
+    editAlbumTooltip: "Modifier l'album",
+    goToGenreTooltip: "Parcourir {genre}"
   },
 
   tagEditor: {
@@ -652,6 +667,7 @@ export const fr = {
     yearField: "Année",
     genreField: "Genre",
     genrePlaceholder: "Ajouter un genre...",
+    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     cancelBtn: "Annuler",
     saveBtn: "Enregistrer",
     saveBtnShort: "Enregistrer",
@@ -695,6 +711,7 @@ export const fr = {
     albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     genreField: "Genre",
     genrePlaceholder: "Ajouter un genre...",
+    genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
     compilationField: "Compilation (marquer comme Artistes divers)",
     yearField: "Année de sortie",
     discField: "N° de disque",
@@ -834,8 +851,7 @@ export const fr = {
     editInfoTooltip: "Modifier les infos de l'album",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
-    refreshError: "Échec de l'actualisation de l'album",
-    goToGenrePlaylistTooltip: "Aller à la playlist automatique {genre}"
+    refreshError: "Échec de l'actualisation de l'album"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
@@ -855,7 +871,11 @@ export const fr = {
     disableLogoPulse: "Cliquez pour désactiver la pulsation du logo",
     toggleLogoPulsing: "Basculer la pulsation du logo Luminous",
     on: "Activé",
-    off: "Désactivé"
+    off: "Désactivé",
+    back: "Retour",
+    loading: "Chargement…",
+    expand: "Développer",
+    collapse: "Réduire"
   },
   organizer: {
     title: "Organiser les fichiers",

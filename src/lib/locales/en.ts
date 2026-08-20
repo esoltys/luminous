@@ -840,8 +840,7 @@ export const en = {
     editInfoTooltip: "Edit album info",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
-    refreshError: "Failed to refresh album metadata",
-    goToGenrePlaylistTooltip: "Go to {genre} auto-playlist"
+    refreshError: "Failed to refresh album metadata"
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
@@ -876,7 +875,8 @@ export const en = {
     songCount: "{count} songs",
     playAll: "Play all {count} songs",
     editSongTooltip: "Edit Song",
-    editAlbumTooltip: "Edit Album"
+    editAlbumTooltip: "Edit Album",
+    goToGenreTooltip: "Browse {genre}"
   },
   organizer: {
     title: "Organize Files",

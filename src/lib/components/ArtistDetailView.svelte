@@ -10,6 +10,8 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
+  import GenreChips from "./GenreChips.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import TagEditor from "./TagEditor.svelte";
   import SongRating from "./SongRating.svelte";
   import SortableHeader from "./SortableHeader.svelte";
@@ -92,6 +94,7 @@
 
   function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
+    tagsStore.load();
     refetchSongs();
   }
 
@@ -910,8 +913,12 @@
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.genre}
-                  <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.genre}>
-                    {song.genre || "—"}
+                  <div class="truncate pr-2 min-w-0" title={song.genre}>
+                    {#if song.genre}
+                      <GenreChips genre={song.genre} />
+                    {:else}
+                      <span class="text-brand-text-secondary text-xs font-medium">—</span>
+                    {/if}
                   </div>
                 {/if}
                 {#if collectionStore.visibleColumns.grouping}
