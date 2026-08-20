@@ -811,11 +811,11 @@ pub fn run() {
             commands::tageditor::clear_album_cover_art,
             // Genre/tag browsing commands (#224) — read the existing
             // songs.genre column above; editing goes through save_song_tags.
-            commands::tags::list_all_tags,
             commands::tags::get_songs_by_tag,
-            commands::tags::get_genre_graph,
+            commands::tags::get_tags_overview,
             commands::tags::get_songs_by_main_tag,
             commands::tags::get_songs_by_genre_edge,
+            commands::tags::get_songs_without_genre,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

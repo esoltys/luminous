@@ -876,7 +876,8 @@ export const en = {
     playAll: "Play all {count} songs",
     editSongTooltip: "Edit Song",
     editAlbumTooltip: "Edit Album",
-    goToGenreTooltip: "Browse {genre}"
+    goToGenreTooltip: "Browse {genre}",
+    noGenre: "No Genre"
   },
   organizer: {
     title: "Organize Files",

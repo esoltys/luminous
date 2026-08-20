@@ -49,14 +49,12 @@ impl TagManager {
         Ok(lists)
     }
 
-    /// Every distinct genre/tag value in use, with how many songs carry it
-    /// (at any position in their genre list), ordered by name.
-    pub fn list_all_tags(&self) -> Result<Vec<Tag>> {
+    fn compute_tags(lists: &[Vec<String>]) -> Vec<Tag> {
         let mut counts: HashMap<String, (String, i64)> = HashMap::new();
-        for values in self.all_song_genre_lists()? {
+        for values in lists {
             for value in values {
                 let key = value.to_lowercase();
-                let entry = counts.entry(key).or_insert((value, 0));
+                let entry = counts.entry(key).or_insert_with(|| (value.clone(), 0));
                 entry.1 += 1;
             }
         }
@@ -65,30 +63,23 @@ impl TagManager {
             .map(|(name, song_count)| Tag { name, song_count })
             .collect();
         tags.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        Ok(tags)
+        tags
     }
 
-    /// The emergent genre hierarchy: one [`GenreGroup`] per genre value that
-    /// has ever appeared *first* in a song's genre list (its main category),
-    /// each carrying every value seen as a subgenre of it (later in the same
-    /// song's list) across the library, aggregated with counts. A value can
-    /// appear as a child under more than one group if different songs
-    /// disagree about its main category — both relationships are real and
-    /// both are returned.
-    pub fn get_genre_graph(&self) -> Result<Vec<GenreGroup>> {
+    fn compute_graph(lists: &[Vec<String>]) -> Vec<GenreGroup> {
         let mut root_counts: HashMap<String, (String, i64)> = HashMap::new();
         let mut child_counts: HashMap<String, HashMap<String, (String, i64)>> = HashMap::new();
 
-        for values in self.all_song_genre_lists()? {
+        for values in lists {
             let Some(root) = values.first() else { continue };
             let root_key = root.to_lowercase();
-            let root_entry = root_counts.entry(root_key.clone()).or_insert((root.clone(), 0));
+            let root_entry = root_counts.entry(root_key.clone()).or_insert_with(|| (root.clone(), 0));
             root_entry.1 += 1;
 
             let children = child_counts.entry(root_key).or_default();
             for child in &values[1..] {
                 let child_key = child.to_lowercase();
-                let child_entry = children.entry(child_key).or_insert((child.clone(), 0));
+                let child_entry = children.entry(child_key).or_insert_with(|| (child.clone(), 0));
                 child_entry.1 += 1;
             }
         }
@@ -113,7 +104,78 @@ impl TagManager {
             })
             .collect();
         groups.sort_by(|a, b| a.main_tag.to_lowercase().cmp(&b.main_tag.to_lowercase()));
-        Ok(groups)
+        groups
+    }
+
+    /// Every distinct genre/tag value in use, with how many songs carry it
+    /// (at any position in their genre list), ordered by name.
+    pub fn list_all_tags(&self) -> Result<Vec<Tag>> {
+        Ok(Self::compute_tags(&self.all_song_genre_lists()?))
+    }
+
+    /// The emergent genre hierarchy: one [`GenreGroup`] per genre value that
+    /// has ever appeared *first* in a song's genre list (its main category),
+    /// each carrying every value seen as a subgenre of it (later in the same
+    /// song's list) across the library, aggregated with counts. A value can
+    /// appear as a child under more than one group if different songs
+    /// disagree about its main category — both relationships are real and
+    /// both are returned.
+    pub fn get_genre_graph(&self) -> Result<Vec<GenreGroup>> {
+        Ok(Self::compute_graph(&self.all_song_genre_lists()?))
+    }
+
+    /// Combines [`Self::list_all_tags`] and [`Self::get_genre_graph`] into a
+    /// single DB scan (each independently re-scans every song's genre column
+    /// otherwise) — used by `tagsStore.load()`, which needs both together
+    /// every time the Genres tab opens, so the two don't each pay for their
+    /// own full scan back to back. Also returns how many songs have no genre
+    /// at all (empty/NULL), so the Genres tab can surface them as their own
+    /// browsable group rather than silently excluding them.
+    pub fn get_tags_overview(&self) -> Result<(Vec<Tag>, Vec<GenreGroup>, i64)> {
+        let lists = self.all_song_genre_lists()?;
+        let no_genre_count = self.count_songs_without_genre()?;
+        Ok((
+            Self::compute_tags(&lists),
+            Self::compute_graph(&lists),
+            no_genre_count,
+        ))
+    }
+
+    /// How many songs have no genre value at all (empty or NULL) — excluded
+    /// from `all_song_genre_lists` entirely, so tracked separately.
+    fn count_songs_without_genre(&self) -> Result<i64> {
+        let conn = self.db.pool.get()?;
+        let count = conn.query_row(
+            "SELECT COUNT(*) FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND (genre IS NULL OR genre = '')",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    }
+
+    /// Songs with no genre value at all — the "No Genre" browsable group.
+    pub fn get_songs_without_genre(&self, limit: i64, mode: QueuePopulationMode) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE (genre IS NULL OR genre = '')
+               AND source IN (1, 2)
+               AND unavailable = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
     }
 
     /// Songs whose genre list contains `tag_name` at any position
@@ -299,6 +361,40 @@ mod tests {
         assert_eq!(tags.len(), 2);
         let metal = tags.iter().find(|t| t.name.eq_ignore_ascii_case("metal")).unwrap();
         assert_eq!(metal.song_count, 2);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_tags_overview_matches_separate_calls() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
+        insert_song(&db, "/b.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        let (tags, graph, no_genre_count) = manager.get_tags_overview().unwrap();
+        assert_eq!(tags, manager.list_all_tags().unwrap());
+        assert_eq!(graph, manager.get_genre_graph().unwrap());
+        assert_eq!(no_genre_count, 0);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_songs_without_genre() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "");
+
+        let manager = TagManager::new(db.clone());
+        let (_, _, no_genre_count) = manager.get_tags_overview().unwrap();
+        assert_eq!(no_genre_count, 1);
+
+        let songs = manager
+            .get_songs_without_genre(50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(songs.len(), 1);
+        assert_eq!(songs[0].path.as_deref(), Some("/b.mp3"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

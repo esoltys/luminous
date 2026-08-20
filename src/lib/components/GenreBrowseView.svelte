@@ -9,6 +9,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import EmptyState from "./EmptyState.svelte";
+  import Select from "./Select.svelte";
   import GenreChips from "./GenreChips.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -42,13 +43,15 @@
   type DrillDownContext =
     | { kind: "tag"; tag: string }
     | { kind: "main"; tag: string }
-    | { kind: "edge"; root: string; child: string };
+    | { kind: "edge"; root: string; child: string }
+    | { kind: "none" };
 
   let drillDownContext = $state<DrillDownContext | null>(null);
 
   function fetchForContext(ctx: DrillDownContext) {
     if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag, 500);
     if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag, 500);
+    if (ctx.kind === "none") return tagsStore.getSongsWithoutGenre(500);
     return tagsStore.getSongsByGenreEdge(ctx.root, ctx.child, 500);
   }
 
@@ -114,6 +117,11 @@
     return loadDrillDown({ kind: "edge", root: rootTag, child: childTag }, childTag);
   }
 
+  /** Songs with no genre value at all. */
+  function openNoGenre() {
+    return loadDrillDown({ kind: "none" }, i18n.t("songTags.noGenre", {}, "No Genre"));
+  }
+
   function closeDrillDown() {
     selectedTag = null;
     drillDownContext = null;
@@ -135,44 +143,85 @@
   }
 
   async function playAllInTag() {
-    if (drillDownSongs.length === 0) return;
+    if (sortedDrillDownSongs.length === 0) return;
     await playerStore.playSongs(
-      drillDownSongs.map((s) => s.id),
+      sortedDrillDownSongs.map((s) => s.id),
       0,
       undefined,
       { type: "song" },
       selectedTag ?? undefined
     );
   }
+
+  type DrillDownSortField = "title" | "artist" | "album" | "added";
+  let sortField = $state<DrillDownSortField>("artist");
+  let sortAsc = $state(true);
+
+  let sortedDrillDownSongs = $derived.by(() => {
+    const sorted = [...drillDownSongs];
+    sorted.sort((a, b) => {
+      if (sortField === "added") {
+        const diff = (a.added ?? 0) - (b.added ?? 0);
+        return sortAsc ? diff : -diff;
+      }
+      const valA = (a[sortField] || "").toString();
+      const valB = (b[sortField] || "").toString();
+      const cmp = valA.localeCompare(valB);
+      return sortAsc ? cmp : -cmp;
+    });
+    return sorted;
+  });
 </script>
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
   {#if selectedTag !== null}
-    <div class="h-9 flex items-center gap-2 mb-3">
-      <button
-        onclick={closeDrillDown}
-        class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-      >
-        <ArrowLeft class="w-3.5 h-3.5" />
-        {i18n.t("common.back", {}, "Back")}
-      </button>
-      <span class="text-brand-text-secondary/40">/</span>
-      <h2 class="text-sm font-bold text-brand-text-primary truncate">{selectedTag}</h2>
+    <div class="h-9 flex items-center justify-between gap-2 mb-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <button
+          onclick={closeDrillDown}
+          class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors shrink-0"
+        >
+          <ArrowLeft class="w-3.5 h-3.5" />
+          {i18n.t("common.back", {}, "Back")}
+        </button>
+        <span class="text-brand-text-secondary/40 shrink-0">/</span>
+        <h2 class="text-sm font-bold text-brand-text-primary truncate">{selectedTag}</h2>
+      </div>
+      <div class="relative shrink-0">
+        <Select
+          value={`${sortField}-${sortAsc}`}
+          onchange={(e) => {
+            const [field, asc] = e.currentTarget.value.split("-");
+            sortField = field as DrillDownSortField;
+            sortAsc = asc === "true";
+          }}
+          class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+        >
+          <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
+          <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
+          <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
+          <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
+          <option value="title-true">▲ {i18n.t('collection.tableHeaderTitle')}</option>
+          <option value="title-false">▼ {i18n.t('collection.tableHeaderTitle')}</option>
+          <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
+          <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
+        </Select>
+      </div>
     </div>
 
     {#if drillDownLoading}
       <div class="py-16 text-center text-sm text-brand-text-secondary">{i18n.t("common.loading", {}, "Loading…")}</div>
     {:else}
-      {#if drillDownSongs.length > 0}
+      {#if sortedDrillDownSongs.length > 0}
         <button
           onclick={playAllInTag}
           class="mb-3 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
         >
-          {i18n.t("songTags.playAll", { count: drillDownSongs.length }, `Play all ${drillDownSongs.length} songs`)}
+          {i18n.t("songTags.playAll", { count: sortedDrillDownSongs.length }, `Play all ${sortedDrillDownSongs.length} songs`)}
         </button>
       {/if}
       <div class="flex flex-col gap-2">
-        {#each drillDownSongs as song (song.id)}
+        {#each sortedDrillDownSongs as song (song.id)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
@@ -248,7 +297,7 @@
       </div>
     </div>
 
-    {#if tagsStore.allTags.length === 0}
+    {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
       <div class="py-16">
         <EmptyState
           icon={TagIcon}
@@ -307,6 +356,17 @@
             {/if}
           </div>
         {/each}
+        {#if tagsStore.noGenreCount > 0}
+          <button
+            onclick={openNoGenre}
+            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+          >
+            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+            <span class="text-xs tabular-nums">
+              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+            </span>
+          </button>
+        {/if}
       </div>
     {:else}
       <div class="flex flex-col gap-1.5">
@@ -321,6 +381,17 @@
             </span>
           </button>
         {/each}
+        {#if tagsStore.noGenreCount > 0}
+          <button
+            onclick={openNoGenre}
+            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+          >
+            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+            <span class="text-xs tabular-nums">
+              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+            </span>
+          </button>
+        {/if}
       </div>
     {/if}
   {/if}

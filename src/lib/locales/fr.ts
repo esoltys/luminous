@@ -654,7 +654,8 @@ export const fr = {
     playAll: "Lire les {count} chansons",
     editSongTooltip: "Modifier la chanson",
     editAlbumTooltip: "Modifier l'album",
-    goToGenreTooltip: "Parcourir {genre}"
+    goToGenreTooltip: "Parcourir {genre}",
+    noGenre: "Sans genre"
   },
 
   tagEditor: {
