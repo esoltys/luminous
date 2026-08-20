@@ -606,6 +606,12 @@
     pointerDragStartIndex = index;
     pointerDragStartX = event.clientX;
     pointerDragStartY = event.clientY;
+    // With the window's dragDropEnabled option on, WebView2 can hijack an in-progress mouse
+    // gesture into a native OS drag once it crosses the platform's drag threshold, silently
+    // stopping pointermove/pointerup from reaching the DOM. Explicit pointer capture pins
+    // subsequent events to this element (and this JS event loop) instead, preventing that.
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture?.(event.pointerId);
     window.addEventListener("pointermove", handlePointerDragMove);
     window.addEventListener("pointerup", handlePointerDragUp);
   }
