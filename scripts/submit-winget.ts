@@ -12,7 +12,7 @@
 // only the local manifest folder is (re)generated — nothing is submitted
 // upstream. --check regenerates into a temp dir and diffs against the
 // latest committed version folder, exiting non-zero on drift.
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -79,8 +79,9 @@ async function fetchReleaseInfo(version: string): Promise<ReleaseInfo> {
   const tag = `v${version}`;
   console.log(`Fetching release ${tag} from GitHub...`);
 
-  const assetsJson = execSync(
-    `gh release view ${tag} --json assets -q ".assets[].name"`,
+  const assetsJson = execFileSync(
+    "gh",
+    ["release", "view", tag, "--json", "assets", "-q", ".assets[].name"],
     { cwd: rootDir, encoding: "utf-8" }
   );
   const assetNames = assetsJson.split("\n").map(s => s.trim()).filter(Boolean);
@@ -96,7 +97,7 @@ async function fetchReleaseInfo(version: string): Promise<ReleaseInfo> {
   fs.mkdirSync(scratchDir, { recursive: true });
 
   console.log(`Downloading ${exeAsset}...`);
-  execSync(`gh release download ${tag} -p "${exeAsset}" -D "${scratchDir}"`, {
+  execFileSync("gh", ["release", "download", tag, "-p", exeAsset, "-D", scratchDir], {
     cwd: rootDir,
     stdio: "inherit"
   });
