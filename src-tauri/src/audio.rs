@@ -662,11 +662,12 @@ fn build_output(
         .map_err(|e| format!("CPAL stream build failed: {e}"))?;
 
     // Start paused — nothing decoded yet. The caller starts it once a track
-    // is actually ready to play.
+    // is actually ready to play. Some ALSA backends (e.g. the "pulse" plugin,
+    // used when routing through PulseAudio/WSLg) don't support pausing a
+    // stream that hasn't started, so a failure here is expected and harmless
+    // — log it instead of surfacing a spurious error to the frontend.
     if let Err(e) = stream.pause() {
-        let _ = event_tx.send(AudioEvent::Error {
-            message: format!("CPAL stream pause failed: {e}"),
-        });
+        log::warn!("CPAL stream pause at startup failed (harmless if unsupported by this backend): {e}");
     }
 
     Ok(AudioOutput {
