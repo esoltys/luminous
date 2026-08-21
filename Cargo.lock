@@ -3064,6 +3064,7 @@ dependencies = [
  "cpal",
  "cucumber",
  "device_query",
+ "libc",
  "lofty",
  "log",
  "notify",
