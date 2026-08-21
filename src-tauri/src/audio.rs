@@ -506,7 +506,6 @@ fn get_default_device_name() -> Option<String> {
 
 #[allow(clippy::too_many_arguments)]
 fn build_output(
-    event_tx: &mpsc::Sender<AudioEvent>,
     position: &Arc<AtomicU64>,
     volume: &Arc<Mutex<f32>>,
     visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
@@ -717,7 +716,6 @@ fn decode_thread(
                     Ok(AudioCommand::Cue(r)) => {
                         if output.is_none() {
                             match build_output(
-                                &event_tx,
                                 &position,
                                 &volume,
                                 &visualizer_buf,
@@ -838,7 +836,6 @@ fn decode_thread(
         // first track this thread ever plays; reused for every track after).
         if output.is_none() {
             match build_output(
-                &event_tx,
                 &position,
                 &volume,
                 &visualizer_buf,
@@ -935,7 +932,6 @@ fn decode_thread(
                     output = None;
 
                     match build_output(
-                        &event_tx,
                         &position,
                         &volume,
                         &visualizer_buf,
