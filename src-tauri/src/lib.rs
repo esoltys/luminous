@@ -365,10 +365,116 @@ pub fn run() {
                 app.path().app_data_dir().expect("no app data dir"),
             ));
 
-            // Spawn position tick loop (Tokio)
+            // Spawn real-time visualizer spectrum emission loop (Tokio)
+            let app_handle_visualizer = app.handle().clone();
+            let audio_visualizer = Arc::clone(&audio);
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+                loop {
+                    interval.tick().await;
+                    let (enabled, spectrum) = {
+                        let engine = audio_visualizer.lock().await;
+                        let enabled = engine
+                            .spectrum_enabled
+                            .load(std::sync::atomic::Ordering::Relaxed);
+                        let state = engine.current_state();
+                        let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                            let sample_rate = engine
+                                .output_sample_rate
+                                .load(std::sync::atomic::Ordering::Relaxed);
+                            Some(crate::analyzer::calculate_spectrum(
+                                &engine.visualizer_buf,
+                                1024,
+                                sample_rate,
+                            ))
+                        } else {
+                            None
+                        };
+                        (enabled, spectrum)
+                    };
+
+                    if enabled {
+                        if let Some(spec) = spectrum {
+                            let _ = app_handle_visualizer.emit("spectrum-data", spec);
+                        }
+                    }
+                }
+            });
+
+            let args: Vec<String> = std::env::args().collect();
+            let startup_path = if args.len() > 1 {
+                let p = &args[1];
+                let path = std::path::Path::new(p);
+                if path.exists() && path.is_file() {
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
+                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
+                    {
+                        Some(p.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let watcher = Arc::new(parking_lot::Mutex::new(None));
+
+            // souvlaki needs an HWND on Windows to register SMTC for our window.
+            #[cfg(target_os = "windows")]
+            let media_hwnd: Option<*mut std::ffi::c_void> = app
+                .get_webview_window("main")
+                .and_then(|w| w.hwnd().ok())
+                .map(|h| h.0);
+            #[cfg(not(target_os = "windows"))]
+            let media_hwnd: Option<*mut std::ffi::c_void> = None;
+
+            let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
+            if media_session.is_none() {
+                eprintln!(
+                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2/Now Playing) unavailable; continuing without it."
+                );
+            }
+
+            let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
+
+            let state = AppState {
+                db,
+                audio,
+                player,
+                volume_before_mute,
+                playlists,
+                cover_manager,
+                watcher,
+                watcher_paused,
+                startup_file: Mutex::new(startup_path),
+                media_session,
+                minimize_to_tray,
+            };
+
+            crate::collection::start_watcher(app.handle().clone(), &state);
+
+            // Start background EBU R128 loudness analyzer (#77)
+            crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
+
+            app.manage(state);
+            let managed_state = app.state::<AppState>();
+
+            // Spawn position tick loop (Tokio). Spawned after app.manage()
+            // above since it calls media_session::mirror_state(), which
+            // reaches into app.state::<AppState>() — doing this before
+            // manage() panics ("state() called before manage()") if a tick
+            // fires that early.
             let app_handle_ticks = app.handle().clone();
-            let audio_ticks = Arc::clone(&audio);
-            let player_ticks = Arc::clone(&player);
+            let audio_ticks = Arc::clone(&managed_state.audio);
+            let player_ticks = Arc::clone(&managed_state.player);
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
                 let mut tick_counter: u32 = 0;
@@ -410,46 +516,13 @@ pub fn run() {
                 }
             });
 
-            // Spawn real-time visualizer spectrum emission loop (Tokio)
-            let app_handle_visualizer = app.handle().clone();
-            let audio_visualizer = Arc::clone(&audio);
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
-                loop {
-                    interval.tick().await;
-                    let (enabled, spectrum) = {
-                        let engine = audio_visualizer.lock().await;
-                        let enabled = engine
-                            .spectrum_enabled
-                            .load(std::sync::atomic::Ordering::Relaxed);
-                        let state = engine.current_state();
-                        let spectrum = if enabled && state == crate::models::PlayState::Playing {
-                            let sample_rate = engine
-                                .output_sample_rate
-                                .load(std::sync::atomic::Ordering::Relaxed);
-                            Some(crate::analyzer::calculate_spectrum(
-                                &engine.visualizer_buf,
-                                1024,
-                                sample_rate,
-                            ))
-                        } else {
-                            None
-                        };
-                        (enabled, spectrum)
-                    };
-
-                    if enabled {
-                        if let Some(spec) = spectrum {
-                            let _ = app_handle_visualizer.emit("spectrum-data", spec);
-                        }
-                    }
-                }
-            });
-
-            // Spawn event receiver loop (OS thread)
+            // Spawn event receiver loop (OS thread). Spawned after
+            // app.manage() for the same reason as the tick loop above — its
+            // handler also reaches app.state::<AppState>() via
+            // media_session::mirror_state().
             let app_handle_events = app.handle().clone();
-            let audio_events = Arc::clone(&audio);
-            let player_events = Arc::clone(&player);
+            let audio_events = Arc::clone(&managed_state.audio);
+            let player_events = Arc::clone(&managed_state.player);
             std::thread::Builder::new()
                 .name("luminous-events".to_string())
                 .spawn(move || {
@@ -562,71 +635,6 @@ pub fn run() {
                     }
                 })
                 .expect("failed to spawn event thread");
-
-            let args: Vec<String> = std::env::args().collect();
-            let startup_path = if args.len() > 1 {
-                let p = &args[1];
-                let path = std::path::Path::new(p);
-                if path.exists() && path.is_file() {
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_ascii_lowercase();
-                    if crate::playlist_parsers::PlaylistFormat::from_path(path).is_some()
-                        || crate::collection::AUDIO_EXTENSIONS.contains(&ext.as_str())
-                    {
-                        Some(p.clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let watcher = Arc::new(parking_lot::Mutex::new(None));
-
-            // souvlaki needs an HWND on Windows to register SMTC for our window.
-            #[cfg(target_os = "windows")]
-            let media_hwnd: Option<*mut std::ffi::c_void> = app
-                .get_webview_window("main")
-                .and_then(|w| w.hwnd().ok())
-                .map(|h| h.0);
-            #[cfg(not(target_os = "windows"))]
-            let media_hwnd: Option<*mut std::ffi::c_void> = None;
-
-            let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
-            if media_session.is_none() {
-                eprintln!(
-                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2/Now Playing) unavailable; continuing without it."
-                );
-            }
-
-            let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
-
-            let state = AppState {
-                db,
-                audio,
-                player,
-                volume_before_mute,
-                playlists,
-                cover_manager,
-                watcher,
-                watcher_paused,
-                startup_file: Mutex::new(startup_path),
-                media_session,
-                minimize_to_tray,
-            };
-
-            crate::collection::start_watcher(app.handle().clone(), &state);
-
-            // Start background EBU R128 loudness analyzer (#77)
-            crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
-
-            app.manage(state);
 
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");

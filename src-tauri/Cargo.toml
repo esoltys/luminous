@@ -120,6 +120,9 @@ rayon = "1"
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 cucumber = { version = "0.23", features = ["macros"] }
 tempfile = "3"
@@ -141,9 +144,9 @@ name = "lyrics_bdd"
 harness = false
 
 [[test]]
-name = "cover_art_bdd"
+name = "tag_editor_bdd"
 harness = false
 
 [[test]]
-name = "tag_editor_bdd"
+name = "cover_art_bdd"
 harness = false
