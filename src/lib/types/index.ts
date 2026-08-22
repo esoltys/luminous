@@ -296,6 +296,24 @@ export interface GenreGroup {
   children: TagCount[];
 }
 
+/** One sub-genre chip assigned under a {@link TagGroup} (#545) — `is_conflict`
+ * is true when this same name is also the name of some (other) top-level
+ * group elsewhere in the library. */
+export interface TagGroupChild {
+  name: string;
+  song_count: number;
+  is_conflict: boolean;
+}
+
+/** One primary-genre "card" in the persisted Genres curation hierarchy
+ * (#545) — distinct from the emergent, per-song-order {@link GenreGroup}. */
+export interface TagGroup {
+  name: string;
+  color_index: number;
+  song_count: number;
+  children: TagGroupChild[];
+}
+
 /**
  * Converts a custom luminous-art protocol URI (e.g. luminous-art://...)
  * to a platform-appropriate URL (e.g. http://luminous-art.localhost/ on Windows).

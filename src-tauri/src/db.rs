@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 17;
+pub const CURRENT_SCHEMA_VERSION: i32 = 18;
 
 #[derive(Debug)]
 pub struct Database {
@@ -245,6 +245,18 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![17],
+            )?;
+        }
+
+        if version < 18 {
+            log::info!(
+                "Running migration 18: tag_groups/tag_assignments for persisted Genres curation hierarchy (#545)"
+            );
+            conn.execute_batch(MIGRATION_18)?;
+            seed_tag_hierarchy(&conn)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![18],
             )?;
         }
 
@@ -605,6 +617,123 @@ CREATE TABLE IF NOT EXISTS artist_profiles (
     bio TEXT
 );
 ";
+
+// ---------------------------------------------------------------------------
+// Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
+// hierarchy (#545) layered on top of the existing `songs.genre` string
+// column. `songs.genre` remains the source of truth for which songs carry
+// which tag; these tables only remember, per tag name, which primary genre
+// "card" it's been curated under, its display color, and manual ordering —
+// independent of any single song's own genre-list order (see tags.rs's
+// `get_genre_graph` doc comment on why that per-song order can't serve as a
+// stable hierarchy on its own).
+// ---------------------------------------------------------------------------
+const MIGRATION_18: &str = "
+CREATE TABLE IF NOT EXISTS tag_groups (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    color_index INTEGER NOT NULL DEFAULT 0,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS tag_assignments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag_name    TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    group_id    INTEGER NOT NULL REFERENCES tag_groups(id) ON DELETE CASCADE,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+);
+";
+
+/// One-time seed for migration 18, run once right after the tables above are
+/// created: derives an initial hierarchy from the same root/child convention
+/// `TagManager::compute_graph` already uses (each song's first genre value is
+/// its main category, the rest are subgenres), so upgrading users land on a
+/// sensible starting point instead of an empty Genres page. Every root
+/// becomes a `tag_groups` row (ordered by song count, colored round-robin
+/// from the 10-hue palette the Genres UI uses); every child is assigned to
+/// whichever root it appeared under most often. Purely a starting point —
+/// from here on, `tag_groups`/`tag_assignments` are the persisted source of
+/// truth and are only reconciled (not recomputed) against library changes,
+/// see `tags::reconcile_hierarchy`. `INSERT OR IGNORE` throughout makes this
+/// safe to re-run if migration 18 is ever interrupted before its version
+/// marker is recorded.
+fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
+    use std::collections::HashMap;
+
+    let mut stmt = conn.prepare(
+        "SELECT genre FROM songs
+         WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+    )?;
+    let lists: Vec<Vec<String>> = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .filter_map(|r| r.ok())
+        .map(|raw| {
+            raw.split("; ")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .filter(|values| !values.is_empty())
+        .collect();
+
+    // root_key (lowercase) -> (display name, song count)
+    let mut root_counts: HashMap<String, (String, i64)> = HashMap::new();
+    // child_key (lowercase) -> (display name, root_key -> count)
+    let mut child_roots: HashMap<String, (String, HashMap<String, i64>)> = HashMap::new();
+
+    for values in &lists {
+        let root = &values[0];
+        let root_key = root.to_lowercase();
+        root_counts
+            .entry(root_key.clone())
+            .or_insert_with(|| (root.clone(), 0))
+            .1 += 1;
+        for child in &values[1..] {
+            let child_key = child.to_lowercase();
+            let entry = child_roots
+                .entry(child_key)
+                .or_insert_with(|| (child.clone(), HashMap::new()));
+            *entry.1.entry(root_key.clone()).or_insert(0) += 1;
+        }
+    }
+
+    let mut roots: Vec<(String, String, i64)> = root_counts
+        .into_iter()
+        .map(|(key, (name, count))| (key, name, count))
+        .collect();
+    roots.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase())));
+
+    let mut group_ids: HashMap<String, i64> = HashMap::new();
+    for (i, (root_key, name, _count)) in roots.iter().enumerate() {
+        conn.execute(
+            "INSERT OR IGNORE INTO tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
+            params![name, (i % 10) as i32, i as i32],
+        )?;
+        let id: i64 = conn.query_row(
+            "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![name],
+            |row| row.get(0),
+        )?;
+        group_ids.insert(root_key.clone(), id);
+    }
+
+    let mut sort_order = 0i32;
+    for (name, per_root) in child_roots.into_values() {
+        let best_root_key = per_root
+            .into_iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(root_key, _)| root_key);
+        let Some(group_id) = best_root_key.and_then(|k| group_ids.get(&k)) else {
+            continue;
+        };
+        conn.execute(
+            "INSERT OR IGNORE INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)",
+            params![name, group_id, sort_order],
+        )?;
+        sort_order += 1;
+    }
+
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

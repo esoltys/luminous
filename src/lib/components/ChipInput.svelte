@@ -17,6 +17,11 @@
     /** Fires on every draft keystroke, before a chip is committed — e.g. to
         clear a `highlighted` flag as soon as the user starts editing. */
     oninput?: () => void;
+    /** Existing values to autocomplete the draft against (e.g. every known
+        genre/tag name) — shown as a dropdown of case-insensitive prefix
+        matches, excluding values already added as chips. Omit for plain
+        free-text input with no suggestions. */
+    suggestions?: string[];
   }
 
   let {
@@ -27,12 +32,28 @@
     highlighted = false,
     class: className = "",
     oninput,
+    suggestions,
   }: Props = $props();
 
   let chips = $derived(parseMultiValue(value));
   let draft = $state("");
   let draggedIndex = $state<number | null>(null);
   let dragOverIndex = $state<number | null>(null);
+  let showSuggestions = $state(false);
+
+  let matchingSuggestions = $derived.by(() => {
+    if (!suggestions || draft.trim() === "") return [];
+    const query = draft.trim().toLowerCase();
+    return suggestions
+      .filter((s) => s.toLowerCase().includes(query) && !chips.some((c) => c.toLowerCase() === s.toLowerCase()))
+      .slice(0, 8);
+  });
+
+  function pickSuggestion(name: string) {
+    draft = name;
+    commitDraft();
+    showSuggestions = false;
+  }
 
   function reorderChip(fromIndex: number, toIndex: number) {
     if (disabled || fromIndex === toIndex) return;
@@ -118,6 +139,7 @@
   onpointerup={handlePointerUp}
 />
 
+<div class="relative">
 <div
   class="flex flex-wrap items-center gap-1.5 border rounded-lg bg-brand-main px-2 py-1.5 min-h-9 focus-within:border-brand-accent transition-colors {highlighted ? 'border-brand-accent ring-1 ring-brand-accent/40' : 'border-brand-border'} {disabled ? 'opacity-50' : ''} {className}"
 >
@@ -148,8 +170,23 @@
     {disabled}
     placeholder={chips.length === 0 ? (placeholder ?? "") : ""}
     onkeydown={handleKeydown}
-    onblur={commitDraft}
-    oninput={() => oninput?.()}
+    onfocus={() => { showSuggestions = true; }}
+    onblur={() => { commitDraft(); showSuggestions = false; }}
+    oninput={() => { showSuggestions = true; oninput?.(); }}
     class="flex-1 min-w-[80px] bg-transparent outline-none text-xs text-brand-text-primary placeholder:text-brand-text-secondary/50 py-0.5"
   />
+</div>
+{#if showSuggestions && matchingSuggestions.length > 0}
+  <div class="absolute z-20 top-full mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-lg bg-brand-sidebar border border-brand-border shadow-2xl">
+    {#each matchingSuggestions as name (name)}
+      <button
+        type="button"
+        onmousedown={(e) => { e.preventDefault(); pickSuggestion(name); }}
+        class="w-full text-left px-3 py-1.5 text-xs text-brand-text-primary hover:bg-brand-accent/15 transition-colors"
+      >
+        {name}
+      </button>
+    {/each}
+  </div>
+{/if}
 </div>

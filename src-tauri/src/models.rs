@@ -812,6 +812,29 @@ pub struct GenreGroup {
     pub children: Vec<TagCount>,
 }
 
+/// One sub-genre chip assigned under a [`TagGroup`] (#545) — persisted in
+/// `tag_assignments`, independent of any single song's own genre-list order.
+/// `is_conflict` is true when this same name is *also* the name of some
+/// `tag_groups` row (i.e. it's used as a top-level genre elsewhere in the
+/// library), which the Genres page flags with a warning badge.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagGroupChild {
+    pub name: String,
+    pub song_count: i64,
+    pub is_conflict: bool,
+}
+
+/// One primary-genre "card" in the persisted Genres curation hierarchy
+/// (#545) — backed by `tag_groups`, distinct from the emergent, per-song-order
+/// [`GenreGroup`] the Genre browse view derives on the fly.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct TagGroup {
+    pub name: String,
+    pub color_index: i32,
+    pub song_count: i64,
+    pub children: Vec<TagGroupChild>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

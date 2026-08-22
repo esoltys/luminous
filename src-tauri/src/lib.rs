@@ -740,6 +740,17 @@ pub fn run() {
                 }
             }
 
+            // Keep the persisted Genres curation hierarchy (#545) in step
+            // with newly-seen or vanished tag names whenever the library
+            // changes (scans, tag edits, bulk merge/delete).
+            {
+                use tauri::Listener;
+                let handle = app.handle().clone();
+                app.listen("library-changed", move |_| {
+                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(handle.clone()));
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -852,6 +863,15 @@ pub fn run() {
             commands::tags::get_songs_by_main_tag,
             commands::tags::get_songs_by_genre_edge,
             commands::tags::get_songs_without_genre,
+            // Persisted Genres curation hierarchy (#545)
+            commands::tags::get_tag_hierarchy,
+            commands::tags::get_merge_suggestions,
+            commands::tags::set_tag_group_color,
+            commands::tags::reparent_tag,
+            commands::tags::promote_tag,
+            commands::tags::reorder_tag_in_group,
+            commands::tags::merge_tags,
+            commands::tags::delete_tags,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

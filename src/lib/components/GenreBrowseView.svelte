@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft, Music, DiscAlbum } from "lucide-svelte";
+  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare } from "lucide-svelte";
+  import { genreColorHsl } from "../utils/genrePalette";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
@@ -11,6 +13,9 @@
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import GenreChips from "./GenreChips.svelte";
+  import GenreCards from "./GenreCards.svelte";
+  import MergeSurvivorDialog from "./MergeSurvivorDialog.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
@@ -18,7 +23,72 @@
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import type { Song } from "../types";
 
-  let expandedRoots = $state<Set<string>>(new Set());
+  let selectMode = $state(false);
+  let selected = $state<Set<string>>(new Set());
+  let mergeDialogNames = $state<string[] | null>(null);
+  let mergeDialogSuggestionPair = $state<[string, string] | null>(null);
+  let deleteConfirmNames = $state<string[] | null>(null);
+
+  function toggleSelectMode() {
+    selectMode = !selectMode;
+    selected = new Set();
+  }
+
+  function toggleSelect(name: string) {
+    const next = new Set(selected);
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
+    }
+    selected = next;
+  }
+
+  function openMergeSelected() {
+    if (selected.size < 2) return;
+    mergeDialogSuggestionPair = null;
+    mergeDialogNames = Array.from(selected);
+  }
+
+  function openDeleteSelected() {
+    if (selected.size === 0) return;
+    deleteConfirmNames = Array.from(selected);
+  }
+
+  function acceptSuggestion(a: string, b: string) {
+    mergeDialogSuggestionPair = [a, b];
+    mergeDialogNames = [a, b];
+  }
+
+  async function confirmMerge(survivor: string) {
+    const names = mergeDialogNames ?? [];
+    const suggestionPair = mergeDialogSuggestionPair;
+    mergeDialogNames = null;
+    mergeDialogSuggestionPair = null;
+    const others = names.filter((n) => n !== survivor);
+    let total = 0;
+    for (const other of others) {
+      total += await tagsStore.mergeTags(other, survivor);
+    }
+    if (suggestionPair) tagsStore.dismissSuggestion(suggestionPair[0], suggestionPair[1]);
+    selected = new Set();
+    toastStore.show(
+      i18n.t("songTags.mergeToast", { count: total, name: survivor }, `Merged into "${survivor}" (${total} songs updated)`),
+      "success"
+    );
+  }
+
+  async function confirmDelete() {
+    const names = deleteConfirmNames ?? [];
+    deleteConfirmNames = null;
+    const total = await tagsStore.deleteTags(names);
+    selected = new Set();
+    toastStore.show(
+      i18n.t("songTags.deleteToast", { count: total }, `Deleted (${total} songs updated)`),
+      "success"
+    );
+  }
+
   let selectedTag = $state<string | null>(null);
   let drillDownSongs = $state<Song[]>([]);
   let drillDownLoading = $state(false);
@@ -72,19 +142,16 @@
   // visit to this tab, compounding on itself.
   onMount(() => {
     let unlisten: (() => void) | undefined;
+    let unlistenHierarchy: (() => void) | undefined;
     listen("library-changed", refreshDrillDown).then((fn) => { unlisten = fn; });
-    return () => unlisten?.();
+    tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
+    tagsStore.loadHierarchy();
+    tagsStore.loadMergeSuggestions();
+    return () => {
+      unlisten?.();
+      unlistenHierarchy?.();
+    };
   });
-
-  function toggleExpanded(mainTag: string) {
-    const next = new Set(expandedRoots);
-    if (next.has(mainTag)) {
-      next.delete(mainTag);
-    } else {
-      next.add(mainTag);
-    }
-    expandedRoots = next;
-  }
 
   async function loadDrillDown(ctx: DrillDownContext, displayTag: string) {
     drillDownContext = ctx;
@@ -279,23 +346,82 @@
       <div class="text-xs text-brand-text-secondary font-medium">
         {i18n.t("songTags.genresTabDescription", {}, "Browse songs by tags you've added")}
       </div>
-      <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+      <div class="flex items-center gap-2">
         <button
-          onclick={() => setViewMode("genre")}
-          class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          aria-pressed={prefs.genreViewMode === "genre"}
+          onclick={toggleSelectMode}
+          class="flex items-center gap-1.5 px-3 h-7 rounded-full text-xs font-semibold border transition-colors {selectMode ? 'bg-brand-accent text-white border-brand-accent' : 'border-brand-border text-brand-text-secondary hover:text-brand-text-primary'}"
         >
-          {i18n.t("songTags.viewGenre", {}, "Genre")}
+          <CheckSquare class="w-3.5 h-3.5" />
+          {i18n.t("songTags.selectTags", {}, "Select Tags")}
         </button>
-        <button
-          onclick={() => setViewMode("tags")}
-          class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          aria-pressed={prefs.genreViewMode === "tags"}
-        >
-          {i18n.t("songTags.viewTags", {}, "Tags")}
-        </button>
+        <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <button
+            onclick={() => setViewMode("genre")}
+            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            aria-pressed={prefs.genreViewMode === "genre"}
+          >
+            {i18n.t("songTags.viewGenre", {}, "Genre")}
+          </button>
+          <button
+            onclick={() => setViewMode("tags")}
+            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            aria-pressed={prefs.genreViewMode === "tags"}
+          >
+            {i18n.t("songTags.viewTags", {}, "Tags")}
+          </button>
+        </div>
       </div>
     </div>
+
+    {#if selectMode}
+      <div class="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-brand-sidebar border border-brand-border/60">
+        <span class="text-xs font-medium text-brand-text-secondary">
+          {i18n.t("songTags.selectedCount", { count: selected.size }, `${selected.size} selected`)}
+        </span>
+        <div class="flex items-center gap-2">
+          <button
+            onclick={openMergeSelected}
+            disabled={selected.size < 2}
+            class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {i18n.t("songTags.mergeSelected", {}, "Merge Selected")}
+          </button>
+          <button
+            onclick={openDeleteSelected}
+            disabled={selected.size === 0}
+            class="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {i18n.t("songTags.deleteSelected", {}, "Delete Selected")}
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    {#each tagsStore.mergeSuggestions as [a, b] (`${a}|${b}`)}
+      <div class="flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-lg bg-brand-accent/10 border border-brand-accent/25">
+        <div class="flex items-center gap-2 min-w-0 text-xs text-brand-text-primary">
+          <GitMerge class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
+          <span class="truncate">
+            {i18n.t("songTags.mergeSuggestion", { a, b }, `"${a}" and "${b}" look similar`)}
+          </span>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <button
+            onclick={() => acceptSuggestion(a, b)}
+            class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
+          >
+            {i18n.t("songTags.mergeConfirm", {}, "Merge")}
+          </button>
+          <button
+            onclick={() => tagsStore.dismissSuggestion(a, b)}
+            class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+            aria-label={i18n.t("songTags.dismissSuggestion", {}, "Dismiss")}
+          >
+            <XIcon class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    {/each}
 
     {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
       <div class="py-16">
@@ -310,89 +436,51 @@
         />
       </div>
     {:else if prefs.genreViewMode === "genre"}
-      <div class="flex flex-col gap-1.5">
-        {#each tagsStore.genreGraph as group (group.main_tag)}
-          <div class="rounded-lg bg-brand-sidebar border border-brand-border/60 overflow-hidden">
-            <div class="flex items-center">
-              {#if group.children.length > 0}
-                <button
-                  onclick={() => toggleExpanded(group.main_tag)}
-                  class="p-2.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                  aria-label={expandedRoots.has(group.main_tag) ? i18n.t("common.collapse", {}, "Collapse") : i18n.t("common.expand", {}, "Expand")}
-                >
-                  {#if expandedRoots.has(group.main_tag)}
-                    <ChevronDown class="w-4 h-4" />
-                  {:else}
-                    <ChevronRight class="w-4 h-4" />
-                  {/if}
-                </button>
-              {:else}
-                <span class="w-9"></span>
-              {/if}
-              <button
-                onclick={() => openMainTag(group.main_tag)}
-                class="flex-1 flex items-center justify-between py-2.5 pr-3 text-left"
-              >
-                <span class="text-sm font-semibold text-brand-text-primary">{group.main_tag}</span>
-                <span class="text-xs text-brand-text-secondary tabular-nums">
-                  {i18n.t("songTags.songCount", { count: group.song_count }, `${group.song_count} songs`)}
-                </span>
-              </button>
-            </div>
-            {#if expandedRoots.has(group.main_tag) && group.children.length > 0}
-              <div class="pl-9 pb-1.5 flex flex-col">
-                {#each group.children as child (child.name)}
-                  <button
-                    onclick={() => openGenreEdge(group.main_tag, child.name)}
-                    class="flex items-center justify-between py-1.5 pr-3 text-left text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                  >
-                    <span class="text-xs font-medium">{child.name}</span>
-                    <span class="text-xs tabular-nums">
-                      {i18n.t("songTags.songCount", { count: child.song_count }, `${child.song_count} songs`)}
-                    </span>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/each}
-        {#if tagsStore.noGenreCount > 0}
-          <button
-            onclick={openNoGenre}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
-          >
-            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
-            <span class="text-xs tabular-nums">
-              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
-            </span>
-          </button>
-        {/if}
-      </div>
+      <GenreCards {selectMode} {selected} onToggleSelect={toggleSelect} onOpenMainTag={openMainTag} onOpenGenreEdge={openGenreEdge} />
+      {#if tagsStore.noGenreCount > 0}
+        <button
+          onclick={openNoGenre}
+          class="mt-1.5 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+        >
+          <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+          <span class="text-xs tabular-nums">
+            {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+          </span>
+        </button>
+      {/if}
     {:else}
-      <div class="flex flex-col gap-1.5">
+      <div class="flex flex-wrap gap-2">
         {#each tagsStore.allTags as tag (tag.name)}
-          <button
-            onclick={() => openTag(tag.name)}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left"
+          {@const group = tagsStore.hierarchy.find((g) => g.name === tag.name || g.children.some((c) => c.name === tag.name))}
+          {@const colorIndex = group?.color_index}
+          <span
+            class="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-full border transition-colors {selected.has(tag.name) ? 'bg-brand-accent/25 border-brand-accent/60' : 'border-brand-border/60'}"
+            style={colorIndex !== undefined ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 18%, transparent); border-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 45%, transparent);` : ""}
           >
-            <span class="text-sm font-semibold text-brand-text-primary">{tag.name}</span>
-            <span class="text-xs text-brand-text-secondary tabular-nums">
-              {i18n.t("songTags.songCount", { count: tag.song_count }, `${tag.song_count} songs`)}
-            </span>
-          </button>
+            {#if selectMode}
+              <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="w-3 h-3" />
+            {/if}
+            <button
+              onclick={() => !selectMode && openTag(tag.name)}
+              class="text-sm font-semibold text-brand-text-primary py-1 pr-2"
+              style={`font-size: ${Math.min(1 + tag.song_count / 25, 1.4)}rem`}
+            >
+              {tag.name}
+            </button>
+          </span>
         {/each}
-        {#if tagsStore.noGenreCount > 0}
-          <button
-            onclick={openNoGenre}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
-          >
-            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
-            <span class="text-xs tabular-nums">
-              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
-            </span>
-          </button>
-        {/if}
       </div>
+      {#if tagsStore.noGenreCount > 0}
+        <button
+          onclick={openNoGenre}
+          class="mt-3 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+        >
+          <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+          <span class="text-xs tabular-nums">
+            {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+          </span>
+        </button>
+      {/if}
     {/if}
   {/if}
 </div>
@@ -431,5 +519,28 @@
     hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
     onClose={() => { editingAlbumSongs = null; }}
     onSave={handleEditorSaved}
+  />
+{/if}
+
+{#if mergeDialogNames}
+  <MergeSurvivorDialog
+    names={mergeDialogNames}
+    onConfirm={confirmMerge}
+    onCancel={() => { mergeDialogNames = null; mergeDialogSuggestionPair = null; }}
+  />
+{/if}
+
+{#if deleteConfirmNames}
+  <ConfirmDialog
+    title={i18n.t("songTags.deleteSelected", {}, "Delete Selected")}
+    message={i18n.t(
+      "songTags.deleteConfirmMessage",
+      { count: deleteConfirmNames.length },
+      `Remove ${deleteConfirmNames.length} tag(s) from every song that carries them? This can't be undone.`
+    )}
+    confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
+    cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
+    onConfirm={confirmDelete}
+    onCancel={() => { deleteConfirmNames = null; }}
   />
 {/if}

@@ -4,6 +4,7 @@
   import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock, ImageOff } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import SongRating from "./SongRating.svelte";
@@ -229,6 +230,11 @@
   }
 
   onMount(loadMetadata);
+  onMount(() => {
+    // Best-effort preload for the genre field's autocomplete — a failure
+    // here shouldn't block or break the editor itself.
+    if (!tagsStore.loaded) tagsStore.load().catch(() => {});
+  });
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Enter") {
@@ -420,6 +426,7 @@
                 bind:value={genre}
                 disabled={isSaving}
                 placeholder={i18n.t('tagEditor.genrePlaceholder')}
+                suggestions={tagsStore.allTags.map((t) => t.name)}
                 class="w-full"
               />
             </FormField>
