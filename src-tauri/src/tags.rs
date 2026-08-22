@@ -33,7 +33,19 @@ pub struct TagManager {
 }
 
 impl TagManager {
+    /// Self-heals `tag_groups`/`tag_assignments` on every construction rather
+    /// than trusting migration 18's `schema_version` bookkeeping alone to
+    /// have actually created them — cheap (idempotent `CREATE TABLE IF NOT
+    /// EXISTS`) and independent of whatever state a database's version
+    /// counter is in, so a database that somehow skipped migration 18 (or
+    /// had it only partially apply) still gets working tables instead of a
+    /// permanent "no such table" error on every hierarchy read/write.
     pub fn new(db: Arc<Database>) -> Self {
+        if let Ok(conn) = db.pool.get() {
+            if let Err(e) = conn.execute_batch(crate::db::TAG_HIERARCHY_TABLES_SQL) {
+                log::error!("Failed to ensure tag_groups/tag_assignments tables exist: {e}");
+            }
+        }
         Self { db }
     }
 

@@ -252,7 +252,7 @@ impl Database {
             log::info!(
                 "Running migration 18: tag_groups/tag_assignments for persisted Genres curation hierarchy (#545)"
             );
-            conn.execute_batch(MIGRATION_18)?;
+            conn.execute_batch(TAG_HIERARCHY_TABLES_SQL)?;
             seed_tag_hierarchy(&conn)?;
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
@@ -628,7 +628,12 @@ CREATE TABLE IF NOT EXISTS artist_profiles (
 // `get_genre_graph` doc comment on why that per-song order can't serve as a
 // stable hierarchy on its own).
 // ---------------------------------------------------------------------------
-const MIGRATION_18: &str = "
+/// Also used directly by `TagManager` (see `tags::ensure_hierarchy_tables`) to
+/// self-heal regardless of what the on-disk `schema_version` claims — cheap
+/// and idempotent (`CREATE TABLE IF NOT EXISTS`), so it's safe to re-run on
+/// every `TagManager::new()` rather than trusting the migration bookkeeping
+/// alone to have actually created these tables.
+pub const TAG_HIERARCHY_TABLES_SQL: &str = "
 CREATE TABLE IF NOT EXISTS tag_groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
