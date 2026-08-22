@@ -847,19 +847,49 @@ impl TagManager {
     }
 
     /// Near-duplicate tag-name pairs across the current tag list — see
-    /// [`Self::is_similar`]. Ordered for determinism; the frontend owns
-    /// per-session dismissal, not persisted here.
+    /// [`Self::is_similar`]. Excludes any pair that's already a genuine
+    /// parent/subgenre relationship in the persisted hierarchy (e.g. "Metal"
+    /// and "Black Metal" both contain "metal" and would otherwise look like
+    /// a name variant, but one is deliberately curated as the other's
+    /// subgenre, not a duplicate spelling of it). Ordered for determinism;
+    /// the frontend owns per-session dismissal, not persisted here.
     pub fn get_merge_suggestions(&self) -> Result<Vec<(String, String)>> {
         let tags = self.list_all_tags()?;
+        let related = self.parent_child_pairs()?;
         let mut pairs = Vec::new();
         for i in 0..tags.len() {
             for j in (i + 1)..tags.len() {
                 let norm_a = Self::normalize_for_similarity(&tags[i].name);
                 let norm_b = Self::normalize_for_similarity(&tags[j].name);
-                if Self::is_similar(&norm_a, &norm_b) {
+                if Self::is_similar(&norm_a, &norm_b) && !related.contains(&(norm_a, norm_b)) {
                     pairs.push((tags[i].name.clone(), tags[j].name.clone()));
                 }
             }
+        }
+        Ok(pairs)
+    }
+
+    /// Every (normalized child, normalized parent) pair from the persisted
+    /// hierarchy, in both orderings, so callers can cheaply check "are these
+    /// two names already a curated parent/subgenre relationship?".
+    fn parent_child_pairs(&self) -> Result<std::collections::HashSet<(String, String)>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT tag_assignments.tag_name, tag_groups.name
+             FROM tag_assignments JOIN tag_groups ON tag_groups.id = tag_assignments.group_id",
+        )?;
+        let mut pairs = std::collections::HashSet::new();
+        let rows = stmt.query_map([], |row| {
+            let child: String = row.get(0)?;
+            let parent: String = row.get(1)?;
+            Ok((child, parent))
+        })?;
+        for row in rows {
+            let (child, parent) = row?;
+            let norm_child = Self::normalize_for_similarity(&child);
+            let norm_parent = Self::normalize_for_similarity(&parent);
+            pairs.insert((norm_child.clone(), norm_parent.clone()));
+            pairs.insert((norm_parent, norm_child));
         }
         Ok(pairs)
     }
@@ -1259,6 +1289,30 @@ mod tests {
         assert!(has_pair("Prog Metal", "Progressive Metal"));
         assert!(has_pair("Synthpop", "Synth Pop"));
         assert!(!has_pair("Ambient", "Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_merge_suggestions_excludes_curated_subgenres() {
+        // "Black Metal" contains "Metal" and would otherwise pass the
+        // containment/similarity check, but it's a genuine curated subgenre
+        // of "Metal" (not a duplicate spelling of it) — see #545 feedback.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "Metal; Black Metal");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        let suggestions = manager.get_merge_suggestions().unwrap();
+        assert!(
+            !suggestions
+                .iter()
+                .any(|(x, y)| (x == "Metal" && y == "Black Metal")
+                    || (x == "Black Metal" && y == "Metal")),
+            "curated parent/subgenre pairs should not be suggested for merging"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }
