@@ -142,8 +142,8 @@
     let unlistenHierarchy: (() => void) | undefined;
     listen("library-changed", refreshDrillDown).then((fn) => { unlisten = fn; });
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
-    tagsStore.loadHierarchy();
-    tagsStore.loadMergeSuggestions();
+    tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    tagsStore.loadMergeSuggestions().catch((e) => console.error("Failed to load merge suggestions:", e));
     // Restore a drill-down carried over from a previous visit/session (e.g.
     // Back/Forward or app relaunch) by re-fetching its songs.
     refreshDrillDown();
@@ -490,10 +490,10 @@
             {#if selectMode}
               <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="self-center w-3 h-3 pointer-events-none" />
             {/if}
-            <button onclick={() => !selectMode && openTag(tag.name)} class="leading-none">
+            <button onclick={() => !selectMode && openTag(tag.name)} class="self-center leading-none">
               {tag.name}
             </button>
-            <span class="text-[0.65em] font-bold opacity-70 leading-none">{tag.song_count}</span>
+            <span class="self-center text-[0.65em] font-bold opacity-70 leading-none">{tag.song_count}</span>
           </span>
         {/each}
       </div>

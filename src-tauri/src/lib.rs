@@ -147,6 +147,14 @@ fn with_webview2_occlusion_disabled(current: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Without this, every log::info!/warn!/error! call across the backend
+    // (including reconcile-failure diagnostics) is a silent no-op — `log`
+    // is just a facade and needs a registered backend to actually emit
+    // anywhere. Defaults to `info` so normal operation stays quiet; set
+    // `RUST_LOG=debug` (or per-module, e.g. `RUST_LOG=luminous_lib::tags=debug`)
+    // to see more when running `bun run tauri dev` from a terminal.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
