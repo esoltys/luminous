@@ -243,15 +243,23 @@
   // at either extreme).
   const TAG_CLOUD_MIN_REM = 0.75;
   const TAG_CLOUD_MAX_REM = 2;
+  const TAG_CLOUD_MIN_WEIGHT = 500;
+  const TAG_CLOUD_MAX_WEIGHT = 800;
   let tagCountRange = $derived.by(() => {
     const counts = tagsStore.allTags.map((t) => t.song_count);
     return { min: Math.min(...counts, 1), max: Math.max(...counts, 1) };
   });
-  function tagCloudFontSize(count: number): string {
+  /** Padding is in `em` (not a fixed rem) so it scales together with the
+   * text instead of leaving small pills looking oddly padded relative to
+   * large ones. Each pill sizes to its own content — rows aren't forced to
+   * a uniform height, so `items-center` (not `items-baseline`) is what
+   * actually centers the label+count within its own pill. */
+  function tagCloudStyle(count: number): string {
     const { min, max } = tagCountRange;
-    if (max <= min) return `${TAG_CLOUD_MIN_REM}rem`;
-    const t = (Math.log(count + 1) - Math.log(min + 1)) / (Math.log(max + 1) - Math.log(min + 1));
-    return `${(TAG_CLOUD_MIN_REM + t * (TAG_CLOUD_MAX_REM - TAG_CLOUD_MIN_REM)).toFixed(2)}rem`;
+    const t = max <= min ? 0 : (Math.log(count + 1) - Math.log(min + 1)) / (Math.log(max + 1) - Math.log(min + 1));
+    const fontSize = TAG_CLOUD_MIN_REM + t * (TAG_CLOUD_MAX_REM - TAG_CLOUD_MIN_REM);
+    const fontWeight = Math.round(TAG_CLOUD_MIN_WEIGHT + t * (TAG_CLOUD_MAX_WEIGHT - TAG_CLOUD_MIN_WEIGHT));
+    return `font-size: ${fontSize.toFixed(2)}rem; font-weight: ${fontWeight}; padding: 0.5em 0.9em;`;
   }
 </script>
 
@@ -464,7 +472,7 @@
         </button>
       {/if}
     {:else}
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         {#each tagsStore.allTags as tag (tag.name)}
           {@const group = tagsStore.hierarchy.find((g) => g.name === tag.name || g.children.some((c) => c.name === tag.name))}
           {@const colorIndex = group?.color_index}
@@ -472,8 +480,8 @@
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <span
             onclick={() => { if (selectMode) toggleSelect(tag.name); }}
-            class="inline-flex items-baseline gap-1.5 px-3 py-1.5 rounded-full font-bold transition-colors {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`font-size: ${tagCloudFontSize(tag.song_count)}; ${
+            class="inline-flex items-center gap-1.5 rounded-full transition-colors {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`${tagCloudStyle(tag.song_count)} ${
               colorIndex !== undefined
                 ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 32%, black); color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 85%, white);`
                 : "background-color: var(--color-brand-sidebar); color: var(--color-brand-text-primary);"
