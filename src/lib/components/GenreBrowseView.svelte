@@ -9,7 +9,7 @@
   import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
+  import { collectionStore, type GenreDrillDown } from "../stores/collection.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import GenreChips from "./GenreChips.svelte";
@@ -89,7 +89,6 @@
     );
   }
 
-  let selectedTag = $state<string | null>(null);
   let drillDownSongs = $state<Song[]>([]);
   let drillDownLoading = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
@@ -110,24 +109,22 @@
     editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
   }
 
-  type DrillDownContext =
-    | { kind: "tag"; tag: string }
-    | { kind: "main"; tag: string }
-    | { kind: "edge"; root: string; child: string }
-    | { kind: "none" };
+  // Persisted on collectionStore (not local state) so Back/Forward restores
+  // the Genres tab's drill-down the same way it already does for the
+  // Artist/Album/Playlist detail views.
+  let selectedTag = $derived(collectionStore.selectedGenreDrillDown?.displayTag ?? null);
 
-  let drillDownContext = $state<DrillDownContext | null>(null);
-
-  function fetchForContext(ctx: DrillDownContext) {
-    if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag, 500);
-    if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag, 500);
+  function fetchForContext(ctx: GenreDrillDown) {
+    if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag!, 500);
+    if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag!, 500);
     if (ctx.kind === "none") return tagsStore.getSongsWithoutGenre(500);
-    return tagsStore.getSongsByGenreEdge(ctx.root, ctx.child, 500);
+    return tagsStore.getSongsByGenreEdge(ctx.root!, ctx.tag!, 500);
   }
 
   function refreshDrillDown() {
-    if (drillDownContext) {
-      fetchForContext(drillDownContext).then((songs) => { drillDownSongs = songs; });
+    const ctx = collectionStore.selectedGenreDrillDown;
+    if (ctx) {
+      fetchForContext(ctx).then((songs) => { drillDownSongs = songs; });
     }
   }
 
@@ -147,15 +144,17 @@
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
     tagsStore.loadHierarchy();
     tagsStore.loadMergeSuggestions();
+    // Restore a drill-down carried over from a previous visit/session (e.g.
+    // Back/Forward or app relaunch) by re-fetching its songs.
+    refreshDrillDown();
     return () => {
       unlisten?.();
       unlistenHierarchy?.();
     };
   });
 
-  async function loadDrillDown(ctx: DrillDownContext, displayTag: string) {
-    drillDownContext = ctx;
-    selectedTag = displayTag;
+  async function loadDrillDown(ctx: GenreDrillDown) {
+    collectionStore.selectedGenreDrillDown = ctx;
     drillDownLoading = true;
     try {
       drillDownSongs = await fetchForContext(ctx);
@@ -168,12 +167,12 @@
    * navigation (e.g. a GenreChips chip clicked elsewhere in the app) where
    * there's no specific root/child relationship to narrow by. */
   function openTag(tagName: string) {
-    return loadDrillDown({ kind: "tag", tag: tagName }, tagName);
+    return loadDrillDown({ kind: "tag", tag: tagName, displayTag: tagName });
   }
 
   /** Strict main-tag match — clicking a root in the Genre view. */
   function openMainTag(tagName: string) {
-    return loadDrillDown({ kind: "main", tag: tagName }, tagName);
+    return loadDrillDown({ kind: "main", tag: tagName, displayTag: tagName });
   }
 
   /** Exact root/child edge match — clicking a child under a specific root in
@@ -181,17 +180,16 @@
    * out immediately, and a tag shared under multiple roots only shows the
    * songs for *this* relationship. */
   function openGenreEdge(rootTag: string, childTag: string) {
-    return loadDrillDown({ kind: "edge", root: rootTag, child: childTag }, childTag);
+    return loadDrillDown({ kind: "edge", root: rootTag, tag: childTag, displayTag: childTag });
   }
 
   /** Songs with no genre value at all. */
   function openNoGenre() {
-    return loadDrillDown({ kind: "none" }, i18n.t("songTags.noGenre", {}, "No Genre"));
+    return loadDrillDown({ kind: "none", displayTag: i18n.t("songTags.noGenre", {}, "No Genre") });
   }
 
   function closeDrillDown() {
-    selectedTag = null;
-    drillDownContext = null;
+    collectionStore.selectedGenreDrillDown = null;
   }
 
   // Consumes collectionStore.viewGenreTag()'s one-shot "open this tag" signal
@@ -238,6 +236,23 @@
     });
     return sorted;
   });
+
+  // Tag-cloud font sizing: log-scaled against the current min/max song
+  // count so the range is actually perceptible regardless of whether counts
+  // span 1-10 or 1-1000 (a plain linear/count-divided-by-N scale washes out
+  // at either extreme).
+  const TAG_CLOUD_MIN_REM = 0.75;
+  const TAG_CLOUD_MAX_REM = 2;
+  let tagCountRange = $derived.by(() => {
+    const counts = tagsStore.allTags.map((t) => t.song_count);
+    return { min: Math.min(...counts, 1), max: Math.max(...counts, 1) };
+  });
+  function tagCloudFontSize(count: number): string {
+    const { min, max } = tagCountRange;
+    if (max <= min) return `${TAG_CLOUD_MIN_REM}rem`;
+    const t = (Math.log(count + 1) - Math.log(min + 1)) / (Math.log(max + 1) - Math.log(min + 1));
+    return `${(TAG_CLOUD_MIN_REM + t * (TAG_CLOUD_MAX_REM - TAG_CLOUD_MIN_REM)).toFixed(2)}rem`;
+  }
 </script>
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
@@ -344,7 +359,7 @@
   {:else}
     <div class="h-9 flex items-center justify-between mb-3">
       <div class="text-xs text-brand-text-secondary font-medium">
-        {i18n.t("songTags.genresTabDescription", {}, "Browse songs by tags you've added")}
+        {i18n.t("songTags.genresTabDescription", { count: tagsStore.hierarchy.length }, `Showing ${tagsStore.hierarchy.length} genres`)}
       </div>
       <div class="flex items-center gap-2">
         <button
@@ -453,20 +468,24 @@
         {#each tagsStore.allTags as tag (tag.name)}
           {@const group = tagsStore.hierarchy.find((g) => g.name === tag.name || g.children.some((c) => c.name === tag.name))}
           {@const colorIndex = group?.color_index}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <span
-            class="inline-flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-full border transition-colors {selected.has(tag.name) ? 'bg-brand-accent/25 border-brand-accent/60' : 'border-brand-border/60'}"
-            style={colorIndex !== undefined ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 18%, transparent); border-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 45%, transparent);` : ""}
+            onclick={() => { if (selectMode) toggleSelect(tag.name); }}
+            class="inline-flex items-baseline gap-1.5 px-3 py-1.5 rounded-full font-bold transition-colors {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`font-size: ${tagCloudFontSize(tag.song_count)}; ${
+              colorIndex !== undefined
+                ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 32%, black); color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 85%, white);`
+                : "background-color: var(--color-brand-sidebar); color: var(--color-brand-text-primary);"
+            }`}
           >
             {#if selectMode}
-              <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="w-3 h-3" />
+              <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="self-center w-3 h-3 pointer-events-none" />
             {/if}
-            <button
-              onclick={() => !selectMode && openTag(tag.name)}
-              class="text-sm font-semibold text-brand-text-primary py-1 pr-2"
-              style={`font-size: ${Math.min(1 + tag.song_count / 25, 1.4)}rem`}
-            >
+            <button onclick={() => !selectMode && openTag(tag.name)} class="leading-none">
               {tag.name}
             </button>
+            <span class="text-[0.65em] font-bold opacity-70 leading-none">{tag.song_count}</span>
           </span>
         {/each}
       </div>

@@ -742,7 +742,10 @@ pub fn run() {
 
             // Keep the persisted Genres curation hierarchy (#545) in step
             // with newly-seen or vanished tag names whenever the library
-            // changes (scans, tag edits, bulk merge/delete).
+            // changes (scans, tag edits, bulk merge/delete). Belt-and-braces
+            // alongside `get_tag_hierarchy`'s own reconcile-on-read: this is
+            // what lets an already-open Genres tab pick up a change without
+            // the user having to leave and reopen it.
             {
                 use tauri::Listener;
                 let handle = app.handle().clone();

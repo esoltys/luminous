@@ -122,19 +122,21 @@
           </p>
         {/if}
         {#each group.children as child (child.name)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <span
             data-chip-key={child.name}
             data-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {selectMode ? '' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-2 ring-brand-accent' : ''} {selected.has(child.name) ? 'bg-brand-accent/25 border-brand-accent/60' : 'bg-brand-accent/10 border-brand-accent/20'}"
+            onclick={() => { if (selectMode) onToggleSelect(child.name); }}
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-2 ring-brand-accent' : ''} {selected.has(child.name) ? 'bg-brand-accent/25 border-brand-accent/60' : 'bg-brand-accent/10 border-brand-accent/20'}"
           >
             {#if selectMode}
               <input
                 type="checkbox"
                 checked={selected.has(child.name)}
                 onchange={() => onToggleSelect(child.name)}
-                class="w-3 h-3"
+                class="w-3 h-3 pointer-events-none"
               />
             {/if}
             <button

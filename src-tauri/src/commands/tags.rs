@@ -89,6 +89,14 @@ pub async fn get_songs_by_genre_edge(
 #[tauri::command]
 pub async fn get_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGroup>, String> {
     let manager = TagManager::new(state.db.clone());
+    // Self-heals on every read rather than relying solely on the
+    // `library-changed` listener having already caught up — cheap (a no-op
+    // pass over already-in-sync data) and guarantees the Genres tab never
+    // shows a stale-empty hierarchy just because reconciliation hasn't run
+    // yet this session.
+    if let Err(e) = manager.reconcile_hierarchy() {
+        log::error!("Tag hierarchy reconcile-on-read failed: {e}");
+    }
     manager.get_tag_hierarchy().map_err(|e| e.to_string())
 }
 

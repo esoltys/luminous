@@ -867,7 +867,7 @@ export const en = {
     collapse: "Collapse"
   },
   songTags: {
-    genresTabDescription: "Browse songs by tags you've added",
+    genresTabDescription: "Showing {count} genres",
     viewGenre: "Genre",
     viewTags: "Tags",
     emptyTitle: "No tags yet",
