@@ -291,6 +291,14 @@ impl Player {
             }
         }
 
+        let (loudness_gain, loudness_source, loudness_gain_db) =
+            if let Some(ref song) = restored_song {
+                let settings = crate::loudness::get_settings(&db).unwrap_or_default();
+                Self::compute_loudness_gain(&settings, song)
+            } else {
+                (1.0, LoudnessGainSource::Disabled, None)
+            };
+
         let scrobble_point_nanosec = restored_song
             .as_ref()
             .and_then(|s| s.length_nanosec.map(|ns| (ns as u64) / 2));
@@ -306,8 +314,8 @@ impl Player {
             repeat_mode,
             stop_after_current: false,
             volume,
-            current_loudness_source: LoudnessGainSource::Disabled,
-            current_loudness_gain_db: None,
+            current_loudness_source: loudness_source,
+            current_loudness_gain_db: loudness_gain_db,
             playlist_items,
             shuffle_order: Vec::new(),
             current_index,
@@ -322,6 +330,7 @@ impl Player {
 
         if let Some(song) = restored_song {
             if let Ok(engine) = player.audio.try_lock() {
+                engine.set_loudness_gain(loudness_gain);
                 let _ = engine.cue(Box::new(song), restored_position_ns);
             }
         }
