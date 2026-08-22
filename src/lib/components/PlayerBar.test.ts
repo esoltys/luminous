@@ -290,9 +290,9 @@ describe("PlayerBar.svelte", () => {
     playerStore.state = "playing";
     const { getAllByTitle, getByTitle, container } = render(PlayerBar);
 
-    // Gone by Compact (Full-only): shuffle, repeat, and the whole right
-    // column (volume/mute + expand) — the transport+seek block takes the
-    // freed space instead, sticking to the right edge via ml-auto.
+    // Gone by Compact (Full-only): shuffle, repeat, the seek row, and the
+    // whole right column (volume/mute + expand) — the transport block takes
+    // the freed space instead, sticking to the right edge via ml-auto.
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
     expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
@@ -302,11 +302,11 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
     const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
     expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
-
-    // Gone by Minimal (Compact-and-up only): previous, seek row.
-    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
-    expect(seekRow).toHaveClass("hidden", "min-[400px]:flex");
+    expect(seekRow).toHaveClass("hidden", "min-[700px]:flex");
+
+    // Gone by Minimal (Compact-and-up only): previous.
+    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
 
     // Never hidden (the constant core): cover art, play/pause, skip-next.
     const coverButton = getByTitle("Queue");
