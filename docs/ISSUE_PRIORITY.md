@@ -59,11 +59,18 @@ Every bug/feature issue gets a Priority when it's created, regardless of milesto
 to "Todo" and assign a Priority using this scheme (2.0-milestone issues additionally use it to
 indicate when they should be worked on after 1.0 ships):
 
-- **P1** — real (non-cosmetic) bugs, plus foundational/first-run work that other issues depend on.
-- **P2** — features touched often, expected for parity with comparable desktop music players, or
+### Bugs
+- **P1** — Critical system down with no workaround (stops the app from working as designed; if the user can still use the app then it's not a P1).
+- **P2** — Severe degradation, workaround exists.
+- **P3** — Limited impact, single function affected.
+- **P4** — Inconvenience, cosmetic.
+
+### Features
+- **P1** — Foundational/first-run work that other issues depend on.
+- **P2** — Features touched often, expected for parity with comparable desktop music players, or
   that encourage exploring the library (cover art, artist bios and connections, browsing by
   genre) rather than just playing tracks.
-- **P3** — lower-frequency or power-user features, and cosmetic/low-severity bugs.
-- **P4** — speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
+- **P3** — Lower-frequency or power-user features.
+- **P4** — Speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
 
 Don't default new issues to P2/P3 — assign a priority using the same criteria above.
