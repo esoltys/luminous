@@ -129,7 +129,8 @@
             data-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-2 ring-brand-accent' : ''} {selected.has(child.name) ? 'bg-brand-accent/25 border-brand-accent/60' : 'bg-brand-accent/10 border-brand-accent/20'}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'chip' && dropTarget.chip === child.name) || selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 22%, transparent); border-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 45%, transparent); color: ${genreColorHsl(group.color_index)};`}
           >
             {#if selectMode}
               <input
@@ -142,9 +143,10 @@
             <button
               type="button"
               onclick={() => !selectMode && onOpenGenreEdge(group.name, child.name)}
-              class="text-brand-text-primary"
+              class="inline-flex items-baseline gap-1"
             >
-              {child.name}
+              <span>{child.name}</span>
+              <span class="text-[0.85em] opacity-70">{child.song_count}</span>
             </button>
             {#if child.is_conflict}
               <span title={i18n.t("songTags.conflictTooltip", { name: child.name }, `"${child.name}" is also a top-level genre elsewhere in your library`)}>
