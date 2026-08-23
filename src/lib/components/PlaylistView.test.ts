@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import PlaylistView from "./PlaylistView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { collectionStore } from "../stores/collection.svelte";
 import type { Playlist, PlaylistItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -181,6 +182,34 @@ describe("PlaylistView.svelte", () => {
 
     expect(elementFromPointMock).not.toHaveBeenCalled();
     expect(reorderSpy).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the artist when clicking the Artist link instead of starting a row drag", async () => {
+    // Regression test for #553: handleRowPointerDown used to call setPointerCapture
+    // unconditionally on pointerdown, stealing subsequent pointer events from the
+    // Artist/Album LinkButton and silently blocking its onclick navigation.
+    // jsdom doesn't implement setPointerCapture at all, so stub it directly rather than
+    // spying on a non-existent prototype method.
+    const setPointerCaptureSpy = vi.fn();
+    const originalSetPointerCapture = HTMLElement.prototype.setPointerCapture;
+    HTMLElement.prototype.setPointerCapture = setPointerCaptureSpy;
+    try {
+      const viewArtistSpy = vi.spyOn(collectionStore, "viewArtist");
+      const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
+      const { getByText } = render(PlaylistView);
+
+      const artistLink = getByText("Artist A").closest("button")!;
+
+      await fireEvent.pointerDown(artistLink, { button: 0, clientX: 0, clientY: 0 });
+      expect(setPointerCaptureSpy).not.toHaveBeenCalled();
+
+      await fireEvent.click(artistLink);
+
+      expect(viewArtistSpy).toHaveBeenCalledWith("Artist A");
+      expect(reorderSpy).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.setPointerCapture = originalSetPointerCapture;
+    }
   });
 
   it("filters tracks by title or artist using the filter search input", async () => {

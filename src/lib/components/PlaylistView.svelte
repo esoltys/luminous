@@ -603,6 +603,12 @@
 
   function handleRowPointerDown(event: PointerEvent, index: number, item: PlaylistItem) {
     if (isItemUnavailable(item) || event.button !== 0) return;
+    // Don't hijack pointer events (and thus clicks) meant for an interactive child of the row,
+    // e.g. the Artist/Album LinkButton — setPointerCapture would steal the subsequent click
+    // before the button's own onclick can fire, silently blocking navigation.
+    if ((event.target as HTMLElement | null)?.closest("button, a, input, select, textarea, [data-interactive]")) {
+      return;
+    }
     pointerDragStartIndex = index;
     pointerDragStartX = event.clientX;
     pointerDragStartY = event.clientY;
