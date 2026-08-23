@@ -61,6 +61,10 @@
     deleteConfirmNames = Array.from(selected);
   }
 
+  function suggestionSongCount(name: string): number {
+    return tagsStore.allTags.find((t) => t.name === name)?.song_count ?? 0;
+  }
+
   /** "Parent: Name" when the tag is curated as a sub-genre somewhere, so a
    * merge suggestion like "Alternative" vs. "Alternative Metal" doesn't read
    * as ambiguous when "Alternative Metal" is actually filed under "Metal". */
@@ -473,14 +477,15 @@
     {/if}
 
     {#each tagsStore.mergeSuggestions as [a, b] (`${a}|${b}`)}
+      {@const [big, small] = suggestionSongCount(a) >= suggestionSongCount(b) ? [a, b] : [b, a]}
       <div class="flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-lg bg-brand-accent/10 border border-brand-accent/25">
         <div class="flex items-center gap-2 min-w-0 text-xs text-brand-text-primary">
           <GitMerge class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
           <span class="truncate">
             {i18n.t(
               "songTags.mergeSuggestion",
-              { a: suggestionLabel(a), b: suggestionLabel(b) },
-              `"${suggestionLabel(a)}" and "${suggestionLabel(b)}" look similar`
+              { a: suggestionLabel(big), b: suggestionLabel(small) },
+              `"${suggestionLabel(big)}" and "${suggestionLabel(small)}" look similar`
             )}
           </span>
         </div>
@@ -548,7 +553,7 @@
             class="inline-flex items-center gap-1.5 rounded-full transition-colors {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
             style={`${tagCloudStyle(tag.song_count)} ${
               colorIndex !== undefined
-                ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 32%, black); color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 85%, white);`
+                ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 32%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 85%, var(--color-brand-text-primary));`
                 : "background-color: var(--color-brand-sidebar); color: var(--color-brand-text-primary);"
             }`}
           >

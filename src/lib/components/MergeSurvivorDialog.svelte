@@ -15,8 +15,17 @@
   }
 
   let { names, onConfirm, onCancel }: Props = $props();
+
+  function songCount(name: string): number {
+    return tagsStore.allTags.find((t) => t.name === name)?.song_count ?? 0;
+  }
+
+  // The name involved in the most songs is the least disruptive pick and
+  // the one users expect to see first, so it leads both the ordering and
+  // the default selection.
+  let sortedNames = $derived([...names].sort((a, b) => songCount(b) - songCount(a)));
   // svelte-ignore state_referenced_locally
-  let survivor = $state(names[0]);
+  let survivor = $state(sortedNames[0]);
 
   /** "Parent: Name" when curated as a sub-genre somewhere — same context
    * the merge-suggestion banner shows, so the choice isn't ambiguous when
@@ -43,10 +52,15 @@
       {i18n.t("songTags.mergeDialogPrompt", {}, "Which name should be kept?")}
     </p>
     <div class="flex flex-col gap-1.5">
-      {#each names as name (name)}
-        <label class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors {survivor === name ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border hover:border-brand-accent/40'}">
-          <input type="radio" name="merge-survivor" value={name} checked={survivor === name} onchange={() => { survivor = name; }} />
-          <span class="text-sm font-medium text-brand-text-primary">{nameLabel(name)}</span>
+      {#each sortedNames as name (name)}
+        <label class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors {survivor === name ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border hover:border-brand-accent/40'}">
+          <span class="flex items-center gap-2 min-w-0">
+            <input type="radio" name="merge-survivor" value={name} checked={survivor === name} onchange={() => { survivor = name; }} />
+            <span class="text-sm font-medium text-brand-text-primary truncate">{nameLabel(name)}</span>
+          </span>
+          <span class="text-xs text-brand-text-secondary tabular-nums shrink-0">
+            {i18n.t("songTags.songCount", { count: songCount(name) }, `${songCount(name)} songs`)}
+          </span>
         </label>
       {/each}
     </div>
