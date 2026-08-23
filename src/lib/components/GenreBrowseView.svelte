@@ -319,15 +319,25 @@
 
     {#if drillDownLoading}
       <div class="py-16 text-center text-sm text-brand-text-secondary">{i18n.t("common.loading", {}, "Loading…")}</div>
+    {:else if sortedDrillDownSongs.length === 0}
+      <div class="py-16">
+        <EmptyState
+          icon={TagIcon}
+          title={i18n.t("songTags.drillDownEmptyTitle", {}, "No songs found")}
+          subtitle={i18n.t(
+            "songTags.drillDownEmptySubtitle",
+            { name: selectedTag ?? "" },
+            `No songs currently carry "${selectedTag}" — it may have just been renamed, merged, or reorganized.`
+          )}
+        />
+      </div>
     {:else}
-      {#if sortedDrillDownSongs.length > 0}
-        <button
-          onclick={playAllInTag}
-          class="mb-3 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
-        >
-          {i18n.t("songTags.playAll", { count: sortedDrillDownSongs.length }, `Play all ${sortedDrillDownSongs.length} songs`)}
-        </button>
-      {/if}
+      <button
+        onclick={playAllInTag}
+        class="mb-3 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
+      >
+        {i18n.t("songTags.playAll", { count: sortedDrillDownSongs.length }, `Play all ${sortedDrillDownSongs.length} songs`)}
+      </button>
       <div class="flex flex-col gap-2">
         {#each sortedDrillDownSongs as song (song.id)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
