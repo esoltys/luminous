@@ -351,10 +351,10 @@ impl TagManager {
     // -----------------------------------------------------------------
 
     /// The persisted hierarchy: one [`TagGroup`] per `tag_groups` row, each
-    /// with its assigned children, current song counts (any-position match,
-    /// matching [`Self::list_all_tags`]'s semantics), and a per-child
-    /// `is_conflict` flag when that child's name is also the name of some
-    /// (other) top-level group.
+    /// with its assigned children and current song counts (any-position
+    /// match, matching [`Self::list_all_tags`]'s semantics). A tag that's
+    /// also the name of some `tag_groups` row never appears as a child here
+    /// — `reconcile_hierarchy` strips that link before this is read.
     pub fn get_tag_hierarchy(&self) -> Result<Vec<TagGroup>> {
         let conn = self.db.pool.get()?;
         let counts = Self::compute_tags(&self.all_song_genre_lists()?)
@@ -368,10 +368,6 @@ impl TagManager {
         let groups_raw: Vec<(i64, String, i32)> = group_stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .filter_map(|r| r.ok())
-            .collect();
-        let group_names: std::collections::HashSet<String> = groups_raw
-            .iter()
-            .map(|(_, name, _)| name.to_lowercase())
             .collect();
 
         let mut child_stmt = conn.prepare(
@@ -390,7 +386,6 @@ impl TagManager {
                     .filter(|(group_id, _)| *group_id == id)
                     .map(|(_, child_name)| TagGroupChild {
                         song_count: counts.get(&child_name.to_lowercase()).copied().unwrap_or(0),
-                        is_conflict: group_names.contains(&child_name.to_lowercase()),
                         name: child_name.clone(),
                     })
                     .collect();
@@ -465,23 +460,27 @@ impl TagManager {
             }
         }
 
-        // Clean up any self-referential assignment (a tag curated as a
-        // sub-genre of a card sharing its own name) from before
-        // reparent_tag/demote_group_to_child guarded against creating one —
-        // it has no meaningful drill-down (there's no separate "child
-        // instance" of the same literal genre value) and would otherwise
-        // show 0 songs despite the chip's own displayed count.
+        // A top-level genre can never meaningfully nest as a sub-genre
+        // elsewhere — under its own card (no separate "child instance" of
+        // the same literal genre value exists to drill into) or under a
+        // different one (ambiguous: is a song tagged with it under the
+        // top-level genre, the sub-genre, or both?). Strip any assignment
+        // whose name collides with *any* existing `tag_groups` row,
+        // regardless of which group it's currently under — covers stale
+        // data from before reparent_tag/demote_group_to_child/apply_merge_hierarchy
+        // guarded against creating one, and is the single enforcement point
+        // every write path relies on instead of duplicating this check.
         {
             let mut stmt = conn.prepare(
-                "SELECT tag_assignments.tag_name
-                 FROM tag_assignments JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
-                 WHERE tag_assignments.tag_name = tag_groups.name COLLATE NOCASE",
+                "SELECT DISTINCT tag_assignments.tag_name
+                 FROM tag_assignments
+                 JOIN tag_groups ON tag_groups.name = tag_assignments.tag_name COLLATE NOCASE",
             )?;
-            let self_referential: Vec<String> = stmt
+            let colliding: Vec<String> = stmt
                 .query_map([], |r| r.get::<_, String>(0))?
                 .filter_map(|r| r.ok())
                 .collect();
-            for name in self_referential {
+            for name in colliding {
                 conn.execute(
                     "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
                     params![name],
@@ -548,15 +547,6 @@ impl TagManager {
         // touches the curated tables, never the raw `songs.genre` text, so
         // the tag is still literally position-0 somewhere and this loop
         // would otherwise recreate its root on the spot.
-        //
-        // This doesn't affect the case this loop also exists for — a tag
-        // genuinely used as a main category on some songs and a subgenre on
-        // others, discovered together in the same, first reconcile pass —
-        // because `existing_assignments` here only reflects assignments
-        // that existed *before* this call started; the sibling loop below
-        // that creates fresh assignments runs after this one, so a brand
-        // new conflict still gets both rows in one pass (see
-        // `test_conflict_flag_when_child_name_is_also_a_top_level_group`).
         for (key, name) in usage.clone() {
             if *is_root.get(&key).unwrap_or(&false)
                 && !existing_groups.contains_key(&key)
@@ -570,14 +560,19 @@ impl TagManager {
 
         // Auto-assign every tag ever observed as a subgenre (appearing after
         // position 0 on some song) that doesn't have an assignment yet, to
-        // whichever root it appeared under most often.
+        // whichever root it appeared under most often — unless it's already
+        // its own top-level card (created just above, in this same pass, or
+        // from an earlier one). A top-level genre never gets auto-curated as
+        // anyone's child; the self-heal pass at the top of this function
+        // strips that link if it's ever found, so creating one here would
+        // just be undone on the very next reconcile.
         let mut next_assignment_sort: i32 = conn.query_row(
             "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_assignments",
             [],
             |r| r.get(0),
         )?;
         for (key, name) in usage {
-            if existing_assignments.contains(&key) {
+            if existing_assignments.contains(&key) || existing_groups.contains_key(&key) {
                 continue;
             }
             let Some(root_counts) = child_root_counts.get(&key) else {
@@ -615,7 +610,12 @@ impl TagManager {
 
     /// Moves `tag_name` to be a child of `new_group_name`, creating the
     /// assignment if it doesn't have one yet. `new_group_name` must already
-    /// be a `tag_groups` row (the card being dropped onto).
+    /// be a `tag_groups` row (the card being dropped onto). If `tag_name` is
+    /// itself a top-level genre (its own card, whether `new_group_name` or
+    /// some other one), the resulting link is invalid and gets stripped by
+    /// `reconcile_hierarchy`'s self-heal pass before the next read — see its
+    /// doc comment; this is the single enforcement point, not duplicated
+    /// here.
     pub fn reparent_tag(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
         // A tag can't be curated as a sub-genre of a card sharing its own
         // name — that's a self-loop with no meaningful drill-down (there's
@@ -645,10 +645,9 @@ impl TagManager {
     /// Demotes `tag_name` from its own primary-genre card to a sub-genre
     /// chip under `new_group_name` — the reverse of `promote_tag`, and
     /// distinct from `reparent_tag` (which only ever moves an *assignment*
-    /// and deliberately leaves any separately-existing card with the same
-    /// name alone, so dragging a conflict chip doesn't collapse the actual
-    /// root card sharing its name). This one specifically removes `tag_name`'s
-    /// own `tag_groups` row — used when the user drags a whole card's header
+    /// and never touches a separately-existing `tag_groups` row). This one
+    /// specifically removes `tag_name`'s own `tag_groups` row — used when
+    /// the user drags a whole card's header
     /// onto another card. Any children that were curated under the deleted
     /// card cascade-delete (`tag_assignments.group_id` is `ON DELETE CASCADE`,
     /// `PRAGMA foreign_keys=ON`) and re-home themselves on the next reconcile
@@ -803,8 +802,12 @@ impl TagManager {
     /// [`Self::rewrite_genre_for_merge`] pass over every affected song: any
     /// children `from` had as a group are reparented under `into` (creating
     /// a group for `into` if it didn't have one), then every row keyed by
-    /// `from` (its group and/or its own assignment — a conflict tag can have
-    /// both) is removed, since `from` no longer exists as a distinct name.
+    /// `from` (its group and/or its own assignment) is removed, since `from`
+    /// no longer exists as a distinct name. If one of `from`'s children was
+    /// already literally named `into` (or any other top-level genre), the
+    /// reassignment above leaves it as an invalid link — left for
+    /// `reconcile_hierarchy`'s self-heal pass to strip before the next read,
+    /// same single enforcement point every other write path relies on.
     pub fn apply_merge_hierarchy(&self, from: &str, into: &str) -> Result<()> {
         let conn = self.db.pool.get()?;
 
@@ -841,20 +844,9 @@ impl TagManager {
                 )?;
                 conn.execute("DELETE FROM tag_groups WHERE id = ?1", params![from_id])?;
             }
-            // `from`'s children land under `into`'s group by name alone (the
-            // reassignment above, or the rename-in-place when `into` didn't
-            // exist yet) — if one of them was already literally named
-            // `into`, it's now a self-referential chip nested inside its own
-            // card. Purge it the same way reconcile_hierarchy's self-heal
-            // does for pre-existing ones; there's no meaningful drill-down
-            // for a "child instance" of the same literal genre value.
-            conn.execute(
-                "DELETE FROM tag_assignments WHERE group_id = ?1 AND tag_name = ?2 COLLATE NOCASE",
-                params![into_id, into],
-            )?;
         }
         // Independent of the group handling above — `from` may have had an
-        // assignment row of its own at the same time (the conflict case).
+        // assignment row of its own at the same time.
         conn.execute(
             "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
             params![from],
@@ -1135,8 +1127,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
+    /// A tag that's a top-level genre on its own can never also be curated
+    /// as a sub-genre elsewhere — even when both facts are discovered in the
+    /// very same reconcile pass, only the top-level card should result.
     #[test]
-    fn test_conflict_flag_when_child_name_is_also_a_top_level_group() {
+    fn test_reconcile_hierarchy_never_links_a_top_level_genre_as_a_subgenre() {
         let (db, dir) = test_db();
         insert_song(&db, "/a.mp3", "Electronic; Pop");
         insert_song(&db, "/b.mp3", "Pop");
@@ -1144,9 +1139,52 @@ mod tests {
         let manager = TagManager::new(db.clone());
         manager.reconcile_hierarchy().unwrap();
         let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            hierarchy.iter().any(|g| g.name == "Pop"),
+            "Pop keeps its own card"
+        );
         let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
-        let pop_child = electronic.children.iter().find(|c| c.name == "Pop").unwrap();
-        assert!(pop_child.is_conflict, "Pop is also its own top-level group");
+        assert!(
+            !electronic.children.iter().any(|c| c.name == "Pop"),
+            "Pop must never be linked as a sub-genre of Electronic since it's already a top-level genre"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Regression test for stale/legacy data (or any write path that isn't
+    /// as careful as `reconcile_hierarchy` itself): a `tag_assignments` row
+    /// that collides with a *different* top-level card's name — not just its
+    /// own — must get purged too, and stay purged on the next reconcile.
+    #[test]
+    fn test_reconcile_hierarchy_purges_a_cross_group_conflicting_assignment() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "Rock");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        {
+            let conn = db.pool.get().unwrap();
+            let metal_id: i64 = conn
+                .query_row("SELECT id FROM tag_groups WHERE name = 'Metal'", [], |r| r.get(0))
+                .unwrap();
+            conn.execute(
+                "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Rock', ?1, 0)",
+                params![metal_id],
+            )
+            .unwrap();
+        }
+
+        manager.reconcile_hierarchy().unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            hierarchy.iter().any(|g| g.name == "Rock"),
+            "Rock keeps its own card"
+        );
+        let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+        assert!(!metal.children.iter().any(|c| c.name == "Rock"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1387,20 +1425,37 @@ mod tests {
     #[test]
     fn test_merge_hierarchy_purges_self_referential_child() {
         let (db, dir) = test_db();
-        // "IDM" is a top-level group with "Electronic" curated as one of
-        // its children; "Electronic" is also its own separate top-level
-        // group elsewhere in the library.
-        insert_song(&db, "/a.mp3", "IDM; Electronic");
+        insert_song(&db, "/a.mp3", "IDM");
         insert_song(&db, "/b.mp3", "Electronic");
 
         let manager = TagManager::new(db.clone());
         manager.reconcile_hierarchy().unwrap();
 
-        // Renaming/merging "IDM" into "Electronic" should fold IDM's
-        // children under the "Electronic" card — but the "Electronic"
-        // child it already had must be dropped, not turned into a
-        // self-referential chip.
+        // Simulates "Electronic" having been curated as a child of "IDM"
+        // from before this invariant existed — reconcile_hierarchy itself
+        // would never create this link (see
+        // `test_reconcile_hierarchy_never_links_a_top_level_genre_as_a_subgenre`),
+        // but a merge shouldn't have to special-case it either; it's left
+        // for the next reconcile pass, same as any other write path.
+        {
+            let conn = db.pool.get().unwrap();
+            let idm_id: i64 = conn
+                .query_row("SELECT id FROM tag_groups WHERE name = 'IDM'", [], |r| r.get(0))
+                .unwrap();
+            conn.execute(
+                "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Electronic', ?1, 0)",
+                params![idm_id],
+            )
+            .unwrap();
+        }
+
+        // Renaming/merging "IDM" into "Electronic" folds IDM's children
+        // under the "Electronic" card — including the "Electronic" child it
+        // already had, which would otherwise become a self-referential
+        // chip. The next reconcile (as every `get_tag_hierarchy` command
+        // read performs) cleans it up.
         manager.apply_merge_hierarchy("IDM", "Electronic").unwrap();
+        manager.reconcile_hierarchy().unwrap();
 
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();

@@ -17,7 +17,7 @@ describe("TagsStore", () => {
       name: "Metal",
       color_index: 0,
       song_count: 1,
-      children: [{ name: "Symphonic Metal", song_count: 1, is_conflict: false }],
+      children: [{ name: "Symphonic Metal", song_count: 1 }],
     },
   ];
 

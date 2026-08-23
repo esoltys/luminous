@@ -814,14 +814,14 @@ pub struct GenreGroup {
 
 /// One sub-genre chip assigned under a [`TagGroup`] (#545) — persisted in
 /// `tag_assignments`, independent of any single song's own genre-list order.
-/// `is_conflict` is true when this same name is *also* the name of some
-/// `tag_groups` row (i.e. it's used as a top-level genre elsewhere in the
-/// library), which the Genres page flags with a warning badge.
+/// A tag that's also the name of some `tag_groups` row (i.e. used as a
+/// top-level genre elsewhere in the library) can never appear here —
+/// `TagManager::reconcile_hierarchy` strips that link on sight, since a
+/// top-level genre can't meaningfully nest inside another one (or itself).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct TagGroupChild {
     pub name: String,
     pub song_count: i64,
-    pub is_conflict: bool,
 }
 
 /// One primary-genre "card" in the persisted Genres curation hierarchy

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle, GripVertical } from "lucide-svelte";
+  import { GripVertical } from "lucide-svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -248,14 +248,7 @@
     }
 
     if (!target) return;
-    if (target.group.toLowerCase() === chip.name.toLowerCase()) {
-      // Dragging a conflict chip onto the separate top-level card that
-      // shares its own literal name (e.g. "Rock: Pop" onto the "Pop"
-      // card) resolves the conflict — a tag can't be curated as a child
-      // of a card sharing its own name, so this un-childs it rather than
-      // reparenting into a self-loop the backend would just reject.
-      await tagsStore.promoteTag(chip.name);
-    } else if (target.kind === "header" && target.group === chip.fromGroup) {
+    if (target.kind === "header" && target.group === chip.fromGroup) {
       await tagsStore.promoteTag(chip.name);
     } else if (target.kind === "card" && target.group !== chip.fromGroup) {
       await tagsStore.reparentTag(chip.name, target.group);
@@ -376,11 +369,6 @@
               <span class="inline-flex items-baseline gap-1">
                 <span>{child.name}</span>
                 <span class="text-[0.85em] opacity-70">{child.song_count}</span>
-              </span>
-            {/if}
-            {#if child.is_conflict}
-              <span title={i18n.t("songTags.conflictTooltip", { name: child.name }, `"${child.name}" is also a top-level genre elsewhere in your library`)}>
-                <AlertTriangle class="w-3 h-3 text-amber-400" />
               </span>
             {/if}
           </span>
