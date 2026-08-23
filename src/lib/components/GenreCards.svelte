@@ -207,6 +207,18 @@
     }
   }
 
+  /** Clicking anywhere on a card other than a sub-genre chip (or one of the
+   * header's own controls) opens the card's drill-down — matches the
+   * inner name/count button's action, just extended to the whole card so
+   * users don't have to aim for that one small area. */
+  function handleCardClick(e: MouseEvent, name: string) {
+    if (selectMode) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-chip-key], [data-color-swatch-for]")) return;
+    if (target.tagName === "INPUT") return;
+    onOpenMainTag(name);
+  }
+
   async function handlePointerUp() {
     const chip = draggedChip;
     const card = draggedCard;
@@ -261,9 +273,12 @@
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-card-name={group.name}
-      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color,transform] {draggedCard === group.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard) ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : 'border-brand-border/60'}"
+      onclick={(e) => handleCardClick(e, group.name)}
+      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color,transform] {selectMode ? '' : 'cursor-pointer'} {draggedCard === group.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard) ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : 'border-brand-border/60'}"
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare, LayoutGrid, Rows3 } from "lucide-svelte";
+  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare, LayoutGrid, Rows3, Pencil } from "lucide-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
+  import { songsToCoverStack } from "../utils/covers";
+  import { shuffleArray } from "../utils/shuffle";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
@@ -14,6 +16,8 @@
   import Select from "./Select.svelte";
   import GenreChips from "./GenreChips.svelte";
   import GenreCards from "./GenreCards.svelte";
+  import CoverStack from "./CoverStack.svelte";
+  import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import MergeSurvivorDialog from "./MergeSurvivorDialog.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import CoverArt from "./CoverArt.svelte";
@@ -241,6 +245,58 @@
     );
   }
 
+  async function shufflePlayInTag() {
+    if (sortedDrillDownSongs.length === 0) return;
+    await playerStore.setShuffleMode("all");
+    await playerStore.playSongs(
+      shuffleArray(sortedDrillDownSongs.map((s) => s.id)),
+      0,
+      undefined,
+      { type: "song" },
+      selectedTag ?? undefined
+    );
+  }
+
+  let drillDownDurationLabel = $derived.by(() => {
+    const totalNs = drillDownSongs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
+    const totalMinutes = Math.round(totalNs / 1_000_000_000 / 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  });
+
+  let drillDownCovers = $derived(songsToCoverStack(drillDownSongs));
+
+  let renamingDrillDownTag = $state(false);
+  let drillDownRenameValue = $state("");
+
+  function startDrillDownRename() {
+    if (!selectedTag) return;
+    drillDownRenameValue = selectedTag;
+    renamingDrillDownTag = true;
+  }
+
+  function focusAndSelectInput(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
+
+  async function commitDrillDownRename() {
+    const from = selectedTag;
+    const into = drillDownRenameValue.trim();
+    renamingDrillDownTag = false;
+    if (!from || !into || into === from) return;
+    const count = await tagsStore.mergeTags(from, into);
+    // Re-point the open drill-down at the new name instead of leaving it
+    // pointed at a tag that no longer exists.
+    collectionStore.selectedGenreDrillDown = { kind: "tag", tag: into, displayTag: into };
+    refreshDrillDown();
+    toastStore.show(
+      i18n.t("songTags.renameToast", { count, name: into }, `Renamed to "${into}" (${count} songs updated)`),
+      "success"
+    );
+  }
+
   type DrillDownSortField = "title" | "artist" | "album" | "added";
   let sortField = $state<DrillDownSortField>("artist");
   let sortAsc = $state(true);
@@ -288,37 +344,85 @@
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
   {#if selectedTag !== null}
-    <div class="h-9 flex items-center justify-between gap-2 mb-3">
-      <div class="flex items-center gap-2 min-w-0">
-        <button
-          onclick={closeDrillDown}
-          class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors shrink-0"
-        >
-          <ArrowLeft class="w-3.5 h-3.5" />
-          {i18n.t("common.back", {}, "Back")}
-        </button>
-        <span class="text-brand-text-secondary/40 shrink-0">/</span>
-        <h2 class="text-sm font-bold text-brand-text-primary truncate">{selectedTag}</h2>
-      </div>
-      <div class="relative shrink-0">
-        <Select
-          value={`${sortField}-${sortAsc}`}
-          onchange={(e) => {
-            const [field, asc] = e.currentTarget.value.split("-");
-            sortField = field as DrillDownSortField;
-            sortAsc = asc === "true";
-          }}
-          class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
-        >
-          <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
-          <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
-          <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
-          <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
-          <option value="title-true">▲ {i18n.t('collection.tableHeaderTitle')}</option>
-          <option value="title-false">▼ {i18n.t('collection.tableHeaderTitle')}</option>
-          <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
-          <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
-        </Select>
+    <div class="border-b border-brand-border/60 -mx-6 px-6 pb-5 mb-4">
+      <button
+        onclick={closeDrillDown}
+        class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors mb-2"
+      >
+        <ArrowLeft class="w-3.5 h-3.5" />
+        {i18n.t("common.back", {}, "Back")}
+      </button>
+
+      <div class="flex items-start justify-between gap-6">
+        <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
+          {#if renamingDrillDownTag}
+            <input
+              use:focusAndSelectInput
+              bind:value={drillDownRenameValue}
+              onblur={commitDrillDownRename}
+              onkeydown={(e) => {
+                if (e.key === "Enter") commitDrillDownRename();
+                if (e.key === "Escape") renamingDrillDownTag = false;
+              }}
+              class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug py-0.5 bg-brand-main border border-brand-accent rounded px-2"
+            />
+          {:else}
+            <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{selectedTag}</h1>
+          {/if}
+
+          <div class="flex items-center gap-2 text-xs text-brand-text-secondary font-medium">
+            <span>{i18n.t("songTags.songCount", { count: drillDownSongs.length }, `${drillDownSongs.length} songs`)}</span>
+            {#if drillDownSongs.length > 0}
+              <span>•</span>
+              <span>{drillDownDurationLabel}</span>
+            {/if}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 mt-3">
+            <PlayShuffleButtons
+              onPlayAll={playAllInTag}
+              onShufflePlay={shufflePlayInTag}
+              disabled={drillDownLoading || sortedDrillDownSongs.length === 0}
+            />
+            <button
+              type="button"
+              onclick={startDrillDownRename}
+              class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand-sidebar/80 hover:bg-brand-sidebar text-brand-text-primary border border-brand-border hover:border-brand-accent/40 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              title={i18n.t("songTags.renameTag", {}, "Rename")}
+            >
+              <Pencil class="w-3.5 h-3.5 text-brand-accent" />
+              <span>{i18n.t("songTags.renameTag", {}, "Rename")}</span>
+            </button>
+            <div class="relative">
+              <Select
+                value={`${sortField}-${sortAsc}`}
+                onchange={(e) => {
+                  const [field, asc] = e.currentTarget.value.split("-");
+                  sortField = field as DrillDownSortField;
+                  sortAsc = asc === "true";
+                }}
+                class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+              >
+                <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
+                <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
+                <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
+                <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
+                <option value="title-true">▲ {i18n.t('collection.tableHeaderTitle')}</option>
+                <option value="title-false">▼ {i18n.t('collection.tableHeaderTitle')}</option>
+                <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
+                <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {#if drillDownCovers.length > 0}
+          <div class="relative w-40 h-40 hidden sm:block shrink-0">
+            <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]">
+              <CoverStack covers={drillDownCovers} sizeClass="w-[82%] h-[82%]" />
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
 
