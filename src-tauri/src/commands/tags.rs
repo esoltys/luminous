@@ -229,7 +229,7 @@ pub async fn merge_tags(
     let manager = TagManager::new(state.db.clone());
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let affected = manager
-        .songs_containing_any(&[from.clone()])
+        .songs_containing_any(std::slice::from_ref(&from))
         .map_err(|e| e.to_string())?;
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
     let metas = load_full_metadata(&conn, &song_ids);
