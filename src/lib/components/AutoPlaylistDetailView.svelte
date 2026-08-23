@@ -33,7 +33,7 @@ import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel, getGenreAutoPlaylistLabel } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
@@ -178,7 +178,12 @@ import { shuffleArray } from "../utils/shuffle";
             const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
             return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
           })()
-        : (genre || i18n.t("artistDetail.unknownGenre"));
+        : (() => {
+            const fallback = genre || i18n.t("artistDetail.unknownGenre");
+            if (kind !== "genre") return fallback;
+            const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+            return getGenreAutoPlaylistLabel(pl?.dynamic_enabled, pl?.dynamic_spec, fallback);
+          })();
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
