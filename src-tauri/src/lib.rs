@@ -876,7 +876,6 @@ pub fn run() {
             commands::tags::get_songs_without_genre,
             // Persisted Genres curation hierarchy (#545)
             commands::tags::get_tag_hierarchy,
-            commands::tags::get_merge_suggestions,
             commands::tags::set_tag_group_color,
             commands::tags::reparent_tag,
             commands::tags::promote_tag,

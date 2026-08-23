@@ -888,7 +888,6 @@ export const en = {
     selectedCount: "{count} selected",
     mergeSelected: "Merge Selected",
     deleteSelected: "Delete Selected",
-    mergeSuggestion: "\"{a}\" and \"{b}\" look similar",
     mergeConfirm: "Merge",
     mergeDialogTitle: "Merge tags",
     mergeDialogPrompt: "Which name should be kept?",
@@ -898,7 +897,6 @@ export const en = {
     promoteTag: "Promote to top-level genre",
     renameToast: "Renamed to \"{name}\" ({count} songs updated)",
     deleteConfirmMessage: "Remove {count} tag(s) from every song that carries them? This can't be undone.",
-    dismissSuggestion: "Dismiss",
     deleteBtn: "Delete",
     cancelBtn: "Cancel"
   },
