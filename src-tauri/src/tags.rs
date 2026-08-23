@@ -841,6 +841,17 @@ impl TagManager {
                 )?;
                 conn.execute("DELETE FROM tag_groups WHERE id = ?1", params![from_id])?;
             }
+            // `from`'s children land under `into`'s group by name alone (the
+            // reassignment above, or the rename-in-place when `into` didn't
+            // exist yet) — if one of them was already literally named
+            // `into`, it's now a self-referential chip nested inside its own
+            // card. Purge it the same way reconcile_hierarchy's self-heal
+            // does for pre-existing ones; there's no meaningful drill-down
+            // for a "child instance" of the same literal genre value.
+            conn.execute(
+                "DELETE FROM tag_assignments WHERE group_id = ?1 AND tag_name = ?2 COLLATE NOCASE",
+                params![into_id, into],
+            )?;
         }
         // Independent of the group handling above — `from` may have had an
         // assignment row of its own at the same time (the conflict case).
@@ -1365,6 +1376,38 @@ mod tests {
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert!(!metal.children.iter().any(|c| c.name == "Prog Metal"));
         assert!(metal.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Regression test for a genre card showing up as its own sub-genre
+    /// chip: merging a group into another group whose name collides with
+    /// one of the *merged-away* group's existing children must not leave
+    /// that child assigned under a group sharing its own literal name.
+    #[test]
+    fn test_merge_hierarchy_purges_self_referential_child() {
+        let (db, dir) = test_db();
+        // "IDM" is a top-level group with "Electronic" curated as one of
+        // its children; "Electronic" is also its own separate top-level
+        // group elsewhere in the library.
+        insert_song(&db, "/a.mp3", "IDM; Electronic");
+        insert_song(&db, "/b.mp3", "Electronic");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        // Renaming/merging "IDM" into "Electronic" should fold IDM's
+        // children under the "Electronic" card — but the "Electronic"
+        // child it already had must be dropped, not turned into a
+        // self-referential chip.
+        manager.apply_merge_hierarchy("IDM", "Electronic").unwrap();
+
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(
+            !electronic.children.iter().any(|c| c.name.eq_ignore_ascii_case("Electronic")),
+            "Electronic must not be nested as its own sub-genre"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }
