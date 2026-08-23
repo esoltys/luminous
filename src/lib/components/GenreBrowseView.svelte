@@ -55,6 +55,14 @@
     deleteConfirmNames = Array.from(selected);
   }
 
+  /** "Parent: Name" when the tag is curated as a sub-genre somewhere, so a
+   * merge suggestion like "Alternative" vs. "Alternative Metal" doesn't read
+   * as ambiguous when "Alternative Metal" is actually filed under "Metal". */
+  function suggestionLabel(name: string): string {
+    const parent = tagsStore.hierarchy.find((g) => g.children.some((c) => c.name === name));
+    return parent ? `${parent.name}: ${name}` : name;
+  }
+
   function acceptSuggestion(a: string, b: string) {
     mergeDialogSuggestionPair = [a, b];
     mergeDialogNames = [a, b];
@@ -425,7 +433,11 @@
         <div class="flex items-center gap-2 min-w-0 text-xs text-brand-text-primary">
           <GitMerge class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
           <span class="truncate">
-            {i18n.t("songTags.mergeSuggestion", { a, b }, `"${a}" and "${b}" look similar`)}
+            {i18n.t(
+              "songTags.mergeSuggestion",
+              { a: suggestionLabel(a), b: suggestionLabel(b) },
+              `"${suggestionLabel(a)}" and "${suggestionLabel(b)}" look similar`
+            )}
           </span>
         </div>
         <div class="flex items-center gap-3 shrink-0">

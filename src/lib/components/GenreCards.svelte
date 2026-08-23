@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle } from "lucide-svelte";
+  import { AlertTriangle, GripVertical } from "lucide-svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { GENRE_PALETTE_HUES, genreColorHsl } from "../utils/genrePalette";
@@ -21,6 +21,11 @@
   // never fires in-page (see ChipInput.svelte). Mirrors its pointer-event
   // pattern instead.
   let draggedChip = $state<{ name: string; fromGroup: string } | null>(null);
+  /** Whole-card drag (via the header's grip handle) — demotes a top-level
+   * card into a sub-genre chip under whatever card it's dropped on. Shares
+   * the same dropTarget tracking as chip drags since hit-testing doesn't
+   * care which kind of drag is in progress. */
+  let draggedCard = $state<string | null>(null);
   let dropTarget = $state<{ kind: "card" | "header" | "chip"; group: string; chip?: string } | null>(null);
 
   function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
@@ -30,8 +35,14 @@
     draggedChip = { name, fromGroup };
   }
 
+  function handleCardPointerDown(e: PointerEvent, name: string) {
+    if (selectMode) return;
+    e.preventDefault();
+    draggedCard = name;
+  }
+
   function handlePointerMove(e: PointerEvent) {
-    if (!draggedChip) return;
+    if (!draggedChip && !draggedCard) return;
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const chipEl = el?.closest<HTMLElement>("[data-chip-key]");
     const headerEl = el?.closest<HTMLElement>("[data-card-header]");
@@ -49,11 +60,20 @@
 
   async function handlePointerUp() {
     const chip = draggedChip;
+    const card = draggedCard;
     const target = dropTarget;
     draggedChip = null;
+    draggedCard = null;
     dropTarget = null;
-    if (!chip || !target) return;
 
+    if (card) {
+      if (target && target.group !== card) {
+        await tagsStore.demoteGroupToChild(card, target.group);
+      }
+      return;
+    }
+
+    if (!chip || !target) return;
     if (target.kind === "header" && target.group === chip.fromGroup) {
       await tagsStore.promoteTag(chip.name);
     } else if (target.kind === "card" && target.group !== chip.fromGroup) {
@@ -74,12 +94,20 @@
   {#each tagsStore.hierarchy as group (group.name)}
     <div
       data-card-name={group.name}
-      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-colors {dropTarget?.kind === 'card' && dropTarget.group === group.name ? 'border-brand-accent ring-2 ring-brand-accent/40' : 'border-brand-border/60'}"
+      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color] {draggedCard === group.name ? 'opacity-40' : ''} {dropTarget?.kind === 'card' && dropTarget.group === group.name ? 'border-brand-accent ring-2 ring-brand-accent/40' : 'border-brand-border/60'}"
     >
       <div
         data-card-header={group.name}
         class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/15' : ''}"
       >
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <span
+          onpointerdown={(e) => handleCardPointerDown(e, group.name)}
+          class="shrink-0 touch-none {selectMode ? '' : 'cursor-grab active:cursor-grabbing'} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
+        >
+          <GripVertical class="w-3.5 h-3.5" />
+        </span>
         <div class="relative shrink-0">
           <button
             type="button"

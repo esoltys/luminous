@@ -879,6 +879,7 @@ export const en = {
     goToGenreTooltip: "Browse {genre}",
     noGenre: "No Genre",
     changeColorTooltip: "Change color",
+    dragCardTooltip: "Drag to make this a sub-genre of another card",
     noSubgenresYet: "No sub-genres yet — drag a tag here",
     conflictTooltip: "\"{name}\" is also a top-level genre elsewhere in your library",
     selectTags: "Select Tags",

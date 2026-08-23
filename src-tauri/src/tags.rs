@@ -596,6 +596,41 @@ impl TagManager {
         Ok(())
     }
 
+    /// Demotes `tag_name` from its own primary-genre card to a sub-genre
+    /// chip under `new_group_name` — the reverse of `promote_tag`, and
+    /// distinct from `reparent_tag` (which only ever moves an *assignment*
+    /// and deliberately leaves any separately-existing card with the same
+    /// name alone, so dragging a conflict chip doesn't collapse the actual
+    /// root card sharing its name). This one specifically removes `tag_name`'s
+    /// own `tag_groups` row — used when the user drags a whole card's header
+    /// onto another card. Any children that were curated under the deleted
+    /// card cascade-delete (`tag_assignments.group_id` is `ON DELETE CASCADE`,
+    /// `PRAGMA foreign_keys=ON`) and re-home themselves on the next reconcile
+    /// pass, same as any other orphaned tag.
+    pub fn demote_group_to_child(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let group_id: i64 = conn.query_row(
+            "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![new_group_name],
+            |r| r.get(0),
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_assignments WHERE group_id = ?1",
+            params![group_id],
+            |r| r.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(tag_name) DO UPDATE SET group_id = excluded.group_id, sort_order = excluded.sort_order",
+            params![tag_name, group_id, next_sort],
+        )?;
+        Ok(())
+    }
+
     /// Promotes `tag_name` from a sub-genre chip to its own primary-genre
     /// card: removes any existing assignment and creates a `tag_groups` row.
     pub fn promote_tag(&self, tag_name: &str) -> Result<()> {
@@ -1198,6 +1233,35 @@ mod tests {
         assert!(hierarchy.iter().any(|g| g.name == "Progressive Metal"));
         let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
         assert!(!ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_demote_group_to_child_removes_own_card_and_reassigns_its_children() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+        insert_song(&db, "/b.mp3", "Synth-Pop; Electronic");
+        insert_song(&db, "/c.mp3", "Synth-Pop; New Retro Wave");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        // Sanity: Synth-Pop starts out as its own card (it's position-0 on
+        // /c.mp3) with "New Retro Wave" curated under it.
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(hierarchy.iter().any(|g| g.name == "Synth-Pop"));
+
+        manager.demote_group_to_child("Synth-Pop", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            !hierarchy.iter().any(|g| g.name == "Synth-Pop"),
+            "Synth-Pop should no longer have its own card"
+        );
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(electronic.children.iter().any(|c| c.name == "Synth-Pop"));
+        // Its former child cascade-deleted rather than dangling on a
+        // deleted group_id.
+        assert!(!hierarchy.iter().flat_map(|g| &g.children).any(|c| c.name == "New Retro Wave"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

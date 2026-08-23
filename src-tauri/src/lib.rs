@@ -880,6 +880,7 @@ pub fn run() {
             commands::tags::set_tag_group_color,
             commands::tags::reparent_tag,
             commands::tags::promote_tag,
+            commands::tags::demote_group_to_child,
             commands::tags::reorder_tag_in_group,
             commands::tags::merge_tags,
             commands::tags::delete_tags,

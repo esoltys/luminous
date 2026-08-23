@@ -139,6 +139,18 @@ pub async fn promote_tag(state: State<'_, AppState>, tag_name: String) -> Result
 }
 
 #[tauri::command]
+pub async fn demote_group_to_child(
+    state: State<'_, AppState>,
+    tag_name: String,
+    new_group_name: String,
+) -> Result<(), String> {
+    let manager = TagManager::new(state.db.clone());
+    manager
+        .demote_group_to_child(&tag_name, &new_group_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn reorder_tag_in_group(
     state: State<'_, AppState>,
     tag_name: String,

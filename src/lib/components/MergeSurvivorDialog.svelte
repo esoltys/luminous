@@ -3,6 +3,7 @@
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
 
   interface Props {
     /** Every tag name involved — 2 for a suggestion/simple merge, more for a
@@ -16,6 +17,14 @@
   let { names, onConfirm, onCancel }: Props = $props();
   // svelte-ignore state_referenced_locally
   let survivor = $state(names[0]);
+
+  /** "Parent: Name" when curated as a sub-genre somewhere — same context
+   * the merge-suggestion banner shows, so the choice isn't ambiguous when
+   * two names share a label but live under different parents. */
+  function nameLabel(name: string): string {
+    const parent = tagsStore.hierarchy.find((g) => g.children.some((c) => c.name === name));
+    return parent ? `${parent.name}: ${name}` : name;
+  }
 </script>
 
 <Modal onClose={onCancel} maxWidth="max-w-sm">
@@ -37,7 +46,7 @@
       {#each names as name (name)}
         <label class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors {survivor === name ? 'border-brand-accent bg-brand-accent/10' : 'border-brand-border hover:border-brand-accent/40'}">
           <input type="radio" name="merge-survivor" value={name} checked={survivor === name} onchange={() => { survivor = name; }} />
-          <span class="text-sm font-medium text-brand-text-primary">{name}</span>
+          <span class="text-sm font-medium text-brand-text-primary">{nameLabel(name)}</span>
         </label>
       {/each}
     </div>
