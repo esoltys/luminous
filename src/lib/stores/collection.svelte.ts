@@ -88,6 +88,19 @@ export interface AutoPlaylistRef {
   updated?: number;
 }
 
+/** The Genres tab's current drill-down (see GenreBrowseView's own DrillDownContext,
+ * which this mirrors) — tracked here so Back/Forward restores it like any other
+ * detail view instead of only rewinding the tab/sub-tab selection. */
+export interface GenreDrillDown {
+  kind: "tag" | "main" | "edge" | "none";
+  /** The tag name for "tag"/"main", or the child tag for "edge". Unused for "none". */
+  tag?: string;
+  /** The root tag for "edge" only. */
+  root?: string;
+  /** Label shown in the drill-down header — computed once when entering. */
+  displayTag: string;
+}
+
 /** A snapshot of "where the user is" for Back/Forward navigation history. */
 interface NavigationView {
   activeTab: ActiveTab;
@@ -97,6 +110,7 @@ interface NavigationView {
   selectedAlbumName: string | null;
   selectedPlaylistId: number | null;
   selectedAutoPlaylist: AutoPlaylistRef | null;
+  selectedGenreDrillDown: GenreDrillDown | null;
 }
 
 const MAX_HISTORY = 50;
@@ -334,6 +348,19 @@ class CollectionStore {
     this.scheduleRecordHistory();
   }
 
+  private _selectedGenreDrillDown = $state<GenreDrillDown | null>(null);
+
+  /** The Genres tab's current drill-down (see GenreBrowseView). */
+  get selectedGenreDrillDown() { return this._selectedGenreDrillDown; }
+  set selectedGenreDrillDown(val) {
+    this._selectedGenreDrillDown = val;
+    if (typeof window !== "undefined") {
+      if (val) localStorage.setItem("navigation_selectedGenreDrillDown", JSON.stringify(val));
+      else localStorage.removeItem("navigation_selectedGenreDrillDown");
+    }
+    this.scheduleRecordHistory();
+  }
+
   // Back/Forward navigation history. Snapshots are coalesced via a microtask
   // so that a single user action touching several fields in sequence (e.g.
   // viewArtist() setting activeTab/activeSubTab/selectedArtistName) records
@@ -355,6 +382,7 @@ class CollectionStore {
       selectedAlbumName: this._selectedAlbumName,
       selectedPlaylistId: this._selectedPlaylistId,
       selectedAutoPlaylist: this._selectedAutoPlaylist,
+      selectedGenreDrillDown: this._selectedGenreDrillDown,
     };
   }
 
@@ -388,6 +416,7 @@ class CollectionStore {
     this.selectedAlbumName = snap.selectedAlbumName;
     this.selectedPlaylistId = snap.selectedPlaylistId;
     this.selectedAutoPlaylist = snap.selectedAutoPlaylist;
+    this.selectedGenreDrillDown = snap.selectedGenreDrillDown;
     if (snap.selectedPlaylistId !== null) {
       playlistsStore.selectPlaylist(snap.selectedPlaylistId);
     }
@@ -546,6 +575,15 @@ class CollectionStore {
             this._selectedAutoPlaylist = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef;
           } catch (e) {
             console.error("Failed to parse saved selectedAutoPlaylist:", e);
+          }
+        }
+
+        const savedGenreDrillDown = localStorage.getItem("navigation_selectedGenreDrillDown");
+        if (savedGenreDrillDown) {
+          try {
+            this._selectedGenreDrillDown = JSON.parse(savedGenreDrillDown) as GenreDrillDown;
+          } catch (e) {
+            console.error("Failed to parse saved selectedGenreDrillDown:", e);
           }
         }
 

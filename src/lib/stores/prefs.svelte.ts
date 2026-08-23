@@ -16,6 +16,7 @@ interface UiPreferences {
   playlists_auto_view_mode: CollectionViewMode;
   playlists_custom_view_mode: CollectionViewMode;
   genre_view_mode: GenreViewMode;
+  genre_cards_view_mode: CollectionViewMode;
 }
 
 class PrefsStore {
@@ -27,6 +28,9 @@ class PrefsStore {
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
   genreViewMode = $state<GenreViewMode>("genre");
+  /** Collapses primary-genre cards down to compact header rows on the
+   * Genres tab (mirrors the Albums/Artists cards-vs-rows toggle). */
+  genreCardsViewMode = $state<CollectionViewMode>("cards");
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
 
@@ -40,6 +44,7 @@ class PrefsStore {
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
     this.genreViewMode = prefs.genre_view_mode;
+    this.genreCardsViewMode = prefs.genre_cards_view_mode;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
   }
 
@@ -54,6 +59,7 @@ class PrefsStore {
       playlists_auto_view_mode: this.playlistsAutoViewMode,
       playlists_custom_view_mode: this.playlistsCustomViewMode,
       genre_view_mode: this.genreViewMode,
+      genre_cards_view_mode: this.genreCardsViewMode,
     };
     invoke("set_ui_preferences", { prefs });
   }
@@ -95,6 +101,11 @@ class PrefsStore {
 
   setGenreViewMode(mode: GenreViewMode) {
     this.genreViewMode = mode;
+    this.save();
+  }
+
+  setGenreCardsViewMode(mode: CollectionViewMode) {
+    this.genreCardsViewMode = mode;
     this.save();
   }
 

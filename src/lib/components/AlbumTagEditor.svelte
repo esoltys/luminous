@@ -1,7 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
   import { Sliders, Save, X, LoaderCircle, Layers, Lock, ImageOff } from "lucide-svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import FormField from "./FormField.svelte";
@@ -57,6 +59,12 @@
   let disc = $state<number | null>(initialDisc);
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
+
+  onMount(() => {
+    // Best-effort preload for the genre field's autocomplete — a failure
+    // here shouldn't block or break the editor itself.
+    if (!tagsStore.loaded) tagsStore.load().catch(() => {});
+  });
 
   const VARIOUS_ARTISTS = "Various Artists";
   // Remembers whatever was in Album Artist before the Compilation toggle
@@ -216,6 +224,7 @@
               bind:value={genre}
               disabled={isSaving}
               placeholder={i18n.t('albumTagEditor.genrePlaceholder')}
+              suggestions={tagsStore.allTags.map((t) => t.name)}
               class="w-full"
             />
           </FormField>

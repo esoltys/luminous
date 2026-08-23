@@ -147,6 +147,14 @@ fn with_webview2_occlusion_disabled(current: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Without this, every log::info!/warn!/error! call across the backend
+    // (including reconcile-failure diagnostics) is a silent no-op — `log`
+    // is just a facade and needs a registered backend to actually emit
+    // anywhere. Defaults to `info` so normal operation stays quiet; set
+    // `RUST_LOG=debug` (or per-module, e.g. `RUST_LOG=luminous_lib::tags=debug`)
+    // to see more when running `bun run tauri dev` from a terminal.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
@@ -740,6 +748,20 @@ pub fn run() {
                 }
             }
 
+            // Keep the persisted Genres curation hierarchy (#545) in step
+            // with newly-seen or vanished tag names whenever the library
+            // changes (scans, tag edits, bulk merge/delete). Belt-and-braces
+            // alongside `get_tag_hierarchy`'s own reconcile-on-read: this is
+            // what lets an already-open Genres tab pick up a change without
+            // the user having to leave and reopen it.
+            {
+                use tauri::Listener;
+                let handle = app.handle().clone();
+                app.listen("library-changed", move |_| {
+                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(handle.clone()));
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -852,6 +874,16 @@ pub fn run() {
             commands::tags::get_songs_by_main_tag,
             commands::tags::get_songs_by_genre_edge,
             commands::tags::get_songs_without_genre,
+            // Persisted Genres curation hierarchy (#545)
+            commands::tags::get_tag_hierarchy,
+            commands::tags::get_merge_suggestions,
+            commands::tags::set_tag_group_color,
+            commands::tags::reparent_tag,
+            commands::tags::promote_tag,
+            commands::tags::demote_group_to_child,
+            commands::tags::reorder_tag_in_group,
+            commands::tags::merge_tags,
+            commands::tags::delete_tags,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,

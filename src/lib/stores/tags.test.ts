@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import type { GenreGroup, Tag } from "../types";
+import type { GenreGroup, Tag, TagGroup } from "../types";
 
 import { tagsStore } from "./tags.svelte";
 
@@ -11,6 +11,14 @@ describe("TagsStore", () => {
   ];
   const mockGraph: GenreGroup[] = [
     { main_tag: "Metal", song_count: 1, children: [{ name: "Symphonic Metal", song_count: 1 }] },
+  ];
+  const mockHierarchy: TagGroup[] = [
+    {
+      name: "Metal",
+      color_index: 0,
+      song_count: 1,
+      children: [{ name: "Symphonic Metal", song_count: 1, is_conflict: false }],
+    },
   ];
 
   beforeEach(() => {
@@ -27,6 +35,19 @@ describe("TagsStore", () => {
           return [{ id: 3, title: "Song C" }];
         case "get_songs_without_genre":
           return [{ id: 4, title: "Song D" }];
+        case "get_tag_hierarchy":
+          return mockHierarchy;
+        case "get_merge_suggestions":
+          return [["Prog Metal", "Progressive Metal"]];
+        case "set_tag_group_color":
+        case "reparent_tag":
+        case "promote_tag":
+        case "reorder_tag_in_group":
+          return null;
+        case "merge_tags":
+          return 2;
+        case "delete_tags":
+          return 3;
         default:
           throw new Error(`Unhandled invoke: ${cmd}`);
       }
@@ -68,5 +89,51 @@ describe("TagsStore", () => {
       mode: undefined,
     });
     expect(songs).toHaveLength(1);
+  });
+
+  it("loads the persisted Genres hierarchy", async () => {
+    await tagsStore.loadHierarchy();
+    expect(tagsStore.hierarchy).toEqual(mockHierarchy);
+  });
+
+  it("loads merge suggestions, excluding session-dismissed pairs", async () => {
+    await tagsStore.loadMergeSuggestions();
+    expect(tagsStore.mergeSuggestions).toEqual([["Prog Metal", "Progressive Metal"]]);
+
+    tagsStore.dismissSuggestion("Prog Metal", "Progressive Metal");
+    expect(tagsStore.mergeSuggestions).toEqual([]);
+
+    // Dismissal is order-independent and persists across a reload within the session.
+    await tagsStore.loadMergeSuggestions();
+    expect(tagsStore.mergeSuggestions).toEqual([]);
+  });
+
+  it("sets a group's color and refreshes the hierarchy", async () => {
+    await tagsStore.setGroupColor("Metal", 3);
+    expect(invoke).toHaveBeenCalledWith("set_tag_group_color", { name: "Metal", colorIndex: 3 });
+    expect(invoke).toHaveBeenCalledWith("get_tag_hierarchy");
+  });
+
+  it("reparents, promotes, and reorders a tag, refreshing the hierarchy each time", async () => {
+    await tagsStore.reparentTag("Symphonic Metal", "Ambient");
+    expect(invoke).toHaveBeenCalledWith("reparent_tag", { tagName: "Symphonic Metal", newGroupName: "Ambient" });
+
+    await tagsStore.promoteTag("Symphonic Metal");
+    expect(invoke).toHaveBeenCalledWith("promote_tag", { tagName: "Symphonic Metal" });
+
+    await tagsStore.reorderTagInGroup("Symphonic Metal", 0);
+    expect(invoke).toHaveBeenCalledWith("reorder_tag_in_group", { tagName: "Symphonic Metal", newIndex: 0 });
+  });
+
+  it("merges tags and returns the affected song count", async () => {
+    const count = await tagsStore.mergeTags("Prog Metal", "Progressive Metal");
+    expect(invoke).toHaveBeenCalledWith("merge_tags", { from: "Prog Metal", into: "Progressive Metal" });
+    expect(count).toBe(2);
+  });
+
+  it("deletes tags and returns the affected song count", async () => {
+    const count = await tagsStore.deleteTags(["Symphonic Metal"]);
+    expect(invoke).toHaveBeenCalledWith("delete_tags", { names: ["Symphonic Metal"] });
+    expect(count).toBe(3);
   });
 });

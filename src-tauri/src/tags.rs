@@ -13,11 +13,19 @@
 use crate::{
     collection::{mode_query_fragments, row_to_song, SONG_SELECT_COLS},
     db::Database,
-    models::{parse_multi_value, GenreGroup, QueuePopulationMode, Song, Tag, TagCount},
+    models::{
+        join_multi_value, parse_multi_value, GenreGroup, QueuePopulationMode, Song, Tag, TagCount,
+        TagGroup, TagGroupChild,
+    },
 };
 use anyhow::Result;
 use rusqlite::params;
 use std::{collections::HashMap, sync::Arc};
+
+/// Number of hues in the Genres page's fixed curated palette — colors are
+/// stored as an index into it (`tag_groups.color_index`), the actual hue
+/// values only matter to the frontend's swatch rendering.
+const PALETTE_SIZE: i32 = 10;
 
 #[derive(Debug)]
 pub struct TagManager {
@@ -25,7 +33,19 @@ pub struct TagManager {
 }
 
 impl TagManager {
+    /// Self-heals `tag_groups`/`tag_assignments` on every construction rather
+    /// than trusting migration 18's `schema_version` bookkeeping alone to
+    /// have actually created them — cheap (idempotent `CREATE TABLE IF NOT
+    /// EXISTS`) and independent of whatever state a database's version
+    /// counter is in, so a database that somehow skipped migration 18 (or
+    /// had it only partially apply) still gets working tables instead of a
+    /// permanent "no such table" error on every hierarchy read/write.
     pub fn new(db: Arc<Database>) -> Self {
+        if let Ok(conn) = db.pool.get() {
+            if let Err(e) = conn.execute_batch(crate::db::TAG_HIERARCHY_TABLES_SQL) {
+                log::error!("Failed to ensure tag_groups/tag_assignments tables exist: {e}");
+            }
+        }
         Self { db }
     }
 
@@ -321,6 +341,672 @@ impl TagManager {
             .collect();
         Ok(songs)
     }
+
+    // -----------------------------------------------------------------
+    // Persisted Genres curation hierarchy (#545): `tag_groups` (primary
+    // genre cards) and `tag_assignments` (sub-genre chip -> card), layered
+    // on top of the `songs.genre` values read above. See migration 18's
+    // doc comment in db.rs for why this can't just reuse the emergent,
+    // per-song-order graph `get_genre_graph` computes.
+    // -----------------------------------------------------------------
+
+    /// The persisted hierarchy: one [`TagGroup`] per `tag_groups` row, each
+    /// with its assigned children, current song counts (any-position match,
+    /// matching [`Self::list_all_tags`]'s semantics), and a per-child
+    /// `is_conflict` flag when that child's name is also the name of some
+    /// (other) top-level group.
+    pub fn get_tag_hierarchy(&self) -> Result<Vec<TagGroup>> {
+        let conn = self.db.pool.get()?;
+        let counts = Self::compute_tags(&self.all_song_genre_lists()?)
+            .into_iter()
+            .map(|t| (t.name.to_lowercase(), t.song_count))
+            .collect::<HashMap<_, _>>();
+
+        let mut group_stmt = conn.prepare(
+            "SELECT id, name, color_index FROM tag_groups ORDER BY sort_order, name COLLATE NOCASE",
+        )?;
+        let groups_raw: Vec<(i64, String, i32)> = group_stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let group_names: std::collections::HashSet<String> = groups_raw
+            .iter()
+            .map(|(_, name, _)| name.to_lowercase())
+            .collect();
+
+        let mut child_stmt = conn.prepare(
+            "SELECT group_id, tag_name FROM tag_assignments ORDER BY sort_order, tag_name COLLATE NOCASE",
+        )?;
+        let children_raw: Vec<(i64, String)> = child_stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let groups = groups_raw
+            .into_iter()
+            .map(|(id, name, color_index)| {
+                let children = children_raw
+                    .iter()
+                    .filter(|(group_id, _)| *group_id == id)
+                    .map(|(_, child_name)| TagGroupChild {
+                        song_count: counts.get(&child_name.to_lowercase()).copied().unwrap_or(0),
+                        is_conflict: group_names.contains(&child_name.to_lowercase()),
+                        name: child_name.clone(),
+                    })
+                    .collect();
+                TagGroup {
+                    song_count: counts.get(&name.to_lowercase()).copied().unwrap_or(0),
+                    color_index,
+                    name,
+                    children,
+                }
+            })
+            .collect();
+        Ok(groups)
+    }
+
+    /// Reconciles `tag_groups`/`tag_assignments` against tags currently in
+    /// use in the library — mirrors `playlist::reconcile_dynamic_playlists`'
+    /// role for dynamic playlists. Auto-creates a row for any tag name in use
+    /// that has none yet (a new group if it's ever a song's main/position-0
+    /// value, otherwise assigned under whichever existing root it appears
+    /// under most often), and evicts any existing row for a tag name no
+    /// songs use anymore. Never re-derives or moves an *existing* row — once
+    /// curated (or auto-assigned), an assignment is sticky. Returns whether
+    /// anything changed, so the caller can skip emitting a refresh event.
+    pub fn reconcile_hierarchy(&self) -> Result<bool> {
+        let conn = self.db.pool.get()?;
+        let lists = self.all_song_genre_lists()?;
+
+        let mut usage: HashMap<String, String> = HashMap::new();
+        let mut is_root: HashMap<String, bool> = HashMap::new();
+        let mut child_root_counts: HashMap<String, HashMap<String, i64>> = HashMap::new();
+
+        for values in &lists {
+            for (i, v) in values.iter().enumerate() {
+                let key = v.to_lowercase();
+                usage.entry(key.clone()).or_insert_with(|| v.clone());
+                if i == 0 {
+                    is_root.insert(key, true);
+                }
+            }
+            if let Some(root) = values.first() {
+                let root_key = root.to_lowercase();
+                for child in &values[1..] {
+                    *child_root_counts
+                        .entry(child.to_lowercase())
+                        .or_default()
+                        .entry(root_key.clone())
+                        .or_insert(0) += 1;
+                }
+            }
+        }
+
+        let mut changed = false;
+
+        let mut existing_groups: HashMap<String, i64> = HashMap::new();
+        {
+            let mut stmt = conn.prepare("SELECT id, name FROM tag_groups")?;
+            for row in stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?
+                .filter_map(|r| r.ok())
+            {
+                existing_groups.insert(row.1.to_lowercase(), row.0);
+            }
+        }
+        let mut existing_assignments: std::collections::HashSet<String> = std::collections::HashSet::new();
+        {
+            let mut stmt = conn.prepare("SELECT tag_name FROM tag_assignments")?;
+            for name in stmt
+                .query_map([], |r| r.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+            {
+                existing_assignments.insert(name.to_lowercase());
+            }
+        }
+
+        // Clean up any self-referential assignment (a tag curated as a
+        // sub-genre of a card sharing its own name) from before
+        // reparent_tag/demote_group_to_child guarded against creating one —
+        // it has no meaningful drill-down (there's no separate "child
+        // instance" of the same literal genre value) and would otherwise
+        // show 0 songs despite the chip's own displayed count.
+        {
+            let mut stmt = conn.prepare(
+                "SELECT tag_assignments.tag_name
+                 FROM tag_assignments JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
+                 WHERE tag_assignments.tag_name = tag_groups.name COLLATE NOCASE",
+            )?;
+            let self_referential: Vec<String> = stmt
+                .query_map([], |r| r.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            for name in self_referential {
+                conn.execute(
+                    "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                    params![name],
+                )?;
+                existing_assignments.remove(&name.to_lowercase());
+                changed = true;
+            }
+        }
+
+        // Evict rows for tags no longer used anywhere in the library.
+        for key in existing_groups.keys().cloned().collect::<Vec<_>>() {
+            if !usage.contains_key(&key) {
+                conn.execute(
+                    "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+                    params![key],
+                )?;
+                existing_groups.remove(&key);
+                changed = true;
+            }
+        }
+        for key in existing_assignments.iter().cloned().collect::<Vec<_>>() {
+            if !usage.contains_key(&key) {
+                conn.execute(
+                    "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                    params![key],
+                )?;
+                existing_assignments.remove(&key);
+                changed = true;
+            }
+        }
+
+        let mut next_group_sort: i32 =
+            conn.query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_groups", [], |r| {
+                r.get(0)
+            })?;
+        let mut group_count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM tag_groups", [], |r| r.get(0))?;
+
+        let create_group = |conn: &rusqlite::Connection,
+                                 name: &str,
+                                 next_group_sort: &mut i32,
+                                 group_count: &mut i32|
+         -> Result<i64> {
+            conn.execute(
+                "INSERT OR IGNORE INTO tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
+                params![name, *group_count % PALETTE_SIZE, *next_group_sort],
+            )?;
+            let id: i64 = conn.query_row(
+                "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+                params![name],
+                |r| r.get(0),
+            )?;
+            *next_group_sort += 1;
+            *group_count += 1;
+            Ok(id)
+        };
+
+        // Auto-create a group for any tag ever used as a main/position-0
+        // value, that doesn't have one yet — UNLESS it already has a curated
+        // assignment from a *previous* reconcile or an explicit demote (see
+        // `demote_group_to_child`). Without this exception, demoting a card
+        // would get silently undone the very next time the hierarchy is read
+        // (`get_tag_hierarchy` reconciles before every read): the demote only
+        // touches the curated tables, never the raw `songs.genre` text, so
+        // the tag is still literally position-0 somewhere and this loop
+        // would otherwise recreate its root on the spot.
+        //
+        // This doesn't affect the case this loop also exists for — a tag
+        // genuinely used as a main category on some songs and a subgenre on
+        // others, discovered together in the same, first reconcile pass —
+        // because `existing_assignments` here only reflects assignments
+        // that existed *before* this call started; the sibling loop below
+        // that creates fresh assignments runs after this one, so a brand
+        // new conflict still gets both rows in one pass (see
+        // `test_conflict_flag_when_child_name_is_also_a_top_level_group`).
+        for (key, name) in usage.clone() {
+            if *is_root.get(&key).unwrap_or(&false)
+                && !existing_groups.contains_key(&key)
+                && !existing_assignments.contains(&key)
+            {
+                let id = create_group(&conn, &name, &mut next_group_sort, &mut group_count)?;
+                existing_groups.insert(key, id);
+                changed = true;
+            }
+        }
+
+        // Auto-assign every tag ever observed as a subgenre (appearing after
+        // position 0 on some song) that doesn't have an assignment yet, to
+        // whichever root it appeared under most often.
+        let mut next_assignment_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_assignments",
+            [],
+            |r| r.get(0),
+        )?;
+        for (key, name) in usage {
+            if existing_assignments.contains(&key) {
+                continue;
+            }
+            let Some(root_counts) = child_root_counts.get(&key) else {
+                continue; // never observed as a subgenre — nothing to assign.
+            };
+            let best_root = root_counts.iter().max_by_key(|(_, c)| **c).map(|(k, _)| k.clone());
+            let group_id = match best_root.and_then(|rk| existing_groups.get(&rk).copied()) {
+                Some(id) => id,
+                // Shouldn't normally happen (every root got a group above),
+                // but fall back to giving the tag its own group rather than
+                // silently dropping it.
+                None => create_group(&conn, &name, &mut next_group_sort, &mut group_count)?,
+            };
+            existing_groups.entry(key.clone()).or_insert(group_id);
+            conn.execute(
+                "INSERT OR IGNORE INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)",
+                params![name, group_id, next_assignment_sort],
+            )?;
+            existing_assignments.insert(key);
+            next_assignment_sort += 1;
+            changed = true;
+        }
+
+        Ok(changed)
+    }
+
+    pub fn set_group_color(&self, name: &str, color_index: i32) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE tag_groups SET color_index = ?1 WHERE name = ?2 COLLATE NOCASE",
+            params![color_index.rem_euclid(PALETTE_SIZE), name],
+        )?;
+        Ok(())
+    }
+
+    /// Moves `tag_name` to be a child of `new_group_name`, creating the
+    /// assignment if it doesn't have one yet. `new_group_name` must already
+    /// be a `tag_groups` row (the card being dropped onto).
+    pub fn reparent_tag(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        // A tag can't be curated as a sub-genre of a card sharing its own
+        // name — that's a self-loop with no meaningful drill-down (there's
+        // no separate "child instance" of the same literal genre value).
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
+        let conn = self.db.pool.get()?;
+        let group_id: i64 = conn.query_row(
+            "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![new_group_name],
+            |r| r.get(0),
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_assignments WHERE group_id = ?1",
+            params![group_id],
+            |r| r.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(tag_name) DO UPDATE SET group_id = excluded.group_id, sort_order = excluded.sort_order",
+            params![tag_name, group_id, next_sort],
+        )?;
+        Ok(())
+    }
+
+    /// Demotes `tag_name` from its own primary-genre card to a sub-genre
+    /// chip under `new_group_name` — the reverse of `promote_tag`, and
+    /// distinct from `reparent_tag` (which only ever moves an *assignment*
+    /// and deliberately leaves any separately-existing card with the same
+    /// name alone, so dragging a conflict chip doesn't collapse the actual
+    /// root card sharing its name). This one specifically removes `tag_name`'s
+    /// own `tag_groups` row — used when the user drags a whole card's header
+    /// onto another card. Any children that were curated under the deleted
+    /// card cascade-delete (`tag_assignments.group_id` is `ON DELETE CASCADE`,
+    /// `PRAGMA foreign_keys=ON`) and re-home themselves on the next reconcile
+    /// pass, same as any other orphaned tag.
+    pub fn demote_group_to_child(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let group_id: i64 = conn.query_row(
+            "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+            params![new_group_name],
+            |r| r.get(0),
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_assignments WHERE group_id = ?1",
+            params![group_id],
+            |r| r.get(0),
+        )?;
+        conn.execute(
+            "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(tag_name) DO UPDATE SET group_id = excluded.group_id, sort_order = excluded.sort_order",
+            params![tag_name, group_id, next_sort],
+        )?;
+        Ok(())
+    }
+
+    /// Promotes `tag_name` from a sub-genre chip to its own primary-genre
+    /// card: removes any existing assignment and creates a `tag_groups` row.
+    pub fn promote_tag(&self, tag_name: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![tag_name],
+        )?;
+        let next_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_groups",
+            [],
+            |r| r.get(0),
+        )?;
+        let group_count: i32 = conn.query_row("SELECT COUNT(*) FROM tag_groups", [], |r| r.get(0))?;
+        conn.execute(
+            "INSERT INTO tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)
+             ON CONFLICT(name) DO NOTHING",
+            params![tag_name, group_count % PALETTE_SIZE, next_sort],
+        )?;
+        Ok(())
+    }
+
+    /// Reorders `tag_name` to `new_index` among its group's other children.
+    pub fn reorder_tag_in_group(&self, tag_name: &str, new_index: i32) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        let group_id: i64 = conn.query_row(
+            "SELECT group_id FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![tag_name],
+            |r| r.get(0),
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT tag_name FROM tag_assignments WHERE group_id = ?1 ORDER BY sort_order, tag_name COLLATE NOCASE",
+        )?;
+        let mut siblings: Vec<String> = stmt
+            .query_map(params![group_id], |r| r.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let Some(pos) = siblings.iter().position(|n| n.eq_ignore_ascii_case(tag_name)) else {
+            return Ok(());
+        };
+        let moved = siblings.remove(pos);
+        let target = (new_index.max(0) as usize).min(siblings.len());
+        siblings.insert(target, moved);
+
+        let tx = conn.unchecked_transaction()?;
+        for (i, name) in siblings.iter().enumerate() {
+            tx.execute(
+                "UPDATE tag_assignments SET sort_order = ?1 WHERE tag_name = ?2 COLLATE NOCASE",
+                params![i as i32, name],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Every song whose genre list contains any of `names` (case-insensitive,
+    /// exact component match), as `(song_id, path, genre)` — the working set
+    /// for [`merge_tags`]/[`delete_tags`] file+DB rewrites, computed here
+    /// (not by the command layer) since it needs the same component-match
+    /// semantics as [`Self::get_songs_by_tag`].
+    ///
+    /// [`merge_tags`]: crate::commands::tags::merge_tags
+    /// [`delete_tags`]: crate::commands::tags::delete_tags
+    pub fn songs_containing_any(&self, names: &[String]) -> Result<Vec<(i64, String, String)>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, genre FROM songs
+             WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+        )?;
+        let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+        let rows: Vec<(i64, String, String)> = stmt
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .filter_map(|r| r.ok())
+            .filter(|(_, _, genre): &(i64, String, String)| {
+                parse_multi_value(genre)
+                    .iter()
+                    .any(|v| targets.contains(&v.to_lowercase()))
+            })
+            .collect();
+        Ok(rows)
+    }
+
+    /// Replaces `from` with `into` at the same position in a `; `-delimited
+    /// genre string, deduping if `into` is already present elsewhere in it.
+    pub fn rewrite_genre_for_merge(genre: &str, from: &str, into: &str) -> String {
+        let from_lower = from.to_lowercase();
+        let mut values = parse_multi_value(genre);
+        let mut seen_into = false;
+        for v in values.iter_mut() {
+            if v.eq_ignore_ascii_case(&from_lower) {
+                *v = into.to_string();
+            }
+        }
+        let mut deduped: Vec<String> = Vec::with_capacity(values.len());
+        for v in values {
+            let is_into = v.eq_ignore_ascii_case(into);
+            if is_into && seen_into {
+                continue;
+            }
+            if is_into {
+                seen_into = true;
+            }
+            deduped.push(v);
+        }
+        join_multi_value(&deduped)
+    }
+
+    /// Strips every name in `names` out of a `; `-delimited genre string.
+    pub fn rewrite_genre_for_delete(genre: &str, names: &[String]) -> String {
+        let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+        let kept: Vec<String> = parse_multi_value(genre)
+            .into_iter()
+            .filter(|v| !targets.contains(&v.to_lowercase()))
+            .collect();
+        join_multi_value(&kept)
+    }
+
+    /// Merges `from`'s hierarchy bookkeeping into `into` after a
+    /// [`Self::rewrite_genre_for_merge`] pass over every affected song: any
+    /// children `from` had as a group are reparented under `into` (creating
+    /// a group for `into` if it didn't have one), then every row keyed by
+    /// `from` (its group and/or its own assignment — a conflict tag can have
+    /// both) is removed, since `from` no longer exists as a distinct name.
+    pub fn apply_merge_hierarchy(&self, from: &str, into: &str) -> Result<()> {
+        let conn = self.db.pool.get()?;
+
+        let from_group_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+                params![from],
+                |r| r.get(0),
+            )
+            .ok();
+
+        if let Some(from_id) = from_group_id {
+            let into_group_id: Option<i64> = conn
+                .query_row(
+                    "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+                    params![into],
+                    |r| r.get(0),
+                )
+                .ok();
+            let into_id = match into_group_id {
+                Some(id) => id,
+                None => {
+                    conn.execute(
+                        "UPDATE tag_groups SET name = ?1 WHERE id = ?2",
+                        params![into, from_id],
+                    )?;
+                    from_id
+                }
+            };
+            if into_id != from_id {
+                conn.execute(
+                    "UPDATE OR IGNORE tag_assignments SET group_id = ?1 WHERE group_id = ?2",
+                    params![into_id, from_id],
+                )?;
+                conn.execute("DELETE FROM tag_groups WHERE id = ?1", params![from_id])?;
+            }
+        }
+        // Independent of the group handling above — `from` may have had an
+        // assignment row of its own at the same time (the conflict case).
+        conn.execute(
+            "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+            params![from],
+        )?;
+        Ok(())
+    }
+
+    /// Removes hierarchy rows for deleted tag names.
+    pub fn apply_delete_hierarchy(&self, names: &[String]) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        for name in names {
+            conn.execute(
+                "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
+                params![name],
+            )?;
+            conn.execute(
+                "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                params![name],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Normalizes a tag name for similarity comparison: lowercase, strip
+    /// everything but alphanumerics.
+    fn normalize_for_similarity(name: &str) -> String {
+        name.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(|c| c.to_lowercase())
+            .collect()
+    }
+
+    /// Levenshtein edit distance between two strings (byte-length bounded,
+    /// tag names are short so this is never a performance concern).
+    fn edit_distance(a: &str, b: &str) -> usize {
+        let a: Vec<char> = a.chars().collect();
+        let b: Vec<char> = b.chars().collect();
+        let mut prev: Vec<usize> = (0..=b.len()).collect();
+        let mut curr = vec![0; b.len() + 1];
+        for i in 1..=a.len() {
+            curr[0] = i;
+            for j in 1..=b.len() {
+                curr[j] = if a[i - 1] == b[j - 1] {
+                    prev[j - 1]
+                } else {
+                    1 + prev[j - 1].min(prev[j]).min(curr[j - 1])
+                };
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+        prev[b.len()]
+    }
+
+    /// True when `needle`'s characters all appear in `haystack` in order
+    /// (not necessarily contiguously) — an abbreviation match, e.g.
+    /// "progmetal" is a subsequence of "progressivemetal" even though it's
+    /// not a contiguous substring.
+    fn is_subsequence(needle: &str, haystack: &str) -> bool {
+        let mut hay = haystack.chars();
+        for nc in needle.chars() {
+            if hay.find(|hc| *hc == nc).is_none() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// True when two normalized tag names are near-duplicates:
+    /// - identical once normalized (e.g. "Synthpop" vs "Synth Pop" — same
+    ///   letters, just different spacing), or
+    /// - the shorter is at least half the longer's length and is a
+    ///   subsequence of it (an abbreviation, e.g. "Prog Metal" vs
+    ///   "Progressive Metal" — the length ratio guards against trivial
+    ///   matches like "a" being "found" in almost anything), or
+    /// - their normalized edit-distance similarity ratio is at least 80%
+    ///   (`1 - distance / max_len`).
+    fn is_similar(norm_a: &str, norm_b: &str) -> bool {
+        if norm_a.is_empty() || norm_b.is_empty() {
+            return false;
+        }
+        if norm_a == norm_b {
+            return true;
+        }
+        let (shorter, longer) = if norm_a.chars().count() <= norm_b.chars().count() {
+            (norm_a, norm_b)
+        } else {
+            (norm_b, norm_a)
+        };
+        let len_ratio = shorter.chars().count() as f64 / longer.chars().count() as f64;
+        if len_ratio >= 0.5 && Self::is_subsequence(shorter, longer) {
+            return true;
+        }
+        let max_len = norm_a.chars().count().max(norm_b.chars().count());
+        let distance = Self::edit_distance(norm_a, norm_b);
+        let similarity = 1.0 - (distance as f64 / max_len as f64);
+        similarity >= 0.8
+    }
+
+    /// Near-duplicate tag-name pairs across the current tag list — see
+    /// [`Self::is_similar`]. Excludes any pair that's already a genuine
+    /// parent/subgenre relationship in the persisted hierarchy (e.g. "Metal"
+    /// and "Black Metal" both contain "metal" and would otherwise look like
+    /// a name variant, but one is deliberately curated as the other's
+    /// subgenre, not a duplicate spelling of it). Ordered for determinism;
+    /// the frontend owns per-session dismissal, not persisted here.
+    pub fn get_merge_suggestions(&self) -> Result<Vec<(String, String)>> {
+        let tags = self.list_all_tags()?;
+        let related = self.parent_child_pairs()?;
+        let mut pairs = Vec::new();
+        for i in 0..tags.len() {
+            for j in (i + 1)..tags.len() {
+                let norm_a = Self::normalize_for_similarity(&tags[i].name);
+                let norm_b = Self::normalize_for_similarity(&tags[j].name);
+                if Self::is_similar(&norm_a, &norm_b) && !related.contains(&(norm_a, norm_b)) {
+                    pairs.push((tags[i].name.clone(), tags[j].name.clone()));
+                }
+            }
+        }
+        Ok(pairs)
+    }
+
+    /// Every (normalized child, normalized parent) pair from the persisted
+    /// hierarchy, in both orderings, so callers can cheaply check "are these
+    /// two names already a curated parent/subgenre relationship?".
+    fn parent_child_pairs(&self) -> Result<std::collections::HashSet<(String, String)>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT tag_assignments.tag_name, tag_groups.name
+             FROM tag_assignments JOIN tag_groups ON tag_groups.id = tag_assignments.group_id",
+        )?;
+        let mut pairs = std::collections::HashSet::new();
+        let rows = stmt.query_map([], |row| {
+            let child: String = row.get(0)?;
+            let parent: String = row.get(1)?;
+            Ok((child, parent))
+        })?;
+        for row in rows {
+            let (child, parent) = row?;
+            let norm_child = Self::normalize_for_similarity(&child);
+            let norm_parent = Self::normalize_for_similarity(&parent);
+            pairs.insert((norm_child.clone(), norm_parent.clone()));
+            pairs.insert((norm_parent, norm_child));
+        }
+        Ok(pairs)
+    }
+}
+
+/// Reconciles the persisted Genres hierarchy against the library and, if
+/// anything changed, emits `tags-changed` so the frontend can refresh —
+/// mirrors `playlist::reconcile_and_sync`'s role for dynamic playlists.
+/// Listened for on `library-changed` only (unlike dynamic playlists, the
+/// hierarchy has nothing to do with playback stats).
+pub async fn reconcile_hierarchy_and_notify(app: tauri::AppHandle) {
+    use tauri::{Emitter, Manager};
+    let state = app.state::<crate::AppState>();
+    let manager = TagManager::new(state.db.clone());
+    match manager.reconcile_hierarchy() {
+        Ok(true) => {
+            let _ = app.emit("tags-changed", ());
+        }
+        Ok(false) => {}
+        Err(e) => log::error!("Tag hierarchy reconcile failed: {e}"),
+    }
 }
 
 #[cfg(test)]
@@ -497,6 +1183,357 @@ mod tests {
             .unwrap();
         assert_eq!(under_classical.len(), 1);
         assert_eq!(under_classical[0].genre.as_deref(), Some("Classical; Symphonic Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    // -----------------------------------------------------------------
+    // Persisted Genres curation hierarchy (#545)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn test_hierarchy_reflects_existing_genres_after_reconcile() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/b.mp3", "Metal; Symphonic Metal");
+        insert_song(&db, "/c.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        // Migration 18 only seeds from whatever's in `songs` at that moment
+        // (i.e. an existing library at upgrade time) — these tests insert
+        // songs into a fresh DB afterward, so reconcile (normally triggered
+        // by the app's "library-changed" listener) does the initial build.
+        manager.reconcile_hierarchy().unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+
+        let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+        let child_names: Vec<&str> = metal.children.iter().map(|c| c.name.as_str()).collect();
+        assert!(child_names.contains(&"Progressive Metal"));
+        assert!(child_names.contains(&"Symphonic Metal"));
+        assert!(hierarchy.iter().any(|g| g.name == "Ambient"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reconcile_hierarchy_adds_new_tags_and_evicts_stale_ones() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
+        let manager = TagManager::new(db.clone());
+        // First call builds the hierarchy from scratch; a second call with
+        // nothing new/removed should be a no-op.
+        assert!(manager.reconcile_hierarchy().unwrap());
+        assert!(!manager.reconcile_hierarchy().unwrap());
+
+        // A brand new tag appears (e.g. a fresh scan/tag edit) — reconcile should pick it up.
+        insert_song(&db, "/b.mp3", "Ambient; Drone");
+        assert!(manager.reconcile_hierarchy().unwrap());
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(hierarchy.iter().any(|g| g.name == "Ambient"));
+        let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
+        assert!(ambient.children.iter().any(|c| c.name == "Drone"));
+
+        // Every song using "Metal" is deleted — its group should be evicted.
+        db.pool
+            .get()
+            .unwrap()
+            .execute("DELETE FROM songs WHERE path = '/a.mp3'", [])
+            .unwrap();
+        assert!(manager.reconcile_hierarchy().unwrap());
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(!hierarchy.iter().any(|g| g.name == "Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_conflict_flag_when_child_name_is_also_a_top_level_group() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic; Pop");
+        insert_song(&db, "/b.mp3", "Pop");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        let pop_child = electronic.children.iter().find(|c| c.name == "Pop").unwrap();
+        assert!(pop_child.is_conflict, "Pop is also its own top-level group");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reparent_and_promote_tag() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/b.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        manager.reparent_tag("Progressive Metal", "Ambient").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+        assert!(!metal.children.iter().any(|c| c.name == "Progressive Metal"));
+        let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
+        assert!(ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        manager.promote_tag("Progressive Metal").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(hierarchy.iter().any(|g| g.name == "Progressive Metal"));
+        let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
+        assert!(!ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reparent_and_demote_refuse_a_tag_becoming_a_child_of_its_own_name() {
+        // A tag can't meaningfully be a sub-genre of a card sharing its own
+        // name — there's no separate "child instance" of the same literal
+        // genre value, so the drill-down would show 0 songs despite the
+        // chip's own displayed count. Both operations should be no-ops.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+        insert_song(&db, "/b.mp3", "Rock; Electronic");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        manager.reparent_tag("Electronic", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(
+            !electronic.children.iter().any(|c| c.name == "Electronic"),
+            "reparent_tag onto a same-named group should be a no-op"
+        );
+
+        manager.demote_group_to_child("Electronic", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            hierarchy.iter().any(|g| g.name == "Electronic"),
+            "demote_group_to_child onto a same-named group should be a no-op, not delete the card"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reconcile_hierarchy_evicts_a_preexisting_self_referential_assignment() {
+        // Simulates data from before the reparent/demote guards existed —
+        // reconcile should clean this up rather than leave a chip that
+        // always shows 0 songs despite its own displayed count.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        {
+            let conn = db.pool.get().unwrap();
+            let group_id: i64 = conn
+                .query_row(
+                    "SELECT id FROM tag_groups WHERE name = 'Electronic'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            conn.execute(
+                "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Electronic', ?1, 0)",
+                params![group_id],
+            )
+            .unwrap();
+        }
+
+        manager.reconcile_hierarchy().unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(!electronic.children.iter().any(|c| c.name == "Electronic"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_demote_group_to_child_removes_own_card_and_reassigns_its_children() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+        insert_song(&db, "/b.mp3", "Synth-Pop; Electronic");
+        insert_song(&db, "/c.mp3", "Synth-Pop; New Retro Wave");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        // Sanity: Synth-Pop starts out as its own card (it's position-0 on
+        // /c.mp3) with "New Retro Wave" curated under it.
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(hierarchy.iter().any(|g| g.name == "Synth-Pop"));
+
+        manager.demote_group_to_child("Synth-Pop", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            !hierarchy.iter().any(|g| g.name == "Synth-Pop"),
+            "Synth-Pop should no longer have its own card"
+        );
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(electronic.children.iter().any(|c| c.name == "Synth-Pop"));
+        // Its former child cascade-deleted rather than dangling on a
+        // deleted group_id.
+        assert!(!hierarchy.iter().flat_map(|g| &g.children).any(|c| c.name == "New Retro Wave"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_demoted_group_is_not_resurrected_by_a_later_reconcile() {
+        // Regression test: get_tag_hierarchy's command handler reconciles
+        // before every read (self-heal-on-read), so a demote that only
+        // touches the curated tables — never the raw songs.genre text, which
+        // still has this tag at position 0 — must survive that next
+        // reconcile pass, not get its root silently recreated by it.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Alternative");
+        insert_song(&db, "/b.mp3", "Shoegaze");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        manager.demote_group_to_child("Shoegaze", "Alternative").unwrap();
+
+        // Simulates the reconcile-before-read that get_tag_hierarchy's
+        // command handler now does on every call.
+        manager.reconcile_hierarchy().unwrap();
+
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            !hierarchy.iter().any(|g| g.name == "Shoegaze"),
+            "a later reconcile should not resurrect a tag the user just demoted"
+        );
+        let alternative = hierarchy.iter().find(|g| g.name == "Alternative").unwrap();
+        assert!(alternative.children.iter().any(|c| c.name == "Shoegaze"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reorder_tag_in_group() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal; Symphonic Metal; Doom Metal");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        manager.reorder_tag_in_group("Doom Metal", 0).unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+        assert_eq!(metal.children[0].name, "Doom Metal");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_rewrite_genre_for_merge_preserves_position_and_dedupes() {
+        assert_eq!(
+            TagManager::rewrite_genre_for_merge("Metal; Prog Metal", "Prog Metal", "Progressive Metal"),
+            "Metal; Progressive Metal"
+        );
+        // Merging into a name already present elsewhere in the list dedupes.
+        assert_eq!(
+            TagManager::rewrite_genre_for_merge("Prog Metal; Progressive Metal", "Prog Metal", "Progressive Metal"),
+            "Progressive Metal"
+        );
+        // Unaffected songs pass through unchanged.
+        assert_eq!(
+            TagManager::rewrite_genre_for_merge("Ambient", "Prog Metal", "Progressive Metal"),
+            "Ambient"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_genre_for_delete_strips_names() {
+        assert_eq!(
+            TagManager::rewrite_genre_for_delete(
+                "Metal; Progressive Metal; Symphonic Metal",
+                &["Progressive Metal".to_string()]
+            ),
+            "Metal; Symphonic Metal"
+        );
+    }
+
+    #[test]
+    fn test_merge_tags_rewrites_genre_and_hierarchy() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Prog Metal");
+        insert_song(&db, "/b.mp3", "Metal; Progressive Metal");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        let affected = manager
+            .songs_containing_any(&["Prog Metal".to_string()])
+            .unwrap();
+        assert_eq!(affected.len(), 1);
+
+        let conn = db.pool.get().unwrap();
+        for (id, _path, genre) in &affected {
+            let new_genre = TagManager::rewrite_genre_for_merge(genre, "Prog Metal", "Progressive Metal");
+            conn.execute(
+                "UPDATE songs SET genre = ?1 WHERE id = ?2",
+                params![new_genre, id],
+            )
+            .unwrap();
+        }
+        manager.apply_merge_hierarchy("Prog Metal", "Progressive Metal").unwrap();
+
+        let songs = manager
+            .get_songs_by_tag("Progressive Metal", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(songs.len(), 2);
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
+        assert!(!metal.children.iter().any(|c| c.name == "Prog Metal"));
+        assert!(metal.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_merge_suggestions_matches_mock_examples() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Prog Metal");
+        insert_song(&db, "/b.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/c.mp3", "Synthpop");
+        insert_song(&db, "/d.mp3", "Synth Pop");
+        insert_song(&db, "/e.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        let suggestions = manager.get_merge_suggestions().unwrap();
+        let has_pair = |a: &str, b: &str| {
+            suggestions
+                .iter()
+                .any(|(x, y)| (x == a && y == b) || (x == b && y == a))
+        };
+        assert!(has_pair("Prog Metal", "Progressive Metal"));
+        assert!(has_pair("Synthpop", "Synth Pop"));
+        assert!(!has_pair("Ambient", "Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_merge_suggestions_excludes_curated_subgenres() {
+        // "Black Metal" contains "Metal" and would otherwise pass the
+        // containment/similarity check, but it's a genuine curated subgenre
+        // of "Metal" (not a duplicate spelling of it) — see #545 feedback.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "Metal; Black Metal");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        let suggestions = manager.get_merge_suggestions().unwrap();
+        assert!(
+            !suggestions
+                .iter()
+                .any(|(x, y)| (x == "Metal" && y == "Black Metal")
+                    || (x == "Black Metal" && y == "Metal")),
+            "curated parent/subgenre pairs should not be suggested for merging"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }
