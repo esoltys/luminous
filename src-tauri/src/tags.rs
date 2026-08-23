@@ -1405,7 +1405,10 @@ mod tests {
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
         assert!(
-            !electronic.children.iter().any(|c| c.name.eq_ignore_ascii_case("Electronic")),
+            !electronic
+                .children
+                .iter()
+                .any(|c| c.name.eq_ignore_ascii_case("Electronic")),
             "Electronic must not be nested as its own sub-genre"
         );
 
