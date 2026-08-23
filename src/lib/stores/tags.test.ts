@@ -37,8 +37,6 @@ describe("TagsStore", () => {
           return [{ id: 4, title: "Song D" }];
         case "get_tag_hierarchy":
           return mockHierarchy;
-        case "get_merge_suggestions":
-          return [["Prog Metal", "Progressive Metal"]];
         case "set_tag_group_color":
         case "reparent_tag":
         case "promote_tag":
@@ -94,18 +92,6 @@ describe("TagsStore", () => {
   it("loads the persisted Genres hierarchy", async () => {
     await tagsStore.loadHierarchy();
     expect(tagsStore.hierarchy).toEqual(mockHierarchy);
-  });
-
-  it("loads merge suggestions, excluding session-dismissed pairs", async () => {
-    await tagsStore.loadMergeSuggestions();
-    expect(tagsStore.mergeSuggestions).toEqual([["Prog Metal", "Progressive Metal"]]);
-
-    tagsStore.dismissSuggestion("Prog Metal", "Progressive Metal");
-    expect(tagsStore.mergeSuggestions).toEqual([]);
-
-    // Dismissal is order-independent and persists across a reload within the session.
-    await tagsStore.loadMergeSuggestions();
-    expect(tagsStore.mergeSuggestions).toEqual([]);
   });
 
   it("sets a group's color and refreshes the hierarchy", async () => {

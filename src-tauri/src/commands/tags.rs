@@ -101,14 +101,6 @@ pub async fn get_tag_hierarchy(state: State<'_, AppState>) -> Result<Vec<TagGrou
 }
 
 #[tauri::command]
-pub async fn get_merge_suggestions(
-    state: State<'_, AppState>,
-) -> Result<Vec<(String, String)>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager.get_merge_suggestions().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn set_tag_group_color(
     state: State<'_, AppState>,
     name: String,
