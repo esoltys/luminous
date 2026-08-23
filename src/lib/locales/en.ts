@@ -883,7 +883,6 @@ export const en = {
     sortName: "Name",
     sortSongCount: "Song Count",
     noSubgenresYet: "No sub-genres yet — drag a tag here",
-    conflictTooltip: "\"{name}\" is also a top-level genre elsewhere in your library",
     selectTags: "Select Tags",
     selectedCount: "{count} selected",
     mergeSelected: "Merge Selected",

@@ -296,13 +296,12 @@ export interface GenreGroup {
   children: TagCount[];
 }
 
-/** One sub-genre chip assigned under a {@link TagGroup} (#545) — `is_conflict`
- * is true when this same name is also the name of some (other) top-level
- * group elsewhere in the library. */
+/** One sub-genre chip assigned under a {@link TagGroup} (#545). A tag that's
+ * also the name of some (other) top-level group elsewhere in the library
+ * never appears here — the backend strips that link on sight. */
 export interface TagGroupChild {
   name: string;
   song_count: number;
-  is_conflict: boolean;
 }
 
 /** One primary-genre "card" in the persisted Genres curation hierarchy

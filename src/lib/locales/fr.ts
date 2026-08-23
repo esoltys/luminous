@@ -661,7 +661,6 @@ export const fr = {
     sortName: "Nom",
     sortSongCount: "Nombre de chansons",
     noSubgenresYet: "Aucun sous-genre pour l'instant — glissez un tag ici",
-    conflictTooltip: "« {name} » est également un genre principal ailleurs dans votre bibliothèque",
     selectTags: "Sélectionner les tags",
     selectedCount: "{count} sélectionné(s)",
     mergeSelected: "Fusionner la sélection",
