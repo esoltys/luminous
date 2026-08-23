@@ -1024,7 +1024,7 @@ export const en = {
     closeSearch: "Close search dropdown",
     goBack: "Go back",
     goForward: "Go forward",
-    toggleSidebar: "Toggle left sidebar",
+    toggleSidebar: "Toggle sidebar (compact / expanded)",
     toggleImmersive: "Toggle immersion mode",
     toggleRightPanel: "Toggle right panel",
     toggleMiniplayer: "Toggle miniplayer",
