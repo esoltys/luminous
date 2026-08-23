@@ -465,6 +465,32 @@ impl TagManager {
             }
         }
 
+        // Clean up any self-referential assignment (a tag curated as a
+        // sub-genre of a card sharing its own name) from before
+        // reparent_tag/demote_group_to_child guarded against creating one —
+        // it has no meaningful drill-down (there's no separate "child
+        // instance" of the same literal genre value) and would otherwise
+        // show 0 songs despite the chip's own displayed count.
+        {
+            let mut stmt = conn.prepare(
+                "SELECT tag_assignments.tag_name
+                 FROM tag_assignments JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
+                 WHERE tag_assignments.tag_name = tag_groups.name COLLATE NOCASE",
+            )?;
+            let self_referential: Vec<String> = stmt
+                .query_map([], |r| r.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            for name in self_referential {
+                conn.execute(
+                    "DELETE FROM tag_assignments WHERE tag_name = ?1 COLLATE NOCASE",
+                    params![name],
+                )?;
+                existing_assignments.remove(&name.to_lowercase());
+                changed = true;
+            }
+        }
+
         // Evict rows for tags no longer used anywhere in the library.
         for key in existing_groups.keys().cloned().collect::<Vec<_>>() {
             if !usage.contains_key(&key) {
@@ -591,6 +617,12 @@ impl TagManager {
     /// assignment if it doesn't have one yet. `new_group_name` must already
     /// be a `tag_groups` row (the card being dropped onto).
     pub fn reparent_tag(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        // A tag can't be curated as a sub-genre of a card sharing its own
+        // name — that's a self-loop with no meaningful drill-down (there's
+        // no separate "child instance" of the same literal genre value).
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
         let conn = self.db.pool.get()?;
         let group_id: i64 = conn.query_row(
             "SELECT id FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
@@ -622,6 +654,9 @@ impl TagManager {
     /// `PRAGMA foreign_keys=ON`) and re-home themselves on the next reconcile
     /// pass, same as any other orphaned tag.
     pub fn demote_group_to_child(&self, tag_name: &str, new_group_name: &str) -> Result<()> {
+        if tag_name.eq_ignore_ascii_case(new_group_name) {
+            return Ok(());
+        }
         let conn = self.db.pool.get()?;
         conn.execute(
             "DELETE FROM tag_groups WHERE name = ?1 COLLATE NOCASE",
@@ -1247,6 +1282,72 @@ mod tests {
         assert!(hierarchy.iter().any(|g| g.name == "Progressive Metal"));
         let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
         assert!(!ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reparent_and_demote_refuse_a_tag_becoming_a_child_of_its_own_name() {
+        // A tag can't meaningfully be a sub-genre of a card sharing its own
+        // name — there's no separate "child instance" of the same literal
+        // genre value, so the drill-down would show 0 songs despite the
+        // chip's own displayed count. Both operations should be no-ops.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+        insert_song(&db, "/b.mp3", "Rock; Electronic");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        manager.reparent_tag("Electronic", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(
+            !electronic.children.iter().any(|c| c.name == "Electronic"),
+            "reparent_tag onto a same-named group should be a no-op"
+        );
+
+        manager.demote_group_to_child("Electronic", "Electronic").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            hierarchy.iter().any(|g| g.name == "Electronic"),
+            "demote_group_to_child onto a same-named group should be a no-op, not delete the card"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_reconcile_hierarchy_evicts_a_preexisting_self_referential_assignment() {
+        // Simulates data from before the reparent/demote guards existed —
+        // reconcile should clean this up rather than leave a chip that
+        // always shows 0 songs despite its own displayed count.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Electronic");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        {
+            let conn = db.pool.get().unwrap();
+            let group_id: i64 = conn
+                .query_row(
+                    "SELECT id FROM tag_groups WHERE name = 'Electronic'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            conn.execute(
+                "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Electronic', ?1, 0)",
+                params![group_id],
+            )
+            .unwrap();
+        }
+
+        manager.reconcile_hierarchy().unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let electronic = hierarchy.iter().find(|g| g.name == "Electronic").unwrap();
+        assert!(!electronic.children.iter().any(|c| c.name == "Electronic"));
 
         let _ = std::fs::remove_dir_all(dir);
     }

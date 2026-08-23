@@ -4,6 +4,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { GENRE_PALETTE_HUES, genreColorHsl } from "../utils/genrePalette";
+  import { portal } from "../utils/portal";
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
 
@@ -31,7 +32,35 @@
     compact = false,
   }: Props = $props();
 
+  // Portaled to document.body (see the imported `portal` action) rather than
+  // positioned absolute inside the card — the card has overflow-hidden (so
+  // its header's flush corners match the rounded border), which otherwise
+  // clips the popover to a sliver instead of just placing it above other
+  // content.
   let colorPopoverFor = $state<string | null>(null);
+  let colorPopoverPos = $state<{ x: number; y: number } | null>(null);
+  let colorPopoverEl = $state<HTMLDivElement | null>(null);
+
+  function toggleColorPopover(e: MouseEvent, name: string) {
+    if (colorPopoverFor === name) {
+      colorPopoverFor = null;
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    colorPopoverPos = { x: rect.left, y: rect.bottom + 4 };
+    colorPopoverFor = name;
+  }
+
+  function handleWindowMouseDown(e: MouseEvent) {
+    if (!colorPopoverFor) return;
+    const target = e.target as HTMLElement;
+    // The swatch button that opened it toggles the popover itself in its
+    // own click handler — closing here first would just make it reopen.
+    if (target.closest("[data-color-swatch-for]")) return;
+    if (colorPopoverEl && !colorPopoverEl.contains(target)) {
+      colorPopoverFor = null;
+    }
+  }
 
   let contextMenuTarget = $state<{ x: number; y: number; name: string; isRoot: boolean } | null>(null);
   let renamingTag = $state<string | null>(null);
@@ -215,7 +244,7 @@
   }
 </script>
 
-<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} />
+<svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} onmousedown={handleWindowMouseDown} />
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
@@ -240,25 +269,13 @@
         <div class="relative shrink-0">
           <button
             type="button"
-            onclick={() => { colorPopoverFor = colorPopoverFor === group.name ? null : group.name; }}
+            data-color-swatch-for={group.name}
+            onclick={(e) => toggleColorPopover(e, group.name)}
             class="w-4 h-4 rounded-full border border-black/10 shrink-0"
             style="background-color: {genreColorHsl(group.color_index)}"
             title={i18n.t("songTags.changeColorTooltip", {}, "Change color")}
             aria-label={i18n.t("songTags.changeColorTooltip", {}, "Change color")}
           ></button>
-          {#if colorPopoverFor === group.name}
-            <div class="absolute z-20 top-6 left-0 grid grid-cols-5 gap-1.5 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl">
-              {#each GENRE_PALETTE_HUES as _, i (i)}
-                <button
-                  type="button"
-                  onclick={() => { tagsStore.setGroupColor(group.name, i); colorPopoverFor = null; }}
-                  class="w-5 h-5 rounded-full border-2 {group.color_index === i ? 'border-brand-text-primary' : 'border-transparent'}"
-                  style="background-color: {genreColorHsl(i)}"
-                  aria-label={`${i}`}
-                ></button>
-              {/each}
-            </div>
-          {/if}
         </div>
         {#if renamingTag === group.name}
           <input
@@ -351,6 +368,26 @@
     style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; background-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 40%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 90%, var(--color-brand-text-primary)); border-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 60%, transparent);`}
   >
     {ghostInfo.label}
+  </div>
+{/if}
+
+{#if colorPopoverFor && colorPopoverPos}
+  {@const group = sortedHierarchy.find((g) => g.name === colorPopoverFor)}
+  <div
+    use:portal
+    bind:this={colorPopoverEl}
+    class="fixed z-50 grid grid-cols-5 gap-1.5 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl"
+    style={`left: ${colorPopoverPos.x}px; top: ${colorPopoverPos.y}px;`}
+  >
+    {#each GENRE_PALETTE_HUES as _, i (i)}
+      <button
+        type="button"
+        onclick={() => { tagsStore.setGroupColor(colorPopoverFor!, i); colorPopoverFor = null; }}
+        class="w-5 h-5 rounded-full border-2 {group?.color_index === i ? 'border-brand-text-primary' : 'border-transparent'}"
+        style="background-color: {genreColorHsl(i)}"
+        aria-label={`${i}`}
+      ></button>
+    {/each}
   </div>
 {/if}
 

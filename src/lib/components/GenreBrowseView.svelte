@@ -133,10 +133,15 @@
   let selectedTag = $derived(collectionStore.selectedGenreDrillDown?.displayTag ?? null);
 
   function fetchForContext(ctx: GenreDrillDown) {
-    if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag!, 500);
     if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag!, 500);
     if (ctx.kind === "none") return tagsStore.getSongsWithoutGenre(500);
-    return tagsStore.getSongsByGenreEdge(ctx.root!, ctx.tag!, 500);
+    // "tag" and "edge" both resolve to the same query: dragging a chip
+    // between cards only moves curation metadata, never the underlying
+    // songs.genre text, so a curated child's real membership is still
+    // just "every song carrying this exact value" — the same as the flat
+    // Tags view's any-position match, regardless of which card it's
+    // currently filed under.
+    return tagsStore.getSongsByTag(ctx.tag!, 500);
   }
 
   function refreshDrillDown() {
