@@ -514,14 +514,28 @@ impl TagManager {
         };
 
         // Auto-create a group for any tag ever used as a main/position-0
-        // value, that doesn't have one yet. Independent of whether the same
-        // tag also gets an assignment below — a tag genuinely used as a main
-        // category on some songs and a subgenre on others (the library
-        // disagreeing with itself, same as `get_genre_graph` already has to
-        // handle) legitimately ends up with both, which is exactly what the
-        // conflict badge is for.
+        // value, that doesn't have one yet — UNLESS it already has a curated
+        // assignment from a *previous* reconcile or an explicit demote (see
+        // `demote_group_to_child`). Without this exception, demoting a card
+        // would get silently undone the very next time the hierarchy is read
+        // (`get_tag_hierarchy` reconciles before every read): the demote only
+        // touches the curated tables, never the raw `songs.genre` text, so
+        // the tag is still literally position-0 somewhere and this loop
+        // would otherwise recreate its root on the spot.
+        //
+        // This doesn't affect the case this loop also exists for — a tag
+        // genuinely used as a main category on some songs and a subgenre on
+        // others, discovered together in the same, first reconcile pass —
+        // because `existing_assignments` here only reflects assignments
+        // that existed *before* this call started; the sibling loop below
+        // that creates fresh assignments runs after this one, so a brand
+        // new conflict still gets both rows in one pass (see
+        // `test_conflict_flag_when_child_name_is_also_a_top_level_group`).
         for (key, name) in usage.clone() {
-            if *is_root.get(&key).unwrap_or(&false) && !existing_groups.contains_key(&key) {
+            if *is_root.get(&key).unwrap_or(&false)
+                && !existing_groups.contains_key(&key)
+                && !existing_assignments.contains(&key)
+            {
                 let id = create_group(&conn, &name, &mut next_group_sort, &mut group_count)?;
                 existing_groups.insert(key, id);
                 changed = true;
@@ -1262,6 +1276,36 @@ mod tests {
         // Its former child cascade-deleted rather than dangling on a
         // deleted group_id.
         assert!(!hierarchy.iter().flat_map(|g| &g.children).any(|c| c.name == "New Retro Wave"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_demoted_group_is_not_resurrected_by_a_later_reconcile() {
+        // Regression test: get_tag_hierarchy's command handler reconciles
+        // before every read (self-heal-on-read), so a demote that only
+        // touches the curated tables — never the raw songs.genre text, which
+        // still has this tag at position 0 — must survive that next
+        // reconcile pass, not get its root silently recreated by it.
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Alternative");
+        insert_song(&db, "/b.mp3", "Shoegaze");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+        manager.demote_group_to_child("Shoegaze", "Alternative").unwrap();
+
+        // Simulates the reconcile-before-read that get_tag_hierarchy's
+        // command handler now does on every call.
+        manager.reconcile_hierarchy().unwrap();
+
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        assert!(
+            !hierarchy.iter().any(|g| g.name == "Shoegaze"),
+            "a later reconcile should not resurrect a tag the user just demoted"
+        );
+        let alternative = hierarchy.iter().find(|g| g.name == "Alternative").unwrap();
+        assert!(alternative.children.iter().any(|c| c.name == "Shoegaze"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
