@@ -348,7 +348,7 @@
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
             class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 22%, transparent); border-color: color-mix(in srgb, ${genreColorHslBright(group.color_index)} 70%, transparent); color: ${genreColorHslBright(group.color_index)};`}
+            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslBright(group.color_index)} 70%, transparent); color: ${genreColorHslBright(group.color_index)};`}
           >
             {#if selectMode}
               <input
