@@ -52,22 +52,43 @@
    * care which kind of drag is in progress. */
   let draggedCard = $state<string | null>(null);
   let dropTarget = $state<{ kind: "card" | "header" | "chip"; group: string; chip?: string } | null>(null);
+  /** Cursor position while a drag is active, for the floating ghost label —
+   * cleared alongside draggedChip/draggedCard on pointerup. */
+  let pointerPos = $state<{ x: number; y: number } | null>(null);
+
+  /** What the floating ghost shows: the dragged item's own label, colored
+   * like its current card (falls back to the target card's own hue for a
+   * promoted-from-nowhere case, though that shouldn't normally happen). */
+  let ghostInfo = $derived.by(() => {
+    if (draggedChip) {
+      const group = tagsStore.hierarchy.find((g) => g.name === draggedChip!.fromGroup);
+      return { label: draggedChip.name, colorIndex: group?.color_index ?? 0 };
+    }
+    if (draggedCard) {
+      const group = tagsStore.hierarchy.find((g) => g.name === draggedCard);
+      return { label: draggedCard, colorIndex: group?.color_index ?? 0 };
+    }
+    return null;
+  });
 
   function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
     if (selectMode) return;
     if ((e.target as HTMLElement).closest("button")) return;
     e.preventDefault();
     draggedChip = { name, fromGroup };
+    pointerPos = { x: e.clientX, y: e.clientY };
   }
 
   function handleCardPointerDown(e: PointerEvent, name: string) {
     if (selectMode) return;
     e.preventDefault();
     draggedCard = name;
+    pointerPos = { x: e.clientX, y: e.clientY };
   }
 
   function handlePointerMove(e: PointerEvent) {
     if (!draggedChip && !draggedCard) return;
+    pointerPos = { x: e.clientX, y: e.clientY };
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const chipEl = el?.closest<HTMLElement>("[data-chip-key]");
     const headerEl = el?.closest<HTMLElement>("[data-card-header]");
@@ -90,6 +111,7 @@
     draggedChip = null;
     draggedCard = null;
     dropTarget = null;
+    pointerPos = null;
 
     if (card) {
       if (target && target.group !== card) {
@@ -119,11 +141,11 @@
   {#each sortedHierarchy as group (group.name)}
     <div
       data-card-name={group.name}
-      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color] {draggedCard === group.name ? 'opacity-40' : ''} {dropTarget?.kind === 'card' && dropTarget.group === group.name ? 'border-brand-accent ring-2 ring-brand-accent/40' : 'border-brand-border/60'}"
+      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color,transform] {draggedCard === group.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard) ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : 'border-brand-border/60'}"
     >
       <div
         data-card-header={group.name}
-        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/15' : ''}"
+        class="flex items-center gap-2 px-3 py-2.5 transition-colors {dropTarget?.kind === 'header' && dropTarget.group === group.name ? 'bg-brand-accent/25' : ''}"
       >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
@@ -182,7 +204,7 @@
             data-chip-group={group.name}
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'chip' && dropTarget.chip === child.name) || selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
             style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 22%, transparent); border-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 45%, transparent); color: ${genreColorHsl(group.color_index)};`}
           >
             {#if selectMode}
@@ -212,3 +234,12 @@
     </div>
   {/each}
 </div>
+
+{#if ghostInfo && pointerPos}
+  <div
+    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border text-xs font-semibold shadow-2xl -translate-y-1/2"
+    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; background-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 40%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 90%, var(--color-brand-text-primary)); border-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 60%, transparent);`}
+  >
+    {ghostInfo.label}
+  </div>
+{/if}
