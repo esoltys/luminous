@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare, LayoutGrid, Rows3, Pencil } from "lucide-svelte";
+  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, CheckSquare, LayoutGrid, Rows3, Pencil } from "lucide-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { songsToCoverStack } from "../utils/covers";
   import { shuffleArray } from "../utils/shuffle";
@@ -36,7 +36,6 @@
   let genreSortField = $state<GenreSortField>("name");
   let genreSortAsc = $state(true);
   let mergeDialogNames = $state<string[] | null>(null);
-  let mergeDialogSuggestionPair = $state<[string, string] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
 
   function toggleSelectMode() {
@@ -56,7 +55,6 @@
 
   function openMergeSelected() {
     if (selected.size < 2) return;
-    mergeDialogSuggestionPair = null;
     mergeDialogNames = Array.from(selected);
   }
 
@@ -65,34 +63,14 @@
     deleteConfirmNames = Array.from(selected);
   }
 
-  function suggestionSongCount(name: string): number {
-    return tagsStore.allTags.find((t) => t.name === name)?.song_count ?? 0;
-  }
-
-  /** "Parent: Name" when the tag is curated as a sub-genre somewhere, so a
-   * merge suggestion like "Alternative" vs. "Alternative Metal" doesn't read
-   * as ambiguous when "Alternative Metal" is actually filed under "Metal". */
-  function suggestionLabel(name: string): string {
-    const parent = tagsStore.hierarchy.find((g) => g.children.some((c) => c.name === name));
-    return parent ? `${parent.name}: ${name}` : name;
-  }
-
-  function acceptSuggestion(a: string, b: string) {
-    mergeDialogSuggestionPair = [a, b];
-    mergeDialogNames = [a, b];
-  }
-
   async function confirmMerge(survivor: string) {
     const names = mergeDialogNames ?? [];
-    const suggestionPair = mergeDialogSuggestionPair;
     mergeDialogNames = null;
-    mergeDialogSuggestionPair = null;
     const others = names.filter((n) => n !== survivor);
     let total = 0;
     for (const other of others) {
       total += await tagsStore.mergeTags(other, survivor);
     }
-    if (suggestionPair) tagsStore.dismissSuggestion(suggestionPair[0], suggestionPair[1]);
     selected = new Set();
     toastStore.show(
       i18n.t("songTags.mergeToast", { count: total, name: survivor }, `Merged into "${survivor}" (${total} songs updated)`),
@@ -170,7 +148,6 @@
     listen("library-changed", refreshDrillDown).then((fn) => { unlisten = fn; });
     tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
     tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
-    tagsStore.loadMergeSuggestions().catch((e) => console.error("Failed to load merge suggestions:", e));
     // Restore a drill-down carried over from a previous visit/session (e.g.
     // Back/Forward or app relaunch) by re-fetching its songs.
     refreshDrillDown();
@@ -595,37 +572,6 @@
       </div>
     {/if}
 
-    {#each tagsStore.mergeSuggestions as [a, b] (`${a}|${b}`)}
-      {@const [big, small] = suggestionSongCount(a) >= suggestionSongCount(b) ? [a, b] : [b, a]}
-      <div class="flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-lg bg-brand-accent/10 border border-brand-accent/25">
-        <div class="flex items-center gap-2 min-w-0 text-xs text-brand-text-primary">
-          <GitMerge class="w-3.5 h-3.5 text-brand-accent-text shrink-0" />
-          <span class="truncate">
-            {i18n.t(
-              "songTags.mergeSuggestion",
-              { a: suggestionLabel(big), b: suggestionLabel(small) },
-              `"${suggestionLabel(big)}" and "${suggestionLabel(small)}" look similar`
-            )}
-          </span>
-        </div>
-        <div class="flex items-center gap-3 shrink-0">
-          <button
-            onclick={() => acceptSuggestion(a, b)}
-            class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
-          >
-            {i18n.t("songTags.mergeConfirm", {}, "Merge")}
-          </button>
-          <button
-            onclick={() => tagsStore.dismissSuggestion(a, b)}
-            class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-            aria-label={i18n.t("songTags.dismissSuggestion", {}, "Dismiss")}
-          >
-            <XIcon class="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    {/each}
-
     {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
       <div class="py-16">
         <EmptyState
@@ -742,7 +688,7 @@
   <MergeSurvivorDialog
     names={mergeDialogNames}
     onConfirm={confirmMerge}
-    onCancel={() => { mergeDialogNames = null; mergeDialogSuggestionPair = null; }}
+    onCancel={() => { mergeDialogNames = null; }}
   />
 {/if}
 
