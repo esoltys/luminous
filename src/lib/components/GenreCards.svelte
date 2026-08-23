@@ -300,7 +300,8 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none {selectMode ? '' : draggedCard === group.name ? 'cursor-grabbing' : 'cursor-grab'} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          class="shrink-0 touch-none text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          style={selectMode ? '' : `cursor: ${draggedCard === group.name ? 'grabbing' : 'grab'};`}
           title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
         >
           <GripVertical class="w-3.5 h-3.5" />
