@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
+  import { prefs, type GenreViewMode, type GenreSortField } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore, type GenreDrillDown } from "../stores/collection.svelte";
@@ -30,11 +30,6 @@
   let selectMode = $state(false);
   let selected = $state<Set<string>>(new Set());
 
-  /** Sorts both the primary-genre cards and each card's own sub-genre chips —
-   * display-only, doesn't touch the persisted drag-reorder sort_order. */
-  type GenreSortField = "name" | "count";
-  let genreSortField = $state<GenreSortField>("name");
-  let genreSortAsc = $state(true);
   let mergeDialogNames = $state<string[] | null>(null);
   let mergeDialogSuggestionPair = $state<[string, string] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
@@ -517,11 +512,11 @@
         {#if prefs.genreViewMode === "genre"}
           <div class="relative">
             <Select
-              value={`${genreSortField}-${genreSortAsc}`}
+              value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
               onchange={(e) => {
                 const [field, asc] = e.currentTarget.value.split("-");
-                genreSortField = field as GenreSortField;
-                genreSortAsc = asc === "true";
+                prefs.setGenreSortField(field as GenreSortField);
+                prefs.setGenreSortAsc(asc === "true");
               }}
               class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
             >
@@ -645,8 +640,8 @@
         onToggleSelect={toggleSelect}
         onOpenMainTag={openMainTag}
         onOpenGenreEdge={openGenreEdge}
-        sortField={genreSortField}
-        sortAsc={genreSortAsc}
+        sortField={prefs.genreSortField}
+        sortAsc={prefs.genreSortAsc}
         compact={prefs.genreCardsViewMode === "rows"}
       />
       {#if tagsStore.noGenreCount > 0}
