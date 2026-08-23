@@ -159,6 +159,11 @@
 
   function handleChipPointerDown(e: PointerEvent, name: string, fromGroup: string) {
     if (selectMode) return;
+    // Right-click (and middle-click) must fall through untouched — calling
+    // preventDefault on any pointerdown suppresses the compatibility mouse
+    // events it's derived from, which was silently swallowing the
+    // right-button's contextmenu trigger too.
+    if (e.button !== 0) return;
     // The rename input and the a11y checkbox handle their own clicks —
     // don't hijack them into a drag.
     if ((e.target as HTMLElement).tagName === "INPUT") return;
@@ -171,6 +176,7 @@
 
   function handleCardPointerDown(e: PointerEvent, name: string) {
     if (selectMode) return;
+    if (e.button !== 0) return;
     e.preventDefault();
     draggedCard = name;
     dragStartPos = { x: e.clientX, y: e.clientY };
@@ -230,7 +236,14 @@
     }
 
     if (!target) return;
-    if (target.kind === "header" && target.group === chip.fromGroup) {
+    if (target.group.toLowerCase() === chip.name.toLowerCase()) {
+      // Dragging a conflict chip onto the separate top-level card that
+      // shares its own literal name (e.g. "Rock: Pop" onto the "Pop"
+      // card) resolves the conflict — a tag can't be curated as a child
+      // of a card sharing its own name, so this un-childs it rather than
+      // reparenting into a self-loop the backend would just reject.
+      await tagsStore.promoteTag(chip.name);
+    } else if (target.kind === "header" && target.group === chip.fromGroup) {
       await tagsStore.promoteTag(chip.name);
     } else if (target.kind === "card" && target.group !== chip.fromGroup) {
       await tagsStore.reparentTag(chip.name, target.group);
