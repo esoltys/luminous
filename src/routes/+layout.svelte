@@ -75,7 +75,7 @@
           break;
         case '1':
           e.preventDefault();
-          collectionStore.toggleSidebar();
+          collectionStore.toggleSidebarCompact();
           break;
         case '2':
           e.preventDefault();

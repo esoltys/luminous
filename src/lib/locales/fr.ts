@@ -1000,7 +1000,7 @@ export const fr = {
     closeSearch: "Fermer le menu de recherche",
     goBack: "Retour",
     goForward: "Avancer",
-    toggleSidebar: "Basculer la barre latérale gauche",
+    toggleSidebar: "Basculer la barre latérale (compacte / étendue)",
     toggleImmersive: "Basculer le mode immersion",
     toggleRightPanel: "Basculer le panneau droit",
     toggleMiniplayer: "Basculer le mini-lecteur",
