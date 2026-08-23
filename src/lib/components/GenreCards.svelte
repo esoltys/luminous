@@ -10,11 +10,36 @@
     selectMode: boolean;
     selected: Set<string>;
     onToggleSelect: (name: string) => void;
+    sortField?: "name" | "count";
+    sortAsc?: boolean;
+    /** Collapses cards down to compact header-only rows (mirrors the
+     * Albums/Artists cards-vs-rows toggle). */
+    compact?: boolean;
   }
 
-  let { onOpenMainTag, onOpenGenreEdge, selectMode, selected, onToggleSelect }: Props = $props();
+  let {
+    onOpenMainTag,
+    onOpenGenreEdge,
+    selectMode,
+    selected,
+    onToggleSelect,
+    sortField = "name",
+    sortAsc = true,
+    compact = false,
+  }: Props = $props();
 
   let colorPopoverFor = $state<string | null>(null);
+
+  /** Sorts both the cards themselves and each card's own children — display
+   * only, doesn't touch the persisted drag-reorder sort_order. */
+  let sortedHierarchy = $derived.by(() => {
+    const dir = sortAsc ? 1 : -1;
+    const cmp = (a: { name: string; song_count: number }, b: { name: string; song_count: number }) =>
+      sortField === "name" ? a.name.localeCompare(b.name) * dir : (a.song_count - b.song_count) * dir;
+    return tagsStore.hierarchy
+      .map((g) => ({ ...g, children: [...g.children].sort(cmp) }))
+      .sort(cmp);
+  });
 
   // Drag reparent/promote/reorder cannot use native HTML5 drag-and-drop —
   // Tauri intercepts OS-level drag-drop at the webview layer so `dragstart`
@@ -90,8 +115,8 @@
 
 <svelte:window onpointermove={handlePointerMove} onpointerup={handlePointerUp} />
 
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-  {#each tagsStore.hierarchy as group (group.name)}
+<div class={compact ? "flex flex-col gap-1.5" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"}>
+  {#each sortedHierarchy as group (group.name)}
     <div
       data-card-name={group.name}
       class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color] {draggedCard === group.name ? 'opacity-40' : ''} {dropTarget?.kind === 'card' && dropTarget.group === group.name ? 'border-brand-accent ring-2 ring-brand-accent/40' : 'border-brand-border/60'}"
@@ -143,7 +168,7 @@
         </button>
       </div>
 
-      <div class="px-3 pb-3 flex flex-wrap gap-1.5 min-h-9">
+      <div class="px-3 pb-3 flex flex-wrap gap-1.5 min-h-9 {compact ? 'hidden' : ''}">
         {#if group.children.length === 0}
           <p class="text-xs text-brand-text-secondary/70 italic py-1">
             {i18n.t("songTags.noSubgenresYet", {}, "No sub-genres yet — drag a tag here")}

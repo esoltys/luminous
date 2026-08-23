@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare } from "lucide-svelte";
+  import { Tag as TagIcon, ArrowLeft, Music, DiscAlbum, GitMerge, X as XIcon, CheckSquare, LayoutGrid, Rows3 } from "lucide-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -25,6 +25,12 @@
 
   let selectMode = $state(false);
   let selected = $state<Set<string>>(new Set());
+
+  /** Sorts both the primary-genre cards and each card's own sub-genre chips —
+   * display-only, doesn't touch the persisted drag-reorder sort_order. */
+  type GenreSortField = "name" | "count";
+  let genreSortField = $state<GenreSortField>("name");
+  let genreSortAsc = $state(true);
   let mergeDialogNames = $state<string[] | null>(null);
   let mergeDialogSuggestionPair = $state<[string, string] | null>(null);
   let deleteConfirmNames = $state<string[] | null>(null);
@@ -385,6 +391,44 @@
           <CheckSquare class="w-3.5 h-3.5" />
           {i18n.t("songTags.selectTags", {}, "Select Tags")}
         </button>
+        {#if prefs.genreViewMode === "genre"}
+          <div class="relative">
+            <Select
+              value={`${genreSortField}-${genreSortAsc}`}
+              onchange={(e) => {
+                const [field, asc] = e.currentTarget.value.split("-");
+                genreSortField = field as GenreSortField;
+                genreSortAsc = asc === "true";
+              }}
+              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            >
+              <option value="name-true">▲ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="name-false">▼ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="count-true">▲ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+              <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+            </Select>
+          </div>
+          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("cards")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-label={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-pressed={prefs.genreCardsViewMode === "cards"}
+            >
+              <LayoutGrid class="w-4 h-4" />
+            </button>
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("rows")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-label={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-pressed={prefs.genreCardsViewMode === "rows"}
+            >
+              <Rows3 class="w-4 h-4" />
+            </button>
+          </div>
+        {/if}
         <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
           <button
             onclick={() => setViewMode("genre")}
@@ -471,7 +515,16 @@
         />
       </div>
     {:else if prefs.genreViewMode === "genre"}
-      <GenreCards {selectMode} {selected} onToggleSelect={toggleSelect} onOpenMainTag={openMainTag} onOpenGenreEdge={openGenreEdge} />
+      <GenreCards
+        {selectMode}
+        {selected}
+        onToggleSelect={toggleSelect}
+        onOpenMainTag={openMainTag}
+        onOpenGenreEdge={openGenreEdge}
+        sortField={genreSortField}
+        sortAsc={genreSortAsc}
+        compact={prefs.genreCardsViewMode === "rows"}
+      />
       {#if tagsStore.noGenreCount > 0}
         <button
           onclick={openNoGenre}
