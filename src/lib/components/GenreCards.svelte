@@ -300,8 +300,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none text-brand-text-secondary/50 hover:text-brand-text-secondary"
-          style={selectMode ? '' : `cursor: ${draggedCard === group.name ? 'grabbing' : 'grab'};`}
+          class="shrink-0 touch-none {selectMode ? '' : 'genre-drag-handle'} {draggedCard === group.name ? 'is-dragging' : ''} text-brand-text-secondary/50 hover:text-brand-text-secondary"
           title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
         >
           <GripVertical class="w-3.5 h-3.5" />
@@ -357,7 +356,7 @@
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
             style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslFg(group.color_index)} 70%, transparent); color: ${genreColorHslFg(group.color_index)};`}
           >
             {#if selectMode}
@@ -458,3 +457,22 @@
     onCancel={() => { deleteConfirmName = null; }}
   />
 {/if}
+
+<style>
+  /* app.css resets cursor to default everywhere for this desktop app, and
+     `cursor` doesn't reliably inherit into a lucide-svelte icon's rendered
+     <svg> from its wrapping element (confirmed via devtools: the <svg>'s
+     own computed cursor stayed "default" even though its parent <span>
+     correctly computed "grab") — so these drag handles set cursor
+     explicitly on every descendant rather than relying on inheritance.
+     :not(input) excludes the inline chip-rename <input>, which keeps its
+     own text-caret cursor from app.css. */
+  .genre-drag-handle,
+  .genre-drag-handle :global(*:not(input)) {
+    cursor: grab !important;
+  }
+  .genre-drag-handle.is-dragging,
+  .genre-drag-handle.is-dragging :global(*:not(input)) {
+    cursor: grabbing !important;
+  }
+</style>
