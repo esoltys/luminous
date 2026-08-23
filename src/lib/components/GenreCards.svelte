@@ -3,7 +3,7 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { GENRE_PALETTE_HUES, genreColorHsl } from "../utils/genrePalette";
+  import { GENRE_PALETTE_HUES, genreColorHsl, genreColorHslBright } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -273,12 +273,14 @@
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
   {#each sortedHierarchy as group (group.name)}
+    {@const cardHighlighted = (dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       data-card-name={group.name}
       onclick={(e) => handleCardClick(e, group.name)}
-      class="rounded-lg bg-brand-sidebar border overflow-hidden transition-[opacity,box-shadow,border-color,transform] {selectMode ? '' : 'cursor-pointer'} {draggedCard === group.name ? 'opacity-40' : ''} {(dropTarget?.kind === 'card' || dropTarget?.kind === 'header') && dropTarget.group === group.name && (draggedChip || draggedCard) ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : 'border-brand-border/60'}"
+      class="rounded-lg bg-brand-sidebar border-2 overflow-hidden transition-[opacity,box-shadow,border-color,transform] {selectMode ? '' : 'cursor-pointer'} {draggedCard === group.name ? 'opacity-40' : ''} {cardHighlighted ? 'border-brand-accent ring-4 ring-brand-accent/50 scale-[1.02] bg-brand-accent/5' : ''}"
+      style={cardHighlighted ? '' : `border-color: ${genreColorHsl(group.color_index)}`}
     >
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -289,7 +291,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           onpointerdown={(e) => handleCardPointerDown(e, group.name)}
-          class="shrink-0 touch-none {selectMode ? '' : 'cursor-grab active:cursor-grabbing'} text-brand-text-secondary/50 hover:text-brand-text-secondary"
+          class="shrink-0 touch-none {selectMode ? '' : draggedCard === group.name ? 'cursor-grabbing' : 'cursor-grab'} text-brand-text-secondary/50 hover:text-brand-text-secondary"
           title={i18n.t("songTags.dragCardTooltip", {}, "Drag to make this a sub-genre of another card")}
         >
           <GripVertical class="w-3.5 h-3.5" />
@@ -346,7 +348,7 @@
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
             class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 22%, transparent); border-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 45%, transparent); color: ${genreColorHsl(group.color_index)};`}
+            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 22%, transparent); border-color: color-mix(in srgb, ${genreColorHslBright(group.color_index)} 70%, transparent); color: ${genreColorHslBright(group.color_index)};`}
           >
             {#if selectMode}
               <input

@@ -6,3 +6,12 @@ export function genreColorHsl(colorIndex: number): string {
   const hue = GENRE_PALETTE_HUES[((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) % GENRE_PALETTE_HUES.length];
   return `hsl(${hue}, 38%, 58%)`;
 }
+
+/** A brighter, more saturated variant of the palette color, used wherever
+ * text or a border needs to read clearly against a dark card background
+ * (e.g. subgenre chip labels/borders) — `genreColorHsl`'s base lightness is
+ * tuned for swatches and fills, not for legibility as foreground text. */
+export function genreColorHslBright(colorIndex: number): string {
+  const hue = GENRE_PALETTE_HUES[((colorIndex % GENRE_PALETTE_HUES.length) + GENRE_PALETTE_HUES.length) % GENRE_PALETTE_HUES.length];
+  return `hsl(${hue}, 60%, 76%)`;
+}
