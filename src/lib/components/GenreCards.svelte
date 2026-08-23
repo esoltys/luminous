@@ -3,10 +3,19 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { GENRE_PALETTE_HUES, genreColorHsl, genreColorHslBright } from "../utils/genrePalette";
+  import { GENRE_PALETTE_HUES, genreColorHsl, genreColorHslBright, genreColorHslDark } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
+  import { themeStore } from "../stores/theme.svelte";
+  import { isLightColor } from "../utils/colorUtils";
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+
+  /** Subgenre chip text/border must read clearly against the chip's own pale
+   * fill, which tracks the active theme: bright text only works on a dark
+   * theme's near-black fill, so a light theme needs the dark/saturated
+   * variant instead. */
+  let isLightTheme = $derived(isLightColor(themeStore.resolvedColors["bg-main"]));
+  let genreColorHslFg = $derived(isLightTheme ? genreColorHslDark : genreColorHslBright);
 
   interface Props {
     onOpenMainTag: (tag: string) => void;
@@ -348,7 +357,7 @@
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
             class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslBright(group.color_index)} 70%, transparent); color: ${genreColorHslBright(group.color_index)};`}
+            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslFg(group.color_index)} 70%, transparent); color: ${genreColorHslFg(group.color_index)};`}
           >
             {#if selectMode}
               <input
