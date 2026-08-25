@@ -216,9 +216,6 @@ impl TagManager {
 
     /// Songs whose genre list contains `tag_name` at any position
     /// (case-insensitive, exact component match — not a substring match).
-    /// Mirrors `CollectionScanner::get_songs_by_genre`'s signature/shape, but
-    /// matches component-wise rather than requiring an exact full-column
-    /// match.
     pub fn get_songs_by_tag(
         &self,
         tag_name: &str,

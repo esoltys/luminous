@@ -2538,8 +2538,9 @@ mod tests {
         let pl = manager.create_playlist("Rock Mix").unwrap();
 
         // Mirrors the spec the Smart Playlist builder serialises for a single
-        // "genre contains rock" rule — must NOT be routed to the exact-match
-        // get_songs_by_genre() path, which would never match "Classic Rock".
+        // "genre contains rock" rule — must NOT be routed to the curated-tag
+        // "tag:" path, which would never match "Classic Rock" (no such
+        // curated tag exists).
         manager
             .set_playlist_dynamic_spec(pl.id, "genre:rock")
             .unwrap();

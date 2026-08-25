@@ -790,7 +790,6 @@ pub fn run() {
             commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,
-            commands::collection::get_songs_by_genre,
             commands::collection::get_recently_played,
             commands::collection::get_recently_played_songs,
             commands::collection::clear_play_history,

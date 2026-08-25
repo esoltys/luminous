@@ -606,7 +606,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     },
     get_recently_added_songs: () => library.songs.slice(0, 5),
     get_recently_played_songs: () => library.songs.slice(0, 5),
-    get_songs_by_genre: (args) => library.songs.filter((s) => s.genre === args.genre),
     get_songs_by_decade: (args) => {
       const decadeStr = args.decade as string;
       const yearStr = decadeStr.replace(/\D/g, "");
