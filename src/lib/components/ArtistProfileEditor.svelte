@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { X, Plus, Trash2, Globe, Tag as TagIcon, Link as LinkIcon, User } from "lucide-svelte";
+  import { X, Plus, Trash2, Globe, Tag as TagIcon, Link as LinkIcon, User, Save, LoaderCircle } from "lucide-svelte";
+  import Button from "./Button.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -98,7 +99,7 @@
       onClose();
     } catch (err) {
       console.error("Failed to save artist profile:", err);
-      toastStore.show("Failed to save artist profile", "error");
+      toastStore.show(i18n.t("artistProfileEditor.savedError", {}, "Failed to save artist profile"), "error");
     } finally {
       isSaving = false;
     }
@@ -151,19 +152,18 @@
 
       <!-- Body Form -->
       <div class="p-6 overflow-y-auto flex flex-col gap-5 text-sm">
-        <!-- Website Field -->
+        <!-- Bio Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="artist-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-            <Globe class="w-3.5 h-3.5 text-brand-accent" />
-            {i18n.t("artistProfileEditor.website", {}, "Website")}
+          <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
           </label>
-          <input
-            id="artist-website"
-            type="text"
-            bind:value={website}
-            placeholder={i18n.t("artistProfileEditor.websitePlaceholder", {}, "https://www.artist.com or www.artist.com")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
-          />
+          <textarea
+            id="artist-bio"
+            bind:value={bio}
+            rows="3"
+            placeholder={i18n.t("artistProfileEditor.bioPlaceholder", {}, "Add a bio or background notes for this artist...")}
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
+          ></textarea>
         </div>
 
         <!-- Tags Manager -->
@@ -214,18 +214,19 @@
           </div>
         </div>
 
-        <!-- Bio Field -->
+        <!-- Website Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
+          <label for="artist-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+            <Globe class="w-3.5 h-3.5 text-brand-accent" />
+            {i18n.t("artistProfileEditor.website", {}, "Website")}
           </label>
-          <textarea
-            id="artist-bio"
-            bind:value={bio}
-            rows="3"
-            placeholder={i18n.t("artistProfileEditor.bioPlaceholder", {}, "Add a bio or background notes for this artist...")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
-          ></textarea>
+          <input
+            id="artist-website"
+            type="text"
+            bind:value={website}
+            placeholder={i18n.t("artistProfileEditor.websitePlaceholder", {}, "https://www.artist.com or www.artist.com")}
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+          />
         </div>
 
         <!-- Social & External Links -->
@@ -247,7 +248,7 @@
 
           {#if socialLinks.length === 0}
             <div class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60">
-              No links added yet. Click "Add Link" to attach social media or streaming profiles.
+              {i18n.t("artistProfileEditor.noLinks", {}, 'No links added yet. Click "Add Link" to attach social media or streaming profiles.')}
             </div>
           {:else}
             <div class="flex flex-col gap-2">
@@ -261,7 +262,9 @@
                       class="w-full appearance-none pl-8 pr-6 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors"
                     >
                       {#each SOCIAL_PLATFORMS as p (p.id)}
-                        <option value={p.id}>{p.label}</option>
+                        <option value={p.id}>
+                          {p.id === "website" ? i18n.t("artistProfileEditor.website", {}, "Website") : p.id === "custom" ? i18n.t("artistProfileEditor.customLink", {}, "Custom Link") : p.label}
+                        </option>
                       {/each}
                     </select>
                     <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-secondary">
@@ -297,25 +300,28 @@
 
       <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-sidebar/80">
-        <button
-          type="button"
+        <Button
           onclick={onClose}
-          class="px-4 py-2 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-lg transition-colors"
+          disabled={isSaving}
+          variant="secondary"
+          size="sm"
         >
           {i18n.t("artistProfileEditor.cancel", {}, "Cancel")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           onclick={handleSave}
           disabled={isSaving}
-          class="px-4 py-2 text-xs font-semibold bg-brand-accent text-brand-accent-text hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+          variant="primary"
+          size="sm"
         >
           {#if isSaving}
-            <span>Saving...</span>
+            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+            <span>{i18n.t("artistProfileEditor.saving", {}, "Saving...")}</span>
           {:else}
+            <Save class="w-3.5 h-3.5" />
             <span>{i18n.t("artistProfileEditor.save", {}, "Save")}</span>
           {/if}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
