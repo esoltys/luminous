@@ -26,17 +26,19 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
-  import { Clock, Play, Plus, FolderPlus, Edit3, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
+  import { Clock, Play, Plus, FolderPlus, Edit3, DiscAlbum, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Trash2, Eraser } from "lucide-svelte";
 import { shuffleArray } from "../utils/shuffle";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { getPopulationModeSuffix, getBpmBucketLabel, getGenreAutoPlaylistLabel } from "../utils/playlist";
+  import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
+  import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
+  import AlbumTagEditor from "./AlbumTagEditor.svelte";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { columnResize } from "../utils/columnResize";
 
@@ -75,6 +77,7 @@ import { shuffleArray } from "../utils/shuffle";
   let songs = $state<Song[]>([]);
   let loading = $state(true);
   let editingSongId = $state<number | null>(null);
+  let editingAlbumSongs = $state<Song[] | null>(null);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
   let showSaveModal = $state(false);
@@ -82,6 +85,15 @@ import { shuffleArray } from "../utils/shuffle";
 
   let selectedSongIds = $state<Set<number>>(new Set());
   let lastSelectedSongId = $state<number | null>(null);
+
+  /** Hover quick-action, ported from the old GenreBrowseView drill-down
+   * (#548) — opens the full-album tag editor for whichever album the
+   * hovered row belongs to. Applies to every auto-playlist kind, not just
+   * genre, matching the parity the port was meant to preserve. */
+  async function openAlbumEditor(song: Song) {
+    if (!song.album) return;
+    editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
+  }
 
   function handleContextMenu(event: MouseEvent, song: Song) {
     event.preventDefault();
@@ -178,17 +190,31 @@ import { shuffleArray } from "../utils/shuffle";
             const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
             return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
           })()
-        : (() => {
-            const fallback = genre || i18n.t("artistDetail.unknownGenre");
-            if (kind !== "genre") return fallback;
-            const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
-            return getGenreAutoPlaylistLabel(pl?.dynamic_enabled, pl?.dynamic_spec, fallback);
-          })();
+        : kind === "no_genre"
+          ? i18n.t("songTags.noGenre", {}, "No Genre")
+          : genre || i18n.t("artistDetail.unknownGenre");
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
-  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm") ? songsToCoverStack(songs) : []);
+  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "no_genre") ? songsToCoverStack(songs) : []);
+
+  /** Genre auto-playlist header color (#548): follows the curated tag's own
+   * color — a chip's playlist uses its parent card's color — instead of the
+   * fixed teal gradient every other genre playlist used to share. Falls back
+   * to `undefined` (the fixed teal gradient) when the tag isn't found in the
+   * hierarchy at all (e.g. a fresh sub-threshold tag the hierarchy hasn't
+   * caught up to yet). */
+  let genreColorIndex = $derived.by(() => {
+    if (kind !== "genre" || !genre) return undefined;
+    return resolveGenreColorIndex(tagsStore.hierarchy, genre);
+  });
+
+  $effect(() => {
+    if (kind === "genre" && tagsStore.hierarchy.length === 0) {
+      tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    }
+  });
 
   let updatedLabel = $derived.by(() => {
     if ((kind !== "genre" && kind !== "decade" && kind !== "bpm") || updated === undefined) return null;
@@ -213,7 +239,11 @@ import { shuffleArray } from "../utils/shuffle";
     if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
     if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
     if (k === "bpm") return invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 });
-    return invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
+    if (k === "no_genre") return invoke<Song[]>("get_songs_without_genre", { limit: 500 });
+    // Sub-threshold fallback (no backing playlist row yet) — direct
+    // curated-hierarchy query (#548), same matching a materialized genre
+    // auto-playlist's own population uses.
+    return invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 500 });
   }
 
   // Track backing playlist track_count reactively so refills trigger an instant re-fetch in the UI
@@ -591,8 +621,21 @@ import { shuffleArray } from "../utils/shuffle";
       </div>
 
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
-        {#if (kind === "genre" || kind === "decade" || kind === "bpm") && topCovers.length > 0}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]'} flex items-center justify-center overflow-hidden border relative">
+        {#if kind === "genre" && topCovers.length > 0}
+          <div
+            class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border relative"
+            style={genreColorIndex !== undefined
+              ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
+              : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
+          >
+            <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
+          </div>
+        {:else if (kind === "decade" || kind === "bpm") && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]'} flex items-center justify-center overflow-hidden border relative">
+            <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
+          </div>
+        {:else if kind === "no_genre" && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)] relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if kind === "favourites"}
@@ -615,9 +658,18 @@ import { shuffleArray } from "../utils/shuffle";
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]">
             <Gauge class="w-16 h-16 text-[#E879F9]" />
           </div>
+        {:else if kind === "no_genre"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]">
+            <Music class="w-16 h-16 text-slate-300" />
+          </div>
         {:else}
-          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#059669]/25 to-[#34D399]/15 flex items-center justify-center overflow-hidden border border-[#34D399]/30 shadow-[0_0_28px_3px_rgba(52,211,153,0.4)]">
-            <Music class="w-16 h-16 text-[#34D399]" />
+          <div
+            class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border"
+            style={genreColorIndex !== undefined
+              ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
+              : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
+          >
+            <Music class="w-16 h-16" style={genreColorIndex !== undefined ? `color: ${genreColorHsl(genreColorIndex)}` : "color: #34D399"} />
           </div>
         {/if}
       </div>
@@ -1128,9 +1180,17 @@ import { shuffleArray } from "../utils/shuffle";
                     <button
                       onclick={(e) => { e.stopPropagation(); openTagEditor(song.id); }}
                       class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
-                      title={i18n.t('collection.editTagsTooltip')}
+                      title={i18n.t('songTags.editSongTooltip', {}, 'Edit Song')}
                     >
                       <Edit3 class="w-4 h-4" />
+                    </button>
+                    <button
+                      onclick={(e) => { e.stopPropagation(); openAlbumEditor(song); }}
+                      class="text-brand-text-primary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled={!song.album}
+                      title={i18n.t('songTags.editAlbumTooltip', {}, 'Edit Album')}
+                    >
+                      <DiscAlbum class="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1148,6 +1208,21 @@ import { shuffleArray } from "../utils/shuffle";
   <TagEditor
     songId={editingSongId}
     onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
+
+{#if editingAlbumSongs !== null && editingAlbumSongs.length > 0}
+  <AlbumTagEditor
+    songIds={editingAlbumSongs.map((s) => s.id)}
+    initialAlbum={editingAlbumSongs[0].album}
+    initialAlbumArtist={editingAlbumSongs[0].album_artist || editingAlbumSongs[0].artist}
+    initialGenre={editingAlbumSongs[0].genre}
+    initialYear={editingAlbumSongs[0].year}
+    initialDisc={editingAlbumSongs[0].disc}
+    initialCompilation={editingAlbumSongs[0].compilation}
+    hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
+    onClose={() => { editingAlbumSongs = null; }}
     onSave={handleTagEditorSaved}
   />
 {/if}
