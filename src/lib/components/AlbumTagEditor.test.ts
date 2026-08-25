@@ -8,17 +8,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
-}));
-
-if (typeof Element !== "undefined" && !Element.prototype.animate) {
-  Element.prototype.animate = vi.fn().mockReturnValue({
-    finished: Promise.resolve(),
-    cancel: () => {},
-  }) as any;
-}
-
 describe("AlbumTagEditor.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();

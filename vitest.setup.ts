@@ -145,3 +145,15 @@ if (typeof HTMLCanvasElement !== "undefined") {
     globalAlpha: 1,
   })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 }
+
+// jsdom doesn't implement the Web Animations API, so components that call
+// element.animate() for Svelte transitions/animations throw. Tests here
+// don't assert on animation timing, so a minimal no-op stub is enough.
+if (typeof Element !== "undefined" && !Element.prototype.animate) {
+  Element.prototype.animate = vi.fn().mockReturnValue({
+    finished: Promise.resolve(),
+    cancel: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }) as any;
+}

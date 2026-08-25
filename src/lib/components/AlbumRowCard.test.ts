@@ -7,10 +7,6 @@ import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem } from "../types";
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
-}));
-
 describe("AlbumRowCard.svelte", () => {
   const mockAlbum: AlbumItem = {
     album: "Fake Nudes",
