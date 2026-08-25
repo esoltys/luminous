@@ -35,7 +35,7 @@
   import CoverArt from "./CoverArt.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import EmptyState from "./EmptyState.svelte";
-  import { Play, Plus, Edit3, Trash2, GripVertical, AlertTriangle, Music, Clock } from "lucide-svelte";
+  import { Play, Plus, Edit3, Trash2, GripVertical, AlertTriangle, Music, Clock, DiscAlbum } from "lucide-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
 
@@ -68,8 +68,12 @@
     onAddToPlaylist?: (song: Song) => void;
     onRemoveFromPlaylist?: (row: SongTableRow) => void;
     onEditTags: (song: Song) => void;
+    /** Adds a per-row "edit this song's album" quick action (AutoPlaylistDetailView only). */
+    onEditAlbum?: (song: Song) => void;
     /** When set, position rows show a drag handle and pointer-based reorder is enabled (PlaylistView only). */
     onReorder?: (fromIndex: number, toIndex: number, selectedKeys: string[]) => void;
+    /** When set in "position" mode, the leading column header becomes a sortable control for this field instead of a plain label. */
+    positionSortField?: string;
     virtualized?: boolean;
     /** Persists/restores virtualized scroll position — only used when `virtualized` is true. */
     scrollMemoryKey?: string;
@@ -94,7 +98,9 @@
     onAddToPlaylist,
     onRemoveFromPlaylist,
     onEditTags,
+    onEditAlbum,
     onReorder,
+    positionSortField,
     virtualized = false,
     scrollMemoryKey,
   }: Props = $props();
@@ -494,6 +500,16 @@
       >
         <Edit3 class="w-4 h-4" />
       </button>
+      {#if onEditAlbum}
+        <button
+          onclick={() => onEditAlbum?.(song)}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled={!song.album}
+          title={i18n.t("songTags.editAlbumTooltip", {}, "Edit Album")}
+        >
+          <DiscAlbum class="w-4 h-4" />
+        </button>
+      {/if}
       {#if onRemoveFromPlaylist}
         <button
           onclick={() => onRemoveFromPlaylist?.(row)}
@@ -569,7 +585,18 @@
 
 <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
   <div class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
-    <div class="text-center w-9"></div>
+    {#if mode === "position" && positionSortField}
+      <SortableHeader
+        active={sortField === positionSortField}
+        {sortAsc}
+        onclick={() => onToggleSort(positionSortField)}
+        class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0"
+      >
+        {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('playlists.tableHeaderTrack')} {arrow}</span>{/snippet}
+      </SortableHeader>
+    {:else}
+      <div class="text-center w-9"></div>
+    {/if}
     {#each SONG_TABLE_COLUMNS as col (col.key)}
       {#if !(mode === "position" && col.key === "track") && collectionStore.visibleColumns[col.key]}
         {@render headerCell(col)}
@@ -581,7 +608,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={bodyContainer}
-  class="rounded-b-lg overflow-hidden"
+  class="rounded-b-lg overflow-hidden {virtualized ? 'flex-1 min-h-0 relative' : ''}"
   onpointermove={handlePointerDragMove}
   onpointerup={handlePointerDragUp}
 >
