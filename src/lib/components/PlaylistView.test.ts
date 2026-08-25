@@ -145,12 +145,12 @@ describe("PlaylistView.svelte", () => {
 
   it("handles pointer-based drag reordering of playlist items", async () => {
     // Tauri's dragDropEnabled window option blocks native HTML5 drag events, so reordering
-    // is implemented with pointer events instead (see PlaylistView.svelte handleRowPointerDown).
+    // is implemented with pointer events instead (see SongTable.svelte handleRowPointerDown).
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
+    const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")! as HTMLElement;
 
     document.elementFromPoint = vi.fn().mockReturnValue(rowThree);
 
@@ -166,8 +166,8 @@ describe("PlaylistView.svelte", () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
+    const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")! as HTMLElement;
 
     const elementFromPointMock = vi.fn().mockReturnValue(rowThree);
     document.elementFromPoint = elementFromPointMock;
@@ -247,8 +247,8 @@ describe("PlaylistView.svelte", () => {
   it("handles multi-selection with Shift+Click and shows batch floating bar", async () => {
     const { getByText, queryByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-song-row]")!;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")!;
 
     await fireEvent.click(rowOne);
     await fireEvent.click(rowThree, { shiftKey: true });
@@ -264,7 +264,7 @@ describe("PlaylistView.svelte", () => {
 
   it("opens context menu on right-click", async () => {
     const { getByText, getAllByText } = render(PlaylistView);
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-song-row]")!;
 
     await fireEvent.contextMenu(rowOne);
 

@@ -8,7 +8,7 @@
     song: Song | undefined;
     disabled?: boolean;
     disabledTooltip?: string;
-    /** "dim" (default) just lowers opacity; "strikethrough" also strikes the title and shows a warning icon (PlaylistView's unavailable/disconnected treatment). */
+    /** "dim" (default) just lowers row opacity; "strikethrough" also strikes the title text. A warning icon shows in the title cell whenever the row is disabled, regardless of variant. */
     disabledVariant?: "dim" | "strikethrough";
     isDuplicate?: boolean;
     /** Position of this row in the caller's underlying (unfiltered) order — required when `onReorder` is provided. */
@@ -74,6 +74,18 @@
     onReorder?: (fromIndex: number, toIndex: number, selectedKeys: string[]) => void;
     /** When set in "position" mode, the leading column header becomes a sortable control for this field instead of a plain label. */
     positionSortField?: string;
+    /** When true, disabled rows stay selectable/right-clickable (PlaylistView, so an unavailable track can still be selected and removed) — only play/double-click and drag stay blocked. */
+    interactiveWhenDisabled?: boolean;
+    /** When true, disabled rows show `disabledTooltip` in place of the artist/album cell content instead of the song's real (possibly stale) values (PlaylistView). */
+    disabledPlaceholder?: boolean;
+    /**
+     * Overrides how a row is identified as "currently playing" — defaults to
+     * matching `song.id` against `playerStore.currentSong`. PlaylistView
+     * needs the more precise `playerStore.playlistItemUuid` match too, since
+     * the same song can appear more than once in a playlist and only one
+     * instance is actually playing.
+     */
+    isRowPlaying?: (row: SongTableRow) => boolean;
     virtualized?: boolean;
     /** Persists/restores virtualized scroll position — only used when `virtualized` is true. */
     scrollMemoryKey?: string;
@@ -101,9 +113,17 @@
     onEditAlbum,
     onReorder,
     positionSortField,
+    interactiveWhenDisabled = false,
+    disabledPlaceholder = false,
+    isRowPlaying,
     virtualized = false,
     scrollMemoryKey,
   }: Props = $props();
+
+  function rowIsPlaying(row: SongTableRow): boolean {
+    if (isRowPlaying) return isRowPlaying(row);
+    return !!row.song && !!playerStore.currentSong && playerStore.currentSong.id === row.song.id;
+  }
 
   let lastSelectedKey = $state<string | null>(null);
   let keyIndex = $derived.by(() => {
@@ -227,7 +247,7 @@
   }
 
   function handleRowPointerDown(e: PointerEvent, row: SongTableRow) {
-    if (!onReorder || row.underlyingIndex === undefined) return;
+    if (!onReorder || row.underlyingIndex === undefined || row.disabled) return;
     const target = e.target as HTMLElement;
     if (target.closest("button, a, input, select, textarea, [data-interactive]")) return;
     if (e.button !== 0) return;
@@ -235,7 +255,13 @@
     pointerDragStartX = e.clientX;
     pointerDragStartY = e.clientY;
     draggedIndex = row.underlyingIndex;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    // With the window's dragDropEnabled option on, WebView2 can hijack an in-progress mouse
+    // gesture into a native OS drag once it crosses the platform's drag threshold, silently
+    // stopping pointermove/pointerup from reaching the DOM. Explicit pointer capture pins
+    // subsequent events to this element (and this JS event loop) instead, preventing that.
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    window.addEventListener("pointermove", handlePointerDragMove);
+    window.addEventListener("pointerup", handlePointerDragUp);
   }
 
   function handlePointerDragMove(e: PointerEvent) {
@@ -252,6 +278,8 @@
   }
 
   function handlePointerDragUp() {
+    window.removeEventListener("pointermove", handlePointerDragMove);
+    window.removeEventListener("pointerup", handlePointerDragUp);
     if (pointerDragArmed && dragOverIndex !== null) {
       commitReorder(dragOverIndex);
     }
@@ -317,6 +345,12 @@
   function rowDisabled(row: SongTableRow): boolean {
     return !!row.disabled;
   }
+
+  // Body cells use primary text throughout — secondary was too low-contrast
+  // to read comfortably.
+  function secondaryColor(_song: Song): string {
+    return "text-brand-text-primary";
+  }
 </script>
 
 {#snippet headerCell(col: (typeof SONG_TABLE_COLUMNS)[number])}
@@ -345,7 +379,7 @@
 
 {#snippet bodyCell(col: (typeof SONG_TABLE_COLUMNS)[number], song: Song, row: SongTableRow)}
   {#if col.key === "track"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {formatTrackNumber(song.track, song.disc, discCount, keyIndex.get(row.key) ?? 0)}
     </div>
   {:else if col.key === "title"}
@@ -357,61 +391,75 @@
         artManual={song.art_manual}
         sizeClass="w-7 h-7 rounded shrink-0"
       />
+      {#if rowDisabled(row)}
+        <span title={row.disabledTooltip}>
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-400/80" />
+        </span>
+      {/if}
+      {#if row.isDuplicate}
+        <span
+          class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-brand-accent/20 text-brand-accent-text border border-brand-accent/30 shrink-0"
+          title={i18n.t("playlists.duplicateTrackFlag")}
+        >
+          {i18n.t("playlists.duplicateTrackFlag")}
+        </span>
+      {/if}
       <span
         class="truncate text-brand-text-primary {row.disabledVariant === 'strikethrough' && rowDisabled(row) ? 'line-through' : ''}"
         title={song.title || i18n.t("collection.unknownSong")}
       >
         {song.title || i18n.t("collection.unknownSong")}
       </span>
-      {#if row.disabledVariant === "strikethrough" && rowDisabled(row)}
-        <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-amber-500" />
-      {/if}
     </div>
   {:else if col.key === "artist"}
-    <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
-      {#if song.artist}
+    <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
+      {#if disabledPlaceholder && rowDisabled(row)}
+        <span class="text-brand-text-secondary italic text-xs">{row.disabledTooltip}</span>
+      {:else if song.artist}
         {#each parseMultiValue(song.artist) as name, i (name)}
-          {#if i > 0}<span class="text-brand-text-secondary/50 shrink-0">,&nbsp;</span>{/if}
+          {#if i > 0}<span class="{secondaryColor(song)}/50 shrink-0">,&nbsp;</span>{/if}
           <LinkButton
             onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
-            class="text-brand-text-secondary truncate min-w-0"
+            class="{secondaryColor(song)} truncate min-w-0"
             title={i18n.t("collection.filterByArtist", { artist: name })}
           >
             {name}
           </LinkButton>
         {/each}
       {:else}
-        <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
+        <span class="{secondaryColor(song)} truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
       {/if}
     </div>
   {:else if col.key === "album"}
-    <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
-      {#if song.album}
+    <div class="{secondaryColor(song)} truncate pr-4 flex items-center min-w-0">
+      {#if disabledPlaceholder && rowDisabled(row)}
+        <span class="text-brand-text-secondary italic text-xs">{song.album ?? ""}</span>
+      {:else if song.album}
         <LinkButton
           onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-          class="text-brand-text-secondary truncate min-w-0"
+          class="{secondaryColor(song)} truncate min-w-0"
           title={i18n.t("collection.filterByAlbum", { album: song.album })}
         >
           {song.album}
         </LinkButton>
       {:else}
-        <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
+        <span class="{secondaryColor(song)} truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
       {/if}
     </div>
   {:else if col.key === "composer"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.composer}>
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.composer}>
       {song.composer || "—"}
     </div>
   {:else if col.key === "album_artist"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
       {song.album_artist || "—"}
     </div>
   {:else if col.key === "format"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-semibold uppercase">
       {song.filetype ? song.filetype.toUpperCase() : "—"}
     </div>
   {:else if col.key === "year"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.year || "—"}
     </div>
   {:else if col.key === "genre"}
@@ -419,39 +467,39 @@
       {#if song.genre}
         <GenreChips genre={song.genre} />
       {:else}
-        <span class="text-brand-text-secondary text-xs font-medium">—</span>
+        <span class="{secondaryColor(song)} text-xs font-medium">—</span>
       {/if}
     </div>
   {:else if col.key === "grouping"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
       {song.grouping || "—"}
     </div>
   {:else if col.key === "bpm"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.bpm || "—"}
     </div>
   {:else if col.key === "initial_key"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.initial_key || "—"}
     </div>
   {:else if col.key === "bitrate"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.bitrate ? `${song.bitrate}k` : "—"}
     </div>
   {:else if col.key === "samplerate"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {formatSampleRate(song.samplerate)}
     </div>
   {:else if col.key === "bitdepth"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {formatBitDepth(song.bitdepth)}
     </div>
   {:else if col.key === "channels"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {formatChannels(song.channels)}
     </div>
   {:else if col.key === "filesize"}
-    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {formatFileSize(song.filesize)}
     </div>
   {:else if col.key === "rating"}
@@ -459,27 +507,27 @@
       <SongRating rating={song.rating} onRate={(r) => onRate(song, r)} />
     </div>
   {:else if col.key === "playcount"}
-    <div class="text-center text-brand-text-secondary font-medium text-xs">
+    <div class="text-center {secondaryColor(song)} font-medium text-xs">
       {song.playcount ?? 0}
     </div>
   {:else if col.key === "skipcount"}
-    <div class="text-center text-brand-text-secondary font-medium text-xs">
+    <div class="text-center {secondaryColor(song)} font-medium text-xs">
       {song.skipcount ?? 0}
     </div>
   {:else if col.key === "lastplayed"}
-    <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
+    <div class="text-center {secondaryColor(song)} text-xs whitespace-nowrap">
       {formatDate(song.lastplayed)}
     </div>
   {:else if col.key === "added"}
-    <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
+    <div class="text-center {secondaryColor(song)} text-xs whitespace-nowrap">
       {formatDateAdded(song.added)}
     </div>
   {:else if col.key === "duration"}
-    <div class="text-center text-brand-text-secondary text-xs font-medium">
+    <div class="text-center {secondaryColor(song)} text-xs font-medium">
       {formatDuration(song.length_nanosec)}
     </div>
   {:else if col.key === "path"}
-    <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
+    <div class="{secondaryColor(song)} truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
       {song.path || "—"}
     </div>
   {:else if col.key === "actions"}
@@ -526,12 +574,11 @@
 {#snippet leadingCell(row: SongTableRow, displayIndex: number)}
   {@const song = row.song}
   <div class="text-center flex justify-center relative w-9 h-6 items-center">
-    {#if song && playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === "playing"}
+    {#if song && rowIsPlaying(row) && playerStore.state === "playing"}
       <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
         <NowPlayingBars />
       </div>
-    {/if}
-    {#if mode === "position"}
+    {:else if mode === "position"}
       <span class="absolute text-xs font-medium text-brand-text-secondary group-hover:opacity-0 transition-opacity">{displayIndex + 1}</span>
     {/if}
     {#if song}
@@ -559,9 +606,9 @@
     data-index={row.underlyingIndex}
     role="row"
     tabindex="0"
-    onclick={(e) => song && !disabled && handleRowClick(e, row)}
+    onclick={(e) => song && (!disabled || interactiveWhenDisabled) && handleRowClick(e, row)}
     ondblclick={() => song && !disabled && onRowDoubleClick(row)}
-    oncontextmenu={(e) => song && !disabled && handleRowContextMenu(e, row)}
+    oncontextmenu={(e) => song && (!disabled || interactiveWhenDisabled) && handleRowContextMenu(e, row)}
     onkeydown={(e) => { if (e.key === "Enter" && song && !disabled) onRowDoubleClick(row); }}
     onpointerdown={(e) => handleRowPointerDown(e, row)}
     style={gridColsStyle}
@@ -570,7 +617,7 @@
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
       {onReorder ? 'cursor-grab active:cursor-grabbing' : ''}
       {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'border-t-2! border-brand-accent' : ''}
-      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10' : '')}"
+      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && rowIsPlaying(row) ? 'bg-brand-accent/10' : '')}"
   >
     {@render leadingCell(row, displayIndex)}
     {#if song}
@@ -584,7 +631,7 @@
 {/snippet}
 
 <div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-  <div class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
+  <div role="row" class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
     {#if mode === "position" && positionSortField}
       <SortableHeader
         active={sortField === positionSortField}
@@ -605,12 +652,9 @@
   </div>
 </div>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={bodyContainer}
   class="rounded-b-lg overflow-hidden {virtualized ? 'flex-1 min-h-0 relative' : ''}"
-  onpointermove={handlePointerDragMove}
-  onpointerup={handlePointerDragUp}
 >
   {#if loading}
     <div class="flex items-center justify-center py-16">
