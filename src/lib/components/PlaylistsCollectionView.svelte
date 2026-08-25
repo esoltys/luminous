@@ -76,16 +76,10 @@
     }
   }
 
-  // System genre auto-playlists are stored with a raw genre name as dynamic_spec (e.g. "Rock", "Jazz").
-  // Smart playlists built via the Smart Playlist builder always contain a "field:value" rule (e.g. "genre:jazz rating:>=4").
+  // System genre auto-playlists are keyed one row per curated tag (#548),
+  // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
-    playlistsStore.playlists.filter(
-      (p) =>
-        p.dynamic_enabled &&
-        !p.dynamic_spec?.startsWith("decade:") &&
-        !p.dynamic_spec?.startsWith("bpmrange:") &&
-        !isSmartPlaylistSpec(p.dynamic_spec)
-    )
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:"))
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let bpmAutoPlaylists = $derived(
@@ -146,7 +140,7 @@
         defs.push({
           id: `auto:genre:${p.id}`,
           kind: "genre",
-          genre: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
+          genre: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
