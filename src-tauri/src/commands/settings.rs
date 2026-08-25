@@ -100,11 +100,7 @@ impl UiPreferences {
                 &mut self.genre_cards_view_mode,
                 VIEW,
             ),
-            (
-                "genre_sort_field",
-                &mut self.genre_sort_field,
-                GENRE_SORT,
-            ),
+            ("genre_sort_field", &mut self.genre_sort_field, GENRE_SORT),
         ]
     }
 }

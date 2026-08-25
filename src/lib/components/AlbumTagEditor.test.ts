@@ -91,7 +91,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101, 102],
         album: "New Album Title",
         albumArtist: "Old Artist",
@@ -99,7 +99,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2020,
         disc: 2,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -128,7 +128,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Test Album",
         albumArtist: "Test Artist",
@@ -136,7 +136,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: null,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -170,7 +170,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Test Album",
         albumArtist: "Test Artist",
@@ -178,7 +178,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: 1,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -209,7 +209,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Test Album",
         albumArtist: "Test Artist",
@@ -217,7 +217,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: 1,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -249,7 +249,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Test Album",
         albumArtist: "Artist A; Artist B",
@@ -257,7 +257,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: 1,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -286,7 +286,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Test Album",
         albumArtist: "Test Artist",
@@ -294,7 +294,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: null,
         compilation: false,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -330,7 +330,7 @@ describe("AlbumTagEditor.svelte", () => {
     await fireEvent.click(saveBtn);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("save_album_tags", {
+      expect(invoke).toHaveBeenCalledWith("save_album_tags", expect.objectContaining({
         songIds: [101],
         album: "Now That's What I Call Tests",
         albumArtist: "Various Artists",
@@ -338,7 +338,7 @@ describe("AlbumTagEditor.svelte", () => {
         year: 2024,
         disc: 1,
         compilation: true,
-      });
+      }));
       expect(onSave).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });

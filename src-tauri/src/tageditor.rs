@@ -97,11 +97,17 @@ struct AcoustIdResponse {
 pub fn write_tags(
     path: &Path,
     title: &str,
+    titlesort: Option<&str>,
     artist: &str,
+    artistsort: Option<&str>,
     album: &str,
+    albumsort: Option<&str>,
     album_artist: &str,
+    album_artist_sort: Option<&str>,
     composer: &str,
+    composersort: Option<&str>,
     genre: &str,
+    _genresort: Option<&str>,
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
@@ -133,6 +139,19 @@ pub fn write_tags(
 
     tag.set_title(title.to_string());
     tag.set_album(album.to_string());
+
+    let mut set_or_remove_sort = |key: lofty::tag::ItemKey, val: Option<&str>| {
+        tag.remove_key(key);
+        if let Some(v) = val.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            tag.insert_text(key, v.to_string());
+        }
+    };
+
+    set_or_remove_sort(lofty::tag::ItemKey::TrackTitleSortOrder, titlesort);
+    set_or_remove_sort(lofty::tag::ItemKey::TrackArtistSortOrder, artistsort);
+    set_or_remove_sort(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
+    set_or_remove_sort(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
+    set_or_remove_sort(lofty::tag::ItemKey::ComposerSortOrder, composersort);
 
     // Genre, Artist, Album Artist, and Composer are all written as one
     // `TagItem` per value rather than a single `set_*()`/`insert_text()`
@@ -574,11 +593,17 @@ mod tests {
         write_tags(
             &path,
             "Title",
+            None,
             "Artist",
+            None,
             "Album",
+            None,
             "Album Artist",
+            None,
             "Composer",
+            None,
             "Rock; Jazz Fusion; Live",
+            None,
             None,
             None,
             None,
@@ -607,8 +632,8 @@ mod tests {
         write_test_wav(&path);
 
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
-            false,
+            &path, "Title", None, "Artist", None, "Album", None, "", None, "", None, "Metal", None,
+            None, None, None, "", None, "", false,
         )
         .expect("write_tags should succeed");
 
@@ -625,12 +650,13 @@ mod tests {
         write_test_wav(&path);
 
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
-            false,
+            &path, "Title", None, "Artist", None, "Album", None, "", None, "", None, "Metal", None,
+            None, None, None, "", None, "", false,
         )
         .expect("write_tags should succeed");
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+            &path, "Title", None, "Artist", None, "Album", None, "", None, "", None, "", None,
+            None, None, None, "", None, "", false,
         )
         .expect("write_tags with empty genre should succeed");
 
@@ -648,11 +674,17 @@ mod tests {
         write_tags(
             &path,
             "Title",
+            None,
             "Artist A; Artist B",
+            None,
             "Album",
+            None,
             "Album Artist A; Album Artist B",
+            None,
             "Composer A; Composer B",
+            None,
             "",
+            None,
             None,
             None,
             None,
@@ -694,11 +726,17 @@ mod tests {
         write_tags(
             &path,
             "Title",
+            None,
             "Artist",
+            None,
             "Album",
+            None,
             "Album Artist",
+            None,
             "Composer",
+            None,
             "",
+            None,
             None,
             None,
             None,
@@ -709,7 +747,8 @@ mod tests {
         )
         .expect("write_tags should succeed");
         write_tags(
-            &path, "Title", "", "Album", "", "", "", None, None, None, "", None, "", false,
+            &path, "Title", None, "", None, "Album", None, "", None, "", None, "", None, None,
+            None, None, "", None, "", false,
         )
         .expect("write_tags with empty artist/album_artist/composer should succeed");
 
@@ -718,6 +757,50 @@ mod tests {
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::TrackArtist).count(), 0);
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::AlbumArtist).count(), 0);
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::Composer).count(), 0);
+    }
+
+    #[test]
+    fn test_write_and_read_sort_tags() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            "The Beatles",
+            Some("Beatles, The"),
+            "The Beatles",
+            Some("Beatles, The"),
+            "Abbey Road",
+            Some("Abbey Road Sort"),
+            "The Beatles",
+            Some("Beatles, The"),
+            "McCartney",
+            Some("McCartney, Paul"),
+            "Rock",
+            Some("Rock, Classic"),
+            None,
+            None,
+            None,
+            "",
+            None,
+            "",
+            false,
+        )
+        .expect("write_tags should succeed");
+
+        let song = crate::collection::read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.title.as_deref(), Some("The Beatles"));
+        assert_eq!(song.titlesort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.artist.as_deref(), Some("The Beatles"));
+        assert_eq!(song.artistsort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.album.as_deref(), Some("Abbey Road"));
+        assert_eq!(song.albumsort.as_deref(), Some("Abbey Road Sort"));
+        assert_eq!(song.album_artist.as_deref(), Some("The Beatles"));
+        assert_eq!(song.album_artist_sort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.composer.as_deref(), Some("McCartney"));
+        assert_eq!(song.composersort.as_deref(), Some("McCartney, Paul"));
+        assert_eq!(song.genre.as_deref(), Some("Rock"));
     }
 
     #[tokio::test]

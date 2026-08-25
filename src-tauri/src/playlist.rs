@@ -1011,7 +1011,10 @@ impl PlaylistManager {
                         candidate_tags.push(primary);
                     }
                     for t in tagged.tags() {
-                        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+                        if !candidate_tags
+                            .iter()
+                            .any(|existing| std::ptr::eq(*existing, t))
+                        {
                             candidate_tags.push(t);
                         }
                     }
@@ -2733,7 +2736,9 @@ mod tests {
 
         let playlists = manager.get_playlists().unwrap();
         assert!(
-            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("tag:Metal")),
+            playlists
+                .iter()
+                .any(|p| p.dynamic_spec.as_deref() == Some("tag:Metal")),
             "the top-level card gets its own auto-playlist row"
         );
         assert!(

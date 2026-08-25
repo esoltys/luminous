@@ -313,8 +313,29 @@
 
     const fieldName = sortField as string;
     return [...result].sort((a, b) => {
-      let valA = a.song ? (a.song as Record<string, any>)[fieldName] : undefined;
-      let valB = b.song ? (b.song as Record<string, any>)[fieldName] : undefined;
+      let valA: unknown = a.song ? (a.song as Record<string, any>)[fieldName] : undefined;
+      let valB: unknown = b.song ? (b.song as Record<string, any>)[fieldName] : undefined;
+
+      if (a.song && b.song) {
+        const songA = a.song;
+        const songB = b.song;
+        if (fieldName === "title") {
+          valA = songA.titlesort?.trim() || songA.title;
+          valB = songB.titlesort?.trim() || songB.title;
+        } else if (fieldName === "artist") {
+          valA = songA.album_artist_sort?.trim() || songA.artistsort?.trim() || songA.album_artist || songA.artist;
+          valB = songB.album_artist_sort?.trim() || songB.artistsort?.trim() || songB.album_artist || songB.artist;
+        } else if (fieldName === "album") {
+          valA = songA.albumsort?.trim() || songA.album;
+          valB = songB.albumsort?.trim() || songB.album;
+        } else if (fieldName === "composer") {
+          valA = songA.composersort?.trim() || songA.composer;
+          valB = songB.composersort?.trim() || songB.composer;
+        } else if (fieldName === "genre") {
+          valA = songA.genresort?.trim() || songA.genre;
+          valB = songB.genresort?.trim() || songB.genre;
+        }
+      }
 
       if (valA === undefined || valA === null) return sortAsc ? 1 : -1;
       if (valB === undefined || valB === null) return sortAsc ? -1 : 1;

@@ -256,8 +256,22 @@
 
     const field = singleSortField as keyof Song;
     return [...singleSongs].sort((a, b) => {
-      const valA = a[field];
-      const valB = b[field];
+      let valA: unknown = a[field];
+      let valB: unknown = b[field];
+
+      if (singleSortField === "title") {
+        valA = a.titlesort?.trim() || a.title;
+        valB = b.titlesort?.trim() || b.title;
+      } else if (singleSortField === "artist") {
+        valA = a.album_artist_sort?.trim() || a.artistsort?.trim() || a.album_artist || a.artist;
+        valB = b.album_artist_sort?.trim() || b.artistsort?.trim() || b.album_artist || b.artist;
+      } else if (singleSortField === "composer") {
+        valA = a.composersort?.trim() || a.composer;
+        valB = b.composersort?.trim() || b.composer;
+      } else if (singleSortField === "genre") {
+        valA = a.genresort?.trim() || a.genre;
+        valB = b.genresort?.trim() || b.genre;
+      }
 
       if (valA === undefined || valA === null) return singleSortAsc ? 1 : -1;
       if (valB === undefined || valB === null) return singleSortAsc ? -1 : 1;

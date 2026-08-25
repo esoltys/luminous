@@ -67,6 +67,7 @@ export interface Song {
   year?: number;
   originalyear?: number;
   genre?: string;
+  genresort?: string;
   compilation: boolean;
 
   // Extended tags
@@ -236,7 +237,9 @@ export interface DbSchemaStatus {
 
 export interface AlbumItem {
   artist: string | null;
+  artist_sort?: string | null;
   album: string | null;
+  albumsort?: string | null;
   year: number | null;
   track_count: number;
   disc_count: number;
@@ -254,6 +257,7 @@ export interface AlbumItem {
 
 export interface ArtistItem {
   name: string | null;
+  sort_artist?: string | null;
   album_count: number;
   song_count: number;
   genre?: string | null;

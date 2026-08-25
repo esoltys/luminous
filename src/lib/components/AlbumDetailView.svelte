@@ -279,8 +279,22 @@
 
     const field = sortField as keyof Song;
     return [...songs].sort((a, b) => {
-      const valA = a[field];
-      const valB = b[field];
+      let valA: unknown = a[field];
+      let valB: unknown = b[field];
+
+      if (sortField === "title") {
+        valA = a.titlesort?.trim() || a.title;
+        valB = b.titlesort?.trim() || b.title;
+      } else if (sortField === "artist") {
+        valA = a.album_artist_sort?.trim() || a.artistsort?.trim() || a.album_artist || a.artist;
+        valB = b.album_artist_sort?.trim() || b.artistsort?.trim() || b.album_artist || b.artist;
+      } else if (sortField === "composer") {
+        valA = a.composersort?.trim() || a.composer;
+        valB = b.composersort?.trim() || b.composer;
+      } else if (sortField === "genre") {
+        valA = a.genresort?.trim() || a.genre;
+        valB = b.genresort?.trim() || b.genre;
+      }
 
       if (valA === undefined || valA === null) return sortAsc ? 1 : -1;
       if (valB === undefined || valB === null) return sortAsc ? -1 : 1;
@@ -1104,8 +1118,11 @@
   <AlbumTagEditor
     songIds={songs.map((s) => s.id)}
     initialAlbum={songs[0].album}
+    initialAlbumSort={songs[0].albumsort}
     initialAlbumArtist={songs[0].album_artist || songs[0].artist}
+    initialAlbumArtistSort={songs[0].album_artist_sort || songs[0].artistsort}
     initialGenre={songs[0].genre}
+    initialGenreSort={songs[0].genresort}
     initialYear={songs[0].year}
     initialDisc={songs[0].disc}
     initialCompilation={songs[0].compilation}

@@ -519,8 +519,22 @@ import { shuffleArray } from "../utils/shuffle";
     }
     const field = sortField as keyof Song;
     return [...list].sort((a, b) => {
-      let valA = a[field];
-      let valB = b[field];
+      let valA: unknown = a[field];
+      let valB: unknown = b[field];
+
+      if (sortField === "title") {
+        valA = a.titlesort?.trim() || a.title;
+        valB = b.titlesort?.trim() || b.title;
+      } else if (sortField === "artist") {
+        valA = a.album_artist_sort?.trim() || a.artistsort?.trim() || a.album_artist || a.artist;
+        valB = b.album_artist_sort?.trim() || b.artistsort?.trim() || b.album_artist || b.artist;
+      } else if (sortField === "composer") {
+        valA = a.composersort?.trim() || a.composer;
+        valB = b.composersort?.trim() || b.composer;
+      } else if (sortField === "genre") {
+        valA = a.genresort?.trim() || a.genre;
+        valB = b.genresort?.trim() || b.genre;
+      }
 
       if (valA === undefined || valA === null) return sortAsc ? 1 : -1;
       if (valB === undefined || valB === null) return sortAsc ? -1 : 1;
@@ -1216,8 +1230,11 @@ import { shuffleArray } from "../utils/shuffle";
   <AlbumTagEditor
     songIds={editingAlbumSongs.map((s) => s.id)}
     initialAlbum={editingAlbumSongs[0].album}
+    initialAlbumSort={editingAlbumSongs[0].albumsort}
     initialAlbumArtist={editingAlbumSongs[0].album_artist || editingAlbumSongs[0].artist}
+    initialAlbumArtistSort={editingAlbumSongs[0].album_artist_sort || editingAlbumSongs[0].artistsort}
     initialGenre={editingAlbumSongs[0].genre}
+    initialGenreSort={editingAlbumSongs[0].genresort}
     initialYear={editingAlbumSongs[0].year}
     initialDisc={editingAlbumSongs[0].disc}
     initialCompilation={editingAlbumSongs[0].compilation}

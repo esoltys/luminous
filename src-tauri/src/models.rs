@@ -196,6 +196,7 @@ pub struct Song {
     pub year: Option<i32>,
     pub originalyear: Option<i32>,
     pub genre: Option<String>,
+    pub genresort: Option<String>,
     pub compilation: bool,
 
     // Extended tags
