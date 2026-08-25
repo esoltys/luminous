@@ -208,6 +208,59 @@ describe("CollectionStore", () => {
     expect(collectionStore.filteredArtists[0].name).toBe("The Beatles");
   });
 
+  it("filters albums by artist tags using tag prefix and general search", () => {
+    collectionStore.albums = [
+      { album: "Come On Over", artist: "Shania Twain" } as AlbumItem,
+      { album: "The Woman in Me", artist: "Shania Twain" } as AlbumItem,
+      { album: "Let's Talk About Love", artist: "Celine Dion" } as AlbumItem,
+      { album: "Abbey Road", artist: "The Beatles" } as AlbumItem,
+    ];
+    collectionStore.artistProfiles = {
+      "shania twain": {
+        artist_key: "Shania Twain",
+        tags: ["country", "canadian", "pop"],
+        social_links: [],
+      },
+      "celine dion": {
+        artist_key: "Celine Dion",
+        tags: ["pop", "canadian", "ballad"],
+        social_links: [],
+      },
+      "the beatles": {
+        artist_key: "The Beatles",
+        tags: ["rock", "british", "classic"],
+        social_links: [],
+      },
+    };
+
+    // Explicit tag search with tag: prefix
+    collectionStore.searchQuery = "tag:country";
+    expect(collectionStore.filteredAlbums).toHaveLength(2);
+    expect(collectionStore.filteredAlbums.map((a) => a.album)).toEqual([
+      "Come On Over",
+      "The Woman in Me",
+    ]);
+
+    // Explicit tag search with artist-tag: prefix
+    collectionStore.searchQuery = "artist-tag:canadian";
+    expect(collectionStore.filteredAlbums).toHaveLength(3);
+    expect(collectionStore.filteredAlbums.map((a) => a.album)).toEqual([
+      "Come On Over",
+      "The Woman in Me",
+      "Let's Talk About Love",
+    ]);
+
+    // General keyword search matching artist tag
+    collectionStore.searchQuery = "british";
+    expect(collectionStore.filteredAlbums).toHaveLength(1);
+    expect(collectionStore.filteredAlbums[0].album).toBe("Abbey Road");
+
+    // General keyword search matching album title directly
+    collectionStore.searchQuery = "over";
+    expect(collectionStore.filteredAlbums).toHaveLength(1);
+    expect(collectionStore.filteredAlbums[0].album).toBe("Come On Over");
+  });
+
   it("handles navigation helpers viewArtist and viewAlbum and clears search terms", () => {
     collectionStore.searchQuery = "some search";
     collectionStore.searchResults = [{ id: 1 } as Song];

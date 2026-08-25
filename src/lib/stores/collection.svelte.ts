@@ -1275,12 +1275,31 @@ class CollectionStore {
   }
 
   get filteredAlbums(): AlbumItem[] {
-    const query = this.searchQuery.trim().toLowerCase();
-    if (query === "") return this.albums;
-    return this.albums.filter(album => 
-      (album.album && album.album.toLowerCase().includes(query)) ||
-      (album.artist && album.artist.toLowerCase().includes(query))
-    );
+    const rawQuery = this.searchQuery.trim();
+    if (rawQuery === "") return this.albums;
+
+    // Check if query is structured search with artist-tag or tag
+    const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
+    if (tagMatch) {
+      const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
+      if (!tagQuery) return this.albums;
+      return this.albums.filter((album) => {
+        if (!album.artist) return false;
+        const profile = this.artistProfiles[album.artist.toLowerCase()];
+        return profile?.tags?.some((t) => t.toLowerCase().includes(tagQuery)) ?? false;
+      });
+    }
+
+    const query = rawQuery.toLowerCase();
+    return this.albums.filter((album) => {
+      if (album.album && album.album.toLowerCase().includes(query)) return true;
+      if (album.artist && album.artist.toLowerCase().includes(query)) return true;
+      if (album.artist) {
+        const profile = this.artistProfiles[album.artist.toLowerCase()];
+        if (profile?.tags?.some((t) => t.toLowerCase().includes(query))) return true;
+      }
+      return false;
+    });
   }
 
   get filteredArtists(): ArtistItem[] {
@@ -1288,7 +1307,7 @@ class CollectionStore {
     if (rawQuery === "") return this.artists;
 
     // Check if query is structured search with artist-tag or tag
-    const tagMatch = rawQuery.match(/^(?:artist[-_]?tag|tags?):(.+)$/i);
+    const tagMatch = rawQuery.match(/^(?:artist[-_]?tags?|artisttags?|tags?):(.+)$/i);
     if (tagMatch) {
       const tagQuery = tagMatch[1].replace(/^['"]|['"]$/g, "").trim().toLowerCase();
       if (!tagQuery) return this.artists;
