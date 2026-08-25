@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { X, Plus, Trash2, Globe, Tag as TagIcon, Link as LinkIcon, User } from "lucide-svelte";
+  import { X, Plus, Trash2, Globe, Tag as TagIcon, Link as LinkIcon, User, Save, LoaderCircle } from "lucide-svelte";
+  import Button from "./Button.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -297,25 +298,28 @@
 
       <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-sidebar/80">
-        <button
-          type="button"
+        <Button
           onclick={onClose}
-          class="px-4 py-2 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-lg transition-colors"
+          disabled={isSaving}
+          variant="secondary"
+          size="sm"
         >
           {i18n.t("artistProfileEditor.cancel", {}, "Cancel")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           onclick={handleSave}
           disabled={isSaving}
-          class="px-4 py-2 text-xs font-semibold bg-brand-accent text-brand-accent-text hover:brightness-110 disabled:opacity-50 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+          variant="primary"
+          size="sm"
         >
           {#if isSaving}
-            <span>Saving...</span>
+            <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+            <span>{i18n.t("artistProfileEditor.saving", {}, "Saving...")}</span>
           {:else}
+            <Save class="w-3.5 h-3.5" />
             <span>{i18n.t("artistProfileEditor.save", {}, "Save")}</span>
           {/if}
-        </button>
+        </Button>
       </div>
     </div>
   </div>

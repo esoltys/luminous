@@ -826,6 +826,7 @@ export const en = {
     platform: "Platform",
     linkValue: "Handle or URL",
     save: "Save",
+    saving: "Saving...",
     cancel: "Cancel",
     savedSuccess: "Artist profile updated",
     removeTagTooltip: "Remove tag {tag}",

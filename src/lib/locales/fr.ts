@@ -858,6 +858,7 @@ export const fr = {
     platform: "Plateforme",
     linkValue: "Identifiant ou URL",
     save: "Enregistrer",
+    saving: "Enregistrement en cours...",
     cancel: "Annuler",
     savedSuccess: "Profil de l'artiste mis à jour",
     removeTagTooltip: "Supprimer le tag {tag}",
