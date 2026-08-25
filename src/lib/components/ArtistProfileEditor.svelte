@@ -99,7 +99,7 @@
       onClose();
     } catch (err) {
       console.error("Failed to save artist profile:", err);
-      toastStore.show("Failed to save artist profile", "error");
+      toastStore.show(i18n.t("artistProfileEditor.savedError", {}, "Failed to save artist profile"), "error");
     } finally {
       isSaving = false;
     }
@@ -248,7 +248,7 @@
 
           {#if socialLinks.length === 0}
             <div class="px-4 py-3 rounded-lg border border-dashed border-brand-border text-center text-xs text-brand-text-secondary/60">
-              No links added yet. Click "Add Link" to attach social media or streaming profiles.
+              {i18n.t("artistProfileEditor.noLinks", {}, 'No links added yet. Click "Add Link" to attach social media or streaming profiles.')}
             </div>
           {:else}
             <div class="flex flex-col gap-2">
@@ -262,7 +262,9 @@
                       class="w-full appearance-none pl-8 pr-6 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors"
                     >
                       {#each SOCIAL_PLATFORMS as p (p.id)}
-                        <option value={p.id}>{p.label}</option>
+                        <option value={p.id}>
+                          {p.id === "website" ? i18n.t("artistProfileEditor.website", {}, "Website") : p.id === "custom" ? i18n.t("artistProfileEditor.customLink", {}, "Custom Link") : p.label}
+                        </option>
                       {/each}
                     </select>
                     <div class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-secondary">
