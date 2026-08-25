@@ -394,8 +394,12 @@
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
         <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
-          <!-- Immersive Ambient Blurred Background -->
-          {#if playerStore.currentSong}
+          <!-- Immersive Ambient Blurred Background: skipped on Linux, where the
+               `blur-3xl` filter over a full-window layer is expensive on
+               WebKitGTK's compositor and can let the translucent layer sample
+               the main UI underneath instead of the intended solid backdrop
+               (see #452) — the face's own `bg-brand-main` is fallback enough. -->
+          {#if playerStore.currentSong && !isLinux}
             <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
               <CoverArt
                 songId={playerStore.currentSong?.id}
@@ -524,10 +528,26 @@
     height: 100%;
     transform: rotateY(0deg);
     transform-style: preserve-3d;
+    visibility: visible;
   }
 
   .flip-back {
     transform: rotateY(180deg);
+  }
+
+  /* Belt-and-suspenders on top of `backface-visibility: hidden`: some
+     Chromium/WebView2 builds fail to honor it without hardware-accelerated
+     compositing (e.g. no GPU, remote desktop, bad drivers), which leaves the
+     inactive face fully painted and visible through/around the active one
+     instead of hidden (#569). `visibility: hidden` is unconditional — it
+     doesn't depend on 3D compositing — so it hides the idle face regardless
+     of whether the browser's backface trick worked. The delay keeps it from
+     hiding mid-flip; the delay is dropped when un-hiding so the face is
+     ready to show the instant its flip starts. */
+  .flip-perspective:not(.no-3d) .flip-card:not(.flipped) .flip-back,
+  .flip-perspective:not(.no-3d) .flip-card.flipped .flip-front {
+    visibility: hidden;
+    transition: visibility 0s linear 0.8s;
   }
 
   /* Disable 3D flip on Linux/WebKit and use simple, clean opacity cross-fade.
@@ -549,23 +569,32 @@
     backface-visibility: visible;
     -webkit-backface-visibility: visible;
     transform: none !important;
-    transition: opacity 0.4s ease-in-out;
+    transition: opacity 0.4s ease-in-out, visibility 0s linear 0s;
   }
 
   .no-3d .flip-front {
     opacity: 1;
+    visibility: visible;
   }
 
   .no-3d .flip-card.flipped .flip-front {
     opacity: 0;
+    visibility: hidden;
+    transition-delay: 0s, 0.4s;
   }
 
   .no-3d .flip-back {
     opacity: 0;
+    visibility: hidden;
+  }
+
+  .no-3d .flip-card:not(.flipped) .flip-back {
+    transition-delay: 0s, 0.4s;
   }
 
   .no-3d .flip-card.flipped .flip-back {
     opacity: 1;
+    visibility: visible;
   }
 
   :global(body) {
