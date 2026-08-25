@@ -871,8 +871,7 @@ pub fn run() {
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,
             commands::tags::get_tags_overview,
-            commands::tags::get_songs_by_main_tag,
-            commands::tags::get_songs_by_genre_edge,
+            commands::tags::get_songs_by_curated_tag,
             commands::tags::get_songs_without_genre,
             // Persisted Genres curation hierarchy (#545)
             commands::tags::get_tag_hierarchy,
