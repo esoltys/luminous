@@ -6,6 +6,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { songsToCoverStack } from "../utils/covers";
+  import { formatDuration } from "../utils/formatters";
   import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -422,14 +423,6 @@ import { shuffleArray } from "../utils/shuffle";
       })
       .catch((err) => console.error(err))
       .finally(() => (loading = false));
-  }
-
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const sec = Math.floor(ns / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
   async function rateSong(song: Song, rating: number) {

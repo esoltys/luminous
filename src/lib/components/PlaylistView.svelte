@@ -5,6 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { shuffleArray } from "../utils/shuffle";
+  import { formatDuration } from "../utils/formatters";
   import {
     Trash2,
     ListMusic,
@@ -733,14 +734,6 @@
     } catch (err) {
       console.error("Failed to save Queue as custom playlist:", err);
     }
-  }
-
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const sec = Math.floor(ns / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
   let currentCoverUrl = $derived.by(() => {

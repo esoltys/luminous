@@ -13,6 +13,7 @@
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
+  import { formatDuration } from "../utils/formatters";
   import { parseMultiValue } from "../utils/multiValue";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
@@ -408,14 +409,6 @@
       const songIds = songs.map((s) => s.id);
       playerStore.playSongs(songIds, 0);
     }
-  }
-
-  function formatDuration(ns: number | undefined): string {
-    if (!ns) return "0:00";
-    const sec = Math.floor(ns / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
   async function handleAddSongToPlaylist(songId: number) {
