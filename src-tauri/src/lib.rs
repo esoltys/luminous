@@ -366,6 +366,15 @@ pub fn run() {
             if let Err(e) = manager.queue() {
                 log::error!("Failed to bootstrap Queue playlist: {e}");
             }
+            // Rebuild curated-tag ("tag:") genre auto-playlists once right
+            // after migrations run (see db.rs migration 19, #548), rather
+            // than waiting for the next library scan — an upgrading user's
+            // old bare-genre-name rows were just discarded by that
+            // migration, so without this they'd see an empty genre
+            // auto-playlist section until they happened to trigger a scan.
+            if let Err(e) = manager.sync_all_auto_playlists() {
+                log::error!("Failed to sync auto-playlists at startup: {e}");
+            }
             let playlists = Arc::new(Mutex::new(manager));
 
             let cover_manager = Arc::new(CoverManager::new(
