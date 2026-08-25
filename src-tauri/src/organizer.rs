@@ -3,6 +3,7 @@
 //! Provides template parsing, dry-run path computation, conflict detection,
 //! and batch file relocation with atomic SQLite path updates.
 
+use crate::collection::is_audio_file;
 use crate::covermanager::CoverManager;
 use crate::db::Database;
 use crate::models::{self, Song};
@@ -774,17 +775,6 @@ pub fn compute_preview(
     Ok(preview_items)
 }
 
-const AUDIO_EXTENSIONS: &[&str] = &[
-    "mp3", "flac", "m4a", "aac", "ogg", "opus", "wav", "aiff", "aif", "wma", "alac", "dsf", "dff",
-];
-
-fn is_audio_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
-}
-
 fn move_companion_files(
     conn: &rusqlite::Connection,
     src_dir: &Path,
@@ -1259,6 +1249,20 @@ pub(crate) fn remove_empty_dirs_under_root(root: &Path) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_audio_file_matches_collection_scanner() {
+        // Regression test: organizer used to keep its own AUDIO_EXTENSIONS list, which drifted
+        // from collection.rs's list — a file the scanner indexed could then be silently skipped
+        // by the organizer. Both now share crate::collection::is_audio_file.
+        for ext in crate::collection::AUDIO_EXTENSIONS {
+            let filename = format!("song.{ext}");
+            assert!(
+                is_audio_file(Path::new(&filename)),
+                "organizer should recognize .{ext}"
+            );
+        }
+    }
 
     #[test]
     fn test_template_expansion_default_pattern() {
