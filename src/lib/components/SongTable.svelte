@@ -26,11 +26,13 @@
   import { parseMultiValue } from "../utils/multiValue";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { columnResize } from "../utils/columnResize";
+  import { watchScrollMemory } from "../utils/scrollMemory";
   import type { VisibleColumns } from "../stores/collection.svelte";
   import SortableHeader from "./SortableHeader.svelte";
   import SongRating from "./SongRating.svelte";
   import GenreChips from "./GenreChips.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import CoverArt from "./CoverArt.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import EmptyState from "./EmptyState.svelte";
   import { Play, Plus, Edit3, Trash2, GripVertical, AlertTriangle, Music, Clock } from "lucide-svelte";
@@ -69,6 +71,8 @@
     /** When set, position rows show a drag handle and pointer-based reorder is enabled (PlaylistView only). */
     onReorder?: (fromIndex: number, toIndex: number, selectedKeys: string[]) => void;
     virtualized?: boolean;
+    /** Persists/restores virtualized scroll position — only used when `virtualized` is true. */
+    scrollMemoryKey?: string;
   }
 
   let {
@@ -92,6 +96,7 @@
     onEditTags,
     onReorder,
     virtualized = false,
+    scrollMemoryKey,
   }: Props = $props();
 
   let lastSelectedKey = $state<string | null>(null);
@@ -99,6 +104,36 @@
     const m = new Map<string, number>();
     rows.forEach((r, i) => m.set(r.key, i));
     return m;
+  });
+
+  // The virtualized body's <svelte-virtual-list-viewport> reserves layout
+  // width for its own scrollbar; the sticky header sits outside that
+  // viewport and doesn't. On platforms with a non-overlay scrollbar (e.g.
+  // Windows), that gutter makes the header's grid track a few pixels wider
+  // than the rows' grid track, misaligning every column after the ones that
+  // can absorb it. Measure the actual scrollbar width and pad the header by
+  // the same amount so both grids compute identical track widths.
+  let bodyContainer = $state<HTMLDivElement | undefined>(undefined);
+  let scrollbarWidth = $state(0);
+
+  $effect(() => {
+    if (!virtualized || !bodyContainer) return;
+    const viewport = bodyContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
+    if (!viewport) return;
+    const update = () => {
+      scrollbarWidth = viewport.offsetWidth - viewport.clientWidth;
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (!virtualized || !scrollMemoryKey || !bodyContainer) return;
+    const viewport = bodyContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
+    if (!viewport) return;
+    return watchScrollMemory(viewport, scrollMemoryKey);
   });
 
   let orderForRange = $derived(rangeSelectionOrder ?? rows);
@@ -304,12 +339,22 @@
 
 {#snippet bodyCell(col: (typeof SONG_TABLE_COLUMNS)[number], song: Song, row: SongTableRow)}
   {#if col.key === "track"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {formatTrackNumber(song.track, song.disc, discCount, keyIndex.get(row.key) ?? 0)}
     </div>
   {:else if col.key === "title"}
     <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
-      <span class="truncate {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'} {row.disabledVariant === 'strikethrough' && rowDisabled(row) ? 'line-through' : ''}">
+      <CoverArt
+        songId={song.id}
+        artEmbedded={song.art_embedded}
+        artAutomatic={song.art_automatic}
+        artManual={song.art_manual}
+        sizeClass="w-7 h-7 rounded shrink-0"
+      />
+      <span
+        class="truncate text-brand-text-primary {row.disabledVariant === 'strikethrough' && rowDisabled(row) ? 'line-through' : ''}"
+        title={song.title || i18n.t("collection.unknownSong")}
+      >
         {song.title || i18n.t("collection.unknownSong")}
       </span>
       {#if row.disabledVariant === "strikethrough" && rowDisabled(row)}
@@ -317,40 +362,50 @@
       {/if}
     </div>
   {:else if col.key === "artist"}
-    <div class="text-brand-text-primary truncate pr-4 flex items-center min-w-0">
+    <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
       {#if song.artist}
         {#each parseMultiValue(song.artist) as name, i (name)}
-          {#if i > 0}<span class="text-brand-text-primary/50 shrink-0">,&nbsp;</span>{/if}
+          {#if i > 0}<span class="text-brand-text-secondary/50 shrink-0">,&nbsp;</span>{/if}
           <LinkButton
             onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
-            class="text-brand-text-primary truncate min-w-0"
+            class="text-brand-text-secondary truncate min-w-0"
             title={i18n.t("collection.filterByArtist", { artist: name })}
           >
             {name}
           </LinkButton>
         {/each}
       {:else}
-        <span class="text-brand-text-primary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
+        <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownArtist")}</span>
       {/if}
     </div>
   {:else if col.key === "album"}
-    <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium">
-      {song.album || i18n.t("collection.unknownAlbum")}
+    <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
+      {#if song.album}
+        <LinkButton
+          onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
+          class="text-brand-text-secondary truncate min-w-0"
+          title={i18n.t("collection.filterByAlbum", { album: song.album })}
+        >
+          {song.album}
+        </LinkButton>
+      {:else}
+        <span class="text-brand-text-secondary truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
+      {/if}
     </div>
   {:else if col.key === "composer"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.composer}>
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.composer}>
       {song.composer || "—"}
     </div>
   {:else if col.key === "album_artist"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
       {song.album_artist || "—"}
     </div>
   {:else if col.key === "format"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
       {song.filetype ? song.filetype.toUpperCase() : "—"}
     </div>
   {:else if col.key === "year"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {song.year || "—"}
     </div>
   {:else if col.key === "genre"}
@@ -362,35 +417,35 @@
       {/if}
     </div>
   {:else if col.key === "grouping"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
       {song.grouping || "—"}
     </div>
   {:else if col.key === "bpm"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {song.bpm || "—"}
     </div>
   {:else if col.key === "initial_key"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {song.initial_key || "—"}
     </div>
   {:else if col.key === "bitrate"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {song.bitrate ? `${song.bitrate}k` : "—"}
     </div>
   {:else if col.key === "samplerate"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {formatSampleRate(song.samplerate)}
     </div>
   {:else if col.key === "bitdepth"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {formatBitDepth(song.bitdepth)}
     </div>
   {:else if col.key === "channels"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {formatChannels(song.channels)}
     </div>
   {:else if col.key === "filesize"}
-    <div class="text-brand-text-primary truncate pr-2 min-w-0 text-xs font-medium">
+    <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
       {formatFileSize(song.filesize)}
     </div>
   {:else if col.key === "rating"}
@@ -398,27 +453,27 @@
       <SongRating rating={song.rating} onRate={(r) => onRate(song, r)} />
     </div>
   {:else if col.key === "playcount"}
-    <div class="text-center text-brand-text-primary font-medium">
+    <div class="text-center text-brand-text-secondary font-medium text-xs">
       {song.playcount ?? 0}
     </div>
   {:else if col.key === "skipcount"}
-    <div class="text-center text-brand-text-primary font-medium text-xs">
+    <div class="text-center text-brand-text-secondary font-medium text-xs">
       {song.skipcount ?? 0}
     </div>
   {:else if col.key === "lastplayed"}
-    <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
+    <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
       {formatDate(song.lastplayed)}
     </div>
   {:else if col.key === "added"}
-    <div class="text-center text-brand-text-primary text-xs whitespace-nowrap">
+    <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
       {formatDateAdded(song.added)}
     </div>
   {:else if col.key === "duration"}
-    <div class="text-center text-brand-text-primary text-xs font-medium">
+    <div class="text-center text-brand-text-secondary text-xs font-medium">
       {formatDuration(song.length_nanosec)}
     </div>
   {:else if col.key === "path"}
-    <div class="text-brand-text-primary truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
+    <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
       {song.path || "—"}
     </div>
   {:else if col.key === "actions"}
@@ -426,7 +481,7 @@
       {#if onAddToPlaylist}
         <button
           onclick={() => onAddToPlaylist?.(song)}
-          class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
           title={i18n.t("collection.addPlaylistTooltipDefault")}
         >
           <Plus class="w-4 h-4" />
@@ -434,7 +489,7 @@
       {/if}
       <button
         onclick={() => onEditTags(song)}
-        class="text-brand-text-primary hover:text-brand-accent-text transition-colors"
+        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
         title={i18n.t("collection.editTagsTooltip")}
       >
         <Edit3 class="w-4 h-4" />
@@ -442,7 +497,7 @@
       {#if onRemoveFromPlaylist}
         <button
           onclick={() => onRemoveFromPlaylist?.(row)}
-          class="text-brand-text-primary hover:text-red-400 transition-colors"
+          class="text-brand-text-secondary hover:text-red-400 transition-colors"
           title={i18n.t("playlists.removeFromPlaylist")}
         >
           <Trash2 class="w-4 h-4" />
@@ -495,11 +550,11 @@
     onpointerdown={(e) => handleRowPointerDown(e, row)}
     style={gridColsStyle}
     title={row.disabledTooltip}
-    class="grid items-center hover:bg-brand-sidebar/40 group transition-colors py-2 px-4 text-sm
+    class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
       {onReorder ? 'cursor-grab active:cursor-grabbing' : ''}
       {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'border-t-2! border-brand-accent' : ''}
-      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
+      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10' : '')}"
   >
     {@render leadingCell(row, displayIndex)}
     {#if song}
@@ -512,8 +567,8 @@
   </div>
 {/snippet}
 
-<div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar/80 backdrop-blur-md border-b border-brand-border text-[10px] text-brand-text-primary uppercase tracking-wider font-semibold select-none">
-  <div class="grid items-center py-2.5 px-4" style={gridColsStyle}>
+<div class="sticky top-0 z-10 flex flex-col rounded-t-lg bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
+  <div class="grid items-center py-3 px-4" style="{gridColsStyle}{virtualized ? `; padding-right: calc(1rem + ${scrollbarWidth}px)` : ''}">
     <div class="text-center w-9"></div>
     {#each SONG_TABLE_COLUMNS as col (col.key)}
       {#if !(mode === "position" && col.key === "track") && collectionStore.visibleColumns[col.key]}
@@ -525,7 +580,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="divide-y divide-brand-border/40 rounded-b-lg overflow-hidden"
+  bind:this={bodyContainer}
+  class="rounded-b-lg overflow-hidden"
   onpointermove={handlePointerDragMove}
   onpointerup={handlePointerDragUp}
 >
