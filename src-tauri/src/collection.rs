@@ -1049,42 +1049,6 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Songs in a genre, selected per `mode`'s bias (see #120), for per-genre
-    /// auto-playlists.
-    ///
-    /// `genre` is matched with exact equality against the full (possibly
-    /// multi-value, `; `-delimited) `songs.genre` column — a song tagged
-    /// only `"Rock"` and one tagged `"Rock; Blues"` are treated as
-    /// different genres here, unlike the substring-matching `genre:` Smart
-    /// Playlist filter in `filter_parser.rs`. Deliberately left unsplit for
-    /// #143: fanning multi-value genres out into their own auto-playlists
-    /// is native-tags territory, tracked by #224.
-    pub fn get_songs_by_genre(
-        &self,
-        genre: &str,
-        limit: i64,
-        mode: QueuePopulationMode,
-    ) -> Result<Vec<Song>> {
-        let conn = self.db.pool.get()?;
-        let (extra_where, order_by) = mode_query_fragments(mode);
-        let sql = format!(
-            "SELECT {} FROM songs
-             WHERE genre = ?1
-               AND source IN (1, 2)
-               AND unavailable = 0
-               {extra_where}
-             ORDER BY {order_by}
-             LIMIT ?2",
-            SONG_SELECT_COLS
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let songs = stmt
-            .query_map(params![genre, limit], row_to_song)?
-            .filter_map(|r| r.ok())
-            .collect();
-        Ok(songs)
-    }
-
     /// Distinct non-empty genres present in the library, used to build one
     /// auto-playlist per genre.
     pub fn get_library_genres(&self) -> Result<Vec<String>> {
@@ -2420,9 +2384,10 @@ fn multi_value_contains_pattern(value: &str) -> String {
 
 /// Extra `WHERE`-clause fragment and `ORDER BY` expression implementing a
 /// `QueuePopulationMode`'s bias. Spliced onto a base scope filter (genre,
-/// decade, or a Smart Playlist's own filter query) by `get_songs_by_genre`,
-/// `get_songs_by_decade`, and `search_songs_by_mode`. Binds no parameters of
-/// its own, so it's safe to splice into either positional (`?N`) SQL.
+/// decade, or a Smart Playlist's own filter query) by `TagManager`'s
+/// curated-tag matchers, `get_songs_by_decade`, and `search_songs_by_mode`.
+/// Binds no parameters of its own, so it's safe to splice into either
+/// positional (`?N`) SQL.
 ///
 /// Ordering uses `RANDOM()` (uniform shuffle) for unweighted modes, and an
 /// `RANDOM() * weight` key for `Familiar`/`Discover` — a lightweight, easy-
@@ -4558,9 +4523,11 @@ mod tests {
 
     /// Verifies each `QueuePopulationMode`'s WHERE-clause bias (see #120)
     /// selects the correct subset of songs. Ordering is randomized by
-    /// design, so this only asserts set membership, not order.
+    /// design, so this only asserts set membership, not order. Exercised via
+    /// `TagManager::get_songs_by_tag`, which splices in the same
+    /// `mode_query_fragments` this test targets.
     #[test]
-    fn test_get_songs_by_genre_population_modes() {
+    fn test_get_songs_by_tag_population_modes() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_population_mode_test_{}",
             std::time::SystemTime::now()
@@ -4630,7 +4597,7 @@ mod tests {
         // Played once, low rating — excluded from all three biased modes.
         seed("/music/neutral.mp3", "Neutral", 2.0, 1, Some(1_700_000_000));
 
-        let scanner = CollectionScanner::new(db);
+        let tag_manager = crate::tags::TagManager::new(db);
 
         fn titles(mut songs: Vec<Song>) -> Vec<String> {
             let mut out: Vec<String> = songs.drain(..).filter_map(|s| s.title).collect();
@@ -4638,16 +4605,16 @@ mod tests {
             out
         }
 
-        let all = scanner
-            .get_songs_by_genre(genre, 10, QueuePopulationMode::All)
+        let all = tag_manager
+            .get_songs_by_tag(genre, 10, QueuePopulationMode::All)
             .unwrap();
         assert_eq!(
             titles(all),
             vec!["DeepCut", "Discover", "Familiar", "Fav", "Neutral"]
         );
 
-        let familiar = scanner
-            .get_songs_by_genre(genre, 10, QueuePopulationMode::Familiar)
+        let familiar = tag_manager
+            .get_songs_by_tag(genre, 10, QueuePopulationMode::Familiar)
             .unwrap();
         assert_eq!(
             titles(familiar),
@@ -4655,18 +4622,18 @@ mod tests {
             "Familiar biases order via weighting, not filtering"
         );
 
-        let favourites = scanner
-            .get_songs_by_genre(genre, 10, QueuePopulationMode::Favourites)
+        let favourites = tag_manager
+            .get_songs_by_tag(genre, 10, QueuePopulationMode::Favourites)
             .unwrap();
         assert_eq!(titles(favourites), vec!["Fav"]);
 
-        let discover = scanner
-            .get_songs_by_genre(genre, 10, QueuePopulationMode::Discover)
+        let discover = tag_manager
+            .get_songs_by_tag(genre, 10, QueuePopulationMode::Discover)
             .unwrap();
         assert_eq!(titles(discover), vec!["Discover", "Familiar", "Neutral"]);
 
-        let deep_cuts = scanner
-            .get_songs_by_genre(genre, 10, QueuePopulationMode::DeepCuts)
+        let deep_cuts = tag_manager
+            .get_songs_by_tag(genre, 10, QueuePopulationMode::DeepCuts)
             .unwrap();
         assert_eq!(titles(deep_cuts), vec!["DeepCut", "Fav"]);
 

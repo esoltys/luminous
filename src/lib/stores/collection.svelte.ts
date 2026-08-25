@@ -75,9 +75,13 @@ export interface VisibleColumns {
  */
 export type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
 
-/** An auto-playlist reference (Favourites, Recently Added, genre, decade, or BPM), for the auto-playlist detail view. */
+/** An auto-playlist reference (Favourites, Recently Added, genre, decade, BPM,
+ * or the genre-less "No Genre" group), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
+  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "no_genre";
+  /** For kind "genre": the curated tag's plain name (#548) — a top-level
+   * card name or a sub-genre chip name, resolved the same way either way
+   * (see `viewGenreTag`). */
   genre?: string;
   decade?: string;
   /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
@@ -86,19 +90,6 @@ export interface AutoPlaylistRef {
   playlistId?: number;
   /** For kind "genre", "decade" or "bpm": when this playlist's songs were last (re)generated. */
   updated?: number;
-}
-
-/** The Genres tab's current drill-down (see GenreBrowseView's own DrillDownContext,
- * which this mirrors) — tracked here so Back/Forward restores it like any other
- * detail view instead of only rewinding the tab/sub-tab selection. */
-export interface GenreDrillDown {
-  kind: "tag" | "main" | "edge" | "none";
-  /** The tag name for "tag"/"main", or the child tag for "edge". Unused for "none". */
-  tag?: string;
-  /** The root tag for "edge" only. */
-  root?: string;
-  /** Label shown in the drill-down header — computed once when entering. */
-  displayTag: string;
 }
 
 /** A snapshot of "where the user is" for Back/Forward navigation history. */
@@ -110,7 +101,6 @@ interface NavigationView {
   selectedAlbumName: string | null;
   selectedPlaylistId: number | null;
   selectedAutoPlaylist: AutoPlaylistRef | null;
-  selectedGenreDrillDown: GenreDrillDown | null;
 }
 
 const MAX_HISTORY = 50;
@@ -348,19 +338,6 @@ class CollectionStore {
     this.scheduleRecordHistory();
   }
 
-  private _selectedGenreDrillDown = $state<GenreDrillDown | null>(null);
-
-  /** The Genres tab's current drill-down (see GenreBrowseView). */
-  get selectedGenreDrillDown() { return this._selectedGenreDrillDown; }
-  set selectedGenreDrillDown(val) {
-    this._selectedGenreDrillDown = val;
-    if (typeof window !== "undefined") {
-      if (val) localStorage.setItem("navigation_selectedGenreDrillDown", JSON.stringify(val));
-      else localStorage.removeItem("navigation_selectedGenreDrillDown");
-    }
-    this.scheduleRecordHistory();
-  }
-
   // Back/Forward navigation history. Snapshots are coalesced via a microtask
   // so that a single user action touching several fields in sequence (e.g.
   // viewArtist() setting activeTab/activeSubTab/selectedArtistName) records
@@ -382,7 +359,6 @@ class CollectionStore {
       selectedAlbumName: this._selectedAlbumName,
       selectedPlaylistId: this._selectedPlaylistId,
       selectedAutoPlaylist: this._selectedAutoPlaylist,
-      selectedGenreDrillDown: this._selectedGenreDrillDown,
     };
   }
 
@@ -416,7 +392,6 @@ class CollectionStore {
     this.selectedAlbumName = snap.selectedAlbumName;
     this.selectedPlaylistId = snap.selectedPlaylistId;
     this.selectedAutoPlaylist = snap.selectedAutoPlaylist;
-    this.selectedGenreDrillDown = snap.selectedGenreDrillDown;
     if (snap.selectedPlaylistId !== null) {
       playlistsStore.selectPlaylist(snap.selectedPlaylistId);
     }
@@ -575,15 +550,6 @@ class CollectionStore {
             this._selectedAutoPlaylist = JSON.parse(savedAutoPlaylist) as AutoPlaylistRef;
           } catch (e) {
             console.error("Failed to parse saved selectedAutoPlaylist:", e);
-          }
-        }
-
-        const savedGenreDrillDown = localStorage.getItem("navigation_selectedGenreDrillDown");
-        if (savedGenreDrillDown) {
-          try {
-            this._selectedGenreDrillDown = JSON.parse(savedGenreDrillDown) as GenreDrillDown;
-          } catch (e) {
-            console.error("Failed to parse saved selectedGenreDrillDown:", e);
           }
         }
 
@@ -983,20 +949,27 @@ class CollectionStore {
     this.saveRecentSearches();
   }
 
-  /** One-shot "open this tag in the Genres tab" signal — set by viewGenreTag(),
-   * consumed and cleared by GenreBrowseView on pickup. Deliberately not
-   * persisted/history-tracked like selectedArtistName/selectedAlbumName: it's
-   * a fire-once navigation command, not durable "where the user is" state. */
-  pendingGenreTag = $state<string | null>(null);
-
+  /** Opens a genre/tag's auto-playlist detail view (#548) — every Genres-tab
+   * card/chip click and every "browse this genre" entry point elsewhere in
+   * the app (e.g. a GenreChips chip on a song row) route through here.
+   * Resolves the curated tag's materialized playlist row if one exists
+   * (`dynamic_spec === "tag:"+tag`); a tag below the auto-playlist song
+   * threshold has none yet, so `playlistId` stays undefined and
+   * AutoPlaylistDetailView falls back to a direct curated-hierarchy query. */
   viewGenreTag(tag: string) {
     this.searchQuery = "";
     this.searchResults = [];
     this.selectedArtistName = null;
     this.selectedAlbumName = null;
-    this.activeTab = "collection";
-    this.activeSubTab = "genres";
-    this.pendingGenreTag = tag;
+    const playlist = playlistsStore.playlists.find(
+      (p) => p.dynamic_enabled && p.dynamic_spec === `tag:${tag}`
+    );
+    this.viewAutoPlaylist({
+      kind: "genre",
+      genre: tag,
+      playlistId: playlist?.id,
+      updated: playlist?.updated,
+    });
   }
 
   viewArtist(name: string) {

@@ -113,7 +113,7 @@
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
             });
           } else {
-            const genre = p.dynamic_spec || p.name;
+            const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
             results.push({
               type: "auto",
               id: `auto:genre:${p.id}`,

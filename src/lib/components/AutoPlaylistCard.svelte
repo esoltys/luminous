@@ -71,7 +71,7 @@
                 ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
                 : k === "bpm"
                   ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
-                  : invoke<Song[]>("get_songs_by_genre", { genre: g ?? "", limit: 50 });
+                  : invoke<Song[]>("get_songs_by_curated_tag", { tagName: g ?? "", limit: 50 });
 
     request
       .then((res) => {

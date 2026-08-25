@@ -20,12 +20,28 @@ use crate::{
 };
 use anyhow::Result;
 use rusqlite::params;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// Number of hues in the Genres page's fixed curated palette — colors are
 /// stored as an index into it (`tag_groups.color_index`), the actual hue
 /// values only matter to the frontend's swatch rendering.
 const PALETTE_SIZE: i32 = 10;
+
+/// Converts a caller-supplied `limit` into a `.take()` bound, honoring the
+/// same "negative means no limit" convention `playlist.rs`'s `NO_SONG_LIMIT`
+/// uses for SQL `LIMIT` clauses — `limit.max(0) as usize` would otherwise
+/// silently truncate a "no limit" (-1) call to zero results, since these
+/// component-match methods filter/take in Rust rather than in SQL.
+fn take_limit(limit: i64) -> usize {
+    if limit < 0 {
+        usize::MAX
+    } else {
+        limit as usize
+    }
+}
 
 #[derive(Debug)]
 pub struct TagManager {
@@ -200,9 +216,6 @@ impl TagManager {
 
     /// Songs whose genre list contains `tag_name` at any position
     /// (case-insensitive, exact component match — not a substring match).
-    /// Mirrors `CollectionScanner::get_songs_by_genre`'s signature/shape, but
-    /// matches component-wise rather than requiring an exact full-column
-    /// match.
     pub fn get_songs_by_tag(
         &self,
         tag_name: &str,
@@ -242,104 +255,104 @@ impl TagManager {
                     })
                     .unwrap_or(false)
             })
-            .take(limit.max(0) as usize)
+            .take(take_limit(limit))
             .collect();
         Ok(songs)
     }
 
-    /// Songs whose *main* (position-0) genre value is exactly `tag_name`
-    /// (case-insensitive). Used when drilling into a root of the Genre-view
-    /// hierarchy — narrower than [`Self::get_songs_by_tag`], which also
-    /// matches songs that merely carry the value as a subgenre.
-    pub fn get_songs_by_main_tag(
+    /// Songs whose genre list contains `group_name` itself OR any tag
+    /// currently curated (`tag_assignments`) as one of its children (#548) —
+    /// the curated-hierarchy analog of the old position-based
+    /// `get_songs_by_main_tag`: a top-level card's membership follows
+    /// curation (drag a chip onto another card, its songs move with it),
+    /// not each song's own incidental genre-list order. `group_name` doesn't
+    /// have to actually be a `tag_groups` row — an unrecognized name simply
+    /// has no children, so this degrades to a plain [`Self::get_songs_by_tag`]
+    /// call for it.
+    pub fn get_songs_by_curated_group(
         &self,
-        tag_name: &str,
+        group_name: &str,
         limit: i64,
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
+        let mut targets: HashSet<String> = {
+            let mut stmt = conn.prepare(
+                "SELECT tag_assignments.tag_name FROM tag_assignments
+                 JOIN tag_groups ON tag_groups.id = tag_assignments.group_id
+                 WHERE tag_groups.name = ?1 COLLATE NOCASE",
+            )?;
+            let rows = stmt.query_map(params![group_name], |r| r.get::<_, String>(0))?;
+            let names: HashSet<String> = rows
+                .filter_map(|r| r.ok())
+                .map(|s| s.to_lowercase())
+                .collect();
+            names
+        };
+        targets.insert(group_name.to_lowercase());
+
+        // No cheap LIKE prefilter here (unlike get_songs_by_tag) — with
+        // multiple target values a single `LIKE '%'||name||'%'` would miss a
+        // song whose only matching value is a child that doesn't literally
+        // contain `group_name` as a substring (e.g. group "Metal" with child
+        // "Doom"). Mirrors songs_containing_any's full-scan-then-filter
+        // shape instead.
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE genre LIKE '%' || ?1 || '%'
-               AND source IN (1, 2)
+             WHERE source IN (1, 2)
                AND unavailable = 0
+               AND genre IS NOT NULL
+               AND genre != ''
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
-        let candidates: Vec<Song> = stmt
-            .query_map(params![tag_name], row_to_song)?
+        let songs = stmt
+            .query_map([], row_to_song)?
             .filter_map(|r| r.ok())
-            .collect();
-
-        let target = tag_name.to_lowercase();
-        let songs = candidates
-            .into_iter()
-            .filter(|song| {
+            .filter(|song: &Song| {
                 song.genre
                     .as_deref()
-                    .and_then(|g| parse_multi_value(g).into_iter().next())
-                    .map(|main| main.to_lowercase() == target)
+                    .map(|g| {
+                        parse_multi_value(g)
+                            .iter()
+                            .any(|v| targets.contains(&v.to_lowercase()))
+                    })
                     .unwrap_or(false)
             })
-            .take(limit.max(0) as usize)
+            .take(take_limit(limit))
             .collect();
         Ok(songs)
     }
 
-    /// Songs matching the exact `get_genre_graph` edge: main (position-0)
-    /// genre value is `root_tag`, and `child_tag` appears somewhere after
-    /// it. Used when drilling into a child under a specific root in the
-    /// Genre view — a tag appearing as a child under multiple roots (see
-    /// `get_genre_graph`'s doc comment) needs this to show only the songs
-    /// for *this* root/child relationship, not every song carrying
-    /// `child_tag` anywhere regardless of its own main tag.
-    pub fn get_songs_by_genre_edge(
+    /// Single dispatch point for a curated-hierarchy tag lookup (#548): if
+    /// `name` is currently a `tag_groups` row (a top-level card), membership
+    /// includes its curated children ([`Self::get_songs_by_curated_group`]);
+    /// otherwise it's treated as a leaf/chip and matched exactly at any
+    /// position ([`Self::get_songs_by_tag`]) — covers both a curated child
+    /// and a name not (yet) present in the hierarchy at all. The one
+    /// invariant this relies on (`reconcile_hierarchy`'s self-heal pass): a
+    /// name is never simultaneously a group and a child, so this dispatch
+    /// never has to pick between the two.
+    pub fn get_songs_by_curated_tag(
         &self,
-        root_tag: &str,
-        child_tag: &str,
+        name: &str,
         limit: i64,
         mode: QueuePopulationMode,
     ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
-        let (extra_where, order_by) = mode_query_fragments(mode);
-        let sql = format!(
-            "SELECT {} FROM songs
-             WHERE genre LIKE '%' || ?1 || '%'
-               AND genre LIKE '%' || ?2 || '%'
-               AND source IN (1, 2)
-               AND unavailable = 0
-               {extra_where}
-             ORDER BY {order_by}",
-            SONG_SELECT_COLS
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let candidates: Vec<Song> = stmt
-            .query_map(params![root_tag, child_tag], row_to_song)?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        let root_target = root_tag.to_lowercase();
-        let child_target = child_tag.to_lowercase();
-        let songs = candidates
-            .into_iter()
-            .filter(|song| {
-                let Some(values) = song.genre.as_deref().map(parse_multi_value) else {
-                    return false;
-                };
-                let Some(main) = values.first() else {
-                    return false;
-                };
-                main.to_lowercase() == root_target
-                    && values[1..]
-                        .iter()
-                        .any(|v| v.to_lowercase() == child_target)
-            })
-            .take(limit.max(0) as usize)
-            .collect();
-        Ok(songs)
+        let is_group: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM tag_groups WHERE name = ?1 COLLATE NOCASE)",
+            params![name],
+            |r| r.get(0),
+        )?;
+        if is_group {
+            self.get_songs_by_curated_group(name, limit, mode)
+        } else {
+            self.get_songs_by_tag(name, limit, mode)
+        }
     }
 
     // -----------------------------------------------------------------
@@ -1022,48 +1035,105 @@ mod tests {
     }
 
     #[test]
-    fn test_get_songs_by_main_tag_excludes_subgenre_only_matches() {
+    fn test_get_songs_by_curated_group_matches_self_and_children_not_substrings() {
         let (db, dir) = test_db();
-        // Main tag is Ambient; Ambient Folk is only a subgenre here.
-        insert_song(&db, "/a.mp3", "Ambient; Ambient Folk");
-        // Main tag is genuinely Ambient Folk.
-        insert_song(&db, "/b.mp3", "Ambient Folk");
+        // "Doom" doesn't contain "Metal" as a substring — regression test for
+        // the LIKE-prefilter trap get_songs_by_curated_group deliberately
+        // avoids (see its doc comment). It starts out as its own root card
+        // (it's position-0 on /c.mp3, with nothing else around to curate it
+        // as anyone's child) and is explicitly demoted under Metal —
+        // demote_group_to_child, not reparent_tag, since Doom has its own
+        // pre-existing tag_groups row to remove, not just an assignment to
+        // create.
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/c.mp3", "Doom");
+        insert_song(&db, "/d.mp3", "Prog Rock"); // unrelated, must not match
 
         let manager = TagManager::new(db.clone());
-        let by_tag = manager
-            .get_songs_by_tag("Ambient Folk", 50, QueuePopulationMode::All)
-            .unwrap();
-        assert_eq!(by_tag.len(), 2, "any-position match includes both songs");
+        manager.reconcile_hierarchy().unwrap();
+        manager.demote_group_to_child("Doom", "Metal").unwrap();
 
-        let by_main = manager
-            .get_songs_by_main_tag("Ambient Folk", 50, QueuePopulationMode::All)
+        let songs = manager
+            .get_songs_by_curated_group("Metal", 50, QueuePopulationMode::All)
             .unwrap();
-        assert_eq!(by_main.len(), 1, "main-tag match excludes the subgenre-only song");
-        assert_eq!(by_main[0].genre.as_deref(), Some("Ambient Folk"));
+        let genres: Vec<Option<String>> = songs.iter().map(|s| s.genre.clone()).collect();
+        assert_eq!(songs.len(), 3, "self + curated child (Progressive Metal) + demoted child (Doom)");
+        assert!(genres.contains(&Some("Metal".to_string())));
+        assert!(genres.contains(&Some("Metal; Progressive Metal".to_string())));
+        assert!(genres.contains(&Some("Doom".to_string())));
 
         let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
-    fn test_get_songs_by_genre_edge_disambiguates_shared_child_tag() {
+    fn test_get_songs_by_curated_group_reflects_live_reparenting() {
         let (db, dir) = test_db();
-        insert_song(&db, "/a.mp3", "Metal; Symphonic Metal");
-        insert_song(&db, "/b.mp3", "Classical; Symphonic Metal");
-        // Reordered so Symphonic Metal is no longer a subgenre of Metal here.
-        insert_song(&db, "/c.mp3", "Symphonic Metal; Metal");
+        insert_song(&db, "/a.mp3", "Metal");
+        insert_song(&db, "/b.mp3", "Ambient");
+        insert_song(&db, "/c.mp3", "Drone");
 
         let manager = TagManager::new(db.clone());
-        let under_metal = manager
-            .get_songs_by_genre_edge("Metal", "Symphonic Metal", 50, QueuePopulationMode::All)
-            .unwrap();
-        assert_eq!(under_metal.len(), 1);
-        assert_eq!(under_metal[0].genre.as_deref(), Some("Metal; Symphonic Metal"));
+        manager.reconcile_hierarchy().unwrap();
+        manager.reparent_tag("Drone", "Ambient").unwrap();
 
-        let under_classical = manager
-            .get_songs_by_genre_edge("Classical", "Symphonic Metal", 50, QueuePopulationMode::All)
+        let under_ambient = manager
+            .get_songs_by_curated_group("Ambient", 50, QueuePopulationMode::All)
             .unwrap();
-        assert_eq!(under_classical.len(), 1);
-        assert_eq!(under_classical[0].genre.as_deref(), Some("Classical; Symphonic Metal"));
+        assert_eq!(under_ambient.len(), 2, "Drone is curated under Ambient");
+
+        // Dragging Drone onto Metal instead moves its real playlist membership.
+        manager.reparent_tag("Drone", "Metal").unwrap();
+        let under_ambient = manager
+            .get_songs_by_curated_group("Ambient", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(under_ambient.len(), 1, "Drone moved out of Ambient");
+        let under_metal = manager
+            .get_songs_by_curated_group("Metal", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(under_metal.len(), 2, "Drone moved under Metal");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_get_songs_by_curated_tag_dispatches_group_vs_child() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Metal; Progressive Metal");
+        insert_song(&db, "/b.mp3", "Ambient");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        let group_songs = manager
+            .get_songs_by_curated_tag("Metal", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(group_songs.len(), 1, "group dispatch includes its curated child");
+
+        let child_songs = manager
+            .get_songs_by_curated_tag("Progressive Metal", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(child_songs.len(), 1, "child dispatch is an exact any-position match");
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A genre value containing a literal colon (e.g. from a source that
+    /// allows it in tag text) must not be misclassified anywhere in the
+    /// curated dispatch — it's just an ordinary string component match, the
+    /// same as any other tag name.
+    #[test]
+    fn test_get_songs_by_curated_tag_handles_colon_in_genre_value() {
+        let (db, dir) = test_db();
+        insert_song(&db, "/a.mp3", "Sci-Fi: Space Opera");
+
+        let manager = TagManager::new(db.clone());
+        manager.reconcile_hierarchy().unwrap();
+
+        let songs = manager
+            .get_songs_by_curated_tag("Sci-Fi: Space Opera", 50, QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(songs.len(), 1);
 
         let _ = std::fs::remove_dir_all(dir);
     }

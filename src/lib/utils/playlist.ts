@@ -45,42 +45,16 @@ export function getBpmBucketLabel(dynamicSpec: string | undefined | null, fallba
   return bpmKey ? i18n.t(`playlists.${bpmKey}`) : fallbackName;
 }
 
-/**
- * Genre auto-playlists store the full combined tag value (e.g. `"Metal; Death Metal"`) as
- * both `name` and `dynamic_spec` — the parent genre ("Metal") already has its own separate
- * auto-playlist card, so repeating it in the sub-genre's card label is redundant. This
- * derives the displayed label from just the last `;`-delimited segment (e.g. `"Death
- * Metal"`), leaving single-value genres like `"Rock"` unchanged. It only fires for genre
- * auto-playlists — `dynamic_enabled` with a `dynamic_spec` that isn't a decade/BPM bucket
- * or a Smart Playlist rule — so regular playlists and Smart Playlists whose name happens
- * to contain `;` are returned as `fallbackName`, untouched. Matching/`dynamic_spec` stay on
- * the full combined value; only the displayed label changes.
- */
-export function getGenreAutoPlaylistLabel(
-  dynamicEnabled: boolean | undefined,
-  dynamicSpec: string | undefined | null,
-  fallbackName: string
-): string {
-  const isGenreAutoPlaylist =
-    !!dynamicEnabled &&
-    !!dynamicSpec &&
-    !dynamicSpec.startsWith("decade:") &&
-    !dynamicSpec.startsWith("bpmrange:") &&
-    !isSmartPlaylistSpec(dynamicSpec);
-  if (!isGenreAutoPlaylist) return fallbackName;
-  const segments = dynamicSpec!
-    .split(";")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return segments.length > 1 ? segments[segments.length - 1] : fallbackName;
-}
-
 export function getPlaylistDisplayName(
   playlist: Playlist | { name: string; population_mode?: QueuePopulationMode; dynamic_enabled?: boolean; dynamic_spec?: string } | undefined | null
 ): string {
   if (!playlist || !playlist.name) return "";
-  const bpmName = getBpmBucketLabel(playlist.dynamic_spec, playlist.name);
-  const baseName = getGenreAutoPlaylistLabel(playlist.dynamic_enabled, playlist.dynamic_spec, bpmName);
+  // Genre auto-playlists (#548) are keyed one row per curated tag, so
+  // `name` is already the plain display name — no per-spec label
+  // derivation needed here the way the old bare-genre-string convention
+  // required (a chip's own card already exists separately, so there's
+  // nothing to strip a parent's name out of).
+  const baseName = getBpmBucketLabel(playlist.dynamic_spec, playlist.name);
   if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) {
     return baseName;
   }

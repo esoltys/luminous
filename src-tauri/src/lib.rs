@@ -366,6 +366,15 @@ pub fn run() {
             if let Err(e) = manager.queue() {
                 log::error!("Failed to bootstrap Queue playlist: {e}");
             }
+            // Rebuild curated-tag ("tag:") genre auto-playlists once right
+            // after migrations run (see db.rs migration 19, #548), rather
+            // than waiting for the next library scan — an upgrading user's
+            // old bare-genre-name rows were just discarded by that
+            // migration, so without this they'd see an empty genre
+            // auto-playlist section until they happened to trigger a scan.
+            if let Err(e) = manager.sync_all_auto_playlists() {
+                log::error!("Failed to sync auto-playlists at startup: {e}");
+            }
             let playlists = Arc::new(Mutex::new(manager));
 
             let cover_manager = Arc::new(CoverManager::new(
@@ -781,7 +790,6 @@ pub fn run() {
             commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,
-            commands::collection::get_songs_by_genre,
             commands::collection::get_recently_played,
             commands::collection::get_recently_played_songs,
             commands::collection::clear_play_history,
@@ -871,8 +879,7 @@ pub fn run() {
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,
             commands::tags::get_tags_overview,
-            commands::tags::get_songs_by_main_tag,
-            commands::tags::get_songs_by_genre_edge,
+            commands::tags::get_songs_by_curated_tag,
             commands::tags::get_songs_without_genre,
             // Persisted Genres curation hierarchy (#545)
             commands::tags::get_tag_hierarchy,

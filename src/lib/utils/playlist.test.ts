@@ -16,11 +16,11 @@ describe("playlist utils", () => {
     expect(getPlaylistDisplayName(playlist)).toBe("My Favorites");
   });
 
-  it("returns base name for dynamic playlist in 'all' mode", () => {
+  it("returns base name for a curated genre auto-playlist (tag:) in 'all' mode", () => {
     const playlist: Playlist = {
       id: 2,
       name: "Rock",
-      dynamic_spec: "Rock",
+      dynamic_spec: "tag:Rock",
       population_mode: "all",
       created: 100,
       updated: 100,
@@ -35,7 +35,7 @@ describe("playlist utils", () => {
     const playlistDeepCuts: Playlist = {
       id: 3,
       name: "1980s Rock",
-      dynamic_spec: "1980s Rock",
+      dynamic_spec: "decade:1980s",
       population_mode: "deep_cuts",
       created: 100,
       updated: 100,
@@ -48,7 +48,7 @@ describe("playlist utils", () => {
     const playlistFavourites: Playlist = {
       id: 4,
       name: "Jazz",
-      dynamic_spec: "Jazz",
+      dynamic_spec: "tag:Jazz",
       population_mode: "favourites",
       created: 100,
       updated: 100,
@@ -67,11 +67,17 @@ describe("playlist utils", () => {
     expect(getPopulationModeSuffix("all")).toBe("");
   });
 
-  it("shows only the last segment of a multi-component genre auto-playlist name", () => {
+  // #548: genre auto-playlists are now keyed one row per curated tag —
+  // `name` is already the plain curated tag name (a sub-genre chip like
+  // "Death Metal" has its own row, entirely separate from its parent
+  // card's "Metal" row), so there's no combined "Metal; Death Metal" value
+  // left to strip a segment out of the way the old bare-genre convention
+  // required.
+  it("shows a curated sub-genre chip's own plain name unaffected", () => {
     const subgenrePlaylist: Playlist = {
       id: 5,
-      name: "Metal; Death Metal",
-      dynamic_spec: "Metal; Death Metal",
+      name: "Death Metal",
+      dynamic_spec: "tag:Death Metal",
       population_mode: "all",
       created: 100,
       updated: 100,
@@ -83,8 +89,8 @@ describe("playlist utils", () => {
 
     const otherSubgenrePlaylist: Playlist = {
       id: 6,
-      name: "Pop; Indie Pop",
-      dynamic_spec: "Pop; Indie Pop",
+      name: "Indie Pop",
+      dynamic_spec: "tag:Indie Pop",
       population_mode: "all",
       created: 100,
       updated: 100,
@@ -95,11 +101,11 @@ describe("playlist utils", () => {
     expect(getPlaylistDisplayName(otherSubgenrePlaylist)).toBe("Indie Pop");
   });
 
-  it("appends the mode suffix to the stripped sub-genre label", () => {
+  it("appends the mode suffix to a curated sub-genre chip's name", () => {
     const playlist: Playlist = {
       id: 7,
-      name: "Metal; Death Metal",
-      dynamic_spec: "Metal; Death Metal",
+      name: "Death Metal",
+      dynamic_spec: "tag:Death Metal",
       population_mode: "favourites",
       created: 100,
       updated: 100,
@@ -114,7 +120,7 @@ describe("playlist utils", () => {
     const playlist: Playlist = {
       id: 8,
       name: "Jazz",
-      dynamic_spec: "Jazz",
+      dynamic_spec: "tag:Jazz",
       population_mode: "all",
       created: 100,
       updated: 100,

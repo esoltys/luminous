@@ -4,6 +4,7 @@ use crate::{
     collection::CollectionScanner,
     db::Database,
     models::{Playlist, PlaylistItem, PlaylistItemType, QueuePopulationMode, Song},
+    tags::TagManager,
 };
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
@@ -362,49 +363,73 @@ impl PlaylistManager {
     }
 
     /// Regenerates each genre "auto-playlist" — a system-managed `playlists`
-    /// row with `dynamic_enabled = 1` and `dynamic_spec` set to the genre
-    /// name — if it's missing or its `updated` timestamp is more than 24h
-    /// old, and prunes rows for genres no longer present in the library.
+    /// row with `dynamic_enabled = 1` and `dynamic_spec` set to `tag:<name>`
+    /// — if it's missing or its `updated` timestamp is more than 24h old,
+    /// and prunes rows for curated tags no longer present in the hierarchy.
     /// `updated` doubles as the "last (re)generated at" timestamp shown in
     /// the UI.
     ///
-    /// One auto-playlist is created per *distinct `songs.genre` value*, not
-    /// per individual genre — a song tagged with multiple genres (e.g.
-    /// `"Rock; Blues"`) gets its own auto-playlist for that exact
-    /// combination rather than being folded into separate "Rock" and
-    /// "Blues" auto-playlists. Fanning multi-value genres out is native-tags
-    /// territory (#224); left unsplit here deliberately for #143.
+    /// One auto-playlist is created per *curated tag* (#548) — every
+    /// `tag_groups` row (a top-level genre card) and every `tag_assignments`
+    /// row (a sub-genre chip) — rather than per distinct raw `songs.genre`
+    /// string as before #548. A top-level card's membership includes every
+    /// song carrying it OR any tag currently curated as its child; a chip's
+    /// membership is an exact match at any position. See
+    /// `TagManager::get_songs_by_curated_tag`. Mirrors
+    /// `sync_decade_auto_playlists`'s prefix-based prune/threshold-gate
+    /// shape.
     pub fn sync_genre_auto_playlists(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
 
-        let scanner = CollectionScanner::new(self.db.clone());
-        let genres = scanner.get_library_genres()?;
+        let tag_manager = TagManager::new(self.db.clone());
+        // Self-contained and idempotent — doesn't rely on the async
+        // "library-changed" listener (tags::reconcile_hierarchy_and_notify)
+        // having already run first, which would otherwise be a real
+        // ordering bug: this sync could run against a stale hierarchy right
+        // after a scan.
+        tag_manager.reconcile_hierarchy()?;
+        let hierarchy = tag_manager.get_tag_hierarchy()?;
+
+        let mut wanted: HashSet<String> = HashSet::new();
+        for group in &hierarchy {
+            wanted.insert(group.name.clone());
+            for child in &group.children {
+                wanted.insert(child.name.clone());
+            }
+        }
+
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        // Prune genre auto-playlists for genres no longer in the library. Only
-        // touch rows using the bare-genre-name convention (e.g. "Rock") —
-        // anything containing ':' is either a decade auto-playlist (excluded
-        // above) or a user-created Smart Playlist rule spec (e.g. "genre:rock"),
-        // and must not be swept up here.
-        let mut stmt =
-            conn.prepare("SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec NOT LIKE '%:%'")?;
+        // Prune genre auto-playlists for curated tags no longer in the
+        // hierarchy. Only touch rows using the "tag:" convention — decade/
+        // BPM auto-playlists and user-created Smart Playlist rule specs use
+        // their own prefixes/shapes and must not be swept up here.
+        let mut stmt = conn.prepare(
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'tag:%'",
+        )?;
         let existing: Vec<(i64, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
             .filter_map(|r| r.ok())
             .collect();
         drop(stmt);
         for (id, spec) in &existing {
-            if !genres.contains(spec) {
+            let name = spec.strip_prefix("tag:").unwrap_or(spec);
+            if !wanted.contains(name) {
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
                 conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
             }
         }
 
-        for genre in &genres {
+        for name in &wanted {
+            let spec = format!("tag:{}", name);
             let existing_row: Option<(i64, i64, i64, String)> = conn
                 .query_row(
                     "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
-                    params![genre],
+                    params![spec],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
                 .ok();
@@ -414,11 +439,11 @@ impl PlaylistManager {
                 .unwrap_or_default();
 
             // Check library threshold first. Auto-playlists are created if the library
-            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this genre
+            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this tag
             // (QueuePopulationMode::All).
-            // Once created, an auto-playlist is only pruned if all songs for this genre are removed (0 songs).
-            let total_songs = scanner.get_songs_by_genre(
-                genre,
+            // Once created, an auto-playlist is only pruned if all songs for this tag are removed (0 songs).
+            let total_songs = tag_manager.get_songs_by_curated_tag(
+                name,
                 MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
                 QueuePopulationMode::All,
             )?;
@@ -438,7 +463,7 @@ impl PlaylistManager {
                 continue;
             }
 
-            let songs = scanner.get_songs_by_genre(genre, NO_SONG_LIMIT, mode)?;
+            let songs = tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)?;
 
             let needs_generation = match existing_row {
                 None => true,
@@ -462,8 +487,8 @@ impl PlaylistManager {
                 }
                 None => {
                     conn.execute(
-                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?1, ?2, ?2)",
-                        params![genre, now],
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        params![name, spec, now],
                     )?;
                     conn.last_insert_rowid()
                 }
@@ -698,7 +723,7 @@ impl PlaylistManager {
 
     /// Every library song matching a dynamic spec, in the order the spec's
     /// population mode dictates. The single dispatch point for all four spec
-    /// kinds (decade:, bpmrange:, bare genre name, smart-rule query).
+    /// kinds (decade:, bpmrange:, tag:, smart-rule query).
     fn songs_for_spec(&self, spec: &str, mode: QueuePopulationMode) -> Result<Vec<Song>> {
         let scanner = CollectionScanner::new(self.db.clone());
         if let Some(decade) = spec.strip_prefix("decade:") {
@@ -708,10 +733,12 @@ impl PlaylistManager {
             .and_then(crate::collection::parse_bpm_range_spec)
         {
             scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)
-        } else if !spec.contains(':') {
-            // Bare-name convention: a system genre auto-playlist, not a Smart
-            // Playlist rule spec (which always contains a "field:" rule).
-            scanner.get_songs_by_genre(spec, NO_SONG_LIMIT, mode)
+        } else if let Some(name) = spec.strip_prefix("tag:") {
+            // A system genre auto-playlist, keyed on a curated tag name
+            // (#548) rather than a Smart Playlist rule spec (which always
+            // contains a "field:" rule).
+            let tag_manager = TagManager::new(self.db.clone());
+            tag_manager.get_songs_by_curated_tag(name, NO_SONG_LIMIT, mode)
         } else {
             let query = spec.replace(';', " ");
             scanner.search_songs_by_mode(&query, NO_SONG_LIMIT, mode)
@@ -2511,8 +2538,9 @@ mod tests {
         let pl = manager.create_playlist("Rock Mix").unwrap();
 
         // Mirrors the spec the Smart Playlist builder serialises for a single
-        // "genre contains rock" rule — must NOT be routed to the exact-match
-        // get_songs_by_genre() path, which would never match "Classic Rock".
+        // "genre contains rock" rule — must NOT be routed to the curated-tag
+        // "tag:" path, which would never match "Classic Rock" (no such
+        // curated tag exists).
         manager
             .set_playlist_dynamic_spec(pl.id, "genre:rock")
             .unwrap();
@@ -2649,7 +2677,7 @@ mod tests {
         let playlists = manager.get_playlists().unwrap();
         let rock_pl = playlists
             .iter()
-            .find(|p| p.dynamic_spec.as_deref() == Some("Rock"))
+            .find(|p| p.dynamic_spec.as_deref() == Some("tag:Rock"))
             .expect("Rock auto playlist should be created");
 
         // Change mode to DeepCuts (which has only 1 matching track < 25)
@@ -2663,7 +2691,7 @@ mod tests {
         let playlists_after = manager.get_playlists().unwrap();
         let rock_pl_after = playlists_after
             .iter()
-            .find(|p| p.dynamic_spec.as_deref() == Some("Rock"));
+            .find(|p| p.dynamic_spec.as_deref() == Some("tag:Rock"));
 
         assert!(
             rock_pl_after.is_some(),
@@ -2672,6 +2700,151 @@ mod tests {
         assert_eq!(
             rock_pl_after.unwrap().population_mode,
             QueuePopulationMode::DeepCuts
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    // -----------------------------------------------------------------------
+    // Curated-hierarchy genre auto-playlists (#548)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_sync_genre_auto_playlists_creates_one_row_per_card_and_chip() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Metal Song {}', 'Metal; Progressive Metal', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_genre_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        assert!(
+            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("tag:Metal")),
+            "the top-level card gets its own auto-playlist row"
+        );
+        assert!(
+            playlists
+                .iter()
+                .any(|p| p.dynamic_spec.as_deref() == Some("tag:Progressive Metal")),
+            "the curated chip gets its own auto-playlist row too"
+        );
+
+        let metal_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("tag:Metal"))
+            .unwrap();
+        assert_eq!(
+            metal_pl.track_count, 30,
+            "the card's playlist includes songs carrying its curated child too"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_genre_auto_playlists_prunes_on_decuration() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Ambient Song {}', 'Ambient', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_genre_auto_playlists().unwrap();
+        assert!(manager
+            .get_playlists()
+            .unwrap()
+            .iter()
+            .any(|p| p.dynamic_spec.as_deref() == Some("tag:Ambient")));
+
+        // Every "Ambient" song is deleted — the curated tag drops out of the
+        // hierarchy entirely, and the next sync must prune its playlist row.
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute("DELETE FROM songs WHERE genre = 'Ambient'", [])
+            .unwrap();
+
+        manager.sync_genre_auto_playlists().unwrap();
+        assert!(
+            !manager
+                .get_playlists()
+                .unwrap()
+                .iter()
+                .any(|p| p.dynamic_spec.as_deref() == Some("tag:Ambient")),
+            "a de-curated (no-longer-used) tag's auto-playlist must be pruned"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_songs_for_spec_dispatches_tag_prefix_through_curated_hierarchy() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Song A', 'Metal', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Position-0/alone, so reconcile_hierarchy would otherwise give
+            // it its own root card — demoted under Metal below to prove
+            // curated-child membership (not song order) is what
+            // "tag:Metal" now matches on.
+            conn.execute(
+                "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Song B', 'Progressive Metal', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let mut manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // Force the hierarchy to exist before populate_dynamic_playlist
+        // dispatches through songs_for_spec's "tag:" branch.
+        let tag_manager = crate::tags::TagManager::new(db_arc.clone());
+        tag_manager.reconcile_hierarchy().unwrap();
+        tag_manager
+            .demote_group_to_child("Progressive Metal", "Metal")
+            .unwrap();
+
+        let pl = manager.create_playlist("Metal Auto").unwrap();
+        manager
+            .set_playlist_dynamic_spec(pl.id, "tag:Metal")
+            .unwrap();
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(
+            tracks.len(),
+            2,
+            "tag: dispatch for a group includes its curated child's songs"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

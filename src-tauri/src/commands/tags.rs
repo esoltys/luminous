@@ -55,8 +55,12 @@ pub async fn get_songs_by_tag(
         .map_err(|e| e.to_string())
 }
 
+/// Curated-hierarchy song lookup (#548) — the direct-query fallback used
+/// both by a sub-threshold genre/tag's click-through (no backing playlist
+/// row yet) and, via `PlaylistManager::songs_for_spec`'s `tag:` dispatch, by
+/// every materialized genre auto-playlist's own population.
 #[tauri::command]
-pub async fn get_songs_by_main_tag(
+pub async fn get_songs_by_curated_tag(
     tag_name: String,
     limit: Option<i64>,
     mode: Option<QueuePopulationMode>,
@@ -64,21 +68,7 @@ pub async fn get_songs_by_main_tag(
 ) -> Result<Vec<Song>, String> {
     let manager = TagManager::new(state.db.clone());
     manager
-        .get_songs_by_main_tag(&tag_name, limit.unwrap_or(50), mode.unwrap_or_default())
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn get_songs_by_genre_edge(
-    root_tag: String,
-    child_tag: String,
-    limit: Option<i64>,
-    mode: Option<QueuePopulationMode>,
-    state: State<'_, AppState>,
-) -> Result<Vec<Song>, String> {
-    let manager = TagManager::new(state.db.clone());
-    manager
-        .get_songs_by_genre_edge(&root_tag, &child_tag, limit.unwrap_or(50), mode.unwrap_or_default())
+        .get_songs_by_curated_tag(&tag_name, limit.unwrap_or(50), mode.unwrap_or_default())
         .map_err(|e| e.to_string())
 }
 

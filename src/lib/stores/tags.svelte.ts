@@ -107,24 +107,13 @@ class TagsStore {
     return invoke<Song[]>("get_songs_by_tag", { tagName, limit, mode });
   }
 
-  /** Strict main-tag match — used when drilling into a root of the Genre
-   * view's hierarchy, so a song that's been reordered to have a different
-   * main tag no longer shows up here just because it still carries this
-   * value as a subgenre. */
-  async getSongsByMainTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
-    return invoke<Song[]>("get_songs_by_main_tag", { tagName, limit, mode });
-  }
-
-  /** Exact root/child edge match — used when drilling into a specific child
-   * under a specific root in the Genre view, so a tag shared as a child
-   * under multiple roots only shows songs for *this* relationship. */
-  async getSongsByGenreEdge(
-    rootTag: string,
-    childTag: string,
-    limit?: number,
-    mode?: QueuePopulationMode
-  ): Promise<Song[]> {
-    return invoke<Song[]>("get_songs_by_genre_edge", { rootTag, childTag, limit, mode });
+  /** Curated-hierarchy lookup (#548) — dispatches to a top-level card's
+   * self+children match or a leaf/chip's exact any-position match depending
+   * on what `name` currently is in the hierarchy. Used as the sub-threshold
+   * fallback (no backing playlist row yet) for a genre auto-playlist's
+   * click-through. */
+  async getSongsByCuratedTag(tagName: string, limit?: number, mode?: QueuePopulationMode): Promise<Song[]> {
+    return invoke<Song[]>("get_songs_by_curated_tag", { tagName, limit, mode });
   }
 }
 

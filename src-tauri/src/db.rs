@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 18;
+pub const CURRENT_SCHEMA_VERSION: i32 = 19;
 
 #[derive(Debug)]
 pub struct Database {
@@ -257,6 +257,17 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![18],
+            )?;
+        }
+
+        if version < 19 {
+            log::info!(
+                "Running migration 19: discard old bare-genre-name auto-playlist rows, superseded by the curated tag: convention (#548)"
+            );
+            conn.execute_batch(MIGRATION_19)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![19],
             )?;
         }
 
@@ -619,6 +630,37 @@ CREATE TABLE IF NOT EXISTS artist_profiles (
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 19: discard old-convention genre auto-playlist rows (#548).
+// Genre auto-playlists used to key `dynamic_spec` on the bare, full raw
+// `songs.genre` string (e.g. "Rock", "Metal; Symphonic Metal") — one row per
+// distinct string. #548 replaces that with one row per curated tag
+// (`tag_groups`/`tag_assignments`, #545), keyed as `tag:<name>`. There's no
+// way to map an old bare-string row onto the new convention (it may combine
+// several curated tags, or not correspond to any curated tag at all), so
+// these rows are simply discarded rather than migrated in place —
+// `sync_all_auto_playlists`, run once at startup right after migrations
+// (see lib.rs's `setup()`), immediately rebuilds fresh `tag:` rows from the
+// curated hierarchy, so this is a convention change on regenerable system
+// rows, not a loss of user data. `decade:`/`bpmrange:` auto-playlists and
+// user-authored Smart Playlist rule specs (which always contain a
+// `field:value` rule, e.g. "artist:Miles Davis") are untouched.
+// ---------------------------------------------------------------------------
+const MIGRATION_19: &str = "
+DELETE FROM playlist_items WHERE playlist_id IN (
+    SELECT id FROM playlists
+    WHERE dynamic_enabled = 1
+      AND dynamic_spec NOT LIKE 'decade:%'
+      AND dynamic_spec NOT LIKE 'bpmrange:%'
+      AND dynamic_spec NOT LIKE '%:%'
+);
+DELETE FROM playlists
+WHERE dynamic_enabled = 1
+  AND dynamic_spec NOT LIKE 'decade:%'
+  AND dynamic_spec NOT LIKE 'bpmrange:%'
+  AND dynamic_spec NOT LIKE '%:%';
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -798,6 +840,96 @@ mod tests {
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION + 1);
         assert!(db.is_newer_than_app());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_19_discards_old_bare_genre_rows_but_keeps_others() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration19_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        // Simulate a pre-migration database: stamp an earlier version and
+        // seed rows in every convention migration 19 must tell apart.
+        // `schema_version` accumulates one row per version ever applied
+        // (`MAX(version)` is what's read back), so downgrading requires
+        // clearing every row at/above 19, not just upserting a row for 18 —
+        // that alone would leave the already-inserted 19 row as the max and
+        // migration 19 would look already-applied on reopen.
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute("DELETE FROM schema_version WHERE version >= 19", [])
+                .unwrap();
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (18)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('Rock', 1, 'Rock')",
+                [],
+            )
+            .unwrap();
+            let old_id = conn.last_insert_rowid();
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, position, uuid, type) VALUES (?1, 0, 'u1', 0)",
+                params![old_id],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('1980s', 1, 'decade:1980s')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('Down-Tempo BPM', 1, 'bpmrange:60-90')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec) VALUES ('Miles Mix', 1, 'artist:Miles Davis')",
+                [],
+            )
+            .unwrap();
+        }
+
+        // Reopening runs migrations forward, including the new migration 19.
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        let remaining_specs: Vec<String> = {
+            let mut stmt = conn
+                .prepare("SELECT dynamic_spec FROM playlists WHERE dynamic_enabled = 1 ORDER BY dynamic_spec")
+                .unwrap();
+            stmt.query_map([], |r| r.get(0))
+                .unwrap()
+                .filter_map(|r| r.ok())
+                .collect()
+        };
+        assert!(
+            !remaining_specs.contains(&"Rock".to_string()),
+            "old bare-genre-name row must be discarded"
+        );
+        assert!(remaining_specs.contains(&"decade:1980s".to_string()));
+        assert!(remaining_specs.contains(&"bpmrange:60-90".to_string()));
+        assert!(remaining_specs.contains(&"artist:Miles Davis".to_string()));
+
+        let orphaned_items: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_items WHERE uuid = 'u1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphaned_items, 0, "the discarded playlist's items must go with it");
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
