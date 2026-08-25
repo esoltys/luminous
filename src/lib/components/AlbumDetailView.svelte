@@ -25,7 +25,7 @@
   import ColumnSelector from "./ColumnSelector.svelte";
   import { Play, Plus, Edit3, RefreshCw, Clock, Music } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
-  import { getCoverArtUrl } from "../types";
+  import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { formatTrackNumber } from "../utils/artist";
@@ -192,18 +192,9 @@
     async function resolve() {
       let url: string | null = null;
       if (item?.art_manual) {
-        url =
-          item.art_manual.startsWith("http://") || item.art_manual.startsWith("https://") || item.art_manual.startsWith("/")
-            ? item.art_manual
-            : getCoverArtUrl(`luminous-art://${item.art_manual}`);
+        url = resolveArtUrl(item.art_manual);
       } else if (item?.art_automatic) {
-        if (item.art_automatic.startsWith("http://") || item.art_automatic.startsWith("https://") || item.art_automatic.startsWith("/")) {
-          url = item.art_automatic;
-        } else if (item.art_automatic.startsWith("album-")) {
-          url = getCoverArtUrl(`luminous-art://${item.art_automatic}`);
-        } else {
-          url = getCoverArtUrl(`luminous-art://local/${item.art_automatic}`);
-        }
+        url = resolveArtUrl(item.art_automatic);
       } else if (item?.art_embedded && fallbackSongId !== undefined) {
         try {
           const uri = await invoke<string | null>("get_cover_art_uri", { songId: fallbackSongId });
