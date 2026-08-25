@@ -6,6 +6,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { formatDuration } from "../utils/formatters";
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -51,13 +52,6 @@
 
 
 
-  function formatTime(nanosec: number | undefined): string {
-    if (nanosec === undefined) return "0:00";
-    const sec = Math.floor(nanosec / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  }
 
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
@@ -365,11 +359,11 @@
       <!-- Invisible spacer matching the mode-toggle button's footprint, so the
            waveform + timers stay centered instead of skewing left toward it. -->
       <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
-      <span>{formatTime(playerStore.positionNanosec)}</span>
+      <span>{formatDuration(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
       </div>
-      <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
+      <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
       <button
         onclick={() => prefs.toggleSeekBarMode()}
         class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"

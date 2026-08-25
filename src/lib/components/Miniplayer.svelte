@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SongRating from "./SongRating.svelte";
@@ -198,13 +199,6 @@
     };
   });
 
-  function formatTime(nanosec: number | undefined): string {
-    if (nanosec === undefined) return "0:00";
-    const sec = Math.floor(nanosec / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -378,8 +372,8 @@
       <div class="flex flex-col gap-1 w-full text-[10px] text-brand-text-secondary/70 px-1">
         <WaveformSeekBar />
         <div class="flex items-center justify-between w-full px-0.5 font-mono text-[9px] opacity-80">
-          <span>{formatTime(playerStore.positionNanosec)}</span>
-          <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
+          <span>{formatDuration(playerStore.positionNanosec)}</span>
+          <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
         </div>
       </div>
     </div>
