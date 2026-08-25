@@ -51,6 +51,13 @@
   let showClearArtConfirm = $state(false);
   let isClearingArt = $state(false);
 
+  let titlesort = $state("");
+  let artistsort = $state("");
+  let albumsort = $state("");
+  let albumArtistSort = $state("");
+  let composersort = $state("");
+  let genresort = $state("");
+
   let isLoading = $state(false);
   let isSaving = $state(false);
   let isLookingUp = $state(false);
@@ -69,11 +76,17 @@
         id: number;
         path: string;
         title: string;
+        titlesort: string | null;
         artist: string;
+        artistsort: string | null;
         album: string;
+        albumsort: string | null;
         album_artist: string;
+        album_artist_sort: string | null;
         composer: string;
+        composersort: string | null;
         genre: string;
+        genresort: string | null;
         track: number | null;
         disc: number | null;
         year: number | null;
@@ -86,11 +99,17 @@
       }>("get_song_details", { songId });
 
       title = details.title;
+      titlesort = details.titlesort ?? "";
       artist = details.artist;
+      artistsort = details.artistsort ?? "";
       album = details.album;
+      albumsort = details.albumsort ?? "";
       albumArtist = details.album_artist;
+      albumArtistSort = details.album_artist_sort ?? "";
       composer = details.composer;
+      composersort = details.composersort ?? "";
       genre = details.genre;
+      genresort = details.genresort ?? "";
       track = details.track;
       disc = details.disc;
       year = details.year;
@@ -171,11 +190,17 @@
       await invoke("save_song_tags", {
         songId,
         title,
+        titlesort: titlesort.trim() || null,
         artist,
+        artistsort: artistsort.trim() || null,
         album,
+        albumsort: albumsort.trim() || null,
         albumArtist,
+        albumArtistSort: albumArtistSort.trim() || null,
         composer,
+        composersort: composersort.trim() || null,
         genre,
+        genresort: genresort.trim() || null,
         track,
         disc,
         year,
@@ -459,6 +484,39 @@
               <span class="text-[10px] font-bold text-brand-text-secondary/80 uppercase tracking-wide">{i18n.t('rating.label')}</span>
               <SongRating {rating} onRate={handleRate} size="md" />
             </div>
+
+            <!-- Sort Overrides ("Sort As") -->
+            <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden mt-1">
+              <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+                <span>Sort Overrides ("Sort As")</span>
+                <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
+                <FormField label="Title Sort As" for="tag-titlesort">
+                  <Input id="tag-titlesort" bind:value={titlesort} disabled={isSaving} size="sm" placeholder="e.g. Beatles, The" class="w-full" />
+                </FormField>
+
+                <FormField label="Artist Sort As" for="tag-artistsort">
+                  <Input id="tag-artistsort" bind:value={artistsort} disabled={isSaving} size="sm" placeholder="e.g. Beatles, The" class="w-full" />
+                </FormField>
+
+                <FormField label="Album Sort As" for="tag-albumsort">
+                  <Input id="tag-albumsort" bind:value={albumsort} disabled={isSaving} size="sm" class="w-full" />
+                </FormField>
+
+                <FormField label="Album Artist Sort As" for="tag-albumartistsort">
+                  <Input id="tag-albumartistsort" bind:value={albumArtistSort} disabled={isSaving} size="sm" class="w-full" />
+                </FormField>
+
+                <FormField label="Composer Sort As" for="tag-composersort">
+                  <Input id="tag-composersort" bind:value={composersort} disabled={isSaving} size="sm" class="w-full" />
+                </FormField>
+
+                <FormField label="Genre Sort As" for="tag-genresort">
+                  <Input id="tag-genresort" bind:value={genresort} disabled={isSaving} size="sm" class="w-full" />
+                </FormField>
+              </div>
+            </details>
           </div>
         </div>
       {/if}

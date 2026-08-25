@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 19;
+pub const CURRENT_SCHEMA_VERSION: i32 = 20;
 
 #[derive(Debug)]
 pub struct Database {
@@ -268,6 +268,20 @@ impl Database {
             conn.execute(
                 "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                 params![19],
+            )?;
+        }
+
+        if version < 20 {
+            log::info!("Running migration 20: add genresort column to songs table (#151)");
+            let has_genresort: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'genresort'")?
+                .exists([])?;
+            if !has_genresort {
+                conn.execute_batch(MIGRATION_20)?;
+            }
+            conn.execute(
+                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                params![20],
             )?;
         }
 
@@ -661,6 +675,13 @@ WHERE dynamic_enabled = 1
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 20: genresort column on songs table (#151)
+// ---------------------------------------------------------------------------
+const MIGRATION_20: &str = "
+ALTER TABLE songs ADD COLUMN genresort TEXT;
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -747,7 +768,10 @@ fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
         .into_iter()
         .map(|(key, (name, count))| (key, name, count))
         .collect();
-    roots.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase())));
+    roots.sort_by(|a, b| {
+        b.2.cmp(&a.2)
+            .then_with(|| a.1.to_lowercase().cmp(&b.1.to_lowercase()))
+    });
 
     let mut group_ids: HashMap<String, i64> = HashMap::new();
     for (i, (root_key, name, _count)) in roots.iter().enumerate() {
@@ -929,7 +953,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(orphaned_items, 0, "the discarded playlist's items must go with it");
+        assert_eq!(
+            orphaned_items, 0,
+            "the discarded playlist's items must go with it"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

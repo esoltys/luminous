@@ -189,8 +189,25 @@
     let result = collectionStore.filteredSongs;
 
     return [...result].sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
+      let valA: unknown = a[sortField];
+      let valB: unknown = b[sortField];
+
+      if (sortField === "title") {
+        valA = a.titlesort?.trim() || a.title;
+        valB = b.titlesort?.trim() || b.title;
+      } else if (sortField === "artist") {
+        valA = a.album_artist_sort?.trim() || a.artistsort?.trim() || a.album_artist || a.artist;
+        valB = b.album_artist_sort?.trim() || b.artistsort?.trim() || b.album_artist || b.artist;
+      } else if (sortField === "album") {
+        valA = a.albumsort?.trim() || a.album;
+        valB = b.albumsort?.trim() || b.album;
+      } else if (sortField === "composer") {
+        valA = a.composersort?.trim() || a.composer;
+        valB = b.composersort?.trim() || b.composer;
+      } else if (sortField === "genre") {
+        valA = a.genresort?.trim() || a.genre;
+        valB = b.genresort?.trim() || b.genre;
+      }
 
       // Missing tags come back as `null` — but some tags (composer especially)
       // are commonly present-but-blank in files rather than absent entirely, which
@@ -260,8 +277,16 @@
     const asc = albumSortAsc;
 
     return list.sort((a, b) => {
-      let valA = a[field];
-      let valB = b[field];
+      let valA: unknown = a[field];
+      let valB: unknown = b[field];
+
+      if (field === "album") {
+        valA = a.albumsort?.trim() || a.album;
+        valB = b.albumsort?.trim() || b.album;
+      } else if (field === "artist") {
+        valA = a.artist_sort?.trim() || a.artist;
+        valB = b.artist_sort?.trim() || b.artist;
+      }
 
       if (valA === null || valA === undefined) return asc ? 1 : -1;
       if (valB === null || valB === undefined) return asc ? -1 : 1;
@@ -282,8 +307,12 @@
     const asc = artistSortAsc;
 
     return list.sort((a, b) => {
-      let valA = field === "genre" ? (a.genre?.trim() || i18n.t('artistDetail.unknownGenre')) : a[field];
-      let valB = field === "genre" ? (b.genre?.trim() || i18n.t('artistDetail.unknownGenre')) : b[field];
+      let valA: unknown = field === "genre"
+        ? (a.genre?.trim() || i18n.t('artistDetail.unknownGenre'))
+        : (field === "name" ? (a.sort_artist?.trim() || a.name) : a[field]);
+      let valB: unknown = field === "genre"
+        ? (b.genre?.trim() || i18n.t('artistDetail.unknownGenre'))
+        : (field === "name" ? (b.sort_artist?.trim() || b.name) : b[field]);
 
       if (valA === null || valA === undefined) return asc ? 1 : -1;
       if (valB === null || valB === undefined) return asc ? -1 : 1;

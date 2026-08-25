@@ -108,12 +108,7 @@ impl CoverManager {
         let picture = tagged_file
             .primary_tag()
             .and_then(|t| t.pictures().first())
-            .or_else(|| {
-                tagged_file
-                    .tags()
-                    .iter()
-                    .find_map(|t| t.pictures().first())
-            });
+            .or_else(|| tagged_file.tags().iter().find_map(|t| t.pictures().first()));
 
         let picture = match picture {
             Some(p) => p,

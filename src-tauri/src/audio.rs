@@ -666,7 +666,9 @@ fn build_output(
     // stream that hasn't started, so a failure here is expected and harmless
     // — log it instead of surfacing a spurious error to the frontend.
     if let Err(e) = stream.pause() {
-        log::warn!("CPAL stream pause at startup failed (harmless if unsupported by this backend): {e}");
+        log::warn!(
+            "CPAL stream pause at startup failed (harmless if unsupported by this backend): {e}"
+        );
     }
 
     Ok(AudioOutput {

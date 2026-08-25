@@ -17,8 +17,11 @@
   interface Props {
     songIds: number[];
     initialAlbum?: string | null;
+    initialAlbumSort?: string | null;
     initialAlbumArtist?: string | null;
+    initialAlbumArtistSort?: string | null;
     initialGenre?: string | null;
+    initialGenreSort?: string | null;
     initialYear?: number | null;
     initialDisc?: number | null;
     initialCompilation?: boolean;
@@ -35,8 +38,11 @@
   let {
     songIds,
     initialAlbum = "",
+    initialAlbumSort = "",
     initialAlbumArtist = "",
+    initialAlbumArtistSort = "",
     initialGenre = "",
+    initialGenreSort = "",
     initialYear = null,
     initialDisc = null,
     initialCompilation = false,
@@ -59,6 +65,13 @@
   let disc = $state<number | null>(initialDisc);
   // svelte-ignore state_referenced_locally
   let compilation = $state(initialCompilation ?? false);
+
+  // svelte-ignore state_referenced_locally
+  let albumsort = $state(initialAlbumSort ?? "");
+  // svelte-ignore state_referenced_locally
+  let albumArtistSort = $state(initialAlbumArtistSort ?? "");
+  // svelte-ignore state_referenced_locally
+  let genresort = $state(initialGenreSort ?? "");
 
   onMount(() => {
     // Best-effort preload for the genre field's autocomplete — a failure
@@ -114,8 +127,11 @@
       await invoke("save_album_tags", {
         songIds,
         album: album ?? "",
+        albumsort: albumsort.trim() || null,
         albumArtist: albumArtist ?? "",
+        albumArtistSort: albumArtistSort.trim() || null,
         genre: genre ?? "",
+        genresort: genresort.trim() || null,
         year,
         disc,
         compilation,
@@ -258,6 +274,27 @@
               class="w-full"
             />
           </FormField>
+
+          <!-- Sort Overrides ("Sort As") -->
+          <details class="col-span-2 group border border-brand-border rounded-lg bg-brand-sidebar/40 overflow-hidden">
+            <summary class="flex items-center justify-between px-3 py-2 text-xs font-semibold text-brand-text-secondary cursor-pointer select-none hover:text-brand-text-primary transition-colors">
+              <span>Sort Overrides ("Sort As")</span>
+              <span class="text-[10px] text-brand-text-secondary/70 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div class="p-3 pt-2 grid grid-cols-2 gap-3 border-t border-brand-border/60">
+              <FormField label="Album Sort As" for="album-tag-albumsort">
+                <Input id="album-tag-albumsort" bind:value={albumsort} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+
+              <FormField label="Album Artist Sort As" for="album-tag-albumartistsort">
+                <Input id="album-tag-albumartistsort" bind:value={albumArtistSort} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+
+              <FormField label="Genre Sort As" for="album-tag-genresort" span2>
+                <Input id="album-tag-genresort" bind:value={genresort} disabled={isSaving} size="sm" class="w-full" />
+              </FormField>
+            </div>
+          </details>
         </div>
       </div>
     </div>

@@ -109,13 +109,17 @@ impl TagManager {
         for values in lists {
             let Some(root) = values.first() else { continue };
             let root_key = root.to_lowercase();
-            let root_entry = root_counts.entry(root_key.clone()).or_insert_with(|| (root.clone(), 0));
+            let root_entry = root_counts
+                .entry(root_key.clone())
+                .or_insert_with(|| (root.clone(), 0));
             root_entry.1 += 1;
 
             let children = child_counts.entry(root_key).or_default();
             for child in &values[1..] {
                 let child_key = child.to_lowercase();
-                let child_entry = children.entry(child_key).or_insert_with(|| (child.clone(), 0));
+                let child_entry = children
+                    .entry(child_key)
+                    .or_insert_with(|| (child.clone(), 0));
                 child_entry.1 += 1;
             }
         }
@@ -193,7 +197,11 @@ impl TagManager {
     }
 
     /// Songs with no genre value at all — the "No Genre" browsable group.
-    pub fn get_songs_without_genre(&self, limit: i64, mode: QueuePopulationMode) -> Result<Vec<Song>> {
+    pub fn get_songs_without_genre(
+        &self,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
         let conn = self.db.pool.get()?;
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
@@ -462,7 +470,8 @@ impl TagManager {
                 existing_groups.insert(row.1.to_lowercase(), row.0);
             }
         }
-        let mut existing_assignments: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut existing_assignments: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         {
             let mut stmt = conn.prepare("SELECT tag_name FROM tag_assignments")?;
             for name in stmt
@@ -525,17 +534,18 @@ impl TagManager {
             }
         }
 
-        let mut next_group_sort: i32 =
-            conn.query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_groups", [], |r| {
-                r.get(0)
-            })?;
+        let mut next_group_sort: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM tag_groups",
+            [],
+            |r| r.get(0),
+        )?;
         let mut group_count: i32 =
             conn.query_row("SELECT COUNT(*) FROM tag_groups", [], |r| r.get(0))?;
 
         let create_group = |conn: &rusqlite::Connection,
-                                 name: &str,
-                                 next_group_sort: &mut i32,
-                                 group_count: &mut i32|
+                            name: &str,
+                            next_group_sort: &mut i32,
+                            group_count: &mut i32|
          -> Result<i64> {
             conn.execute(
                 "INSERT OR IGNORE INTO tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)",
@@ -591,7 +601,10 @@ impl TagManager {
             let Some(root_counts) = child_root_counts.get(&key) else {
                 continue; // never observed as a subgenre — nothing to assign.
             };
-            let best_root = root_counts.iter().max_by_key(|(_, c)| **c).map(|(k, _)| k.clone());
+            let best_root = root_counts
+                .iter()
+                .max_by_key(|(_, c)| **c)
+                .map(|(k, _)| k.clone());
             let group_id = match best_root.and_then(|rk| existing_groups.get(&rk).copied()) {
                 Some(id) => id,
                 // Shouldn't normally happen (every root got a group above),
@@ -705,7 +718,8 @@ impl TagManager {
             [],
             |r| r.get(0),
         )?;
-        let group_count: i32 = conn.query_row("SELECT COUNT(*) FROM tag_groups", [], |r| r.get(0))?;
+        let group_count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM tag_groups", [], |r| r.get(0))?;
         conn.execute(
             "INSERT INTO tag_groups (name, color_index, sort_order) VALUES (?1, ?2, ?3)
              ON CONFLICT(name) DO NOTHING",
@@ -729,7 +743,10 @@ impl TagManager {
             .query_map(params![group_id], |r| r.get(0))?
             .filter_map(|r| r.ok())
             .collect();
-        let Some(pos) = siblings.iter().position(|n| n.eq_ignore_ascii_case(tag_name)) else {
+        let Some(pos) = siblings
+            .iter()
+            .position(|n| n.eq_ignore_ascii_case(tag_name))
+        else {
             return Ok(());
         };
         let moved = siblings.remove(pos);
@@ -763,9 +780,7 @@ impl TagManager {
         )?;
         let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
         let rows: Vec<(i64, String, String)> = stmt
-            .query_map([], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-            })?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
             .filter_map(|r| r.ok())
             .filter(|(_, _, genre): &(i64, String, String)| {
                 parse_multi_value(genre)
@@ -882,7 +897,6 @@ impl TagManager {
         }
         Ok(())
     }
-
 }
 
 /// Reconciles the persisted Genres hierarchy against the library and, if
@@ -939,7 +953,10 @@ mod tests {
         let manager = TagManager::new(db.clone());
         let tags = manager.list_all_tags().unwrap();
         assert_eq!(tags.len(), 2);
-        let metal = tags.iter().find(|t| t.name.eq_ignore_ascii_case("metal")).unwrap();
+        let metal = tags
+            .iter()
+            .find(|t| t.name.eq_ignore_ascii_case("metal"))
+            .unwrap();
         assert_eq!(metal.song_count, 2);
 
         let _ = std::fs::remove_dir_all(dir);
@@ -1013,7 +1030,10 @@ mod tests {
         let metal = graph.iter().find(|g| g.main_tag == "Metal").unwrap();
         assert!(metal.children.iter().any(|c| c.name == "Symphonic Metal"));
         let classical = graph.iter().find(|g| g.main_tag == "Classical").unwrap();
-        assert!(classical.children.iter().any(|c| c.name == "Symphonic Metal"));
+        assert!(classical
+            .children
+            .iter()
+            .any(|c| c.name == "Symphonic Metal"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1058,7 +1078,11 @@ mod tests {
             .get_songs_by_curated_group("Metal", 50, QueuePopulationMode::All)
             .unwrap();
         let genres: Vec<Option<String>> = songs.iter().map(|s| s.genre.clone()).collect();
-        assert_eq!(songs.len(), 3, "self + curated child (Progressive Metal) + demoted child (Doom)");
+        assert_eq!(
+            songs.len(),
+            3,
+            "self + curated child (Progressive Metal) + demoted child (Doom)"
+        );
         assert!(genres.contains(&Some("Metal".to_string())));
         assert!(genres.contains(&Some("Metal; Progressive Metal".to_string())));
         assert!(genres.contains(&Some("Doom".to_string())));
@@ -1108,12 +1132,20 @@ mod tests {
         let group_songs = manager
             .get_songs_by_curated_tag("Metal", 50, QueuePopulationMode::All)
             .unwrap();
-        assert_eq!(group_songs.len(), 1, "group dispatch includes its curated child");
+        assert_eq!(
+            group_songs.len(),
+            1,
+            "group dispatch includes its curated child"
+        );
 
         let child_songs = manager
             .get_songs_by_curated_tag("Progressive Metal", 50, QueuePopulationMode::All)
             .unwrap();
-        assert_eq!(child_songs.len(), 1, "child dispatch is an exact any-position match");
+        assert_eq!(
+            child_songs.len(),
+            1,
+            "child dispatch is an exact any-position match"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1238,7 +1270,9 @@ mod tests {
         {
             let conn = db.pool.get().unwrap();
             let metal_id: i64 = conn
-                .query_row("SELECT id FROM tag_groups WHERE name = 'Metal'", [], |r| r.get(0))
+                .query_row("SELECT id FROM tag_groups WHERE name = 'Metal'", [], |r| {
+                    r.get(0)
+                })
                 .unwrap();
             conn.execute(
                 "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Rock', ?1, 0)",
@@ -1267,18 +1301,26 @@ mod tests {
 
         let manager = TagManager::new(db.clone());
         manager.reconcile_hierarchy().unwrap();
-        manager.reparent_tag("Progressive Metal", "Ambient").unwrap();
+        manager
+            .reparent_tag("Progressive Metal", "Ambient")
+            .unwrap();
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         let metal = hierarchy.iter().find(|g| g.name == "Metal").unwrap();
         assert!(!metal.children.iter().any(|c| c.name == "Progressive Metal"));
         let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
-        assert!(ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+        assert!(ambient
+            .children
+            .iter()
+            .any(|c| c.name == "Progressive Metal"));
 
         manager.promote_tag("Progressive Metal").unwrap();
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         assert!(hierarchy.iter().any(|g| g.name == "Progressive Metal"));
         let ambient = hierarchy.iter().find(|g| g.name == "Ambient").unwrap();
-        assert!(!ambient.children.iter().any(|c| c.name == "Progressive Metal"));
+        assert!(!ambient
+            .children
+            .iter()
+            .any(|c| c.name == "Progressive Metal"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1304,7 +1346,9 @@ mod tests {
             "reparent_tag onto a same-named group should be a no-op"
         );
 
-        manager.demote_group_to_child("Electronic", "Electronic").unwrap();
+        manager
+            .demote_group_to_child("Electronic", "Electronic")
+            .unwrap();
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         assert!(
             hierarchy.iter().any(|g| g.name == "Electronic"),
@@ -1363,7 +1407,9 @@ mod tests {
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         assert!(hierarchy.iter().any(|g| g.name == "Synth-Pop"));
 
-        manager.demote_group_to_child("Synth-Pop", "Electronic").unwrap();
+        manager
+            .demote_group_to_child("Synth-Pop", "Electronic")
+            .unwrap();
         let hierarchy = manager.get_tag_hierarchy().unwrap();
         assert!(
             !hierarchy.iter().any(|g| g.name == "Synth-Pop"),
@@ -1373,7 +1419,10 @@ mod tests {
         assert!(electronic.children.iter().any(|c| c.name == "Synth-Pop"));
         // Its former child cascade-deleted rather than dangling on a
         // deleted group_id.
-        assert!(!hierarchy.iter().flat_map(|g| &g.children).any(|c| c.name == "New Retro Wave"));
+        assert!(!hierarchy
+            .iter()
+            .flat_map(|g| &g.children)
+            .any(|c| c.name == "New Retro Wave"));
 
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1391,7 +1440,9 @@ mod tests {
 
         let manager = TagManager::new(db.clone());
         manager.reconcile_hierarchy().unwrap();
-        manager.demote_group_to_child("Shoegaze", "Alternative").unwrap();
+        manager
+            .demote_group_to_child("Shoegaze", "Alternative")
+            .unwrap();
 
         // Simulates the reconcile-before-read that get_tag_hierarchy's
         // command handler now does on every call.
@@ -1411,7 +1462,11 @@ mod tests {
     #[test]
     fn test_reorder_tag_in_group() {
         let (db, dir) = test_db();
-        insert_song(&db, "/a.mp3", "Metal; Progressive Metal; Symphonic Metal; Doom Metal");
+        insert_song(
+            &db,
+            "/a.mp3",
+            "Metal; Progressive Metal; Symphonic Metal; Doom Metal",
+        );
 
         let manager = TagManager::new(db.clone());
         manager.reconcile_hierarchy().unwrap();
@@ -1426,12 +1481,20 @@ mod tests {
     #[test]
     fn test_rewrite_genre_for_merge_preserves_position_and_dedupes() {
         assert_eq!(
-            TagManager::rewrite_genre_for_merge("Metal; Prog Metal", "Prog Metal", "Progressive Metal"),
+            TagManager::rewrite_genre_for_merge(
+                "Metal; Prog Metal",
+                "Prog Metal",
+                "Progressive Metal"
+            ),
             "Metal; Progressive Metal"
         );
         // Merging into a name already present elsewhere in the list dedupes.
         assert_eq!(
-            TagManager::rewrite_genre_for_merge("Prog Metal; Progressive Metal", "Prog Metal", "Progressive Metal"),
+            TagManager::rewrite_genre_for_merge(
+                "Prog Metal; Progressive Metal",
+                "Prog Metal",
+                "Progressive Metal"
+            ),
             "Progressive Metal"
         );
         // Unaffected songs pass through unchanged.
@@ -1467,14 +1530,17 @@ mod tests {
 
         let conn = db.pool.get().unwrap();
         for (id, _path, genre) in &affected {
-            let new_genre = TagManager::rewrite_genre_for_merge(genre, "Prog Metal", "Progressive Metal");
+            let new_genre =
+                TagManager::rewrite_genre_for_merge(genre, "Prog Metal", "Progressive Metal");
             conn.execute(
                 "UPDATE songs SET genre = ?1 WHERE id = ?2",
                 params![new_genre, id],
             )
             .unwrap();
         }
-        manager.apply_merge_hierarchy("Prog Metal", "Progressive Metal").unwrap();
+        manager
+            .apply_merge_hierarchy("Prog Metal", "Progressive Metal")
+            .unwrap();
 
         let songs = manager
             .get_songs_by_tag("Progressive Metal", 50, QueuePopulationMode::All)
@@ -1510,7 +1576,9 @@ mod tests {
         {
             let conn = db.pool.get().unwrap();
             let idm_id: i64 = conn
-                .query_row("SELECT id FROM tag_groups WHERE name = 'IDM'", [], |r| r.get(0))
+                .query_row("SELECT id FROM tag_groups WHERE name = 'IDM'", [], |r| {
+                    r.get(0)
+                })
                 .unwrap();
             conn.execute(
                 "INSERT INTO tag_assignments (tag_name, group_id, sort_order) VALUES ('Electronic', ?1, 0)",
@@ -1539,5 +1607,4 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(dir);
     }
-
 }

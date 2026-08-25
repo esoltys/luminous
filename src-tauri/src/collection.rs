@@ -713,7 +713,7 @@ impl CollectionScanner {
         let query_trimmed = query.trim();
         if query_trimmed.is_empty() {
             let sql = format!(
-                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY album_artist, album, disc, track LIMIT ?1",
+                "SELECT {} FROM songs WHERE unavailable = 0 ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track LIMIT ?1",
                 SONG_SELECT_COLS
             );
             let mut stmt = conn.prepare(&sql)?;
@@ -759,7 +759,7 @@ impl CollectionScanner {
 
         let where_str = where_clauses.join(" AND ");
         let sql = format!(
-            "SELECT {} FROM songs WHERE {} ORDER BY album_artist, album, disc, track LIMIT ?{}",
+            "SELECT {} FROM songs WHERE {} ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track LIMIT ?{}",
             SONG_SELECT_COLS, where_str, limit_param_idx
         );
 
@@ -846,7 +846,7 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE source IN (1, 2) AND unavailable = 0
-             ORDER BY album_artist, album, disc, track
+             ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
              LIMIT ?1 OFFSET ?2",
             SONG_SELECT_COLS
         );
@@ -907,7 +907,7 @@ impl CollectionScanner {
              WHERE ({} OR {})
                AND source IN (1, 2)
                AND unavailable = 0
-             ORDER BY album, disc, track",
+             ORDER BY COALESCE(albumsort, album), disc, track",
             SONG_SELECT_COLS,
             multi_value_contains_sql("COALESCE(artist, '')", "?1"),
             multi_value_contains_sql("COALESCE(album_artist, '')", "?1")
@@ -949,7 +949,7 @@ impl CollectionScanner {
                     WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
-                    ORDER BY COUNT(*) DESC, genre ASC
+                    ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
                     LIMIT 1
                 ) AS genre,
                 COALESCE(
@@ -984,7 +984,7 @@ impl CollectionScanner {
                        )
                )
              GROUP BY album
-             ORDER BY album",
+             ORDER BY COALESCE(MAX(albumsort), album)",
             multi_value_contains_sql("s2.artist", "?1")
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -1018,7 +1018,7 @@ impl CollectionScanner {
              WHERE rating = 5
                AND source IN (1, 2)
                AND unavailable = 0
-             ORDER BY album_artist, album, disc, track",
+             ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
             SONG_SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -1059,7 +1059,7 @@ impl CollectionScanner {
                AND unavailable = 0
                AND genre IS NOT NULL
                AND genre != ''
-             ORDER BY genre",
+             ORDER BY COALESCE(genresort, genre)",
         )?;
         let genres = stmt
             .query_map([], |row| row.get::<_, String>(0))?
@@ -1190,7 +1190,7 @@ impl CollectionScanner {
                     WHERE g.album = songs.album AND g.source IN (1, 2) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
-                    ORDER BY COUNT(*) DESC, genre ASC
+                    ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
                     LIMIT 1
                 ) AS genre,
                 COALESCE(
@@ -1198,11 +1198,13 @@ impl CollectionScanner {
                     -1
                 ) AS rating,
                 MAX(added) AS added,
-                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
+                COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec,
+                COALESCE(MAX(NULLIF(album_artist_sort, '')), MAX(NULLIF(artistsort, ''))) AS artist_sort,
+                MAX(NULLIF(albumsort, '')) AS albumsort
              FROM songs
              WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
              GROUP BY album
-             ORDER BY album_artist, album",
+             ORDER BY COALESCE(MAX(album_artist_sort), MAX(artistsort), MAX(album_artist), MAX(artist)), COALESCE(MAX(albumsort), album)",
         )?;
         let albums: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
@@ -1219,6 +1221,8 @@ impl CollectionScanner {
                     "rating": row.get::<_, f32>(9)?,
                     "added": row.get::<_, Option<i64>>(10)?,
                     "total_duration_nanosec": row.get::<_, i64>(11)?,
+                    "artist_sort": row.get::<_, Option<String>>(12)?,
+                    "albumsort": row.get::<_, Option<String>>(13)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1245,12 +1249,16 @@ impl CollectionScanner {
                 GROUP BY album
              ),
              base AS (
-                SELECT s.id, s.album, COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist
+                SELECT s.id, s.album,
+                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
+                       COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
                 WHERE s.source IN (1, 2) AND s.unavailable = 0
              ),
              grouped AS (
-                SELECT MIN(effective_artist) AS effective_artist, COUNT(*) AS song_count
+                SELECT MIN(effective_artist) AS effective_artist,
+                       MIN(sort_artist) AS sort_artist,
+                       COUNT(*) AS song_count
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
              )
@@ -1269,11 +1277,12 @@ impl CollectionScanner {
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
                       AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
-                    ORDER BY COUNT(*) DESC, sg.genre ASC
+                    ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
-                ) AS genre
+                ) AS genre,
+                g.sort_artist
              FROM grouped g
-             ORDER BY g.effective_artist COLLATE NOCASE",
+             ORDER BY g.sort_artist COLLATE NOCASE",
         )?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
@@ -1282,6 +1291,7 @@ impl CollectionScanner {
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
                     "genre": row.get::<_, Option<String>>(3)?,
+                    "sort_artist": row.get::<_, Option<String>>(4)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1305,13 +1315,15 @@ impl CollectionScanner {
              ),
              base AS (
                 SELECT s.id, s.album, s.playcount,
-                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist
+                       COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
+                       COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
                 WHERE s.source IN (1, 2) AND s.unavailable = 0
              ),
              grouped AS (
                 SELECT
                     MIN(effective_artist) AS effective_artist,
+                    MIN(sort_artist) AS sort_artist,
                     COUNT(*) AS song_count,
                     SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
@@ -1334,11 +1346,11 @@ impl CollectionScanner {
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
                       AND sg.source IN (1, 2) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
-                    ORDER BY COUNT(*) DESC, sg.genre ASC
+                    ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre
              FROM grouped g
-             ORDER BY g.total_playcount DESC, g.effective_artist COLLATE NOCASE
+             ORDER BY g.total_playcount DESC, g.sort_artist COLLATE NOCASE
              LIMIT ?1",
         )?;
         let artists: Vec<serde_json::Value> = stmt
@@ -1463,10 +1475,10 @@ impl CollectionScanner {
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let album_track_count: i64 = row.get(56)?;
-                let album_disc_count: i64 = row.get(57)?;
-                let context_type: String = row.get(58)?;
-                let playlist_id: Option<i64> = row.get(59)?;
+                let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+                let context_type: String = row.get(SONG_SELECT_COL_COUNT + 2)?;
+                let playlist_id: Option<i64> = row.get(SONG_SELECT_COL_COUNT + 3)?;
                 Ok((
                     song,
                     album_track_count,
@@ -1598,8 +1610,8 @@ impl CollectionScanner {
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
             .query_map(params![query_limit], |row| {
                 let song = row_to_song(row)?;
-                let count: i64 = row.get(56)?;
-                let disc_count: i64 = row.get(57)?;
+                let count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
                 Ok((song, count, disc_count))
             })?
             .filter_map(|r| r.ok())
@@ -1679,10 +1691,7 @@ fn attach_album_ratings(conn: &rusqlite::Connection, items: &mut [HomeItem]) -> 
 }
 
 /// Retrieve customizable profile for an artist from SQLite (#473).
-pub fn get_artist_profile_conn(
-    conn: &rusqlite::Connection,
-    artist: &str,
-) -> Result<ArtistProfile> {
+pub fn get_artist_profile_conn(conn: &rusqlite::Connection, artist: &str) -> Result<ArtistProfile> {
     let mut stmt = conn.prepare(
         "SELECT artist_key, website, tags, social_links, bio FROM artist_profiles WHERE artist_key = ?1 COLLATE NOCASE",
     )?;
@@ -1915,8 +1924,8 @@ fn get_songs_by_ids(
     let map = stmt
         .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
             let song = row_to_song(row)?;
-            let album_track_count: i64 = row.get(56)?;
-            let album_disc_count: i64 = row.get(57)?;
+            let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+            let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
             Ok((song.id, (song, album_track_count, album_disc_count)))
         })?
         .filter_map(|r| r.ok())
@@ -2073,7 +2082,10 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         candidate_tags.push(primary);
     }
     for t in tagged_file.tags() {
-        if !candidate_tags.iter().any(|existing| std::ptr::eq(*existing, t)) {
+        if !candidate_tags
+            .iter()
+            .any(|existing| std::ptr::eq(*existing, t))
+        {
             candidate_tags.push(t);
         }
     }
@@ -2147,9 +2159,7 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
         }
 
         if song.grouping.is_none() {
-            song.grouping = tag
-                .get_string(ItemKey::ContentGroup)
-                .map(|s| s.to_string());
+            song.grouping = tag.get_string(ItemKey::ContentGroup).map(|s| s.to_string());
         }
         if song.initial_key.is_none() {
             song.initial_key = tag.get_string(ItemKey::InitialKey).map(|s| s.to_string());
@@ -2177,6 +2187,33 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
             song.replaygain_album_gain = tag
                 .get_string(ItemKey::ReplayGainAlbumGain)
                 .and_then(parse_replaygain_db);
+        }
+
+        // Custom sort order tags (#151)
+        if song.titlesort.is_none() {
+            song.titlesort = tag
+                .get_string(ItemKey::TrackTitleSortOrder)
+                .map(|s| s.to_string());
+        }
+        if song.artistsort.is_none() {
+            song.artistsort = tag
+                .get_string(ItemKey::TrackArtistSortOrder)
+                .map(|s| s.to_string());
+        }
+        if song.albumsort.is_none() {
+            song.albumsort = tag
+                .get_string(ItemKey::AlbumTitleSortOrder)
+                .map(|s| s.to_string());
+        }
+        if song.album_artist_sort.is_none() {
+            song.album_artist_sort = tag
+                .get_string(ItemKey::AlbumArtistSortOrder)
+                .map(|s| s.to_string());
+        }
+        if song.composersort.is_none() {
+            song.composersort = tag
+                .get_string(ItemKey::ComposerSortOrder)
+                .map(|s| s.to_string());
         }
     }
 
@@ -2292,14 +2329,18 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
         &format!(
             "INSERT INTO songs ({}) VALUES ({})
                   ON CONFLICT(path) DO UPDATE SET
-                    title=excluded.title, artist=excluded.artist,
-                    album=excluded.album, album_artist=excluded.album_artist,
+                    title=excluded.title, titlesort=excluded.titlesort,
+                    artist=excluded.artist, artistsort=excluded.artistsort,
+                    album=excluded.album, albumsort=excluded.albumsort,
+                    album_artist=excluded.album_artist, album_artist_sort=excluded.album_artist_sort,
+                    composer=excluded.composer, composersort=excluded.composersort,
+                    lyrics=excluded.lyrics, comment=excluded.comment,
                     track=excluded.track, disc=excluded.disc,
-                    year=excluded.year, originalyear=excluded.originalyear, genre=excluded.genre,
+                    year=excluded.year, originalyear=excluded.originalyear,
+                    genre=excluded.genre, genresort=excluded.genresort,
                     compilation=excluded.compilation,
-                    composer=excluded.composer, lyrics=excluded.lyrics,
                     grouping=excluded.grouping, bpm=excluded.bpm, initial_key=excluded.initial_key,
-                    comment=excluded.comment, length_nanosec=excluded.length_nanosec,
+                    length_nanosec=excluded.length_nanosec,
                     bitrate=excluded.bitrate, samplerate=excluded.samplerate,
                     channels=excluded.channels, bitdepth=excluded.bitdepth,
                     filesize=excluded.filesize, mtime=excluded.mtime,
@@ -2318,10 +2359,15 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.filetype as i32,
             song.path,
             song.title,
+            song.titlesort,
             song.artist,
+            song.artistsort,
             song.album,
+            song.albumsort,
             song.album_artist,
+            song.album_artist_sort,
             song.composer,
+            song.composersort,
             song.lyrics,
             song.comment,
             song.track,
@@ -2329,6 +2375,7 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.year,
             song.originalyear,
             song.genre,
+            song.genresort,
             song.compilation,
             song.grouping,
             song.bpm,
@@ -2419,7 +2466,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     album, albumsort, album_artist, album_artist_sort,
     composer, composersort, performer, performersort,
     grouping, comment, lyrics,
-    track, disc, year, originalyear, genre, compilation,
+    track, disc, year, originalyear, genre, genresort, compilation,
     bpm, initial_key,
     length_nanosec, beginning_nanosec, end_nanosec,
     bitrate, samplerate, bitdepth, channels, filesize, mtime,
@@ -2437,12 +2484,13 @@ pub(crate) const SONG_SELECT_COLS: &str = "
 /// and `row_to_song_at`'s field order — `cargo test` in `collection.rs`
 /// exercises every column through `row_to_song`, so a mismatch fails loudly
 /// there instead of silently defaulting a field at a call site.
-pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str = "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
+pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
+    "s.id, s.source, s.filetype, s.path, s.url, s.stream_url,
     s.title, s.titlesort, s.artist, s.artistsort,
     s.album, s.albumsort, s.album_artist, s.album_artist_sort,
     s.composer, s.composersort, s.performer, s.performersort,
     s.grouping, s.comment, s.lyrics,
-    s.track, s.disc, s.year, s.originalyear, s.genre, s.compilation,
+    s.track, s.disc, s.year, s.originalyear, s.genre, s.genresort, s.compilation,
     s.bpm, s.initial_key,
     s.length_nanosec, s.beginning_nanosec, s.end_nanosec,
     s.bitrate, s.samplerate, s.bitdepth, s.channels, s.filesize, s.mtime,
@@ -2452,6 +2500,8 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str = "s.id, s.source, s.filetype,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
     s.is_vbr, s.is_instrumental, s.added";
+
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 57;
 
 /// `SONG_SELECT_COLS_QUALIFIED` plus correlated `album_track_count` and
 /// `album_disc_count` subqueries. Shared by the home-screen queries
@@ -2470,8 +2520,8 @@ fn home_item_select_cols() -> String {
 }
 
 const SONG_INSERT_COLS: &str = "
-    source, filetype, path, title, artist, album, album_artist,
-    composer, lyrics, comment, track, disc, year, originalyear, genre, compilation,
+    source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
+    composer, composersort, lyrics, comment, track, disc, year, originalyear, genre, genresort, compilation,
     grouping, bpm, initial_key,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
@@ -2479,7 +2529,7 @@ const SONG_INSERT_COLS: &str = "
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -2522,36 +2572,37 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         year: row.get(col(23))?,
         originalyear: row.get(col(24))?,
         genre: row.get(col(25))?,
-        compilation: row.get(col(26))?,
-        bpm: row.get(col(27))?,
-        initial_key: row.get(col(28))?,
-        length_nanosec: row.get(col(29))?,
-        beginning_nanosec: row.get::<_, Option<i64>>(col(30))?.unwrap_or(0),
-        end_nanosec: row.get::<_, Option<i64>>(col(31))?.unwrap_or(0),
-        bitrate: row.get(col(32))?,
-        samplerate: row.get(col(33))?,
-        bitdepth: row.get(col(34))?,
-        channels: row.get(col(35))?,
-        filesize: row.get(col(36))?,
-        mtime: row.get(col(37))?,
-        rating: row.get::<_, Option<f32>>(col(38))?.unwrap_or(-1.0),
-        playcount: row.get::<_, Option<i32>>(col(39))?.unwrap_or(0),
-        skipcount: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
-        lastplayed: row.get(col(41))?,
-        lastseen: row.get(col(42))?,
-        art_embedded: row.get(col(43))?,
-        art_automatic: row.get(col(44))?,
-        art_manual: row.get(col(45))?,
-        art_unset: row.get(col(46))?,
-        cue_path: row.get(col(47))?,
-        ebur128_integrated_loudness_lufs: row.get(col(48))?,
-        ebur128_loudness_range_lu: row.get(col(49))?,
-        unavailable: row.get::<_, Option<bool>>(col(50))?.unwrap_or(false),
-        replaygain_track_gain: row.get(col(51))?,
-        replaygain_album_gain: row.get(col(52))?,
-        is_vbr: row.get(col(53))?,
-        is_instrumental: row.get::<_, Option<bool>>(col(54))?.unwrap_or(false),
-        added: row.get(col(55))?,
+        genresort: row.get(col(26))?,
+        compilation: row.get(col(27))?,
+        bpm: row.get(col(28))?,
+        initial_key: row.get(col(29))?,
+        length_nanosec: row.get(col(30))?,
+        beginning_nanosec: row.get::<_, Option<i64>>(col(31))?.unwrap_or(0),
+        end_nanosec: row.get::<_, Option<i64>>(col(32))?.unwrap_or(0),
+        bitrate: row.get(col(33))?,
+        samplerate: row.get(col(34))?,
+        bitdepth: row.get(col(35))?,
+        channels: row.get(col(36))?,
+        filesize: row.get(col(37))?,
+        mtime: row.get(col(38))?,
+        rating: row.get::<_, Option<f32>>(col(39))?.unwrap_or(-1.0),
+        playcount: row.get::<_, Option<i32>>(col(40))?.unwrap_or(0),
+        skipcount: row.get::<_, Option<i32>>(col(41))?.unwrap_or(0),
+        lastplayed: row.get(col(42))?,
+        lastseen: row.get(col(43))?,
+        art_embedded: row.get(col(44))?,
+        art_automatic: row.get(col(45))?,
+        art_manual: row.get(col(46))?,
+        art_unset: row.get(col(47))?,
+        cue_path: row.get(col(48))?,
+        ebur128_integrated_loudness_lufs: row.get(col(49))?,
+        ebur128_loudness_range_lu: row.get(col(50))?,
+        unavailable: row.get::<_, Option<bool>>(col(51))?.unwrap_or(false),
+        replaygain_track_gain: row.get(col(52))?,
+        replaygain_album_gain: row.get(col(53))?,
+        is_vbr: row.get(col(54))?,
+        is_instrumental: row.get::<_, Option<bool>>(col(55))?.unwrap_or(false),
+        added: row.get(col(56))?,
         ..Default::default()
     })
 }
@@ -3407,11 +3458,17 @@ mod tests {
         crate::tageditor::write_tags(
             &path,
             "Title",
+            None,
             "Artist",
+            None,
             "Album",
+            None,
             "",
+            None,
             "",
+            None,
             "Rock; Jazz Fusion; Live",
+            None,
             None,
             None,
             None,
@@ -3435,11 +3492,17 @@ mod tests {
         crate::tageditor::write_tags(
             &path,
             "Title",
+            None,
             "Artist A; Artist B",
+            None,
             "Album",
+            None,
             "Album Artist A; Album Artist B",
+            None,
             "Composer A; Composer B",
+            None,
             "",
+            None,
             None,
             None,
             None,
@@ -3476,11 +3539,17 @@ mod tests {
         crate::tageditor::write_tags(
             &path,
             "Title",
+            None,
             "Artist",
+            None,
             "Album",
+            None,
             "",
+            None,
             "",
+            None,
             "",
+            None,
             None,
             None,
             Some(1995),
@@ -3512,11 +3581,17 @@ mod tests {
         crate::tageditor::write_tags(
             &path,
             "Title",
+            None,
             "Artist",
+            None,
             "Album",
+            None,
             "",
+            None,
             "",
+            None,
             "",
+            None,
             None,
             None,
             Some(1995),
@@ -3527,7 +3602,8 @@ mod tests {
         )
         .expect("write_tags should succeed");
         crate::tageditor::write_tags(
-            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+            &path, "Title", None, "Artist", None, "Album", None, "", None, "", None, "", None,
+            None, None, None, "", None, "", false,
         )
         .expect("second write_tags (clearing year) should succeed");
 
@@ -5423,7 +5499,10 @@ mod tests {
         // Retrieve saved profile (case-insensitive key match)
         let loaded = get_artist_profile_conn(&conn, "shania twain").unwrap();
         assert_eq!(loaded.artist_key, "Shania Twain");
-        assert_eq!(loaded.website, Some("https://www.shaniatwain.com".to_string()));
+        assert_eq!(
+            loaded.website,
+            Some("https://www.shaniatwain.com".to_string())
+        );
         assert_eq!(loaded.tags, vec!["pop", "country", "canadian"]);
         assert_eq!(loaded.social_links.len(), 2);
         assert_eq!(loaded.social_links[0].platform, "instagram");
