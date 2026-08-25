@@ -152,19 +152,18 @@
 
       <!-- Body Form -->
       <div class="p-6 overflow-y-auto flex flex-col gap-5 text-sm">
-        <!-- Website Field -->
+        <!-- Bio Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="artist-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-            <Globe class="w-3.5 h-3.5 text-brand-accent" />
-            {i18n.t("artistProfileEditor.website", {}, "Website")}
+          <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
+            {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
           </label>
-          <input
-            id="artist-website"
-            type="text"
-            bind:value={website}
-            placeholder={i18n.t("artistProfileEditor.websitePlaceholder", {}, "https://www.artist.com or www.artist.com")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
-          />
+          <textarea
+            id="artist-bio"
+            bind:value={bio}
+            rows="3"
+            placeholder={i18n.t("artistProfileEditor.bioPlaceholder", {}, "Add a bio or background notes for this artist...")}
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
+          ></textarea>
         </div>
 
         <!-- Tags Manager -->
@@ -215,18 +214,19 @@
           </div>
         </div>
 
-        <!-- Bio Field -->
+        <!-- Website Field -->
         <div class="flex flex-col gap-1.5">
-          <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
-            {i18n.t("artistProfileEditor.bio", {}, "About / Biography")}
+          <label for="artist-website" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+            <Globe class="w-3.5 h-3.5 text-brand-accent" />
+            {i18n.t("artistProfileEditor.website", {}, "Website")}
           </label>
-          <textarea
-            id="artist-bio"
-            bind:value={bio}
-            rows="3"
-            placeholder={i18n.t("artistProfileEditor.bioPlaceholder", {}, "Add a bio or background notes for this artist...")}
-            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent resize-none transition-colors"
-          ></textarea>
+          <input
+            id="artist-website"
+            type="text"
+            bind:value={website}
+            placeholder={i18n.t("artistProfileEditor.websitePlaceholder", {}, "https://www.artist.com or www.artist.com")}
+            class="w-full px-3 py-2 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary placeholder:text-brand-text-secondary/50 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+          />
         </div>
 
         <!-- Social & External Links -->
