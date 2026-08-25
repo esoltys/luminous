@@ -11,10 +11,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
-}));
-
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     innerSize: () => Promise.resolve({ width: 800, height: 600 }),

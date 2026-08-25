@@ -10,10 +10,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
-}));
-
 describe("PlaylistView.svelte", () => {
   const mockPlaylist: Playlist = {
     id: 1,
