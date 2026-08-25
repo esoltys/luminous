@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { Music, Disc, LoaderCircle } from "lucide-svelte";
-  import { getCoverArtUrl } from "../types";
+  import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -28,22 +28,12 @@
 
   async function loadCoverArt() {
     if (artManual) {
-      if (artManual.startsWith("http://") || artManual.startsWith("https://") || artManual.startsWith("/")) {
-        imgSrc = artManual;
-      } else {
-        imgSrc = getCoverArtUrl(`luminous-art://${artManual}`);
-      }
+      imgSrc = resolveArtUrl(artManual);
       hasFailed = false;
       return;
     }
     if (artAutomatic) {
-      if (artAutomatic.startsWith("http://") || artAutomatic.startsWith("https://") || artAutomatic.startsWith("/")) {
-        imgSrc = artAutomatic;
-      } else if (artAutomatic.startsWith("album-")) {
-        imgSrc = getCoverArtUrl(`luminous-art://${artAutomatic}`);
-      } else {
-        imgSrc = getCoverArtUrl(`luminous-art://local/${artAutomatic}`);
-      }
+      imgSrc = resolveArtUrl(artAutomatic);
       hasFailed = false;
       return;
     }

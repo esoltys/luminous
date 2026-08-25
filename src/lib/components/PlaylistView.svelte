@@ -31,7 +31,7 @@
     Plus,
     FolderPlus
   } from "lucide-svelte";
-  import { getCoverArtUrl } from "../types";
+  import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
@@ -726,14 +726,10 @@
     const song = playerStore.currentSong;
     if (!song) return null;
     if (song.art_manual) {
-      return getCoverArtUrl(`luminous-art://${song.art_manual}`);
+      return resolveArtUrl(song.art_manual);
     }
     if (song.art_automatic) {
-      if (song.art_automatic.startsWith("album-")) {
-        return getCoverArtUrl(`luminous-art://${song.art_automatic}`);
-      } else {
-        return getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
-      }
+      return resolveArtUrl(song.art_automatic);
     }
     return null;
   });

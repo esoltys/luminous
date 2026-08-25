@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getCoverArtUrl } from "../types";
+import { getCoverArtUrl, resolveArtUrl } from "../types";
 import type { Song } from "../types";
 import {
   hexToRgb,
@@ -564,19 +564,9 @@ export class ThemeStore {
 
     let url: string | null = null;
     if (song.art_manual) {
-      if (song.art_manual.startsWith("http://") || song.art_manual.startsWith("https://") || song.art_manual.startsWith("/")) {
-        url = song.art_manual;
-      } else {
-        url = getCoverArtUrl(`luminous-art://${song.art_manual}`);
-      }
+      url = resolveArtUrl(song.art_manual);
     } else if (song.art_automatic) {
-      if (song.art_automatic.startsWith("http://") || song.art_automatic.startsWith("https://") || song.art_automatic.startsWith("/")) {
-        url = song.art_automatic;
-      } else if (song.art_automatic.startsWith("album-")) {
-        url = getCoverArtUrl(`luminous-art://${song.art_automatic}`);
-      } else {
-        url = getCoverArtUrl(`luminous-art://local/${song.art_automatic}`);
-      }
+      url = resolveArtUrl(song.art_automatic);
     } else if (song.art_embedded) {
       try {
         const uri = await invoke<string | null>("get_cover_art_uri", { songId: song.id });

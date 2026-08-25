@@ -2255,9 +2255,13 @@ pub(crate) fn read_and_prepare_song(cover_manager: &CoverManager, path: &Path) -
             song.art_automatic = Some(cached_filename);
             song.art_unset = false;
         }
-    } else if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
-        song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
-        song.art_unset = false;
+    }
+
+    if song.art_automatic.is_none() {
+        if let Some(folder_art_path) = cover_manager.scan_folder_art(path) {
+            song.art_automatic = Some(folder_art_path.to_string_lossy().to_string());
+            song.art_unset = false;
+        }
     }
 
     Ok(song)
@@ -5465,5 +5469,36 @@ mod tests {
         assert_eq!(all[0].artist_key, "Shania Twain");
 
         let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_read_and_prepare_song_falls_back_to_folder_art() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_prep_song_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("track.wav");
+        let folder_art_path = temp_dir.join("folder.jpg");
+
+        write_test_wav(&audio_path);
+        std::fs::write(&folder_art_path, b"JPEG image content").unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let cover_manager = CoverManager::new(db, temp_dir.clone());
+
+        let song = read_and_prepare_song(&cover_manager, &audio_path).unwrap();
+
+        assert!(song.art_automatic.is_some());
+        assert_eq!(
+            song.art_automatic.unwrap(),
+            folder_art_path.to_string_lossy().to_string()
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
