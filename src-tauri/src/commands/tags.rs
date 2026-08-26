@@ -339,11 +339,10 @@ pub async fn delete_tags(
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
 
     let names_c = names.clone();
-    let updated_count =
-        rewrite_genre_and_persist(conn, &song_ids, move |genre| {
-            TagManager::rewrite_genre_for_delete(genre, &names_c)
-        })
-        .await?;
+    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
+        TagManager::rewrite_genre_for_delete(genre, &names_c)
+    })
+    .await?;
 
     manager
         .apply_delete_hierarchy(&names)

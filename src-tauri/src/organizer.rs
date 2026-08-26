@@ -692,8 +692,7 @@ pub fn compute_preview(
                 dup_path.push("Duplicates");
                 dup_path.push(rel_path);
 
-                let (final_dup_path, is_unchanged) =
-                    resolve_duplicate_path(&dup_path, source_path);
+                let (final_dup_path, is_unchanged) = resolve_duplicate_path(&dup_path, source_path);
 
                 preview_items[idx].to_path = final_dup_path.to_string_lossy().to_string();
                 if is_unchanged {
