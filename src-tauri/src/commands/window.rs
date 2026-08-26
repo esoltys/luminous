@@ -81,22 +81,60 @@ async fn settle_size(window: &WebviewWindow, target_w: f64, target_h: f64) {
     }
 }
 
-#[tauri::command]
-pub async fn enter_miniplayer_mode(
+/// Per-mode geometry defaults and behavior that differ between the
+/// miniplayer and the full player — everything else about applying a mode
+/// (clamping, positioning fallback, the GTK settle-retry) is shared.
+struct WindowModeSpec {
+    decorations: bool,
+    always_on_top: bool,
+    min_size: (f64, f64),
+    default_size: (f64, f64),
+    min_clamp: (f64, f64),
+    // `Position` implements neither `Copy` nor `Clone`, so it can't sit
+    // directly in a spec reused across calls — a zero-arg constructor does.
+    fallback_position: fn() -> Position,
+}
+
+const MINIPLAYER_MODE: WindowModeSpec = WindowModeSpec {
+    decorations: false,
+    always_on_top: true,
+    min_size: (200.0, 200.0),
+    default_size: (MINIPLAYER_WIDTH, MINIPLAYER_HEIGHT),
+    min_clamp: (200.0, 200.0),
+    fallback_position: || Position::TopRight,
+};
+
+const FULL_PLAYER_MODE: WindowModeSpec = WindowModeSpec {
+    decorations: true,
+    always_on_top: false,
+    min_size: (320.0, 120.0),
+    default_size: (FULL_PLAYER_WIDTH, FULL_PLAYER_HEIGHT),
+    min_clamp: (320.0, 120.0),
+    fallback_position: || Position::Center,
+};
+
+async fn apply_window_mode(
     window: WebviewWindow,
+    spec: &WindowModeSpec,
     width: Option<f64>,
     height: Option<f64>,
     x: Option<f64>,
     y: Option<f64>,
 ) -> Result<(), String> {
-    let target_w = width.unwrap_or(MINIPLAYER_WIDTH).round().max(200.0);
-    let target_h = height.unwrap_or(MINIPLAYER_HEIGHT).round().max(200.0);
+    let target_w = width
+        .unwrap_or(spec.default_size.0)
+        .round()
+        .max(spec.min_clamp.0);
+    let target_h = height
+        .unwrap_or(spec.default_size.1)
+        .round()
+        .max(spec.min_clamp.1);
 
-    let _ = window.set_always_on_top(true);
-    let _ = window.set_decorations(false);
+    let _ = window.set_decorations(spec.decorations);
+    let _ = window.set_always_on_top(spec.always_on_top);
     let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
-        width: 200.0,
-        height: 200.0,
+        width: spec.min_size.0,
+        height: spec.min_size.1,
     })));
     let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
         width: target_w,
@@ -108,12 +146,23 @@ pub async fn enter_miniplayer_mode(
             y: py,
         }));
     } else {
-        let _ = window.move_window(Position::TopRight);
+        let _ = window.move_window((spec.fallback_position)());
     }
 
     settle_size(&window, target_w, target_h).await;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn enter_miniplayer_mode(
+    window: WebviewWindow,
+    width: Option<f64>,
+    height: Option<f64>,
+    x: Option<f64>,
+    y: Option<f64>,
+) -> Result<(), String> {
+    apply_window_mode(window, &MINIPLAYER_MODE, width, height, x, y).await
 }
 
 #[tauri::command]
@@ -124,31 +173,7 @@ pub async fn exit_miniplayer_mode(
     x: Option<f64>,
     y: Option<f64>,
 ) -> Result<(), String> {
-    let target_w = width.unwrap_or(FULL_PLAYER_WIDTH).round().max(320.0);
-    let target_h = height.unwrap_or(FULL_PLAYER_HEIGHT).round().max(120.0);
-
-    let _ = window.set_decorations(true);
-    let _ = window.set_always_on_top(false);
-    let _ = window.set_min_size(Some(tauri::Size::Logical(tauri::LogicalSize {
-        width: 320.0,
-        height: 120.0,
-    })));
-    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-        width: target_w,
-        height: target_h,
-    }));
-    if let (Some(px), Some(py)) = (x, y) {
-        let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
-            x: px,
-            y: py,
-        }));
-    } else {
-        let _ = window.move_window(Position::Center);
-    }
-
-    settle_size(&window, target_w, target_h).await;
-
-    Ok(())
+    apply_window_mode(window, &FULL_PLAYER_MODE, width, height, x, y).await
 }
 
 #[tauri::command]
