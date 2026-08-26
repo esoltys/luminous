@@ -161,7 +161,6 @@ struct SongFullMetadata {
     composer: String,
     composersort: Option<String>,
     genre: String,
-    genresort: Option<String>,
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
@@ -175,7 +174,7 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
     let mut out = Vec::with_capacity(song_ids.len());
     for &id in song_ids {
         let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year, grouping, bpm, initial_key, compilation
+            "SELECT path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, track, disc, year, grouping, bpm, initial_key, compilation
              FROM songs WHERE id = ?1",
             rusqlite::params![id],
             |row| {
@@ -193,14 +192,13 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
                     composer: row.get(9).unwrap_or_default(),
                     composersort: row.get(10).ok(),
                     genre: row.get(11).unwrap_or_default(),
-                    genresort: row.get(12).ok(),
-                    track: row.get(13).ok(),
-                    disc: row.get(14).ok(),
-                    year: row.get(15).ok(),
-                    grouping: row.get(16).unwrap_or_default(),
-                    bpm: row.get(17).ok(),
-                    initial_key: row.get(18).unwrap_or_default(),
-                    compilation: row.get(19).unwrap_or(false),
+                    track: row.get(12).ok(),
+                    disc: row.get(13).ok(),
+                    year: row.get(14).ok(),
+                    grouping: row.get(15).unwrap_or_default(),
+                    bpm: row.get(16).ok(),
+                    initial_key: row.get(17).unwrap_or_default(),
+                    compilation: row.get(18).unwrap_or(false),
                 })
             },
         );
@@ -233,25 +231,26 @@ async fn rewrite_genre_and_persist(
                 let path = std::path::PathBuf::from(&item.path);
                 let write_res = crate::tageditor::write_tags(
                     &path,
-                    &item.title,
-                    item.titlesort.as_deref(),
-                    &item.artist,
-                    item.artistsort.as_deref(),
-                    &item.album,
-                    item.albumsort.as_deref(),
-                    &item.album_artist,
-                    item.album_artist_sort.as_deref(),
-                    &item.composer,
-                    item.composersort.as_deref(),
-                    &new_genre,
-                    item.genresort.as_deref(),
-                    item.track,
-                    item.disc,
-                    item.year,
-                    &item.grouping,
-                    item.bpm,
-                    &item.initial_key,
-                    item.compilation,
+                    &crate::tageditor::TagWriteRequest {
+                        title: &item.title,
+                        titlesort: item.titlesort.as_deref(),
+                        artist: &item.artist,
+                        artistsort: item.artistsort.as_deref(),
+                        album: &item.album,
+                        albumsort: item.albumsort.as_deref(),
+                        album_artist: &item.album_artist,
+                        album_artist_sort: item.album_artist_sort.as_deref(),
+                        composer: &item.composer,
+                        composersort: item.composersort.as_deref(),
+                        genre: &new_genre,
+                        track: item.track,
+                        disc: item.disc,
+                        year: item.year,
+                        grouping: &item.grouping,
+                        bpm: item.bpm,
+                        initial_key: &item.initial_key,
+                        compilation: item.compilation,
+                    },
                 );
                 if write_res.is_ok() {
                     count += 1;

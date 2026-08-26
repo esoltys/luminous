@@ -188,32 +188,32 @@ pub async fn save_song_tags(
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
-    let genresort_c = genresort.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
         crate::tageditor::write_tags(
             &path_clone,
-            &title_c,
-            titlesort_c.as_deref(),
-            &artist_c,
-            artistsort_c.as_deref(),
-            &album_c,
-            albumsort_c.as_deref(),
-            &album_artist_c,
-            album_artist_sort_c.as_deref(),
-            &composer_c,
-            composersort_c.as_deref(),
-            &genre_c,
-            genresort_c.as_deref(),
-            track,
-            disc,
-            year,
-            &grouping_c,
-            bpm,
-            &initial_key_c,
-            compilation,
+            &crate::tageditor::TagWriteRequest {
+                title: &title_c,
+                titlesort: titlesort_c.as_deref(),
+                artist: &artist_c,
+                artistsort: artistsort_c.as_deref(),
+                album: &album_c,
+                albumsort: albumsort_c.as_deref(),
+                album_artist: &album_artist_c,
+                album_artist_sort: album_artist_sort_c.as_deref(),
+                composer: &composer_c,
+                composersort: composersort_c.as_deref(),
+                genre: &genre_c,
+                track,
+                disc,
+                year,
+                grouping: &grouping_c,
+                bpm,
+                initial_key: &initial_key_c,
+                compilation,
+            },
         )
     })
     .await
@@ -347,7 +347,6 @@ pub async fn save_album_tags(
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
-    let genresort_c = genresort.clone();
 
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
@@ -355,25 +354,26 @@ pub async fn save_album_tags(
             let path = std::path::PathBuf::from(&item.path);
             let write_res = crate::tageditor::write_tags(
                 &path,
-                &item.title,
-                item.titlesort.as_deref(),
-                &item.artist,
-                item.artistsort.as_deref(),
-                &album_c,
-                albumsort_c.as_deref(),
-                &album_artist_c,
-                album_artist_sort_c.as_deref(),
-                &item.composer,
-                item.composersort.as_deref(),
-                &genre_c,
-                genresort_c.as_deref(),
-                item.track,
-                disc,
-                year,
-                &item.grouping,
-                item.bpm,
-                &item.initial_key,
-                compilation,
+                &crate::tageditor::TagWriteRequest {
+                    title: &item.title,
+                    titlesort: item.titlesort.as_deref(),
+                    artist: &item.artist,
+                    artistsort: item.artistsort.as_deref(),
+                    album: &album_c,
+                    albumsort: albumsort_c.as_deref(),
+                    album_artist: &album_artist_c,
+                    album_artist_sort: album_artist_sort_c.as_deref(),
+                    composer: &item.composer,
+                    composersort: item.composersort.as_deref(),
+                    genre: &genre_c,
+                    track: item.track,
+                    disc,
+                    year,
+                    grouping: &item.grouping,
+                    bpm: item.bpm,
+                    initial_key: &item.initial_key,
+                    compilation,
+                },
             );
             if write_res.is_ok() {
                 count += 1;
