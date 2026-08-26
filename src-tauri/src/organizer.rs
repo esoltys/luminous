@@ -405,6 +405,58 @@ fn apply_dir_casing_map(parts: &mut [String], map: &DirCasingMap) {
     }
 }
 
+/// The folder collision-routing paths (destination and its "Duplicates"
+/// subfolder) are computed relative to: the explicit destination dir if
+/// set, else whichever library root `source_path` is under, else its own
+/// parent directory.
+fn resolve_dest_folder(
+    source_path: &Path,
+    options: &OrganizeOptions,
+    library_dirs: &[String],
+) -> PathBuf {
+    if let Some(ref dest) = options.destination_dir {
+        PathBuf::from(dest)
+    } else {
+        library_dirs
+            .iter()
+            .map(PathBuf::from)
+            .find(|dir| source_path.starts_with(dir))
+            .or_else(|| source_path.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+}
+
+/// Appends a numeric " (N)" suffix to `dup_path`'s file stem, incrementing
+/// until it lands on a path that doesn't already exist on disk. If it lands
+/// on `source_path` itself, the file is already at its resolved target, so
+/// returns `is_unchanged = true` instead of a fresh suffix.
+fn resolve_duplicate_path(dup_path: &Path, source_path: &Path) -> (PathBuf, bool) {
+    let mut duplicate_counter = 1;
+    let mut final_dup_path = dup_path.to_path_buf();
+
+    while final_dup_path.exists() {
+        if final_dup_path == source_path {
+            return (final_dup_path, true);
+        }
+        if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
+            if let Some(stem) = dup_path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+            {
+                final_dup_path = dup_path.with_file_name(format!(
+                    "{} ({}).{}",
+                    stem,
+                    duplicate_counter,
+                    ext.to_string_lossy()
+                ));
+            }
+        }
+        duplicate_counter += 1;
+    }
+
+    (final_dup_path, false)
+}
+
 /// Compute dry-run preview items for given song IDs.
 pub fn compute_preview(
     db: &Database,
@@ -604,8 +656,6 @@ pub fn compute_preview(
                 }
             }
 
-            let mut duplicate_counter = 1;
-
             for &idx in &indices {
                 if idx == canonical_idx {
                     continue; // Canonical item gets to keep its target, but it might still have an external collision (checked below)
@@ -632,16 +682,7 @@ pub fn compute_preview(
                 let original_target = Path::new(&preview_items[idx].to_path);
                 let source_path = Path::new(&preview_items[idx].from_path);
 
-                let dest_folder: PathBuf = if let Some(ref dest) = options.destination_dir {
-                    PathBuf::from(dest)
-                } else {
-                    library_dirs
-                        .iter()
-                        .map(PathBuf::from)
-                        .find(|dir| source_path.starts_with(dir))
-                        .or_else(|| source_path.parent().map(|p| p.to_path_buf()))
-                        .unwrap_or_else(|| PathBuf::from("."))
-                };
+                let dest_folder = resolve_dest_folder(source_path, options, &library_dirs);
 
                 let rel_path = original_target
                     .strip_prefix(&dest_folder)
@@ -651,29 +692,8 @@ pub fn compute_preview(
                 dup_path.push("Duplicates");
                 dup_path.push(rel_path);
 
-                let mut final_dup_path = dup_path.clone();
-                let mut is_unchanged = false;
-
-                while final_dup_path.exists() {
-                    if final_dup_path == source_path {
-                        is_unchanged = true;
-                        break;
-                    }
-                    if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
-                        if let Some(stem) = dup_path
-                            .file_stem()
-                            .map(|s| s.to_string_lossy().into_owned())
-                        {
-                            final_dup_path = dup_path.with_file_name(format!(
-                                "{} ({}).{}",
-                                stem,
-                                duplicate_counter,
-                                ext.to_string_lossy()
-                            ));
-                        }
-                    }
-                    duplicate_counter += 1;
-                }
+                let (final_dup_path, is_unchanged) =
+                    resolve_duplicate_path(&dup_path, source_path);
 
                 preview_items[idx].to_path = final_dup_path.to_string_lossy().to_string();
                 if is_unchanged {
@@ -716,16 +736,7 @@ pub fn compute_preview(
                 }
             }
 
-            let dest_folder: PathBuf = if let Some(ref dest) = options.destination_dir {
-                PathBuf::from(dest)
-            } else {
-                library_dirs
-                    .iter()
-                    .map(PathBuf::from)
-                    .find(|dir| source_path.starts_with(dir))
-                    .or_else(|| source_path.parent().map(|p| p.to_path_buf()))
-                    .unwrap_or_else(|| PathBuf::from("."))
-            };
+            let dest_folder = resolve_dest_folder(source_path, options, &library_dirs);
 
             let rel_path = current_target
                 .strip_prefix(&dest_folder)
@@ -735,30 +746,7 @@ pub fn compute_preview(
             dup_path.push("Duplicates");
             dup_path.push(rel_path);
 
-            let mut duplicate_counter = 1;
-            let mut final_dup_path = dup_path.clone();
-            let mut is_unchanged = false;
-
-            while final_dup_path.exists() {
-                if final_dup_path == source_path {
-                    is_unchanged = true;
-                    break;
-                }
-                if let Some(ext) = dup_path.extension().map(|s| s.to_owned()) {
-                    if let Some(stem) = dup_path
-                        .file_stem()
-                        .map(|s| s.to_string_lossy().into_owned())
-                    {
-                        final_dup_path = dup_path.with_file_name(format!(
-                            "{} ({}).{}",
-                            stem,
-                            duplicate_counter,
-                            ext.to_string_lossy()
-                        ));
-                    }
-                }
-                duplicate_counter += 1;
-            }
+            let (final_dup_path, is_unchanged) = resolve_duplicate_path(&dup_path, source_path);
 
             item.to_path = final_dup_path.to_string_lossy().to_string();
             if is_unchanged {
