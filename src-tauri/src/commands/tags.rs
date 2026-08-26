@@ -170,40 +170,41 @@ struct SongFullMetadata {
     compilation: bool,
 }
 
+/// Reads each song via the canonical `SONG_SELECT_COLS`/`row_to_song` mapping
+/// (see `collection.rs`) rather than a hand-rolled column list, so a new or
+/// reordered song column can't silently default here while staying correct
+/// everywhere else.
 fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<SongFullMetadata> {
+    let sql = format!(
+        "SELECT {} FROM songs WHERE id = ?1",
+        crate::collection::SONG_SELECT_COLS
+    );
     let mut out = Vec::with_capacity(song_ids.len());
     for &id in song_ids {
-        let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, track, disc, year, grouping, bpm, initial_key, compilation
-             FROM songs WHERE id = ?1",
-            rusqlite::params![id],
-            |row| {
-                Ok(SongFullMetadata {
-                    id,
-                    path: row.get(0)?,
-                    title: row.get(1).unwrap_or_default(),
-                    titlesort: row.get(2).ok(),
-                    artist: row.get(3).unwrap_or_default(),
-                    artistsort: row.get(4).ok(),
-                    album: row.get(5).unwrap_or_default(),
-                    albumsort: row.get(6).ok(),
-                    album_artist: row.get(7).unwrap_or_default(),
-                    album_artist_sort: row.get(8).ok(),
-                    composer: row.get(9).unwrap_or_default(),
-                    composersort: row.get(10).ok(),
-                    genre: row.get(11).unwrap_or_default(),
-                    track: row.get(12).ok(),
-                    disc: row.get(13).ok(),
-                    year: row.get(14).ok(),
-                    grouping: row.get(15).unwrap_or_default(),
-                    bpm: row.get(16).ok(),
-                    initial_key: row.get(17).unwrap_or_default(),
-                    compilation: row.get(18).unwrap_or(false),
-                })
-            },
-        );
-        if let Ok(meta) = res {
-            out.push(meta);
+        let res = conn.query_row(&sql, rusqlite::params![id], crate::collection::row_to_song);
+        if let Ok(song) = res {
+            out.push(SongFullMetadata {
+                id: song.id,
+                path: song.path.unwrap_or_default(),
+                title: song.title.unwrap_or_default(),
+                titlesort: song.titlesort,
+                artist: song.artist.unwrap_or_default(),
+                artistsort: song.artistsort,
+                album: song.album.unwrap_or_default(),
+                albumsort: song.albumsort,
+                album_artist: song.album_artist.unwrap_or_default(),
+                album_artist_sort: song.album_artist_sort,
+                composer: song.composer.unwrap_or_default(),
+                composersort: song.composersort,
+                genre: song.genre.unwrap_or_default(),
+                track: song.track.map(|t| t as u32),
+                disc: song.disc.map(|d| d as u32),
+                year: song.year.map(|y| y as u32),
+                grouping: song.grouping.unwrap_or_default(),
+                bpm: song.bpm,
+                initial_key: song.initial_key.unwrap_or_default(),
+                compilation: song.compilation,
+            });
         }
     }
     out
