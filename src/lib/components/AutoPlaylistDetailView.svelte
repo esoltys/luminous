@@ -225,32 +225,16 @@
   }
 
   async function handleAddSongToPlaylist(songId: number) {
-    if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, [songId]);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-    } else {
-      {
-        await playlistsStore.addSongsToQueue([songId]);
-        const songObj = songs.find((s) => s.id === songId);
-        const name = songObj?.title || "Song";
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
-      }
-    }
+    const songObj = songs.find((s) => s.id === songId);
+    await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
   }
 
   async function handleAddAllToPlaylist() {
     if (songs.length === 0) return;
-    if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, songs.map((s) => s.id));
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: playlistsStore.activeCustomPlaylist.name }, `Added to ${playlistsStore.activeCustomPlaylist.name}`));
-    } else {
-      {
-        const songIds = songs.map((s) => s.id);
-        await playlistsStore.addSongsToQueue(songIds);
-        const name = displayName || "Playlist";
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
-      }
-    }
+    await playlistsStore.addSongsToActiveTarget(
+      songs.map((s) => s.id),
+      displayName || "Playlist"
+    );
   }
 
   function handleSaveAsCustomPlaylist() {
