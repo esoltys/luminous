@@ -281,6 +281,24 @@ class PlaylistsStore {
     }
   }
 
+  /** Add songs to whatever the "Add to Playlist" quick-add target currently is —
+   * the pinned custom playlist, or the Queue if nothing custom is pinned — and
+   * show the matching toast. `queueLabel` names the songs/album/etc. being added,
+   * used only in the Queue toast; the playlist toast always names the playlist. */
+  async addSongsToActiveTarget(songIds: number[], queueLabel: string) {
+    const targetPlaylist = this.activeCustomPlaylist;
+    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
+    if (isQueue) {
+      await this.addSongsToQueue(songIds);
+      toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: queueLabel }, `Added ${queueLabel} to Queue`));
+    } else {
+      await this.addSongsToPlaylist(targetPlaylist.id, songIds);
+      toastStore.show(
+        i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`)
+      );
+    }
+  }
+
   async removeItemsFromPlaylist(playlistId: number, uuids: string[]) {
     // The backend keeps the live playback queue in sync in the same call —
     // a no-op if these uuids aren't part of the currently loaded queue (see #262).

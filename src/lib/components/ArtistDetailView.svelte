@@ -89,19 +89,8 @@
   async function handleBulkAddSinglesToPlaylist() {
     if (selectedKeys.size === 0) return;
     const songIds = Array.from(selectedKeys, Number);
-    const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
-
-    if (isQueue) {
-      {
-        await playlistsStore.addSongsToQueue(songIds);
-        const label = songIds.length === 1 ? "1 song" : `${songIds.length} songs`;
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: label }, `Added ${label} to Queue`));
-      }
-    } else {
-      await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
-    }
+    const label = songIds.length === 1 ? "1 song" : `${songIds.length} songs`;
+    await playlistsStore.addSongsToActiveTarget(songIds, label);
   }
 
   function openTagEditor(songId: number) {
@@ -144,21 +133,8 @@
   }
 
   async function handleAddSingleToPlaylist(songId: number) {
-    const targetPlaylist = playlistsStore.activeCustomPlaylist;
-    const isQueue = !targetPlaylist || targetPlaylist.is_queue;
-    const songIds = [songId];
-
-    if (isQueue) {
-      {
-        await playlistsStore.addSongsToQueue(songIds);
-        const songObj = songs.find((s) => s.id === songId);
-        const name = songObj?.title || "Song";
-        toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
-      }
-    } else {
-      await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
-      toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
-    }
+    const songObj = songs.find((s) => s.id === songId);
+    await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
   }
 
   let albums = $derived(getArtistAlbums(collectionStore.albums, artistName));
@@ -599,20 +575,10 @@
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
       if (songs.length > 0) {
-        const targetPlaylist = playlistsStore.activeCustomPlaylist;
-        const isQueue = !targetPlaylist || targetPlaylist.is_queue;
-        const songIds = songs.map(s => s.id);
-
-        if (isQueue) {
-          {
-            await playlistsStore.addSongsToQueue(songIds);
-            const name = album.album || i18n.t("collection.unknownAlbum");
-            toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
-          }
-        } else {
-          await playlistsStore.addSongsToPlaylist(targetPlaylist.id, songIds);
-          toastStore.show(i18n.t("playlists.addedToPlaylistSuccess", { name: targetPlaylist.name }, `Added to ${targetPlaylist.name}`));
-        }
+        await playlistsStore.addSongsToActiveTarget(
+          songs.map(s => s.id),
+          album.album || i18n.t("collection.unknownAlbum")
+        );
       }
     }}
     onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}
