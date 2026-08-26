@@ -592,53 +592,14 @@ impl Player {
     /// Play the item at the given index (in virtual/shuffle order).
     /// If the item is unavailable, auto-advances to the next playable track.
     async fn play_at_index(&mut self, index: usize) -> Result<()> {
-        let total = if self.shuffle_mode != ShuffleMode::Off {
-            self.shuffle_order.len()
-        } else {
-            self.playlist_items.len()
+        let Some(candidate) = self.find_playable_from(index) else {
+            log::warn!("Entire playlist contains only unavailable tracks — stopping.");
+            return self.stop().await;
         };
 
-        // Walk forward from `index` to find a playable item, guarding against
-        // an all-unavailable playlist (cycle limit = total items).
-        let mut candidate = index;
-        let mut attempts = 0;
-        loop {
-            if attempts >= total {
-                log::warn!("Entire playlist contains only unavailable tracks — stopping.");
-                return self.stop().await;
-            }
-
-            let item_index = if self.shuffle_mode != ShuffleMode::Off {
-                match self.shuffle_order.get(candidate) {
-                    Some(&i) => i,
-                    None => return self.stop().await,
-                }
-            } else {
-                candidate
-            };
-
-            let item = match self.playlist_items.get(item_index) {
-                Some(i) => i,
-                None => return self.stop().await,
-            };
-
-            if Self::is_item_playable(item) {
-                break;
-            }
-
-            log::debug!("Skipping unavailable playlist item at index {candidate}");
-            candidate = (candidate + 1) % total;
-            attempts += 1;
-        }
-
-        let item_index = if self.shuffle_mode != ShuffleMode::Off {
-            *self
-                .shuffle_order
-                .get(candidate)
-                .ok_or(anyhow!("index out of bounds"))?
-        } else {
-            candidate
-        };
+        let item_index = self
+            .resolve_item_index(candidate)
+            .ok_or(anyhow!("index out of bounds"))?;
 
         let item = self
             .playlist_items
@@ -1117,17 +1078,7 @@ impl Player {
                 if Some(prev_index) == self.current_index {
                     continue;
                 }
-                let item_index = self
-                    .shuffle_order
-                    .get(prev_index)
-                    .copied()
-                    .unwrap_or(prev_index);
-                if self
-                    .playlist_items
-                    .get(item_index)
-                    .map(Self::is_item_playable)
-                    .unwrap_or(false)
-                {
+                if self.is_playable_at(prev_index) {
                     return self.play_at_index(prev_index).await;
                 }
             }
@@ -1145,20 +1096,7 @@ impl Player {
                 len.saturating_sub(1)
             };
             for _ in 0..len {
-                let item_index = if self.shuffle_mode != ShuffleMode::Off {
-                    self.shuffle_order
-                        .get(candidate)
-                        .copied()
-                        .unwrap_or(candidate)
-                } else {
-                    candidate
-                };
-                if self
-                    .playlist_items
-                    .get(item_index)
-                    .map(Self::is_item_playable)
-                    .unwrap_or(false)
-                {
+                if self.is_playable_at(candidate) {
                     return self.play_at_index(candidate).await;
                 }
                 if candidate == 0 {
@@ -1170,35 +1108,64 @@ impl Player {
         Ok(())
     }
 
-    /// Read-only walk from a virtual index to the first playable item,
-    /// mirroring `play_at_index`'s skip-unavailable behavior.
-    fn peek_playable_index(&self, index: usize) -> Option<usize> {
-        let total = if self.shuffle_mode != ShuffleMode::Off {
+    /// Number of virtual indices in whichever order is currently active:
+    /// `shuffle_order` while shuffling, `playlist_items` otherwise.
+    /// `rebuild_shuffle_order` keeps `shuffle_order` sized to match
+    /// `playlist_items` even when shuffle is off (as the identity mapping),
+    /// so every index-walking helper below can treat "virtual index" as the
+    /// single space to reason about instead of re-deriving it per call site.
+    fn virtual_len(&self) -> usize {
+        if self.shuffle_mode != ShuffleMode::Off {
             self.shuffle_order.len()
         } else {
             self.playlist_items.len()
-        };
+        }
+    }
+
+    /// Resolves a virtual index (position in the active play order) to its
+    /// underlying `playlist_items` index — identity when shuffle is off,
+    /// indirected through `shuffle_order` when shuffle is on. `None` only if
+    /// `virtual_index` is out of range for whichever indexing is active.
+    fn resolve_item_index(&self, virtual_index: usize) -> Option<usize> {
+        if self.shuffle_mode != ShuffleMode::Off {
+            self.shuffle_order.get(virtual_index).copied()
+        } else {
+            (virtual_index < self.playlist_items.len()).then_some(virtual_index)
+        }
+    }
+
+    /// True if the playlist item at virtual index `candidate` exists and is
+    /// currently playable (see `is_item_playable`).
+    fn is_playable_at(&self, candidate: usize) -> bool {
+        self.resolve_item_index(candidate)
+            .and_then(|i| self.playlist_items.get(i))
+            .map(Self::is_item_playable)
+            .unwrap_or(false)
+    }
+
+    /// Read-only walk forward from a virtual index (wrapping through the
+    /// active play order) to the first playable item, mirroring
+    /// `play_at_index`'s skip-unavailable behavior. `None` only if every
+    /// item was checked without finding one (an all-unavailable playlist).
+    fn find_playable_from(&self, start: usize) -> Option<usize> {
+        let total = self.virtual_len();
         if total == 0 {
             return None;
         }
-        let mut candidate = index;
+        let mut candidate = start % total;
         for _ in 0..total {
-            let item_index = if self.shuffle_mode != ShuffleMode::Off {
-                *self.shuffle_order.get(candidate)?
-            } else {
-                candidate
-            };
-            if self
-                .playlist_items
-                .get(item_index)
-                .map(Self::is_item_playable)
-                .unwrap_or(false)
-            {
+            if self.is_playable_at(candidate) {
                 return Some(candidate);
             }
             candidate = (candidate + 1) % total;
         }
         None
+    }
+
+    /// Read-only walk from a virtual index to the first playable item,
+    /// mirroring `play_at_index`'s skip-unavailable behavior.
+    fn peek_playable_index(&self, index: usize) -> Option<usize> {
+        self.find_playable_from(index)
     }
 
     /// Determine what will play after the current track ends naturally,
@@ -1244,11 +1211,7 @@ impl Player {
     }
 
     fn target_at_virtual_index(&self, candidate: usize) -> Option<GaplessTarget> {
-        let item_index = if self.shuffle_mode != ShuffleMode::Off {
-            *self.shuffle_order.get(candidate)?
-        } else {
-            candidate
-        };
+        let item_index = self.resolve_item_index(candidate)?;
         let item = self.playlist_items.get(item_index)?;
         let song = item.song.clone()?;
         Some(GaplessTarget {
@@ -1385,36 +1348,20 @@ impl Player {
 
     /// Compute the next playback index based on mode.
     fn get_next_index(&self) -> Option<usize> {
-        let len = self.playlist_items.len();
-        if len == 0 {
+        let total = self.virtual_len();
+        if total == 0 {
             return None;
         }
 
         let current = self.current_index?;
 
-        match self.shuffle_mode {
-            ShuffleMode::Off => {
-                let next = current + 1;
-                if next < len {
-                    Some(next)
-                } else {
-                    match self.repeat_mode {
-                        RepeatMode::Playlist => Some(0),
-                        _ => None,
-                    }
-                }
-            }
-            _ => {
-                // In shuffle mode, current_index tracks position in shuffle_order
-                let next = current + 1;
-                if next < self.shuffle_order.len() {
-                    Some(next)
-                } else {
-                    match self.repeat_mode {
-                        RepeatMode::Playlist => Some(0),
-                        _ => None,
-                    }
-                }
+        let next = current + 1;
+        if next < total {
+            Some(next)
+        } else {
+            match self.repeat_mode {
+                RepeatMode::Playlist => Some(0),
+                _ => None,
             }
         }
     }
@@ -2214,6 +2161,78 @@ mod tests {
             player.current_song.as_ref().unwrap().id,
             4,
             "play_playlist should play requested start_index track even when shuffle mode is active"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for the get_next_index/find_playable_from/
+    /// resolve_item_index consolidation (#577 item 13): non-shuffle forward
+    /// advance must still stop after the last track with repeat off, and
+    /// still wrap back to the first track with RepeatMode::Playlist.
+    #[tokio::test]
+    async fn test_next_track_stops_at_end_then_wraps_with_repeat_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_repeat_mode(RepeatMode::Off);
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        player.next_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 2);
+
+        player.next_track().await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+
+        player.next_track().await.unwrap();
+        assert!(
+            player.current_song.is_none(),
+            "advancing past the last track with repeat off must stop, not wrap"
+        );
+
+        player.set_repeat_mode(RepeatMode::Playlist);
+        player.play_playlist(items, 2, 0, None).await.unwrap();
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
+
+        player.next_track().await.unwrap();
+        assert_eq!(
+            player.current_song.as_ref().unwrap().id,
+            1,
+            "advancing past the last track with RepeatMode::Playlist must wrap to the first"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
