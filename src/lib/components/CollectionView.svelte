@@ -6,19 +6,15 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Clock, FileText, Music, DiscAlbum, Mic2, Edit3, Columns, LayoutGrid, Rows3 } from "lucide-svelte";
+  import { Play, Plus, Music, DiscAlbum, Mic2, Columns, LayoutGrid, Rows3 } from "lucide-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { prefs, type CollectionViewMode } from "../stores/prefs.svelte";
-  import { VirtualList } from "svelte-virtual-list-ts";
   import { getArtistAlbums, getArtistSongs, getArtistGradient } from "../utils/artist";
-  import { formatDuration } from "../utils/formatters";
-  import { parseMultiValue } from "../utils/multiValue";
   import ArtistDetailView from "./ArtistDetailView.svelte";
   import AlbumDetailView from "./AlbumDetailView.svelte";
   import GenreBrowseView from "./GenreBrowseView.svelte";
-  import GenreChips from "./GenreChips.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
@@ -26,18 +22,13 @@
   import ArtistCard from "./ArtistCard.svelte";
   import AlbumRowCard from "./AlbumRowCard.svelte";
   import ArtistRowCard from "./ArtistRowCard.svelte";
-  import SortableHeader from "./SortableHeader.svelte";
   import Select from "./Select.svelte";
-  import NowPlayingBars from "./NowPlayingBars.svelte";
-  import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import SearchEmptyState from "./SearchEmptyState.svelte";
-  import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels } from "../utils/formatters";
-  import { formatDateAdded } from "../utils/date";
+  import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
-  import { rememberScroll, watchScrollMemory } from "../utils/scrollMemory";
-  import { columnResize } from "../utils/columnResize";
+  import { rememberScroll } from "../utils/scrollMemory";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -46,16 +37,10 @@
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
 
-  let selectedSongIds = $state<Set<number>>(new Set());
-  let lastSelectedSongId = $state<number | null>(null);
+  let selectedKeys = $state<Set<string>>(new Set());
 
-  function handleContextMenu(event: MouseEvent, song: Song) {
-    event.preventDefault();
-    if (!selectedSongIds.has(song.id)) {
-      selectedSongIds = new Set([song.id]);
-      lastSelectedSongId = song.id;
-    }
-    contextMenuState = { x: event.clientX, y: event.clientY, song };
+  function handleRowContextMenu(event: MouseEvent, row: SongTableRow) {
+    if (row.song) contextMenuState = { x: event.clientX, y: event.clientY, song: row.song };
   }
 
   function handleAlbumContextMenu(event: MouseEvent, album: AlbumItem) {
@@ -63,78 +48,18 @@
     albumContextMenuState = { x: event.clientX, y: event.clientY, album };
   }
 
-  function handleSongClick(e: MouseEvent, song: Song) {
-    if (e.shiftKey && lastSelectedSongId !== null) {
-      const idx1 = filteredSongs.findIndex((s) => s.id === lastSelectedSongId);
-      const idx2 = filteredSongs.findIndex((s) => s.id === song.id);
-      if (idx1 !== -1 && idx2 !== -1) {
-        const start = Math.min(idx1, idx2);
-        const end = Math.max(idx1, idx2);
-        const newSet = new Set(e.ctrlKey || e.metaKey ? selectedSongIds : []);
-        for (let i = start; i <= end; i++) {
-          newSet.add(filteredSongs[i].id);
-        }
-        selectedSongIds = newSet;
-      }
-    } else if (e.ctrlKey || e.metaKey) {
-      const newSet = new Set(selectedSongIds);
-      if (newSet.has(song.id)) {
-        newSet.delete(song.id);
-      } else {
-        newSet.add(song.id);
-      }
-      selectedSongIds = newSet;
-      lastSelectedSongId = song.id;
-    } else if (selectedSongIds.size === 1 && selectedSongIds.has(song.id)) {
-      selectedSongIds = new Set();
-      lastSelectedSongId = null;
-    } else {
-      selectedSongIds = new Set([song.id]);
-      lastSelectedSongId = song.id;
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (collectionStore.activeTab !== "collection" || collectionStore.activeSubTab !== "songs") return;
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
-      e.preventDefault();
-      selectedSongIds = new Set(filteredSongs.map((s) => s.id));
-    } else if (e.key === "Escape") {
-      selectedSongIds = new Set();
-    }
-  }
-
-  function handleWindowMouseDown(e: MouseEvent) {
-    if (selectedSongIds.size === 0) return;
-    const target = e.target as HTMLElement;
-    if (!target) return;
-    if (
-      target.closest("[data-song-row]") ||
-      target.closest("[role='menu']") ||
-      target.closest("[data-floating-toolbar]") ||
-      target.closest("button") ||
-      target.closest("input")
-    ) {
-      return;
-    }
-    selectedSongIds = new Set();
-  }
-
   async function handleBulkAddToPlaylist() {
-    if (selectedSongIds.size === 0) return;
+    if (selectedKeys.size === 0) return;
     if (playlistsStore.activeCustomPlaylist) {
-      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedSongIds));
+      await playlistsStore.addSongsToPlaylist(playlistsStore.activeCustomPlaylist.id, Array.from(selectedKeys, Number));
     } else {
       toastStore.show(i18n.t("collection.selectPlaylistFirstAlert"));
     }
   }
 
   function handlePlaySelected() {
-    if (selectedSongIds.size === 0) return;
-    const selectedList = filteredSongs.filter((s) => selectedSongIds.has(s.id));
+    if (selectedKeys.size === 0) return;
+    const selectedList = filteredSongs.filter((s) => selectedKeys.has(String(s.id)));
     if (selectedList.length > 0) {
       playerStore.playSongs(selectedList.map((s) => s.id), 0);
     }
@@ -338,51 +263,6 @@
     lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
   };
 
-  let gridColsStyle = $derived.by(() => {
-    const vc = collectionStore.visibleColumns;
-    const cw = collectionStore.columnWidths;
-    const cols: string[] = ["36px"]; // play indicator always present
-    for (const { key } of SONG_TABLE_COLUMNS) {
-      if (!vc[key]) continue;
-      const saved = cw[key];
-      cols.push(saved !== undefined ? `${saved}px` : (COLLECTION_COL_DEFAULTS[key] ?? "80px"));
-    }
-    return `grid-template-columns: ${cols.join(" ")}`;
-  });
-
-  // The song rows live inside <VirtualList>'s scrolling viewport, which
-  // reserves layout width for its own vertical scrollbar; the sticky header
-  // sits outside that viewport and doesn't. On platforms with a non-overlay
-  // scrollbar (e.g. Windows), that gutter makes the header's grid track a
-  // few pixels wider than the rows' grid track, misaligning every column
-  // after the ones that can absorb it. Measure the actual scrollbar width
-  // and pad the header by the same amount so both grids compute identical
-  // track widths.
-  let songsTableContainer = $state<HTMLDivElement | undefined>(undefined);
-  let scrollbarWidth = $state(0);
-
-  $effect(() => {
-    if (!songsTableContainer) return;
-    const viewport = songsTableContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
-    if (!viewport) return;
-    const update = () => {
-      scrollbarWidth = viewport.offsetWidth - viewport.clientWidth;
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(viewport);
-    return () => observer.disconnect();
-  });
-
-  // VirtualList renders its own <svelte-virtual-list-viewport> scrolling element
-  // inside songsTableContainer, so it can't be reached with a template `use:` ref.
-  $effect(() => {
-    if (!songsTableContainer) return;
-    const viewport = songsTableContainer.querySelector<HTMLElement>("svelte-virtual-list-viewport");
-    if (!viewport) return;
-    return watchScrollMemory(viewport, "collection:songs");
-  });
-
   function toggleSort(field: keyof Song) {
     if (sortField === field) {
       sortAsc = !sortAsc;
@@ -432,9 +312,35 @@
   async function rateSong(song: Song, rating: number) {
     song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
   }
+
+  function songToRow(song: Song): SongTableRow {
+    const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path);
+    return {
+      key: String(song.id),
+      song,
+      disabled: song.unavailable || disconnected,
+      disabledTooltip: disconnected ? i18n.t("collection.driveDisconnectedTooltip") : undefined,
+    };
+  }
+
+  let tableRows = $derived(filteredSongs.map(songToRow));
 </script>
 
-<svelte:window onkeydown={handleKeydown} onmousedown={handleWindowMouseDown} />
+{#snippet songsEmptyState()}
+  {#if filteredSongs.length === 0 && collectionStore.searchQuery}
+    <SearchEmptyState
+      icon={Music}
+      title={i18n.t('collection.noSongsTitle')}
+      matchQueryText={i18n.t('collection.noTracksMatchQuery')}
+      query={collectionStore.searchQuery}
+      onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
+    />
+  {:else}
+    <!-- Library has no songs at all yet (no watched folders) — a distinct
+         welcome moment, not a "your search/filters found nothing" state. -->
+    <LibraryWelcome />
+  {/if}
+{/snippet}
 
 {#if collectionStore.selectedAlbumName !== null}
   <AlbumDetailView albumName={collectionStore.selectedAlbumName} />
@@ -472,538 +378,25 @@
     </div>
 
     <div class="flex-1 px-6 pt-2 overflow-hidden flex flex-col {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-      <div bind:this={songsTableContainer} class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
-        <div class="sticky top-0 z-20 flex flex-col bg-brand-sidebar border-b border-brand-border text-xs text-brand-text-secondary uppercase tracking-wider font-semibold select-none">
-          <div class="grid items-center py-3 px-4" style="{gridColsStyle}; padding-right: calc(1rem + {scrollbarWidth}px)">
-            <div class="text-center w-9"></div>
-            {#if collectionStore.visibleColumns.track}
-              <div use:columnResize={{ column: "track", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "track"}
-                {sortAsc}
-                onclick={() => toggleSort("track")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTrack')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.title}
-              <div use:columnResize={{ column: "title", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "title"}
-                {sortAsc}
-                onclick={() => toggleSort("title")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderTitle')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.artist}
-              <div use:columnResize={{ column: "artist", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "artist"}
-                {sortAsc}
-                onclick={() => toggleSort("artist")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderArtist')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.album}
-              <div use:columnResize={{ column: "album", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "album"}
-                {sortAsc}
-                onclick={() => toggleSort("album")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-1rem)]">{i18n.t('collection.tableHeaderAlbum')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.composer}
-              <div use:columnResize={{ column: "composer", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "composer"}
-                {sortAsc}
-                onclick={() => toggleSort("composer")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderComposer')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.album_artist}
-              <div use:columnResize={{ column: "album_artist", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "album_artist"}
-                {sortAsc}
-                onclick={() => toggleSort("album_artist")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderAlbumArtist')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.format}
-              <div use:columnResize={{ column: "format", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "filetype"}
-                {sortAsc}
-                onclick={() => toggleSort("filetype")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFormat')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.year}
-              <div use:columnResize={{ column: "year", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "year"}
-                {sortAsc}
-                onclick={() => toggleSort("year")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderYear')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.genre}
-              <div use:columnResize={{ column: "genre", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "genre"}
-                {sortAsc}
-                onclick={() => toggleSort("genre")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGenre')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.grouping}
-              <div use:columnResize={{ column: "grouping", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "grouping"}
-                {sortAsc}
-                onclick={() => toggleSort("grouping")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderGrouping')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.bpm}
-              <div use:columnResize={{ column: "bpm", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "bpm"}
-                {sortAsc}
-                onclick={() => toggleSort("bpm")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBpm')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.initial_key}
-              <div use:columnResize={{ column: "initial_key", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "initial_key"}
-                {sortAsc}
-                onclick={() => toggleSort("initial_key")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderInitialKey')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.bitrate}
-              <div use:columnResize={{ column: "bitrate", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "bitrate"}
-                {sortAsc}
-                onclick={() => toggleSort("bitrate")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitrate')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.samplerate}
-              <div use:columnResize={{ column: "samplerate", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "samplerate"}
-                {sortAsc}
-                onclick={() => toggleSort("samplerate")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderSampleRate')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.bitdepth}
-              <div use:columnResize={{ column: "bitdepth", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "bitdepth"}
-                {sortAsc}
-                onclick={() => toggleSort("bitdepth")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderBitDepth')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.channels}
-              <div use:columnResize={{ column: "channels", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "channels"}
-                {sortAsc}
-                onclick={() => toggleSort("channels")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderChannels')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.filesize}
-              <div use:columnResize={{ column: "filesize", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "filesize"}
-                {sortAsc}
-                onclick={() => toggleSort("filesize")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderFileSize')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.rating}
-              <div use:columnResize={{ column: "rating", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "rating"}
-                {sortAsc}
-                onclick={() => toggleSort("rating")}
-                class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderRating')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.playcount}
-              <div use:columnResize={{ column: "playcount", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "playcount"}
-                {sortAsc}
-                onclick={() => toggleSort("playcount")}
-                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderPlays')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.skipcount}
-              <div use:columnResize={{ column: "skipcount", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "skipcount"}
-                {sortAsc}
-                onclick={() => toggleSort("skipcount")}
-                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderSkips')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.lastplayed}
-              <div use:columnResize={{ column: "lastplayed", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "lastplayed"}
-                {sortAsc}
-                onclick={() => toggleSort("lastplayed")}
-                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderLastPlayed')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.added}
-              <div use:columnResize={{ column: "added", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "added"}
-                {sortAsc}
-                onclick={() => toggleSort("added")}
-                class="text-center hover:text-brand-text-primary transition-colors flex items-center justify-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate">{i18n.t('collection.tableHeaderAdded')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.duration}
-              <div use:columnResize={{ column: "duration", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "length_nanosec"}
-                {sortAsc}
-                onclick={() => toggleSort("length_nanosec")}
-                class="flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<Clock class="w-4 h-4 shrink-0" /> {arrow}{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.path}
-              <div use:columnResize={{ column: "path", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden">
-              <SortableHeader
-                active={sortField === "path"}
-                {sortAsc}
-                onclick={() => toggleSort("path")}
-                class="text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full"
-              >
-                {#snippet label(arrow)}<span class="truncate max-w-[calc(100%-0.5rem)]">{i18n.t('collection.tableHeaderPath')} {arrow}</span>{/snippet}
-              </SortableHeader>
-              </div>
-            {/if}
-            {#if collectionStore.visibleColumns.actions}
-              <div use:columnResize={{ column: "actions", onResize: collectionStore.setColumnWidth.bind(collectionStore), onReset: collectionStore.resetColumnWidth.bind(collectionStore) }} class="relative overflow-hidden text-center">{i18n.t('collection.tableHeaderActions')}</div>
-            {/if}
-          </div>
-        </div>
-
-        <div class="flex-1 min-h-0 relative">
-          {#if filteredSongs.length === 0 && collectionStore.searchQuery}
-            <div class="py-16 text-center">
-              <SearchEmptyState
-                icon={Music}
-                title={i18n.t('collection.noSongsTitle')}
-                matchQueryText={i18n.t('collection.noTracksMatchQuery')}
-                query={collectionStore.searchQuery}
-                onReset={() => { collectionStore.searchQuery = ""; collectionStore.search(""); }}
-              />
-            </div>
-          {:else if filteredSongs.length === 0}
-            <!-- Library has no songs at all yet (no watched folders) — a distinct
-                 welcome moment, not a "your search/filters found nothing" state. -->
-            <div class="py-16 text-center">
-              <LibraryWelcome />
-            </div>
-          {:else}
-            {#key gridColsStyle}
-            <VirtualList items={filteredSongs} itemHeight={41}>
-              {#snippet children({ item: song }: { item: Song })}
-              {@const disconnected = !song.unavailable && collectionStore.isPathOnDisconnectedDrive(song.path)}
-              {@const disabled = song.unavailable || disconnected}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div
-                data-song-row="true"
-                onclick={(e) => !disabled && handleSongClick(e, song)}
-                ondblclick={() => !disabled && handlePlaySong(song)}
-                oncontextmenu={(e) => !disabled && handleContextMenu(e, song)}
-                style={gridColsStyle}
-                title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : undefined}
-                class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
-                  {disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                  {selectedSongIds.has(song.id) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (playerStore.currentSong && playerStore.currentSong.id === song.id ? 'bg-brand-accent/10 text-brand-accent-text-hover' : '')}"
-              >
-                <div class="text-center flex justify-center relative w-9 h-6 items-center">
-                  {#if playerStore.currentSong && playerStore.currentSong.id === song.id && playerStore.state === 'playing'}
-                    <div class="flex items-center justify-center gap-0.5 h-4 w-4 absolute group-hover:opacity-0 transition-opacity">
-                      <NowPlayingBars />
-                    </div>
-                  {/if}
-                  <button
-                    onclick={() => !disabled && handlePlaySong(song)}
-                    class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
-                    disabled={disabled}
-                    title={disconnected ? i18n.t('collection.driveDisconnectedTooltip') : i18n.t('collection.playSong')}
-                  >
-                    <Play class="w-4 h-4 fill-current" />
-                  </button>
-                </div>
-                {#if collectionStore.visibleColumns.track}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {song.track !== undefined && song.track !== null ? song.track : "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.title}
-                  <div class="font-medium truncate pr-4 flex items-center gap-2 min-w-0">
-                    <CoverArt
-                      songId={song.id}
-                      artEmbedded={song.art_embedded}
-                      artAutomatic={song.art_automatic}
-                      artManual={song.art_manual}
-                      sizeClass="w-7 h-7 rounded shrink-0"
-                    />
-                    <span
-                      class="truncate min-w-0 font-medium {playerStore.currentSong && playerStore.currentSong.id === song.id ? 'text-brand-accent-text-hover' : 'text-brand-text-primary'}"
-                      title={song.title || i18n.t('collection.unknownSong')}
-                    >
-                      {song.title || i18n.t('collection.unknownSong')}
-                    </span>
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.artist}
-                  <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
-                    {#if song.artist}
-                      {#each parseMultiValue(song.artist) as name, i (name)}
-                        {#if i > 0}<span class="text-brand-text-secondary/50 shrink-0">,&nbsp;</span>{/if}
-                        <LinkButton
-                          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
-                          class="text-brand-text-secondary truncate min-w-0"
-                          title={i18n.t('collection.filterByArtist', { artist: name })}
-                        >
-                          {name}
-                        </LinkButton>
-                      {/each}
-                    {:else}
-                      <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownArtist')}</span>
-                    {/if}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.album}
-                  <div class="text-brand-text-secondary truncate pr-4 flex items-center min-w-0">
-                    {#if song.album}
-                      <LinkButton
-                        onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
-                        class="text-brand-text-secondary truncate min-w-0"
-                        title={i18n.t('collection.filterByAlbum', { album: song.album })}
-                      >
-                        {song.album}
-                      </LinkButton>
-                    {:else}
-                      <span class="text-brand-text-secondary truncate min-w-0">{i18n.t('collection.unknownAlbum')}</span>
-                    {/if}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.composer}
-                  <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.composer}>
-                    {song.composer || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.album_artist}
-                  <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.album_artist}>
-                    {song.album_artist || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.format}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-semibold uppercase">
-                    {song.filetype ? song.filetype.toUpperCase() : "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.year}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {song.year || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.genre}
-                  <div class="truncate pr-2 min-w-0" title={song.genre}>
-                    {#if song.genre}
-                      <GenreChips genre={song.genre} />
-                    {:else}
-                      <span class="text-brand-text-secondary text-xs font-medium">—</span>
-                    {/if}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.grouping}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium" title={song.grouping}>
-                    {song.grouping || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.bpm}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {song.bpm || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.initial_key}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {song.initial_key || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.bitrate}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {song.bitrate ? `${song.bitrate}k` : "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.samplerate}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {formatSampleRate(song.samplerate)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.bitdepth}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {formatBitDepth(song.bitdepth)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.channels}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {formatChannels(song.channels)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.filesize}
-                  <div class="text-brand-text-secondary truncate pr-2 min-w-0 text-xs font-medium">
-                    {formatFileSize(song.filesize)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.rating}
-                  <div class="flex justify-center">
-                    <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.playcount}
-                  <div class="text-center text-brand-text-secondary font-medium text-xs">
-                    {song.playcount ?? 0}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.skipcount}
-                  <div class="text-center text-brand-text-secondary font-medium text-xs">
-                    {song.skipcount ?? 0}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.lastplayed}
-                  <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
-                    {formatDate(song.lastplayed)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.added}
-                  <div class="text-center text-brand-text-secondary text-xs whitespace-nowrap">
-                    {formatDateAdded(song.added)}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.duration}
-                  <div class="text-center text-brand-text-secondary font-medium text-xs">{formatDuration(song.length_nanosec)}</div>
-                {/if}
-                {#if collectionStore.visibleColumns.path}
-                  <div class="text-brand-text-secondary truncate pr-4 min-w-0 text-xs font-medium" title={song.path}>
-                    {song.path || "—"}
-                  </div>
-                {/if}
-                {#if collectionStore.visibleColumns.actions}
-                  <div class="flex items-center justify-center gap-2.5">
-                    <button
-                      onclick={() => handleAddSongToPlaylist(song.id)}
-                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-                      title={playlistsStore.activeCustomPlaylist
-                        ? i18n.t('collection.addPlaylistTooltip', { name: playlistsStore.activeCustomPlaylist.name })
-                        : i18n.t('collection.addPlaylistTooltipDefault')}
-                    >
-                      <Plus class="w-4 h-4" />
-                    </button>
-                    <button
-                      onclick={() => openTagEditor(song.id)}
-                      class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-                      title={i18n.t('collection.editTagsTooltip')}
-                    >
-                      <Edit3 class="w-4 h-4" />
-                    </button>
-                  </div>
-                {/if}
-              </div>
-              {/snippet}
-            </VirtualList>
-            {/key}
-          {/if}
-        </div>
+      <div class="flex-1 overflow-hidden border border-brand-border rounded-lg bg-brand-sidebar/40 flex flex-col min-h-0">
+        <SongTable
+          rows={tableRows}
+          mode="track"
+          leadingColumnWidth="36px"
+          colDefaults={COLLECTION_COL_DEFAULTS}
+          {sortField}
+          {sortAsc}
+          onToggleSort={(f) => toggleSort(f as keyof Song)}
+          bind:selectedKeys
+          onRowDoubleClick={(row) => row.song && handlePlaySong(row.song)}
+          onRowContextMenu={handleRowContextMenu}
+          onRate={rateSong}
+          onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
+          onEditTags={(song) => openTagEditor(song.id)}
+          virtualized
+          scrollMemoryKey="collection:songs"
+          emptyState={songsEmptyState}
+        />
       </div>
     </div>
 
@@ -1200,17 +593,17 @@
     x={contextMenuState.x}
     y={contextMenuState.y}
     {song}
-    selectedCount={selectedSongIds.size}
-    selectedSongIds={Array.from(selectedSongIds)}
+    selectedCount={selectedKeys.size}
+    selectedSongIds={Array.from(selectedKeys, Number)}
     onPlay={() => {
-      if (selectedSongIds.size > 1) {
+      if (selectedKeys.size > 1) {
         handlePlaySelected();
       } else {
         handlePlaySong(song);
       }
     }}
     onAddToPlaylist={() => {
-      if (selectedSongIds.size > 1) {
+      if (selectedKeys.size > 1) {
         handleBulkAddToPlaylist();
       } else {
         handleAddSongToPlaylist(song.id);
@@ -1255,10 +648,10 @@
   />
 {/if}
 
-{#if selectedSongIds.size > 0 && collectionStore.activeSubTab === 'songs'}
+{#if selectedKeys.size > 0 && collectionStore.activeSubTab === 'songs'}
   <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
     <span class="text-brand-accent-text font-bold">
-      {i18n.t('playlists.selectedCount', { count: selectedSongIds.size })}
+      {i18n.t('playlists.selectedCount', { count: selectedKeys.size })}
     </span>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button
@@ -1281,7 +674,7 @@
     </button>
     <div class="h-4 w-px bg-brand-border/60"></div>
     <button
-      onclick={() => { selectedSongIds = new Set(); }}
+      onclick={() => { selectedKeys = new Set(); }}
       class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
     >
       {i18n.t('playlists.clearSelection')}
