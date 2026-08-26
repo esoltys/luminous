@@ -3457,25 +3457,13 @@ mod tests {
 
         crate::tageditor::write_tags(
             &path,
-            "Title",
-            None,
-            "Artist",
-            None,
-            "Album",
-            None,
-            "",
-            None,
-            "",
-            None,
-            "Rock; Jazz Fusion; Live",
-            None,
-            None,
-            None,
-            None,
-            "",
-            None,
-            "",
-            false,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock; Jazz Fusion; Live",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -3491,25 +3479,14 @@ mod tests {
 
         crate::tageditor::write_tags(
             &path,
-            "Title",
-            None,
-            "Artist A; Artist B",
-            None,
-            "Album",
-            None,
-            "Album Artist A; Album Artist B",
-            None,
-            "Composer A; Composer B",
-            None,
-            "",
-            None,
-            None,
-            None,
-            None,
-            "",
-            None,
-            "",
-            false,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist A; Artist B",
+                album: "Album",
+                album_artist: "Album Artist A; Album Artist B",
+                composer: "Composer A; Composer B",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -3538,25 +3515,13 @@ mod tests {
 
         crate::tageditor::write_tags(
             &path,
-            "Title",
-            None,
-            "Artist",
-            None,
-            "Album",
-            None,
-            "",
-            None,
-            "",
-            None,
-            "",
-            None,
-            None,
-            None,
-            Some(1995),
-            "",
-            None,
-            "",
-            false,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                year: Some(1995),
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -3580,30 +3545,23 @@ mod tests {
 
         crate::tageditor::write_tags(
             &path,
-            "Title",
-            None,
-            "Artist",
-            None,
-            "Album",
-            None,
-            "",
-            None,
-            "",
-            None,
-            "",
-            None,
-            None,
-            None,
-            Some(1995),
-            "",
-            None,
-            "",
-            false,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                year: Some(1995),
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
         crate::tageditor::write_tags(
-            &path, "Title", None, "Artist", None, "Album", None, "", None, "", None, "", None,
-            None, None, None, "", None, "", false,
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                ..Default::default()
+            },
         )
         .expect("second write_tags (clearing year) should succeed");
 
