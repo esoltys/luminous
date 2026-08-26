@@ -1366,6 +1366,78 @@ impl Player {
         }
     }
 
+    /// Shared by `ShuffleMode::Albums`/`Artists`/`InsideAlbum`, which are
+    /// structurally identical modulo the key a track groups under and which
+    /// half of "group order" vs. "order within a group" gets shuffled:
+    /// - `Albums`/`Artists`: keep each group's original track order, but
+    ///   shuffle which group comes next (`shuffle_groups`).
+    /// - `InsideAlbum`: keep every group in its original playlist position,
+    ///   but shuffle the track order within each group
+    ///   (`shuffle_within_groups`).
+    /// Returns the current item's own group's remaining tracks first,
+    /// followed by every other group — matching every mode's "don't jump
+    /// away from what's already playing" behavior. Does NOT include the
+    /// current item's own index; callers seed their own order with it, since
+    /// `current_real_idx` is excluded from grouping here. Note: unlike the
+    /// original per-mode code, this always tracks the current group's key in
+    /// `other_keys` too — harmless, since `groups.remove` on an
+    /// already-removed key is a no-op when that key is walked a second time
+    /// below.
+    fn shuffle_grouped(
+        &self,
+        len: usize,
+        current_real_idx: Option<usize>,
+        rng: &mut impl rand::Rng,
+        key_fn: impl Fn(&PlaylistItem) -> String,
+        shuffle_groups: bool,
+        shuffle_within_groups: bool,
+    ) -> Vec<usize> {
+        let current_key = current_real_idx.map(|idx| key_fn(&self.playlist_items[idx]));
+        let mut groups: std::collections::HashMap<String, Vec<usize>> =
+            std::collections::HashMap::new();
+        let mut other_keys = Vec::new();
+
+        for i in 0..len {
+            if current_real_idx == Some(i) {
+                continue;
+            }
+            let key = key_fn(&self.playlist_items[i]);
+            groups
+                .entry(key.clone())
+                .or_insert_with(|| {
+                    other_keys.push(key.clone());
+                    Vec::new()
+                })
+                .push(i);
+        }
+
+        if shuffle_within_groups {
+            for group_tracks in groups.values_mut() {
+                group_tracks.shuffle(rng);
+            }
+        }
+        if shuffle_groups {
+            other_keys.shuffle(rng);
+        }
+
+        // Note: the current item itself (excluded from `groups` above) is
+        // NOT included here — callers already seed their own order with it.
+        let mut order = Vec::with_capacity(len);
+
+        if let Some(ref key) = current_key {
+            if let Some(mut current_group) = groups.remove(key) {
+                order.append(&mut current_group);
+            }
+        }
+        for key in &other_keys {
+            if let Some(mut group) = groups.remove(key) {
+                order.append(&mut group);
+            }
+        }
+
+        order
+    }
+
     fn rebuild_shuffle_order(&mut self) {
         let len = self.playlist_items.len();
         if len == 0 {
@@ -1435,121 +1507,34 @@ impl Player {
                 order.extend(remaining_indices);
             }
             ShuffleMode::InsideAlbum => {
-                let current_album_key =
-                    current_real_idx.map(|idx| get_album_key(&self.playlist_items[idx]));
-                let mut groups: std::collections::HashMap<String, Vec<usize>> =
-                    std::collections::HashMap::new();
-                let mut unique_keys = Vec::new();
-
-                for i in 0..len {
-                    if current_real_idx == Some(i) {
-                        continue;
-                    }
-                    let key = get_album_key(&self.playlist_items[i]);
-                    groups
-                        .entry(key.clone())
-                        .or_insert_with(|| {
-                            unique_keys.push(key.clone());
-                            Vec::new()
-                        })
-                        .push(i);
-                }
-
-                for group_tracks in groups.values_mut() {
-                    group_tracks.shuffle(&mut rng);
-                }
-
-                // Add current album's remaining tracks first if playing
-                if let Some(ref album_key) = current_album_key {
-                    if let Some(mut current_group) = groups.remove(album_key) {
-                        order.append(&mut current_group);
-                    }
-                }
-
-                // Add other albums in their normal order
-                for key in &unique_keys {
-                    if let Some(mut group) = groups.remove(key) {
-                        order.append(&mut group);
-                    }
-                }
+                order.extend(self.shuffle_grouped(
+                    len,
+                    current_real_idx,
+                    &mut rng,
+                    get_album_key,
+                    false, // keep album order as-is
+                    true,  // shuffle each album's own track order
+                ));
             }
             ShuffleMode::Albums => {
-                let current_album_key =
-                    current_real_idx.map(|idx| get_album_key(&self.playlist_items[idx]));
-                let mut groups: std::collections::HashMap<String, Vec<usize>> =
-                    std::collections::HashMap::new();
-                let mut other_keys = Vec::new();
-
-                for i in 0..len {
-                    if current_real_idx == Some(i) {
-                        continue;
-                    }
-                    let key = get_album_key(&self.playlist_items[i]);
-                    groups
-                        .entry(key.clone())
-                        .or_insert_with(|| {
-                            if current_album_key.as_ref() != Some(&key) {
-                                other_keys.push(key.clone());
-                            }
-                            Vec::new()
-                        })
-                        .push(i);
-                }
-
-                other_keys.shuffle(&mut rng);
-
-                // Add current album's remaining tracks first (keeps their original order)
-                if let Some(ref album_key) = current_album_key {
-                    if let Some(mut current_group) = groups.remove(album_key) {
-                        order.append(&mut current_group);
-                    }
-                }
-
-                // Add other albums in shuffled order (keeps their original order within each album)
-                for key in &other_keys {
-                    if let Some(mut group) = groups.remove(key) {
-                        order.append(&mut group);
-                    }
-                }
+                order.extend(self.shuffle_grouped(
+                    len,
+                    current_real_idx,
+                    &mut rng,
+                    get_album_key,
+                    true,  // shuffle which album comes next
+                    false, // keep each album's own track order
+                ));
             }
             ShuffleMode::Artists => {
-                let current_artist_key =
-                    current_real_idx.map(|idx| get_artist_key(&self.playlist_items[idx]));
-                let mut groups: std::collections::HashMap<String, Vec<usize>> =
-                    std::collections::HashMap::new();
-                let mut other_keys = Vec::new();
-
-                for i in 0..len {
-                    if current_real_idx == Some(i) {
-                        continue;
-                    }
-                    let key = get_artist_key(&self.playlist_items[i]);
-                    groups
-                        .entry(key.clone())
-                        .or_insert_with(|| {
-                            if current_artist_key.as_ref() != Some(&key) {
-                                other_keys.push(key.clone());
-                            }
-                            Vec::new()
-                        })
-                        .push(i);
-                }
-
-                other_keys.shuffle(&mut rng);
-
-                // Add current artist's remaining tracks first (keeps their original order)
-                if let Some(ref artist_key) = current_artist_key {
-                    if let Some(mut current_group) = groups.remove(artist_key) {
-                        order.append(&mut current_group);
-                    }
-                }
-
-                // Add other artists in shuffled order
-                for key in &other_keys {
-                    if let Some(mut group) = groups.remove(key) {
-                        order.append(&mut group);
-                    }
-                }
+                order.extend(self.shuffle_grouped(
+                    len,
+                    current_real_idx,
+                    &mut rng,
+                    get_artist_key,
+                    true,  // shuffle which artist comes next
+                    false, // keep each artist's own track order
+                ));
             }
         }
 
@@ -2233,6 +2218,102 @@ mod tests {
             player.current_song.as_ref().unwrap().id,
             1,
             "advancing past the last track with RepeatMode::Playlist must wrap to the first"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression coverage for the shuffle_grouped extraction (#577 item
+    /// 14): `Albums` must keep each album's own track order intact and only
+    /// reorder which album comes next, while `InsideAlbum` must do the
+    /// opposite (keep album order, reorder tracks within each album).
+    /// Songs 1/3/5 are "Album A" and 2/4/6 are "Album B", interleaved in
+    /// playlist order — with only two groups, an "other" group-order
+    /// shuffle is a no-op (nothing to permute among one element), which
+    /// makes `Albums`'s exact resulting order deterministic and assertable.
+    #[tokio::test]
+    async fn test_shuffle_grouped_albums_keeps_track_order_inside_each_group() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=6i64 {
+                let album = if id % 2 == 1 { "Album A" } else { "Album B" };
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', '{album}', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=6i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // current_index = 0 -> song 1 (Album A) is "now playing".
+        player.set_shuffle_mode(ShuffleMode::Albums);
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+
+        let order_ids: Vec<i64> = player
+            .shuffle_order
+            .iter()
+            .map(|&idx| player.playlist_items[idx].song.as_ref().unwrap().id)
+            .collect();
+        assert_eq!(
+            order_ids,
+            vec![1, 3, 5, 2, 4, 6],
+            "Albums mode must keep each album's own track order (1,3,5 then 2,4,6), only \
+             reordering which album comes next — with just 2 albums here that reorder is a \
+             no-op, so the exact order is deterministic"
+        );
+
+        // InsideAlbum: album group order must stay as encountered in the
+        // playlist (A's group before B's group), but track order *within*
+        // each album is free to shuffle — assert group membership/position,
+        // not exact per-track order.
+        player.set_shuffle_mode(ShuffleMode::InsideAlbum);
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+
+        let order_ids: Vec<i64> = player
+            .shuffle_order
+            .iter()
+            .map(|&idx| player.playlist_items[idx].song.as_ref().unwrap().id)
+            .collect();
+        assert_eq!(order_ids[0], 1, "current track must stay first");
+        let mut album_a_tail: Vec<i64> = order_ids[1..3].to_vec();
+        album_a_tail.sort();
+        assert_eq!(
+            album_a_tail,
+            vec![3, 5],
+            "InsideAlbum must keep Album A's remaining tracks immediately after the current \
+             track, before any Album B track"
+        );
+        let mut album_b: Vec<i64> = order_ids[3..6].to_vec();
+        album_b.sort();
+        assert_eq!(
+            album_b,
+            vec![2, 4, 6],
+            "InsideAlbum must keep Album B as a contiguous group after Album A"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
