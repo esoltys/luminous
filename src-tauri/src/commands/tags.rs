@@ -211,39 +211,25 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
     out
 }
 
-/// Merges `from` into `into`: rewrites every affected song's embedded genre
-/// tag on disk and in the DB (same dual-write as the regular tag editor —
-/// see `tags.rs`'s module doc comment), then folds `from`'s curated
-/// hierarchy position into `into`'s. Returns the number of songs updated.
-#[tauri::command]
-pub async fn merge_tags(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    from: String,
-    into: String,
+/// Shared by [`merge_tags`]/[`delete_tags`]: rewrites every affected song's
+/// embedded genre tag on disk and in the DB (same dual-write as the regular
+/// tag editor — see `tags.rs`'s module doc comment). `rewrite_genre` computes
+/// each song's new genre string from its current one; callers supply
+/// merge-into or delete-these-names logic. Returns the number of songs
+/// whose on-disk write succeeded.
+async fn rewrite_genre_and_persist(
+    conn: r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>,
+    song_ids: &[i64],
+    rewrite_genre: impl Fn(&str) -> String + Send + 'static,
 ) -> Result<u32, String> {
-    if from.trim().is_empty() || into.trim().is_empty() || from.eq_ignore_ascii_case(&into) {
-        return Ok(0);
-    }
+    let metas = load_full_metadata(&conn, song_ids);
 
-    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
-
-    let manager = TagManager::new(state.db.clone());
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let affected = manager
-        .songs_containing_any(std::slice::from_ref(&from))
-        .map_err(|e| e.to_string())?;
-    let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
-    let metas = load_full_metadata(&conn, &song_ids);
-
-    let from_c = from.clone();
-    let into_c = into.clone();
     let (updated_count, writes): (u32, Vec<(i64, String)>) =
         tauri::async_runtime::spawn_blocking(move || {
             let mut count = 0u32;
             let mut writes = Vec::with_capacity(metas.len());
             for item in &metas {
-                let new_genre = TagManager::rewrite_genre_for_merge(&item.genre, &from_c, &into_c);
+                let new_genre = rewrite_genre(&item.genre);
                 let path = std::path::PathBuf::from(&item.path);
                 let write_res = crate::tageditor::write_tags(
                     &path,
@@ -286,6 +272,39 @@ pub async fn merge_tags(
         .map_err(|e| e.to_string())?;
     }
     tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(updated_count)
+}
+
+/// Merges `from` into `into`: rewrites every affected song's embedded genre
+/// tag on disk and in the DB, then folds `from`'s curated hierarchy position
+/// into `into`'s. Returns the number of songs updated.
+#[tauri::command]
+pub async fn merge_tags(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    from: String,
+    into: String,
+) -> Result<u32, String> {
+    if from.trim().is_empty() || into.trim().is_empty() || from.eq_ignore_ascii_case(&into) {
+        return Ok(0);
+    }
+
+    let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
+
+    let manager = TagManager::new(state.db.clone());
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let affected = manager
+        .songs_containing_any(std::slice::from_ref(&from))
+        .map_err(|e| e.to_string())?;
+    let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
+
+    let from_c = from.clone();
+    let into_c = into.clone();
+    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
+        TagManager::rewrite_genre_for_merge(genre, &from_c, &into_c)
+    })
+    .await?;
 
     manager
         .apply_merge_hierarchy(&from, &into)
@@ -318,57 +337,13 @@ pub async fn delete_tags(
         .songs_containing_any(&names)
         .map_err(|e| e.to_string())?;
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
-    let metas = load_full_metadata(&conn, &song_ids);
 
     let names_c = names.clone();
-    let (updated_count, writes): (u32, Vec<(i64, String)>) =
-        tauri::async_runtime::spawn_blocking(move || {
-            let mut count = 0u32;
-            let mut writes = Vec::with_capacity(metas.len());
-            for item in &metas {
-                let new_genre = TagManager::rewrite_genre_for_delete(&item.genre, &names_c);
-                let path = std::path::PathBuf::from(&item.path);
-                let write_res = crate::tageditor::write_tags(
-                    &path,
-                    &item.title,
-                    item.titlesort.as_deref(),
-                    &item.artist,
-                    item.artistsort.as_deref(),
-                    &item.album,
-                    item.albumsort.as_deref(),
-                    &item.album_artist,
-                    item.album_artist_sort.as_deref(),
-                    &item.composer,
-                    item.composersort.as_deref(),
-                    &new_genre,
-                    item.genresort.as_deref(),
-                    item.track,
-                    item.disc,
-                    item.year,
-                    &item.grouping,
-                    item.bpm,
-                    &item.initial_key,
-                    item.compilation,
-                );
-                if write_res.is_ok() {
-                    count += 1;
-                }
-                writes.push((item.id, new_genre));
-            }
-            (count, writes)
+    let updated_count =
+        rewrite_genre_and_persist(conn, &song_ids, move |genre| {
+            TagManager::rewrite_genre_for_delete(genre, &names_c)
         })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    for (song_id, new_genre) in &writes {
-        tx.execute(
-            "UPDATE songs SET genre = ?1 WHERE id = ?2",
-            rusqlite::params![new_genre, song_id],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    tx.commit().map_err(|e| e.to_string())?;
+        .await?;
 
     manager
         .apply_delete_hierarchy(&names)
