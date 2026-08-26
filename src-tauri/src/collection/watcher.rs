@@ -436,7 +436,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                     // hard-deleted here, mirroring the scan-time protection in
                     // `find_missing_song_ids` — otherwise unplugging a watched USB drive
                     // mid-session would permanently wipe every song on it from the library.
-                    let unreachable_roots = super::unreachable_watched_roots(&conn);
+                    let unreachable_roots = super::reconcile::unreachable_watched_roots(&conn);
 
                     for path in &still_removed {
                         let path_str = path.to_string_lossy().to_string();
