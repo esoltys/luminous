@@ -11,6 +11,131 @@ pub type DbPool = Pool<SqliteConnectionManager>;
 /// Current schema version. Increment when adding migrations.
 pub const CURRENT_SCHEMA_VERSION: i32 = 20;
 
+struct Migration {
+    version: i32,
+    description: &'static str,
+    apply: fn(&rusqlite::Connection) -> Result<()>,
+}
+
+/// Every migration this build knows how to run, in ascending version order.
+/// `run_migrations` applies each entry whose `version` is newer than what's
+/// on disk, in this array's order, then records it in `schema_version` —
+/// exactly as if each were still its own `if version < N` block. Add new
+/// migrations at the end and bump `CURRENT_SCHEMA_VERSION` to match.
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        description: "initial schema",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_1)?),
+    },
+    Migration {
+        version: 2,
+        description: "equalizer settings",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_2)?),
+    },
+    Migration {
+        version: 3,
+        description: "unavailable flag for soft-deleted songs",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_3)?),
+    },
+    Migration {
+        version: 4,
+        description: "parametric equalizer mode",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_4)?),
+    },
+    Migration {
+        version: 5,
+        description: "loudness normalization (#77)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_5)?),
+    },
+    Migration {
+        version: 6,
+        description: "playlist last-updated tracking",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_6)?),
+    },
+    Migration {
+        version: 7,
+        description: "VBR/CBR bitrate flag",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_7)?),
+    },
+    Migration {
+        version: 8,
+        description: "instrumental track flag (#12)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_8)?),
+    },
+    Migration {
+        version: 9,
+        description: "auto_play flag for dynamic playlists (#26)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_9)?),
+    },
+    Migration {
+        version: 10,
+        description: "play_history for context-aware Recently Played",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_10)?),
+    },
+    Migration {
+        version: 11,
+        description: "drop unused excluded_formats setting",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_11)?),
+    },
+    Migration {
+        version: 12,
+        description: "queue population mode for auto/dynamic playlists (#120)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_12)?),
+    },
+    Migration {
+        version: 13,
+        description: "drop unused songs.mood column",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_13)?),
+    },
+    Migration {
+        version: 14,
+        description: "album_ratings table for independent album ratings (#242)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_14)?),
+    },
+    Migration {
+        version: 15,
+        description: "waveforms style column for cache invalidation",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_15)?),
+    },
+    Migration {
+        version: 16,
+        description: "rename moodbars table to band_waveforms (#217, pre-1.0 rename)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_16)?),
+    },
+    Migration {
+        version: 17,
+        description: "artist_profiles table for customizable artist website, tags, social links, bio (#473)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_17)?),
+    },
+    Migration {
+        version: 18,
+        description: "tag_groups/tag_assignments for persisted Genres curation hierarchy (#545)",
+        apply: |conn| {
+            conn.execute_batch(TAG_HIERARCHY_TABLES_SQL)?;
+            seed_tag_hierarchy(conn)
+        },
+    },
+    Migration {
+        version: 19,
+        description: "discard old bare-genre-name auto-playlist rows, superseded by the curated tag: convention (#548)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_19)?),
+    },
+    Migration {
+        version: 20,
+        description: "add genresort column to songs table (#151)",
+        apply: |conn| {
+            let has_genresort: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'genresort'")?
+                .exists([])?;
+            if !has_genresort {
+                conn.execute_batch(MIGRATION_20)?;
+            }
+            Ok(())
+        },
+    },
+];
+
 #[derive(Debug)]
 pub struct Database {
     pub pool: DbPool,
@@ -87,202 +212,19 @@ impl Database {
 
         log::info!("Database schema version: {version} (current: {CURRENT_SCHEMA_VERSION})");
 
-        if version < 1 {
-            log::info!("Running migration 1: initial schema");
-            conn.execute_batch(MIGRATION_1)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![1],
-            )?;
-        }
-
-        if version < 2 {
-            log::info!("Running migration 2: equalizer settings");
-            conn.execute_batch(MIGRATION_2)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![2],
-            )?;
-        }
-
-        if version < 3 {
-            log::info!("Running migration 3: unavailable flag for soft-deleted songs");
-            conn.execute_batch(MIGRATION_3)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![3],
-            )?;
-        }
-
-        if version < 4 {
-            log::info!("Running migration 4: parametric equalizer mode");
-            conn.execute_batch(MIGRATION_4)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![4],
-            )?;
-        }
-
-        if version < 5 {
-            log::info!("Running migration 5: loudness normalization (#77)");
-            conn.execute_batch(MIGRATION_5)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![5],
-            )?;
-        }
-
-        if version < 6 {
-            log::info!("Running migration 6: playlist last-updated tracking");
-            conn.execute_batch(MIGRATION_6)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![6],
-            )?;
-        }
-
-        if version < 7 {
-            log::info!("Running migration 7: VBR/CBR bitrate flag");
-            conn.execute_batch(MIGRATION_7)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![7],
-            )?;
-        }
-
-        if version < 8 {
-            log::info!("Running migration 8: instrumental track flag (#12)");
-            conn.execute_batch(MIGRATION_8)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![8],
-            )?;
-        }
-
-        if version < 9 {
-            log::info!("Running migration 9: auto_play flag for dynamic playlists (#26)");
-            conn.execute_batch(MIGRATION_9)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![9],
-            )?;
-        }
-
-        if version < 10 {
-            log::info!("Running migration 10: play_history for context-aware Recently Played");
-            conn.execute_batch(MIGRATION_10)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![10],
-            )?;
-        }
-
-        if version < 11 {
-            log::info!("Running migration 11: drop unused excluded_formats setting");
-            conn.execute_batch(MIGRATION_11)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![11],
-            )?;
-        }
-
-        if version < 12 {
-            log::info!(
-                "Running migration 12: queue population mode for auto/dynamic playlists (#120)"
-            );
-            conn.execute_batch(MIGRATION_12)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![12],
-            )?;
-        }
-
-        if version < 13 {
-            log::info!("Running migration 13: drop unused songs.mood column");
-            conn.execute_batch(MIGRATION_13)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![13],
-            )?;
-        }
-
-        if version < 14 {
-            log::info!(
-                "Running migration 14: album_ratings table for independent album ratings (#242)"
-            );
-            conn.execute_batch(MIGRATION_14)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![14],
-            )?;
-        }
-
-        if version < 15 {
-            log::info!("Running migration 15: waveforms style column for cache invalidation");
-            conn.execute_batch(MIGRATION_15)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![15],
-            )?;
-        }
-
-        if version < 16 {
-            log::info!(
-                "Running migration 16: rename moodbars table to band_waveforms (#217, pre-1.0 rename)"
-            );
-            conn.execute_batch(MIGRATION_16)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![16],
-            )?;
-        }
-
-        if version < 17 {
-            log::info!(
-                "Running migration 17: artist_profiles table for customizable artist website, tags, social links, bio (#473)"
-            );
-            conn.execute_batch(MIGRATION_17)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![17],
-            )?;
-        }
-
-        if version < 18 {
-            log::info!(
-                "Running migration 18: tag_groups/tag_assignments for persisted Genres curation hierarchy (#545)"
-            );
-            conn.execute_batch(TAG_HIERARCHY_TABLES_SQL)?;
-            seed_tag_hierarchy(&conn)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![18],
-            )?;
-        }
-
-        if version < 19 {
-            log::info!(
-                "Running migration 19: discard old bare-genre-name auto-playlist rows, superseded by the curated tag: convention (#548)"
-            );
-            conn.execute_batch(MIGRATION_19)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![19],
-            )?;
-        }
-
-        if version < 20 {
-            log::info!("Running migration 20: add genresort column to songs table (#151)");
-            let has_genresort: bool = conn
-                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'genresort'")?
-                .exists([])?;
-            if !has_genresort {
-                conn.execute_batch(MIGRATION_20)?;
+        for migration in MIGRATIONS {
+            if version < migration.version {
+                log::info!(
+                    "Running migration {}: {}",
+                    migration.version,
+                    migration.description
+                );
+                (migration.apply)(&conn)?;
+                conn.execute(
+                    "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
+                    params![migration.version],
+                )?;
             }
-            conn.execute(
-                "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-                params![20],
-            )?;
         }
 
         if version > CURRENT_SCHEMA_VERSION {
