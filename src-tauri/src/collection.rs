@@ -2446,7 +2446,7 @@ pub(crate) fn mode_query_fragments(mode: QueuePopulationMode) -> (&'static str, 
         QueuePopulationMode::Favourites => (" AND rating >= 4", "RANDOM()"),
         QueuePopulationMode::DeepCuts => (" AND (playcount = 0 OR lastplayed IS NULL)", "RANDOM()"),
         QueuePopulationMode::Familiar => (
-            "",
+            " AND playcount > 0",
             "((ABS(RANDOM()) % 1000000) / 1000000.0) * (playcount + 1) DESC",
         ),
         QueuePopulationMode::Discover => (
@@ -4652,8 +4652,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             titles(familiar),
-            vec!["DeepCut", "Discover", "Familiar", "Fav", "Neutral"],
-            "Familiar biases order via weighting, not filtering"
+            vec!["Discover", "Familiar", "Neutral"],
+            "Familiar excludes never-played songs (playcount > 0), then biases order by \
+             playcount among the rest"
         );
 
         let favourites = tag_manager
