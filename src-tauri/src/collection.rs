@@ -342,41 +342,61 @@ impl CollectionScanner {
     /// Scan all watched directories, emitting progress events to the frontend.
     /// If `force` is true, skips mtime checks and re-reads metadata for all files.
     /// `silent` marks this as a watcher-triggered catch-up scan rather than an
-    /// explicit user action — see `ScanProgress::silent` (#233).
+    /// explicit user action — see `ScanProgress::silent` (#233). Thin
+    /// Tauri-facing wrapper around `scan_all_core` — see that method for the
+    /// actual scan logic.
     pub async fn scan_all(&self, app: AppHandle, force: bool, silent: bool) -> Result<()> {
         let _watcher_pause_guard = app
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
 
+        let app_data_dir = app.path().app_data_dir().expect("no app data dir");
+        let app_for_progress = app.clone();
+        self.scan_all_core(app_data_dir, force, silent, true, move |progress| {
+            let _ = app_for_progress.emit("scan-progress", progress);
+        })
+        .await
+    }
+
+    /// Core of `scan_all`, decoupled from Tauri's `AppHandle` (progress
+    /// emission is a plain callback, and the covers-cache directory is
+    /// passed in) so it's directly callable from tests without mocking a
+    /// Tauri app — see `tests/library_scan_bdd.rs` and
+    /// `tests/cover_art_bdd.rs`. `resolve_remote_art` gates Phase 3's iTunes
+    /// network fallback; local embedded-art/folder-art resolution always
+    /// runs regardless since neither touches the network. Tests pass
+    /// `false` to keep scans deterministic and offline.
+    pub async fn scan_all_core(
+        &self,
+        app_data_dir: PathBuf,
+        force: bool,
+        silent: bool,
+        resolve_remote_art: bool,
+        mut on_progress: impl FnMut(ScanProgress),
+    ) -> Result<()> {
         let dirs = self.get_directories()?;
         if dirs.is_empty() {
             // Still tell the frontend we're done — otherwise the isScanning
             // flag it optimistically set before calling this command is
             // never cleared, permanently disabling rescan/cleanup controls.
-            let _ = app.emit(
-                "scan-progress",
-                ScanProgress {
-                    phase: ScanPhase::Done,
-                    scanned: 0,
-                    total: 0,
-                    current_path: None,
-                    silent,
-                },
-            );
-            return Ok(());
-        }
-
-        // Phase 1: discover all files
-        let _ = app.emit(
-            "scan-progress",
-            ScanProgress {
-                phase: ScanPhase::Discovering,
+            on_progress(ScanProgress {
+                phase: ScanPhase::Done,
                 scanned: 0,
                 total: 0,
                 current_path: None,
                 silent,
-            },
-        );
+            });
+            return Ok(());
+        }
+
+        // Phase 1: discover all files
+        on_progress(ScanProgress {
+            phase: ScanPhase::Discovering,
+            scanned: 0,
+            total: 0,
+            current_path: None,
+            silent,
+        });
 
         let mut all_paths: Vec<PathBuf> = Vec::new();
         for dir in &dirs {
@@ -396,19 +416,15 @@ impl CollectionScanner {
         log::info!("Scan found {total} audio files (force={force})");
 
         // Phase 2: read tags
-        let _ = app.emit(
-            "scan-progress",
-            ScanProgress {
-                phase: ScanPhase::ReadingTags,
-                scanned: 0,
-                total,
-                current_path: None,
-                silent,
-            },
-        );
+        on_progress(ScanProgress {
+            phase: ScanPhase::ReadingTags,
+            scanned: 0,
+            total,
+            current_path: None,
+            silent,
+        });
 
         let mut scanned = 0u64;
-        let app_data_dir = app.path().app_data_dir().expect("no app data dir");
         let cover_manager = CoverManager::new(Arc::clone(&self.db), app_data_dir);
 
         {
@@ -490,16 +506,13 @@ impl CollectionScanner {
 
                     // Emit progress every 50 files to avoid flooding
                     if scanned.is_multiple_of(50) || scanned == total {
-                        let _ = app.emit(
-                            "scan-progress",
-                            ScanProgress {
-                                phase: ScanPhase::ReadingTags,
-                                scanned,
-                                total,
-                                current_path: Some(path.to_string_lossy().to_string()),
-                                silent,
-                            },
-                        );
+                        on_progress(ScanProgress {
+                            phase: ScanPhase::ReadingTags,
+                            scanned,
+                            total,
+                            current_path: Some(path.to_string_lossy().to_string()),
+                            silent,
+                        });
                     }
                 }
                 tx.commit()?;
@@ -563,16 +576,13 @@ impl CollectionScanner {
         let total_updating_items = albums_to_resolve.len() as u64;
 
         if total_updating_items == 0 {
-            let _ = app.emit(
-                "scan-progress",
-                ScanProgress {
-                    phase: ScanPhase::Updating,
-                    scanned: total,
-                    total,
-                    current_path: None,
-                    silent,
-                },
-            );
+            on_progress(ScanProgress {
+                phase: ScanPhase::Updating,
+                scanned: total,
+                total,
+                current_path: None,
+                silent,
+            });
         }
 
         let mut remote_fetch_count = 0;
@@ -592,16 +602,13 @@ impl CollectionScanner {
                 format!("Cover art: {file_name}")
             };
 
-            let _ = app.emit(
-                "scan-progress",
-                ScanProgress {
-                    phase: ScanPhase::Updating,
-                    scanned: updating_scanned,
-                    total: total_updating_items,
-                    current_path: Some(display_desc),
-                    silent,
-                },
-            );
+            on_progress(ScanProgress {
+                phase: ScanPhase::Updating,
+                scanned: updating_scanned,
+                total: total_updating_items,
+                current_path: Some(display_desc),
+                silent,
+            });
 
             let path = Path::new(&path_str);
             let mut resolved = false;
@@ -636,7 +643,7 @@ impl CollectionScanner {
             }
 
             // 3. Try remote fetch (limit to 50 to avoid long scans / rate limits)
-            if !resolved && remote_fetch_count < 50 {
+            if !resolved && resolve_remote_art && remote_fetch_count < 50 {
                 remote_fetch_count += 1;
                 std::thread::sleep(std::time::Duration::from_millis(150));
 
@@ -652,16 +659,13 @@ impl CollectionScanner {
         }
 
         // Done
-        let _ = app.emit(
-            "scan-progress",
-            ScanProgress {
-                phase: ScanPhase::Done,
-                scanned: total,
-                total,
-                current_path: None,
-                silent,
-            },
-        );
+        on_progress(ScanProgress {
+            phase: ScanPhase::Done,
+            scanned: total,
+            total,
+            current_path: None,
+            silent,
+        });
 
         Ok(())
     }

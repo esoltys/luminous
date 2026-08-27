@@ -20,6 +20,7 @@ use std::sync::Arc;
 pub struct CoverManager {
     db: Arc<Database>,
     covers_dir: PathBuf,
+    itunes_base_url: String,
 }
 
 /// Inspects raw image bytes to detect magic headers for PNG, JPEG, WEBP, GIF, BMP.
@@ -72,7 +73,21 @@ impl CoverManager {
         if !covers_dir.exists() {
             let _ = std::fs::create_dir_all(&covers_dir);
         }
-        Self { db, covers_dir }
+        Self {
+            db,
+            covers_dir,
+            itunes_base_url: "https://itunes.apple.com".to_string(),
+        }
+    }
+
+    /// Override the iTunes Search API base URL — used by BDD tests to point
+    /// `fetch_remote_cover` at a local mock server instead of the real
+    /// network, so the remote-cover-art fallback can be exercised
+    /// deterministically and offline (see `tests/cover_art_bdd.rs`).
+    /// Production code never calls this; `new()`'s default is the real API.
+    pub fn with_itunes_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.itunes_base_url = base_url.into();
+        self
     }
 
     /// Derive a stable cache filename stem from `album_artist` + `album`
@@ -242,7 +257,8 @@ impl CoverManager {
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
         let search_url = format!(
-            "https://itunes.apple.com/search?term={}&entity=album&limit=1",
+            "{}/search?term={}&entity=album&limit=1",
+            self.itunes_base_url,
             percent_encoding::utf8_percent_encode(
                 &format!("{} {}", query_artist, query_album),
                 percent_encoding::NON_ALPHANUMERIC

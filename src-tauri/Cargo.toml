@@ -127,6 +127,7 @@ libc = "0.2"
 [dev-dependencies]
 cucumber = { version = "0.23", features = ["macros"] }
 tempfile = "3"
+wiremock = "0.6"
 
 [[test]]
 name = "equalizer_bdd"
