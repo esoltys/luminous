@@ -126,8 +126,8 @@
         <PlaylistsCollectionView />
       {/await}
     {:else if navigationStore.activeTab === "settings"}
-      {#await import("../lib/components/FoldersView.svelte") then { default: FoldersView }}
-        <FoldersView />
+      {#await import("../lib/components/SettingsView.svelte") then { default: SettingsView }}
+        <SettingsView />
       {/await}
     {:else if navigationStore.activeTab === "lyrics"}
       {#await import("../lib/components/LyricsView.svelte") then { default: LyricsView }}
