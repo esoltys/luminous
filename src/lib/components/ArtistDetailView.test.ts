@@ -99,10 +99,10 @@ describe("ArtistDetailView", () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     // "Country", "Pop", "Rock" should be rendered as chips
-    const countryChip = await screen.findByRole("button", { name: /^Country$/i });
+    const countryChip = await screen.findByTitle("Browse Country");
     expect(countryChip).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Pop$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Rock$/i })).toBeTruthy();
+    expect(screen.getByTitle("Browse Pop")).toBeTruthy();
+    expect(screen.getByTitle("Browse Rock")).toBeTruthy();
 
     await fireEvent.click(countryChip);
     expect(collectionStore.selectedAutoPlaylist?.genre).toBe("Country");
