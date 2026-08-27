@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render } from "@testing-library/svelte";
+import { flushSync } from "svelte";
 import WaveformSeekBar from "./WaveformSeekBar.svelte";
 import { themeStore } from "../stores/theme.svelte";
 import { prefs } from "../stores/prefs.svelte";
+import { playerStore } from "../stores/player.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((cmd: string) => {
@@ -17,12 +19,39 @@ describe("WaveformSeekBar.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prefs.seekBarMode = "waveform";
+    playerStore.currentSong = undefined;
   });
 
-  it("mounts canvas element without crashing", () => {
-    const { container } = render(WaveformSeekBar);
-    const canvas = container.querySelector("canvas");
-    expect(canvas).toBeInTheDocument();
+  it("draws a bar per fetched waveform sample once data resolves", async () => {
+    playerStore.currentSong = { id: 42, length_nanosec: 1000 } as any;
+
+    const fillRectSpy = vi.fn();
+    const roundRectSpy = vi.fn();
+    const mockCtx = {
+      clearRect: vi.fn(),
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: roundRectSpy,
+      fill: vi.fn(),
+      fillRect: fillRectSpy,
+      createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+      fillStyle: "",
+    };
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(mockCtx) as any;
+
+    try {
+      const { container } = render(WaveformSeekBar);
+      expect(container.querySelector("canvas")).toBeInTheDocument();
+
+      // Let the async get_waveform_data invoke resolve and the resulting draw() run.
+      await vi.waitFor(() => {
+        flushSync();
+        expect(roundRectSpy.mock.calls.length + fillRectSpy.mock.calls.length).toBeGreaterThanOrEqual(5);
+      });
+    } finally {
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
   });
 
   it("resolves valid hex colors from themeStore for canvas drawing without invalid CSS var() strings", async () => {

@@ -46,8 +46,9 @@ describe("Select.svelte", () => {
       },
     });
 
-    const select = getByRole("combobox");
+    const select = getByRole("combobox") as HTMLSelectElement;
     await fireEvent.change(select, { target: { value: "opt2" } });
     expect(handleChange).toHaveBeenCalledTimes(1);
+    expect(select.value).toBe("opt2");
   });
 });
