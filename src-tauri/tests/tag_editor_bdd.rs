@@ -134,7 +134,7 @@ fn library_reflects_metadata(w: &mut TagEditorWorld) {
             |row| row.get(0),
         )
         .expect("song not found");
-    assert_eq!(title, "Yellow (Acoustic)");
+    assert_eq!(title, w.new_title);
 }
 
 #[given("I have a song in the library with embedded cover art")]

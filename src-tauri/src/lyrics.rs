@@ -187,6 +187,112 @@ impl LyricsManager {
     }
 }
 
+/// Resolve lyrics for `song_id`: return cached lyrics immediately when the
+/// cache holds synced (or already-checked-unsynced) text, otherwise query
+/// online providers via `lyrics_manager` and cache the result. Extracted
+/// from the `get_lyrics` Tauri command so it's callable without a Tauri
+/// `AppHandle`/`State` — BDD tests exercise this directly (see
+/// `tests/lyrics_bdd.rs`) to verify the cache-hit path never reaches
+/// `lyrics_manager.fetch_lyrics`.
+pub async fn get_lyrics_for_song(
+    db: &crate::db::Database,
+    lyrics_manager: &LyricsManager,
+    song_id: i64,
+    force_refresh: bool,
+) -> Result<String, String> {
+    // 1. Check database cache and instrumental flag
+    let conn = db.pool.get().map_err(|e| e.to_string())?;
+    let (cached_lyrics, is_instrumental): (Option<String>, bool) = conn
+        .query_row(
+            "SELECT lyrics, COALESCE(is_instrumental, 0) FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap_or((None, false));
+
+    if is_instrumental {
+        return Err("Song is marked as instrumental".to_string());
+    }
+
+    if let Some(ref lyrics) = cached_lyrics {
+        if !lyrics.trim().is_empty() {
+            let synced = is_synced_lrc(lyrics);
+            let has_plain_marker = lyrics.starts_with("[synced:false]");
+
+            // If the cached lyrics are synced LRC, or if we have already checked online and marked it unsynced,
+            // return immediately without hitting the network! Skipped entirely on a forced refresh.
+            if !force_refresh && (synced || has_plain_marker) {
+                return Ok(lyrics.clone());
+            }
+        }
+    }
+
+    // 2. Fetch metadata from DB to search online
+    let (artist, title, album, len_ns) = conn
+        .query_row(
+            "SELECT artist, title, album, length_nanosec FROM songs WHERE id = ?1",
+            rusqlite::params![song_id],
+            |row| {
+                let artist: String = row.get(0).unwrap_or_default();
+                let title: String = row.get(1).unwrap_or_default();
+                let album: String = row.get(2).unwrap_or_default();
+                let len_ns: i64 = row.get(3).unwrap_or(0);
+                Ok((artist, title, album, len_ns))
+            },
+        )
+        .map_err(|e| e.to_string())?;
+
+    if artist.trim().is_empty() || title.trim().is_empty() {
+        if let Some(lyrics) = cached_lyrics {
+            if !lyrics.trim().is_empty() {
+                return Ok(lyrics);
+            }
+        }
+        return Err("insufficient song metadata (artist/title) to fetch online lyrics".to_string());
+    }
+
+    let duration_sec = (len_ns / 1_000_000_000) as u32;
+
+    // 3. Query online APIs (LRCLIB -> Lyrics.ovh)
+    match lyrics_manager
+        .fetch_lyrics(&artist, &title, &album, duration_sec)
+        .await
+    {
+        Ok(fetched) => {
+            let synced = is_synced_lrc(&fetched);
+            let final_lyrics = if synced {
+                fetched
+            } else {
+                format!("[synced:false]\n{fetched}")
+            };
+            conn.execute(
+                "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                rusqlite::params![final_lyrics, song_id],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(final_lyrics)
+        }
+        Err(e) => {
+            if let Some(lyrics) = cached_lyrics {
+                if !lyrics.trim().is_empty() {
+                    // Mark as checked to prevent future online lookup spamming
+                    let marked_lyrics = if lyrics.starts_with("[synced:false]") {
+                        lyrics.clone()
+                    } else {
+                        format!("[synced:false]\n{lyrics}")
+                    };
+                    let _ = conn.execute(
+                        "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+                        rusqlite::params![marked_lyrics, song_id],
+                    );
+                    return Ok(marked_lyrics);
+                }
+            }
+            Err(e.to_string())
+        }
+    }
+}
+
 /// Strip a trailing "(feat. ...)"/"[ft. ...]" annotation from a title.
 /// Lyrics providers index by the recording's canonical title, which usually
 /// omits featured-artist credits, so searching with the raw tagged title

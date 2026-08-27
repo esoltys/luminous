@@ -1,5 +1,6 @@
 use cucumber::{given, then, when, World};
 use luminous_lib::db::Database;
+use luminous_lib::lyrics::{get_lyrics_for_song, LyricsManager};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -12,6 +13,9 @@ pub struct LyricsWorld {
     title: String,
     cached_lyrics: Option<String>,
     displayed_lyrics: Option<String>,
+    /// Derived from how long the real `get_lyrics_for_song` call took — see
+    /// `open_lyrics_panel` for why elapsed time is a reliable proxy for
+    /// "did this reach the network".
     network_call_made: bool,
 }
 
@@ -53,26 +57,26 @@ fn db_has_cached_lyrics(w: &mut LyricsWorld) {
 }
 
 #[when("I open the lyrics panel")]
-fn open_lyrics_panel(w: &mut LyricsWorld) {
-    let conn = w.db.pool.get().expect("db conn failed");
-    let lyrics: Option<String> = conn
-        .query_row(
-            "SELECT lyrics FROM songs WHERE id = ?1",
-            rusqlite::params![w.song_id],
-            |row| row.get(0),
-        )
-        .ok()
-        .flatten();
+async fn open_lyrics_panel(w: &mut LyricsWorld) {
+    // Route through the real cache-check/fetch logic used by the
+    // `get_lyrics` Tauri command (extracted into `get_lyrics_for_song` so
+    // it's callable without an `AppHandle`). A `LyricsManager` is real
+    // here, not a stub — the cache-hit branch must return before ever
+    // calling `fetch_lyrics`, so this genuinely exercises that the cache
+    // check works, not a hand-rolled reimplementation of it.
+    //
+    // Elapsed time stands in for "no network request was made": these
+    // tests run with no network mocking, so any accidental fall-through to
+    // `LyricsManager::fetch_lyrics` (an HTTP round trip, or up to a 6s
+    // client timeout if unreachable) takes orders of magnitude longer than
+    // the microsecond-scale SQLite reads on the cache-hit path.
+    let lyrics_manager = LyricsManager::new();
+    let start = std::time::Instant::now();
+    let result = get_lyrics_for_song(&w.db, &lyrics_manager, w.song_id, false).await;
+    let elapsed = start.elapsed();
 
-    match lyrics {
-        Some(l) => {
-            w.displayed_lyrics = Some(l);
-            w.network_call_made = false;
-        }
-        None => {
-            w.network_call_made = true;
-        }
-    }
+    w.network_call_made = elapsed > std::time::Duration::from_millis(500);
+    w.displayed_lyrics = result.ok();
 }
 
 #[then("the system should display the cached lyrics immediately without making a network request")]
