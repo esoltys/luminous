@@ -171,30 +171,27 @@
 
 /* Reduced-motion fallback — every tier collapses to the same opacity fade;
    ring/glow/flash effects (no visible "shape" of their own beyond a shadow)
-   are dropped entirely rather than faded. Scoped to :not(.force-full-motion)
-   so the dev animation gallery (src/routes/dev/animations) can flip a class
-   on <html> to preview full motion regardless of the OS setting — see
-   issue #182. Never set that class anywhere in production UI. */
+   are dropped entirely rather than faded. */
 @media (prefers-reduced-motion: reduce) {
-  html:not(.force-full-motion) .anim-heart-pulse,
-  html:not(.force-full-motion) .anim-check-pop,
-  html:not(.force-full-motion) .anim-row-sweep,
-  html:not(.force-full-motion) .anim-folder-pop,
-  html:not(.force-full-motion) .anim-card-materialize,
-  html:not(.force-full-motion) .anim-slide-in-fade,
-  html:not(.force-full-motion) .anim-milestone-bounce,
-  html:not(.force-full-motion) .anim-shimmer-sweep,
-  html:not(.force-full-motion) .anim-warn-shake {
+  .anim-heart-pulse,
+  .anim-check-pop,
+  .anim-row-sweep,
+  .anim-folder-pop,
+  .anim-card-materialize,
+  .anim-slide-in-fade,
+  .anim-milestone-bounce,
+  .anim-shimmer-sweep,
+  .anim-warn-shake {
     animation: reduced-fade 150ms ease-out;
   }
 
-  html:not(.force-full-motion) .anim-heart-ring,
-  html:not(.force-full-motion) .anim-glow-ring,
-  html:not(.force-full-motion) .anim-ring-expand,
-  html:not(.force-full-motion) .anim-border-glow-pulse,
-  html:not(.force-full-motion) .anim-badge-glow,
-  html:not(.force-full-motion) .anim-gold-ring,
-  html:not(.force-full-motion) .anim-warn-flash {
+  .anim-heart-ring,
+  .anim-glow-ring,
+  .anim-ring-expand,
+  .anim-border-glow-pulse,
+  .anim-badge-glow,
+  .anim-gold-ring,
+  .anim-warn-flash {
     animation: none;
   }
 }
