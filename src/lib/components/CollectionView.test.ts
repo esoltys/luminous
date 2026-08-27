@@ -14,9 +14,6 @@ vi.mock("svelte-virtual-list-ts", async () => {
   };
 });
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
-}));
 
 describe("CollectionView.svelte", () => {
   const mockSongs: Song[] = [

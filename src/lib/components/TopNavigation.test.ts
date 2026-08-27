@@ -5,9 +5,6 @@ import TopNavigation from "./TopNavigation.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
-}));
 
 describe("TopNavigation.svelte", () => {
   beforeEach(() => {
