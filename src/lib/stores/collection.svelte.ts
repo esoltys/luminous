@@ -567,7 +567,8 @@ class CollectionStore {
     }
     this.searchLoading = true;
     try {
-      this.searchResults = await invoke("search_songs", { query, limit: 500 });
+      const results = await invoke<Song[]>("search_songs", { query, limit: 500 });
+      this.searchResults = Array.isArray(results) ? results : [];
     } catch (err) {
       console.error("Failed to execute search:", err);
     } finally {

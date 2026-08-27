@@ -103,7 +103,7 @@
 
   function refetchSongs() {
     invoke<Song[]>("get_songs_by_artist", { artist: artistName }).then((fetchedSongs) => {
-      songs = fetchedSongs;
+      songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
     });
   }
 
@@ -165,9 +165,9 @@
     ])
       .then(([fetchedSongs, fetchedPlaylists, fetchedCompilations, fetchedProfile]) => {
         if (requested !== artistName) return;
-        songs = fetchedSongs;
-        playlists = fetchedPlaylists.filter((p) => !p.is_queue);
-        compilations = fetchedCompilations;
+        songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
+        playlists = Array.isArray(fetchedPlaylists) ? fetchedPlaylists.filter((p) => !p.is_queue) : [];
+        compilations = Array.isArray(fetchedCompilations) ? fetchedCompilations : [];
         if (fetchedProfile?.artist_key) {
           collectionStore.artistProfiles[fetchedProfile.artist_key.toLowerCase()] = fetchedProfile;
         }
