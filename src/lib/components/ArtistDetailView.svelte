@@ -7,6 +7,7 @@
   import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
   import CoverStack from "./CoverStack.svelte";
+  import GenreChips from "./GenreChips.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
   import AlbumContextMenu from "./AlbumContextMenu.svelte";
@@ -25,6 +26,7 @@
   import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
+  import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -181,22 +183,26 @@
     collectionStore.activeSubTab = "artists";
   }
 
-  function deriveGenreLabel(list: Song[]): string {
+  function deriveArtistGenres(list: Song[]): string {
     const counts = new Map<string, number>();
     for (const s of list) {
-      const g = (s.genre ?? "").trim();
-      if (g !== "") counts.set(g, (counts.get(g) ?? 0) + 1);
+      if (!s.genre) continue;
+      for (const g of parseMultiValue(s.genre)) {
+        const trimmed = g.trim();
+        if (trimmed) {
+          counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+        }
+      }
     }
-    if (counts.size === 0) return i18n.t('artistDetail.unknownGenre');
-    const maxCount = Math.max(...counts.values());
-    const top = [...counts.entries()]
-      .filter(([, c]) => c === maxCount)
-      .map(([g]) => g)
-      .sort((a, b) => a.localeCompare(b));
-    return top.slice(0, 2).join(" / ");
+    if (counts.size === 0) return "";
+    const sorted = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([g]) => g);
+    return joinMultiValue(sorted);
   }
 
-  let genreLabel = $derived(deriveGenreLabel(songs));
+  let rawGenre = $derived(deriveArtistGenres(songs));
+  let genreLabel = $derived(rawGenre ? undefined : i18n.t('artistDetail.unknownGenre'));
 
   let totalDurationLabel = $derived.by(() => {
     const totalNs = songs.reduce((sum, s) => sum + (s.length_nanosec ?? 0), 0);
@@ -328,8 +334,16 @@
         {#if !collectionStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
-        <div class="flex items-center gap-3 text-xs text-brand-text-secondary font-medium">
-          <span>{i18n.t('artistDetail.statsLine', { genre: genreLabel, songs: songsText, duration: totalDurationLabel })}</span>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
+          {#if rawGenre}
+            <GenreChips genre={rawGenre} variant="full" />
+          {:else}
+            <span>{genreLabel}</span>
+          {/if}
+          <span>•</span>
+          <span>{songsText}</span>
+          <span>•</span>
+          <span>{totalDurationLabel}</span>
         </div>
         {/if}
 
