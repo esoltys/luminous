@@ -98,7 +98,7 @@ impl TagManager {
             .into_values()
             .map(|(name, song_count)| Tag { name, song_count })
             .collect();
-        tags.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        tags.sort_by_key(|a| a.name.to_lowercase());
         tags
     }
 
@@ -135,7 +135,7 @@ impl TagManager {
                             .collect()
                     })
                     .unwrap_or_default();
-                children.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                children.sort_by_key(|a| a.name.to_lowercase());
                 GenreGroup {
                     main_tag,
                     song_count,
@@ -143,7 +143,7 @@ impl TagManager {
                 }
             })
             .collect();
-        groups.sort_by(|a, b| a.main_tag.to_lowercase().cmp(&b.main_tag.to_lowercase()));
+        groups.sort_by_key(|a| a.main_tag.to_lowercase());
         groups
     }
 
