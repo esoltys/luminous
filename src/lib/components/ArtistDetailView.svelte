@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { shuffleArray } from "../utils/shuffle";
@@ -56,9 +58,9 @@
 
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
-    collectionStore.selectedArtistName = null;
-    collectionStore.activeTab = "collection";
-    collectionStore.activeSubTab = "artists";
+    navigationStore.selectedArtistName = null;
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "artists";
   }
 
   async function handleOpenUrl(url: string) {
@@ -179,8 +181,8 @@
   });
 
   function goBackToArtists() {
-    collectionStore.selectedArtistName = null;
-    collectionStore.activeSubTab = "artists";
+    navigationStore.selectedArtistName = null;
+    navigationStore.activeSubTab = "artists";
   }
 
   function deriveArtistGenres(list: Song[]): string {
@@ -281,7 +283,7 @@
   let singleTableRows = $derived(sortedSingleSongs.map(songToRow));
 
   function openAlbum(album: AlbumItem) {
-    collectionStore.viewAlbum(album.album || "");
+    navigationStore.viewAlbum(album.album || "");
   }
 
   // Mirrors PlaylistsCollectionView's openAuto/openPlaylist split so genre/decade
@@ -292,7 +294,7 @@
   function openPlaylist(playlist: Playlist) {
     if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
-      collectionStore.viewAutoPlaylist(
+      navigationStore.viewAutoPlaylist(
         isDecade
           ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
           : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
@@ -300,7 +302,7 @@
       return;
     }
     playlistsStore.selectPlaylist(playlist.id);
-    collectionStore.viewPlaylist(playlist.id);
+    navigationStore.viewPlaylist(playlist.id);
   }
 
   async function handlePlayAll() {
@@ -310,7 +312,7 @@
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -322,16 +324,16 @@
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 max-w-xl">
-        {#if !collectionStore.isDetailHeaderCollapsed}
+        {#if !windowLayoutStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
@@ -368,7 +370,7 @@
         </div>
       </div>
 
-      {#if !collectionStore.isDetailHeaderCollapsed && headerCovers.length > 0}
+      {#if !windowLayoutStore.isDetailHeaderCollapsed && headerCovers.length > 0}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
         </div>
@@ -595,7 +597,7 @@
         );
       }
     }}
-    onGoToArtist={album.artist && album.artist !== artistName ? () => collectionStore.viewArtist(album.artist || "") : undefined}
+    onGoToArtist={album.artist && album.artist !== artistName ? () => navigationStore.viewArtist(album.artist || "") : undefined}
     onClose={() => { albumContextMenuState = null; }}
   />
 {/if}

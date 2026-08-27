@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import Miniplayer from "./Miniplayer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -47,7 +48,7 @@ describe("Miniplayer.svelte", () => {
     playerStore.volume = 0.8;
     playerStore.shuffleMode = "off";
     playerStore.repeatMode = "off";
-    collectionStore.isMiniplayer = true;
+    windowLayoutStore.isMiniplayer = true;
   });
 
   it("renders idle layout with current song title and artist", () => {
@@ -116,7 +117,7 @@ describe("Miniplayer.svelte", () => {
 
   it("exits miniplayer mode when restore button is clicked or Escape is pressed", async () => {
     playerStore.currentSong = mockSong;
-    const exitSpy = vi.spyOn(collectionStore, "exitMiniplayerMode");
+    const exitSpy = vi.spyOn(windowLayoutStore, "exitMiniplayerMode");
 
     const { getByTitle, getByRole } = render(Miniplayer);
     const restoreBtn = getByTitle(/Restore Full Window/i);

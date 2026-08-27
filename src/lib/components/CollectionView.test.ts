@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import type { Song, AlbumItem, ArtistItem } from "../types";
 
@@ -113,9 +114,9 @@ describe("CollectionView.svelte", () => {
       total_duration_nanosec: 380_000_000_000,
       total_filesize_bytes: 10_000_000,
     };
-    collectionStore.activeSubTab = "songs";
-    collectionStore.selectedAlbumName = null;
-    collectionStore.selectedArtistName = null;
+    navigationStore.activeSubTab = "songs";
+    navigationStore.selectedAlbumName = null;
+    navigationStore.selectedArtistName = null;
     collectionStore.searchQuery = "";
     prefs.albumsViewMode = "cards";
     prefs.artistsViewMode = "cards";
@@ -129,7 +130,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("renders songs in Songs view sub-tab", () => {
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
     const { getByText } = render(CollectionView);
 
     expect(getByText("Alpha Song")).toBeInTheDocument();
@@ -137,14 +138,14 @@ describe("CollectionView.svelte", () => {
   });
 
   it("renders albums in Albums view sub-tab", () => {
-    collectionStore.activeSubTab = "albums";
+    navigationStore.activeSubTab = "albums";
     const { getByText } = render(CollectionView);
 
     expect(getByText("Album 1")).toBeInTheDocument();
   });
 
   it("renders artists and their genre in Artists view sub-tab", () => {
-    collectionStore.activeSubTab = "artists";
+    navigationStore.activeSubTab = "artists";
     const { getByText } = render(CollectionView);
 
     expect(getByText("Band A")).toBeInTheDocument();
@@ -154,7 +155,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("renders Sort: Genre options in Artists sub-tab", () => {
-    collectionStore.activeSubTab = "artists";
+    navigationStore.activeSubTab = "artists";
     const { getByText } = render(CollectionView);
 
     expect(getByText("▲ Genre")).toBeInTheDocument();
@@ -162,7 +163,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("displays empty state when no songs match search query", () => {
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
     collectionStore.songs = [];
     collectionStore.searchQuery = "NonexistentTrack";
 
@@ -171,7 +172,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("opens context menu on right-click of a song row", async () => {
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
     const { getByText, getAllByText } = render(CollectionView);
 
     const songRow = getByText("Alpha Song").closest("div[ondblclick], div.grid")!;
@@ -182,7 +183,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("defaults to Cards view in Albums sub-tab", () => {
-    collectionStore.activeSubTab = "albums";
+    navigationStore.activeSubTab = "albums";
     const { getByText } = render(CollectionView);
 
     // AlbumCard renders the title as a clickable LinkButton; the row view doesn't.
@@ -190,7 +191,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("switches Albums sub-tab to the compact Rows view when the Rows toggle is clicked", async () => {
-    collectionStore.activeSubTab = "albums";
+    navigationStore.activeSubTab = "albums";
     const { getByText, getByTitle } = render(CollectionView);
 
     await fireEvent.click(getByTitle("Row view"));
@@ -200,7 +201,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("switches Artists sub-tab to the compact Rows view independently of Albums", async () => {
-    collectionStore.activeSubTab = "artists";
+    navigationStore.activeSubTab = "artists";
     const { getByTitle } = render(CollectionView);
 
     await fireEvent.click(getByTitle("Row view"));
@@ -210,7 +211,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("renders Sort: Date Added options in Albums sub-tab", () => {
-    collectionStore.activeSubTab = "albums";
+    navigationStore.activeSubTab = "albums";
     const { getByText } = render(CollectionView);
 
     expect(getByText("▲ Date Added")).toBeInTheDocument();
@@ -218,7 +219,7 @@ describe("CollectionView.svelte", () => {
   });
 
   it("renders each artist in a multi-value credit as its own clickable name", async () => {
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
     collectionStore.songs = [
       {
         ...mockSongs[0],
@@ -236,11 +237,11 @@ describe("CollectionView.svelte", () => {
     // Clicking the second name navigates using just that name, not the
     // album artist and not the full "Evergrey; Mikael Stanne" credit.
     await fireEvent.click(stanneButton);
-    expect(collectionStore.selectedArtistName).toBe("Mikael Stanne");
+    expect(navigationStore.selectedArtistName).toBe("Mikael Stanne");
   });
 
   it("does not use font-mono for the date added column in songs view", () => {
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
     collectionStore.visibleColumns.added = true;
     mockSongs[0].added = 1700000000;
     // formatDateAdded falls back to Date.toLocaleDateString() for anything

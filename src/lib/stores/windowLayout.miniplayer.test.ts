@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 import { collectionStore } from "./collection.svelte";
+import { windowLayoutStore } from "./windowLayout.svelte";
 
 describe("CollectionStore - miniplayer geometry and window-geometry IPC races", () => {
   beforeEach(() => {
@@ -42,46 +43,46 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
   });
 
   it("sends remembered size/position as the toggle target when geometry capture is supported, ignoring any command return value", async () => {
-    collectionStore.setMiniplayerGeometry(310, 370, 20, 30);
-    collectionStore.setSavedWindowGeometry(1400, 900, 50, 60);
+    windowLayoutStore.setMiniplayerGeometry(310, 370, 20, 30);
+    windowLayoutStore.setSavedWindowGeometry(1400, 900, 50, 60);
 
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "geometry_capture_supported") return true;
       return { width: 9999, height: 9999 };
     });
 
-    await collectionStore.enterMiniplayerMode();
+    await windowLayoutStore.enterMiniplayerMode();
     expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", { width: 310, height: 370, x: 20, y: 30 });
-    expect(collectionStore.isMiniplayer).toBe(true);
-    expect(collectionStore.miniplayerWidth).toBe(310);
+    expect(windowLayoutStore.isMiniplayer).toBe(true);
+    expect(windowLayoutStore.miniplayerWidth).toBe(310);
 
-    await collectionStore.exitMiniplayerMode();
+    await windowLayoutStore.exitMiniplayerMode();
     expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", { width: 1400, height: 900, x: 50, y: 60 });
-    expect(collectionStore.isMiniplayer).toBe(false);
-    expect(collectionStore.savedWindowWidth).toBe(1400);
+    expect(windowLayoutStore.isMiniplayer).toBe(false);
+    expect(windowLayoutStore.savedWindowWidth).toBe(1400);
   });
 
   it("sends no geometry at all when geometry capture is unsupported, letting the backend use its fixed defaults", async () => {
-    collectionStore.setMiniplayerGeometry(310, 370, 20, 30);
+    windowLayoutStore.setMiniplayerGeometry(310, 370, 20, 30);
 
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "geometry_capture_supported") return false;
       return null;
     });
 
-    await collectionStore.enterMiniplayerMode();
+    await windowLayoutStore.enterMiniplayerMode();
     expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", {});
-    expect(collectionStore.isMiniplayer).toBe(true);
+    expect(windowLayoutStore.isMiniplayer).toBe(true);
 
-    await collectionStore.exitMiniplayerMode();
+    await windowLayoutStore.exitMiniplayerMode();
     expect(invoke).toHaveBeenCalledWith("exit_miniplayer_mode", {});
-    expect(collectionStore.isMiniplayer).toBe(false);
+    expect(windowLayoutStore.isMiniplayer).toBe(false);
   });
 
   it("captures a settled resize/move into the full player's geometry", async () => {
     vi.useFakeTimers();
     try {
-      expect(collectionStore.isMiniplayer).toBe(false);
+      expect(windowLayoutStore.isMiniplayer).toBe(false);
       vi.mocked(invoke).mockImplementation(async (cmd: string) => {
         if (cmd === "get_window_geometry") return { width: 1500, height: 950, x: 10, y: 20 };
         return null;
@@ -90,10 +91,10 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
       windowGeometryCallbacks.forEach((cb) => cb());
       await vi.advanceTimersByTimeAsync(400);
 
-      expect(collectionStore.savedWindowWidth).toBe(1500);
-      expect(collectionStore.savedWindowHeight).toBe(950);
-      expect(collectionStore.savedWindowX).toBe(10);
-      expect(collectionStore.savedWindowY).toBe(20);
+      expect(windowLayoutStore.savedWindowWidth).toBe(1500);
+      expect(windowLayoutStore.savedWindowHeight).toBe(950);
+      expect(windowLayoutStore.savedWindowX).toBe(10);
+      expect(windowLayoutStore.savedWindowY).toBe(20);
     } finally {
       vi.useRealTimers();
     }
@@ -117,22 +118,22 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
         return null;
       });
 
-      collectionStore.setMiniplayerGeometry(300, 360);
-      const enterPromise = collectionStore.enterMiniplayerMode();
+      windowLayoutStore.setMiniplayerGeometry(300, 360);
+      const enterPromise = windowLayoutStore.enterMiniplayerMode();
 
       windowGeometryCallbacks.forEach((cb) => cb());
       await vi.advanceTimersByTimeAsync(400);
-      expect(collectionStore.miniplayerWidth).toBe(300);
+      expect(windowLayoutStore.miniplayerWidth).toBe(300);
 
       resolveEnter(undefined);
       await enterPromise;
 
       windowGeometryCallbacks.forEach((cb) => cb());
       await vi.advanceTimersByTimeAsync(400);
-      expect(collectionStore.miniplayerWidth).toBe(1500);
+      expect(windowLayoutStore.miniplayerWidth).toBe(1500);
 
-      await collectionStore.exitMiniplayerMode();
-      expect(collectionStore.isMiniplayer).toBe(false);
+      await windowLayoutStore.exitMiniplayerMode();
+      expect(windowLayoutStore.isMiniplayer).toBe(false);
     } finally {
       vi.useRealTimers();
     }
@@ -158,19 +159,19 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
       return null;
     });
 
-    const enterCall = collectionStore.enterMiniplayerMode();
-    expect(collectionStore.isMiniplayer).toBe(true);
+    const enterCall = windowLayoutStore.enterMiniplayerMode();
+    expect(windowLayoutStore.isMiniplayer).toBe(true);
 
-    await collectionStore.exitMiniplayerMode();
+    await windowLayoutStore.exitMiniplayerMode();
     expect(exitCallCount).toBe(0);
-    expect(collectionStore.isMiniplayer).toBe(true);
+    expect(windowLayoutStore.isMiniplayer).toBe(true);
 
     resolveEnter(undefined);
     await enterCall;
 
-    await collectionStore.exitMiniplayerMode();
+    await windowLayoutStore.exitMiniplayerMode();
     expect(exitCallCount).toBe(1);
-    expect(collectionStore.isMiniplayer).toBe(false);
+    expect(windowLayoutStore.isMiniplayer).toBe(false);
   });
 
   it("restores miniplayer mode synchronously from localStorage on startup and syncs backend IPC", async () => {
@@ -178,8 +179,8 @@ describe("CollectionStore - miniplayer geometry and window-geometry IPC races", 
     vi.mocked(invoke).mockResolvedValue(null);
 
     // Re-initialize collection store
-    await collectionStore.enterMiniplayerMode(true);
-    expect(collectionStore.isMiniplayer).toBe(true);
+    await windowLayoutStore.enterMiniplayerMode(true);
+    expect(windowLayoutStore.isMiniplayer).toBe(true);
     expect(invoke).toHaveBeenCalledWith("enter_miniplayer_mode", expect.any(Object));
   });
 });
