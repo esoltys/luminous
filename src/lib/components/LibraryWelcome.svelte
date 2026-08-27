@@ -2,6 +2,7 @@
   import { FolderClosed, RefreshCw } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import Button from "./Button.svelte";
 
   // A database last opened by a newer Luminous build looks identical to a
@@ -32,7 +33,7 @@
         appVersion: collectionStore.dbSchemaStatus?.app_version,
       })}
     </p>
-    <Button onclick={() => { collectionStore.activeTab = 'settings'; }} variant="primary" size="sm">
+    <Button onclick={() => { navigationStore.activeTab = 'settings'; }} variant="primary" size="sm">
       {i18n.t('sidebar.settings')}
     </Button>
   {:else}
@@ -43,7 +44,7 @@
         <FolderClosed class="w-3.5 h-3.5" />
         {i18n.t('settings.addFolder')}
       </Button>
-      <Button onclick={() => { collectionStore.activeTab = 'help'; }} variant="secondary" size="sm">
+      <Button onclick={() => { navigationStore.activeTab = 'help'; }} variant="secondary" size="sm">
         {i18n.t('sidebar.help')}
       </Button>
     </div>

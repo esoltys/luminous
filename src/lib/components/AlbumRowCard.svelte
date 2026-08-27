@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -26,7 +27,7 @@
     if (customClick) {
       customClick(e);
     } else {
-      collectionStore.viewAlbum(album.album || "");
+      navigationStore.viewAlbum(album.album || "");
     }
   }
 

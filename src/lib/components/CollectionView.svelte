@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import CoverArt from "./CoverArt.svelte";
@@ -84,11 +85,11 @@
 
   // Albums and Artists each remember their own Cards/Rows view mode.
   let activeViewMode = $derived(
-    collectionStore.activeSubTab === "albums" ? prefs.albumsViewMode : prefs.artistsViewMode
+    navigationStore.activeSubTab === "albums" ? prefs.albumsViewMode : prefs.artistsViewMode
   );
 
   function setActiveViewMode(mode: CollectionViewMode) {
-    if (collectionStore.activeSubTab === "albums") {
+    if (navigationStore.activeSubTab === "albums") {
       prefs.setAlbumsViewMode(mode);
     } else {
       prefs.setArtistsViewMode(mode);
@@ -329,13 +330,13 @@
   {/if}
 {/snippet}
 
-{#if collectionStore.selectedAlbumName !== null}
-  <AlbumDetailView albumName={collectionStore.selectedAlbumName} />
-{:else if collectionStore.selectedArtistName !== null}
-  <ArtistDetailView artistName={collectionStore.selectedArtistName} />
+{#if navigationStore.selectedAlbumName !== null}
+  <AlbumDetailView albumName={navigationStore.selectedAlbumName} />
+{:else if navigationStore.selectedArtistName !== null}
+  <ArtistDetailView artistName={navigationStore.selectedArtistName} />
 {:else}
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-  {#if collectionStore.activeSubTab === "songs"}
+  {#if navigationStore.activeSubTab === "songs"}
     <div class="px-6 pt-4 pb-2 flex-shrink-0">
       <div class="h-9 flex items-center justify-between">
         <div class="text-xs text-brand-text-secondary font-medium">
@@ -387,14 +388,14 @@
       </div>
     </div>
 
-  {:else if collectionStore.activeSubTab === "genres"}
+  {:else if navigationStore.activeSubTab === "genres"}
     <GenreBrowseView />
   {:else}
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${collectionStore.activeSubTab}`}>
+    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`collection:${navigationStore.activeSubTab}`}>
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
         <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
-            {#if collectionStore.activeSubTab === "albums"}
+            {#if navigationStore.activeSubTab === "albums"}
               {sortedAlbums.length === 1 ? i18n.t('collection.showingOneAlbum') : i18n.t('collection.showingAlbums', { count: sortedAlbums.length })}
             {:else}
               {sortedArtists.length === 1 ? i18n.t('collection.showingOneArtist') : i18n.t('collection.showingArtists', { count: sortedArtists.length })}
@@ -422,7 +423,7 @@
                 <Rows3 class="w-4 h-4" />
               </button>
             </div>
-            {#if collectionStore.activeSubTab === "albums"}
+            {#if navigationStore.activeSubTab === "albums"}
               <div class="relative">
                 <Select
                   value={`${albumSortField}-${albumSortAsc}`}
@@ -445,7 +446,7 @@
                   <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
                 </Select>
               </div>
-            {:else if collectionStore.activeSubTab === "artists"}
+            {:else if navigationStore.activeSubTab === "artists"}
               <div class="relative">
                 <Select
                   value={`${artistSortField}-${artistSortAsc}`}
@@ -506,7 +507,7 @@
       {/snippet}
 
       <div class="pt-2">
-        {#if collectionStore.activeSubTab === "albums"}
+        {#if navigationStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
           <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
             {#each sortedAlbums as album}
@@ -529,7 +530,7 @@
             {@render albumEmptyState()}
           </div>
         {/if}
-        {:else if collectionStore.activeSubTab === "artists"}
+        {:else if navigationStore.activeSubTab === "artists"}
         {#if activeViewMode === "rows"}
           <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
             {#each sortedArtists as artist}
@@ -539,7 +540,7 @@
                 {artist}
                 {artistAlbums}
                 {artistSongs}
-                onclick={() => collectionStore.viewArtist(artist.name || "")}
+                onclick={() => navigationStore.viewArtist(artist.name || "")}
               />
             {/each}
             {@render artistEmptyState()}
@@ -553,7 +554,7 @@
                 {artist}
                 {artistAlbums}
                 {artistSongs}
-                onclick={() => collectionStore.viewArtist(artist.name || "")}
+                onclick={() => navigationStore.viewArtist(artist.name || "")}
               />
             {/each}
             {@render artistEmptyState()}
@@ -596,8 +597,8 @@
         handleAddSongToPlaylist(song.id);
       }
     }}
-    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
     onClose={() => { contextMenuState = null; }}
   />
@@ -620,12 +621,12 @@
         );
       }
     }}
-    onGoToArtist={album.artist ? () => collectionStore.viewArtist(album.artist || "") : undefined}
+    onGoToArtist={album.artist ? () => navigationStore.viewArtist(album.artist || "") : undefined}
     onClose={() => { albumContextMenuState = null; }}
   />
 {/if}
 
-{#if selectedKeys.size > 0 && collectionStore.activeSubTab === 'songs'}
+{#if selectedKeys.size > 0 && navigationStore.activeSubTab === 'songs'}
   <div data-floating-toolbar="true" class="absolute left-1/2 -translate-x-1/2 z-40 bg-brand-sidebar/95 border border-brand-border/80 shadow-2xl rounded-full px-5 py-2.5 flex items-center gap-4 text-xs font-semibold backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-200" class:bottom-6={!playerStore.currentSong} class:bottom-28={!!playerStore.currentSong}>
     <span class="text-brand-accent-text font-bold">
       {i18n.t('playlists.selectedCount', { count: selectedKeys.size })}

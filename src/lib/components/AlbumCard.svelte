@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import type { AlbumItem } from "../types";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import CoverStack, { type CoverItem } from "./CoverStack.svelte";
   import LinkButton from "./LinkButton.svelte";
   import SongRating from "./SongRating.svelte";
@@ -35,7 +36,7 @@
     if (customClick) {
       customClick(e);
     } else {
-      collectionStore.viewAlbum(album.album || "");
+      navigationStore.viewAlbum(album.album || "");
     }
   }
 
@@ -78,7 +79,7 @@
   </div>
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton
-      onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(album.album || ""); }}
+      onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(album.album || ""); }}
       class="font-semibold text-sm text-brand-text-primary truncate w-full"
       title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
     >
@@ -88,7 +89,7 @@
       {#if showArtist}
         {#if album.artist}
           <LinkButton
-            onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(album.artist || ""); }}
+            onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(album.artist || ""); }}
             class="text-xs text-brand-text-secondary truncate min-w-0 font-medium"
             title={i18n.t('collection.filterByArtist', { artist: album.artist })}
           >

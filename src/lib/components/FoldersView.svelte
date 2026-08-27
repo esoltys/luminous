@@ -1,5 +1,6 @@
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { Folder, Plus, Trash2, Palette, Settings, Check, Wand2, RefreshCw, RotateCcw, Sparkles, Eraser, Clock, Activity, HardDrive, Info, Shield, Sun, Moon, ArrowUp, Download, Eye, EyeOff, AlertTriangle, Home, MessageCircle, Bug, Package } from "lucide-svelte";
@@ -860,7 +861,7 @@
               <p class="text-xs text-brand-text-secondary leading-relaxed">
                 {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
                 <br />
-                {i18n.t('settings.acoustidDesc3')}<button onclick={() => collectionStore.activeTab = 'help'} class="text-brand-accent hover:underline">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
+                {i18n.t('settings.acoustidDesc3')}<button onclick={() => navigationStore.activeTab = 'help'} class="text-brand-accent hover:underline">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
               </p>
             </div>
           </div>
