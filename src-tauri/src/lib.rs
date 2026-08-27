@@ -145,6 +145,339 @@ fn with_webview2_occlusion_disabled(current: &str) -> String {
     }
 }
 
+/// Reads persisted equalizer settings (linear + parametric) from the DB and
+/// applies them to a freshly-constructed `AudioEngine`, so playback starts
+/// with the user's last-saved EQ state instead of engine defaults.
+fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
+    if let Ok(conn) = db.pool.get() {
+        if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
+            "SELECT enabled, preamp, gains, mode, parametric
+                 FROM equalizer_settings WHERE id = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)? != 0,
+                    row.get::<_, f64>(1)? as f32,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        ) {
+            let mut gains = [0.0f32; 10];
+            for (i, val) in gains_str.split(',').enumerate() {
+                if i < 10 {
+                    if let Ok(gain) = val.parse::<f32>() {
+                        gains[i] = gain;
+                    }
+                }
+            }
+            if let Ok(mut eq) = audio_engine.equalizer.lock() {
+                eq.enabled = enabled;
+                eq.preamp = preamp;
+                eq.load_preset(gains);
+                if let Ok(bands) =
+                    serde_json::from_str::<Vec<crate::equalizer::ParametricBand>>(&parametric_json)
+                {
+                    if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
+                        let mut arr = crate::equalizer::default_parametric_bands();
+                        arr.copy_from_slice(&bands);
+                        eq.load_parametric(arr);
+                    }
+                }
+                if mode_str == "parametric20" {
+                    eq.set_mode(crate::equalizer::EqMode::Parametric20);
+                }
+            }
+        }
+    }
+}
+
+/// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
+/// events to the frontend while the spectrum visualizer is enabled and
+/// something is playing.
+fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        loop {
+            interval.tick().await;
+            let (enabled, spectrum) = {
+                let engine = audio.lock().await;
+                let enabled = engine
+                    .spectrum_enabled
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                let state = engine.current_state();
+                let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                    let sample_rate = engine
+                        .output_sample_rate
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    Some(crate::analyzer::calculate_spectrum(
+                        &engine.visualizer_buf,
+                        1024,
+                        sample_rate,
+                    ))
+                } else {
+                    None
+                };
+                (enabled, spectrum)
+            };
+
+            if enabled {
+                if let Some(spec) = spectrum {
+                    let _ = app_handle.emit("spectrum-data", spec);
+                }
+            }
+        }
+    });
+}
+
+/// Spawns the 250ms playback-position tick loop: emits `playback-position`
+/// while playing, and every 4th tick (~1s) persists position and mirrors it
+/// to the OS media session — MPRIS2's Position property isn't push-updated
+/// by souvlaki's D-Bus backend, so without this the seek bar would freeze at
+/// the position from the last state transition (#80). SMTC interpolates its
+/// own timeline, so this is a no-op cost there beyond the periodic refresh.
+fn spawn_position_tick_loop(
+    app_handle: tauri::AppHandle,
+    audio: Arc<Mutex<AudioEngine>>,
+    player: Arc<Mutex<Player>>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+        let mut tick_counter: u32 = 0;
+        loop {
+            interval.tick().await;
+            let (pos, state) = {
+                let engine = audio.lock().await;
+                (engine.current_position_nanosec(), engine.current_state())
+            };
+            if state == crate::models::PlayState::Playing {
+                let mut p = player.lock().await;
+                if let Some(stats) = p.on_position_update(pos) {
+                    let _ = app_handle.emit("song-stats-changed", stats);
+                }
+                tick_counter = tick_counter.wrapping_add(1);
+                if tick_counter.is_multiple_of(4) {
+                    p.persist_position(pos);
+                    let playback_snapshot = p.get_state().await;
+                    crate::media_session::mirror_state(&app_handle, &playback_snapshot).await;
+                }
+                let _ = app_handle.emit(
+                    "playback-position",
+                    serde_json::json!({
+                        "position_nanosec": pos
+                    }),
+                );
+            }
+        }
+    });
+}
+
+/// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
+/// each `AudioEvent` into player-state transitions, OS media-session
+/// mirroring, and frontend events. A blocking OS thread rather than a Tokio
+/// task since it blocks on `rx.iter()`.
+fn spawn_audio_event_loop(
+    app_handle: tauri::AppHandle,
+    audio: Arc<Mutex<AudioEngine>>,
+    player: Arc<Mutex<Player>>,
+) {
+    std::thread::Builder::new()
+        .name("luminous-events".to_string())
+        .spawn(move || {
+            let rx = {
+                let engine = tauri::async_runtime::block_on(async { audio.lock().await });
+                engine.event_rx.clone()
+            };
+
+            let rx = rx.lock().unwrap();
+            for event in rx.iter() {
+                eprintln!("[Luminous Backend] Received event: {:?}", event);
+                let app = app_handle.clone();
+                let player = player.clone();
+                tauri::async_runtime::block_on(async move {
+                    let mut p = player.lock().await;
+                    match event {
+                        crate::audio::AudioEvent::Playing { .. } => {
+                            p.reset_playback_errors();
+                            let _ = app.emit(
+                                "track-changed",
+                                serde_json::json!({
+                                    "song": p.current_song.clone()
+                                }),
+                            );
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Paused => {
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Stopped => {
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::TrackFinished { .. } => {
+                            let _ = p.on_track_finished().await;
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::AboutToFinish { .. } => {
+                            // Prime the next track so the engine can
+                            // hand over gaplessly at the boundary.
+                            if let Err(e) = p.prepare_gapless_next().await {
+                                log::warn!("Gapless preload failed: {e}");
+                            }
+                        }
+                        crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
+                            let _ = p.on_gapless_transition(song_id).await;
+                            let _ = app.emit(
+                                "track-changed",
+                                serde_json::json!({
+                                    "song": p.current_song.clone()
+                                }),
+                            );
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Error { message } => {
+                            eprintln!("[Luminous Backend] ERROR from audio engine: {}", message);
+
+                            if p.try_heal_and_retry_current_track().await {
+                                // Stale-cased path (Linux/case-sensitive
+                                // filesystem quirk) — repointed and retried
+                                // in place, nothing to surface to the user.
+                                let _ = app.emit("library-changed", ());
+                            } else {
+                                let outcome = p.note_playback_error();
+
+                                if let Some(song) = &outcome.failed_song {
+                                    let _ = app.emit(
+                                        "playback-error",
+                                        serde_json::json!({
+                                            "songId": song.id,
+                                            "title": song.title,
+                                            "path": song.path,
+                                        }),
+                                    );
+                                }
+                                if outcome.flagged_unavailable {
+                                    let _ = app.emit("library-changed", ());
+                                }
+
+                                if outcome.should_stop {
+                                    log::error!(
+                                        "Stopping playback after {} consecutive audio errors \
+                                         — likely a disconnected drive or dead playlist",
+                                        crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
+                                    );
+                                    let _ = p.stop().await;
+                                } else {
+                                    let _ = p.next_track().await;
+                                }
+                            }
+                            let state = p.get_state().await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        _ => {}
+                    }
+                });
+            }
+        })
+        .expect("failed to spawn event thread");
+}
+
+/// Registers global OS media-key shortcuts (play/pause, next/prev track,
+/// volume up/down/mute) so they work even when Luminous isn't focused.
+/// Registration failures (e.g. another app already owns a key) are
+/// swallowed per-shortcut — Luminous just runs without that one shortcut.
+fn register_media_shortcuts(app: &tauri::App) {
+    let media_shortcuts = [
+        "MediaPlayPause",
+        "MediaTrackNext",
+        "MediaTrackPrevious",
+        "AudioVolumeUp",
+        "AudioVolumeDown",
+        "AudioVolumeMute",
+    ];
+    for shortcut_str in media_shortcuts {
+        if let Err(err) = app
+            .global_shortcut()
+            .on_shortcut(shortcut_str, |app, shortcut, event| {
+                if event.state != ShortcutState::Pressed {
+                    return;
+                }
+
+                let key = shortcut.key;
+                let app_handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app_handle.state::<AppState>();
+                    let mut player = state.player.lock().await;
+                    let result = match key {
+                        Code::MediaPlayPause => {
+                            let playback_state = player.get_state().await.state;
+                            if playback_state == crate::models::PlayState::Playing {
+                                player.pause().await
+                            } else {
+                                player.resume().await
+                            }
+                        }
+                        Code::MediaTrackNext => {
+                            if let Some(stats) = player.note_manual_skip() {
+                                let _ = app_handle.emit("song-stats-changed", stats);
+                            }
+                            player.next_track().await
+                        }
+                        Code::MediaTrackPrevious => player.previous_track().await,
+                        Code::AudioVolumeUp => {
+                            let volume = player.get_state().await.volume;
+                            player.set_volume((volume + 0.05).min(1.0)).await
+                        }
+                        Code::AudioVolumeDown => {
+                            let volume = player.get_state().await.volume;
+                            player.set_volume((volume - 0.05).max(0.0)).await
+                        }
+                        Code::AudioVolumeMute => {
+                            let volume = player.get_state().await.volume;
+                            if volume > 0.0 {
+                                let mut volume_before_mute = state.volume_before_mute.lock().await;
+                                *volume_before_mute = volume;
+                                player.set_volume(0.0).await
+                            } else {
+                                let volume_before_mute = *state.volume_before_mute.lock().await;
+                                player.set_volume(volume_before_mute.max(0.05)).await
+                            }
+                        }
+                        _ => Ok(()),
+                    };
+
+                    if let Err(err) = result {
+                        eprintln!(
+                            "[Luminous Backend] Failed to handle media key {:?}: {}",
+                            key, err
+                        );
+                    } else {
+                        let playback_state = player.get_state().await;
+                        crate::media_session::mirror_state(&app_handle, &playback_state).await;
+                        let _ = app_handle.emit("playback-state", playback_state);
+                    }
+                });
+            })
+        {
+            log::debug!(
+                "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
+                shortcut_str,
+                err
+            );
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Without this, every log::info!/warn!/error! call across the backend
@@ -296,51 +629,7 @@ pub fn run() {
             );
 
             let audio_engine = AudioEngine::new();
-
-            // Load and restore equalizer settings on startup
-            if let Ok(conn) = db.pool.get() {
-                if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
-                    "SELECT enabled, preamp, gains, mode, parametric
-                         FROM equalizer_settings WHERE id = 1",
-                    [],
-                    |row| {
-                        Ok((
-                            row.get::<_, i32>(0)? != 0,
-                            row.get::<_, f64>(1)? as f32,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, String>(3)?,
-                            row.get::<_, String>(4)?,
-                        ))
-                    },
-                ) {
-                    let mut gains = [0.0f32; 10];
-                    for (i, val) in gains_str.split(',').enumerate() {
-                        if i < 10 {
-                            if let Ok(gain) = val.parse::<f32>() {
-                                gains[i] = gain;
-                            }
-                        }
-                    }
-                    if let Ok(mut eq) = audio_engine.equalizer.lock() {
-                        eq.enabled = enabled;
-                        eq.preamp = preamp;
-                        eq.load_preset(gains);
-                        if let Ok(bands) = serde_json::from_str::<
-                            Vec<crate::equalizer::ParametricBand>,
-                        >(&parametric_json)
-                        {
-                            if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
-                                let mut arr = crate::equalizer::default_parametric_bands();
-                                arr.copy_from_slice(&bands);
-                                eq.load_parametric(arr);
-                            }
-                        }
-                        if mode_str == "parametric20" {
-                            eq.set_mode(crate::equalizer::EqMode::Parametric20);
-                        }
-                    }
-                }
-            }
+            restore_equalizer_from_db(&db, &audio_engine);
 
             let audio = Arc::new(Mutex::new(audio_engine));
 
@@ -383,40 +672,7 @@ pub fn run() {
             ));
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)
-            let app_handle_visualizer = app.handle().clone();
-            let audio_visualizer = Arc::clone(&audio);
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
-                loop {
-                    interval.tick().await;
-                    let (enabled, spectrum) = {
-                        let engine = audio_visualizer.lock().await;
-                        let enabled = engine
-                            .spectrum_enabled
-                            .load(std::sync::atomic::Ordering::Relaxed);
-                        let state = engine.current_state();
-                        let spectrum = if enabled && state == crate::models::PlayState::Playing {
-                            let sample_rate = engine
-                                .output_sample_rate
-                                .load(std::sync::atomic::Ordering::Relaxed);
-                            Some(crate::analyzer::calculate_spectrum(
-                                &engine.visualizer_buf,
-                                1024,
-                                sample_rate,
-                            ))
-                        } else {
-                            None
-                        };
-                        (enabled, spectrum)
-                    };
-
-                    if enabled {
-                        if let Some(spec) = spectrum {
-                            let _ = app_handle_visualizer.emit("spectrum-data", spec);
-                        }
-                    }
-                }
-            });
+            spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
@@ -489,256 +745,27 @@ pub fn run() {
             // reaches into app.state::<AppState>() — doing this before
             // manage() panics ("state() called before manage()") if a tick
             // fires that early.
-            let app_handle_ticks = app.handle().clone();
-            let audio_ticks = Arc::clone(&managed_state.audio);
-            let player_ticks = Arc::clone(&managed_state.player);
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
-                let mut tick_counter: u32 = 0;
-                loop {
-                    interval.tick().await;
-                    let (pos, state) = {
-                        let engine = audio_ticks.lock().await;
-                        (engine.current_position_nanosec(), engine.current_state())
-                    };
-                    if state == crate::models::PlayState::Playing {
-                        let mut p = player_ticks.lock().await;
-                        if let Some(stats) = p.on_position_update(pos) {
-                            let _ = app_handle_ticks.emit("song-stats-changed", stats);
-                        }
-                        tick_counter = tick_counter.wrapping_add(1);
-                        if tick_counter.is_multiple_of(4) {
-                            p.persist_position(pos);
-                            // MPRIS2's Position property isn't push-updated by
-                            // souvlaki's D-Bus backend — it just returns
-                            // whatever we last set, so without this the OS
-                            // media session's seek bar freezes at the
-                            // position from the last state transition (#80).
-                            // SMTC interpolates its own timeline, so this is
-                            // a no-op cost there beyond the periodic refresh.
-                            let playback_snapshot = p.get_state().await;
-                            crate::media_session::mirror_state(
-                                &app_handle_ticks,
-                                &playback_snapshot,
-                            )
-                            .await;
-                        }
-                        let _ = app_handle_ticks.emit(
-                            "playback-position",
-                            serde_json::json!({
-                                "position_nanosec": pos
-                            }),
-                        );
-                    }
-                }
-            });
+            spawn_position_tick_loop(
+                app.handle().clone(),
+                Arc::clone(&managed_state.audio),
+                Arc::clone(&managed_state.player),
+            );
 
             // Spawn event receiver loop (OS thread). Spawned after
             // app.manage() for the same reason as the tick loop above — its
             // handler also reaches app.state::<AppState>() via
             // media_session::mirror_state().
-            let app_handle_events = app.handle().clone();
-            let audio_events = Arc::clone(&managed_state.audio);
-            let player_events = Arc::clone(&managed_state.player);
-            std::thread::Builder::new()
-                .name("luminous-events".to_string())
-                .spawn(move || {
-                    let rx = {
-                        let engine =
-                            tauri::async_runtime::block_on(async { audio_events.lock().await });
-                        engine.event_rx.clone()
-                    };
-
-                    let rx = rx.lock().unwrap();
-                    for event in rx.iter() {
-                        eprintln!("[Luminous Backend] Received event: {:?}", event);
-                        let app = app_handle_events.clone();
-                        let player = player_events.clone();
-                        tauri::async_runtime::block_on(async move {
-                            let mut p = player.lock().await;
-                            match event {
-                                crate::audio::AudioEvent::Playing { .. } => {
-                                    p.reset_playback_errors();
-                                    let _ = app.emit(
-                                        "track-changed",
-                                        serde_json::json!({
-                                            "song": p.current_song.clone()
-                                        }),
-                                    );
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Paused => {
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Stopped => {
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::TrackFinished { .. } => {
-                                    let _ = p.on_track_finished().await;
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::AboutToFinish { .. } => {
-                                    // Prime the next track so the engine can
-                                    // hand over gaplessly at the boundary.
-                                    if let Err(e) = p.prepare_gapless_next().await {
-                                        log::warn!("Gapless preload failed: {e}");
-                                    }
-                                }
-                                crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
-                                    let _ = p.on_gapless_transition(song_id).await;
-                                    let _ = app.emit(
-                                        "track-changed",
-                                        serde_json::json!({
-                                            "song": p.current_song.clone()
-                                        }),
-                                    );
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Error { message } => {
-                                    eprintln!(
-                                        "[Luminous Backend] ERROR from audio engine: {}",
-                                        message
-                                    );
-
-                                    if p.try_heal_and_retry_current_track().await {
-                                        // Stale-cased path (Linux/case-sensitive
-                                        // filesystem quirk) — repointed and retried
-                                        // in place, nothing to surface to the user.
-                                        let _ = app.emit("library-changed", ());
-                                    } else {
-                                        let outcome = p.note_playback_error();
-
-                                        if let Some(song) = &outcome.failed_song {
-                                            let _ = app.emit(
-                                                "playback-error",
-                                                serde_json::json!({
-                                                    "songId": song.id,
-                                                    "title": song.title,
-                                                    "path": song.path,
-                                                }),
-                                            );
-                                        }
-                                        if outcome.flagged_unavailable {
-                                            let _ = app.emit("library-changed", ());
-                                        }
-
-                                        if outcome.should_stop {
-                                            log::error!(
-                                                "Stopping playback after {} consecutive audio errors \
-                                                 — likely a disconnected drive or dead playlist",
-                                                crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
-                                            );
-                                            let _ = p.stop().await;
-                                        } else {
-                                            let _ = p.next_track().await;
-                                        }
-                                    }
-                                    let state = p.get_state().await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                _ => {}
-                            }
-                        });
-                    }
-                })
-                .expect("failed to spawn event thread");
+            spawn_audio_event_loop(
+                app.handle().clone(),
+                Arc::clone(&managed_state.audio),
+                Arc::clone(&managed_state.player),
+            );
 
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");
             }
 
-            let media_shortcuts = [
-                "MediaPlayPause",
-                "MediaTrackNext",
-                "MediaTrackPrevious",
-                "AudioVolumeUp",
-                "AudioVolumeDown",
-                "AudioVolumeMute",
-            ];
-            for shortcut_str in media_shortcuts {
-                if let Err(err) =
-                    app.global_shortcut()
-                        .on_shortcut(shortcut_str, |app, shortcut, event| {
-                            if event.state != ShortcutState::Pressed {
-                                return;
-                            }
-
-                            let key = shortcut.key;
-                            let app_handle = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let state = app_handle.state::<AppState>();
-                                let mut player = state.player.lock().await;
-                                let result = match key {
-                                    Code::MediaPlayPause => {
-                                        let playback_state = player.get_state().await.state;
-                                        if playback_state == crate::models::PlayState::Playing {
-                                            player.pause().await
-                                        } else {
-                                            player.resume().await
-                                        }
-                                    }
-                                    Code::MediaTrackNext => {
-                                        if let Some(stats) = player.note_manual_skip() {
-                                            let _ = app_handle.emit("song-stats-changed", stats);
-                                        }
-                                        player.next_track().await
-                                    }
-                                    Code::MediaTrackPrevious => player.previous_track().await,
-                                    Code::AudioVolumeUp => {
-                                        let volume = player.get_state().await.volume;
-                                        player.set_volume((volume + 0.05).min(1.0)).await
-                                    }
-                                    Code::AudioVolumeDown => {
-                                        let volume = player.get_state().await.volume;
-                                        player.set_volume((volume - 0.05).max(0.0)).await
-                                    }
-                                    Code::AudioVolumeMute => {
-                                        let volume = player.get_state().await.volume;
-                                        if volume > 0.0 {
-                                            let mut volume_before_mute =
-                                                state.volume_before_mute.lock().await;
-                                            *volume_before_mute = volume;
-                                            player.set_volume(0.0).await
-                                        } else {
-                                            let volume_before_mute =
-                                                *state.volume_before_mute.lock().await;
-                                            player.set_volume(volume_before_mute.max(0.05)).await
-                                        }
-                                    }
-                                    _ => Ok(()),
-                                };
-
-                                if let Err(err) = result {
-                                    eprintln!(
-                                        "[Luminous Backend] Failed to handle media key {:?}: {}",
-                                        key, err
-                                    );
-                                } else {
-                                    let playback_state = player.get_state().await;
-                                    crate::media_session::mirror_state(&app_handle, &playback_state)
-                                        .await;
-                                    let _ = app_handle.emit("playback-state", playback_state);
-                                }
-                            });
-                        })
-                {
-                    log::debug!(
-                        "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
-                        shortcut_str,
-                        err
-                    );
-                }
-            }
+            register_media_shortcuts(app);
 
             // Keep every dynamic playlist's membership in line with its
             // definition the moment the library or song stats change —

@@ -1374,6 +1374,7 @@ impl Player {
     /// - `InsideAlbum`: keep every group in its original playlist position,
     ///   but shuffle the track order within each group
     ///   (`shuffle_within_groups`).
+    ///
     /// Returns the current item's own group's remaining tracks first,
     /// followed by every other group — matching every mode's "don't jump
     /// away from what's already playing" behavior. Does NOT include the
