@@ -117,7 +117,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(shuffleButton);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(setShuffleSpy).toHaveBeenCalledWith("all");
+    expect(setShuffleSpy).toHaveBeenCalledWith("off");
     expect(playSongsSpy).toHaveBeenCalled();
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
     expect(navigationStore.activeTab).toBe("collection");

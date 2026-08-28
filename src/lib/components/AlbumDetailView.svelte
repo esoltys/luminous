@@ -247,7 +247,7 @@
   async function handleShufflePlay() {
     if (sortedSongs.length === 0) return;
     const shuffledIds = shuffleArray(sortedSongs.map((s) => s.id));
-    await playerStore.setShuffleMode("all");
+    await playerStore.setShuffleMode("off");
     await playerStore.playSongs(shuffledIds, 0, undefined, albumPlayContext());
   }
 
