@@ -58,7 +58,7 @@
       "tab": "collection",
       "subTab": "artists",
       "action": "click-artist",
-      "featuredArtist": "Eric Soltys",
+      "featuredArtist": "Shania Twain",
       "sidebarWidth": 220
     },
     {
@@ -66,6 +66,21 @@
       "filename": "artists.png",
       "tab": "collection",
       "subTab": "artists",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "genres",
+      "filename": "genres.png",
+      "tab": "collection",
+      "subTab": "genres",
+      "sidebarWidth": 220
+    },
+    {
+      "name": "genres-hierarchy",
+      "filename": "genres-hierarchy.png",
+      "tab": "collection",
+      "subTab": "genres",
+      "action": "right-click-genre-chip",
       "sidebarWidth": 220
     },
     {

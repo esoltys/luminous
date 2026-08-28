@@ -5,9 +5,9 @@ import { existsSync, readFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index.ts";
+import type { AlbumItem, ArtistItem, ArtistProfile, Playlist, Song } from "../src/lib/types/index.ts";
 import { hydrateEmbeddedArt } from "./embedded-art-cache.ts";
-import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
+import { FALLBACK_ARTIST_PROFILES, FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "mock-config.json");
@@ -130,6 +130,7 @@ export interface MockLibrary {
   songs: Song[];
   albums: AlbumItem[];
   artists: ArtistItem[];
+  artistProfiles: ArtistProfile[];
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
@@ -348,6 +349,9 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
     songs,
     albums: deriveAlbums(songs),
     artists: deriveArtists(songs),
+    // Real-DB mode has no equivalent lookup here yet — profiles are only
+    // wired up for the bundled fixture library.
+    artistProfiles: fromDb ? [] : FALLBACK_ARTIST_PROFILES,
     playlists,
     playlistTracks: fromDb?.playlistTracks ?? {},
     lyrics: FALLBACK_LYRICS,
