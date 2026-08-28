@@ -89,6 +89,8 @@ impl PlaylistManager {
             .and_then(crate::collection::parse_bpm_range_spec)
         {
             scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)
+        } else if let Some(tag) = spec.strip_prefix("artisttag:") {
+            scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)
         } else if let Some(name) = spec.strip_prefix("tag:") {
             // A system genre auto-playlist, keyed on a curated tag name
             // (#548) rather than a Smart Playlist rule spec (which always

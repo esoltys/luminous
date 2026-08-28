@@ -855,6 +855,7 @@ pub fn run() {
             commands::playlist::sync_all_auto_playlists,
             commands::playlist::get_songs_by_decade,
             commands::playlist::get_songs_by_bpm,
+            commands::playlist::get_songs_by_artist_tag,
             commands::playlist::get_playlists_by_artist,
             commands::playlist::get_playlist_tracks,
             commands::playlist::add_to_playlist,

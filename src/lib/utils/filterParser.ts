@@ -60,6 +60,18 @@ export function parseSearchRules(query: string): Rule[] {
       } else if (rawVal.startsWith("=")) {
         op = "=";
         rawVal = rawVal.slice(1);
+      }
+      let normalizedField = field;
+      if (
+        [
+          "artist_tag",
+          "artist-tag",
+          "artisttag",
+          "artist_tags",
+        ].includes(field)
+      ) {
+        normalizedField = "artist_tag";
+        op = "contains";
       } else if (
         [
           "artist",
@@ -70,10 +82,6 @@ export function parseSearchRules(query: string): Rule[] {
           "composer",
           "key",
           "initial_key",
-          "artist_tag",
-          "artist-tag",
-          "artisttag",
-          "artist_tags",
           "tag",
           "tags",
         ].includes(field)
@@ -81,8 +89,8 @@ export function parseSearchRules(query: string): Rule[] {
         op = "contains";
       }
 
-      if (field && rawVal) {
-        rules.push({ field, op, value: rawVal });
+      if (normalizedField && rawVal) {
+        rules.push({ field: normalizedField, op, value: rawVal });
       }
     }
   }
@@ -97,10 +105,10 @@ export function hasAdvancedSearchTerms(query: string): boolean {
 /**
  * True if a playlist's `dynamic_spec` is a user-authored Smart Playlist rule
  * spec (e.g. "genre:rock", "artist:Miles Davis; rating:>=4"), as opposed to a
- * system genre/decade/BPM auto-playlist. Smart Playlist specs always contain
+ * system genre/decade/BPM/artist-tag auto-playlist. Smart Playlist specs always contain
  * a "field:value" rule; system genre auto-playlists use a "tag:" prefix
- * (#548), decade auto-playlists use "decade:", and BPM auto-playlists use
- * "bpmrange:". Mirrors the categorization in playlist.rs.
+ * (#548), decade auto-playlists use "decade:", BPM auto-playlists use
+ * "bpmrange:", and artist tag auto-playlists use "artisttag:". Mirrors the categorization in playlist.rs.
  */
 export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
   return (
@@ -108,6 +116,7 @@ export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
     spec.includes(":") &&
     !spec.startsWith("decade:") &&
     !spec.startsWith("bpmrange:") &&
-    !spec.startsWith("tag:")
+    !spec.startsWith("tag:") &&
+    !spec.startsWith("artisttag:")
   );
 }

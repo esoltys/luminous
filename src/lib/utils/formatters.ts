@@ -35,3 +35,9 @@ export function formatChannels(ch?: number): string {
   if (ch === 2) return "Stereo";
   return `${ch} ch`;
 }
+
+export function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str.replace(/\b\w+/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+}
+

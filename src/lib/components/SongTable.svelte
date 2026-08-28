@@ -32,6 +32,7 @@
   import SortableHeader from "./SortableHeader.svelte";
   import SongRating from "./SongRating.svelte";
   import GenreChips from "./GenreChips.svelte";
+  import ArtistTagChips from "./ArtistTagChips.svelte";
   import LinkButton from "./LinkButton.svelte";
   import CoverArt from "./CoverArt.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
@@ -315,6 +316,7 @@
     album: { i18nKey: "collection.tableHeaderAlbum", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-1rem)]" },
     composer: { i18nKey: "collection.tableHeaderComposer", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     album_artist: { i18nKey: "collection.tableHeaderAlbumArtist", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
+    artist_tag: { i18nKey: "collection.tableHeaderArtistTag", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     format: { i18nKey: "collection.tableHeaderFormat", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     year: { i18nKey: "collection.tableHeaderYear", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     genre: { i18nKey: "collection.tableHeaderGenre", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
@@ -454,6 +456,17 @@
   {:else if col.key === "album_artist"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium" title={song.album_artist}>
       {song.album_artist || "—"}
+    </div>
+  {:else if col.key === "artist_tag"}
+    {@const artistKey = song.album_artist || song.artist || ""}
+    {@const profile = collectionStore.getArtistProfile(artistKey)}
+    {@const tags = profile?.tags ?? []}
+    <div class="truncate pr-2 min-w-0" title={tags.join("; ")}>
+      {#if tags.length > 0}
+        <ArtistTagChips tags={tags} />
+      {:else}
+        <span class="{secondaryColor(song)} text-xs font-medium">—</span>
+      {/if}
     </div>
   {:else if col.key === "format"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-semibold uppercase">

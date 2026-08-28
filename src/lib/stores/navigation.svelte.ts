@@ -10,17 +10,18 @@ export type PlaylistsSubTab = "auto" | "custom";
 /** An auto-playlist reference (Favourites, Recently Added, genre, decade, BPM,
  * or the genre-less "No Genre" group), for the auto-playlist detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "no_genre";
+  kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "no_genre" | "artist_tag";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */
   genre?: string;
+  artistTag?: string;
   decade?: string;
   /** For kind "bpm": the bucket's dynamic_spec suffix, e.g. "60-90" or the open-ended "150-". */
   bpm?: string;
-  /** For kind "genre", "decade" or "bpm": the materialized (dynamic_enabled) playlist row backing it. */
+  /** For kind "genre", "decade", "bpm" or "artist_tag": the materialized (dynamic_enabled) playlist row backing it. */
   playlistId?: number;
-  /** For kind "genre", "decade" or "bpm": when this playlist's songs were last (re)generated. */
+  /** For kind "genre", "decade", "bpm" or "artist_tag": when this playlist's songs were last (re)generated. */
   updated?: number;
 }
 

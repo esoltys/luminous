@@ -30,6 +30,7 @@ export interface VisibleColumns {
   album: boolean;
   // Optional metatag columns
   album_artist: boolean;
+  artist_tag: boolean;
   bitdepth: boolean;
   bitrate: boolean;
   bpm: boolean;
@@ -116,6 +117,7 @@ class CollectionStore {
         album: true,
         // Optional metatag columns
         album_artist: false,
+        artist_tag: false,
         bitdepth: false,
         bitrate: false,
         bpm: false,

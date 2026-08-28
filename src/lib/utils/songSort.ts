@@ -1,4 +1,5 @@
 import type { Song } from "../types";
+import { collectionStore } from "../stores/collection.svelte";
 
 /**
  * Comparator for sorting songs by an arbitrary `Song` field, matching the
@@ -23,6 +24,11 @@ export function compareSongs(a: Song, b: Song, field: keyof Song, asc: boolean):
   } else if (field === "genre") {
     valA = a.genresort?.trim() || a.genre;
     valB = b.genresort?.trim() || b.genre;
+  } else if ((field as string) === "artist_tag") {
+    const pA = collectionStore.getArtistProfile(a.album_artist || a.artist);
+    const pB = collectionStore.getArtistProfile(b.album_artist || b.artist);
+    valA = pA?.tags?.[0];
+    valB = pB?.tags?.[0];
   }
 
   if (valA === undefined || valA === null) return asc ? 1 : -1;

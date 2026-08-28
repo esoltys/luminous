@@ -26,8 +26,9 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
+    artistTag?: string;
     decade?: string;
     bpm?: string;
     label: string;
@@ -43,7 +44,7 @@
 
   onMount(async () => {
     try {
-      // Auto-playlists (genre, decade, and BPM) are materialized as real (dynamic_enabled) playlist
+      // Auto-playlists (genre, decade, BPM, and artist tags) are materialized as real (dynamic_enabled) playlist
       // rows, refreshed at most once every 24h — sync then re-pull the list.
       await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
@@ -59,7 +60,7 @@
     if (isRefreshingAll) return;
     isRefreshingAll = true;
     try {
-      // Pick up genres/decades/BPM buckets that just crossed the auto-playlist
+      // Pick up genres/decades/BPM buckets/artist tags that just crossed the auto-playlist
       // threshold, and prune ones that no longer have any matching songs.
       await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
@@ -81,6 +82,9 @@
   // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
     playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:"))
+  );
+  let artistTagAutoPlaylists = $derived(
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"))
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let bpmAutoPlaylists = $derived(
@@ -149,6 +153,19 @@
         });
       }
     }
+    for (const p of artistTagAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:artist_tag:${p.id}`,
+          kind: "artist_tag",
+          artistTag: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
+          label: getPlaylistDisplayName(p),
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
     for (const p of bpmAutoPlaylists) {
       if (p.track_count > 0) {
         defs.push({
@@ -176,17 +193,17 @@
   );
 
   // Favourites/Recently Added are always pinned first, ahead of the sort
-  // order applied to decade & genre auto-playlists. BPM auto-playlists always
+  // order applied to decade, genre & artist tag auto-playlists. BPM auto-playlists always
   // sort last, in their fixed intensity order (Down-Tempo → Extreme, set by
   // BPM_BUCKET_ORDER above) — never interleaved into the name/track_count/
-  // updated sort applied to genre/decade, which would otherwise scramble them
+  // updated sort applied to genre/decade/artist tag, which would otherwise scramble them
   // (e.g. "High Energy BPM" sorting alphabetically between two genres).
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "bpm");
+    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "artist_tag" && d.kind !== "bpm");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade")
+      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "artist_tag")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -249,11 +266,13 @@
     navigationStore.viewAutoPlaylist(
       def.kind === "genre"
         ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
-        : def.kind === "decade"
-          ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
-          : def.kind === "bpm"
-            ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-            : { kind: def.kind }
+        : def.kind === "artist_tag"
+          ? { kind: "artist_tag", artistTag: def.artistTag, playlistId: def.playlistId, updated: def.updated }
+          : def.kind === "decade"
+            ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
+            : def.kind === "bpm"
+              ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
+              : { kind: def.kind }
     );
   }
 
@@ -406,6 +425,7 @@
                   label={def.label}
                   kind={def.kind}
                   genre={def.genre}
+                  artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
                   playlistId={def.playlistId}
@@ -418,6 +438,7 @@
                   label={def.label}
                   kind={def.kind}
                   genre={def.genre}
+                  artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
                   playlistId={def.playlistId}
