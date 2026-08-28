@@ -322,7 +322,7 @@
     if (songs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
     const shuffledIds = shuffleArray(songs.map((s) => s.id));
-    await playerStore.setShuffleMode("all");
+    await playerStore.setShuffleMode("off");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);

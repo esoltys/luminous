@@ -484,32 +484,51 @@ impl Player {
 
         let uuid_set: std::collections::HashSet<&str> = uuids.iter().map(String::as_str).collect();
         let current_uuid = self.current_item_uuid.clone();
+        let old_uuids: Vec<String> = self.playlist_items.iter().map(|i| i.uuid.clone()).collect();
 
         self.playlist_items.retain(|item| {
             !uuid_set.contains(item.uuid.as_str())
                 || current_uuid.as_deref() == Some(item.uuid.as_str())
         });
 
+        let uuid_to_new_idx: std::collections::HashMap<&str, usize> = self
+            .playlist_items
+            .iter()
+            .enumerate()
+            .map(|(idx, item)| (item.uuid.as_str(), idx))
+            .collect();
+
         let new_real_idx = current_uuid
             .as_ref()
-            .and_then(|u| self.playlist_items.iter().position(|i| &i.uuid == u));
+            .and_then(|u| uuid_to_new_idx.get(u.as_str()).copied());
 
         self.played_indices.clear();
 
         if self.shuffle_mode == ShuffleMode::Off {
             self.current_index = new_real_idx;
             self.shuffle_order = (0..self.playlist_items.len()).collect();
-        } else if let Some(real_idx) = new_real_idx {
-            // Seed a single-element shuffle_order pointing at the playing
-            // item's new real index so rebuild_shuffle_order's remap step
-            // (which reads the old shuffle_order via the old current_index)
-            // resolves it correctly, then let it reshuffle the rest.
-            self.shuffle_order = vec![real_idx];
-            self.current_index = Some(0);
-            self.rebuild_shuffle_order();
         } else {
-            self.current_index = None;
-            self.shuffle_order = Vec::new();
+            let mut new_shuffle_order = Vec::with_capacity(self.playlist_items.len());
+            for &old_real_idx in &self.shuffle_order {
+                if let Some(old_uuid) = old_uuids.get(old_real_idx) {
+                    if let Some(&new_idx) = uuid_to_new_idx.get(old_uuid.as_str()) {
+                        new_shuffle_order.push(new_idx);
+                    }
+                }
+            }
+            let mut seen = std::collections::HashSet::new();
+            for &idx in &new_shuffle_order {
+                seen.insert(idx);
+            }
+            for i in 0..self.playlist_items.len() {
+                if !seen.contains(&i) {
+                    new_shuffle_order.push(i);
+                }
+            }
+            self.shuffle_order = new_shuffle_order;
+            self.current_index = new_real_idx.and_then(|real_idx| {
+                self.shuffle_order.iter().position(|&idx| idx == real_idx)
+            });
         }
 
         if let Some(idx) = self.current_index {
@@ -536,10 +555,19 @@ impl Player {
         if self.shuffle_mode == ShuffleMode::Off {
             self.current_index = new_real_idx;
             self.shuffle_order = (0..self.playlist_items.len()).collect();
-        } else if let Some(real_idx) = new_real_idx {
-            self.shuffle_order = vec![real_idx];
-            self.current_index = Some(0);
-            self.rebuild_shuffle_order();
+        } else {
+            for idx in &mut self.shuffle_order {
+                if *idx == from {
+                    *idx = to;
+                } else if from < to && *idx > from && *idx <= to {
+                    *idx -= 1;
+                } else if from > to && *idx >= to && *idx < from {
+                    *idx += 1;
+                }
+            }
+            self.current_index = new_real_idx.and_then(|real_idx| {
+                self.shuffle_order.iter().position(|&i| i == real_idx)
+            });
         }
     }
 
@@ -2316,6 +2344,62 @@ mod tests {
             vec![2, 4, 6],
             "InsideAlbum must keep Album B as a contiguous group after Album A"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_remove_songs_preserves_shuffle_order() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=5i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=5i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player.set_shuffle_mode(ShuffleMode::All);
+        player.play_playlist(items.clone(), 0, 0, None).await.unwrap();
+
+        // Fix shuffle order manually to test deterministic preservation
+        // Order: [Song 1 (idx 0), Song 4 (idx 3), Song 2 (idx 1), Song 5 (idx 4), Song 3 (idx 2)]
+        player.shuffle_order = vec![0, 3, 1, 4, 2];
+        player.current_index = Some(0);
+
+        // Remove Song 2 (uuid of items[1])
+        let removed_uuid = items[1].uuid.clone();
+        player.remove_songs_from_playlist_items(&[removed_uuid]);
+
+        // After removing Song 2 (items[1]):
+        // Remaining items: Song 1 (idx 0), Song 3 (idx 1), Song 4 (idx 2), Song 5 (idx 3)
+        // Shuffle order should be: Song 1 (0), Song 4 (2), Song 5 (3), Song 3 (1) -> vec![0, 2, 3, 1]
+        assert_eq!(player.shuffle_order, vec![0, 2, 3, 1]);
+        assert_eq!(player.current_index, Some(0));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
