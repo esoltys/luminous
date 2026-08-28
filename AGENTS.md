@@ -25,7 +25,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 ## Branching & PR Rules
 
 - NEVER commit or push directly to `main`. All changes ship via PR, even release version bumps and docs-only edits.
-- NEVER merge PRs yourself. Open the PR, ensure all CI checks pass, and let the user review and merge the PR on GitHub.
+- NEVER merge PRs yourself. Open the PR, provide the PR link to the user, and let the user review and merge the PR on GitHub once CI checks complete (the assistant does not need to monitor or wait for CI).
 - PR base branch depends on the target issue's milestone — see Branching Model below (2.0-milestone work targets `next`; everything else targets `main`).
 - Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/<base>`.
 
@@ -240,7 +240,7 @@ punt either to the user.
 - As soon as you start working a tracked issue, set its Status to "In Progress" on the Project board (see [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the `gh project item-edit` command) — don't leave it sitting at "Todo" while work is underway.
 - Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR. Do NOT run `bun run tauri dev` as a background task (it does not work as expected). Ask the user to run the dev server (`bun run tauri dev`) and check manually.
 - **NEVER merge pull requests yourself.** The assistant must never execute `gh pr merge`, `git merge`, or auto-merge PRs. Pull requests must be reviewed and merged exclusively by the user on GitHub after all CI checks have passed.
-- After creating a PR, monitor the CI check status (`gh pr checks <id>`). Once checks pass, provide the PR link to the user for final review and merge.
+- After creating a PR, provide the PR link directly to the user for review and merge. You do not need to monitor or wait for CI checks — the user will make sure the checks complete before merging.
 - Only after the user has reviewed and merged the PR on GitHub should the corresponding issues be confirmed closed and their Status set to "Done" on the Project board. On Windows, `git worktree remove` fails with "Permission denied" on the worktree the current session is running from (open file handles keep it locked) — hand the `git worktree remove`/`git branch -d` commands to the user to run themselves in that case instead of retrying.
 - **Creating Issues & Pull Requests**:
   1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`) when creating issues.
