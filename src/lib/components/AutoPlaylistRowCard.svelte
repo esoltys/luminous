@@ -4,6 +4,7 @@
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { toTitleCase } from "../utils/formatters";
 
   interface Props {
     label: string;
@@ -25,7 +26,7 @@
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
-    return label;
+    return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
   let subtitleLabel = $derived.by(() => {

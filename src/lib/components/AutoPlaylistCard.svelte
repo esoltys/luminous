@@ -7,6 +7,9 @@
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import CoverStack from "./CoverStack.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
+  import { getPlaylistDisplayName } from "../utils/playlist";
+  import { toTitleCase } from "../utils/formatters";
 
   interface Props {
     label: string;
@@ -25,9 +28,6 @@
     widthClass?: string;
   }
 
-  import { playlistsStore } from "../stores/playlists.svelte";
-  import { getPlaylistDisplayName } from "../utils/playlist";
-
   let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let displayLabel = $derived.by(() => {
@@ -35,7 +35,7 @@
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
-    return label;
+    return kind === "artist_tag" ? toTitleCase(label) : label;
   });
 
   let subtitleLabel = $derived.by(() => {

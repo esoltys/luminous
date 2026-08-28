@@ -475,11 +475,12 @@ impl PlaylistManager {
                 continue;
             }
 
+            let display_name = to_title_case(tag);
             let playlist_id = match existing_row {
                 Some((id, _, _, _)) => {
                     conn.execute(
-                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-                        params![now, id],
+                        "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+                        params![display_name, now, id],
                     )?;
                     conn.execute(
                         "DELETE FROM playlist_items WHERE playlist_id = ?1",
@@ -490,7 +491,7 @@ impl PlaylistManager {
                 None => {
                     conn.execute(
                         "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
-                        params![tag, spec, now],
+                        params![display_name, spec, now],
                     )?;
                     conn.last_insert_rowid()
                 }
@@ -506,6 +507,26 @@ impl PlaylistManager {
 
         Ok(())
     }
+}
+
+/// Converts a lowercase or normalized tag string into Title Case (e.g. "canadian" -> "Canadian", "prog-rock" -> "Prog-Rock").
+fn to_title_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut capitalize_next = true;
+    for ch in s.chars() {
+        if ch.is_alphanumeric() {
+            if capitalize_next {
+                result.extend(ch.to_uppercase());
+                capitalize_next = false;
+            } else {
+                result.extend(ch.to_lowercase());
+            }
+        } else {
+            result.push(ch);
+            capitalize_next = true;
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -925,14 +946,18 @@ mod tests {
         manager.sync_artist_tag_auto_playlists().unwrap();
 
         let playlists = manager.get_playlists().unwrap();
-        assert!(
-            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
-            "Rush has 25 songs so artisttag:canadian should be created"
-        );
-        assert!(
-            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:prog-rock")),
-            "Rush has 25 songs so artisttag:prog-rock should be created"
-        );
+        let canadian_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian"))
+            .expect("Rush has 25 songs so artisttag:canadian should be created");
+        assert_eq!(canadian_pl.name, "Canadian", "artist tag playlist name must be Title Case");
+
+        let prog_pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("artisttag:prog-rock"))
+            .expect("Rush has 25 songs so artisttag:prog-rock should be created");
+        assert_eq!(prog_pl.name, "Prog-Rock", "artist tag playlist name must be Title Case");
+
         assert!(
             !playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:indie")),
             "IndieArtist has 1 song (< 25) so artisttag:indie should not be created"

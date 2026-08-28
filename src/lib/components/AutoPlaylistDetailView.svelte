@@ -31,6 +31,7 @@
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import { compareSongs } from "../utils/songSort";
+  import { toTitleCase } from "../utils/formatters";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
   import AlbumTagEditor from "./AlbumTagEditor.svelte";
@@ -109,7 +110,10 @@
             return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
           })()
         : kind === "artist_tag"
-          ? (artistTag || i18n.t("playlists.artistTagAutoPlaylist"))
+          ? (() => {
+              const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+              return pl?.name || toTitleCase(artistTag || "") || i18n.t("playlists.artistTagAutoPlaylist");
+            })()
           : kind === "no_genre"
             ? i18n.t("songTags.noGenre", {}, "No Genre")
             : genre || i18n.t("artistDetail.unknownGenre");
