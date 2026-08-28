@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumCard from "./AlbumCard.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem } from "../types";
@@ -38,7 +39,7 @@ describe("AlbumCard.svelte", () => {
 
   it("rates the album via the rating widget without navigating to it", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(4);
-    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
     const { getByLabelText } = render(AlbumCard, { props: { album: mockAlbum } });
 
     await fireEvent.click(getByLabelText("Rate 4 of 5"));
@@ -48,7 +49,7 @@ describe("AlbumCard.svelte", () => {
   });
 
   it("navigates to album when album title is clicked", async () => {
-    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
 
     const albumTitleBtn = getByText("Fake Nudes");
@@ -58,7 +59,7 @@ describe("AlbumCard.svelte", () => {
   });
 
   it("navigates to artist when artist name is clicked", async () => {
-    const viewArtistSpy = vi.spyOn(collectionStore, "viewArtist");
+    const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist");
     const { getByText } = render(AlbumCard, { props: { album: mockAlbum } });
 
     const artistBtn = getByText("Barenaked Ladies");

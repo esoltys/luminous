@@ -10,13 +10,18 @@
 import type {
   AlbumItem,
   ArtistItem,
+  ArtistProfile,
   FileType,
+  GenreGroup,
   HomeItem,
   Playlist,
   PlayState,
   RepeatMode,
   ShuffleMode,
   Song,
+  Tag,
+  TagCount,
+  TagGroup,
 } from "../src/lib/types/index";
 
 interface AppSettings {
@@ -51,10 +56,20 @@ function defaultParametricBands(): ParametricBand[] {
   }));
 }
 
+interface MockTagGroup {
+  name: string;
+  color_index: number;
+  children: string[];
+}
+
 interface MockLibrary {
   songs: Song[];
   albums: AlbumItem[];
   artists: ArtistItem[];
+  artistProfiles?: ArtistProfile[];
+  /** Persisted Genres curation hierarchy (#545), read straight from the real
+   * tag_groups/tag_assignments tables — undefined for the bundled fixture. */
+  tagGroups?: MockTagGroup[];
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
@@ -165,10 +180,14 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     songs: [STANDALONE_FALLBACK_SONG],
     albums: [],
     artists: [],
+    artistProfiles: [],
     playlists: [],
     playlistTracks: {},
     lyrics: "",
   };
+  // Mutable so set_artist_profile below can save edits made through the
+  // mocked ArtistProfileEditor during manual dev-server testing.
+  let artistProfiles: ArtistProfile[] = library.artistProfiles ?? [];
   const featured = window.__LUMINOUS_MOCK_FEATURED__ ?? {};
   const featuredSong = featured.song ?? library.songs[0];
 
@@ -430,6 +449,108 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     return items;
   }
 
+  // Mirrors parse_multi_value() in src-tauri/src/models.rs: multi-value
+  // Artist/Album Artist/Composer/Genre tags (#143) are "; "-delimited
+  // strings; splitting on it is enough for the mock's Genres/Tags views.
+  function parseMultiValue(raw: string | undefined | null): string[] {
+    if (!raw) return [];
+    return raw
+      .split(";")
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+  }
+
+  // Mirrors get_tags_overview()'s two DB scans (src-tauri/src/tags.rs):
+  // `tags` is every distinct genre value from any position, case-insensitive
+  // deduped; `graph` groups songs by their first genre value ("main tag"),
+  // with every other value on those songs as a child count.
+  function buildTagsOverview(): { tags: Tag[]; graph: GenreGroup[]; no_genre_count: number } {
+    const tagSongCounts = new Map<string, { name: string; count: number }>();
+    const mainTagGroups = new Map<string, { song_count: number; children: Map<string, number> }>();
+    let noGenreCount = 0;
+
+    for (const song of library.songs) {
+      const values = parseMultiValue(song.genre);
+      if (values.length === 0) {
+        noGenreCount++;
+        continue;
+      }
+      for (const value of values) {
+        const key = value.toLowerCase();
+        const existing = tagSongCounts.get(key);
+        if (existing) existing.count++;
+        else tagSongCounts.set(key, { name: value, count: 1 });
+      }
+
+      const [mainTag, ...children] = values;
+      const group = mainTagGroups.get(mainTag) ?? { song_count: 0, children: new Map() };
+      group.song_count++;
+      for (const child of children) {
+        group.children.set(child, (group.children.get(child) ?? 0) + 1);
+      }
+      mainTagGroups.set(mainTag, group);
+    }
+
+    const tags: Tag[] = [...tagSongCounts.values()]
+      .map(({ name, count }) => ({ name, song_count: count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const graph: GenreGroup[] = [...mainTagGroups.entries()]
+      .map(([main_tag, { song_count, children }]) => ({
+        main_tag,
+        song_count,
+        children: [...children.entries()]
+          .map(([name, count]): TagCount => ({ name, song_count: count }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.main_tag.localeCompare(b.main_tag));
+
+    return { tags, graph, no_genre_count: noGenreCount };
+  }
+
+  // The real Genres tab hierarchy (get_tag_hierarchy) is separately persisted
+  // curation state, not re-derived from song genres on every read — but for
+  // the mock, mirroring the emergent graph above into TagGroup's shape gives
+  // GenreBrowseView/GenreCards the same parent/child structure to render,
+  // which is all the docs screenshots need.
+  function buildTagHierarchy(): TagGroup[] {
+    // Mirrors TagManager::get_tag_hierarchy() in src-tauri/src/tags.rs: the
+    // curated hierarchy is persisted (tag_groups/tag_assignments), not
+    // re-derived from song genre order — a real DB's tagGroups (read
+    // straight from those tables in mock-library.ts) always wins when
+    // present, since it reflects the user's own manual curation (drag a
+    // chip onto a card, promote, rename, etc.) rather than a guess.
+    if (library.tagGroups) {
+      const { tags } = buildTagsOverview();
+      const counts = new Map(tags.map((t) => [t.name.toLowerCase(), t.song_count]));
+      return library.tagGroups.map(
+        (group): TagGroup => ({
+          name: group.name,
+          color_index: group.color_index,
+          song_count: counts.get(group.name.toLowerCase()) ?? 0,
+          children: group.children.map((name) => ({
+            name,
+            song_count: counts.get(name.toLowerCase()) ?? 0,
+          })),
+        })
+      );
+    }
+
+    // No persisted hierarchy to read (the bundled fixture has no equivalent
+    // tables) — fall back to an emergent approximation from song genre order.
+    const { graph } = buildTagsOverview();
+    return graph.map(
+      (group, i): TagGroup => ({
+        name: group.main_tag,
+        color_index: i % 8,
+        song_count: group.song_count,
+        children: group.children,
+      })
+    );
+  }
+
+  let minimizeToTrayEnabled = true;
+
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
@@ -556,6 +677,25 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // resolves empty — matches the real backend's shape (AlbumItem[]) for
     // an artist with no compilation appearances, rather than null.
     get_compilations_by_artist: () => [],
+
+    get_tags_overview: () => buildTagsOverview(),
+    get_tag_hierarchy: () => buildTagHierarchy(),
+    // Not exercised by any screenshot target — mocked with a no-op count so
+    // manual dev-server testing of GenreCards' merge/delete dialogs doesn't
+    // log "unhandled command" warnings.
+    merge_tags: () => 0,
+    delete_tags: () => 0,
+
+    get_artist_profile: (args) => {
+      const artist = args.artist as string;
+      return artistProfiles.find((p) => p.artist_key.toLowerCase() === artist?.toLowerCase()) ?? null;
+    },
+    get_all_artist_profiles: () => artistProfiles,
+    set_artist_profile: (args) => {
+      const profile = args.profile as ArtistProfile;
+      artistProfiles = [...artistProfiles.filter((p) => p.artist_key !== profile.artist_key), profile];
+      return profile;
+    },
 
     get_song_details: (args) => {
       const songId = args.songId as number;
@@ -779,7 +919,14 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // assigns from the echo, so a bare noop would blank the EQ UI.
   commands["apply_equalizer_config"] = (args) => args.config;
   commands["validate_playlist_name"] = () => ({ valid: true, reason: null });
-  commands["get_minimize_to_tray_enabled"] = () => false;
+  // Defaults to enabled (unlike the real app's fresh-install default of
+  // false) so the System Tray settings screenshot documents the feature in
+  // its "on" state without a dedicated capture target/action.
+  commands["get_minimize_to_tray_enabled"] = () => minimizeToTrayEnabled;
+  commands["set_minimize_to_tray_enabled"] = (args) => {
+    minimizeToTrayEnabled = !!args.enabled;
+    return null;
+  };
   // No update available — matches @tauri-apps/plugin-updater's `check()`
   // return shape (null when up to date) so updaterStore.checkForUpdates()
   // resolves cleanly instead of logging an unhandled-command warning.
@@ -792,6 +939,14 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     artists_view_mode: "cards",
     playlists_auto_view_mode: "cards",
     playlists_custom_view_mode: "cards",
+    // Without these, prefs.genreViewMode reads back undefined and the
+    // Genres tab falls through to the flat Tags view instead of the
+    // curated-hierarchy cards view the genres/genres-hierarchy screenshot
+    // targets are meant to capture.
+    genre_view_mode: "genre",
+    genre_cards_view_mode: "cards",
+    genre_sort_field: "name",
+    genre_sort_asc: true,
   });
 
   const NOOP_COMMANDS = [
@@ -804,6 +959,10 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
     "move_window_to_preset", "get_window_geometry", "plugin:window|show",
     "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
+    // Genres curation (#545) — not exercised by any screenshot target, but
+    // mocked so manual dev-server testing of GenreCards' drag/context-menu
+    // actions doesn't log "unhandled command" warnings.
+    "set_tag_group_color", "reparent_tag", "promote_tag", "demote_group_to_child", "reorder_tag_in_group",
   ];
   for (const cmd of NOOP_COMMANDS) commands[cmd] = noop;
 

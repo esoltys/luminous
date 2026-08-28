@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumRowCard from "./AlbumRowCard.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { prefs } from "../stores/prefs.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import type { AlbumItem } from "../types";
@@ -37,7 +38,7 @@ describe("AlbumRowCard.svelte", () => {
 
   it("rates the album via the rating widget without navigating to it", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(4);
-    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
     const { getByLabelText } = render(AlbumRowCard, { props: { album: mockAlbum } });
 
     await fireEvent.click(getByLabelText("Rate 4 of 5"));
@@ -54,7 +55,7 @@ describe("AlbumRowCard.svelte", () => {
   });
 
   it("navigates to the album on click by default", async () => {
-    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum");
     const { getByText } = render(AlbumRowCard, { props: { album: mockAlbum } });
 
     await fireEvent.click(getByText("Fake Nudes"));

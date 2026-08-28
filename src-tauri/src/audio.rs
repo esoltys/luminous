@@ -684,6 +684,56 @@ fn build_output(
     })
 }
 
+/// Runs `build_output` on a brand-new, short-lived OS thread instead of the
+/// caller's own thread. Used only for stream *rebuilds* (device switch /
+/// stream error) — see #619: once `decode_thread`'s long-lived OS thread has
+/// built and torn down a WASAPI stream for one device, re-querying
+/// `default_output_config()` on that same thread for a *different* device can
+/// fail with `RPC_E_CHANGED_MODE`. A fresh thread has no such history, so its
+/// first COM touch (via cpal's own thread-local guard) starts clean.
+/// `cpal::Stream` is `Send + Sync`, so the built `AudioOutput` can safely be
+/// handed back to the caller. Bounded by a timeout so a wedged WASAPI call on
+/// the scratch thread can't hang `decode_thread` — see the wedge risk
+/// documented on `AudioOutput` above.
+#[allow(clippy::too_many_arguments)]
+fn build_output_on_fresh_thread(
+    position: &Arc<AtomicU64>,
+    volume: &Arc<Mutex<f32>>,
+    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
+    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
+    loudness_gain: &Arc<AtomicU32>,
+    fade_gain: &Arc<AtomicU32>,
+) -> Result<AudioOutput, String> {
+    let position = Arc::clone(position);
+    let volume = Arc::clone(volume);
+    let visualizer_buf = Arc::clone(visualizer_buf);
+    let equalizer = Arc::clone(equalizer);
+    let loudness_gain = Arc::clone(loudness_gain);
+    let fade_gain = Arc::clone(fade_gain);
+
+    let (tx, rx) = mpsc::channel();
+    let spawned = std::thread::Builder::new()
+        .name("luminous-audio-rebuild".into())
+        .spawn(move || {
+            let result = build_output(
+                &position,
+                &volume,
+                &visualizer_buf,
+                &equalizer,
+                &loudness_gain,
+                &fade_gain,
+            );
+            let _ = tx.send(result);
+        });
+
+    if let Err(e) = spawned {
+        return Err(format!("Failed to spawn audio rebuild thread: {e}"));
+    }
+
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap_or_else(|_| Err("Timed out rebuilding audio output stream".to_string()))
+}
+
 /// Mutable state that lives for the duration of one track's inner `'decode`
 /// loop iteration in [`decode_thread`]. Kept separate from `output:
 /// Option<AudioOutput>` because the output stream is reassigned wholesale on
@@ -1044,7 +1094,7 @@ fn check_and_rebuild_output(
             }
             *output = None;
 
-            match build_output(
+            match build_output_on_fresh_thread(
                 position,
                 volume,
                 visualizer_buf,

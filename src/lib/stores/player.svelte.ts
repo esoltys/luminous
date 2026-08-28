@@ -58,6 +58,8 @@ export class PlayerStore {
         const oldSongAlbum = this.currentSong?.album;
         const wasPlaying = this._previousState === "playing";
         const prevShuffle = this.shuffleMode;
+        const oldPlaylistId = this.playlistId;
+        const oldContextName = this.activeContextName;
         this.updateState(event.payload);
         this._previousState = this.state;
         if (prevShuffle !== this.shuffleMode && playlistsStore.activePlaylistId !== null) {
@@ -73,9 +75,33 @@ export class PlayerStore {
         if (wasPlaying && this.state === "stopped" && this.remainingPlaylistItems === 0 && !this.currentSong) {
           this.queueJustCompleted = true;
 
-          const toastText = i18n.t("celebrations.queueComplete", {}, "Your Queue is done");
+          const playedPl =
+            oldPlaylistId !== null && oldPlaylistId !== undefined
+              ? playlistsStore.playlists.find((p) => p.id === oldPlaylistId)
+              : undefined;
+          const isQueue = playedPl ? playedPl.is_queue : (!oldContextName || oldContextName === "Queue");
+
+          const toastText = isQueue
+            ? i18n.t("celebrations.queueComplete", {}, "Your Queue is done")
+            : i18n.t("celebrations.contextComplete", { name: oldContextName }, `${oldContextName} complete`);
           toastStore.show(toastText, "milestone");
           setTimeout(() => { this.queueJustCompleted = false; }, 650);
+
+          if (isQueue) {
+            const queuePl = playlistsStore.queuePlaylist;
+            if (queuePl) {
+              await playlistsStore.clearPlaylist(queuePl.id);
+            } else {
+              try {
+                const reqQueue = await playlistsStore.requireQueue();
+                if (reqQueue) {
+                  await playlistsStore.clearPlaylist(reqQueue.id);
+                }
+              } catch (err) {
+                console.error("Failed to resolve Queue to clear:", err);
+              }
+            }
+          }
         }
       });
 
@@ -297,6 +323,7 @@ export class PlayerStore {
   private async syncQueueTrackPosition() {
     if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
     if (this.repeatMode === "playlist") return;
+    if (this.shuffleMode !== "off") return;
     const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
     if (pl?.is_queue || this.activeContextName === "Queue") {
       await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);

@@ -4,6 +4,7 @@
   import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock, ImageOff } from "lucide-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -166,7 +167,7 @@
       console.error("AcoustID lookup failed:", e);
       const str = e.toString();
       if (str.includes("NO_API_KEY")) {
-        collectionStore.activeTab = "settings";
+        navigationStore.activeTab = "settings";
         invoke("set_app_setting", { key: "active_settings_tab", value: "tools" });
         onClose();
         return;
