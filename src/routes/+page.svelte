@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { themeStore } from "../lib/stores/theme.svelte";
-  import { collectionStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/collection.svelte";
+  import { collectionStore } from "../lib/stores/collection.svelte";
+  import { navigationStore, type ActiveTab, type ActiveSubTab } from "../lib/stores/navigation.svelte";
   import { playerStore } from "../lib/stores/player.svelte";
 
   let isInitialized = $state(false);
@@ -64,7 +65,7 @@
         if (settings) {
           if (settings.active_tab) {
             if (settings.active_tab === "equalizer") {
-              collectionStore.activeTab = "settings";
+              navigationStore.activeTab = "settings";
               invoke("set_app_setting", { key: "active_tab", value: "settings" }).catch((err) => {
                 console.error("Failed to save migrated active_tab:", err);
               });
@@ -72,11 +73,11 @@
                 console.error("Failed to save migrated active_settings_tab:", err);
               });
             } else {
-              collectionStore.activeTab = settings.active_tab as ActiveTab;
+              navigationStore.activeTab = settings.active_tab as ActiveTab;
             }
           }
           if (settings.active_sub_tab) {
-            collectionStore.activeSubTab = settings.active_sub_tab as ActiveSubTab;
+            navigationStore.activeSubTab = settings.active_sub_tab as ActiveSubTab;
           }
         }
       } catch (e) {
@@ -93,7 +94,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_tab", value: collectionStore.activeTab }).catch((err) => {
+      invoke("set_app_setting", { key: "active_tab", value: navigationStore.activeTab }).catch((err) => {
         console.error("Failed to save active_tab:", err);
       });
     }
@@ -101,7 +102,7 @@
 
   $effect(() => {
     if (isInitialized) {
-      invoke("set_app_setting", { key: "active_sub_tab", value: collectionStore.activeSubTab }).catch((err) => {
+      invoke("set_app_setting", { key: "active_sub_tab", value: navigationStore.activeSubTab }).catch((err) => {
         console.error("Failed to save active_sub_tab:", err);
       });
     }
@@ -112,27 +113,27 @@
 <div class="flex flex-col h-full overflow-hidden bg-brand-main font-sans">
   <!-- Main View Content Area -->
   <div class="flex-1 min-w-0 overflow-hidden flex flex-col">
-    {#if collectionStore.activeTab === "home"}
+    {#if navigationStore.activeTab === "home"}
       {#await import("../lib/components/HomeView.svelte") then { default: HomeView }}
         <HomeView />
       {/await}
-    {:else if collectionStore.activeTab === "collection"}
+    {:else if navigationStore.activeTab === "collection"}
       {#await import("../lib/components/CollectionView.svelte") then { default: CollectionView }}
         <CollectionView />
       {/await}
-    {:else if collectionStore.activeTab === "playlists"}
+    {:else if navigationStore.activeTab === "playlists"}
       {#await import("../lib/components/PlaylistsCollectionView.svelte") then { default: PlaylistsCollectionView }}
         <PlaylistsCollectionView />
       {/await}
-    {:else if collectionStore.activeTab === "settings"}
-      {#await import("../lib/components/FoldersView.svelte") then { default: FoldersView }}
-        <FoldersView />
+    {:else if navigationStore.activeTab === "settings"}
+      {#await import("../lib/components/SettingsView.svelte") then { default: SettingsView }}
+        <SettingsView />
       {/await}
-    {:else if collectionStore.activeTab === "lyrics"}
+    {:else if navigationStore.activeTab === "lyrics"}
       {#await import("../lib/components/LyricsView.svelte") then { default: LyricsView }}
         <LyricsView />
       {/await}
-    {:else if collectionStore.activeTab === "help"}
+    {:else if navigationStore.activeTab === "help"}
       {#await import("../lib/components/HelpView.svelte") then { default: HelpView }}
         <HelpView />
       {/await}

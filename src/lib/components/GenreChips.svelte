@@ -1,6 +1,7 @@
 <script lang="ts">
   import { parseMultiValue } from "../utils/multiValue";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -22,7 +23,7 @@
 
   function goToTag(e: MouseEvent, value: string) {
     e.stopPropagation();
-    collectionStore.viewGenreTag(value);
+    navigationStore.viewGenreTag(value);
   }
 </script>
 

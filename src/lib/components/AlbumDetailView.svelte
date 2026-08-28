@@ -3,6 +3,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { shuffleArray } from "../utils/shuffle";
@@ -225,8 +227,8 @@
   let rangeSelectionRows = $derived(songs.map(songToRow));
 
   function goBack() {
-    collectionStore.selectedAlbumName = null;
-    collectionStore.activeSubTab = "albums";
+    navigationStore.selectedAlbumName = null;
+    navigationStore.activeSubTab = "albums";
   }
 
   async function handlePlaySong(song: Song) {
@@ -351,10 +353,10 @@
     </div>
   {/if}
 
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
-        {#if !collectionStore.isDetailHeaderCollapsed}
+        {#if !windowLayoutStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
         </h1>
@@ -362,7 +364,7 @@
         <div class="flex items-center gap-2 text-base font-semibold text-brand-accent-text">
           {#if artistName}
             <LinkButton
-              onclick={() => collectionStore.viewArtist(artistName)}
+              onclick={() => navigationStore.viewArtist(artistName)}
               class="font-bold"
             >
               {artistName}
@@ -426,7 +428,7 @@
         </div>
       </div>
 
-      {#if !collectionStore.isDetailHeaderCollapsed}
+      {#if !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
           <CoverArt
@@ -522,8 +524,8 @@
         handleAddSongToPlaylist(song.id);
       }
     }}
-    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
     onClose={() => { contextMenuState = null; }}
   />

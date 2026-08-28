@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import Sidebar from "./Sidebar.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -16,8 +17,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("Sidebar.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionStore.activeTab = "collection";
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "songs";
     collectionStore.stats = {
       total_songs: 10,
       total_albums: 5,
@@ -39,19 +40,19 @@ describe("Sidebar.svelte", () => {
 
     const artistsBtn = getByRole("button", { name: /artists/i });
     await fireEvent.click(artistsBtn);
-    expect(collectionStore.activeSubTab).toBe("artists");
+    expect(navigationStore.activeSubTab).toBe("artists");
 
     const albumsBtn = getByRole("button", { name: /albums/i });
     await fireEvent.click(albumsBtn);
-    expect(collectionStore.activeSubTab).toBe("albums");
+    expect(navigationStore.activeSubTab).toBe("albums");
 
     const songsBtn = getByRole("button", { name: /songs/i });
     await fireEvent.click(songsBtn);
-    expect(collectionStore.activeSubTab).toBe("songs");
+    expect(navigationStore.activeSubTab).toBe("songs");
   });
 
   it("keeps Collection sub-items expanded even when a non-collection tab is active", () => {
-    collectionStore.activeTab = "home";
+    navigationStore.activeTab = "home";
     const { queryByRole } = render(Sidebar, { props: { width: 256 } });
     expect(queryByRole("button", { name: /artists/i })).not.toBeNull();
     expect(queryByRole("button", { name: /albums/i })).not.toBeNull();

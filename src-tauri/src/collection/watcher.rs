@@ -95,31 +95,32 @@ fn reconcile_watcher_batch(
             .push(path);
     }
 
-    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, &PathBuf)>> =
+    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, Option<String>, &PathBuf)>> =
         std::collections::HashMap::new();
     for path in removed_paths {
         let path_str = path.to_string_lossy().to_string();
         let Some(filename) = path.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
             continue;
         };
-        let row: Option<(i64, i64)> = conn
+        let row: Option<(i64, i64, Option<String>)> = conn
             .query_row(
-                "SELECT id, filesize FROM songs WHERE path = ?1 AND filesize IS NOT NULL",
+                "SELECT id, filesize, art_automatic FROM songs WHERE path = ?1 AND filesize IS NOT NULL",
                 params![path_str],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .ok();
-        if let Some((id, filesize)) = row {
+        if let Some((id, filesize, art_automatic)) = row {
             orphans
                 .entry((filename, filesize))
                 .or_default()
-                .push((id, path));
+                .push((id, art_automatic, path));
         }
     }
 
     let mut matched_removed = std::collections::HashSet::new();
     let mut matched_added = std::collections::HashSet::new();
-    let mut update_stmt = conn.prepare("UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3")?;
+    let mut update_stmt =
+        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
 
     for (key, orphan_list) in &orphans {
         if orphan_list.len() != 1 {
@@ -132,12 +133,19 @@ fn reconcile_watcher_batch(
             continue; // ambiguous — multiple new files share this filename+size
         }
 
-        let (song_id, old_path) = orphan_list[0];
+        let (song_id, old_art_automatic, old_path) = &orphan_list[0];
         let new_path = candidate_list[0];
         let new_path_str = new_path.to_string_lossy().to_string();
         let mtime = super::get_mtime(new_path).unwrap_or(0);
-        update_stmt.execute(params![new_path_str, mtime, song_id])?;
-        matched_removed.insert(old_path);
+
+        let new_art_automatic = match old_art_automatic.as_deref() {
+            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
+            _ => CoverManager::scan_folder_art_static(new_path)
+                .map(|p| p.to_string_lossy().to_string()),
+        };
+
+        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, song_id])?;
+        matched_removed.insert(*old_path);
         matched_added.insert(new_path);
     }
 
@@ -645,6 +653,66 @@ mod tests {
         assert_eq!(
             songs[0].path.as_deref(),
             Some(r"C:\Music\OtherArtist\song3.mp3")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_watcher_batch_refreshes_folder_cover_art() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_watcher_reconcile_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir = temp_dir.join("new");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let old_path = old_dir.join("track.mp3");
+        let old_cover = old_dir.join("cover.jpg");
+        let new_path = new_dir.join("track.mp3");
+        let new_cover = new_dir.join("cover.jpg");
+        let content = b"audio bytes for watcher folder art test";
+        std::fs::write(&new_path, content).unwrap();
+        std::fs::write(&new_cover, b"new image bytes").unwrap();
+
+        let song = Song {
+            path: Some(old_path.to_string_lossy().to_string()),
+            title: Some("Watcher Art Track".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            art_automatic: Some(old_cover.to_string_lossy().to_string()),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+
+        let (unmatched_removed, unmatched_added) = reconcile_watcher_batch(
+            &conn,
+            &[old_path.clone()],
+            &[new_path.clone()],
+        )
+        .unwrap();
+        assert!(unmatched_removed.is_empty());
+        assert!(unmatched_added.is_empty());
+
+        let (path, art_automatic): (String, Option<String>) = conn
+            .query_row("SELECT path, art_automatic FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(path, new_path.to_string_lossy().to_string());
+        assert!(art_automatic.is_some());
+        let art_path = art_automatic.unwrap();
+        assert!(
+            art_path.starts_with(&new_dir.to_string_lossy().to_string()),
+            "art_automatic must point to the new folder's cover image, got: {art_path}"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatDuration } from "../utils/formatters";
@@ -152,7 +153,7 @@
     // Escape, which has no global handler, belongs here.
     if (e.key === "Escape") {
       e.preventDefault();
-      collectionStore.exitMiniplayerMode();
+      windowLayoutStore.exitMiniplayerMode();
     }
   }
 
@@ -409,7 +410,7 @@
       </div>
 
       <button
-        onclick={() => collectionStore.exitMiniplayerMode()}
+        onclick={() => windowLayoutStore.exitMiniplayerMode()}
         class="p-1 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-border/40 rounded transition-colors"
         title={i18n.t('miniplayer.exit', {}, 'Restore Full Window (Ctrl+M)')}
       >
