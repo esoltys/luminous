@@ -2,6 +2,7 @@
   import type { ArtistItem, AlbumItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverArt from "./CoverArt.svelte";
+  import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack } from "../utils/covers";
 
   interface Props {
@@ -16,7 +17,7 @@
   // Same front-cover selection ArtistCard uses for its CoverStack (index 0 is
   // the front/topmost tile), so the row's single cover always matches it.
   let frontCover = $derived(getArtistCoverStack(artistAlbums, artistSongs, 1)[0]);
-  let genreLabel = $derived(artist.genre?.trim() || i18n.t('artistDetail.unknownGenre'));
+  let hasGenre = $derived(!!artist.genre?.trim());
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -40,7 +41,11 @@
 
   <div class="min-w-0 flex-1">
     <p class="truncate text-sm font-semibold text-brand-text-primary">{artist.name || i18n.t('collection.unknownArtist')}</p>
-    <p class="truncate text-xs text-brand-text-secondary font-medium">{genreLabel}</p>
+    {#if hasGenre}
+      <div class="min-w-0 mt-0.5"><GenreChips genre={artist.genre} /></div>
+    {:else}
+      <p class="truncate text-xs text-brand-text-secondary font-medium">{i18n.t('artistDetail.unknownGenre')}</p>
+    {/if}
   </div>
 
   <div class="shrink-0 max-w-40 text-right">

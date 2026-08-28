@@ -2,6 +2,7 @@
   import type { ArtistItem, AlbumItem, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import CoverStack from "./CoverStack.svelte";
+  import GenreChips from "./GenreChips.svelte";
   import { getArtistCoverStack } from "../utils/covers";
 
   interface Props {
@@ -22,7 +23,7 @@
 
   let covers = $derived(getArtistCoverStack(artistAlbums, artistSongs));
 
-  let genreLabel = $derived(artist.genre?.trim() || i18n.t('artistDetail.unknownGenre'));
+  let hasGenre = $derived(!!artist.genre?.trim());
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -48,12 +49,15 @@
   >
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
-  <span
-    class="text-xs text-brand-text-secondary font-medium truncate w-full mt-1.5 text-center"
-    title={genreLabel}
-  >
-    {genreLabel}
-  </span>
+  <div class="w-full mt-1.5 flex justify-center">
+    {#if hasGenre}
+      <GenreChips genre={artist.genre} />
+    {:else}
+      <span class="text-xs text-brand-text-secondary font-medium truncate text-center">
+        {i18n.t('artistDetail.unknownGenre')}
+      </span>
+    {/if}
+  </div>
   <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-center">
     {i18n.t('playlists.songsCount', { count: artist.song_count })}
   </span>
