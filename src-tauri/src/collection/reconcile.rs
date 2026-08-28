@@ -110,18 +110,20 @@ pub(crate) fn reconcile_moved_songs(
         return Ok(0);
     }
 
-    let mut stmt = conn.prepare("SELECT id, path, filesize FROM songs WHERE path IS NOT NULL")?;
+    let mut stmt =
+        conn.prepare("SELECT id, path, filesize, art_automatic FROM songs WHERE path IS NOT NULL")?;
     let rows = stmt.query_map([], |row| {
         Ok((
             row.get::<_, i64>(0)?,
             row.get::<_, String>(1)?,
             row.get::<_, Option<i64>>(2)?,
+            row.get::<_, Option<String>>(3)?,
         ))
     })?;
 
-    let mut orphans: std::collections::HashMap<(String, i64), Vec<i64>> =
+    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, Option<String>)>> =
         std::collections::HashMap::new();
-    for (id, path, filesize) in rows.flatten() {
+    for (id, path, filesize, art_automatic) in rows.flatten() {
         let Some(filesize) = filesize else { continue };
         let p = Path::new(&path);
         if disk_paths.contains(&path) {
@@ -130,13 +132,17 @@ pub(crate) fn reconcile_moved_songs(
         let Some(filename) = p.file_name().map(|f| f.to_string_lossy().to_lowercase()) else {
             continue;
         };
-        orphans.entry((filename, filesize)).or_default().push(id);
+        orphans
+            .entry((filename, filesize))
+            .or_default()
+            .push((id, art_automatic));
     }
 
     let mut reconciled = 0usize;
-    let mut update_stmt = conn.prepare("UPDATE songs SET path = ?1, mtime = ?2 WHERE id = ?3")?;
-    for (key, orphan_ids) in orphans {
-        if orphan_ids.len() != 1 {
+    let mut update_stmt =
+        conn.prepare("UPDATE songs SET path = ?1, mtime = ?2, art_automatic = ?3 WHERE id = ?4")?;
+    for (key, orphan_records) in orphans {
+        if orphan_records.len() != 1 {
             continue; // ambiguous — multiple missing songs share this filename+size
         }
         let Some(candidate_paths) = candidates.get(&key) else {
@@ -146,10 +152,18 @@ pub(crate) fn reconcile_moved_songs(
             continue; // ambiguous — multiple new files share this filename+size
         }
 
+        let (orphan_id, old_art_automatic) = &orphan_records[0];
         let new_path = candidate_paths[0];
         let new_path_str = new_path.to_string_lossy().to_string();
         let mtime = super::get_mtime(new_path).unwrap_or(0);
-        update_stmt.execute(params![new_path_str, mtime, orphan_ids[0]])?;
+
+        let new_art_automatic = match old_art_automatic.as_deref() {
+            Some(auto) if auto.starts_with("album-") => Some(auto.to_string()),
+            _ => crate::covermanager::CoverManager::scan_folder_art_static(new_path)
+                .map(|p| p.to_string_lossy().to_string()),
+        };
+
+        update_stmt.execute(params![new_path_str, mtime, new_art_automatic, orphan_id])?;
         reconciled += 1;
     }
 
@@ -413,6 +427,161 @@ mod tests {
                 .iter()
                 .all(|p| p.starts_with(&old_dir.to_string_lossy().to_string())),
             "orphan rows must be untouched, got {paths:?}"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_refreshes_folder_cover_art() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_folder_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir = temp_dir.join("new");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let old_path = old_dir.join("track.mp3");
+        let old_cover = old_dir.join("cover.jpg");
+        let new_path = new_dir.join("track.mp3");
+        let new_cover = new_dir.join("cover.jpg");
+        let content = b"audio bytes for folder art test";
+        std::fs::write(&new_path, content).unwrap();
+        std::fs::write(&new_cover, b"new image bytes").unwrap();
+
+        let song = Song {
+            path: Some(old_path.to_string_lossy().to_string()),
+            title: Some("Folder Art Track".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            art_automatic: Some(old_cover.to_string_lossy().to_string()),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&new_path)).unwrap();
+        assert_eq!(reconciled, 1);
+
+        let (path, art_automatic): (String, Option<String>) = conn
+            .query_row("SELECT path, art_automatic FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(path, new_path.to_string_lossy().to_string());
+        assert!(art_automatic.is_some());
+        let art_path = art_automatic.unwrap();
+        assert!(
+            art_path.starts_with(&new_dir.to_string_lossy().to_string()),
+            "art_automatic must point to the new folder's cover image, got: {art_path}"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_clears_folder_cover_art_when_new_folder_has_none() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_clear_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir = temp_dir.join("new");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let old_path = old_dir.join("track.mp3");
+        let old_cover = old_dir.join("cover.jpg");
+        let new_path = new_dir.join("track.mp3");
+        let content = b"audio bytes for clear art test";
+        std::fs::write(&new_path, content).unwrap();
+
+        let song = Song {
+            path: Some(old_path.to_string_lossy().to_string()),
+            title: Some("No Art Track".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            art_automatic: Some(old_cover.to_string_lossy().to_string()),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&new_path)).unwrap();
+        assert_eq!(reconciled, 1);
+
+        let (path, art_automatic): (String, Option<String>) = conn
+            .query_row("SELECT path, art_automatic FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(path, new_path.to_string_lossy().to_string());
+        assert_eq!(
+            art_automatic, None,
+            "art_automatic must be cleared when new directory has no cover art"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reconcile_moved_songs_preserves_embedded_cover_art() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_reconcile_embedded_art_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let old_dir = temp_dir.join("old");
+        let new_dir = temp_dir.join("new");
+        std::fs::create_dir_all(&old_dir).unwrap();
+        std::fs::create_dir_all(&new_dir).unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let old_path = old_dir.join("track.mp3");
+        let new_path = new_dir.join("track.mp3");
+        let content = b"audio bytes for embedded art test";
+        std::fs::write(&new_path, content).unwrap();
+
+        let song = Song {
+            path: Some(old_path.to_string_lossy().to_string()),
+            title: Some("Embedded Art Track".to_string()),
+            source: SongSource::LocalFile,
+            filesize: Some(content.len() as i64),
+            art_embedded: true,
+            art_automatic: Some("album-1234567890abcdef.jpg".to_string()),
+            ..Default::default()
+        };
+        super::super::upsert_song(&conn, &song).unwrap();
+
+        let reconciled = reconcile_moved_songs(&conn, std::slice::from_ref(&new_path)).unwrap();
+        assert_eq!(reconciled, 1);
+
+        let (path, art_automatic): (String, Option<String>) = conn
+            .query_row("SELECT path, art_automatic FROM songs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(path, new_path.to_string_lossy().to_string());
+        assert_eq!(
+            art_automatic.as_deref(),
+            Some("album-1234567890abcdef.jpg"),
+            "embedded cached artwork filename must be preserved on repath"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);
