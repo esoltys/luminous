@@ -56,7 +56,7 @@
       const val = r.value.trim().replace(/^["']|["']$/g, "");
       if (!val) return;
 
-      if (r.field === "genre") {
+      if (r.field === "genre" || r.field === "artist_tag" || r.field === "artist-tag") {
         parts.push(val.charAt(0).toUpperCase() + val.slice(1));
       } else if (r.field === "artist") {
         parts.push(val);
@@ -81,7 +81,7 @@
       if (decadeToken && single === decadeToken) return `${decadeToken} ${mixWord}`;
       const firstNonYear = activeRules.find((r) => r.field !== "year");
       const firstField = firstNonYear?.field ?? activeRules[0].field;
-      if (firstField === "genre") return `${single} ${mixWord}`;
+      if (firstField === "genre" || firstField === "artist_tag" || firstField === "artist-tag") return `${single} ${mixWord}`;
       if (firstField === "artist") return `${single} ${i18n.t("smartPlaylistBuilder.selectionWord", {}, "Selection")}`;
       if (firstField === "rating") return `${single} ${i18n.t("smartPlaylistBuilder.songsWord", {}, "Songs")}`;
       return `${single} ${i18n.t("smartPlaylistBuilder.playlistWord", {}, "Playlist")}`;
@@ -126,6 +126,7 @@
 
   const availableFields = [
     { key: "artist", label: i18n.t("smartPlaylistBuilder.fieldArtist", {}, "Artist"), type: "text" },
+    { key: "artist_tag", label: i18n.t("smartPlaylistBuilder.fieldArtistTag", {}, "Artist Tag"), type: "text" },
     { key: "album_artist", label: i18n.t("smartPlaylistBuilder.fieldAlbumArtist", {}, "Album Artist"), type: "text" },
     { key: "album", label: i18n.t("smartPlaylistBuilder.fieldAlbum", {}, "Album"), type: "text" },
     { key: "title", label: i18n.t("smartPlaylistBuilder.fieldTitle", {}, "Title"), type: "text" },

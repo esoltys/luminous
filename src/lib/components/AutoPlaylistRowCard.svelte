@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart, Clock, Hourglass, Calendar, Music, Gauge } from "lucide-svelte";
+  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -7,8 +7,9 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
+    artistTag?: string;
     decade?: string;
     bpm?: string;
     playlistId?: number;
@@ -17,10 +18,10 @@
     onClick: () => void;
   }
 
-  let { label, kind, genre, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
+  let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined) {
+    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -30,6 +31,7 @@
   let subtitleLabel = $derived.by(() => {
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
+    if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
@@ -38,7 +40,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -54,13 +56,15 @@
       ? 'bg-[#38BDF8]/15 border-[#38BDF8]/30'
       : kind === 'genre'
         ? 'bg-[#34D399]/15 border-[#34D399]/30'
-        : kind === 'bpm'
-          ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
-          : kind === 'favourites'
-            ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
-            : kind === 'history'
-              ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
-              : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+        : kind === 'artist_tag'
+          ? 'bg-[#FB923C]/15 border-[#FB923C]/30'
+          : kind === 'bpm'
+            ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
+            : kind === 'favourites'
+              ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
+              : kind === 'history'
+                ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
+                : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
   >
     {#if kind === "favourites"}
       <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
@@ -70,6 +74,8 @@
       <Hourglass class="w-5 h-5 text-[#8B5CF6]" />
     {:else if kind === "decade"}
       <Calendar class="w-5 h-5 text-[#38BDF8]" />
+    {:else if kind === "artist_tag"}
+      <Tag class="w-5 h-5 text-[#FB923C]" />
     {:else if kind === "bpm"}
       <Gauge class="w-5 h-5 text-[#E879F9]" />
     {:else}

@@ -46,6 +46,7 @@ impl PlaylistManager {
         self.sync_genre_auto_playlists()?;
         self.sync_decade_auto_playlists()?;
         self.sync_bpm_auto_playlists()?;
+        self.sync_artist_tag_auto_playlists()?;
         Ok(())
     }
 
@@ -378,6 +379,118 @@ impl PlaylistManager {
                     conn.execute(
                         "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
                         params![name, spec, now],
+                    )?;
+                    conn.last_insert_rowid()
+                }
+            };
+
+            for (position, song) in songs.iter().enumerate() {
+                conn.execute(
+                    "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                    params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Regenerates each artist tag "auto-playlist" — a system-managed `playlists` row
+    /// with `dynamic_enabled = 1` and `dynamic_spec` set to `artisttag:<tag>` (e.g. `artisttag:canadian`) — if
+    /// it's missing or its `updated` timestamp is more than 24h old, and prunes
+    /// rows for artist tags no longer present in the library.
+    pub fn sync_artist_tag_auto_playlists(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let tags = scanner.get_library_artist_tags()?;
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let mut stmt = conn.prepare(
+            "SELECT id, dynamic_spec FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'artisttag:%'",
+        )?;
+        let existing: Vec<(i64, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(stmt);
+        for (id, spec) in &existing {
+            let tag = spec.strip_prefix("artisttag:").unwrap_or(spec);
+            if !tags.iter().any(|t| t.eq_ignore_ascii_case(tag)) {
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+            }
+        }
+
+        for tag in &tags {
+            let spec = format!("artisttag:{}", tag);
+            let existing_row: Option<(i64, i64, i64, String)> = conn
+                .query_row(
+                    "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all') FROM playlists p LEFT JOIN playlist_items pi ON pi.playlist_id = p.id WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1 GROUP BY p.id",
+                    params![spec],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .ok();
+            let mode = existing_row
+                .as_ref()
+                .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+                .unwrap_or_default();
+
+            // Check library threshold first. Auto-playlists are created if the library
+            // has at least MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST total songs for this artist tag
+            // (QueuePopulationMode::All).
+            // Once created, an auto-playlist is only pruned if all songs for this tag are removed (0 songs).
+            let total_songs = scanner.get_songs_by_artist_tag(
+                tag,
+                MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST,
+                QueuePopulationMode::All,
+            )?;
+            if existing_row.is_none()
+                && total_songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize
+            {
+                continue;
+            }
+            if existing_row.is_some() && total_songs.is_empty() {
+                if let Some((id, _, _, _)) = existing_row {
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
+                }
+                continue;
+            }
+
+            let songs = scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)?;
+
+            let needs_generation = match existing_row {
+                None => true,
+                Some((_, updated, _, _)) => now - updated > STALE_AFTER_SECS,
+            };
+            if !needs_generation {
+                continue;
+            }
+
+            let playlist_id = match existing_row {
+                Some((id, _, _, _)) => {
+                    conn.execute(
+                        "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                        params![now, id],
+                    )?;
+                    conn.execute(
+                        "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                        params![id],
+                    )?;
+                    id
+                }
+                None => {
+                    conn.execute(
+                        "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                        params![tag, spec, now],
                     )?;
                     conn.last_insert_rowid()
                 }
@@ -763,6 +876,81 @@ mod tests {
                 .iter()
                 .any(|p| p.dynamic_spec.as_deref() == Some("tag:Ambient")),
             "a de-curated (no-longer-used) tag's auto-playlist must be pruned"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_artist_tag_auto_playlists() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+
+            // Insert artist profiles
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, tags) VALUES ('Rush', json('[\"canadian\", \"prog-rock\"]'))",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO artist_profiles (artist_key, tags) VALUES ('IndieArtist', json('[\"indie\"]'))",
+                [],
+            )
+            .unwrap();
+
+            // Insert 25 songs for Rush
+            for i in 1..=25 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, artist, source, unavailable) VALUES ('Rush Song {}', 'Rush', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+
+            // Insert 1 song for IndieArtist (< 25 songs threshold)
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable) VALUES ('Indie Song 1', 'IndieArtist', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_artist_tag_auto_playlists().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        assert!(
+            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
+            "Rush has 25 songs so artisttag:canadian should be created"
+        );
+        assert!(
+            playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:prog-rock")),
+            "Rush has 25 songs so artisttag:prog-rock should be created"
+        );
+        assert!(
+            !playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:indie")),
+            "IndieArtist has 1 song (< 25) so artisttag:indie should not be created"
+        );
+
+        // Deleting Rush songs should prune the artisttag playlists
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute("DELETE FROM songs WHERE artist = 'Rush'", [])
+            .unwrap();
+
+        manager.sync_artist_tag_auto_playlists().unwrap();
+        let updated_playlists = manager.get_playlists().unwrap();
+        assert!(
+            !updated_playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
+            "artisttag:canadian must be pruned when 0 songs remain"
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

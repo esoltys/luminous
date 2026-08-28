@@ -22,7 +22,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser } from "lucide-svelte";
+  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag } from "lucide-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -50,6 +50,7 @@
   };
 
   let genre = $derived(view.genre);
+  let artistTag = $derived(view.artistTag);
   let decade = $derived(view.decade);
   let bpm = $derived(view.bpm);
   let playlistId = $derived(view.playlistId);
@@ -107,14 +108,16 @@
             const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
             return getBpmBucketLabel(pl?.dynamic_spec, pl?.name ?? bpm ?? "");
           })()
-        : kind === "no_genre"
-          ? i18n.t("songTags.noGenre", {}, "No Genre")
-          : genre || i18n.t("artistDetail.unknownGenre");
+        : kind === "artist_tag"
+          ? (artistTag || i18n.t("playlists.artistTagAutoPlaylist"))
+          : kind === "no_genre"
+            ? i18n.t("songTags.noGenre", {}, "No Genre")
+            : genre || i18n.t("artistDetail.unknownGenre");
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
-  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "no_genre") ? songsToCoverStack(songs) : []);
+  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "no_genre" || kind === "artist_tag") ? songsToCoverStack(songs) : []);
 
   /** Genre auto-playlist header color (#548): follows the curated tag's own
    * color — a chip's playlist uses its parent card's color — instead of the
@@ -134,7 +137,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -146,8 +149,8 @@
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   });
 
-  async function fetchSongs(k: typeof kind, g: typeof genre, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade" || k === "bpm") && pid !== undefined) {
+  async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
+    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
     }
@@ -156,6 +159,7 @@
     if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
     if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
     if (k === "bpm") return invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 });
+    if (k === "artist_tag") return invoke<Song[]>("get_songs_by_artist_tag", { tag: at ?? "", limit: 500 });
     if (k === "no_genre") return invoke<Song[]>("get_songs_without_genre", { limit: 500 });
     // Sub-threshold fallback (no backing playlist row yet) — direct
     // curated-hierarchy query (#548), same matching a materialized genre
@@ -173,21 +177,22 @@
   $effect(() => {
     const k = kind;
     const g = genre;
+    const at = artistTag;
     const d = decade;
     const b = bpm;
     const pid = playlistId;
     const count = backingTrackCount;
     loading = true;
-    fetchSongs(k, g, d, b, pid)
+    fetchSongs(k, g, at, d, b, pid)
       .then((fetchedSongs) => {
-        if (kind !== k || genre !== g || decade !== d || bpm !== b || playlistId !== pid) return;
+        if (kind !== k || genre !== g || artistTag !== at || decade !== d || bpm !== b || playlistId !== pid) return;
         songs = fetchedSongs;
       })
       .catch((err) => {
         console.error("Failed to load auto-playlist detail:", err);
       })
       .finally(() => {
-        if (kind === k && genre === g && decade === d && bpm === b && playlistId === pid) loading = false;
+        if (kind === k && genre === g && artistTag === at && decade === d && bpm === b && playlistId === pid) loading = false;
       });
   });
 
@@ -286,7 +291,7 @@
     isChangingMode = true;
     try {
       await playlistsStore.setPlaylistPopulationMode(playlistId, newMode);
-      songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
+      songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
     } catch (err) {
       console.error("Failed to change queue population mode:", err);
     } finally {
@@ -301,7 +306,7 @@
     isRefreshing = true;
     try {
       await playlistsStore.refreshAutoPlaylist(playlistId);
-      songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
+      songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
     } catch (err) {
       console.error("Failed to refresh auto-playlist:", err);
     } finally {
@@ -317,7 +322,7 @@
     collectionStore.refreshLibrary();
     tagsStore.load();
     loading = true;
-    fetchSongs(kind, genre, decade, bpm, playlistId)
+    fetchSongs(kind, genre, artistTag, decade, bpm, playlistId)
       .then((fetchedSongs) => {
         songs = fetchedSongs;
       })
@@ -341,7 +346,7 @@
       }
       if (kind === "history" || kind === "favourites" || kind === "recently_added") {
         try {
-          songs = await fetchSongs(kind, genre, decade, bpm, playlistId);
+          songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
         } catch (err) {
           console.error("Failed to re-fetch songs on stats change:", err);
         }
@@ -504,7 +509,7 @@
           </div>
         </div>
 
-        {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
+        {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -524,6 +529,10 @@
               ? `background-image: linear-gradient(to bottom right, color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 25%, transparent), color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 15%, transparent)); border-color: color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 30%, transparent); box-shadow: 0 0 28px 3px color-mix(in srgb, ${genreColorHsl(genreColorIndex)} 40%, transparent);`
               : "background-image: linear-gradient(to bottom right, rgb(5 150 105 / 0.25), rgb(52 211 153 / 0.15)); border-color: rgb(52 211 153 / 0.3); box-shadow: 0 0 28px 3px rgb(52 211 153 / 0.4);"}
           >
+            <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
+          </div>
+        {:else if kind === "artist_tag" && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)] flex items-center justify-center overflow-hidden border relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if (kind === "decade" || kind === "bpm") && topCovers.length > 0}
@@ -549,6 +558,10 @@
         {:else if kind === "decade"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#2563EB]/25 to-[#38BDF8]/15 flex items-center justify-center overflow-hidden border border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]">
             <Calendar class="w-16 h-16 text-[#38BDF8]" />
+          </div>
+        {:else if kind === "artist_tag"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#EA580C]/25 to-[#FB923C]/15 flex items-center justify-center overflow-hidden border border-[#FB923C]/30 shadow-[0_0_28px_3px_rgba(251,146,60,0.4)]">
+            <Tag class="w-16 h-16 text-[#FB923C]" />
           </div>
         {:else if kind === "bpm"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]">

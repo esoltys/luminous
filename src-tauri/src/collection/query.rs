@@ -469,6 +469,52 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs by artists having a given custom profile tag (e.g. "canadian"),
+    /// selected per `mode`'s bias (see #120), for per-artist-tag auto-playlists.
+    pub fn get_songs_by_artist_tag(
+        &self,
+        tag: &str,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE COALESCE(NULLIF(album_artist, ''), artist) IN (
+                 SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags)
+                 WHERE json_each.value = ?1 COLLATE NOCASE
+             )
+               AND source IN (1, 2)
+               AND unavailable = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?2",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![tag, limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
+    /// Distinct artist tags across all artist profiles in the library.
+    pub fn get_library_artist_tags(&self) -> Result<Vec<String>> {
+        let conn = self.db.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT json_each.value
+             FROM artist_profiles, json_each(artist_profiles.tags)
+             ORDER BY json_each.value COLLATE NOCASE",
+        )?;
+        let tags = stmt
+            .query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(tags)
+    }
+
     /// One aggregated entry per distinct `album` value across the whole
     /// library (untyped JSON, not a `Song`/`AlbumItem` — see the query below
     /// for the exact field set), each summarizing every track that shares

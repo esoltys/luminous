@@ -115,6 +115,19 @@ pub async fn get_songs_by_bpm(
 }
 
 #[tauri::command]
+pub async fn get_songs_by_artist_tag(
+    state: State<'_, AppState>,
+    tag: String,
+    limit: Option<i64>,
+    mode: Option<QueuePopulationMode>,
+) -> Result<Vec<crate::models::Song>, String> {
+    let scanner = crate::collection::CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_by_artist_tag(&tag, limit.unwrap_or(50), mode.unwrap_or_default())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_playlists_by_artist(
     artist: String,
     state: State<'_, AppState>,
