@@ -2,7 +2,7 @@
 // database is configured (see mock-config.json). Intentionally tiny —
 // this used to be a ~8,000-line dump of one real library; a handful of
 // albums is enough to exercise every view in the UI.
-import type { Playlist, Song } from "../src/lib/types/index.ts";
+import type { ArtistProfile, Playlist, Song } from "../src/lib/types/index.ts";
 
 interface TrackSeed {
   title: string;
@@ -10,6 +10,7 @@ interface TrackSeed {
   lastplayed?: number;
   playcount?: number;
   initialKey?: string;
+  titlesort?: string;
 }
 
 interface AlbumSeed {
@@ -22,6 +23,15 @@ interface AlbumSeed {
   bitrate: number;
   samplerate: number;
   tracks: TrackSeed[];
+  /** Multi-value fields are `; `-delimited strings (#143) — same convention
+   * the real tag editor round-trips via ID3v2.4/Vorbis multi-value tags. */
+  albumArtist?: string;
+  composer?: string;
+  artistsort?: string;
+  albumsort?: string;
+  albumArtistSort?: string;
+  composersort?: string;
+  genresort?: string;
 }
 
 const ALBUM_SEEDS: AlbumSeed[] = [
@@ -91,9 +101,13 @@ const ALBUM_SEEDS: AlbumSeed[] = [
     artEmbedded: false,
     bitrate: 900,
     samplerate: 44100,
+    // Custom "Sort As" overrides (#151) — Tag Editor demo data so the library
+    // can be sorted by these instead of the literal tag values.
+    artistsort: "Petty, Tom",
+    albumsort: "Full Moon Fever, The",
     tracks: [
       { title: "Free Fallin'", lengthSec: 259, lastplayed: 9500, playcount: 15, initialKey: "D" },
-      { title: "I Won't Back Down", lengthSec: 170, initialKey: "G" },
+      { title: "I Won't Back Down", lengthSec: 170, initialKey: "G", titlesort: "Won't Back Down, I" },
       { title: "Runnin' Down a Dream", lengthSec: 259 },
     ],
   },
@@ -169,6 +183,95 @@ const ALBUM_SEEDS: AlbumSeed[] = [
       { title: "If I Lose Myself", lengthSec: 253 },
     ],
   },
+  {
+    // Multi-value genre demo (#224) — also gives the Genres tab's curated
+    // hierarchy (get_tag_hierarchy mock, below) a "Metal" parent with real
+    // subgenre chips to render, since the flat ALBUM_SEEDS above are all
+    // single-genre. The first value is the main tag a song's parent card
+    // groups under; genresort demonstrates a custom "Sort As" override
+    // (#151) that would file this under a chosen value instead of the
+    // default alphabetical-by-first-tag placement.
+    artist: "Evanescence",
+    album: "Sanctuary",
+    genre: "Metal; Gothic Metal; Symphonic Metal",
+    genresort: "Metal",
+    composer: "Amy Lee; Ben Moody",
+    composersort: "Lee, Amy",
+    year: 2023,
+    art: "evanescence_sanctuary.jpg",
+    bitrate: 1000,
+    samplerate: 44100,
+    tracks: [
+      { title: "Sanctuary", lengthSec: 248, playcount: 4 },
+      { title: "Between the Shadows", lengthSec: 231 },
+    ],
+  },
+  {
+    // Adds a second "Metal" subgenre child (Glam Metal) so the curated
+    // hierarchy card has more than one chip to arrange/curate, closer to
+    // what a real, well-tagged library's Genres tab looks like.
+    artist: "Def Leppard",
+    album: "Hysteria",
+    genre: "Metal; Glam Metal",
+    year: 1987,
+    art: "hysteria.jpg",
+    artEmbedded: false,
+    bitrate: 900,
+    samplerate: 44100,
+    tracks: [
+      { title: "Pour Some Sugar on Me", lengthSec: 266, playcount: 7 },
+      { title: "Armageddon It", lengthSec: 264 },
+      { title: "Love Bites", lengthSec: 285 },
+    ],
+  },
+  {
+    // A second top-level card ("Rock") with its own subgenre child, so the
+    // Genres tab isn't just a single "Metal" hierarchy.
+    artist: "Led Zeppelin",
+    album: "IV",
+    genre: "Rock; Hard Rock",
+    year: 1971,
+    art: "led_zeppelin_iv.jpg",
+    artEmbedded: false,
+    bitrate: 1200,
+    samplerate: 96000,
+    tracks: [
+      { title: "Black Dog", lengthSec: 296, playcount: 11 },
+      { title: "Rock and Roll", lengthSec: 220 },
+      { title: "Stairway to Heaven", lengthSec: 482, playcount: 18 },
+    ],
+  },
+  {
+    // Enhanced Artist Profiles demo (#473, #474) — a widely-recognized real
+    // artist makes a clearer docs example than the fixture's own "Eric
+    // Soltys" placeholder artist (see FALLBACK_ARTIST_PROFILES below).
+    artist: "Shania Twain",
+    album: "Come On Over",
+    genre: "Country; Country Pop",
+    year: 1997,
+    art: "shania_twain_come_on_over.jpg",
+    artEmbedded: false,
+    bitrate: 900,
+    samplerate: 44100,
+    tracks: [
+      { title: "Man! I Feel Like a Woman!", lengthSec: 237, playcount: 9 },
+      { title: "You're Still the One", lengthSec: 219, playcount: 14 },
+      { title: "That Don't Impress Me Much", lengthSec: 254 },
+    ],
+  },
+  {
+    // Multi-value Artist demo (#143, #458) — a real-world credit line
+    // ("Artist A; Artist B; Artist C") the way the tag editor's multi-value
+    // chips and this fixture's genre field both use the "; " convention.
+    artist: "OneRepublic; Meduza; David Guetta",
+    album: "Artificial Paradise",
+    genre: "Electronic; Pop",
+    year: 2024,
+    art: "onerepublic_artificial_paradise.jpg",
+    bitrate: 950,
+    samplerate: 44100,
+    tracks: [{ title: "Artificial Paradise", lengthSec: 202, playcount: 2 }],
+  },
 ];
 
 let nextId = 1;
@@ -182,9 +285,17 @@ function buildSong(seed: AlbumSeed, track: TrackSeed, index: number): Song {
     filetype: "FLAC",
     path: `/Music/${seed.artist}/${seed.album}/${String(index + 1).padStart(2, "0")} ${track.title}.flac`,
     title: track.title,
+    titlesort: track.titlesort,
     artist: seed.artist,
+    artistsort: seed.artistsort,
     album: seed.album,
+    albumsort: seed.albumsort,
+    album_artist: seed.albumArtist,
+    album_artist_sort: seed.albumArtistSort,
+    composer: seed.composer,
+    composersort: seed.composersort,
     genre: seed.genre,
+    genresort: seed.genresort,
     year: seed.year,
     track: index + 1,
     disc: 1,
@@ -220,6 +331,36 @@ export const FALLBACK_PLAYLISTS: Playlist[] = [
   { id: 4, name: "Indie Rock", dynamic_enabled: true, dynamic_spec: "Indie Rock", created: 1782830000000, updated: 1782830000000, track_count: 8, is_queue: false },
   { id: 5, name: "Queue", dynamic_enabled: false, created: 1782840000000, updated: 1782840000000, track_count: 4, is_queue: true },
   { id: 6, name: "2010s", dynamic_enabled: true, dynamic_spec: "decade:2010s", created: 1782850000000, updated: 1782850000000, track_count: 2, is_queue: false },
+];
+
+// Enhanced Artist Profiles (#473, #474) — bio/website/social links demo
+// data. Shania Twain (a widely-recognized real artist, already used as the
+// canonical example throughout src/lib/utils/artistSocials.ts's own
+// placeholder text) is the featured example in mock-config.json's
+// artist-detail screenshot target; the mock library's own "Eric Soltys"
+// fixture artist gets a lighter-weight profile too.
+export const FALLBACK_ARTIST_PROFILES: ArtistProfile[] = [
+  {
+    artist_key: "Shania Twain",
+    website: "https://shaniatwain.com",
+    tags: ["Country", "Pop"],
+    social_links: [
+      { platform: "instagram", handle_or_url: "@shaniatwain" },
+      { platform: "x", handle_or_url: "@ShaniaTwain" },
+      { platform: "spotify", handle_or_url: "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb" },
+    ],
+    bio: "Canadian singer-songwriter known for blending country songwriting with pop and rock production. Come On Over remains one of the best-selling albums of all time by a solo female artist.",
+  },
+  {
+    artist_key: "Eric Soltys",
+    website: "https://ericsoltys.example.com",
+    tags: ["Ambient", "Electronic"],
+    social_links: [
+      { platform: "bandcamp", handle_or_url: "ericsoltys" },
+      { platform: "instagram", handle_or_url: "@ericsoltys" },
+    ],
+    bio: "Ambient and electronic producer working out of a home studio, blending field recordings with modular synthesis. Basin, Contour, and Horizon form a loose trilogy exploring landscape and memory.",
+  },
 ];
 
 export const FEATURED_YOU_WRECK_ME_LYRICS = `[00:00.00] Tom Petty - You Wreck Me
