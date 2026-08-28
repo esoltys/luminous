@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -208,7 +209,7 @@
         }
         await playlistsStore.updatePlaylistSpec(editing.id, specString, populationMode);
         collectionStore.closeSmartBuilder();
-        collectionStore.viewPlaylist(editing.id);
+        navigationStore.viewPlaylist(editing.id);
         return;
       }
 
@@ -218,7 +219,7 @@
       }
       collectionStore.closeSmartBuilder();
       if (playlist) {
-        collectionStore.viewPlaylist(playlist.id);
+        navigationStore.viewPlaylist(playlist.id);
       }
     } catch (err) {
       console.error("Failed to save smart playlist:", err);

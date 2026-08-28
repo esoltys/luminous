@@ -47,7 +47,7 @@ luminous/
 │   ├── lib/
 │   │   ├── components/       # PlayerBar, Visualizers, Equalizer, LyricsView, TagEditor, etc.
 │   │   ├── locales/          # English & French translation strings
-│   │   ├── stores/           # Global stores (player, collection, playlists, theme, i18n, prefs)
+│   │   ├── stores/           # Global stores (player, collection, navigation, windowLayout, playlists, theme, i18n, prefs)
 │   │   ├── types/            # Frontend interfaces
 │   │   └── utils/            # Shared utilities (color parsing, filter parsing, lyrics, stats, etc.)
 │   └── routes/               # Layouts and navigation views
@@ -56,7 +56,7 @@ luminous/
     │   ├── analyzer.rs       # Real-time FFT spectrum processing
     │   ├── audio.rs          # Symphonia decoding thread & CPAL playback loop with gapless double-buffering
     │   ├── band_waveform.rs  # Layered low/mid/high frequency-band waveform analysis scanner
-    │   ├── collection.rs     # Lofty scanner & folder watcher
+    │   ├── collection.rs     # Lofty scanner & folder watcher (query/reconcile/watcher split into collection/)
     │   ├── covermanager.rs   # Cover art extractor and iTunes search API fallback
     │   ├── db.rs             # SQLite schema migration & connection pool
     │   ├── equalizer.rs      # Biquad DSP: 10-band graphic & 20-band parametric filters
@@ -70,10 +70,12 @@ luminous/
     │   ├── models.rs         # Shared structs and types
     │   ├── organizer.rs      # Tag-based file/folder reorganizer
     │   ├── player.rs         # Playback controller (Shuffle, Repeat, Next/Prev)
-    │   ├── playlist.rs       # Playlist manager, Queue abstraction, dynamic-playlist reconciler & undo/redo stack
+    │   ├── playlist.rs       # Playlist manager & Queue abstraction (auto-sync/dynamic/import-export/undo split into playlist/)
     │   ├── playlist_parsers.rs # M3U, M3U8, PLS, and XSPF import/export
     │   ├── stats.rs          # Play counts, ratings, and history tracking
     │   ├── tageditor.rs      # lofty tag writer & AcoustID fingerprint generator
+    │   ├── tags.rs           # Genre/tag browsing over the existing songs.genre column
+    │   ├── tray.rs           # System tray icon, menu, and minimize-to-tray behavior
     │   ├── waveform.rs       # Background audio peak analyzer
     │   └── commands/         # Tauri IPC command handlers
     └── Cargo.toml            # Rust dependencies (cpal, symphonia, rusqlite, lofty, rustfft)

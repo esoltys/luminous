@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-/** Shared across Equalizer (settings UI) and FoldersView (background-activity
+/** Shared across Equalizer (settings UI) and SettingsFolders (background-activity
  *  notice) so both reflect the same enabled/remaining state without each
  *  polling separately or registering its own "loudness-analysis-progress"
  *  listener. */

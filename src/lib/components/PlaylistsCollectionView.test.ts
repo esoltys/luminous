@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
 import PlaylistsCollectionView from "./PlaylistsCollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -47,9 +48,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("PlaylistsCollectionView.svelte - Decades Auto Playlists", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionStore.selectedPlaylistId = null;
-    collectionStore.selectedAutoPlaylist = null;
-    collectionStore.playlistsSubTab = "auto";
+    navigationStore.selectedPlaylistId = null;
+    navigationStore.selectedAutoPlaylist = null;
+    navigationStore.playlistsSubTab = "auto";
   });
 
   it("renders decade auto-playlist cards in the auto playlist grid", async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import ArtistDetailView from "./ArtistDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -69,7 +70,7 @@ describe("ArtistDetailView", () => {
     await fireEvent.click(tagBtn);
 
     expect(collectionStore.searchQuery).toBe("artist-tag:canadian");
-    expect(collectionStore.activeSubTab).toBe("artists");
+    expect(navigationStore.activeSubTab).toBe("artists");
   });
 
   it("clicking Edit button opens the ArtistProfileEditor modal", async () => {
@@ -105,8 +106,8 @@ describe("ArtistDetailView", () => {
     expect(screen.getByTitle("Browse Rock")).toBeTruthy();
 
     await fireEvent.click(countryChip);
-    expect(collectionStore.selectedAutoPlaylist?.genre).toBe("Country");
-    expect(collectionStore.activeTab).toBe("playlists");
+    expect(navigationStore.selectedAutoPlaylist?.genre).toBe("Country");
+    expect(navigationStore.activeTab).toBe("playlists");
   });
 
   it("renders Unknown genre when artist songs have no genre", async () => {
