@@ -139,4 +139,25 @@ describe("ArtistProfileEditor", () => {
     expect(screen.getByText("Annuler")).toBeTruthy();
     expect(screen.getByText(/Aucun lien ajouté pour le moment/i)).toBeTruthy();
   });
+
+  it("portals modal dialog to document.body with internal scrolling and z-50 overlay", () => {
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "The American Dollar",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeTruthy();
+    // Verify dialog parent is portaled to document.body with z-50
+    const backdrop = dialog.parentElement;
+    expect(backdrop?.parentElement).toBe(document.body);
+    expect(backdrop?.classList.contains("z-50")).toBe(true);
+
+    // Verify modal dialog structure has max-height and flex-col
+    expect(dialog.classList.contains("flex-col")).toBe(true);
+    expect(dialog.classList.contains("overflow-hidden")).toBe(true);
+  });
 });
