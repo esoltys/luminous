@@ -114,4 +114,16 @@ describe("Equalizer.svelte", () => {
       settings: { enabled: true, target_lufs: -18.0, mode: "track", fallback_gain_db: -6.0 },
     });
   });
+
+  it("does not wrap loudness toggle to a new line and uses items-start layout", async () => {
+    const { getByText } = render(Equalizer);
+    await waitFor(() => {
+      expect(getByText(/loudness normalization/i)).toBeInTheDocument();
+    });
+
+    const titleEl = getByText(/loudness normalization/i);
+    const headerContainer = titleEl.closest("div.flex.items-start.justify-between");
+    expect(headerContainer).not.toBeNull();
+    expect(headerContainer).not.toHaveClass("flex-wrap");
+  });
 });
