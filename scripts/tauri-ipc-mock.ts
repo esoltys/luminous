@@ -56,11 +56,20 @@ function defaultParametricBands(): ParametricBand[] {
   }));
 }
 
+interface MockTagGroup {
+  name: string;
+  color_index: number;
+  children: string[];
+}
+
 interface MockLibrary {
   songs: Song[];
   albums: AlbumItem[];
   artists: ArtistItem[];
   artistProfiles?: ArtistProfile[];
+  /** Persisted Genres curation hierarchy (#545), read straight from the real
+   * tag_groups/tag_assignments tables — undefined for the bundled fixture. */
+  tagGroups?: MockTagGroup[];
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
@@ -505,6 +514,30 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   // GenreBrowseView/GenreCards the same parent/child structure to render,
   // which is all the docs screenshots need.
   function buildTagHierarchy(): TagGroup[] {
+    // Mirrors TagManager::get_tag_hierarchy() in src-tauri/src/tags.rs: the
+    // curated hierarchy is persisted (tag_groups/tag_assignments), not
+    // re-derived from song genre order — a real DB's tagGroups (read
+    // straight from those tables in mock-library.ts) always wins when
+    // present, since it reflects the user's own manual curation (drag a
+    // chip onto a card, promote, rename, etc.) rather than a guess.
+    if (library.tagGroups) {
+      const { tags } = buildTagsOverview();
+      const counts = new Map(tags.map((t) => [t.name.toLowerCase(), t.song_count]));
+      return library.tagGroups.map(
+        (group): TagGroup => ({
+          name: group.name,
+          color_index: group.color_index,
+          song_count: counts.get(group.name.toLowerCase()) ?? 0,
+          children: group.children.map((name) => ({
+            name,
+            song_count: counts.get(name.toLowerCase()) ?? 0,
+          })),
+        })
+      );
+    }
+
+    // No persisted hierarchy to read (the bundled fixture has no equivalent
+    // tables) — fall back to an emergent approximation from song genre order.
     const { graph } = buildTagsOverview();
     return graph.map(
       (group, i): TagGroup => ({
