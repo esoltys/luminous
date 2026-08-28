@@ -240,6 +240,7 @@ async function main() {
       songs: [],
       albums: [],
       artists: [],
+      artistProfiles: [],
       playlists: [emptyLibraryQueuePlaylist],
       playlistTracks: {},
       lyrics: "",
@@ -522,7 +523,23 @@ async function main() {
       const miniRegion = page.locator(`[role="group"][aria-label="${miniplayerLabel}"]`);
       await miniRegion.hover();
       await page.waitForTimeout(400);
-    }
+    },
+    "right-click-genre-chip": async (page) => {
+      // Right-clicks whichever sub-genre chip happens to exist first, rather
+      // than a hardcoded name — works against both the bundled fixture (see
+      // mock-data.ts's Evanescence "Symphonic Metal" chip) and a real
+      // library's own curated hierarchy, whatever names that happens to
+      // contain. Opens GenreContextMenu with the hierarchy-curation actions
+      // (Rename/Promote/Delete). A library with no sub-genre chips assigned
+      // yet has nothing to right-click — skip rather than time out the run.
+      const chip = page.locator("[data-chip-key]").first();
+      if ((await chip.count()) === 0) {
+        logWarn("right-click-genre-chip: no sub-genre chip found in this library; skipping the right-click.");
+        return;
+      }
+      await chip.click({ button: "right" });
+      await page.waitForTimeout(400);
+    },
   };
 
   const withLanguageSuffix = (filename: string, language: string) => {

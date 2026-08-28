@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 import { collectionStore } from "./collection.svelte";
+import { navigationStore } from "./navigation.svelte";
 
 describe("CollectionStore - artist/album navigation and history", () => {
   beforeEach(() => {
@@ -34,29 +35,29 @@ describe("CollectionStore - artist/album navigation and history", () => {
     collectionStore.searchQuery = "some search";
     collectionStore.searchResults = [{ id: 1 } as Song];
 
-    collectionStore.viewArtist("Pink Floyd");
-    expect(collectionStore.selectedArtistName).toBe("Pink Floyd");
-    expect(collectionStore.activeTab).toBe("collection");
-    expect(collectionStore.activeSubTab).toBe("artists");
+    navigationStore.viewArtist("Pink Floyd");
+    expect(navigationStore.selectedArtistName).toBe("Pink Floyd");
+    expect(navigationStore.activeTab).toBe("collection");
+    expect(navigationStore.activeSubTab).toBe("artists");
     expect(collectionStore.searchQuery).toBe("");
     expect(collectionStore.searchResults).toHaveLength(0);
 
     collectionStore.searchQuery = "another search";
-    collectionStore.viewAlbum("Dark Side");
-    expect(collectionStore.selectedAlbumName).toBe("Dark Side");
+    navigationStore.viewAlbum("Dark Side");
+    expect(navigationStore.selectedAlbumName).toBe("Dark Side");
     expect(collectionStore.searchQuery).toBe("");
   });
 
   it("persists the selected album/artist detail view to localStorage so a relaunch restores it", () => {
-    collectionStore.viewAlbum("Dark Side of the Moon");
+    navigationStore.viewAlbum("Dark Side of the Moon");
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBe("Dark Side of the Moon");
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
 
-    collectionStore.viewArtist("Pink Floyd");
+    navigationStore.viewArtist("Pink Floyd");
     expect(localStorage.getItem("navigation_selectedArtistName")).toBe("Pink Floyd");
     expect(localStorage.getItem("navigation_selectedAlbumName")).toBeNull();
 
-    collectionStore.selectedArtistName = null;
+    navigationStore.selectedArtistName = null;
     expect(localStorage.getItem("navigation_selectedArtistName")).toBeNull();
   });
 
@@ -64,48 +65,48 @@ describe("CollectionStore - artist/album navigation and history", () => {
     // Flush the microtask-coalesced history record from any earlier test's navigation
     // before establishing our own baseline entry (history is a shared singleton across tests).
     await Promise.resolve();
-    collectionStore.selectedArtistName = null;
-    collectionStore.selectedAlbumName = null;
+    navigationStore.selectedArtistName = null;
+    navigationStore.selectedAlbumName = null;
     await Promise.resolve();
 
-    collectionStore.viewArtist("History Test Artist");
+    navigationStore.viewArtist("History Test Artist");
     await Promise.resolve();
 
-    collectionStore.viewAlbum("History Test Album");
+    navigationStore.viewAlbum("History Test Album");
     await Promise.resolve();
 
-    expect(collectionStore.selectedAlbumName).toBe("History Test Album");
-    expect(collectionStore.canGoBack).toBe(true);
+    expect(navigationStore.selectedAlbumName).toBe("History Test Album");
+    expect(navigationStore.canGoBack).toBe(true);
 
-    collectionStore.goBack();
-    expect(collectionStore.selectedArtistName).toBe("History Test Artist");
-    expect(collectionStore.selectedAlbumName).toBeNull();
-    expect(collectionStore.canGoForward).toBe(true);
+    navigationStore.goBack();
+    expect(navigationStore.selectedArtistName).toBe("History Test Artist");
+    expect(navigationStore.selectedAlbumName).toBeNull();
+    expect(navigationStore.canGoForward).toBe(true);
 
-    collectionStore.goForward();
-    expect(collectionStore.selectedAlbumName).toBe("History Test Album");
-    expect(collectionStore.canGoForward).toBe(false);
+    navigationStore.goForward();
+    expect(navigationStore.selectedAlbumName).toBe("History Test Album");
+    expect(navigationStore.canGoForward).toBe(false);
   });
 
   it("truncates forward history when navigating anew from a Back'd-into state", async () => {
     await Promise.resolve();
 
-    collectionStore.viewArtist("Artist A");
+    navigationStore.viewArtist("Artist A");
     await Promise.resolve();
-    collectionStore.viewArtist("Artist B");
-    await Promise.resolve();
-
-    collectionStore.goBack();
-    expect(collectionStore.selectedArtistName).toBe("Artist A");
-    expect(collectionStore.canGoForward).toBe(true);
-
-    collectionStore.viewArtist("Artist C");
+    navigationStore.viewArtist("Artist B");
     await Promise.resolve();
 
-    expect(collectionStore.selectedArtistName).toBe("Artist C");
-    expect(collectionStore.canGoForward).toBe(false);
+    navigationStore.goBack();
+    expect(navigationStore.selectedArtistName).toBe("Artist A");
+    expect(navigationStore.canGoForward).toBe(true);
 
-    collectionStore.goBack();
-    expect(collectionStore.selectedArtistName).toBe("Artist A");
+    navigationStore.viewArtist("Artist C");
+    await Promise.resolve();
+
+    expect(navigationStore.selectedArtistName).toBe("Artist C");
+    expect(navigationStore.canGoForward).toBe(false);
+
+    navigationStore.goBack();
+    expect(navigationStore.selectedArtistName).toBe("Artist A");
   });
 });

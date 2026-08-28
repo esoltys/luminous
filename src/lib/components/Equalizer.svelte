@@ -357,8 +357,8 @@
 <div class="flex flex-col gap-6 text-brand-text-primary">
   <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 flex flex-col gap-6">
     <div class="flex flex-col gap-4">
-    <div class="flex items-start justify-between">
-      <div class="flex items-center gap-3">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
         <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
           <Sliders class="w-5 h-5" />
         </div>
@@ -567,8 +567,8 @@
 
     <!-- Loudness Normalization (#77) -->
     <div class="flex flex-col gap-6 bg-brand-sidebar border border-brand-border rounded-xl p-6">
-      <div class="flex items-center justify-between gap-4 flex-wrap mb-2">
-        <div class="flex items-center gap-3">
+      <div class="flex items-start justify-between gap-4 mb-2">
+        <div class="flex items-center gap-3 min-w-0">
           <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
             <Activity class="w-5 h-5" />
           </div>

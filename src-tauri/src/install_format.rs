@@ -14,7 +14,7 @@ use std::env;
 /// `format` is a stable machine-readable id (used by `updater.test.ts` and
 /// other call sites that branch on it); `human_name` is the user-facing
 /// label. `supports_self_update` gates whether the frontend offers in-app
-/// updates (`FoldersView.svelte`) — false for anything managed by an
+/// updates (`SettingsGeneral.svelte`) — false for anything managed by an
 /// external package manager (deb/rpm/flatpak/snap), which would just have
 /// its files overwritten out from under it, or reverted, by a self-update,
 /// and false for AppImage, which can't be cleanly patched in place either.

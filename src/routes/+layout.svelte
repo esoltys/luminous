@@ -7,6 +7,8 @@
   import { slide, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
+  import { navigationStore } from '../lib/stores/navigation.svelte';
+  import { windowLayoutStore } from '../lib/stores/windowLayout.svelte';
   import { playerStore } from '../lib/stores/player.svelte';
   import CoverArt from '../lib/components/CoverArt.svelte';
   import Miniplayer from '../lib/components/Miniplayer.svelte';
@@ -42,7 +44,7 @@
   // Visual-only override: never touches the stored sidebarWidth preference,
   // so widening the window back out restores exactly the width the user had.
   let effectiveSidebarWidth = $derived(
-    collectionStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : collectionStore.sidebarWidth
+    windowLayoutStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : windowLayoutStore.sidebarWidth
   );
 
   onMount(() => {
@@ -59,31 +61,31 @@
       switch (e.key.toLowerCase()) {
         case 'm':
           e.preventDefault();
-          collectionStore.toggleMiniplayerMode();
+          windowLayoutStore.toggleMiniplayerMode();
           break;
         case ',':
           e.preventDefault();
-          collectionStore.activeTab = 'settings';
+          navigationStore.activeTab = 'settings';
           break;
         case '[':
           e.preventDefault();
-          collectionStore.goBack();
+          navigationStore.goBack();
           break;
         case ']':
           e.preventDefault();
-          collectionStore.goForward();
+          navigationStore.goForward();
           break;
         case '1':
           e.preventDefault();
-          collectionStore.toggleSidebarCompact();
+          windowLayoutStore.toggleSidebarCompact();
           break;
         case '2':
           e.preventDefault();
-          collectionStore.toggleImmersiveMode();
+          windowLayoutStore.toggleImmersiveMode();
           break;
         case '3':
           e.preventDefault();
-          collectionStore.toggleRightPanel();
+          windowLayoutStore.toggleRightPanel();
           break;
         case '/':
           e.preventDefault();
@@ -188,7 +190,7 @@
   // stopping while immersive) never leaves the user stranded.
   $effect(() => {
     if (!playerStore.currentSong) {
-      collectionStore.exitImmersiveMode();
+      windowLayoutStore.exitImmersiveMode();
     }
   });
 
@@ -200,11 +202,11 @@
     if (
       collectionStore.statsLoaded &&
       collectionStore.stats.total_songs === 0 &&
-      (collectionStore.activeTab === "collection" ||
-        collectionStore.activeTab === "playlists" ||
-        collectionStore.activeTab === "lyrics")
+      (navigationStore.activeTab === "collection" ||
+        navigationStore.activeTab === "playlists" ||
+        navigationStore.activeTab === "lyrics")
     ) {
-      collectionStore.activeTab = "home";
+      navigationStore.activeTab = "home";
     }
   });
 
@@ -213,7 +215,7 @@
     e.preventDefault();
     isResizingSidebar = true;
     const startX = e.clientX;
-    const startWidth = collectionStore.sidebarWidth;
+    const startWidth = windowLayoutStore.sidebarWidth;
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
@@ -223,7 +225,7 @@
       } else {
         newWidth = Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(SIDEBAR_MAX_WIDTH_PX, newWidth));
       }
-      collectionStore.setSidebarWidth(newWidth);
+      windowLayoutStore.setSidebarWidth(newWidth);
     }
 
     function onPointerUp() {
@@ -240,11 +242,11 @@
   function startResizeRightPanel(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = collectionStore.rightPanelWidth;
+    const startWidth = windowLayoutStore.rightPanelWidth;
 
     function onPointerMove(moveEvent: PointerEvent) {
       const deltaX = moveEvent.clientX - startX;
-      collectionStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)));
+      windowLayoutStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, Math.min(RIGHT_PANEL_MAX_WIDTH_PX, startWidth - deltaX)));
     }
 
     function onPointerUp() {
@@ -261,20 +263,20 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      const currentWidth = collectionStore.sidebarWidth;
+      const currentWidth = windowLayoutStore.sidebarWidth;
       if (currentWidth === SIDEBAR_MIN_WIDTH_PX) {
-        collectionStore.setSidebarWidth(SIDEBAR_COLLAPSED_WIDTH_PX);
+        windowLayoutStore.setSidebarWidth(SIDEBAR_COLLAPSED_WIDTH_PX);
       } else if (currentWidth > SIDEBAR_MIN_WIDTH_PX) {
-        collectionStore.setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH_PX, currentWidth - PANEL_RESIZE_STEP_PX));
+        windowLayoutStore.setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH_PX, currentWidth - PANEL_RESIZE_STEP_PX));
       }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      const currentWidth = collectionStore.sidebarWidth;
+      const currentWidth = windowLayoutStore.sidebarWidth;
       if (currentWidth === SIDEBAR_COLLAPSED_WIDTH_PX) {
-        collectionStore.setSidebarWidth(SIDEBAR_MIN_WIDTH_PX);
+        windowLayoutStore.setSidebarWidth(SIDEBAR_MIN_WIDTH_PX);
       } else {
-        collectionStore.setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX));
+        windowLayoutStore.setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH_PX, currentWidth + PANEL_RESIZE_STEP_PX));
       }
     }
   }
@@ -284,21 +286,21 @@
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setRightPanelWidth(Math.min(RIGHT_PANEL_MAX_WIDTH_PX, collectionStore.rightPanelWidth + PANEL_RESIZE_STEP_PX));
+      windowLayoutStore.setRightPanelWidth(Math.min(RIGHT_PANEL_MAX_WIDTH_PX, windowLayoutStore.rightPanelWidth + PANEL_RESIZE_STEP_PX));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       e.stopPropagation();
-      collectionStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, collectionStore.rightPanelWidth - PANEL_RESIZE_STEP_PX));
+      windowLayoutStore.setRightPanelWidth(Math.max(RIGHT_PANEL_MIN_WIDTH_PX, windowLayoutStore.rightPanelWidth - PANEL_RESIZE_STEP_PX));
     }
   }
 </script>
 
 <div class="relative flex flex-col h-screen overflow-hidden bg-brand-main">
-  {#if collectionStore.isMiniplayer}
+  {#if windowLayoutStore.isMiniplayer}
     <div class="w-full h-full">
       <Miniplayer />
     </div>
-  {:else if collectionStore.isPlaybarOnlyMode}
+  {:else if windowLayoutStore.isPlaybarOnlyMode}
     <!-- Playbar-only mode: the window is too short to show anything else,
          including the immersive cover view. Renders PlayerBar unconditionally
          (it already has a graceful "not playing" state) so the user never
@@ -316,10 +318,10 @@
          the glass footer instead of stopping above it. -->
     <div class="flex-1 relative overflow-hidden flip-perspective" class:no-3d={isLinux}>
       <!-- Inner Card Wrapper -->
-      <div class="w-full h-full relative flip-card" class:flipped={collectionStore.effectiveImmersiveMode}>
+      <div class="w-full h-full relative flip-card" class:flipped={windowLayoutStore.effectiveImmersiveMode}>
 
         <!-- FRONT FACE: Normal App Layout -->
-        <div class="flip-face flip-front flex flex-col {collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-front flex flex-col {windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Top Navigation Ribbon -->
           <div class="flex-shrink-0 z-50 overflow-visible">
             <TopNavigation />
@@ -328,7 +330,7 @@
           <!-- Main Grid Layout -->
           <div class="flex flex-1 overflow-hidden">
             <!-- Left Sidebar -->
-            {#if collectionStore.sidebarOpen}
+            {#if windowLayoutStore.sidebarOpen}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <Sidebar width={effectiveSidebarWidth} resizing={isResizingSidebar} />
 
@@ -336,12 +338,12 @@
                      from a visually-64px rail would otherwise jump using the
                      real (larger) stored sidebarWidth as the drag's starting
                      point. Widening the window is the way out. -->
-                {#if !collectionStore.isSidebarAutoCollapsed}
+                {#if !windowLayoutStore.isSidebarAutoCollapsed}
                   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                   <div
                     role="separator"
-                    aria-valuenow={collectionStore.sidebarWidth}
+                    aria-valuenow={windowLayoutStore.sidebarWidth}
                     aria-valuemin={SIDEBAR_COLLAPSED_WIDTH_PX}
                     aria-valuemax={SIDEBAR_MAX_WIDTH_PX}
                     aria-label={i18n.t('topNav.resizeSidebar')}
@@ -363,14 +365,14 @@
             </main>
 
             <!-- Right Contextual Panel -->
-            {#if collectionStore.rightPanelOpen && !collectionStore.isRightPanelAutoHidden}
+            {#if windowLayoutStore.rightPanelOpen && !windowLayoutStore.isRightPanelAutoHidden}
               <div transition:slide={{ axis: 'x', duration: 350 }} class="h-full flex-shrink-0 flex overflow-hidden">
                 <!-- Right Resize Handle -->
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <div 
                   role="separator"
-                  aria-valuenow={collectionStore.rightPanelWidth}
+                  aria-valuenow={windowLayoutStore.rightPanelWidth}
                   aria-valuemin={RIGHT_PANEL_MIN_WIDTH_PX}
                   aria-valuemax={RIGHT_PANEL_MAX_WIDTH_PX}
                   aria-label={i18n.t('topNav.resizeRightPanel')}
@@ -383,7 +385,7 @@
                   <div class="absolute -inset-x-2 top-0 bottom-0 cursor-col-resize"></div>
                 </div>
 
-                <RightPanel isOpen={collectionStore.rightPanelOpen} width={collectionStore.rightPanelWidth} onClose={() => collectionStore.toggleRightPanel()} />
+                <RightPanel isOpen={windowLayoutStore.rightPanelOpen} width={windowLayoutStore.rightPanelWidth} onClose={() => windowLayoutStore.toggleRightPanel()} />
               </div>
             {/if}
           </div>
@@ -393,7 +395,7 @@
         <!-- pb is larger than pt to offset the floating PlayerBar dock (h-20 + bottom-4 inset
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
-        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!collectionStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
+        <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
           <!-- Immersive Ambient Blurred Background: skipped on Linux, where the
                `blur-3xl` filter over a full-window layer is expensive on
                WebKitGTK's compositor and can let the translucent layer sample
@@ -465,7 +467,7 @@
          underneath the gap for the blur to have something to blur. Hidden
          whenever there's no current song, so it doesn't linger showing
          "Nothing playing" after the queue ends. -->
-    {#if playerStore.currentSong && collectionStore.activeTab !== 'help'}
+    {#if playerStore.currentSong && navigationStore.activeTab !== 'help'}
       <div class="absolute inset-x-4 bottom-4 z-40">
         <PlayerBar />
       </div>

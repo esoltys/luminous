@@ -4,6 +4,8 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { formatDuration } from "../utils/formatters";
@@ -173,13 +175,13 @@
   // "viewing any other collection/playlist", which the cover-art click
   // handler below needs in order to pick the right next state (#523).
   let isViewingQueue = $derived.by(() => {
-    if (collectionStore.immersiveMode) return false;
+    if (windowLayoutStore.immersiveMode) return false;
     const queuePl = playlistsStore.queuePlaylist;
     if (!queuePl) return false;
     return (
-      collectionStore.activeTab === 'playlists' &&
-      collectionStore.playlistsSubTab === 'custom' &&
-      collectionStore.selectedPlaylistId === queuePl.id
+      navigationStore.activeTab === 'playlists' &&
+      navigationStore.playlistsSubTab === 'custom' &&
+      navigationStore.selectedPlaylistId === queuePl.id
     );
   });
 
@@ -193,7 +195,7 @@
   async function navigateToQueue() {
     const queuePl = await playlistsStore.requireQueue();
     playlistsStore.selectPlaylist(queuePl.id);
-    collectionStore.viewPlaylist(queuePl.id);
+    navigationStore.viewPlaylist(queuePl.id);
   }
 
   // Three-state navigation flow (#523): from any collection/playlist view,
@@ -208,13 +210,13 @@
     // toggles — clicking through to "exit and view Queue" would silently
     // clear the user's own immersiveMode preference for a screen they can't
     // actually reach yet, so leave it alone until the window widens back out.
-    if (collectionStore.isImmersiveForced) return;
+    if (windowLayoutStore.isImmersiveForced) return;
 
-    if (collectionStore.immersiveMode) {
-      collectionStore.exitImmersiveMode();
+    if (windowLayoutStore.immersiveMode) {
+      windowLayoutStore.exitImmersiveMode();
       await navigateToQueue();
     } else if (isViewingQueue) {
-      collectionStore.toggleImmersiveMode();
+      windowLayoutStore.toggleImmersiveMode();
     } else {
       await navigateToQueue();
     }
@@ -252,7 +254,7 @@
       </div>
       {#if playerStore.currentSong?.album}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(playerStore.currentSong?.album || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(playerStore.currentSong?.album || ""); }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
         >
@@ -265,7 +267,7 @@
       {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
@@ -407,7 +409,7 @@
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     <button
-      onclick={() => collectionStore.toggleMiniplayerMode()}
+      onclick={() => windowLayoutStore.toggleMiniplayerMode()}
       class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
       title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
     >

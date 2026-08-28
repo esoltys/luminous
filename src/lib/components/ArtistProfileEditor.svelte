@@ -4,6 +4,7 @@
   import { collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { portal } from "../utils/portal";
   import SocialIcon from "./SocialIcon.svelte";
   import { SOCIAL_PLATFORMS, getPlatformInfo, type SocialPlatformInfo } from "../utils/artistSocials";
   import type { ArtistProfile, ArtistSocialLink } from "../types";
@@ -124,26 +125,27 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+    use:portal
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
     onclick={handleBackdropClick}
   >
     <div
-      class="w-full max-w-xl bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+      class="w-full max-w-xl bg-brand-sidebar border border-brand-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh] my-auto animate-in fade-in zoom-in-95 duration-150"
       role="dialog"
       aria-modal="true"
       aria-labelledby="artist-editor-title"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-brand-border bg-brand-sidebar/80">
-        <div class="flex items-center gap-2.5">
-          <User class="w-5 h-5 text-brand-accent" />
-          <h2 id="artist-editor-title" class="text-lg font-bold text-brand-text-primary">
+      <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-brand-border bg-brand-sidebar/80 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0 mr-2">
+          <User class="w-5 h-5 text-brand-accent shrink-0" />
+          <h2 id="artist-editor-title" class="text-base sm:text-lg font-bold text-brand-text-primary truncate">
             {i18n.t("artistProfileEditor.title", {}, "Edit Artist Details")}: <span class="text-brand-accent font-semibold">{artistName}</span>
           </h2>
         </div>
         <button
           onclick={onClose}
-          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors"
+          class="p-1.5 text-brand-text-secondary hover:text-brand-text-primary hover:bg-brand-accent/10 rounded-md transition-colors shrink-0"
           aria-label="Close dialog"
         >
           <X class="w-4 h-4" />
@@ -151,7 +153,7 @@
       </div>
 
       <!-- Body Form -->
-      <div class="p-6 overflow-y-auto flex flex-col gap-5 text-sm">
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4 sm:gap-5 text-sm">
         <!-- Bio Field -->
         <div class="flex flex-col gap-1.5">
           <label for="artist-bio" class="font-medium text-xs text-brand-text-secondary uppercase tracking-wider">
@@ -254,9 +256,9 @@
             <div class="flex flex-col gap-2">
               {#each socialLinks as link, idx}
                 {@const platformInfo = getPlatformInfo(link.platform)}
-                <div class="flex items-center gap-2">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <!-- Platform Select -->
-                  <div class="relative w-40 shrink-0">
+                  <div class="relative sm:w-40 shrink-0">
                     <select
                       bind:value={link.platform}
                       class="w-full appearance-none pl-8 pr-6 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs focus:outline-none focus:border-brand-accent transition-colors"
@@ -272,25 +274,23 @@
                     </div>
                   </div>
 
-                  <!-- Value / Handle Input -->
-                  <div class="flex-1 relative">
+                  <!-- Value / Handle Input and Delete Button -->
+                  <div class="flex-1 flex items-center gap-2 min-w-0">
                     <input
                       type="text"
                       bind:value={link.handle_or_url}
                       placeholder={platformInfo.placeholder}
-                      class="w-full px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
+                      class="w-full min-w-0 px-3 py-1.5 rounded-lg bg-brand-main/50 border border-brand-border text-brand-text-primary text-xs placeholder:text-brand-text-secondary/40 focus:outline-none focus:border-brand-accent focus:ring-1 focus:ring-brand-accent transition-colors"
                     />
+                    <button
+                      type="button"
+                      onclick={() => handleRemoveSocialLink(idx)}
+                      class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors shrink-0"
+                      title={i18n.t("artistProfileEditor.removeLinkTooltip", {}, "Remove link")}
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
                   </div>
-
-                  <!-- Delete Button -->
-                  <button
-                    type="button"
-                    onclick={() => handleRemoveSocialLink(idx)}
-                    class="p-1.5 text-brand-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-                    title={i18n.t("artistProfileEditor.removeLinkTooltip", {}, "Remove link")}
-                  >
-                    <Trash2 class="w-3.5 h-3.5" />
-                  </button>
                 </div>
               {/each}
             </div>
@@ -299,7 +299,7 @@
       </div>
 
       <!-- Footer Buttons -->
-      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-sidebar/80">
+      <div class="flex items-center justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-brand-border bg-brand-sidebar/80 shrink-0">
         <Button
           onclick={onClose}
           disabled={isSaving}

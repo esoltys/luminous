@@ -4,6 +4,8 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import {
     Trash2,
@@ -406,7 +408,7 @@
     if (!activePlaylist || isQueue) return;
     showDeleteConfirm = false;
     await playlistsStore.deletePlaylist(activePlaylist.id);
-    collectionStore.selectedPlaylistId = null;
+    navigationStore.selectedPlaylistId = null;
   }
 
   /** Plays the clicked row the same way `playSelected`/`handlePlayAll` do:
@@ -523,7 +525,7 @@
     await playerStore.playSongs(songIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -537,7 +539,7 @@
     await playerStore.playSongs(shuffledSongIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -559,7 +561,7 @@
       const created = await playlistsStore.createPlaylist(saveQueueName.trim());
       await playlistsStore.addSongsToPlaylist(created.id, songIds);
       playlistsStore.selectPlaylist(created.id);
-      collectionStore.viewPlaylist(created.id);
+      navigationStore.viewPlaylist(created.id);
       showSaveQueueModal = false;
     } catch (err) {
       console.error("Failed to save Queue as custom playlist:", err);
@@ -623,10 +625,10 @@
       class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto carousel-scroll"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
-    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {collectionStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
+    <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
       <div class="flex items-stretch justify-between gap-6 relative z-10">
         <div class="flex flex-col justify-end gap-1.5 min-w-0 flex-1">
-          {#if !collectionStore.isDetailHeaderCollapsed}
+          {#if !windowLayoutStore.isDetailHeaderCollapsed}
           {#if isEditingTitle}
             <div class="flex items-center gap-2">
               <input
@@ -727,7 +729,7 @@
             <ColumnSelector align="left" iconOnly />
           </div>
 
-          {#if !collectionStore.isDetailHeaderCollapsed}
+          {#if !windowLayoutStore.isDetailHeaderCollapsed}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none">
             <div class="relative w-full max-w-xs">
               <Search class="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-secondary/60 pointer-events-none" />
@@ -771,7 +773,7 @@
           {/if}
         </div>
 
-        {#if !collectionStore.isDetailHeaderCollapsed}
+        {#if !windowLayoutStore.isDetailHeaderCollapsed}
         {#if isQueue}
           <div class="w-40 h-40 hidden sm:flex shrink-0 bg-brand-main bg-gradient-to-br from-brand-accent/25 to-brand-accent/15 items-center justify-center overflow-hidden border border-brand-accent/30 shadow-[0_0_28px_3px] shadow-brand-accent/40">
             {#key playerStore.currentSong?.id}
@@ -896,8 +898,8 @@
     selectedCount={selectedUuids.size}
     onPlay={playSelected}
     onRemove={removeSelected}
-    onGoToArtist={singleItem.song?.artist ? () => collectionStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
-    onGoToAlbum={singleItem.song?.album ? () => collectionStore.viewAlbum(singleItem.song?.album || "") : undefined}
+    onGoToArtist={singleItem.song?.artist ? () => navigationStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
+    onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
     onClose={() => { contextMenuState = null; }}
   />
