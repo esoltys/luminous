@@ -18,6 +18,7 @@
 
 <script lang="ts">
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
@@ -419,7 +420,7 @@
         {#each parseMultiValue(song.artist) as name, i (name)}
           {#if i > 0}<span class="{secondaryColor(song)}/50 shrink-0">,&nbsp;</span>{/if}
           <LinkButton
-            onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(name); }}
+            onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(name); }}
             class="{secondaryColor(song)} truncate min-w-0"
             title={i18n.t("collection.filterByArtist", { artist: name })}
           >
@@ -436,7 +437,7 @@
         <span class="text-brand-text-secondary italic text-xs">{song.album ?? ""}</span>
       {:else if song.album}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(song.album || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(song.album || ""); }}
           class="{secondaryColor(song)} truncate min-w-0"
           title={i18n.t("collection.filterByAlbum", { album: song.album })}
         >

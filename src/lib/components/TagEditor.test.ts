@@ -45,6 +45,8 @@ describe("TagEditor.svelte", () => {
       if (cmd === "clear_song_cover_art") return null;
       if (cmd === "set_song_rating") return 5;
       if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      if (cmd === "get_all_artist_profiles") return [];
+      if (cmd === "get_playlists") return [{ id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true }];
       return null;
     });
   });

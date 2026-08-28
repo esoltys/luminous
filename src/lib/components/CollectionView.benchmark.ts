@@ -3,6 +3,7 @@ import { vi } from "vitest";
 import { render } from "@testing-library/svelte";
 import CollectionView from "./CollectionView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -155,7 +156,7 @@ describe("CollectionView Virtualization Benchmark", () => {
     // 3. Benchmark Rendering (Mount) Performance under JSDOM
     const renderTimes: number[] = [];
     // Set active sub-tab to songs to render the VirtualList
-    collectionStore.activeSubTab = "songs";
+    navigationStore.activeSubTab = "songs";
 
     for (let i = 0; i < 5; i++) {
       const start = performance.now();

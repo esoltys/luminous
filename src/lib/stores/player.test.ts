@@ -166,4 +166,183 @@ describe("PlayerStore", () => {
 
     if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
   });
+
+  it("should clear the Queue playlist when queue playback naturally completes", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-state") playbackStateCallback = callback;
+      return () => {};
+    });
+
+    store = new PlayerStore();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await playlistsStore.refreshPlaylists();
+    const queueId = playlistsStore.queuePlaylist!.id;
+    vi.mocked(invoke).mockClear();
+
+    // Simulate active playing state on Queue
+    await playbackStateCallback?.({
+      payload: {
+        state: "playing",
+        current_song: { id: 1, title: "Last Track" },
+        playlist_id: queueId,
+        playlist_item_uuid: "uuid-123",
+        remaining_playlist_items: 0,
+        position_nanosec: 1000,
+        volume: 1,
+        shuffle_mode: "off",
+        repeat_mode: "off",
+      },
+    });
+
+    vi.mocked(invoke).mockClear();
+
+    // Simulate natural stop when last track completes
+    await playbackStateCallback?.({
+      payload: {
+        state: "stopped",
+        current_song: null,
+        playlist_id: null,
+        playlist_item_uuid: null,
+        remaining_playlist_items: 0,
+        position_nanosec: 0,
+        volume: 1,
+        shuffle_mode: "off",
+        repeat_mode: "off",
+      },
+    });
+
+    expect(invoke).toHaveBeenCalledWith("clear_playlist", { playlistId: queueId });
+
+    if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
+
+  it("should not clear custom playlists when their playback completes", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-state") playbackStateCallback = callback;
+      return () => {};
+    });
+
+    playlistsStore.playlists = [
+      { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
+      { id: 2, name: "Rock Classics", dynamic_enabled: false, created: 0, updated: 0, track_count: 5, is_queue: false },
+    ];
+    const customPl = playlistsStore.playlists.find((p) => !p.is_queue);
+    expect(customPl).toBeDefined();
+    const customId = customPl!.id;
+    vi.mocked(invoke).mockClear();
+
+    // Simulate active playing state on Custom Playlist
+    await playbackStateCallback?.({
+      payload: {
+        state: "playing",
+        current_song: { id: 1, title: "Last Track" },
+        playlist_id: customId,
+        playlist_item_uuid: "uuid-456",
+        remaining_playlist_items: 0,
+        position_nanosec: 1000,
+        volume: 1,
+        shuffle_mode: "off",
+        repeat_mode: "off",
+      },
+    });
+
+    vi.mocked(invoke).mockClear();
+
+    // Simulate natural stop when last track completes
+    await playbackStateCallback?.({
+      payload: {
+        state: "stopped",
+        current_song: null,
+        playlist_id: null,
+        playlist_item_uuid: null,
+        remaining_playlist_items: 0,
+        position_nanosec: 0,
+        volume: 1,
+        shuffle_mode: "off",
+        repeat_mode: "off",
+      },
+    });
+
+    expect(invoke).not.toHaveBeenCalledWith("clear_playlist", { playlistId: customId });
+
+    if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
+
+  it("should not trim queue tracks before uuid when shuffle_mode is enabled", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-state") playbackStateCallback = callback;
+      return () => {};
+    });
+
+    store = new PlayerStore();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await playlistsStore.refreshPlaylists();
+    const queueId = playlistsStore.queuePlaylist!.id;
+    vi.mocked(invoke).mockClear();
+
+    // Trigger playback-state with shuffle_mode: "all"
+    await playbackStateCallback?.({
+      payload: {
+        state: "playing",
+        current_song: { id: 2, title: "Shuffled Track" },
+        playlist_id: queueId,
+        playlist_item_uuid: "uuid-shuffled-2",
+        remaining_playlist_items: 4,
+        position_nanosec: 500,
+        volume: 1,
+        shuffle_mode: "all",
+        repeat_mode: "off",
+      },
+    });
+
+    expect(invoke).not.toHaveBeenCalledWith("trim_playlist_before_uuid", expect.anything());
+
+    if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
+
+  it("should trim queue tracks before uuid when shuffle_mode is off", async () => {
+    const originalListenImpl = vi.mocked(listen).getMockImplementation();
+    let playbackStateCallback: ((event: { payload: any }) => Promise<void>) | undefined;
+    vi.mocked(listen).mockImplementation(async (event: string, callback: any) => {
+      if (event === "playback-state") playbackStateCallback = callback;
+      return () => {};
+    });
+
+    store = new PlayerStore();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await playlistsStore.refreshPlaylists();
+    const queueId = playlistsStore.queuePlaylist!.id;
+    vi.mocked(invoke).mockClear();
+
+    // Trigger playback-state with shuffle_mode: "off"
+    await playbackStateCallback?.({
+      payload: {
+        state: "playing",
+        current_song: { id: 2, title: "Sequential Track" },
+        playlist_id: queueId,
+        playlist_item_uuid: "uuid-seq-2",
+        remaining_playlist_items: 4,
+        position_nanosec: 500,
+        volume: 1,
+        shuffle_mode: "off",
+        repeat_mode: "off",
+      },
+    });
+
+    expect(invoke).toHaveBeenCalledWith("trim_playlist_before_uuid", {
+      playlistId: queueId,
+      uuid: "uuid-seq-2",
+    });
+
+    if (originalListenImpl) vi.mocked(listen).mockImplementation(originalListenImpl);
+  });
 });

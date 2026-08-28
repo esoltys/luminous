@@ -4,6 +4,7 @@ import { render, fireEvent } from "@testing-library/svelte";
 import PlaylistView from "./PlaylistView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import type { Playlist, PlaylistItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -190,7 +191,7 @@ describe("PlaylistView.svelte", () => {
     const originalSetPointerCapture = HTMLElement.prototype.setPointerCapture;
     HTMLElement.prototype.setPointerCapture = setPointerCaptureSpy;
     try {
-      const viewArtistSpy = vi.spyOn(collectionStore, "viewArtist");
+      const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist");
       const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
       const { getByText } = render(PlaylistView);
 

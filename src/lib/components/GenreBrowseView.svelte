@@ -7,6 +7,7 @@
   import { prefs, type GenreViewMode, type GenreSortField } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import GenreCards from "./GenreCards.svelte";
@@ -87,27 +88,27 @@
   // AutoPlaylistDetailView (#548) — the Genres tab no longer has its own
   // song-list drill-down. A top-level card and a sub-genre chip resolve to
   // the exact same curated-tag auto-playlist lookup on the other end
-  // (collectionStore.viewGenreTag); dragging a chip between cards only moves
+  // (navigationStore.viewGenreTag); dragging a chip between cards only moves
   // curation metadata, so which card a chip is currently filed under never
   // changes which query opens it.
 
   /** Root-level card click, and the flat Tags view's plain tag click. */
   function openMainTag(tagName: string) {
-    collectionStore.viewGenreTag(tagName);
+    navigationStore.viewGenreTag(tagName);
   }
 
   /** Sub-genre chip click. The root/parent card name isn't needed on this
    * end — a curated tag's own auto-playlist is looked up by its name alone,
    * regardless of which card currently curates it. */
   function openGenreEdge(_rootTag: string, childTag: string) {
-    collectionStore.viewGenreTag(childTag);
+    navigationStore.viewGenreTag(childTag);
   }
 
   /** Songs with no genre value at all — the one case with no backing
    * curated tag, routed to AutoPlaylistDetailView's dedicated "no_genre"
    * kind (a direct query, no playlist row). */
   function openNoGenre() {
-    collectionStore.viewAutoPlaylist({ kind: "no_genre" });
+    navigationStore.viewAutoPlaylist({ kind: "no_genre" });
   }
 
   function setViewMode(mode: GenreViewMode) {

@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { applySongStats, type SongStatsPayload } from "../utils/stats";
-  import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { songsToCoverStack } from "../utils/covers";
@@ -197,7 +198,7 @@
     await playerStore.playSongs(songIds, index >= 0 ? index : 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -208,7 +209,7 @@
     await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -220,7 +221,7 @@
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+      navigationStore.viewPlaylist(queuePl.id);
     }
   }
 
@@ -249,7 +250,7 @@
       const created = await playlistsStore.createPlaylist(savePlaylistName.trim());
       await playlistsStore.addSongsToPlaylist(created.id, songs.map((s) => s.id));
       playlistsStore.selectPlaylist(created.id);
-      collectionStore.viewPlaylist(created.id);
+      navigationStore.viewPlaylist(created.id);
       showSaveModal = false;
     } catch (err) {
       console.error("Failed to save auto-playlist as custom playlist:", err);
@@ -645,8 +646,8 @@
         handleAddSongToPlaylist(song.id);
       }
     }}
-    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
     onClose={() => { contextMenuState = null; }}
   />

@@ -92,6 +92,44 @@ vi.mock("@tauri-apps/api/core", () => {
           { id: 1, name: "Queue", dynamic_enabled: false, created: 0, updated: 0, track_count: 0, is_queue: true },
         ];
       }
+      if (cmd === "get_library_snapshot") {
+        return { songs: [], albums: [], artists: [] };
+      }
+      if (cmd === "get_all_artist_profiles") {
+        return [];
+      }
+      if (cmd === "get_directories") {
+        return [];
+      }
+      if (cmd === "get_library_stats") {
+        return { song_count: 0, album_count: 0, artist_count: 0, total_duration_nanosec: 0 };
+      }
+      if (cmd === "get_db_schema_status") {
+        return { is_ready: true, schema_version: 1 };
+      }
+      if (
+        cmd === "get_favourite_songs" ||
+        cmd === "get_recently_added_songs" ||
+        cmd === "get_recently_played_songs" ||
+        cmd === "get_songs_by_artist" ||
+        cmd === "get_songs_by_album" ||
+        cmd === "get_songs_by_genre" ||
+        cmd === "get_songs_by_ids" ||
+        cmd === "search_songs" ||
+        cmd === "get_playlists_by_artist" ||
+        cmd === "get_compilations_by_artist"
+      ) {
+        return [];
+      }
+      if (cmd === "get_artist_profile") {
+        return null;
+      }
+      if (cmd === "get_playlist_tracks") {
+        return [];
+      }
+      if (cmd === "get_all_app_settings") {
+        return {};
+      }
       return null;
     }),
   };
@@ -122,6 +160,42 @@ vi.mock("@tauri-apps/plugin-process", () => {
   return {
     relaunch: vi.fn().mockResolvedValue(undefined),
     exit: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+// Mock Tauri window API (geometry tracking, window controls)
+vi.mock("@tauri-apps/api/window", () => {
+  const mockWindow = {
+    onResized: vi.fn().mockResolvedValue(() => {}),
+    onMoved: vi.fn().mockResolvedValue(() => {}),
+    onCloseRequested: vi.fn().mockResolvedValue(() => {}),
+    onFocusChanged: vi.fn().mockResolvedValue(() => {}),
+    onScaleFactorChanged: vi.fn().mockResolvedValue(() => {}),
+    onThemeChanged: vi.fn().mockResolvedValue(() => {}),
+    innerSize: vi.fn().mockResolvedValue({ width: 1200, height: 800 }),
+    outerSize: vi.fn().mockResolvedValue({ width: 1200, height: 800 }),
+    innerPosition: vi.fn().mockResolvedValue({ x: 100, y: 100 }),
+    outerPosition: vi.fn().mockResolvedValue({ x: 100, y: 100 }),
+    isMaximized: vi.fn().mockResolvedValue(false),
+    isMinimized: vi.fn().mockResolvedValue(false),
+    isFullscreen: vi.fn().mockResolvedValue(false),
+    isVisible: vi.fn().mockResolvedValue(true),
+    isFocused: vi.fn().mockResolvedValue(true),
+    setSize: vi.fn().mockResolvedValue(undefined),
+    setPosition: vi.fn().mockResolvedValue(undefined),
+    maximize: vi.fn().mockResolvedValue(undefined),
+    unmaximize: vi.fn().mockResolvedValue(undefined),
+    minimize: vi.fn().mockResolvedValue(undefined),
+    unminimize: vi.fn().mockResolvedValue(undefined),
+    setFullscreen: vi.fn().mockResolvedValue(undefined),
+    show: vi.fn().mockResolvedValue(undefined),
+    hide: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    setFocus: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    getCurrentWindow: vi.fn(() => mockWindow),
+    Window: vi.fn(() => mockWindow),
   };
 });
 
