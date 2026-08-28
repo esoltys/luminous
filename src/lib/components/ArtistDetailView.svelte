@@ -156,6 +156,8 @@
 
   $effect(() => {
     const requested = artistName;
+    // Track collectionStore.songs so artist details update when the library changes (e.g. new albums added)
+    const _libraryVersion = collectionStore.songs;
     loading = true;
     Promise.all([
       invoke<Song[]>("get_songs_by_artist", { artist: requested }),

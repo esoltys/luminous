@@ -323,6 +323,7 @@ export class PlayerStore {
   private async syncQueueTrackPosition() {
     if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
     if (this.repeatMode === "playlist") return;
+    if (this.shuffleMode !== "off") return;
     const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
     if (pl?.is_queue || this.activeContextName === "Queue") {
       await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
