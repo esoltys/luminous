@@ -655,9 +655,11 @@ impl CollectionScanner {
     }
 
     /// Artists ranked by total play count across their songs (ties broken
-    /// alphabetically). Artists with zero plays are excluded entirely —
-    /// this powers the Home "Top Artists" carousel, not a full artist
-    /// directory (see `get_artists` for that).
+    /// alphabetically). When the library has no play history at all (a
+    /// freshly scanned collection), falls back to ranking by song count
+    /// instead of excluding every artist — this powers the Home "Top
+    /// Artists" carousel, not a full artist directory (see `get_artists`
+    /// for that).
     pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // See get_artists() for why grouping is case-insensitive (issue #295).
@@ -675,6 +677,9 @@ impl CollectionScanner {
                 FROM songs s
                 WHERE s.source IN (1, 2) AND s.unavailable = 0
              ),
+             totals AS (
+                SELECT SUM(COALESCE(playcount, 0)) AS lib_total_playcount FROM base
+             ),
              grouped AS (
                 SELECT
                     MIN(effective_artist) AS effective_artist,
@@ -683,7 +688,6 @@ impl CollectionScanner {
                     SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
-                HAVING SUM(COALESCE(playcount, 0)) > 0
              )
              SELECT
                 g.effective_artist,
@@ -704,8 +708,11 @@ impl CollectionScanner {
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre
-             FROM grouped g
-             ORDER BY g.total_playcount DESC, g.sort_artist COLLATE NOCASE
+             FROM grouped g, totals t
+             ORDER BY
+                g.total_playcount DESC,
+                CASE WHEN t.lib_total_playcount = 0 THEN g.song_count END DESC,
+                g.sort_artist COLLATE NOCASE
              LIMIT ?1",
         )?;
         let artists: Vec<serde_json::Value> = stmt
@@ -959,6 +966,39 @@ impl CollectionScanner {
              FROM songs s
              WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
+             LIMIT ?1"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs_with_counts: Vec<(Song, i64, i64)> = stmt
+            .query_map(params![query_limit], |row| {
+                let song = row_to_song(row)?;
+                let count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+                Ok((song, count, disc_count))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        let mut items = group_songs_into_home_items(songs_with_counts, limit as usize);
+        attach_album_ratings(&conn, &mut items)?;
+        Ok(items)
+    }
+
+    /// A shuffled sample of full albums in the library, for users with
+    /// little or no play history yet. Reuses the same Album grouping as
+    /// `get_recently_added`; only the ordering (random) and the album-only
+    /// filter differ. Reshuffles on every call by design — freshness over
+    /// stability across refreshes.
+    pub fn get_featured_albums(&self, limit: i64) -> Result<Vec<HomeItem>> {
+        let conn = self.db.pool.get()?;
+        // See get_recently_played's identical overfetch-then-group comment.
+        let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
+        let sql = format!(
+            "SELECT {home_item_select_cols}
+             FROM songs s
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+               AND s.album IS NOT NULL AND s.album != ''
+             ORDER BY RANDOM()
              LIMIT ?1"
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -1944,7 +1984,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_top_artists_ranks_by_playcount_and_excludes_zero_plays() {
+    fn test_get_top_artists_ranks_by_playcount_and_ranks_zero_plays_last() {
         let temp_dir = std::env::temp_dir().join(format!(
             "luminous_top_artists_test_{}",
             std::time::SystemTime::now()
@@ -1994,7 +2034,9 @@ mod tests {
             4,
         );
 
-        // Artist Unplayed: never played, must be excluded entirely.
+        // Artist Unplayed: never played. The library as a whole has play
+        // history (High/Low), so the zero-play fallback must NOT kick in —
+        // Unplayed is still included, but ranked last by total_playcount.
         seed(
             r"C:\Music\Artist Unplayed\track.mp3",
             "Artist Unplayed",
@@ -2009,10 +2051,58 @@ mod tests {
             .iter()
             .map(|a| a["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names, vec!["Artist High", "Artist Low"]);
+        assert_eq!(names, vec!["Artist High", "Artist Low", "Artist Unplayed"]);
 
         let high = &top_artists[0];
         assert_eq!(high["song_count"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_top_artists_falls_back_to_song_count_when_library_has_no_plays() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_artists_fallback_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, artist: &str, title: &str| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        };
+
+        // A freshly-scanned library: no song anywhere has ever been played.
+        // Artist Big has more songs than Artist Small.
+        seed(r"C:\Music\Artist Big\a.mp3", "Artist Big", "Track A");
+        seed(r"C:\Music\Artist Big\b.mp3", "Artist Big", "Track B");
+        seed(r"C:\Music\Artist Small\a.mp3", "Artist Small", "Track A");
+
+        let scanner = CollectionScanner::new(db.clone());
+        let top_artists = scanner.get_top_artists(10).unwrap();
+
+        // Zero-play library: nothing gets excluded, and ranking falls back
+        // to song_count DESC instead of collapsing to alphabetical order.
+        let names: Vec<&str> = top_artists
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, vec!["Artist Big", "Artist Small"]);
+        assert_eq!(top_artists[0]["song_count"].as_i64(), Some(2));
+        assert_eq!(top_artists[1]["song_count"].as_i64(), Some(1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2279,6 +2369,112 @@ mod tests {
             }
             other => panic!("expected Album item, got {other:?}"),
         }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_featured_albums_returns_albums_without_play_history() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_featured_albums_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: Option<&str>| {
+            let song = Song {
+                source: SongSource::LocalFile,
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: album.map(|a| a.to_string()),
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        // Two full albums (no play history — playcount defaults to 0/unset).
+        for i in 1..=3 {
+            insert_song(
+                &format!("path/album_a_{i}.mp3"),
+                &format!("A Track {i}"),
+                "Artist A",
+                Some("Album A"),
+            );
+        }
+        for i in 1..=3 {
+            insert_song(
+                &format!("path/album_b_{i}.mp3"),
+                &format!("B Track {i}"),
+                "Artist B",
+                Some("Album B"),
+            );
+        }
+        // A standalone single with no album tag — must be excluded.
+        insert_song("path/single.mp3", "Single Track", "Artist C", None);
+
+        let items = scanner.get_featured_albums(10).unwrap();
+        assert_eq!(items.len(), 2, "should surface both albums, no singles");
+        for item in &items {
+            match item {
+                HomeItem::Album { album } => {
+                    assert!(
+                        matches!(album.album.as_deref(), Some("Album A") | Some("Album B")),
+                        "unexpected album: {album:?}"
+                    );
+                }
+                other => panic!("expected Album item, got {other:?}"),
+            }
+        }
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_featured_albums_respects_limit() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_featured_albums_limit_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: &str| {
+            let song = Song {
+                source: SongSource::LocalFile,
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: Some(album.to_string()),
+                added: Some(1000),
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        for album_idx in 1..=5 {
+            for track_idx in 1..=2 {
+                insert_song(
+                    &format!("path/album_{album_idx}_track_{track_idx}.mp3"),
+                    &format!("Track {track_idx}"),
+                    "Various Artist",
+                    &format!("Album {album_idx}"),
+                );
+            }
+        }
+
+        let items = scanner.get_featured_albums(2).unwrap();
+        assert_eq!(items.len(), 2);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
