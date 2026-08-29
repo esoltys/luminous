@@ -268,7 +268,7 @@ impl CollectionScanner {
                 MAX(added) AS added,
                 COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
              FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND album IS NOT NULL
+             WHERE source IN (1, 2) AND unavailable = 0 AND album IS NOT NULL AND album != ''
                AND album IN (
                  SELECT album FROM songs s2
                  WHERE s2.source IN (1, 2) AND s2.unavailable = 0 AND {}
@@ -557,7 +557,7 @@ impl CollectionScanner {
                 COALESCE(MAX(NULLIF(album_artist_sort, '')), MAX(NULLIF(artistsort, ''))) AS artist_sort,
                 MAX(NULLIF(albumsort, '')) AS albumsort
              FROM songs
-             WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
+             WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
              GROUP BY album
              ORDER BY COALESCE(MAX(album_artist_sort), MAX(artistsort), MAX(album_artist), MAX(artist)), COALESCE(MAX(albumsort), album)",
         )?;
@@ -600,7 +600,7 @@ impl CollectionScanner {
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
+                WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
@@ -665,7 +665,7 @@ impl CollectionScanner {
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2) AND album IS NOT NULL AND unavailable = 0
+                WHERE source IN (1, 2) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
@@ -1477,6 +1477,59 @@ mod tests {
         let album_four = find_album("Album Four");
         assert_eq!(album_four["artist"].as_str(), None);
         assert_eq!(album_four["track_count"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_albums_excludes_empty_string_album() {
+        // A present-but-blank album tag (as opposed to a missing one, which
+        // is NULL) must not surface as a pseudo-album — otherwise untagged
+        // singles from unrelated artists collapse into one bogus "Unknown
+        // Album" / "Various Artists" card (#issue: singles without an album
+        // title showing up in the Albums grid).
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_empty_album_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        let insert_song = |path: &str, title: &str, artist: &str, album: Option<&str>| {
+            let song = Song {
+                path: Some(path.to_string()),
+                title: Some(title.to_string()),
+                artist: Some(artist.to_string()),
+                album: album.map(|s| s.to_string()),
+                source: SongSource::LocalFile,
+                filetype: FileType::Mp3,
+                unavailable: false,
+                ..Default::default()
+            };
+            upsert_song(&conn, &song).unwrap();
+        };
+
+        insert_song("path/1.mp3", "Single One", "Artist A", Some(""));
+        insert_song("path/2.mp3", "Single Two", "Artist B", Some(""));
+        insert_song(
+            "path/3.mp3",
+            "Track In Album",
+            "Artist C",
+            Some("Real Album"),
+        );
+
+        let albums = scanner.get_albums().unwrap();
+
+        assert!(
+            albums.iter().all(|a| a["album"].as_str() != Some("")),
+            "empty-string album should not produce a pseudo-album entry: {albums:?}"
+        );
+        assert_eq!(albums.len(), 1);
+        assert_eq!(albums[0]["album"].as_str(), Some("Real Album"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
