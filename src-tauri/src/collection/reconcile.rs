@@ -121,7 +121,9 @@ pub(crate) fn reconcile_moved_songs(
         ))
     })?;
 
-    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, Option<String>)>> =
+    type OrphanKey = (String, i64);
+    type OrphanRecord = (i64, Option<String>);
+    let mut orphans: std::collections::HashMap<OrphanKey, Vec<OrphanRecord>> =
         std::collections::HashMap::new();
     for (id, path, filesize, art_automatic) in rows.flatten() {
         let Some(filesize) = filesize else { continue };
