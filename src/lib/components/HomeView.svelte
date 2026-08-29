@@ -76,17 +76,14 @@
         {getTimeOfDayGreeting()}
       </h1>
       <p class="text-sm text-brand-text-secondary mt-1">
-        {i18n.t('home.exploreSub')}
+        {collectionStore.stats.total_songs > 0
+          ? i18n.t('home.libraryOverview', {
+              songs: collectionStore.stats.total_songs,
+              albums: collectionStore.stats.total_albums,
+              artists: collectionStore.stats.total_artists
+            })
+          : i18n.t('home.exploreSub')}
       </p>
-      {#if collectionStore.stats.total_songs > 0}
-        <p class="text-sm text-brand-text-secondary mt-1">
-          {i18n.t('home.libraryOverview', {
-            songs: collectionStore.stats.total_songs,
-            albums: collectionStore.stats.total_albums,
-            artists: collectionStore.stats.total_artists
-          })}
-        </p>
-      {/if}
     </div>
 
     <div class="px-6 pt-4 space-y-12">
