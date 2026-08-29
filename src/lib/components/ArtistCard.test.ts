@@ -52,17 +52,24 @@ describe("ArtistCard.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders artist name, genre, and song count", () => {
-    const { getByText } = render(ArtistCard, {
+  it("renders artist name, genre chip, and song count", () => {
+    const { getByText, getByRole } = render(ArtistCard, {
       props: { artist: mockArtist, artistAlbums: [] },
     });
 
     expect(getByText("Dave Hawkins")).toBeInTheDocument();
-    const genreEl = getByText("Rock");
-    expect(genreEl).toBeInTheDocument();
-    expect(genreEl).toHaveAttribute("title", "Rock");
-    expect(genreEl.className).toContain("truncate");
+    const genreChip = getByRole("button", { name: "Rock" });
+    expect(genreChip).toBeInTheDocument();
+    expect(getByText("Rock")).toBeInTheDocument();
     expect(getByText("6 songs")).toBeInTheDocument();
+  });
+
+  it("falls back to unknown genre text when artist has no genre", () => {
+    const { getByText } = render(ArtistCard, {
+      props: { artist: { ...mockArtist, genre: undefined }, artistAlbums: [] },
+    });
+
+    expect(getByText("Unknown genre")).toBeInTheDocument();
   });
 
   it("renders cover artwork from artistAlbums when albums exist", () => {
