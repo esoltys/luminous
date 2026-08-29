@@ -57,6 +57,8 @@ export const en = {
     topArtists: "Top Artists",
     mostPlayed: "Top 5 Most Played",
     recentlyAdded: "Recently Added",
+    exploreLibrary: "Explore Your Library",
+    libraryOverview: "{songs} Songs • {albums} Albums • {artists} Artists",
     emptyState: "Start adding music to see your personalized collections"
   },
   emptyLibrary: {

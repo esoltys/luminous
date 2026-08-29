@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, ArtistItem } from "../types";
+  import type { HomeItem, ArtistItem, ScanProgress } from "../types";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
@@ -16,7 +17,9 @@
   let topArtists = $state<ArtistItem[]>([]);
   let frequentlyPlayed = $state<HomeItem[]>([]);
   let recentlyAdded = $state<HomeItem[]>([]);
+  let featuredAlbums = $state<HomeItem[]>([]);
   let isLoading = $state(true);
+  let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
 
   function getTimeOfDayGreeting(): string {
     const hour = new Date().getHours();
@@ -29,14 +32,16 @@
   async function loadCuratedData() {
     isLoading = true;
     try {
-      const [artists, frequent, added] = await Promise.all([
+      const [artists, frequent, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
         invoke<HomeItem[]>("get_most_frequently_played", { limit: 5 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 5 }),
+        invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
       frequentlyPlayed = frequent;
       recentlyAdded = added;
+      featuredAlbums = featured;
     } catch (err) {
       console.error("Failed to load curated data:", err);
     } finally {
@@ -46,6 +51,21 @@
 
   onMount(() => {
     loadCuratedData();
+
+    const unlistenScan = listen<ScanProgress>("scan-progress", (event) => {
+      if (event.payload.phase === "done") loadCuratedData();
+    });
+
+    const unlistenLibrary = listen("library-changed", () => {
+      clearTimeout(libraryChangedDebounce);
+      libraryChangedDebounce = setTimeout(loadCuratedData, 500);
+    });
+
+    return () => {
+      clearTimeout(libraryChangedDebounce);
+      unlistenScan.then((fn) => fn());
+      unlistenLibrary.then((fn) => fn());
+    };
   });
 </script>
 
@@ -58,6 +78,15 @@
       <p class="text-sm text-brand-text-secondary mt-1">
         {i18n.t('home.exploreSub')}
       </p>
+      {#if collectionStore.stats.total_songs > 0}
+        <p class="text-sm text-brand-text-secondary mt-1">
+          {i18n.t('home.libraryOverview', {
+            songs: collectionStore.stats.total_songs,
+            albums: collectionStore.stats.total_albums,
+            artists: collectionStore.stats.total_artists
+          })}
+        </p>
+      {/if}
     </div>
 
     <div class="px-6 pt-4 space-y-12">
@@ -81,10 +110,12 @@
         </HorizontalScrollRow>
       {/if}
 
-      {#if frequentlyPlayed.length > 0 || recentlyAdded.length > 0}
+      {#if frequentlyPlayed.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if frequentlyPlayed.length > 0}
             <HomeRowList title={i18n.t('home.mostPlayed')} items={frequentlyPlayed} variant="rank" />
+          {:else if featuredAlbums.length > 0}
+            <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
           {/if}
           {#if recentlyAdded.length > 0}
             <HomeRowList title={i18n.t('home.recentlyAdded')} items={recentlyAdded} variant="added" />

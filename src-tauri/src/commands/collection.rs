@@ -234,6 +234,17 @@ pub async fn get_recently_added(
 }
 
 #[tauri::command]
+pub async fn get_featured_albums(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<HomeItem>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_featured_albums(limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_artist_profile(
     artist: String,
     state: State<'_, AppState>,
