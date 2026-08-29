@@ -1495,8 +1495,8 @@ fn decode_one_packet(
                     // truncate the packet at the cut and treat the
                     // remainder of the file as EOF.
                     let frames = samples.len() / session.current.src_channels;
-                    let packet_ns = (frames as f64 * 1_000_000_000.0
-                        / session.current.src_rate as f64) as u64;
+                    let packet_ns =
+                        (frames as f64 * 1_000_000_000.0 / session.current.src_rate as f64) as u64;
                     if let Some(end_ns) = session.current.end_ns {
                         if session.current.decoded_pos_ns >= end_ns {
                             session.current.eof = true;
@@ -1505,7 +1505,8 @@ fn decode_one_packet(
                         if session.current.decoded_pos_ns + packet_ns > end_ns {
                             let keep_frames = ((end_ns - session.current.decoded_pos_ns) as f64
                                 * session.current.src_rate as f64
-                                / 1_000_000_000.0) as usize;
+                                / 1_000_000_000.0)
+                                as usize;
                             samples = &samples[..keep_frames * session.current.src_channels];
                             session.current.eof = true;
                         }

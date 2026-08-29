@@ -950,16 +950,24 @@ mod tests {
             .iter()
             .find(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian"))
             .expect("Rush has 25 songs so artisttag:canadian should be created");
-        assert_eq!(canadian_pl.name, "Canadian", "artist tag playlist name must be Title Case");
+        assert_eq!(
+            canadian_pl.name, "Canadian",
+            "artist tag playlist name must be Title Case"
+        );
 
         let prog_pl = playlists
             .iter()
             .find(|p| p.dynamic_spec.as_deref() == Some("artisttag:prog-rock"))
             .expect("Rush has 25 songs so artisttag:prog-rock should be created");
-        assert_eq!(prog_pl.name, "Prog-Rock", "artist tag playlist name must be Title Case");
+        assert_eq!(
+            prog_pl.name, "Prog-Rock",
+            "artist tag playlist name must be Title Case"
+        );
 
         assert!(
-            !playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:indie")),
+            !playlists
+                .iter()
+                .any(|p| p.dynamic_spec.as_deref() == Some("artisttag:indie")),
             "IndieArtist has 1 song (< 25) so artisttag:indie should not be created"
         );
 
@@ -974,7 +982,9 @@ mod tests {
         manager.sync_artist_tag_auto_playlists().unwrap();
         let updated_playlists = manager.get_playlists().unwrap();
         assert!(
-            !updated_playlists.iter().any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
+            !updated_playlists
+                .iter()
+                .any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
             "artisttag:canadian must be pruned when 0 songs remain"
         );
 

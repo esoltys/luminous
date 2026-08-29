@@ -95,7 +95,9 @@ fn reconcile_watcher_batch(
             .push(path);
     }
 
-    let mut orphans: std::collections::HashMap<(String, i64), Vec<(i64, Option<String>, &PathBuf)>> =
+    type OrphanKey = (String, i64);
+    type OrphanRecord<'a> = (i64, Option<String>, &'a PathBuf);
+    let mut orphans: std::collections::HashMap<OrphanKey, Vec<OrphanRecord>> =
         std::collections::HashMap::new();
     for path in removed_paths {
         let path_str = path.to_string_lossy().to_string();
@@ -695,8 +697,8 @@ mod tests {
 
         let (unmatched_removed, unmatched_added) = reconcile_watcher_batch(
             &conn,
-            &[old_path.clone()],
-            &[new_path.clone()],
+            std::slice::from_ref(&old_path),
+            std::slice::from_ref(&new_path),
         )
         .unwrap();
         assert!(unmatched_removed.is_empty());
