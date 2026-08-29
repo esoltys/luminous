@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { playerStore } from "../stores/player.svelte";
   import { prefs, type GenreViewMode, type GenreSortField } from "../stores/prefs.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -141,7 +142,7 @@
   }
 </script>
 
-<div class="flex-1 px-6 pt-4 pb-6 overflow-y-auto">
+<div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
     <div class="h-9 flex items-center justify-between mb-3">
       <div class="text-xs text-brand-text-secondary font-medium">
         {i18n.t("songTags.genresTabDescription", { count: tagsStore.hierarchy.length }, `Showing ${tagsStore.hierarchy.length} genres`)}
