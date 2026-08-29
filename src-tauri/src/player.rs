@@ -526,9 +526,8 @@ impl Player {
                 }
             }
             self.shuffle_order = new_shuffle_order;
-            self.current_index = new_real_idx.and_then(|real_idx| {
-                self.shuffle_order.iter().position(|&idx| idx == real_idx)
-            });
+            self.current_index = new_real_idx
+                .and_then(|real_idx| self.shuffle_order.iter().position(|&idx| idx == real_idx));
         }
 
         if let Some(idx) = self.current_index {
@@ -565,9 +564,8 @@ impl Player {
                     *idx += 1;
                 }
             }
-            self.current_index = new_real_idx.and_then(|real_idx| {
-                self.shuffle_order.iter().position(|&i| i == real_idx)
-            });
+            self.current_index = new_real_idx
+                .and_then(|real_idx| self.shuffle_order.iter().position(|&i| i == real_idx));
         }
     }
 
@@ -2384,7 +2382,10 @@ mod tests {
             .collect::<Vec<_>>();
 
         player.set_shuffle_mode(ShuffleMode::All);
-        player.play_playlist(items.clone(), 0, 0, None).await.unwrap();
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
 
         // Fix shuffle order manually to test deterministic preservation
         // Order: [Song 1 (idx 0), Song 4 (idx 3), Song 2 (idx 1), Song 5 (idx 4), Song 3 (idx 2)]
