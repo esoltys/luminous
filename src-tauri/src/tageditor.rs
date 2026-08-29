@@ -84,6 +84,34 @@ struct AcoustIdResponse {
 // Tag Editor File Writer
 // ---------------------------------------------------------------------------
 
+/// Every field [`write_tags`] needs to persist a song's tags to disk,
+/// grouped into one request instead of a long positional argument list.
+/// Borrows rather than owns its string fields — callers already hold the
+/// owned data (loaded from the DB or a genre-rewrite result) and just need
+/// to name it once per write. Has no `genresort` field: `genresort` has no
+/// on-disk tag mapping and was never used by `write_tags`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TagWriteRequest<'a> {
+    pub title: &'a str,
+    pub titlesort: Option<&'a str>,
+    pub artist: &'a str,
+    pub artistsort: Option<&'a str>,
+    pub album: &'a str,
+    pub albumsort: Option<&'a str>,
+    pub album_artist: &'a str,
+    pub album_artist_sort: Option<&'a str>,
+    pub composer: &'a str,
+    pub composersort: Option<&'a str>,
+    pub genre: &'a str,
+    pub track: Option<u32>,
+    pub disc: Option<u32>,
+    pub year: Option<u32>,
+    pub grouping: &'a str,
+    pub bpm: Option<f32>,
+    pub initial_key: &'a str,
+    pub compilation: bool,
+}
+
 /// Write the given tag fields to `path`'s primary tag, creating one if the
 /// file has none yet. Every field is written unconditionally — `Option`
 /// fields (`track`, `disc`, `year`, `bpm`) are cleared from the file when
@@ -93,23 +121,28 @@ struct AcoustIdResponse {
 /// Retries the on-disk save up to 5 times with a short delay, since it can
 /// transiently fail if another process (e.g. an antivirus scanner) has the
 /// file open.
-#[allow(clippy::too_many_arguments)]
-pub fn write_tags(
-    path: &Path,
-    title: &str,
-    artist: &str,
-    album: &str,
-    album_artist: &str,
-    composer: &str,
-    genre: &str,
-    track: Option<u32>,
-    disc: Option<u32>,
-    year: Option<u32>,
-    grouping: &str,
-    bpm: Option<f32>,
-    initial_key: &str,
-    compilation: bool,
-) -> Result<()> {
+pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
+    let TagWriteRequest {
+        title,
+        titlesort,
+        artist,
+        artistsort,
+        album,
+        albumsort,
+        album_artist,
+        album_artist_sort,
+        composer,
+        composersort,
+        genre,
+        track,
+        disc,
+        year,
+        grouping,
+        bpm,
+        initial_key,
+        compilation,
+    } = *req;
+
     let mut tagged_file = Probe::open(path)
         .context("failed to open audio file for tag writing")?
         .read()
@@ -133,6 +166,19 @@ pub fn write_tags(
 
     tag.set_title(title.to_string());
     tag.set_album(album.to_string());
+
+    let mut set_or_remove_sort = |key: lofty::tag::ItemKey, val: Option<&str>| {
+        tag.remove_key(key);
+        if let Some(v) = val.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            tag.insert_text(key, v.to_string());
+        }
+    };
+
+    set_or_remove_sort(lofty::tag::ItemKey::TrackTitleSortOrder, titlesort);
+    set_or_remove_sort(lofty::tag::ItemKey::TrackArtistSortOrder, artistsort);
+    set_or_remove_sort(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
+    set_or_remove_sort(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
+    set_or_remove_sort(lofty::tag::ItemKey::ComposerSortOrder, composersort);
 
     // Genre, Artist, Album Artist, and Composer are all written as one
     // `TagItem` per value rather than a single `set_*()`/`insert_text()`
@@ -573,19 +619,15 @@ mod tests {
 
         write_tags(
             &path,
-            "Title",
-            "Artist",
-            "Album",
-            "Album Artist",
-            "Composer",
-            "Rock; Jazz Fusion; Live",
-            None,
-            None,
-            None,
-            "",
-            None,
-            "",
-            false,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                album_artist: "Album Artist",
+                composer: "Composer",
+                genre: "Rock; Jazz Fusion; Live",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -607,8 +649,14 @@ mod tests {
         write_test_wav(&path);
 
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
-            false,
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Metal",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -625,12 +673,24 @@ mod tests {
         write_test_wav(&path);
 
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "Metal", None, None, None, "", None, "",
-            false,
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Metal",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
         write_tags(
-            &path, "Title", "Artist", "Album", "", "", "", None, None, None, "", None, "", false,
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                ..Default::default()
+            },
         )
         .expect("write_tags with empty genre should succeed");
 
@@ -647,19 +707,14 @@ mod tests {
 
         write_tags(
             &path,
-            "Title",
-            "Artist A; Artist B",
-            "Album",
-            "Album Artist A; Album Artist B",
-            "Composer A; Composer B",
-            "",
-            None,
-            None,
-            None,
-            "",
-            None,
-            "",
-            false,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist A; Artist B",
+                album: "Album",
+                album_artist: "Album Artist A; Album Artist B",
+                composer: "Composer A; Composer B",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
 
@@ -693,23 +748,23 @@ mod tests {
 
         write_tags(
             &path,
-            "Title",
-            "Artist",
-            "Album",
-            "Album Artist",
-            "Composer",
-            "",
-            None,
-            None,
-            None,
-            "",
-            None,
-            "",
-            false,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                album_artist: "Album Artist",
+                composer: "Composer",
+                ..Default::default()
+            },
         )
         .expect("write_tags should succeed");
         write_tags(
-            &path, "Title", "", "Album", "", "", "", None, None, None, "", None, "", false,
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                album: "Album",
+                ..Default::default()
+            },
         )
         .expect("write_tags with empty artist/album_artist/composer should succeed");
 
@@ -718,6 +773,45 @@ mod tests {
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::TrackArtist).count(), 0);
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::AlbumArtist).count(), 0);
         assert_eq!(tag.get_strings(lofty::tag::ItemKey::Composer).count(), 0);
+    }
+
+    #[test]
+    fn test_write_and_read_sort_tags() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "The Beatles",
+                titlesort: Some("Beatles, The"),
+                artist: "The Beatles",
+                artistsort: Some("Beatles, The"),
+                album: "Abbey Road",
+                albumsort: Some("Abbey Road Sort"),
+                album_artist: "The Beatles",
+                album_artist_sort: Some("Beatles, The"),
+                composer: "McCartney",
+                composersort: Some("McCartney, Paul"),
+                genre: "Rock",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let song = crate::collection::read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.title.as_deref(), Some("The Beatles"));
+        assert_eq!(song.titlesort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.artist.as_deref(), Some("The Beatles"));
+        assert_eq!(song.artistsort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.album.as_deref(), Some("Abbey Road"));
+        assert_eq!(song.albumsort.as_deref(), Some("Abbey Road Sort"));
+        assert_eq!(song.album_artist.as_deref(), Some("The Beatles"));
+        assert_eq!(song.album_artist_sort.as_deref(), Some("Beatles, The"));
+        assert_eq!(song.composer.as_deref(), Some("McCartney"));
+        assert_eq!(song.composersort.as_deref(), Some("McCartney, Paul"));
+        assert_eq!(song.genre.as_deref(), Some("Rock"));
     }
 
     #[tokio::test]

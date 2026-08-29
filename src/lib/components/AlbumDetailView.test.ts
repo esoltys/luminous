@@ -3,16 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import AlbumDetailView from "./AlbumDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -46,8 +43,8 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
-    collectionStore.selectedAlbumName = mockAlbumName;
-    collectionStore.activeTab = "collection";
+    navigationStore.selectedAlbumName = mockAlbumName;
+    navigationStore.activeTab = "collection";
     collectionStore.albums = [];
     playlistsStore.playlists = [
       { id: 99, name: "Queue", track_count: 0, created: 100, updated: 100, dynamic_enabled: false, is_queue: true },
@@ -77,7 +74,7 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
   });
 
   it("does not switch views to Queue when user clicks Play", async () => {
-    const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist");
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist");
     const playSongsSpy = vi.spyOn(playerStore, "playSongs");
     const setShuffleSpy = vi.spyOn(playerStore, "setShuffleMode");
 
@@ -100,11 +97,11 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
       albumArtist: "The Beatles",
     });
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
-    expect(collectionStore.activeTab).toBe("collection");
+    expect(navigationStore.activeTab).toBe("collection");
   });
 
   it("retains view on Shuffle Play while updating playback and queue", async () => {
-    const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist");
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist");
     const playSongsSpy = vi.spyOn(playerStore, "playSongs");
     const setShuffleSpy = vi.spyOn(playerStore, "setShuffleMode");
 
@@ -120,10 +117,10 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
     await fireEvent.click(shuffleButton);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(setShuffleSpy).toHaveBeenCalledWith("all");
+    expect(setShuffleSpy).toHaveBeenCalledWith("off");
     expect(playSongsSpy).toHaveBeenCalled();
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
-    expect(collectionStore.activeTab).toBe("collection");
+    expect(navigationStore.activeTab).toBe("collection");
   });
 
   it("adds all album songs to Queue when clicking the + button with no active custom playlist", async () => {

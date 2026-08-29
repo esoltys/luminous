@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
@@ -25,8 +26,9 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm";
+    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
+    artistTag?: string;
     decade?: string;
     bpm?: string;
     label: string;
@@ -42,7 +44,7 @@
 
   onMount(async () => {
     try {
-      // Auto-playlists (genre, decade, and BPM) are materialized as real (dynamic_enabled) playlist
+      // Auto-playlists (genre, decade, BPM, and artist tags) are materialized as real (dynamic_enabled) playlist
       // rows, refreshed at most once every 24h — sync then re-pull the list.
       await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
@@ -58,7 +60,7 @@
     if (isRefreshingAll) return;
     isRefreshingAll = true;
     try {
-      // Pick up genres/decades/BPM buckets that just crossed the auto-playlist
+      // Pick up genres/decades/BPM buckets/artist tags that just crossed the auto-playlist
       // threshold, and prune ones that no longer have any matching songs.
       await invoke("sync_all_auto_playlists");
       await playlistsStore.refreshPlaylists();
@@ -76,16 +78,13 @@
     }
   }
 
-  // System genre auto-playlists are stored with a raw genre name as dynamic_spec (e.g. "Rock", "Jazz").
-  // Smart playlists built via the Smart Playlist builder always contain a "field:value" rule (e.g. "genre:jazz rating:>=4").
+  // System genre auto-playlists are keyed one row per curated tag (#548),
+  // stored as "tag:<name>" in dynamic_spec — e.g. "tag:Rock", "tag:Jazz".
   let genreAutoPlaylists = $derived(
-    playlistsStore.playlists.filter(
-      (p) =>
-        p.dynamic_enabled &&
-        !p.dynamic_spec?.startsWith("decade:") &&
-        !p.dynamic_spec?.startsWith("bpmrange:") &&
-        !isSmartPlaylistSpec(p.dynamic_spec)
-    )
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("tag:"))
+  );
+  let artistTagAutoPlaylists = $derived(
+    playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("artisttag:"))
   );
   let decadeAutoPlaylists = $derived(playlistsStore.playlists.filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("decade:")));
   let bpmAutoPlaylists = $derived(
@@ -146,7 +145,20 @@
         defs.push({
           id: `auto:genre:${p.id}`,
           kind: "genre",
-          genre: p.dynamic_spec?.replace(/^genre:/, "") ?? p.name,
+          genre: p.dynamic_spec?.replace(/^tag:/, "") ?? p.name,
+          label: getPlaylistDisplayName(p),
+          playlistId: p.id,
+          updated: p.updated,
+          trackCount: p.track_count,
+        });
+      }
+    }
+    for (const p of artistTagAutoPlaylists) {
+      if (p.track_count > 0) {
+        defs.push({
+          id: `auto:artist_tag:${p.id}`,
+          kind: "artist_tag",
+          artistTag: p.dynamic_spec?.replace(/^artisttag:/, "") ?? p.name,
           label: getPlaylistDisplayName(p),
           playlistId: p.id,
           updated: p.updated,
@@ -181,17 +193,17 @@
   );
 
   // Favourites/Recently Added are always pinned first, ahead of the sort
-  // order applied to decade & genre auto-playlists. BPM auto-playlists always
+  // order applied to decade, genre & artist tag auto-playlists. BPM auto-playlists always
   // sort last, in their fixed intensity order (Down-Tempo → Extreme, set by
   // BPM_BUCKET_ORDER above) — never interleaved into the name/track_count/
-  // updated sort applied to genre/decade, which would otherwise scramble them
+  // updated sort applied to genre/decade/artist tag, which would otherwise scramble them
   // (e.g. "High Energy BPM" sorting alphabetically between two genres).
   let sortedAutoDefs = $derived.by(() => {
     const field = autoSortField;
     const asc = autoSortAsc;
-    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "bpm");
+    const pinned = autoDefs.filter((d) => d.kind !== "genre" && d.kind !== "decade" && d.kind !== "artist_tag" && d.kind !== "bpm");
     const rest = autoDefs
-      .filter((d) => d.kind === "genre" || d.kind === "decade")
+      .filter((d) => d.kind === "genre" || d.kind === "decade" || d.kind === "artist_tag")
       .sort((a, b) => {
         if (field === "name") {
           return asc ? a.label.localeCompare(b.label) : b.label.localeCompare(a.label);
@@ -239,11 +251,11 @@
   });
 
   let activeViewMode = $derived(
-    collectionStore.playlistsSubTab === "auto" ? prefs.playlistsAutoViewMode : prefs.playlistsCustomViewMode
+    navigationStore.playlistsSubTab === "auto" ? prefs.playlistsAutoViewMode : prefs.playlistsCustomViewMode
   );
 
   function setActiveViewMode(mode: CollectionViewMode) {
-    if (collectionStore.playlistsSubTab === "auto") {
+    if (navigationStore.playlistsSubTab === "auto") {
       prefs.setPlaylistsAutoViewMode(mode);
     } else {
       prefs.setPlaylistsCustomViewMode(mode);
@@ -251,27 +263,29 @@
   }
 
   function openAuto(def: AutoDef) {
-    collectionStore.viewAutoPlaylist(
+    navigationStore.viewAutoPlaylist(
       def.kind === "genre"
         ? { kind: "genre", genre: def.genre, playlistId: def.playlistId, updated: def.updated }
-        : def.kind === "decade"
-          ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
-          : def.kind === "bpm"
-            ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-            : { kind: def.kind }
+        : def.kind === "artist_tag"
+          ? { kind: "artist_tag", artistTag: def.artistTag, playlistId: def.playlistId, updated: def.updated }
+          : def.kind === "decade"
+            ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
+            : def.kind === "bpm"
+              ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
+              : { kind: def.kind }
     );
   }
 
   function openPlaylist(pl: Playlist) {
     playlistsStore.selectPlaylist(pl.id);
-    collectionStore.viewPlaylist(pl.id);
+    navigationStore.viewPlaylist(pl.id);
   }
 
   async function handleCreateBlankPlaylist() {
     try {
       const playlist = await playlistsStore.createPlaylist(i18n.t("playlists.untitledPlaylistName"));
       if (playlist) {
-        collectionStore.viewPlaylist(playlist.id);
+        navigationStore.viewPlaylist(playlist.id);
       }
     } catch (err) {
       console.error("Failed to create playlist:", err);
@@ -288,7 +302,7 @@
       if (selected && typeof selected === "string") {
         await playlistsStore.importPlaylist(selected);
         if (playlistsStore.activePlaylistId !== null) {
-          collectionStore.viewPlaylist(playlistsStore.activePlaylistId);
+          navigationStore.viewPlaylist(playlistsStore.activePlaylistId);
         }
       }
     } catch (err) {
@@ -297,15 +311,15 @@
   }
 </script>
 
-{#if collectionStore.selectedPlaylistId !== null}
+{#if navigationStore.selectedPlaylistId !== null}
   <PlaylistView />
-{:else if collectionStore.selectedAutoPlaylist !== null}
-  <AutoPlaylistDetailView view={collectionStore.selectedAutoPlaylist} />
+{:else if navigationStore.selectedAutoPlaylist !== null}
+  <AutoPlaylistDetailView view={navigationStore.selectedAutoPlaylist} />
 {:else}
   <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full">
-    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${collectionStore.playlistsSubTab}`}>
+    <div class="flex-1 px-6 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={`playlists:${navigationStore.playlistsSubTab}`}>
       <div class="sticky top-0 z-20 bg-brand-main pt-3">
-        {#if collectionStore.playlistsSubTab === "custom"}
+        {#if navigationStore.playlistsSubTab === "custom"}
           <div class="h-10 flex items-center gap-2 mb-2">
             <Button onclick={handleCreateBlankPlaylist} variant="primary" title={i18n.t('playlists.newPlaylistBtn')}>
               <Plus class="w-4 h-4" />
@@ -324,7 +338,7 @@
 
         <div class="h-12 flex items-center justify-between">
           <div class="text-xs text-brand-text-secondary font-medium">
-            {#if collectionStore.playlistsSubTab === "auto"}
+            {#if navigationStore.playlistsSubTab === "auto"}
               {sortedAutoDefs.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedAutoDefs.length })}
             {:else}
               {sortedPlaylists.length === 1 ? i18n.t('playlists.showingOnePlaylist') : i18n.t('playlists.showingPlaylists', { count: sortedPlaylists.length })}
@@ -362,7 +376,7 @@
               </button>
             </div>
             <div class="relative">
-            {#if collectionStore.playlistsSubTab === "auto"}
+            {#if navigationStore.playlistsSubTab === "auto"}
               <Select
                 value={`${autoSortField}-${autoSortAsc}`}
                 onchange={(e) => {
@@ -403,7 +417,7 @@
       </div>
 
       <div class="pt-2 pb-8">
-        {#if collectionStore.playlistsSubTab === "auto"}
+        {#if navigationStore.playlistsSubTab === "auto"}
           <div class="grid {activeViewMode === 'rows' ? 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2' : 'grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5'}">
             {#each sortedAutoDefs as def (def.id)}
               {#if activeViewMode === "rows"}
@@ -411,6 +425,7 @@
                   label={def.label}
                   kind={def.kind}
                   genre={def.genre}
+                  artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
                   playlistId={def.playlistId}
@@ -423,6 +438,7 @@
                   label={def.label}
                   kind={def.kind}
                   genre={def.genre}
+                  artistTag={def.artistTag}
                   decade={def.decade}
                   bpm={def.bpm}
                   playlistId={def.playlistId}

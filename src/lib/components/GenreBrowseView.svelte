@@ -1,69 +1,75 @@
 <script lang="ts">
-  import { Tag as TagIcon, ChevronRight, ChevronDown, ArrowLeft, Music, DiscAlbum } from "lucide-svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
+  import { Tag as TagIcon, CheckSquare, LayoutGrid, Rows3 } from "lucide-svelte";
+  import { genreColorHsl } from "../utils/genrePalette";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";
-  import { prefs, type GenreViewMode } from "../stores/prefs.svelte";
-  import { i18n } from "../stores/i18n.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { prefs, type GenreViewMode, type GenreSortField } from "../stores/prefs.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
-  import GenreChips from "./GenreChips.svelte";
-  import CoverArt from "./CoverArt.svelte";
-  import SongRating from "./SongRating.svelte";
-  import SongContextMenu from "./SongContextMenu.svelte";
-  import TagEditor from "./TagEditor.svelte";
-  import AlbumTagEditor from "./AlbumTagEditor.svelte";
-  import type { Song } from "../types";
+  import GenreCards from "./GenreCards.svelte";
+  import MergeSurvivorDialog from "./MergeSurvivorDialog.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
 
-  let expandedRoots = $state<Set<string>>(new Set());
-  let selectedTag = $state<string | null>(null);
-  let drillDownSongs = $state<Song[]>([]);
-  let drillDownLoading = $state(false);
-  let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
-  let editingSongId = $state<number | null>(null);
-  let editingAlbumSongs = $state<Song[] | null>(null);
+  let selectMode = $state(false);
+  let selected = $state<Set<string>>(new Set());
 
-  async function rateSong(song: Song, rating: number) {
-    song.rating = await invoke<number>("set_song_rating", { songId: song.id, rating });
+  let mergeDialogNames = $state<string[] | null>(null);
+  let deleteConfirmNames = $state<string[] | null>(null);
+
+  function toggleSelectMode() {
+    selectMode = !selectMode;
+    selected = new Set();
   }
 
-  function handleContextMenu(e: MouseEvent, song: Song) {
-    e.preventDefault();
-    contextMenuState = { x: e.clientX, y: e.clientY, song };
-  }
-
-  async function openAlbumEditor(song: Song) {
-    if (!song.album) return;
-    editingAlbumSongs = await invoke<Song[]>("get_songs_by_album", { album: song.album });
-  }
-
-  type DrillDownContext =
-    | { kind: "tag"; tag: string }
-    | { kind: "main"; tag: string }
-    | { kind: "edge"; root: string; child: string }
-    | { kind: "none" };
-
-  let drillDownContext = $state<DrillDownContext | null>(null);
-
-  function fetchForContext(ctx: DrillDownContext) {
-    if (ctx.kind === "tag") return tagsStore.getSongsByTag(ctx.tag, 500);
-    if (ctx.kind === "main") return tagsStore.getSongsByMainTag(ctx.tag, 500);
-    if (ctx.kind === "none") return tagsStore.getSongsWithoutGenre(500);
-    return tagsStore.getSongsByGenreEdge(ctx.root, ctx.child, 500);
-  }
-
-  function refreshDrillDown() {
-    if (drillDownContext) {
-      fetchForContext(drillDownContext).then((songs) => { drillDownSongs = songs; });
+  function toggleSelect(name: string) {
+    const next = new Set(selected);
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
     }
+    selected = next;
   }
 
-  function handleEditorSaved() {
-    tagsStore.load();
-    refreshDrillDown();
+  function openMergeSelected() {
+    if (selected.size < 2) return;
+    mergeDialogNames = Array.from(selected);
+  }
+
+  function openDeleteSelected() {
+    if (selected.size === 0) return;
+    deleteConfirmNames = Array.from(selected);
+  }
+
+  async function confirmMerge(survivor: string) {
+    const names = mergeDialogNames ?? [];
+    mergeDialogNames = null;
+    const others = names.filter((n) => n !== survivor);
+    let total = 0;
+    for (const other of others) {
+      total += await tagsStore.mergeTags(other, survivor);
+    }
+    selected = new Set();
+    toastStore.show(
+      i18n.t("songTags.mergeToast", { count: total, name: survivor }, `Merged into "${survivor}" (${total} songs updated)`),
+      "success"
+    );
+  }
+
+  async function confirmDelete() {
+    const names = deleteConfirmNames ?? [];
+    deleteConfirmNames = null;
+    const total = await tagsStore.deleteTags(names);
+    selected = new Set();
+    toastStore.show(
+      i18n.t("songTags.deleteToast", { count: total }, `Deleted (${total} songs updated)`),
+      "success"
+    );
   }
 
   // This view mounts/unmounts with the tab (not a persistent singleton like
@@ -71,231 +77,164 @@
   // uncleaned Tauri listen() here would leak and re-fire once per every past
   // visit to this tab, compounding on itself.
   onMount(() => {
-    let unlisten: (() => void) | undefined;
-    listen("library-changed", refreshDrillDown).then((fn) => { unlisten = fn; });
-    return () => unlisten?.();
+    let unlistenHierarchy: (() => void) | undefined;
+    tagsStore.listenForHierarchyChanges().then((fn) => { unlistenHierarchy = fn; });
+    tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
+    return () => {
+      unlistenHierarchy?.();
+    };
   });
 
-  function toggleExpanded(mainTag: string) {
-    const next = new Set(expandedRoots);
-    if (next.has(mainTag)) {
-      next.delete(mainTag);
-    } else {
-      next.add(mainTag);
-    }
-    expandedRoots = next;
-  }
+  // Every card/chip/tag click routes straight through to
+  // AutoPlaylistDetailView (#548) — the Genres tab no longer has its own
+  // song-list drill-down. A top-level card and a sub-genre chip resolve to
+  // the exact same curated-tag auto-playlist lookup on the other end
+  // (navigationStore.viewGenreTag); dragging a chip between cards only moves
+  // curation metadata, so which card a chip is currently filed under never
+  // changes which query opens it.
 
-  async function loadDrillDown(ctx: DrillDownContext, displayTag: string) {
-    drillDownContext = ctx;
-    selectedTag = displayTag;
-    drillDownLoading = true;
-    try {
-      drillDownSongs = await fetchForContext(ctx);
-    } finally {
-      drillDownLoading = false;
-    }
-  }
-
-  /** Any-position match — flat Tags view, and external "browse this value"
-   * navigation (e.g. a GenreChips chip clicked elsewhere in the app) where
-   * there's no specific root/child relationship to narrow by. */
-  function openTag(tagName: string) {
-    return loadDrillDown({ kind: "tag", tag: tagName }, tagName);
-  }
-
-  /** Strict main-tag match — clicking a root in the Genre view. */
+  /** Root-level card click, and the flat Tags view's plain tag click. */
   function openMainTag(tagName: string) {
-    return loadDrillDown({ kind: "main", tag: tagName }, tagName);
+    navigationStore.viewGenreTag(tagName);
   }
 
-  /** Exact root/child edge match — clicking a child under a specific root in
-   * the Genre view, so a reordered song (no longer under this root) drops
-   * out immediately, and a tag shared under multiple roots only shows the
-   * songs for *this* relationship. */
-  function openGenreEdge(rootTag: string, childTag: string) {
-    return loadDrillDown({ kind: "edge", root: rootTag, child: childTag }, childTag);
+  /** Sub-genre chip click. The root/parent card name isn't needed on this
+   * end — a curated tag's own auto-playlist is looked up by its name alone,
+   * regardless of which card currently curates it. */
+  function openGenreEdge(_rootTag: string, childTag: string) {
+    navigationStore.viewGenreTag(childTag);
   }
 
-  /** Songs with no genre value at all. */
+  /** Songs with no genre value at all — the one case with no backing
+   * curated tag, routed to AutoPlaylistDetailView's dedicated "no_genre"
+   * kind (a direct query, no playlist row). */
   function openNoGenre() {
-    return loadDrillDown({ kind: "none" }, i18n.t("songTags.noGenre", {}, "No Genre"));
+    navigationStore.viewAutoPlaylist({ kind: "no_genre" });
   }
-
-  function closeDrillDown() {
-    selectedTag = null;
-    drillDownContext = null;
-  }
-
-  // Consumes collectionStore.viewGenreTag()'s one-shot "open this tag" signal
-  // — e.g. a genre chip clicked elsewhere in the app.
-  $effect(() => {
-    const tag = collectionStore.pendingGenreTag;
-    if (tag) {
-      collectionStore.pendingGenreTag = null;
-      openTag(tag);
-    }
-  });
 
   function setViewMode(mode: GenreViewMode) {
     prefs.setGenreViewMode(mode);
-    closeDrillDown();
   }
 
-  async function playAllInTag() {
-    if (sortedDrillDownSongs.length === 0) return;
-    await playerStore.playSongs(
-      sortedDrillDownSongs.map((s) => s.id),
-      0,
-      undefined,
-      { type: "song" },
-      selectedTag ?? undefined
-    );
-  }
-
-  type DrillDownSortField = "title" | "artist" | "album" | "added";
-  let sortField = $state<DrillDownSortField>("artist");
-  let sortAsc = $state(true);
-
-  let sortedDrillDownSongs = $derived.by(() => {
-    const sorted = [...drillDownSongs];
-    sorted.sort((a, b) => {
-      if (sortField === "added") {
-        const diff = (a.added ?? 0) - (b.added ?? 0);
-        return sortAsc ? diff : -diff;
-      }
-      const valA = (a[sortField] || "").toString();
-      const valB = (b[sortField] || "").toString();
-      const cmp = valA.localeCompare(valB);
-      return sortAsc ? cmp : -cmp;
-    });
-    return sorted;
+  // Tag-cloud font sizing: log-scaled against the current min/max song
+  // count so the range is actually perceptible regardless of whether counts
+  // span 1-10 or 1-1000 (a plain linear/count-divided-by-N scale washes out
+  // at either extreme).
+  const TAG_CLOUD_MIN_REM = 0.75;
+  const TAG_CLOUD_MAX_REM = 2;
+  const TAG_CLOUD_MIN_WEIGHT = 500;
+  const TAG_CLOUD_MAX_WEIGHT = 800;
+  let tagCountRange = $derived.by(() => {
+    const counts = tagsStore.allTags.map((t) => t.song_count);
+    return { min: Math.min(...counts, 1), max: Math.max(...counts, 1) };
   });
+  /** Padding is in `em` (not a fixed rem) so it scales together with the
+   * text instead of leaving small pills looking oddly padded relative to
+   * large ones. Each pill sizes to its own content — rows aren't forced to
+   * a uniform height, so `items-center` (not `items-baseline`) is what
+   * actually centers the label+count within its own pill. */
+  function tagCloudStyle(count: number): string {
+    const { min, max } = tagCountRange;
+    const t = max <= min ? 0 : (Math.log(count + 1) - Math.log(min + 1)) / (Math.log(max + 1) - Math.log(min + 1));
+    const fontSize = TAG_CLOUD_MIN_REM + t * (TAG_CLOUD_MAX_REM - TAG_CLOUD_MIN_REM);
+    const fontWeight = Math.round(TAG_CLOUD_MIN_WEIGHT + t * (TAG_CLOUD_MAX_WEIGHT - TAG_CLOUD_MIN_WEIGHT));
+    return `font-size: ${fontSize.toFixed(2)}rem; font-weight: ${fontWeight}; padding: 0.5em 0.9em;`;
+  }
 </script>
 
 <div class="flex-1 px-6 pt-4 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}">
-  {#if selectedTag !== null}
-    <div class="h-9 flex items-center justify-between gap-2 mb-3">
-      <div class="flex items-center gap-2 min-w-0">
-        <button
-          onclick={closeDrillDown}
-          class="flex items-center gap-1.5 text-xs font-medium text-brand-text-secondary hover:text-brand-text-primary transition-colors shrink-0"
-        >
-          <ArrowLeft class="w-3.5 h-3.5" />
-          {i18n.t("common.back", {}, "Back")}
-        </button>
-        <span class="text-brand-text-secondary/40 shrink-0">/</span>
-        <h2 class="text-sm font-bold text-brand-text-primary truncate">{selectedTag}</h2>
+    <div class="h-9 flex items-center justify-between mb-3">
+      <div class="text-xs text-brand-text-secondary font-medium">
+        {i18n.t("songTags.genresTabDescription", { count: tagsStore.hierarchy.length }, `Showing ${tagsStore.hierarchy.length} genres`)}
       </div>
-      <div class="relative shrink-0">
-        <Select
-          value={`${sortField}-${sortAsc}`}
-          onchange={(e) => {
-            const [field, asc] = e.currentTarget.value.split("-");
-            sortField = field as DrillDownSortField;
-            sortAsc = asc === "true";
-          }}
-          class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+      <div class="flex items-center gap-2">
+        <button
+          onclick={toggleSelectMode}
+          class="flex items-center gap-1.5 px-3 h-7 rounded-full text-xs font-semibold border transition-colors {selectMode ? 'bg-brand-accent text-white border-brand-accent' : 'border-brand-border text-brand-text-secondary hover:text-brand-text-primary'}"
         >
-          <option value="artist-true">▲ {i18n.t('collection.tableHeaderArtist')}</option>
-          <option value="artist-false">▼ {i18n.t('collection.tableHeaderArtist')}</option>
-          <option value="album-true">▲ {i18n.t('collection.tableHeaderAlbum')}</option>
-          <option value="album-false">▼ {i18n.t('collection.tableHeaderAlbum')}</option>
-          <option value="title-true">▲ {i18n.t('collection.tableHeaderTitle')}</option>
-          <option value="title-false">▼ {i18n.t('collection.tableHeaderTitle')}</option>
-          <option value="added-true">▲ {i18n.t('collection.sortDateAddedLabel')}</option>
-          <option value="added-false">▼ {i18n.t('collection.sortDateAddedLabel')}</option>
-        </Select>
+          <CheckSquare class="w-3.5 h-3.5" />
+          {i18n.t("songTags.selectTags", {}, "Select Tags")}
+        </button>
+        {#if prefs.genreViewMode === "genre"}
+          <div class="relative">
+            <Select
+              value={`${prefs.genreSortField}-${prefs.genreSortAsc}`}
+              onchange={(e) => {
+                const [field, asc] = e.currentTarget.value.split("-");
+                prefs.setGenreSortField(field as GenreSortField);
+                prefs.setGenreSortAsc(asc === "true");
+              }}
+              class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+            >
+              <option value="name-true">▲ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="name-false">▼ {i18n.t('songTags.sortName', {}, 'Name')}</option>
+              <option value="count-true">▲ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+              <option value="count-false">▼ {i18n.t('songTags.sortSongCount', {}, 'Song Count')}</option>
+            </Select>
+          </div>
+          <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("cards")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-label={i18n.t("collection.viewCards", {}, "Card view")}
+              aria-pressed={prefs.genreCardsViewMode === "cards"}
+            >
+              <LayoutGrid class="w-4 h-4" />
+            </button>
+            <button
+              onclick={() => prefs.setGenreCardsViewMode("rows")}
+              class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {prefs.genreCardsViewMode === 'rows' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+              title={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-label={i18n.t("collection.viewRows", {}, "Row view")}
+              aria-pressed={prefs.genreCardsViewMode === "rows"}
+            >
+              <Rows3 class="w-4 h-4" />
+            </button>
+          </div>
+        {/if}
+        <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+          <button
+            onclick={() => setViewMode("genre")}
+            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            aria-pressed={prefs.genreViewMode === "genre"}
+          >
+            {i18n.t("songTags.viewGenre", {}, "Genre")}
+          </button>
+          <button
+            onclick={() => setViewMode("tags")}
+            class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+            aria-pressed={prefs.genreViewMode === "tags"}
+          >
+            {i18n.t("songTags.viewTags", {}, "Tags")}
+          </button>
+        </div>
       </div>
     </div>
 
-    {#if drillDownLoading}
-      <div class="py-16 text-center text-sm text-brand-text-secondary">{i18n.t("common.loading", {}, "Loading…")}</div>
-    {:else}
-      {#if sortedDrillDownSongs.length > 0}
-        <button
-          onclick={playAllInTag}
-          class="mb-3 text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors"
-        >
-          {i18n.t("songTags.playAll", { count: sortedDrillDownSongs.length }, `Play all ${sortedDrillDownSongs.length} songs`)}
-        </button>
-      {/if}
-      <div class="flex flex-col gap-2">
-        {#each sortedDrillDownSongs as song (song.id)}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            role="button"
-            tabindex="0"
-            onclick={() => playerStore.playSong(song.id)}
-            oncontextmenu={(e) => handleContextMenu(e, song)}
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playerStore.playSong(song.id); } }}
-            class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+    {#if selectMode}
+      <div class="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-brand-sidebar border border-brand-border/60">
+        <span class="text-xs font-medium text-brand-text-secondary">
+          {i18n.t("songTags.selectedCount", { count: selected.size }, `${selected.size} selected`)}
+        </span>
+        <div class="flex items-center gap-2">
+          <button
+            onclick={openMergeSelected}
+            disabled={selected.size < 2}
+            class="text-xs font-semibold text-brand-accent-text hover:text-brand-accent-text-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <CoverArt
-              songId={song.id}
-              artEmbedded={song.art_embedded}
-              artAutomatic={song.art_automatic}
-              artManual={song.art_manual}
-              sizeClass="w-11 h-11 shrink-0"
-            />
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <p class="truncate text-sm font-semibold text-brand-text-primary">{song.title || i18n.t('collection.unknownSong')}</p>
-                <span class="shrink-0">
-                  <SongRating rating={song.rating} onRate={(r) => rateSong(song, r)} />
-                </span>
-              </div>
-              <p class="truncate text-xs text-brand-text-secondary font-medium">{song.artist || i18n.t('collection.unknownArtist')}</p>
-            </div>
-            {#if song.genre}
-              <div class="shrink-0 hidden sm:flex items-center max-w-40">
-                <GenreChips genre={song.genre} />
-              </div>
-            {/if}
-            <div class="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onclick={(e) => { e.stopPropagation(); editingSongId = song.id; }}
-                class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-                title={i18n.t('songTags.editSongTooltip', {}, 'Edit Song')}
-              >
-                <Music class="w-4 h-4" />
-              </button>
-              <button
-                onclick={(e) => { e.stopPropagation(); openAlbumEditor(song); }}
-                class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                disabled={!song.album}
-                title={i18n.t('songTags.editAlbumTooltip', {}, 'Edit Album')}
-              >
-                <DiscAlbum class="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        {/each}
+            {i18n.t("songTags.mergeSelected", {}, "Merge Selected")}
+          </button>
+          <button
+            onclick={openDeleteSelected}
+            disabled={selected.size === 0}
+            class="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {i18n.t("songTags.deleteSelected", {}, "Delete Selected")}
+          </button>
+        </div>
       </div>
     {/if}
-  {:else}
-    <div class="h-9 flex items-center justify-between mb-3">
-      <div class="text-xs text-brand-text-secondary font-medium">
-        {i18n.t("songTags.genresTabDescription", {}, "Browse songs by tags you've added")}
-      </div>
-      <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
-        <button
-          onclick={() => setViewMode("genre")}
-          class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'genre' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          aria-pressed={prefs.genreViewMode === "genre"}
-        >
-          {i18n.t("songTags.viewGenre", {}, "Genre")}
-        </button>
-        <button
-          onclick={() => setViewMode("tags")}
-          class="px-3 h-7 rounded-full text-xs font-semibold transition-colors {prefs.genreViewMode === 'tags' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
-          aria-pressed={prefs.genreViewMode === "tags"}
-        >
-          {i18n.t("songTags.viewTags", {}, "Tags")}
-        </button>
-      </div>
-    </div>
 
     {#if tagsStore.allTags.length === 0 && tagsStore.noGenreCount === 0}
       <div class="py-16">
@@ -310,126 +249,86 @@
         />
       </div>
     {:else if prefs.genreViewMode === "genre"}
-      <div class="flex flex-col gap-1.5">
-        {#each tagsStore.genreGraph as group (group.main_tag)}
-          <div class="rounded-lg bg-brand-sidebar border border-brand-border/60 overflow-hidden">
-            <div class="flex items-center">
-              {#if group.children.length > 0}
-                <button
-                  onclick={() => toggleExpanded(group.main_tag)}
-                  class="p-2.5 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                  aria-label={expandedRoots.has(group.main_tag) ? i18n.t("common.collapse", {}, "Collapse") : i18n.t("common.expand", {}, "Expand")}
-                >
-                  {#if expandedRoots.has(group.main_tag)}
-                    <ChevronDown class="w-4 h-4" />
-                  {:else}
-                    <ChevronRight class="w-4 h-4" />
-                  {/if}
-                </button>
-              {:else}
-                <span class="w-9"></span>
-              {/if}
-              <button
-                onclick={() => openMainTag(group.main_tag)}
-                class="flex-1 flex items-center justify-between py-2.5 pr-3 text-left"
-              >
-                <span class="text-sm font-semibold text-brand-text-primary">{group.main_tag}</span>
-                <span class="text-xs text-brand-text-secondary tabular-nums">
-                  {i18n.t("songTags.songCount", { count: group.song_count }, `${group.song_count} songs`)}
-                </span>
-              </button>
-            </div>
-            {#if expandedRoots.has(group.main_tag) && group.children.length > 0}
-              <div class="pl-9 pb-1.5 flex flex-col">
-                {#each group.children as child (child.name)}
-                  <button
-                    onclick={() => openGenreEdge(group.main_tag, child.name)}
-                    class="flex items-center justify-between py-1.5 pr-3 text-left text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-                  >
-                    <span class="text-xs font-medium">{child.name}</span>
-                    <span class="text-xs tabular-nums">
-                      {i18n.t("songTags.songCount", { count: child.song_count }, `${child.song_count} songs`)}
-                    </span>
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/each}
-        {#if tagsStore.noGenreCount > 0}
-          <button
-            onclick={openNoGenre}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
-          >
-            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
-            <span class="text-xs tabular-nums">
-              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
-            </span>
-          </button>
-        {/if}
-      </div>
+      <GenreCards
+        {selectMode}
+        {selected}
+        onToggleSelect={toggleSelect}
+        onOpenMainTag={openMainTag}
+        onOpenGenreEdge={openGenreEdge}
+        sortField={prefs.genreSortField}
+        sortAsc={prefs.genreSortAsc}
+        compact={prefs.genreCardsViewMode === "rows"}
+      />
+      {#if tagsStore.noGenreCount > 0}
+        <button
+          onclick={openNoGenre}
+          class="mt-1.5 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+        >
+          <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+          <span class="text-xs tabular-nums">
+            {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+          </span>
+        </button>
+      {/if}
     {:else}
-      <div class="flex flex-col gap-1.5">
+      <div class="flex flex-wrap items-center gap-2">
         {#each tagsStore.allTags as tag (tag.name)}
-          <button
-            onclick={() => openTag(tag.name)}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left"
+          {@const group = tagsStore.hierarchy.find((g) => g.name === tag.name || g.children.some((c) => c.name === tag.name))}
+          {@const colorIndex = group?.color_index}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <span
+            onclick={() => { if (selectMode) toggleSelect(tag.name); }}
+            class="inline-flex items-center gap-1.5 rounded-full transition-colors {selectMode ? 'cursor-pointer' : ''} {selected.has(tag.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`${tagCloudStyle(tag.song_count)} ${
+              colorIndex !== undefined
+                ? `background-color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 32%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(colorIndex)} 85%, var(--color-brand-text-primary));`
+                : "background-color: var(--color-brand-sidebar); color: var(--color-brand-text-primary);"
+            }`}
           >
-            <span class="text-sm font-semibold text-brand-text-primary">{tag.name}</span>
-            <span class="text-xs text-brand-text-secondary tabular-nums">
-              {i18n.t("songTags.songCount", { count: tag.song_count }, `${tag.song_count} songs`)}
-            </span>
-          </button>
+            {#if selectMode}
+              <input type="checkbox" checked={selected.has(tag.name)} onchange={() => toggleSelect(tag.name)} class="self-center w-3 h-3 pointer-events-none" />
+            {/if}
+            <button onclick={() => !selectMode && openMainTag(tag.name)} class="self-center leading-none">
+              {tag.name}
+            </button>
+            <span class="self-center text-[0.65em] font-bold opacity-70 leading-none">{tag.song_count}</span>
+          </span>
         {/each}
-        {#if tagsStore.noGenreCount > 0}
-          <button
-            onclick={openNoGenre}
-            class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
-          >
-            <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
-            <span class="text-xs tabular-nums">
-              {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
-            </span>
-          </button>
-        {/if}
       </div>
+      {#if tagsStore.noGenreCount > 0}
+        <button
+          onclick={openNoGenre}
+          class="mt-3 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 hover:border-brand-accent/60 transition-colors text-left text-brand-text-secondary"
+        >
+          <span class="text-sm font-semibold">{i18n.t("songTags.noGenre", {}, "No Genre")}</span>
+          <span class="text-xs tabular-nums">
+            {i18n.t("songTags.songCount", { count: tagsStore.noGenreCount }, `${tagsStore.noGenreCount} songs`)}
+          </span>
+        </button>
+      {/if}
     {/if}
-  {/if}
 </div>
 
-{#if contextMenuState}
-  {@const song = contextMenuState.song}
-  <SongContextMenu
-    x={contextMenuState.x}
-    y={contextMenuState.y}
-    {song}
-    onPlay={() => playerStore.playSong(song.id)}
-    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
-    onEditTags={() => { editingSongId = song.id; }}
-    onClose={() => { contextMenuState = null; }}
+{#if mergeDialogNames}
+  <MergeSurvivorDialog
+    names={mergeDialogNames}
+    onConfirm={confirmMerge}
+    onCancel={() => { mergeDialogNames = null; }}
   />
 {/if}
 
-{#if editingSongId !== null}
-  <TagEditor
-    songId={editingSongId}
-    onClose={() => { editingSongId = null; }}
-    onSave={handleEditorSaved}
-  />
-{/if}
-
-{#if editingAlbumSongs !== null && editingAlbumSongs.length > 0}
-  <AlbumTagEditor
-    songIds={editingAlbumSongs.map((s) => s.id)}
-    initialAlbum={editingAlbumSongs[0].album}
-    initialAlbumArtist={editingAlbumSongs[0].album_artist || editingAlbumSongs[0].artist}
-    initialGenre={editingAlbumSongs[0].genre}
-    initialYear={editingAlbumSongs[0].year}
-    initialDisc={editingAlbumSongs[0].disc}
-    initialCompilation={editingAlbumSongs[0].compilation}
-    hasEmbeddedArt={editingAlbumSongs.some((s) => s.art_embedded)}
-    onClose={() => { editingAlbumSongs = null; }}
-    onSave={handleEditorSaved}
+{#if deleteConfirmNames}
+  <ConfirmDialog
+    title={i18n.t("songTags.deleteSelected", {}, "Delete Selected")}
+    message={i18n.t(
+      "songTags.deleteConfirmMessage",
+      { count: deleteConfirmNames.length },
+      `Remove ${deleteConfirmNames.length} tag(s) from every song that carries them? This can't be undone.`
+    )}
+    confirmLabel={i18n.t("songTags.deleteBtn", {}, "Delete")}
+    cancelLabel={i18n.t("songTags.cancelBtn", {}, "Cancel")}
+    onConfirm={confirmDelete}
+    onCancel={() => { deleteConfirmNames = null; }}
   />
 {/if}

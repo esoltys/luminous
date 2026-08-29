@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import ArtistDetailView from "./ArtistDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
+import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string, args?: any) => {
@@ -68,7 +70,7 @@ describe("ArtistDetailView", () => {
     await fireEvent.click(tagBtn);
 
     expect(collectionStore.searchQuery).toBe("artist-tag:canadian");
-    expect(collectionStore.activeSubTab).toBe("artists");
+    expect(navigationStore.activeSubTab).toBe("artists");
   });
 
   it("clicking Edit button opens the ArtistProfileEditor modal", async () => {
@@ -78,5 +80,52 @@ describe("ArtistDetailView", () => {
     await fireEvent.click(editBtn);
 
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("renders genre chips when artist has songs with multi-value genres", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "Country; Pop", length_nanosec: 180_000_000_000 } as any,
+          { id: 2, title: "Song 2", artist: "Shania Twain", genre: "Country; Rock", length_nanosec: 200_000_000_000 } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+    // "Country", "Pop", "Rock" should be rendered as chips
+    const countryChip = await screen.findByTitle("Browse Country");
+    expect(countryChip).toBeTruthy();
+    expect(screen.getByTitle("Browse Pop")).toBeTruthy();
+    expect(screen.getByTitle("Browse Rock")).toBeTruthy();
+
+    await fireEvent.click(countryChip);
+    expect(navigationStore.selectedAutoPlaylist?.genre).toBe("Country");
+    expect(navigationStore.activeTab).toBe("playlists");
+  });
+
+  it("renders Unknown genre when artist songs have no genre", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          { id: 1, title: "Song 1", artist: "Shania Twain", genre: "", length_nanosec: 180_000_000_000 } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+    expect(await screen.findByText("Unknown genre")).toBeTruthy();
   });
 });

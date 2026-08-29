@@ -15,6 +15,8 @@ vite.config.ts.timestamp-*
 !.claude/settings.json
 !.claude/hooks/
 !.claude/hooks/**
+!.claude/skills/
+!.claude/skills/**
 /.worktrees
 
 # Personal override for the Tauri IPC mock config (scripts/mock-config.json is tracked directly)

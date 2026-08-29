@@ -4,6 +4,7 @@ export type RatingStyle = "heart" | "stars";
 export type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 export type GenreViewMode = "genre" | "tags";
+export type GenreSortField = "name" | "count";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
@@ -16,6 +17,9 @@ interface UiPreferences {
   playlists_auto_view_mode: CollectionViewMode;
   playlists_custom_view_mode: CollectionViewMode;
   genre_view_mode: GenreViewMode;
+  genre_cards_view_mode: CollectionViewMode;
+  genre_sort_field: GenreSortField;
+  genre_sort_asc: boolean;
 }
 
 class PrefsStore {
@@ -27,6 +31,13 @@ class PrefsStore {
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
   playlistsCustomViewMode = $state<CollectionViewMode>("cards");
   genreViewMode = $state<GenreViewMode>("genre");
+  /** Collapses primary-genre cards down to compact header rows on the
+   * Genres tab (mirrors the Albums/Artists cards-vs-rows toggle). */
+  genreCardsViewMode = $state<CollectionViewMode>("cards");
+  /** Sorts both the primary-genre cards and each card's own sub-genre chips —
+   * display-only, doesn't touch the persisted drag-reorder sort_order. */
+  genreSortField = $state<GenreSortField>("name");
+  genreSortAsc = $state<boolean>(true);
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
 
@@ -40,6 +51,9 @@ class PrefsStore {
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
     this.playlistsCustomViewMode = prefs.playlists_custom_view_mode;
     this.genreViewMode = prefs.genre_view_mode;
+    this.genreCardsViewMode = prefs.genre_cards_view_mode;
+    this.genreSortField = prefs.genre_sort_field;
+    this.genreSortAsc = prefs.genre_sort_asc;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
   }
 
@@ -54,6 +68,9 @@ class PrefsStore {
       playlists_auto_view_mode: this.playlistsAutoViewMode,
       playlists_custom_view_mode: this.playlistsCustomViewMode,
       genre_view_mode: this.genreViewMode,
+      genre_cards_view_mode: this.genreCardsViewMode,
+      genre_sort_field: this.genreSortField,
+      genre_sort_asc: this.genreSortAsc,
     };
     invoke("set_ui_preferences", { prefs });
   }
@@ -95,6 +112,21 @@ class PrefsStore {
 
   setGenreViewMode(mode: GenreViewMode) {
     this.genreViewMode = mode;
+    this.save();
+  }
+
+  setGenreCardsViewMode(mode: CollectionViewMode) {
+    this.genreCardsViewMode = mode;
+    this.save();
+  }
+
+  setGenreSortField(field: GenreSortField) {
+    this.genreSortField = field;
+    this.save();
+  }
+
+  setGenreSortAsc(asc: boolean) {
+    this.genreSortAsc = asc;
     this.save();
   }
 

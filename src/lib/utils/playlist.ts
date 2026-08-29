@@ -49,6 +49,11 @@ export function getPlaylistDisplayName(
   playlist: Playlist | { name: string; population_mode?: QueuePopulationMode; dynamic_enabled?: boolean; dynamic_spec?: string } | undefined | null
 ): string {
   if (!playlist || !playlist.name) return "";
+  // Genre auto-playlists (#548) are keyed one row per curated tag, so
+  // `name` is already the plain display name — no per-spec label
+  // derivation needed here the way the old bare-genre-string convention
+  // required (a chip's own card already exists separately, so there's
+  // nothing to strip a parent's name out of).
   const baseName = getBpmBucketLabel(playlist.dynamic_spec, playlist.name);
   if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) {
     return baseName;

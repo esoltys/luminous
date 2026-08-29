@@ -2,7 +2,9 @@
   import { Menu, ChevronLeft, ChevronRight, Search, FolderOpen, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
-  import { collectionStore, type AutoPlaylistRef } from "../stores/collection.svelte";
+  import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
@@ -113,7 +115,7 @@
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
             });
           } else {
-            const genre = p.dynamic_spec || p.name;
+            const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
             results.push({
               type: "auto",
               id: `auto:genre:${p.id}`,
@@ -147,10 +149,10 @@
 
     if (e.key === "BrowserBack") {
       e.preventDefault();
-      collectionStore.goBack();
+      navigationStore.goBack();
     } else if (e.key === "BrowserForward") {
       e.preventDefault();
-      collectionStore.goForward();
+      navigationStore.goForward();
     }
   }
 
@@ -158,10 +160,10 @@
   function handleMouseUp(e: MouseEvent) {
     if (e.button === 3) {
       e.preventDefault();
-      collectionStore.goBack();
+      navigationStore.goBack();
     } else if (e.button === 4) {
       e.preventDefault();
-      collectionStore.goForward();
+      navigationStore.goForward();
     }
   }
 
@@ -188,13 +190,13 @@
 
   function selectRecentSearch(item: RecentSearchItem) {
     if (item.kind === "artist") {
-      collectionStore.viewArtist(item.title);
+      navigationStore.viewArtist(item.title);
     } else if (item.kind === "album") {
-      collectionStore.viewAlbum(item.title);
+      navigationStore.viewAlbum(item.title);
     } else if (item.kind === "playlist" && item.entityId) {
-      collectionStore.viewPlaylist(Number(item.entityId));
+      navigationStore.viewPlaylist(Number(item.entityId));
     } else if (item.kind === "song" && item.query) {
-      collectionStore.viewAlbum(item.query);
+      navigationStore.viewAlbum(item.query);
     } else {
       collectionStore.searchQuery = item.query || item.title;
       collectionStore.search(item.query || item.title);
@@ -222,9 +224,9 @@
 
 <header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <div class="flex items-center gap-2">
-    {#if !collectionStore.isSidebarAutoCollapsed}
+    {#if !windowLayoutStore.isSidebarAutoCollapsed}
       <button
-        onclick={() => collectionStore.toggleSidebarCompact()}
+        onclick={() => windowLayoutStore.toggleSidebarCompact()}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary transition-colors"
         title={i18n.t('topNav.toggleSidebarCompact', {}, 'Toggle sidebar (compact / expanded)')}
       >
@@ -236,16 +238,16 @@
          least missed when space is tight. -->
     <div class="hidden md:flex items-center gap-2">
       <button
-        onclick={() => collectionStore.goBack()}
-        disabled={!collectionStore.canGoBack}
+        onclick={() => navigationStore.goBack()}
+        disabled={!navigationStore.canGoBack}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         title={i18n.t('topNav.goBack')}
       >
         <ChevronLeft class="w-5 h-5" />
       </button>
       <button
-        onclick={() => collectionStore.goForward()}
-        disabled={!collectionStore.canGoForward}
+        onclick={() => navigationStore.goForward()}
+        disabled={!navigationStore.canGoForward}
         class="p-2 rounded-lg text-brand-text-secondary hover:bg-brand-main hover:text-brand-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         title={i18n.t('topNav.goForward')}
       >
@@ -367,7 +369,7 @@
                     tabindex="0"
                     onclick={() => {
                       if (artist.name) {
-                        collectionStore.viewArtist(artist.name);
+                        navigationStore.viewArtist(artist.name);
                         collectionStore.addRecentSearch({
                           kind: "artist",
                           title: artist.name,
@@ -378,7 +380,7 @@
                       }
                     }}
                     onkeydown={(e) => {
-                      if (e.key === 'Enter' && artist.name) collectionStore.viewArtist(artist.name);
+                      if (e.key === 'Enter' && artist.name) navigationStore.viewArtist(artist.name);
                       else handleSearchResultKeyDown(e);
                     }}
                     class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -405,7 +407,7 @@
                     tabindex="0"
                     onclick={() => {
                       if (album.album) {
-                        collectionStore.viewAlbum(album.album);
+                        navigationStore.viewAlbum(album.album);
                         collectionStore.addRecentSearch({
                           kind: "album",
                           title: album.album,
@@ -417,7 +419,7 @@
                       }
                     }}
                     onkeydown={(e) => {
-                      if (e.key === 'Enter' && album.album) collectionStore.viewAlbum(album.album);
+                      if (e.key === 'Enter' && album.album) navigationStore.viewAlbum(album.album);
                       else handleSearchResultKeyDown(e);
                     }}
                     class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
@@ -453,7 +455,7 @@
                     tabindex="0"
                     onclick={() => {
                       if (item.type === 'auto') {
-                        collectionStore.viewAutoPlaylist(item.ref);
+                        navigationStore.viewAutoPlaylist(item.ref);
                         collectionStore.addRecentSearch({
                           kind: "playlist",
                           title: item.label,
@@ -461,7 +463,7 @@
                           query: item.label
                         });
                       } else {
-                        collectionStore.viewPlaylist(item.id);
+                        navigationStore.viewPlaylist(item.id);
                         collectionStore.addRecentSearch({
                           kind: "playlist",
                           title: item.label,
@@ -474,8 +476,8 @@
                     }}
                     onkeydown={(e) => {
                       if (e.key === 'Enter') {
-                        if (item.type === 'auto') collectionStore.viewAutoPlaylist(item.ref);
-                        else collectionStore.viewPlaylist(item.id);
+                        if (item.type === 'auto') navigationStore.viewAutoPlaylist(item.ref);
+                        else navigationStore.viewPlaylist(item.id);
                         isSearchFocused = false;
                       } else {
                         handleSearchResultKeyDown(e);
@@ -506,7 +508,7 @@
                     onclick={() => {
                       const songTitle = song.title || i18n.t('collection.unknownSong');
                       if (song.album) {
-                        collectionStore.viewAlbum(song.album);
+                        navigationStore.viewAlbum(song.album);
                       } else {
                         collectionStore.searchQuery = songTitle;
                         collectionStore.search(songTitle);
@@ -522,7 +524,7 @@
                     }}
                     onkeydown={(e) => {
                       if (e.key === 'Enter') {
-                        if (song.album) collectionStore.viewAlbum(song.album);
+                        if (song.album) navigationStore.viewAlbum(song.album);
                         else collectionStore.search(song.title || "");
                         isSearchFocused = false;
                       } else {
@@ -640,10 +642,10 @@
     {/if}
   </div>
 
-  {#if !collectionStore.isRightPanelAutoHidden}
+  {#if !windowLayoutStore.isRightPanelAutoHidden}
     <button
-      onclick={() => collectionStore.toggleRightPanel()}
-      class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {collectionStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
+      onclick={() => windowLayoutStore.toggleRightPanel()}
+      class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {windowLayoutStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
       title={i18n.t('topNav.toggleRightPanel')}
     >
       <span class="font-serif font-bold italic text-lg leading-none" aria-hidden="true">i</span>

@@ -54,9 +54,9 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 
 # --- Database ---
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 r2d2 = "0.8"
-r2d2_sqlite = "0.25"
+r2d2_sqlite = "0.35"
 
 # --- Audio decoding ---
 # `all` enables every codec and format symphonia supports.
@@ -66,10 +66,6 @@ symphonia = { version = "0.6", features = ["all"] }
 # --- Audio output ---
 cpal = "0.18"
 ringbuf = "0.5"
-
-
-# --- Audio resampling ---
-rubato = "4.0"
 
 # --- Tag reading/writing ---
 lofty = "0.25"
@@ -102,6 +98,7 @@ anyhow = "1"
 
 # --- Logging ---
 log = "0.4"
+env_logger = "0.11"
 
 # --- Utilities ---
 walkdir = "2"
@@ -124,9 +121,13 @@ rayon = "1"
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 cucumber = { version = "0.23", features = ["macros"] }
 tempfile = "3"
+wiremock = "0.6"
 
 [[test]]
 name = "equalizer_bdd"
@@ -145,9 +146,9 @@ name = "lyrics_bdd"
 harness = false
 
 [[test]]
-name = "cover_art_bdd"
+name = "tag_editor_bdd"
 harness = false
 
 [[test]]
-name = "tag_editor_bdd"
+name = "cover_art_bdd"
 harness = false

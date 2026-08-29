@@ -135,6 +135,32 @@ describe("PlaylistsStore", () => {
     expect(invoke).toHaveBeenCalledWith("get_playlist_tracks", { playlistId: 101 });
   });
 
+  it("adds songs to the Queue via addSongsToActiveTarget when nothing custom is pinned", async () => {
+    playlistsStore.playlists = [
+      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
+      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = null;
+
+    await playlistsStore.addSongsToActiveTarget([10, 20], "2 songs");
+
+    expect(invoke).toHaveBeenCalledWith("add_songs_to_queue", { songIds: [10, 20] });
+    expect(invoke).not.toHaveBeenCalledWith("add_to_playlist", expect.anything());
+  });
+
+  it("adds songs to the pinned custom playlist via addSongsToActiveTarget", async () => {
+    playlistsStore.playlists = [
+      { id: 101, name: "Queue", track_count: 0, created: 1700000000, updated: 1700000000, dynamic_enabled: false, is_queue: true },
+      { id: 102, name: "Favorites", track_count: 3, created: 1700000001, updated: 1700000001, dynamic_enabled: false, is_queue: false },
+    ];
+    playlistsStore.pinnedPlaylistId = 102;
+
+    await playlistsStore.addSongsToActiveTarget([10, 20], "2 songs");
+
+    expect(invoke).toHaveBeenCalledWith("add_to_playlist", { playlistId: 102, songIds: [10, 20] });
+    expect(invoke).not.toHaveBeenCalledWith("add_songs_to_queue", expect.anything());
+  });
+
   it("removes items from playlist and reorders items", async () => {
     playlistsStore.activePlaylistId = 101;
 

@@ -7,12 +7,14 @@ on:
       - "flatpak/**"
       - "src-tauri/icons/org.luminous.music.metainfo.xml"
       - ".github/workflows/flatpak.yml"
+      - "Cargo.lock"
   pull_request:
     branches: [ "main", "next" ]
     paths:
       - "flatpak/**"
       - "src-tauri/icons/org.luminous.music.metainfo.xml"
       - ".github/workflows/flatpak.yml"
+      - "Cargo.lock"
 
 permissions:
   contents: read
@@ -54,7 +56,10 @@ jobs:
         with:
           bundle: luminous.flatpak
           manifest-path: flatpak/org.luminous.music.yml
-          cache-key: flatpak-builder-${{ github.sha }}
+          # Keyed on the manifest and dependency-source files (not github.sha) so
+          # unrelated commits reuse the cache; only manifest/dependency changes
+          # invalidate it. See #520 (analogous to #390's rust-cache fix).
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/org.luminous.music.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
           build-bundle: true
           run-tests: false
           upload-artifact: true

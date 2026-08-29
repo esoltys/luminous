@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { i18n } from "../stores/i18n.svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -120,5 +121,43 @@ describe("ArtistProfileEditor", () => {
 
     expect(mockSave).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("renders localized text when locale is French", () => {
+    i18n.currentLocale = "fr";
+
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "Big Wreck",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    expect(screen.getByText(/Modifier l'artiste/i)).toBeTruthy();
+    expect(screen.getByText("Enregistrer")).toBeTruthy();
+    expect(screen.getByText("Annuler")).toBeTruthy();
+    expect(screen.getByText(/Aucun lien ajouté pour le moment/i)).toBeTruthy();
+  });
+
+  it("portals modal dialog to document.body with internal scrolling and z-50 overlay", () => {
+    render(ArtistProfileEditor, {
+      props: {
+        artistName: "The American Dollar",
+        isOpen: true,
+        onClose: vi.fn(),
+      },
+    });
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeTruthy();
+    // Verify dialog parent is portaled to document.body with z-50
+    const backdrop = dialog.parentElement;
+    expect(backdrop?.parentElement).toBe(document.body);
+    expect(backdrop?.classList.contains("z-50")).toBe(true);
+
+    // Verify modal dialog structure has max-height and flex-col
+    expect(dialog.classList.contains("flex-col")).toBe(true);
+    expect(dialog.classList.contains("overflow-hidden")).toBe(true);
   });
 });

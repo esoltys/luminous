@@ -1,3 +1,11 @@
+export function formatDuration(ns: number | undefined): string {
+  if (!ns) return "0:00";
+  const sec = Math.floor(ns / 1_000_000_000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s < 10 ? "0" : ""}${s}`;
+}
+
 export function formatDate(timestamp?: number): string {
   if (!timestamp) return "—";
   return new Date(timestamp * 1000).toLocaleDateString();
@@ -27,3 +35,9 @@ export function formatChannels(ch?: number): string {
   if (ch === 2) return "Stereo";
   return `${ch} ch`;
 }
+
+export function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str.replace(/\b\w+/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+}
+

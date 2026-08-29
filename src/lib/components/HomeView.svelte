@@ -3,6 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import type { HomeItem, ArtistItem } from "../types";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
@@ -73,7 +74,7 @@
                 {artist}
                 artistAlbums={getArtistAlbums(collectionStore.albums, artist.name)}
                 artistSongs={getArtistSongs(collectionStore.songs, artist.name)}
-                onclick={() => collectionStore.viewArtist(artist.name || "")}
+                onclick={() => navigationStore.viewArtist(artist.name || "")}
               />
             </div>
           {/each}

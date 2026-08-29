@@ -78,10 +78,12 @@
     }}
   />
 
-  {#if onAddToPlaylist && playlistsStore.activeCustomPlaylist && !playlistsStore.activeCustomPlaylist.is_queue}
+  {#if onAddToPlaylist}
     <ContextMenuItem
       icon={Plus}
-      label={i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })}
+      label={playlistsStore.activeCustomPlaylist && !playlistsStore.activeCustomPlaylist.is_queue
+        ? i18n.t("playlists.contextMenuAddToPlaylist", { name: playlistsStore.activeCustomPlaylist.name })
+        : i18n.t("playlists.contextMenuAddToPlaylistDefault")}
       onclick={() => { onAddToPlaylist?.(); onClose(); }}
     />
   {/if}

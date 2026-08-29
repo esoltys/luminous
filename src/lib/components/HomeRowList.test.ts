@@ -111,7 +111,7 @@ describe("HomeRowList.svelte", () => {
     expect(getByTextDecade("Decade")).toBeInTheDocument();
 
     const genreItems: HomeItem[] = [
-      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "Rock" }) },
+      { type: "playlist", playlist: makePlaylist({ dynamic_enabled: true, dynamic_spec: "tag:Rock" }) },
     ];
     const { getByText: getByTextGenre } = render(HomeRowList, { props: { items: genreItems, variant: "rank" } });
     expect(getByTextGenre("Genre")).toBeInTheDocument();

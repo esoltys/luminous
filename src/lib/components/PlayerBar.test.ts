@@ -4,23 +4,14 @@ import { render, fireEvent } from "@testing-library/svelte";
 import PlayerBar from "./PlayerBar.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
 import type { Song, Playlist } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
 }));
-
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
-}));
-
-if (typeof Element !== "undefined" && !Element.prototype.animate) {
-  Element.prototype.animate = vi.fn().mockReturnValue({
-    finished: Promise.resolve(),
-    cancel: () => {},
-  }) as any;
-}
 
 describe("PlayerBar.svelte", () => {
   const mockSong: Song = {
@@ -59,8 +50,16 @@ describe("PlayerBar.svelte", () => {
     // Reset the viewport-driven breakpoint flags so tests that set
     // viewportWidth narrow (to exercise isImmersiveForced) don't leak into
     // later tests via the shared collectionStore singleton.
-    collectionStore.viewportWidth = 1280;
-    collectionStore.viewportHeight = 800;
+    windowLayoutStore.viewportWidth = 1280;
+    windowLayoutStore.viewportHeight = 800;
+    // Reset navigation + immersive state so tests that put the store into
+    // "viewing the Queue" (or immersive mode) don't leak into later tests
+    // via the shared collectionStore/playlistsStore singletons.
+    windowLayoutStore.immersiveMode = false;
+    navigationStore.activeTab = "collection";
+    navigationStore.playlistsSubTab = "custom";
+    navigationStore.selectedPlaylistId = null;
+    playlistsStore.playlists = [];
   });
 
   it("renders 'Not Playing' state when currentSong is undefined", () => {
@@ -81,7 +80,7 @@ describe("PlayerBar.svelte", () => {
   it("navigates to album when album title is clicked", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    const viewAlbumSpy = vi.spyOn(collectionStore, "viewAlbum").mockImplementation(() => {});
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum").mockImplementation(() => {});
 
     const { getByText } = render(PlayerBar);
     const albumLink = getByText("Test Album");
@@ -90,48 +89,78 @@ describe("PlayerBar.svelte", () => {
     expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
   });
 
-  it("exits immersive mode and navigates to the queue when the album cover is clicked", async () => {
+  const mockQueue: Playlist = {
+    id: 1,
+    name: "Queue",
+    dynamic_enabled: false,
+    created: 0,
+    updated: 0,
+    track_count: 0,
+    is_queue: true,
+  };
+
+  // #523: the three-state PlayerBar cover-art click flow — collection/
+  // playlist view -> Queue -> Immersive Mode -> back to Queue.
+
+  it("navigates to the Queue when the album cover is clicked from a collection/playlist view", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    collectionStore.immersiveMode = true;
+    windowLayoutStore.immersiveMode = false;
+    navigationStore.activeTab = "collection";
 
-    const mockQueue: Playlist = {
-      id: 1,
-      name: "Queue",
-      dynamic_enabled: false,
-      created: 0,
-      updated: 0,
-      track_count: 0,
-      is_queue: true,
-    };
     vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
     const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
-    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
-    const viewPlaylistSpy = vi.spyOn(collectionStore, "viewPlaylist").mockImplementation(() => {});
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+    const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
 
     const { getByTitle } = render(PlayerBar);
     const coverButton = getByTitle("Queue");
     await fireEvent.click(coverButton);
 
-    expect(exitImmersiveModeSpy).toHaveBeenCalled();
-    expect(collectionStore.immersiveMode).toBe(false);
     expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
     expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
   });
 
-  it("enters immersive mode when the album cover is clicked outside immersive mode", async () => {
+  it("flips into Immersive Mode when the album cover is clicked while already viewing the Queue", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    collectionStore.immersiveMode = false;
+    windowLayoutStore.immersiveMode = false;
+    playlistsStore.playlists = [mockQueue];
+    navigationStore.activeTab = "playlists";
+    navigationStore.playlistsSubTab = "custom";
+    navigationStore.selectedPlaylistId = mockQueue.id;
 
-    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
+    const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
 
     const { getByTitle } = render(PlayerBar);
     const coverButton = getByTitle("Immersive Mode");
     await fireEvent.click(coverButton);
 
     expect(toggleImmersiveModeSpy).toHaveBeenCalled();
-    expect(collectionStore.immersiveMode).toBe(true);
+    expect(windowLayoutStore.immersiveMode).toBe(true);
+    expect(viewPlaylistSpy).not.toHaveBeenCalled();
+  });
+
+  it("exits Immersive Mode and navigates to the Queue when the album cover is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    windowLayoutStore.immersiveMode = true;
+
+    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
+    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const exitImmersiveModeSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+
+    const { getByTitle } = render(PlayerBar);
+    const coverButton = getByTitle("Queue");
+    await fireEvent.click(coverButton);
+
+    expect(exitImmersiveModeSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
@@ -226,15 +255,15 @@ describe("PlayerBar.svelte", () => {
   it("does not exit or enter immersive mode from the cover click while width has force-engaged it", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
-    collectionStore.immersiveMode = false;
-    collectionStore.viewportWidth = 500; // below SMALL_BREAKPOINT_WIDTH_PX (640)
+    windowLayoutStore.immersiveMode = false;
+    windowLayoutStore.viewportWidth = 500; // below SMALL_BREAKPOINT_WIDTH_PX (640)
 
-    const toggleImmersiveModeSpy = vi.spyOn(collectionStore, "toggleImmersiveMode");
-    const exitImmersiveModeSpy = vi.spyOn(collectionStore, "exitImmersiveMode");
+    const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
+    const exitImmersiveModeSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
 
     const { getByTitle } = render(PlayerBar);
-    expect(collectionStore.isImmersiveForced).toBe(true);
-    const coverButton = getByTitle("Immersive Mode");
+    expect(windowLayoutStore.isImmersiveForced).toBe(true);
+    const coverButton = getByTitle("Queue");
     await fireEvent.click(coverButton);
 
     expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
@@ -252,9 +281,9 @@ describe("PlayerBar.svelte", () => {
     playerStore.state = "playing";
     const { getAllByTitle, getByTitle, container } = render(PlayerBar);
 
-    // Gone by Compact (Full-only): shuffle, repeat, and the whole right
-    // column (volume/mute + expand) — the transport+seek block takes the
-    // freed space instead, sticking to the right edge via ml-auto.
+    // Gone by Compact (Full-only): shuffle, repeat, the seek row, and the
+    // whole right column (volume/mute + expand) — the transport block takes
+    // the freed space instead, sticking to the right edge via ml-auto.
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
     expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
@@ -264,14 +293,14 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
     const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
     expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
-
-    // Gone by Minimal (Compact-and-up only): previous, seek row.
-    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
-    expect(seekRow).toHaveClass("hidden", "min-[400px]:flex");
+    expect(seekRow).toHaveClass("hidden", "min-[700px]:flex");
+
+    // Gone by Minimal (Compact-and-up only): previous.
+    expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
 
     // Never hidden (the constant core): cover art, play/pause, skip-next.
-    const coverButton = getByTitle("Immersive Mode");
+    const coverButton = getByTitle("Queue");
     expect(coverButton.closest(".hidden")).toBeNull();
     expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
     expect(getByTitle(/next song/i)).not.toHaveClass("hidden");

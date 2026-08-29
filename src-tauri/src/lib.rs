@@ -108,18 +108,395 @@ fn build_prevent_default_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlug
     builder.build()
 }
 
+/// Env vars that must be set before any WebKitGTK webview is created, to
+/// avoid a blank-window rendering failure the release AppImage hit when its
+/// bundled WebKitGTK (built on the CI runner, older than most users' system
+/// WebKitGTK) ran its accelerated compositing path against newer Mesa/
+/// Wayland stacks (#370, #383). Kept as a table (rather than inline
+/// `set_var` calls) so the exact set of vars is a single assertable source
+/// of truth instead of only being verifiable by launching a real WebKitGTK
+/// webview.
+#[cfg(target_os = "linux")]
+const LINUX_WEBKITGTK_RENDERING_ENV_VARS: &[(&str, &str)] = &[
+    ("WEBKIT_DISABLE_COMPOSITING_MODE", "1"),
+    ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
+];
+
+/// Appends WebView2's occlusion-calculation-disabling flag to an existing
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating it if
+/// already present. Factored out of `run()`'s `cfg(target_os = "windows")`
+/// block as a pure string function so it's unit-testable on any host.
+///
+/// Regression test for the Windows "blank app after being minimized/
+/// occluded" failure: Chromium's CalculateNativeWinOcclusion feature
+/// suspends WebView2's rendering pipeline when the window is minimized or
+/// occluded, and it can fail to resume/repaint on restore. Without this
+/// flag set before the webview is created, restoring the window shows a
+/// blank surface.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn with_webview2_occlusion_disabled(current: &str) -> String {
+    let flag = "--disable-features=CalculateNativeWinOcclusion";
+    if current.contains(flag) {
+        current.to_string()
+    } else if current.is_empty() {
+        flag.to_string()
+    } else {
+        format!("{} {}", current, flag)
+    }
+}
+
+/// Reads persisted equalizer settings (linear + parametric) from the DB and
+/// applies them to a freshly-constructed `AudioEngine`, so playback starts
+/// with the user's last-saved EQ state instead of engine defaults.
+fn restore_equalizer_from_db(db: &Database, audio_engine: &AudioEngine) {
+    if let Ok(conn) = db.pool.get() {
+        if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
+            "SELECT enabled, preamp, gains, mode, parametric
+                 FROM equalizer_settings WHERE id = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)? != 0,
+                    row.get::<_, f64>(1)? as f32,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        ) {
+            let mut gains = [0.0f32; 10];
+            for (i, val) in gains_str.split(',').enumerate() {
+                if i < 10 {
+                    if let Ok(gain) = val.parse::<f32>() {
+                        gains[i] = gain;
+                    }
+                }
+            }
+            if let Ok(mut eq) = audio_engine.equalizer.lock() {
+                eq.enabled = enabled;
+                eq.preamp = preamp;
+                eq.load_preset(gains);
+                if let Ok(bands) =
+                    serde_json::from_str::<Vec<crate::equalizer::ParametricBand>>(&parametric_json)
+                {
+                    if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
+                        let mut arr = crate::equalizer::default_parametric_bands();
+                        arr.copy_from_slice(&bands);
+                        eq.load_parametric(arr);
+                    }
+                }
+                if mode_str == "parametric20" {
+                    eq.set_mode(crate::equalizer::EqMode::Parametric20);
+                }
+            }
+        }
+    }
+}
+
+/// Spawns the ~30 FPS spectrum-emission loop that pushes `spectrum-data`
+/// events to the frontend while the spectrum visualizer is enabled and
+/// something is playing.
+fn spawn_visualizer_loop(app_handle: tauri::AppHandle, audio: Arc<Mutex<AudioEngine>>) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
+        loop {
+            interval.tick().await;
+            let (enabled, spectrum) = {
+                let engine = audio.lock().await;
+                let enabled = engine
+                    .spectrum_enabled
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                let state = engine.current_state();
+                let spectrum = if enabled && state == crate::models::PlayState::Playing {
+                    let sample_rate = engine
+                        .output_sample_rate
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    Some(crate::analyzer::calculate_spectrum(
+                        &engine.visualizer_buf,
+                        1024,
+                        sample_rate,
+                    ))
+                } else {
+                    None
+                };
+                (enabled, spectrum)
+            };
+
+            if enabled {
+                if let Some(spec) = spectrum {
+                    let _ = app_handle.emit("spectrum-data", spec);
+                }
+            }
+        }
+    });
+}
+
+/// Spawns the 250ms playback-position tick loop: emits `playback-position`
+/// while playing, and every 4th tick (~1s) persists position and mirrors it
+/// to the OS media session — MPRIS2's Position property isn't push-updated
+/// by souvlaki's D-Bus backend, so without this the seek bar would freeze at
+/// the position from the last state transition (#80). SMTC interpolates its
+/// own timeline, so this is a no-op cost there beyond the periodic refresh.
+fn spawn_position_tick_loop(
+    app_handle: tauri::AppHandle,
+    audio: Arc<Mutex<AudioEngine>>,
+    player: Arc<Mutex<Player>>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+        let mut tick_counter: u32 = 0;
+        loop {
+            interval.tick().await;
+            let (pos, state) = {
+                let engine = audio.lock().await;
+                (engine.current_position_nanosec(), engine.current_state())
+            };
+            if state == crate::models::PlayState::Playing {
+                let mut p = player.lock().await;
+                if let Some(stats) = p.on_position_update(pos) {
+                    let _ = app_handle.emit("song-stats-changed", stats);
+                }
+                tick_counter = tick_counter.wrapping_add(1);
+                if tick_counter.is_multiple_of(4) {
+                    p.persist_position(pos);
+                    let playback_snapshot = p.get_state().await;
+                    crate::media_session::mirror_state(&app_handle, &playback_snapshot).await;
+                }
+                let _ = app_handle.emit(
+                    "playback-position",
+                    serde_json::json!({
+                        "position_nanosec": pos
+                    }),
+                );
+            }
+        }
+    });
+}
+
+/// Spawns the OS thread that drains `AudioEngine`'s event channel and turns
+/// each `AudioEvent` into player-state transitions, OS media-session
+/// mirroring, and frontend events. A blocking OS thread rather than a Tokio
+/// task since it blocks on `rx.iter()`.
+fn spawn_audio_event_loop(
+    app_handle: tauri::AppHandle,
+    audio: Arc<Mutex<AudioEngine>>,
+    player: Arc<Mutex<Player>>,
+) {
+    std::thread::Builder::new()
+        .name("luminous-events".to_string())
+        .spawn(move || {
+            let rx = {
+                let engine = tauri::async_runtime::block_on(async { audio.lock().await });
+                engine.event_rx.clone()
+            };
+
+            let rx = rx.lock().unwrap();
+            for event in rx.iter() {
+                eprintln!("[Luminous Backend] Received event: {:?}", event);
+                let app = app_handle.clone();
+                let player = player.clone();
+                tauri::async_runtime::block_on(async move {
+                    let mut p = player.lock().await;
+                    match event {
+                        crate::audio::AudioEvent::Playing { .. } => {
+                            p.reset_playback_errors();
+                            let _ = app.emit(
+                                "track-changed",
+                                serde_json::json!({
+                                    "song": p.current_song.clone()
+                                }),
+                            );
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Paused => {
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Stopped => {
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::TrackFinished { .. } => {
+                            let _ = p.on_track_finished().await;
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::AboutToFinish { .. } => {
+                            // Prime the next track so the engine can
+                            // hand over gaplessly at the boundary.
+                            if let Err(e) = p.prepare_gapless_next().await {
+                                log::warn!("Gapless preload failed: {e}");
+                            }
+                        }
+                        crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
+                            let _ = p.on_gapless_transition(song_id).await;
+                            let _ = app.emit(
+                                "track-changed",
+                                serde_json::json!({
+                                    "song": p.current_song.clone()
+                                }),
+                            );
+                            let state = p.get_state().await;
+                            crate::media_session::mirror_state(&app, &state).await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        crate::audio::AudioEvent::Error { message } => {
+                            eprintln!("[Luminous Backend] ERROR from audio engine: {}", message);
+
+                            if p.try_heal_and_retry_current_track().await {
+                                // Stale-cased path (Linux/case-sensitive
+                                // filesystem quirk) — repointed and retried
+                                // in place, nothing to surface to the user.
+                                let _ = app.emit("library-changed", ());
+                            } else {
+                                let outcome = p.note_playback_error();
+
+                                if let Some(song) = &outcome.failed_song {
+                                    let _ = app.emit(
+                                        "playback-error",
+                                        serde_json::json!({
+                                            "songId": song.id,
+                                            "title": song.title,
+                                            "path": song.path,
+                                        }),
+                                    );
+                                }
+                                if outcome.flagged_unavailable {
+                                    let _ = app.emit("library-changed", ());
+                                }
+
+                                if outcome.should_stop {
+                                    log::error!(
+                                        "Stopping playback after {} consecutive audio errors \
+                                         — likely a disconnected drive or dead playlist",
+                                        crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
+                                    );
+                                    let _ = p.stop().await;
+                                } else {
+                                    let _ = p.next_track().await;
+                                }
+                            }
+                            let state = p.get_state().await;
+                            let _ = app.emit("playback-state", state);
+                        }
+                        _ => {}
+                    }
+                });
+            }
+        })
+        .expect("failed to spawn event thread");
+}
+
+/// Registers global OS media-key shortcuts (play/pause, next/prev track,
+/// volume up/down/mute) so they work even when Luminous isn't focused.
+/// Registration failures (e.g. another app already owns a key) are
+/// swallowed per-shortcut — Luminous just runs without that one shortcut.
+fn register_media_shortcuts(app: &tauri::App) {
+    let media_shortcuts = [
+        "MediaPlayPause",
+        "MediaTrackNext",
+        "MediaTrackPrevious",
+        "AudioVolumeUp",
+        "AudioVolumeDown",
+        "AudioVolumeMute",
+    ];
+    for shortcut_str in media_shortcuts {
+        if let Err(err) = app
+            .global_shortcut()
+            .on_shortcut(shortcut_str, |app, shortcut, event| {
+                if event.state != ShortcutState::Pressed {
+                    return;
+                }
+
+                let key = shortcut.key;
+                let app_handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app_handle.state::<AppState>();
+                    let mut player = state.player.lock().await;
+                    let result = match key {
+                        Code::MediaPlayPause => {
+                            let playback_state = player.get_state().await.state;
+                            if playback_state == crate::models::PlayState::Playing {
+                                player.pause().await
+                            } else {
+                                player.resume().await
+                            }
+                        }
+                        Code::MediaTrackNext => {
+                            if let Some(stats) = player.note_manual_skip() {
+                                let _ = app_handle.emit("song-stats-changed", stats);
+                            }
+                            player.next_track().await
+                        }
+                        Code::MediaTrackPrevious => player.previous_track().await,
+                        Code::AudioVolumeUp => {
+                            let volume = player.get_state().await.volume;
+                            player.set_volume((volume + 0.05).min(1.0)).await
+                        }
+                        Code::AudioVolumeDown => {
+                            let volume = player.get_state().await.volume;
+                            player.set_volume((volume - 0.05).max(0.0)).await
+                        }
+                        Code::AudioVolumeMute => {
+                            let volume = player.get_state().await.volume;
+                            if volume > 0.0 {
+                                let mut volume_before_mute = state.volume_before_mute.lock().await;
+                                *volume_before_mute = volume;
+                                player.set_volume(0.0).await
+                            } else {
+                                let volume_before_mute = *state.volume_before_mute.lock().await;
+                                player.set_volume(volume_before_mute.max(0.05)).await
+                            }
+                        }
+                        _ => Ok(()),
+                    };
+
+                    if let Err(err) = result {
+                        eprintln!(
+                            "[Luminous Backend] Failed to handle media key {:?}: {}",
+                            key, err
+                        );
+                    } else {
+                        let playback_state = player.get_state().await;
+                        crate::media_session::mirror_state(&app_handle, &playback_state).await;
+                        let _ = app_handle.emit("playback-state", playback_state);
+                    }
+                });
+            })
+        {
+            log::debug!(
+                "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
+                shortcut_str,
+                err
+            );
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Without this, every log::info!/warn!/error! call across the backend
+    // (including reconcile-failure diagnostics) is a silent no-op — `log`
+    // is just a facade and needs a registered backend to actually emit
+    // anywhere. Defaults to `info` so normal operation stays quiet; set
+    // `RUST_LOG=debug` (or per-module, e.g. `RUST_LOG=luminous_lib::tags=debug`)
+    // to see more when running `bun run tauri dev` from a terminal.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     // The AppImage bundles its own WebKitGTK (built on the CI runner), which
     // can be substantially older than the host's system WebKitGTK. Older
     // WebKitGTK builds' accelerated compositing path is known to render a
     // blank window against newer Mesa/Wayland stacks; disabling compositing
-    // mode avoids that without touching DMA-BUF handling, which the line
-    // below already covers separately (#370).
+    // mode avoids that without touching DMA-BUF handling (#370, #383).
     #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    for (key, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+        std::env::set_var(key, value);
+    }
 
     // On Windows, Chromium's CalculateNativeWinOcclusion feature puts the
     // WebView2 rendering pipeline into a suspended/discarded state when the
@@ -129,16 +506,8 @@ pub fn run() {
     #[cfg(target_os = "windows")]
     {
         let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
-        let flag = "--disable-features=CalculateNativeWinOcclusion";
         let current = std::env::var(key).unwrap_or_default();
-        if !current.contains(flag) {
-            let new_val = if current.is_empty() {
-                flag.to_string()
-            } else {
-                format!("{} {}", current, flag)
-            };
-            std::env::set_var(key, new_val);
-        }
+        std::env::set_var(key, with_webview2_occlusion_disabled(&current));
     }
 
     tauri::Builder::default()
@@ -260,51 +629,7 @@ pub fn run() {
             );
 
             let audio_engine = AudioEngine::new();
-
-            // Load and restore equalizer settings on startup
-            if let Ok(conn) = db.pool.get() {
-                if let Ok((enabled, preamp, gains_str, mode_str, parametric_json)) = conn.query_row(
-                    "SELECT enabled, preamp, gains, mode, parametric
-                         FROM equalizer_settings WHERE id = 1",
-                    [],
-                    |row| {
-                        Ok((
-                            row.get::<_, i32>(0)? != 0,
-                            row.get::<_, f64>(1)? as f32,
-                            row.get::<_, String>(2)?,
-                            row.get::<_, String>(3)?,
-                            row.get::<_, String>(4)?,
-                        ))
-                    },
-                ) {
-                    let mut gains = [0.0f32; 10];
-                    for (i, val) in gains_str.split(',').enumerate() {
-                        if i < 10 {
-                            if let Ok(gain) = val.parse::<f32>() {
-                                gains[i] = gain;
-                            }
-                        }
-                    }
-                    if let Ok(mut eq) = audio_engine.equalizer.lock() {
-                        eq.enabled = enabled;
-                        eq.preamp = preamp;
-                        eq.load_preset(gains);
-                        if let Ok(bands) = serde_json::from_str::<
-                            Vec<crate::equalizer::ParametricBand>,
-                        >(&parametric_json)
-                        {
-                            if bands.len() == crate::equalizer::PARAMETRIC_BAND_COUNT {
-                                let mut arr = crate::equalizer::default_parametric_bands();
-                                arr.copy_from_slice(&bands);
-                                eq.load_parametric(arr);
-                            }
-                        }
-                        if mode_str == "parametric20" {
-                            eq.set_mode(crate::equalizer::EqMode::Parametric20);
-                        }
-                    }
-                }
-            }
+            restore_equalizer_from_db(&db, &audio_engine);
 
             let audio = Arc::new(Mutex::new(audio_engine));
 
@@ -330,6 +655,15 @@ pub fn run() {
             if let Err(e) = manager.queue() {
                 log::error!("Failed to bootstrap Queue playlist: {e}");
             }
+            // Rebuild curated-tag ("tag:") genre auto-playlists once right
+            // after migrations run (see db.rs migration 19, #548), rather
+            // than waiting for the next library scan — an upgrading user's
+            // old bare-genre-name rows were just discarded by that
+            // migration, so without this they'd see an empty genre
+            // auto-playlist section until they happened to trigger a scan.
+            if let Err(e) = manager.sync_all_auto_playlists() {
+                log::error!("Failed to sync auto-playlists at startup: {e}");
+            }
             let playlists = Arc::new(Mutex::new(manager));
 
             let cover_manager = Arc::new(CoverManager::new(
@@ -337,203 +671,8 @@ pub fn run() {
                 app.path().app_data_dir().expect("no app data dir"),
             ));
 
-            // Spawn position tick loop (Tokio)
-            let app_handle_ticks = app.handle().clone();
-            let audio_ticks = Arc::clone(&audio);
-            let player_ticks = Arc::clone(&player);
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
-                let mut tick_counter: u32 = 0;
-                loop {
-                    interval.tick().await;
-                    let (pos, state) = {
-                        let engine = audio_ticks.lock().await;
-                        (engine.current_position_nanosec(), engine.current_state())
-                    };
-                    if state == crate::models::PlayState::Playing {
-                        let mut p = player_ticks.lock().await;
-                        if let Some(stats) = p.on_position_update(pos) {
-                            let _ = app_handle_ticks.emit("song-stats-changed", stats);
-                        }
-                        tick_counter = tick_counter.wrapping_add(1);
-                        if tick_counter.is_multiple_of(4) {
-                            p.persist_position(pos);
-                            // MPRIS2's Position property isn't push-updated by
-                            // souvlaki's D-Bus backend — it just returns
-                            // whatever we last set, so without this the OS
-                            // media session's seek bar freezes at the
-                            // position from the last state transition (#80).
-                            // SMTC interpolates its own timeline, so this is
-                            // a no-op cost there beyond the periodic refresh.
-                            let playback_snapshot = p.get_state().await;
-                            crate::media_session::mirror_state(
-                                &app_handle_ticks,
-                                &playback_snapshot,
-                            )
-                            .await;
-                        }
-                        let _ = app_handle_ticks.emit(
-                            "playback-position",
-                            serde_json::json!({
-                                "position_nanosec": pos
-                            }),
-                        );
-                    }
-                }
-            });
-
             // Spawn real-time visualizer spectrum emission loop (Tokio)
-            let app_handle_visualizer = app.handle().clone();
-            let audio_visualizer = Arc::clone(&audio);
-            tauri::async_runtime::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(33)); // ~30 FPS
-                loop {
-                    interval.tick().await;
-                    let (enabled, spectrum) = {
-                        let engine = audio_visualizer.lock().await;
-                        let enabled = engine
-                            .spectrum_enabled
-                            .load(std::sync::atomic::Ordering::Relaxed);
-                        let state = engine.current_state();
-                        let spectrum = if enabled && state == crate::models::PlayState::Playing {
-                            let sample_rate = engine
-                                .output_sample_rate
-                                .load(std::sync::atomic::Ordering::Relaxed);
-                            Some(crate::analyzer::calculate_spectrum(
-                                &engine.visualizer_buf,
-                                1024,
-                                sample_rate,
-                            ))
-                        } else {
-                            None
-                        };
-                        (enabled, spectrum)
-                    };
-
-                    if enabled {
-                        if let Some(spec) = spectrum {
-                            let _ = app_handle_visualizer.emit("spectrum-data", spec);
-                        }
-                    }
-                }
-            });
-
-            // Spawn event receiver loop (OS thread)
-            let app_handle_events = app.handle().clone();
-            let audio_events = Arc::clone(&audio);
-            let player_events = Arc::clone(&player);
-            std::thread::Builder::new()
-                .name("luminous-events".to_string())
-                .spawn(move || {
-                    let rx = {
-                        let engine =
-                            tauri::async_runtime::block_on(async { audio_events.lock().await });
-                        engine.event_rx.clone()
-                    };
-
-                    let rx = rx.lock().unwrap();
-                    for event in rx.iter() {
-                        eprintln!("[Luminous Backend] Received event: {:?}", event);
-                        let app = app_handle_events.clone();
-                        let player = player_events.clone();
-                        tauri::async_runtime::block_on(async move {
-                            let mut p = player.lock().await;
-                            match event {
-                                crate::audio::AudioEvent::Playing { .. } => {
-                                    p.reset_playback_errors();
-                                    let _ = app.emit(
-                                        "track-changed",
-                                        serde_json::json!({
-                                            "song": p.current_song.clone()
-                                        }),
-                                    );
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Paused => {
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Stopped => {
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::TrackFinished { .. } => {
-                                    let _ = p.on_track_finished().await;
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::AboutToFinish { .. } => {
-                                    // Prime the next track so the engine can
-                                    // hand over gaplessly at the boundary.
-                                    if let Err(e) = p.prepare_gapless_next().await {
-                                        log::warn!("Gapless preload failed: {e}");
-                                    }
-                                }
-                                crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
-                                    let _ = p.on_gapless_transition(song_id).await;
-                                    let _ = app.emit(
-                                        "track-changed",
-                                        serde_json::json!({
-                                            "song": p.current_song.clone()
-                                        }),
-                                    );
-                                    let state = p.get_state().await;
-                                    crate::media_session::mirror_state(&app, &state).await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                crate::audio::AudioEvent::Error { message } => {
-                                    eprintln!(
-                                        "[Luminous Backend] ERROR from audio engine: {}",
-                                        message
-                                    );
-
-                                    if p.try_heal_and_retry_current_track().await {
-                                        // Stale-cased path (Linux/case-sensitive
-                                        // filesystem quirk) — repointed and retried
-                                        // in place, nothing to surface to the user.
-                                        let _ = app.emit("library-changed", ());
-                                    } else {
-                                        let outcome = p.note_playback_error();
-
-                                        if let Some(song) = &outcome.failed_song {
-                                            let _ = app.emit(
-                                                "playback-error",
-                                                serde_json::json!({
-                                                    "songId": song.id,
-                                                    "title": song.title,
-                                                    "path": song.path,
-                                                }),
-                                            );
-                                        }
-                                        if outcome.flagged_unavailable {
-                                            let _ = app.emit("library-changed", ());
-                                        }
-
-                                        if outcome.should_stop {
-                                            log::error!(
-                                                "Stopping playback after {} consecutive audio errors \
-                                                 — likely a disconnected drive or dead playlist",
-                                                crate::player::MAX_CONSECUTIVE_PLAYBACK_ERRORS
-                                            );
-                                            let _ = p.stop().await;
-                                        } else {
-                                            let _ = p.next_track().await;
-                                        }
-                                    }
-                                    let state = p.get_state().await;
-                                    let _ = app.emit("playback-state", state);
-                                }
-                                _ => {}
-                            }
-                        });
-                    }
-                })
-                .expect("failed to spawn event thread");
+            spawn_visualizer_loop(app.handle().clone(), Arc::clone(&audio));
 
             let args: Vec<String> = std::env::args().collect();
             let startup_path = if args.len() > 1 {
@@ -599,93 +738,34 @@ pub fn run() {
             crate::loudness::spawn_background_analyzer(app.handle().clone(), Arc::clone(&state.db));
 
             app.manage(state);
+            let managed_state = app.state::<AppState>();
+
+            // Spawn position tick loop (Tokio). Spawned after app.manage()
+            // above since it calls media_session::mirror_state(), which
+            // reaches into app.state::<AppState>() — doing this before
+            // manage() panics ("state() called before manage()") if a tick
+            // fires that early.
+            spawn_position_tick_loop(
+                app.handle().clone(),
+                Arc::clone(&managed_state.audio),
+                Arc::clone(&managed_state.player),
+            );
+
+            // Spawn event receiver loop (OS thread). Spawned after
+            // app.manage() for the same reason as the tick loop above — its
+            // handler also reaches app.state::<AppState>() via
+            // media_session::mirror_state().
+            spawn_audio_event_loop(
+                app.handle().clone(),
+                Arc::clone(&managed_state.audio),
+                Arc::clone(&managed_state.player),
+            );
 
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");
             }
 
-            let media_shortcuts = [
-                "MediaPlayPause",
-                "MediaTrackNext",
-                "MediaTrackPrevious",
-                "AudioVolumeUp",
-                "AudioVolumeDown",
-                "AudioVolumeMute",
-            ];
-            for shortcut_str in media_shortcuts {
-                if let Err(err) =
-                    app.global_shortcut()
-                        .on_shortcut(shortcut_str, |app, shortcut, event| {
-                            if event.state != ShortcutState::Pressed {
-                                return;
-                            }
-
-                            let key = shortcut.key;
-                            let app_handle = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let state = app_handle.state::<AppState>();
-                                let mut player = state.player.lock().await;
-                                let result = match key {
-                                    Code::MediaPlayPause => {
-                                        let playback_state = player.get_state().await.state;
-                                        if playback_state == crate::models::PlayState::Playing {
-                                            player.pause().await
-                                        } else {
-                                            player.resume().await
-                                        }
-                                    }
-                                    Code::MediaTrackNext => {
-                                        if let Some(stats) = player.note_manual_skip() {
-                                            let _ = app_handle.emit("song-stats-changed", stats);
-                                        }
-                                        player.next_track().await
-                                    }
-                                    Code::MediaTrackPrevious => player.previous_track().await,
-                                    Code::AudioVolumeUp => {
-                                        let volume = player.get_state().await.volume;
-                                        player.set_volume((volume + 0.05).min(1.0)).await
-                                    }
-                                    Code::AudioVolumeDown => {
-                                        let volume = player.get_state().await.volume;
-                                        player.set_volume((volume - 0.05).max(0.0)).await
-                                    }
-                                    Code::AudioVolumeMute => {
-                                        let volume = player.get_state().await.volume;
-                                        if volume > 0.0 {
-                                            let mut volume_before_mute =
-                                                state.volume_before_mute.lock().await;
-                                            *volume_before_mute = volume;
-                                            player.set_volume(0.0).await
-                                        } else {
-                                            let volume_before_mute =
-                                                *state.volume_before_mute.lock().await;
-                                            player.set_volume(volume_before_mute.max(0.05)).await
-                                        }
-                                    }
-                                    _ => Ok(()),
-                                };
-
-                                if let Err(err) = result {
-                                    eprintln!(
-                                        "[Luminous Backend] Failed to handle media key {:?}: {}",
-                                        key, err
-                                    );
-                                } else {
-                                    let playback_state = player.get_state().await;
-                                    crate::media_session::mirror_state(&app_handle, &playback_state)
-                                        .await;
-                                    let _ = app_handle.emit("playback-state", playback_state);
-                                }
-                            });
-                        })
-                {
-                    log::debug!(
-                        "[Luminous Backend] Global shortcut registration skipped for '{}': {}",
-                        shortcut_str,
-                        err
-                    );
-                }
-            }
+            register_media_shortcuts(app);
 
             // Keep every dynamic playlist's membership in line with its
             // definition the moment the library or song stats change —
@@ -702,6 +782,20 @@ pub fn run() {
                         tauri::async_runtime::spawn(playlist::reconcile_and_sync(handle.clone()));
                     });
                 }
+            }
+
+            // Keep the persisted Genres curation hierarchy (#545) in step
+            // with newly-seen or vanished tag names whenever the library
+            // changes (scans, tag edits, bulk merge/delete). Belt-and-braces
+            // alongside `get_tag_hierarchy`'s own reconcile-on-read: this is
+            // what lets an already-open Genres tab pick up a change without
+            // the user having to leave and reopen it.
+            {
+                use tauri::Listener;
+                let handle = app.handle().clone();
+                app.listen("library-changed", move |_| {
+                    tauri::async_runtime::spawn(tags::reconcile_hierarchy_and_notify(handle.clone()));
+                });
             }
 
             Ok(())
@@ -723,7 +817,6 @@ pub fn run() {
             commands::collection::get_top_artists,
             commands::collection::get_favourite_songs,
             commands::collection::get_recently_added_songs,
-            commands::collection::get_songs_by_genre,
             commands::collection::get_recently_played,
             commands::collection::get_recently_played_songs,
             commands::collection::clear_play_history,
@@ -762,6 +855,7 @@ pub fn run() {
             commands::playlist::sync_all_auto_playlists,
             commands::playlist::get_songs_by_decade,
             commands::playlist::get_songs_by_bpm,
+            commands::playlist::get_songs_by_artist_tag,
             commands::playlist::get_playlists_by_artist,
             commands::playlist::get_playlist_tracks,
             commands::playlist::add_to_playlist,
@@ -813,9 +907,17 @@ pub fn run() {
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,
             commands::tags::get_tags_overview,
-            commands::tags::get_songs_by_main_tag,
-            commands::tags::get_songs_by_genre_edge,
+            commands::tags::get_songs_by_curated_tag,
             commands::tags::get_songs_without_genre,
+            // Persisted Genres curation hierarchy (#545)
+            commands::tags::get_tag_hierarchy,
+            commands::tags::set_tag_group_color,
+            commands::tags::reparent_tag,
+            commands::tags::promote_tag,
+            commands::tags::demote_group_to_child,
+            commands::tags::reorder_tag_in_group,
+            commands::tags::merge_tags,
+            commands::tags::delete_tags,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
@@ -845,4 +947,56 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Luminous");
+}
+
+#[cfg(test)]
+mod startup_rendering_workaround_tests {
+    use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_linux_webkitgtk_env_vars_disable_compositing_and_dmabuf() {
+        // Regression test for #383: both mitigations for the AppImage's
+        // bundled-WebKitGTK blank-window bug must stay set, or the
+        // regression (silently dropping one on a future edit) would only
+        // surface as a hard-to-reproduce rendering bug on specific Mesa/
+        // Wayland stacks, not a test failure.
+        let keys: Vec<&str> = LINUX_WEBKITGTK_RENDERING_ENV_VARS
+            .iter()
+            .map(|(k, _)| *k)
+            .collect();
+        assert!(keys.contains(&"WEBKIT_DISABLE_COMPOSITING_MODE"));
+        assert!(keys.contains(&"WEBKIT_DISABLE_DMABUF_RENDERER"));
+        for (_, value) in LINUX_WEBKITGTK_RENDERING_ENV_VARS {
+            assert_eq!(*value, "1");
+        }
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_added_to_empty_value() {
+        assert_eq!(
+            with_webview2_occlusion_disabled(""),
+            "--disable-features=CalculateNativeWinOcclusion"
+        );
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_appended_to_existing_args() {
+        assert_eq!(
+            with_webview2_occlusion_disabled("--some-other-flag"),
+            "--some-other-flag --disable-features=CalculateNativeWinOcclusion"
+        );
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_not_duplicated_if_already_present() {
+        let already_set = "--disable-features=CalculateNativeWinOcclusion";
+        assert_eq!(with_webview2_occlusion_disabled(already_set), already_set);
+
+        let already_set_with_other = "--foo --disable-features=CalculateNativeWinOcclusion --bar";
+        assert_eq!(
+            with_webview2_occlusion_disabled(already_set_with_other),
+            already_set_with_other
+        );
+    }
 }

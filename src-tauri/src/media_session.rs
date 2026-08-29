@@ -114,21 +114,54 @@ pub fn spawn(
                 hwnd: hwnd.0,
             };
 
-            let mut controls = match MediaControls::new(config) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::warn!("Failed to initialize OS media session: {e:?}");
+            // Wrap media controls initialization in catch_unwind to guard against
+            // panics from underlying platform backends (e.g. souvlaki unwrapping on
+            // missing D-Bus session bus on Linux #537).
+            let init_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                #[cfg(target_os = "linux")]
+                if !is_dbus_session_available() {
+                    log::warn!("No D-Bus session bus available; skipping OS media session initialization");
+                    return None;
+                }
+
+                let mut controls = match MediaControls::new(config) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::warn!("Failed to initialize OS media session: {e:?}");
+                        return None;
+                    }
+                };
+
+                let event_app = app_handle.clone();
+                if let Err(e) = controls.attach(move |event| handle_event(event_app.clone(), event)) {
+                    log::warn!("Failed to attach OS media session event handler: {e:?}");
+                    return None;
+                }
+
+                Some(controls)
+            }));
+
+            let mut controls = match init_result {
+                Ok(Some(c)) => c,
+                Ok(None) => {
+                    let _ = ready_tx.send(false);
+                    return;
+                }
+                Err(panic_payload) => {
+                    let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                        *s
+                    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                        s.as_str()
+                    } else {
+                        "unknown panic"
+                    };
+                    log::warn!(
+                        "OS media session initialization panicked ({panic_msg}); continuing without OS media integration"
+                    );
                     let _ = ready_tx.send(false);
                     return;
                 }
             };
-
-            let event_app = app_handle.clone();
-            if let Err(e) = controls.attach(move |event| handle_event(event_app.clone(), event)) {
-                log::warn!("Failed to attach OS media session event handler: {e:?}");
-                let _ = ready_tx.send(false);
-                return;
-            }
 
             let _ = ready_tx.send(true);
 
@@ -175,6 +208,61 @@ pub fn spawn(
         Ok(true) => Some(MediaSessionHandle { tx }),
         _ => None,
     }
+}
+
+/// Helper function to check if a D-Bus session bus is available based on env variables
+/// and socket paths.
+#[cfg(any(target_os = "linux", test))]
+fn check_dbus_session_available<F>(
+    dbus_addr: Option<String>,
+    xdg_runtime_dir: Option<String>,
+    uid: u32,
+    path_exists: F,
+) -> bool
+where
+    F: Fn(&std::path::Path) -> bool,
+{
+    if let Some(addr) = dbus_addr {
+        let addr = addr.trim();
+        if !addr.is_empty() {
+            if let Some(path) = addr.strip_prefix("unix:path=") {
+                let socket_path = path.split(',').next().unwrap_or(path);
+                if path_exists(std::path::Path::new(socket_path)) {
+                    return true;
+                }
+            } else {
+                // Non unix:path address (e.g. abstract socket unix:abstract= or tcp:)
+                return true;
+            }
+        }
+    }
+
+    if let Some(runtime_dir) = xdg_runtime_dir {
+        let bus_path = std::path::Path::new(&runtime_dir).join("bus");
+        if path_exists(&bus_path) {
+            return true;
+        }
+    }
+
+    let fallback = format!("/run/user/{uid}/bus");
+    if path_exists(std::path::Path::new(&fallback)) {
+        return true;
+    }
+
+    false
+}
+
+/// Check if a D-Bus session bus is likely available on Linux.
+///
+/// Under minimal or headless Linux environments (e.g. fresh WSL2 without a running session bus),
+/// attempting to connect via `souvlaki` (zbus backend) will unwrap an `Err` and panic (#537).
+/// Checking beforehand avoids triggering that panic during startup.
+#[cfg(target_os = "linux")]
+fn is_dbus_session_available() -> bool {
+    let dbus_addr = std::env::var("DBUS_SESSION_BUS_ADDRESS").ok();
+    let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok();
+    let uid = unsafe { libc::getuid() };
+    check_dbus_session_available(dbus_addr, xdg_runtime_dir, uid, |p| p.exists())
 }
 
 /// Route an inbound OS media control event onto the same `state.player`
@@ -243,4 +331,112 @@ fn seek_target(current_nanosec: i64, direction: SeekDirection, amount: Duration)
         SeekDirection::Backward => current_nanosec.saturating_sub(delta).max(0),
     };
     target as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_seek_target_forward() {
+        let current = 5_000_000_000i64; // 5s
+        let step = Duration::from_secs(10);
+        let target = seek_target(current, SeekDirection::Forward, step);
+        assert_eq!(target, 15_000_000_000);
+    }
+
+    #[test]
+    fn test_seek_target_backward() {
+        let current = 15_000_000_000i64; // 15s
+        let step = Duration::from_secs(10);
+        let target = seek_target(current, SeekDirection::Backward, step);
+        assert_eq!(target, 5_000_000_000);
+    }
+
+    #[test]
+    fn test_seek_target_backward_underflow_clamps_to_zero() {
+        let current = 3_000_000_000i64; // 3s
+        let step = Duration::from_secs(10);
+        let target = seek_target(current, SeekDirection::Backward, step);
+        assert_eq!(target, 0);
+    }
+
+    #[test]
+    fn test_seek_target_negative_current_clamps_to_zero() {
+        let current = -1_000_000_000i64;
+        let step = Duration::from_secs(5);
+        let target = seek_target(current, SeekDirection::Backward, step);
+        assert_eq!(target, 0);
+    }
+
+    #[test]
+    fn test_check_dbus_session_existing_unix_path() {
+        let mut existing = HashSet::new();
+        existing.insert(PathBuf::from("/run/user/1000/bus"));
+
+        let exists = |p: &Path| existing.contains(p);
+        assert!(check_dbus_session_available(
+            Some("unix:path=/run/user/1000/bus".to_string()),
+            None,
+            1000,
+            exists
+        ));
+    }
+
+    #[test]
+    fn test_check_dbus_session_missing_unix_path() {
+        let existing: HashSet<PathBuf> = HashSet::new();
+        let exists = |p: &Path| existing.contains(p);
+        assert!(!check_dbus_session_available(
+            Some("unix:path=/run/user/1000/bus".to_string()),
+            None,
+            1000,
+            exists
+        ));
+    }
+
+    #[test]
+    fn test_check_dbus_session_abstract_socket() {
+        let existing: HashSet<PathBuf> = HashSet::new();
+        let exists = |p: &Path| existing.contains(p);
+        assert!(check_dbus_session_available(
+            Some("unix:abstract=/tmp/dbus-test".to_string()),
+            None,
+            1000,
+            exists
+        ));
+    }
+
+    #[test]
+    fn test_check_dbus_session_fallback_xdg_runtime_dir() {
+        let mut existing = HashSet::new();
+        let expected_path = PathBuf::from("/var/run/user/1000").join("bus");
+        existing.insert(expected_path);
+
+        let exists = |p: &Path| existing.contains(p);
+        assert!(check_dbus_session_available(
+            None,
+            Some("/var/run/user/1000".to_string()),
+            1000,
+            exists
+        ));
+    }
+
+    #[test]
+    fn test_check_dbus_session_fallback_uid() {
+        let mut existing = HashSet::new();
+        existing.insert(PathBuf::from("/run/user/1000/bus"));
+
+        let exists = |p: &Path| existing.contains(p);
+        assert!(check_dbus_session_available(None, None, 1000, exists));
+    }
+
+    #[test]
+    fn test_check_dbus_session_none_available() {
+        let existing: HashSet<PathBuf> = HashSet::new();
+        let exists = |p: &Path| existing.contains(p);
+        assert!(!check_dbus_session_available(None, None, 1000, exists));
+    }
 }

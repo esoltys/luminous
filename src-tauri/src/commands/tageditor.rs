@@ -10,15 +10,21 @@ pub struct SongDetails {
     pub id: i64,
     pub path: String,
     pub title: String,
+    pub titlesort: Option<String>,
     pub artist: String,
+    pub artistsort: Option<String>,
     pub album: String,
+    pub albumsort: Option<String>,
     pub album_artist: String,
+    pub album_artist_sort: Option<String>,
     pub composer: String,
+    pub composersort: Option<String>,
     /// `artist`, `album_artist`, `composer`, and `genre` are all `; `-delimited
     /// when the song carries multiple values — see
     /// `models::parse_multi_value`/`join_multi_value`, the single source of
     /// truth for this convention.
     pub genre: String,
+    pub genresort: Option<String>,
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
@@ -37,7 +43,7 @@ pub async fn get_song_details(
 ) -> Result<SongDetails, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
-        "SELECT id, path, title, artist, album, album_artist, composer, genre, track, disc, year,
+        "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
                 grouping, bpm, initial_key, rating, compilation, art_embedded
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
@@ -46,20 +52,26 @@ pub async fn get_song_details(
                 id: row.get(0)?,
                 path: row.get(1)?,
                 title: row.get(2).unwrap_or_default(),
-                artist: row.get(3).unwrap_or_default(),
-                album: row.get(4).unwrap_or_default(),
-                album_artist: row.get(5).unwrap_or_default(),
-                composer: row.get(6).unwrap_or_default(),
-                genre: row.get(7).unwrap_or_default(),
-                track: row.get(8).ok(),
-                disc: row.get(9).ok(),
-                year: row.get(10).ok(),
-                grouping: row.get(11).unwrap_or_default(),
-                bpm: row.get(12).ok(),
-                initial_key: row.get(13).unwrap_or_default(),
-                rating: row.get(14).unwrap_or(crate::stats::RATING_UNRATED),
-                compilation: row.get(15).unwrap_or(false),
-                art_embedded: row.get(16).unwrap_or(false),
+                titlesort: row.get(3).ok(),
+                artist: row.get(4).unwrap_or_default(),
+                artistsort: row.get(5).ok(),
+                album: row.get(6).unwrap_or_default(),
+                albumsort: row.get(7).ok(),
+                album_artist: row.get(8).unwrap_or_default(),
+                album_artist_sort: row.get(9).ok(),
+                composer: row.get(10).unwrap_or_default(),
+                composersort: row.get(11).ok(),
+                genre: row.get(12).unwrap_or_default(),
+                genresort: row.get(13).ok(),
+                track: row.get(14).ok(),
+                disc: row.get(15).ok(),
+                year: row.get(16).ok(),
+                grouping: row.get(17).unwrap_or_default(),
+                bpm: row.get(18).ok(),
+                initial_key: row.get(19).unwrap_or_default(),
+                rating: row.get(20).unwrap_or(crate::stats::RATING_UNRATED),
+                compilation: row.get(21).unwrap_or(false),
+                art_embedded: row.get(22).unwrap_or(false),
             })
         },
     )
@@ -117,11 +129,17 @@ pub async fn save_song_tags(
     state: State<'_, AppState>,
     song_id: i64,
     title: String,
+    titlesort: Option<String>,
     artist: String,
+    artistsort: Option<String>,
     album: String,
+    albumsort: Option<String>,
     album_artist: String,
+    album_artist_sort: Option<String>,
     composer: String,
+    composersort: Option<String>,
     genre: Option<String>,
+    genresort: Option<String>,
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
@@ -152,16 +170,21 @@ pub async fn save_song_tags(
     // whatever's already in the DB rather than clobbering it.
     let path_clone = path.clone();
     let title_c = title.clone();
+    let titlesort_c = titlesort.clone();
     // Normalize every multi-value field to the canonical `; `-delimited,
     // trimmed, deduped form before it hits disk or the DB, regardless of
     // exactly what the chip input sent over the wire.
     let artist_str = models::join_multi_value(&models::parse_multi_value(&artist));
     let artist_c = artist_str.clone();
+    let artistsort_c = artistsort.clone();
     let album_c = album.clone();
+    let albumsort_c = albumsort.clone();
     let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
     let album_artist_c = album_artist_str.clone();
+    let album_artist_sort_c = album_artist_sort.clone();
     let composer_str = models::join_multi_value(&models::parse_multi_value(&composer));
     let composer_c = composer_str.clone();
+    let composersort_c = composersort.clone();
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
@@ -171,19 +194,26 @@ pub async fn save_song_tags(
     tauri::async_runtime::spawn_blocking(move || {
         crate::tageditor::write_tags(
             &path_clone,
-            &title_c,
-            &artist_c,
-            &album_c,
-            &album_artist_c,
-            &composer_c,
-            &genre_c,
-            track,
-            disc,
-            year,
-            &grouping_c,
-            bpm,
-            &initial_key_c,
-            compilation,
+            &crate::tageditor::TagWriteRequest {
+                title: &title_c,
+                titlesort: titlesort_c.as_deref(),
+                artist: &artist_c,
+                artistsort: artistsort_c.as_deref(),
+                album: &album_c,
+                albumsort: albumsort_c.as_deref(),
+                album_artist: &album_artist_c,
+                album_artist_sort: album_artist_sort_c.as_deref(),
+                composer: &composer_c,
+                composersort: composersort_c.as_deref(),
+                genre: &genre_c,
+                track,
+                disc,
+                year,
+                grouping: &grouping_c,
+                bpm,
+                initial_key: &initial_key_c,
+                compilation,
+            },
         )
     })
     .await
@@ -194,25 +224,37 @@ pub async fn save_song_tags(
     conn.execute(
         "UPDATE songs SET
             title = ?1,
-            artist = ?2,
-            album = ?3,
-            album_artist = ?4,
-            composer = ?5,
-            genre = ?6,
-            track = ?7,
-            disc = ?8,
-            year = ?9,
-            grouping = ?10,
-            bpm = ?11,
-            initial_key = ?12
-         WHERE id = ?13",
+            titlesort = ?2,
+            artist = ?3,
+            artistsort = ?4,
+            album = ?5,
+            albumsort = ?6,
+            album_artist = ?7,
+            album_artist_sort = ?8,
+            composer = ?9,
+            composersort = ?10,
+            genre = ?11,
+            genresort = ?12,
+            track = ?13,
+            disc = ?14,
+            year = ?15,
+            grouping = ?16,
+            bpm = ?17,
+            initial_key = ?18
+         WHERE id = ?19",
         rusqlite::params![
             title,
+            titlesort,
             artist_str,
+            artistsort,
             album,
+            albumsort,
             album_artist_str,
+            album_artist_sort,
             composer_str,
+            composersort,
             genre_str,
+            genresort,
             track,
             disc,
             year,
@@ -233,8 +275,11 @@ pub async fn save_album_tags(
     state: State<'_, AppState>,
     song_ids: Vec<i64>,
     album: String,
+    albumsort: Option<String>,
     album_artist: String,
+    album_artist_sort: Option<String>,
     genre: Option<String>,
+    genresort: Option<String>,
     year: Option<u32>,
     disc: Option<u32>,
     compilation: bool,
@@ -253,8 +298,11 @@ pub async fn save_album_tags(
     struct SongMetadata {
         path: String,
         title: String,
+        titlesort: Option<String>,
         artist: String,
+        artistsort: Option<String>,
         composer: String,
+        composersort: Option<String>,
         track: Option<u32>,
         grouping: String,
         bpm: Option<f32>,
@@ -264,19 +312,22 @@ pub async fn save_album_tags(
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, artist, composer, track, grouping, bpm, initial_key
+            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, grouping, bpm, initial_key
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
                 Ok(SongMetadata {
                     path: row.get(0)?,
                     title: row.get(1).unwrap_or_default(),
-                    artist: row.get(2).unwrap_or_default(),
-                    composer: row.get(3).unwrap_or_default(),
-                    track: row.get(4).ok(),
-                    grouping: row.get(5).unwrap_or_default(),
-                    bpm: row.get(6).ok(),
-                    initial_key: row.get(7).unwrap_or_default(),
+                    titlesort: row.get(2).ok(),
+                    artist: row.get(3).unwrap_or_default(),
+                    artistsort: row.get(4).ok(),
+                    composer: row.get(5).unwrap_or_default(),
+                    composersort: row.get(6).ok(),
+                    track: row.get(7).ok(),
+                    grouping: row.get(8).unwrap_or_default(),
+                    bpm: row.get(9).ok(),
+                    initial_key: row.get(10).unwrap_or_default(),
                 })
             },
         );
@@ -286,11 +337,13 @@ pub async fn save_album_tags(
     }
 
     let album_c = album.clone();
+    let albumsort_c = albumsort.clone();
     // Normalize to the canonical `; `-delimited, trimmed, deduped form
     // before it hits disk or the DB, regardless of exactly what the chip
     // input sent over the wire.
     let album_artist_str = models::join_multi_value(&models::parse_multi_value(&album_artist));
     let album_artist_c = album_artist_str.clone();
+    let album_artist_sort_c = album_artist_sort.clone();
     let genre_str =
         models::join_multi_value(&models::parse_multi_value(&genre.unwrap_or_default()));
     let genre_c = genre_str.clone();
@@ -301,19 +354,26 @@ pub async fn save_album_tags(
             let path = std::path::PathBuf::from(&item.path);
             let write_res = crate::tageditor::write_tags(
                 &path,
-                &item.title,
-                &item.artist,
-                &album_c,
-                &album_artist_c,
-                &item.composer,
-                &genre_c,
-                item.track,
-                disc,
-                year,
-                &item.grouping,
-                item.bpm,
-                &item.initial_key,
-                compilation,
+                &crate::tageditor::TagWriteRequest {
+                    title: &item.title,
+                    titlesort: item.titlesort.as_deref(),
+                    artist: &item.artist,
+                    artistsort: item.artistsort.as_deref(),
+                    album: &album_c,
+                    albumsort: albumsort_c.as_deref(),
+                    album_artist: &album_artist_c,
+                    album_artist_sort: album_artist_sort_c.as_deref(),
+                    composer: &item.composer,
+                    composersort: item.composersort.as_deref(),
+                    genre: &genre_c,
+                    track: item.track,
+                    disc,
+                    year,
+                    grouping: &item.grouping,
+                    bpm: item.bpm,
+                    initial_key: &item.initial_key,
+                    compilation,
+                },
             );
             if write_res.is_ok() {
                 count += 1;
@@ -329,16 +389,22 @@ pub async fn save_album_tags(
         tx.execute(
             "UPDATE songs SET
                 album = ?1,
-                album_artist = ?2,
-                genre = ?3,
-                year = ?4,
-                disc = ?5,
-                compilation = ?6
-             WHERE id = ?7",
+                albumsort = ?2,
+                album_artist = ?3,
+                album_artist_sort = ?4,
+                genre = ?5,
+                genresort = ?6,
+                year = ?7,
+                disc = ?8,
+                compilation = ?9
+             WHERE id = ?10",
             rusqlite::params![
                 album,
+                albumsort,
                 album_artist_str,
+                album_artist_sort,
                 genre_str,
+                genresort,
                 year,
                 disc,
                 compilation,

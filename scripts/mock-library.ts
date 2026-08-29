@@ -5,21 +5,30 @@ import { existsSync, readFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AlbumItem, ArtistItem, Playlist, Song } from "../src/lib/types/index.ts";
+import type { AlbumItem, ArtistItem, ArtistProfile, Playlist, Song } from "../src/lib/types/index.ts";
 import { hydrateEmbeddedArt } from "./embedded-art-cache.ts";
-import { FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
+import { FALLBACK_ARTIST_PROFILES, FALLBACK_LYRICS, FALLBACK_PLAYLISTS, FALLBACK_SONGS } from "./mock-data.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "mock-config.json");
 const LOCAL_CONFIG_PATH = path.join(__dirname, "mock-config.local.json");
 const TAURI_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.conf.json");
+// Tauri merges platform-specific config files (tauri.<platform>.conf.json)
+// over the base tauri.conf.json at build time. Windows overrides `identifier`
+// to the Microsoft Store MSIX package identity (e.g.
+// "39231EricJamesSoltys.LuminousMusicPlayer") — a real installed/dev build on
+// Windows opens its database under *that* identity's AppData folder, not the
+// bare "org.luminous.music" one, so this has to be read too or the default
+// path resolves to a folder the app never actually writes to.
+const TAURI_WINDOWS_CONF_PATH = path.join(__dirname, "../src-tauri/tauri.windows.conf.json");
 
 /**
  * The real app's db lives at `{tauri app_data_dir}/luminous.db` (see
  * src-tauri/src/db.rs). Tauri's `app_data_dir()` resolves to the *Roaming*
  * AppData folder on Windows (not Local — a common mix-up), Application
  * Support on macOS, and XDG_DATA_HOME on Linux. Reading the identifier from
- * tauri.conf.json instead of hardcoding it keeps this in sync automatically.
+ * tauri.conf.json (plus any platform override) instead of hardcoding it
+ * keeps this in sync automatically.
  */
 function defaultDbPath(): string | undefined {
   let identifier: string;
@@ -27,6 +36,14 @@ function defaultDbPath(): string | undefined {
     identifier = JSON.parse(readFileSync(TAURI_CONF_PATH, "utf8")).identifier;
   } catch {
     return undefined;
+  }
+  if (process.platform === "win32" && existsSync(TAURI_WINDOWS_CONF_PATH)) {
+    try {
+      const windowsIdentifier = JSON.parse(readFileSync(TAURI_WINDOWS_CONF_PATH, "utf8")).identifier;
+      if (windowsIdentifier) identifier = windowsIdentifier;
+    } catch {
+      // Fall back to the base identifier if the override file is malformed.
+    }
   }
   if (!identifier) return undefined;
 
@@ -126,10 +143,25 @@ export function resolveScreenshotSettings(
   };
 }
 
+/** Raw persisted Genres curation (tag_groups/tag_assignments), before song
+ * counts are attached — those depend on the (possibly limited) `songs` set
+ * actually loaded, so they're computed IPC-mock-side against real song data,
+ * not here. */
+export interface MockTagGroup {
+  name: string;
+  color_index: number;
+  children: string[];
+}
+
 export interface MockLibrary {
   songs: Song[];
   albums: AlbumItem[];
   artists: ArtistItem[];
+  artistProfiles: ArtistProfile[];
+  /** Persisted Genres curation hierarchy (#545) — undefined for the bundled
+   * fixture, which has no equivalent persisted tables and falls back to an
+   * emergent, re-derived-from-song-genres approximation instead. */
+  tagGroups?: MockTagGroup[];
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
   lyrics: string;
@@ -263,6 +295,21 @@ interface DbLibrary {
   songs: Song[];
   playlists: Playlist[];
   playlistTracks: Record<number, Song[]>;
+  artistProfiles: ArtistProfile[];
+  tagGroups: MockTagGroup[];
+}
+
+// Mirrors get_all_artist_profiles_conn() in src-tauri/src/collection/query.rs:
+// tags/social_links are stored as JSON text columns (artist_profiles table,
+// migration 17).
+function rowToArtistProfile(row: Record<string, unknown>): ArtistProfile {
+  return {
+    artist_key: row.artist_key as string,
+    website: (row.website as string | null) ?? undefined,
+    tags: JSON.parse((row.tags as string) || "[]"),
+    social_links: JSON.parse((row.social_links as string) || "[]"),
+    bio: (row.bio as string | null) ?? undefined,
+  };
 }
 
 async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing = false): Promise<DbLibrary | null> {
@@ -303,7 +350,40 @@ async function loadFromDatabase(dbPath: string, limit: number, silentIfMissing =
         playlistTracks[playlist.id] = (trackStmt.all(playlist.id) as Record<string, unknown>[]).map(rowToSong);
       }
 
-      return { songs, playlists, playlistTracks };
+      // Best-effort: a DB from before migration 17 (#473) won't have this
+      // table yet — fall back to no profiles rather than failing the whole load.
+      let artistProfiles: ArtistProfile[] = [];
+      try {
+        const profileRows = db
+          .prepare("SELECT artist_key, website, tags, social_links, bio FROM artist_profiles")
+          .all() as Record<string, unknown>[];
+        artistProfiles = profileRows.map(rowToArtistProfile);
+      } catch (err) {
+        console.warn("[Mock Library] Could not read artist_profiles table:", (err as Error).message);
+      }
+
+      // Mirrors TagManager::get_tag_hierarchy() in src-tauri/src/tags.rs:
+      // tag_groups (one row per top-level card) joined with tag_assignments
+      // (one row per sub-genre chip). Best-effort: a DB from before
+      // migration 18 (#545) won't have these tables yet.
+      let tagGroups: MockTagGroup[] = [];
+      try {
+        const groupRows = db
+          .prepare("SELECT id, name, color_index FROM tag_groups ORDER BY sort_order, name COLLATE NOCASE")
+          .all() as Record<string, unknown>[];
+        const childRows = db
+          .prepare("SELECT group_id, tag_name FROM tag_assignments ORDER BY sort_order, tag_name COLLATE NOCASE")
+          .all() as Record<string, unknown>[];
+        tagGroups = groupRows.map((g) => ({
+          name: g.name as string,
+          color_index: g.color_index as number,
+          children: childRows.filter((c) => c.group_id === g.id).map((c) => c.tag_name as string),
+        }));
+      } catch (err) {
+        console.warn("[Mock Library] Could not read tag_groups/tag_assignments tables:", (err as Error).message);
+      }
+
+      return { songs, playlists, playlistTracks, artistProfiles, tagGroups };
     } finally {
       db.close();
     }
@@ -348,6 +428,10 @@ export async function loadMockLibrary(config: MockConfig = loadMockConfig()): Pr
     songs,
     albums: deriveAlbums(songs),
     artists: deriveArtists(songs),
+    artistProfiles: fromDb?.artistProfiles ?? FALLBACK_ARTIST_PROFILES,
+    // undefined (not []) when there's no real DB, so the IPC mock knows to
+    // fall back to its own emergent-hierarchy approximation for the fixture.
+    tagGroups: fromDb?.tagGroups,
     playlists,
     playlistTracks: fromDb?.playlistTracks ?? {},
     lyrics: FALLBACK_LYRICS,

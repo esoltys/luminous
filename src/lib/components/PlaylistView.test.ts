@@ -3,14 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import PlaylistView from "./PlaylistView.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { collectionStore } from "../stores/collection.svelte";
+import { navigationStore } from "../stores/navigation.svelte";
 import type { Playlist, PlaylistItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
 describe("PlaylistView.svelte", () => {
@@ -148,12 +146,12 @@ describe("PlaylistView.svelte", () => {
 
   it("handles pointer-based drag reordering of playlist items", async () => {
     // Tauri's dragDropEnabled window option blocks native HTML5 drag events, so reordering
-    // is implemented with pointer events instead (see PlaylistView.svelte handleRowPointerDown).
+    // is implemented with pointer events instead (see SongTable.svelte handleRowPointerDown).
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
+    const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")! as HTMLElement;
 
     document.elementFromPoint = vi.fn().mockReturnValue(rowThree);
 
@@ -169,8 +167,8 @@ describe("PlaylistView.svelte", () => {
     const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
     const { getByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")! as HTMLElement;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")! as HTMLElement;
+    const rowOne = getByText("Track One").closest("[data-song-row]")! as HTMLElement;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")! as HTMLElement;
 
     const elementFromPointMock = vi.fn().mockReturnValue(rowThree);
     document.elementFromPoint = elementFromPointMock;
@@ -181,6 +179,34 @@ describe("PlaylistView.svelte", () => {
 
     expect(elementFromPointMock).not.toHaveBeenCalled();
     expect(reorderSpy).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the artist when clicking the Artist link instead of starting a row drag", async () => {
+    // Regression test for #553: handleRowPointerDown used to call setPointerCapture
+    // unconditionally on pointerdown, stealing subsequent pointer events from the
+    // Artist/Album LinkButton and silently blocking its onclick navigation.
+    // jsdom doesn't implement setPointerCapture at all, so stub it directly rather than
+    // spying on a non-existent prototype method.
+    const setPointerCaptureSpy = vi.fn();
+    const originalSetPointerCapture = HTMLElement.prototype.setPointerCapture;
+    HTMLElement.prototype.setPointerCapture = setPointerCaptureSpy;
+    try {
+      const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist");
+      const reorderSpy = vi.spyOn(playlistsStore, "reorderItemByUuid");
+      const { getByText } = render(PlaylistView);
+
+      const artistLink = getByText("Artist A").closest("button")!;
+
+      await fireEvent.pointerDown(artistLink, { button: 0, clientX: 0, clientY: 0 });
+      expect(setPointerCaptureSpy).not.toHaveBeenCalled();
+
+      await fireEvent.click(artistLink);
+
+      expect(viewArtistSpy).toHaveBeenCalledWith("Artist A");
+      expect(reorderSpy).not.toHaveBeenCalled();
+    } finally {
+      HTMLElement.prototype.setPointerCapture = originalSetPointerCapture;
+    }
   });
 
   it("filters tracks by title or artist using the filter search input", async () => {
@@ -222,8 +248,8 @@ describe("PlaylistView.svelte", () => {
   it("handles multi-selection with Shift+Click and shows batch floating bar", async () => {
     const { getByText, queryByText } = render(PlaylistView);
 
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
-    const rowThree = getByText("Track Three").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-song-row]")!;
+    const rowThree = getByText("Track Three").closest("[data-song-row]")!;
 
     await fireEvent.click(rowOne);
     await fireEvent.click(rowThree, { shiftKey: true });
@@ -239,7 +265,7 @@ describe("PlaylistView.svelte", () => {
 
   it("opens context menu on right-click", async () => {
     const { getByText, getAllByText } = render(PlaylistView);
-    const rowOne = getByText("Track One").closest("[data-playlist-row]")!;
+    const rowOne = getByText("Track One").closest("[data-song-row]")!;
 
     await fireEvent.contextMenu(rowOne);
 

@@ -2,6 +2,7 @@
   import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
@@ -83,24 +84,24 @@
   function openPlaylist(playlist: Playlist) {
     if (playlist.dynamic_enabled && !isSmartPlaylistSpec(playlist.dynamic_spec)) {
       const isDecade = playlist.dynamic_spec?.startsWith("decade:") ?? false;
-      collectionStore.viewAutoPlaylist(
+      navigationStore.viewAutoPlaylist(
         isDecade
           ? { kind: "decade", decade: playlist.dynamic_spec?.replace(/^decade:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
-          : { kind: "genre", genre: playlist.dynamic_spec ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
+          : { kind: "genre", genre: playlist.dynamic_spec?.replace(/^tag:/, "") ?? playlist.name, playlistId: playlist.id, updated: playlist.updated }
       );
       return;
     }
     playlistsStore.selectPlaylist(playlist.id);
-    collectionStore.viewPlaylist(playlist.id);
+    navigationStore.viewPlaylist(playlist.id);
   }
 
   function openItem(item: HomeItem) {
     if (item.type === "song" && item.song.album) {
-      collectionStore.viewAlbum(item.song.album);
+      navigationStore.viewAlbum(item.song.album);
     } else if (item.type === "song") {
       playerStore.playSong(item.song.id);
     } else if (item.type === "album") {
-      collectionStore.viewAlbum(item.album.album || "");
+      navigationStore.viewAlbum(item.album.album || "");
     } else if (item.type === "playlist") {
       openPlaylist(item.playlist);
     }
@@ -222,8 +223,8 @@
     y={contextMenuState.y}
     {song}
     onPlay={() => playerStore.playSong(song.id)}
-    onGoToArtist={() => collectionStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
-    onGoToAlbum={() => collectionStore.viewAlbum(song.album || "")}
+    onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
+    onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

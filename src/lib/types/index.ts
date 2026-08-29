@@ -67,6 +67,7 @@ export interface Song {
   year?: number;
   originalyear?: number;
   genre?: string;
+  genresort?: string;
   compilation: boolean;
 
   // Extended tags
@@ -236,7 +237,9 @@ export interface DbSchemaStatus {
 
 export interface AlbumItem {
   artist: string | null;
+  artist_sort?: string | null;
   album: string | null;
+  albumsort?: string | null;
   year: number | null;
   track_count: number;
   disc_count: number;
@@ -254,6 +257,7 @@ export interface AlbumItem {
 
 export interface ArtistItem {
   name: string | null;
+  sort_artist?: string | null;
   album_count: number;
   song_count: number;
   genre?: string | null;
@@ -296,12 +300,29 @@ export interface GenreGroup {
   children: TagCount[];
 }
 
+/** One sub-genre chip assigned under a {@link TagGroup} (#545). A tag that's
+ * also the name of some (other) top-level group elsewhere in the library
+ * never appears here — the backend strips that link on sight. */
+export interface TagGroupChild {
+  name: string;
+  song_count: number;
+}
+
+/** One primary-genre "card" in the persisted Genres curation hierarchy
+ * (#545) — distinct from the emergent, per-song-order {@link GenreGroup}. */
+export interface TagGroup {
+  name: string;
+  color_index: number;
+  song_count: number;
+  children: TagGroupChild[];
+}
+
 /**
  * Converts a custom luminous-art protocol URI (e.g. luminous-art://...)
  * to a platform-appropriate URL (e.g. http://luminous-art.localhost/ on Windows).
  */
 export function getCoverArtUrl(uri: string | null | undefined): string | null {
-  if (!uri) return null;
+  if (!uri || typeof uri !== "string") return null;
   if (uri.startsWith("luminous-art://")) {
     const isMock = typeof window !== "undefined" && (
       (window as any).__LUMINOUS_MOCK_LIBRARY__ || 
@@ -328,6 +349,25 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
     }
   }
   return uri;
+}
+
+/**
+ * Resolves an art_manual or art_automatic string (which may be a remote HTTP URL,
+ * a cached embedded art filename like "album-123.jpg", or an absolute local file path)
+ * into a proper platform webview URL.
+ */
+export function resolveArtUrl(art: string | null | undefined): string | null {
+  if (!art || typeof art !== "string") return null;
+  if (art.startsWith("http://") || art.startsWith("https://")) {
+    return art;
+  }
+  if (art.startsWith("luminous-art://")) {
+    return getCoverArtUrl(art);
+  }
+  if (art.startsWith("album-")) {
+    return getCoverArtUrl(`luminous-art://${art}`);
+  }
+  return getCoverArtUrl(`luminous-art://local/${art}`);
 }
 
 export type HomeItem =

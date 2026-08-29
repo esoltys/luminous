@@ -4,8 +4,11 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { collectionStore } from "../stores/collection.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { themeStore } from "../stores/theme.svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
+  import { formatDuration } from "../utils/formatters";
   import { prefs } from "../stores/prefs.svelte";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -16,18 +19,20 @@
 
   const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
 
-  // Responsive control trimming (issue #413, refined against real usage):
-  // three named tiers as this floating bar narrows toward the app's 320px
-  // minWidth — Full (>=700px), Compact (400-700px), Minimal (<400px). Cover
-  // art, play/pause, and skip-next are the constant core (shown in all three
-  // tiers); everything else drops out in priority order: expand/shuffle/
-  // repeat/volume+mute first (gone by Compact — the transport+seek block
-  // takes the freed space and sticks to the right edge via `ml-auto` rather
-  // than re-centering in it), then prev and the seek bar itself (gone by
-  // Minimal). 400/700 are hand-tuned breakpoints specific to this bar,
-  // written as literal `min-[Npx]:` arbitrary-value classes because
-  // Tailwind's class scanner can't resolve an interpolated constants.ts
-  // value — don't try to centralize them.
+  // Responsive control trimming (issue #413, refined against real usage,
+  // padding/seekbar fixed under #543): three named tiers as this floating
+  // bar narrows toward the app's 320px minWidth — Full (>=700px), Compact
+  // (400-700px), Minimal (<400px). Cover art, play/pause, and skip-next are
+  // the constant core (shown in all three tiers); everything else drops out
+  // in priority order: expand/shuffle/repeat/volume+mute/waveform seek bar
+  // + time labels first (gone by Compact — the transport block takes the
+  // freed space and sticks to the right edge via `ml-auto` rather than
+  // re-centering in it), then prev (gone by Minimal). Horizontal padding on
+  // the outer bar stays constant across all tiers so cover art never sits
+  // flush against the rounded edges. 400/700 are hand-tuned breakpoints
+  // specific to this bar, written as literal `min-[Npx]:` arbitrary-value
+  // classes because Tailwind's class scanner can't resolve an interpolated
+  // constants.ts value — don't try to centralize them.
 
   import {
     Play,
@@ -49,13 +54,6 @@
 
 
 
-  function formatTime(nanosec: number | undefined): string {
-    if (nanosec === undefined) return "0:00";
-    const sec = Math.floor(nanosec / 1_000_000_000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  }
 
   let volumePercent = $derived(playerStore.volume * 100);
   let volumeSliderStyle = $derived(
@@ -171,13 +169,38 @@
     }
   }
 
-  let coverTitle = $derived.by(() => {
-    if (!playerStore.currentSong) return "";
-    return collectionStore.immersiveMode
-      ? i18n.t('playerBar.queueTitle', {}, 'Queue')
-      : i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode');
+  // True only when the user is already looking at the Queue itself (not
+  // immersive, on the Playlists tab's custom-playlists sub-tab, with the
+  // Queue playlist selected) — distinguishes "viewing the Queue" from
+  // "viewing any other collection/playlist", which the cover-art click
+  // handler below needs in order to pick the right next state (#523).
+  let isViewingQueue = $derived.by(() => {
+    if (windowLayoutStore.immersiveMode) return false;
+    const queuePl = playlistsStore.queuePlaylist;
+    if (!queuePl) return false;
+    return (
+      navigationStore.activeTab === 'playlists' &&
+      navigationStore.playlistsSubTab === 'custom' &&
+      navigationStore.selectedPlaylistId === queuePl.id
+    );
   });
 
+  let coverTitle = $derived.by(() => {
+    if (!playerStore.currentSong) return "";
+    return isViewingQueue
+      ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode')
+      : i18n.t('playerBar.queueTitle', {}, 'Queue');
+  });
+
+  async function navigateToQueue() {
+    const queuePl = await playlistsStore.requireQueue();
+    playlistsStore.selectPlaylist(queuePl.id);
+    navigationStore.viewPlaylist(queuePl.id);
+  }
+
+  // Three-state navigation flow (#523): from any collection/playlist view,
+  // clicking goes to the Queue; from the Queue, it flips into Immersive
+  // Mode; from Immersive Mode, it flips back to the Queue.
   async function handleCoverClick(e: MouseEvent) {
     if (!playerStore.currentSong) return;
     e.stopPropagation();
@@ -187,20 +210,20 @@
     // toggles — clicking through to "exit and view Queue" would silently
     // clear the user's own immersiveMode preference for a screen they can't
     // actually reach yet, so leave it alone until the window widens back out.
-    if (collectionStore.isImmersiveForced) return;
+    if (windowLayoutStore.isImmersiveForced) return;
 
-    if (collectionStore.immersiveMode) {
-      collectionStore.exitImmersiveMode();
-      const queuePl = await playlistsStore.requireQueue();
-      playlistsStore.selectPlaylist(queuePl.id);
-      collectionStore.viewPlaylist(queuePl.id);
+    if (windowLayoutStore.immersiveMode) {
+      windowLayoutStore.exitImmersiveMode();
+      await navigateToQueue();
+    } else if (isViewingQueue) {
+      windowLayoutStore.toggleImmersiveMode();
     } else {
-      collectionStore.toggleImmersiveMode();
+      await navigateToQueue();
     }
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-3 min-[700px]:px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
   <div class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
@@ -231,7 +254,7 @@
       </div>
       {#if playerStore.currentSong?.album}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewAlbum(playerStore.currentSong?.album || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(playerStore.currentSong?.album || ""); }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
         >
@@ -244,7 +267,7 @@
       {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); collectionStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
+          onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
@@ -334,18 +357,18 @@
 
     </div>
 
-    <div class="hidden min-[400px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
+    <div class="hidden min-[700px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
       <!-- Invisible spacer matching the mode-toggle button's footprint, so the
            waveform + timers stay centered instead of skewing left toward it. -->
-      <div class="hidden min-[700px]:block w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
-      <span>{formatTime(playerStore.positionNanosec)}</span>
+      <div class="w-4 h-4 flex-shrink-0" aria-hidden="true"></div>
+      <span>{formatDuration(playerStore.positionNanosec)}</span>
       <div class="flex-1 flex flex-col gap-1">
         <WaveformSeekBar />
       </div>
-      <span>{formatTime(playerStore.currentSong?.length_nanosec)}</span>
+      <span>{formatDuration(playerStore.currentSong?.length_nanosec)}</span>
       <button
         onclick={() => prefs.toggleSeekBarMode()}
-        class="hidden min-[700px]:block text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
+        class="text-brand-text-secondary/50 hover:text-brand-text-primary transition-colors p-0.5 flex-shrink-0"
         title={prefs.seekBarMode === 'waveform'
           ? i18n.t('playerBar.seekbarModeWaveform', {}, 'Waveform mode — click to switch to frequency bands')
           : i18n.t('playerBar.seekbarModeBands', {}, 'Frequency bands mode — click to switch to waveform')}
@@ -386,7 +409,7 @@
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
     <button
-      onclick={() => collectionStore.toggleMiniplayerMode()}
+      onclick={() => windowLayoutStore.toggleMiniplayerMode()}
       class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
       title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
     >

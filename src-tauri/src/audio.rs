@@ -24,6 +24,7 @@
 
 use crate::models::{PlayState, Song};
 use anyhow::{anyhow, Result};
+use cpal::traits::StreamTrait;
 use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
@@ -506,7 +507,6 @@ fn get_default_device_name() -> Option<String> {
 
 #[allow(clippy::too_many_arguments)]
 fn build_output(
-    event_tx: &mpsc::Sender<AudioEvent>,
     position: &Arc<AtomicU64>,
     volume: &Arc<Mutex<f32>>,
     visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
@@ -662,11 +662,14 @@ fn build_output(
         .map_err(|e| format!("CPAL stream build failed: {e}"))?;
 
     // Start paused — nothing decoded yet. The caller starts it once a track
-    // is actually ready to play.
+    // is actually ready to play. Some ALSA backends (e.g. the "pulse" plugin,
+    // used when routing through PulseAudio/WSLg) don't support pausing a
+    // stream that hasn't started, so a failure here is expected and harmless
+    // — log it instead of surfacing a spurious error to the frontend.
     if let Err(e) = stream.pause() {
-        let _ = event_tx.send(AudioEvent::Error {
-            message: format!("CPAL stream pause failed: {e}"),
-        });
+        log::warn!(
+            "CPAL stream pause at startup failed (harmless if unsupported by this backend): {e}"
+        );
     }
 
     Ok(AudioOutput {
@@ -679,6 +682,98 @@ fn build_output(
         device_name,
         stream_error_flag,
     })
+}
+
+/// Runs `build_output` on a brand-new, short-lived OS thread instead of the
+/// caller's own thread. Used only for stream *rebuilds* (device switch /
+/// stream error) — see #619: once `decode_thread`'s long-lived OS thread has
+/// built and torn down a WASAPI stream for one device, re-querying
+/// `default_output_config()` on that same thread for a *different* device can
+/// fail with `RPC_E_CHANGED_MODE`. A fresh thread has no such history, so its
+/// first COM touch (via cpal's own thread-local guard) starts clean.
+/// `cpal::Stream` is `Send + Sync`, so the built `AudioOutput` can safely be
+/// handed back to the caller. Bounded by a timeout so a wedged WASAPI call on
+/// the scratch thread can't hang `decode_thread` — see the wedge risk
+/// documented on `AudioOutput` above.
+#[allow(clippy::too_many_arguments)]
+fn build_output_on_fresh_thread(
+    position: &Arc<AtomicU64>,
+    volume: &Arc<Mutex<f32>>,
+    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
+    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
+    loudness_gain: &Arc<AtomicU32>,
+    fade_gain: &Arc<AtomicU32>,
+) -> Result<AudioOutput, String> {
+    let position = Arc::clone(position);
+    let volume = Arc::clone(volume);
+    let visualizer_buf = Arc::clone(visualizer_buf);
+    let equalizer = Arc::clone(equalizer);
+    let loudness_gain = Arc::clone(loudness_gain);
+    let fade_gain = Arc::clone(fade_gain);
+
+    let (tx, rx) = mpsc::channel();
+    let spawned = std::thread::Builder::new()
+        .name("luminous-audio-rebuild".into())
+        .spawn(move || {
+            let result = build_output(
+                &position,
+                &volume,
+                &visualizer_buf,
+                &equalizer,
+                &loudness_gain,
+                &fade_gain,
+            );
+            let _ = tx.send(result);
+        });
+
+    if let Err(e) = spawned {
+        return Err(format!("Failed to spawn audio rebuild thread: {e}"));
+    }
+
+    rx.recv_timeout(std::time::Duration::from_secs(5))
+        .unwrap_or_else(|_| Err("Timed out rebuilding audio output stream".to_string()))
+}
+
+/// Mutable state that lives for the duration of one track's inner `'decode`
+/// loop iteration in [`decode_thread`]. Kept separate from `output:
+/// Option<AudioOutput>` because the output stream is reassigned wholesale on
+/// device rebuild while these fields mutate in place — bundling both would
+/// force simultaneous partial-borrows of one struct across the extracted
+/// helpers below.
+struct DecodeSession {
+    current: ActiveTrack,
+    next: Option<ActiveTrack>,
+    transition: Option<PendingTransition>,
+    /// Absolute count of samples pushed to the ring buffer, in the same
+    /// "space" as `AudioOutput::played_samples` (kept in sync at every
+    /// buffer clear).
+    pushed_samples: u64,
+    target_sample_rate: u32,
+    target_channels: u16,
+    last_device_check: std::time::Instant,
+}
+
+enum DeviceCheckOutcome {
+    Ok,
+    BreakDecode,
+}
+
+enum CmdOutcome {
+    Continue,
+    BreakDecode,
+    RequeuePlay(PlayRequest),
+}
+
+enum EofOutcome {
+    NotEof,
+    ContinueDecode,
+    BreakDecode,
+}
+
+enum DecodeStepOutcome {
+    Decoded,
+    ContinueDecode,
+    BreakDecode,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -694,8 +789,6 @@ fn decode_thread(
     loudness_gain: Arc<AtomicU32>,
     fade_gain: Arc<AtomicU32>,
 ) {
-    use cpal::traits::StreamTrait;
-
     // The persistent output stream/ring buffer — built lazily on the first
     // track this thread ever plays, then kept alive for every subsequent
     // track, pause, and resume. See `AudioOutput` above.
@@ -716,7 +809,6 @@ fn decode_thread(
                     Ok(AudioCommand::Cue(r)) => {
                         if output.is_none() {
                             match build_output(
-                                &event_tx,
                                 &position,
                                 &volume,
                                 &visualizer_buf,
@@ -837,7 +929,6 @@ fn decode_thread(
         // first track this thread ever plays; reused for every track after).
         if output.is_none() {
             match build_output(
-                &event_tx,
                 &position,
                 &volume,
                 &visualizer_buf,
@@ -856,10 +947,10 @@ fn decode_thread(
             }
         }
         let out = output.as_mut().unwrap();
-        let mut target_sample_rate = out.sample_rate;
-        let mut target_channels = out.channels;
+        let target_sample_rate = out.sample_rate;
+        let target_channels = out.channels;
 
-        let mut current = match ActiveTrack::open(
+        let current = match ActiveTrack::open(
             req.song,
             req.start_nanosec,
             target_sample_rate,
@@ -880,9 +971,6 @@ fn decode_thread(
         }
         let start_samples = samples_for_ns(current.start_ns, target_sample_rate, target_channels);
         out.played_samples.store(start_samples, Ordering::Relaxed);
-        // Absolute count of samples pushed to the ring buffer, in the same
-        // "space" as `played_samples` (kept in sync at every buffer clear).
-        let mut pushed_samples: u64 = start_samples;
 
         if let Err(e) = out.stream.play() {
             let _ = event_tx.send(AudioEvent::Error {
@@ -897,446 +985,571 @@ fn decode_thread(
         position.store(current.start_ns, Ordering::Relaxed);
         let _ = event_tx.send(AudioEvent::Playing { song_id });
 
-        // Gapless state: a preloaded next track, and (once the current file
-        // is exhausted) the pending handover to it.
-        let mut next: Option<ActiveTrack> = None;
-        let mut transition: Option<PendingTransition> = None;
-        let mut last_device_check = std::time::Instant::now();
+        let mut session = DecodeSession {
+            current,
+            next: None,
+            transition: None,
+            pushed_samples: start_samples,
+            target_sample_rate,
+            target_channels,
+            last_device_check: std::time::Instant::now(),
+        };
 
         'decode: loop {
-            // Periodic default output device change / error check (~500ms throttle)
-            let now = std::time::Instant::now();
-            let check_due =
-                now.duration_since(last_device_check) >= std::time::Duration::from_millis(500);
-            let stream_errored = output
-                .as_ref()
-                .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
-                .unwrap_or(false);
-
-            if stream_errored || check_due {
-                last_device_check = now;
-                let current_dev_name = get_default_device_name();
-                let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
-                let device_changed = current_dev_name != old_dev_name;
-
-                if stream_errored || device_changed {
-                    log::info!(
-                        "Audio output device change/error detected (old: {:?}, new: {:?}, errored: {}). Rebuilding audio stream...",
-                        old_dev_name,
-                        current_dev_name,
-                        stream_errored
-                    );
-
-                    let cur_pos = position.load(Ordering::Relaxed);
-                    if let Some(old_out) = output.as_ref() {
-                        let _ = old_out.stream.pause();
-                    }
-                    output = None;
-
-                    match build_output(
-                        &event_tx,
-                        &position,
-                        &volume,
-                        &visualizer_buf,
-                        &equalizer,
-                        &loudness_gain,
-                        &fade_gain,
-                    ) {
-                        Ok(new_out) => {
-                            output_sample_rate.store(new_out.sample_rate, Ordering::Relaxed);
-                            target_sample_rate = new_out.sample_rate;
-                            target_channels = new_out.channels;
-
-                            let target_time =
-                                symphonia::core::units::Time::from_nanos(cur_pos as i64);
-                            let _ = current.format.seek(
-                                symphonia::core::formats::SeekMode::Accurate,
-                                symphonia::core::formats::SeekTo::Time {
-                                    time: target_time,
-                                    track_id: Some(current.track_id),
-                                },
-                            );
-                            current.decoder.reset();
-                            current.decoded_pos_ns = cur_pos;
-                            current.eof = false;
-                            current.resampler = Resampler::new(
-                                current.src_rate,
-                                target_sample_rate,
-                                target_channels as usize,
-                            );
-
-                            if let Some(n) = next.as_mut() {
-                                n.resampler = Resampler::new(
-                                    n.src_rate,
-                                    target_sample_rate,
-                                    target_channels as usize,
-                                );
-                            }
-
-                            if let Ok(mut consumer) = new_out.consumer.lock() {
-                                while consumer.try_pop().is_some() {}
-                            }
-                            let start_samples =
-                                samples_for_ns(cur_pos, target_sample_rate, target_channels);
-                            new_out
-                                .played_samples
-                                .store(start_samples, Ordering::Relaxed);
-                            pushed_samples = start_samples;
-                            transition = None;
-
-                            if let Err(e) = new_out.stream.play() {
-                                let _ = event_tx.send(AudioEvent::Error {
-                                    message: format!("CPAL stream play failed: {e}"),
-                                });
-                            }
-                            output = Some(new_out);
-                        }
-                        Err(message) => {
-                            let _ = event_tx.send(AudioEvent::Error { message });
-                            break 'decode;
-                        }
-                    }
-                }
+            match check_and_rebuild_output(
+                &mut output,
+                &mut session,
+                &position,
+                &volume,
+                &visualizer_buf,
+                &equalizer,
+                &loudness_gain,
+                &fade_gain,
+                &output_sample_rate,
+                &event_tx,
+            ) {
+                DeviceCheckOutcome::Ok => {}
+                DeviceCheckOutcome::BreakDecode => break 'decode,
             }
 
             let out = output.as_mut().unwrap();
 
-            match cmd_rx.try_recv() {
-                Ok(AudioCommand::Pause) => {
-                    let _ = out.stream.pause();
-                    if let Ok(mut s) = play_state.lock() {
-                        *s = PlayState::Paused;
-                    }
-                    let _ = event_tx.send(AudioEvent::Paused);
-                    // Position still belongs to the finished track while a
-                    // transition is draining — resume must reopen that song.
-                    let song_for_resume = match transition.as_ref() {
-                        Some(t) => t.finished_song.clone(),
-                        None => current.song.clone(),
-                    };
-                    paused_req = Some(PlayRequest {
-                        song: song_for_resume,
-                        start_nanosec: position.load(Ordering::Relaxed),
-                    });
-                    break 'decode;
-                }
-                Ok(AudioCommand::PauseWithFade(dur_ms)) => {
-                    apply_fade_ramp(&fade_gain, 1.0, 0.0, dur_ms);
-                    let _ = out.stream.pause();
-                    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-                    if let Ok(mut s) = play_state.lock() {
-                        *s = PlayState::Paused;
-                    }
-                    let _ = event_tx.send(AudioEvent::Paused);
-                    let song_for_resume = match transition.as_ref() {
-                        Some(t) => t.finished_song.clone(),
-                        None => current.song.clone(),
-                    };
-                    paused_req = Some(PlayRequest {
-                        song: song_for_resume,
-                        start_nanosec: position.load(Ordering::Relaxed),
-                    });
-                    break 'decode;
-                }
-                Ok(AudioCommand::Stop) => {
-                    let _ = out.stream.pause();
-                    if let Ok(mut s) = play_state.lock() {
-                        *s = PlayState::Stopped;
-                    }
-                    let _ = event_tx.send(AudioEvent::Stopped);
-                    break 'decode;
-                }
-                Ok(AudioCommand::StopWithFade(dur_ms)) => {
-                    apply_fade_ramp(&fade_gain, 1.0, 0.0, dur_ms);
-                    let _ = out.stream.pause();
-                    fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
-                    if let Ok(mut s) = play_state.lock() {
-                        *s = PlayState::Stopped;
-                    }
-                    let _ = event_tx.send(AudioEvent::Stopped);
-                    break 'decode;
-                }
-                Ok(AudioCommand::Play(new_req)) => {
+            match handle_decode_command(
+                cmd_rx.try_recv(),
+                out,
+                &mut session,
+                &play_state,
+                &volume,
+                &fade_gain,
+                &position,
+                &event_tx,
+                &mut paused_req,
+            ) {
+                CmdOutcome::Continue => {}
+                CmdOutcome::BreakDecode => break 'decode,
+                CmdOutcome::RequeuePlay(new_req) => {
                     current_req = Some(new_req);
-                    let _ = event_tx.send(AudioEvent::Stopped);
                     break 'decode;
                 }
-                Ok(AudioCommand::SeekTo(target_ns)) => {
-                    log::debug!("SeekTo command received. target_ns: {target_ns}");
+            }
 
-                    if let Some(t) = transition.take() {
-                        // Mid-handover seek: the audible position is still in
-                        // the finished track but its decoder is gone — reopen
-                        // it fresh at the target. The preload is dropped so
-                        // AboutToFinish re-arms naturally on the new track.
-                        next = None;
-                        match ActiveTrack::open(
-                            t.finished_song,
-                            target_ns,
-                            target_sample_rate,
-                            target_channels as usize,
-                        ) {
-                            Ok(t) => current = t,
-                            Err(message) => {
-                                let _ = event_tx.send(AudioEvent::Error { message });
-                                break 'decode;
-                            }
-                        }
-                    } else {
-                        let target_time =
-                            symphonia::core::units::Time::from_nanos(target_ns as i64);
-                        let seek_res = current.format.seek(
-                            symphonia::core::formats::SeekMode::Accurate,
-                            symphonia::core::formats::SeekTo::Time {
-                                time: target_time,
-                                track_id: Some(current.track_id),
-                            },
-                        );
-                        match seek_res {
-                            Ok(seeked_to) => {
-                                current.decoder.reset();
-                                log::info!("Seek successful: {seeked_to:?}");
-                            }
-                            Err(e) => {
-                                log::error!("Seek failed: {e:?}");
-                            }
-                        }
-                        current.decoded_pos_ns = target_ns;
-                        current.eof = false;
-                        current.resampler = Resampler::new(
-                            current.src_rate,
-                            target_sample_rate,
-                            target_channels as usize,
+            advance_transition_and_preload_signal(out, &mut session, &position, &event_tx);
+
+            match handle_eof(out, &mut session, &play_state, &event_tx) {
+                EofOutcome::NotEof => {}
+                EofOutcome::ContinueDecode => continue 'decode,
+                EofOutcome::BreakDecode => break 'decode,
+            }
+
+            match decode_one_packet(out, &mut session, &event_tx) {
+                DecodeStepOutcome::Decoded => {}
+                DecodeStepOutcome::ContinueDecode => continue 'decode,
+                DecodeStepOutcome::BreakDecode => break 'decode,
+            }
+        }
+    }
+}
+
+/// Drives step 1 of one `'decode` iteration: the periodic (~500ms throttled)
+/// default-output-device change / stream-error check, rebuilding `output`
+/// and reseeking `session.current`/`session.next` onto it when needed.
+#[allow(clippy::too_many_arguments)]
+fn check_and_rebuild_output(
+    output: &mut Option<AudioOutput>,
+    session: &mut DecodeSession,
+    position: &Arc<AtomicU64>,
+    volume: &Arc<Mutex<f32>>,
+    visualizer_buf: &Arc<crate::analyzer::AudioVisualizerBuffer>,
+    equalizer: &Arc<Mutex<crate::equalizer::Equalizer>>,
+    loudness_gain: &Arc<AtomicU32>,
+    fade_gain: &Arc<AtomicU32>,
+    output_sample_rate: &Arc<AtomicU32>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+) -> DeviceCheckOutcome {
+    let now = std::time::Instant::now();
+    let check_due =
+        now.duration_since(session.last_device_check) >= std::time::Duration::from_millis(500);
+    let stream_errored = output
+        .as_ref()
+        .map(|o| o.stream_error_flag.load(Ordering::Relaxed))
+        .unwrap_or(false);
+
+    if stream_errored || check_due {
+        session.last_device_check = now;
+        let current_dev_name = get_default_device_name();
+        let old_dev_name = output.as_ref().and_then(|o| o.device_name.clone());
+        let device_changed = current_dev_name != old_dev_name;
+
+        if stream_errored || device_changed {
+            log::info!(
+                "Audio output device change/error detected (old: {:?}, new: {:?}, errored: {}). Rebuilding audio stream...",
+                old_dev_name,
+                current_dev_name,
+                stream_errored
+            );
+
+            let cur_pos = position.load(Ordering::Relaxed);
+            if let Some(old_out) = output.as_ref() {
+                let _ = old_out.stream.pause();
+            }
+            *output = None;
+
+            match build_output_on_fresh_thread(
+                position,
+                volume,
+                visualizer_buf,
+                equalizer,
+                loudness_gain,
+                fade_gain,
+            ) {
+                Ok(new_out) => {
+                    output_sample_rate.store(new_out.sample_rate, Ordering::Relaxed);
+                    session.target_sample_rate = new_out.sample_rate;
+                    session.target_channels = new_out.channels;
+
+                    let target_time = symphonia::core::units::Time::from_nanos(cur_pos as i64);
+                    let _ = session.current.format.seek(
+                        symphonia::core::formats::SeekMode::Accurate,
+                        symphonia::core::formats::SeekTo::Time {
+                            time: target_time,
+                            track_id: Some(session.current.track_id),
+                        },
+                    );
+                    session.current.decoder.reset();
+                    session.current.decoded_pos_ns = cur_pos;
+                    session.current.eof = false;
+                    session.current.resampler = Resampler::new(
+                        session.current.src_rate,
+                        session.target_sample_rate,
+                        session.target_channels as usize,
+                    );
+
+                    if let Some(n) = session.next.as_mut() {
+                        n.resampler = Resampler::new(
+                            n.src_rate,
+                            session.target_sample_rate,
+                            session.target_channels as usize,
                         );
                     }
 
-                    // Clear the buffer after seek to avoid stale audio
-                    if let Ok(mut consumer) = out.consumer.lock() {
+                    if let Ok(mut consumer) = new_out.consumer.lock() {
                         while consumer.try_pop().is_some() {}
                     }
-                    let target_samples =
-                        samples_for_ns(target_ns, target_sample_rate, target_channels);
-                    out.played_samples.store(target_samples, Ordering::Relaxed);
-                    pushed_samples = target_samples;
-                    position.store(target_ns, Ordering::Relaxed);
-                }
-                Ok(AudioCommand::SetVolume(v)) => {
-                    if let Ok(mut vol) = volume.lock() {
-                        *vol = v.clamp(0.0, 1.0);
-                    }
-                }
-                Ok(AudioCommand::PreloadNext(preq)) => {
-                    match ActiveTrack::open(
-                        preq.song,
-                        preq.start_nanosec,
-                        target_sample_rate,
-                        target_channels as usize,
-                    ) {
-                        Ok(t) => {
-                            log::debug!("Preloaded next track {} for gapless", t.song.id);
-                            next = Some(t);
-                        }
-                        Err(e) => {
-                            // Fall back to the drain + TrackFinished path;
-                            // the player will issue a normal Play.
-                            log::warn!("Gapless preload failed: {e}");
-                            next = None;
-                        }
-                    }
-                }
-                Ok(AudioCommand::PreloadNextCrossfade(preq, _secs)) => {
-                    match ActiveTrack::open(
-                        preq.song,
-                        preq.start_nanosec,
-                        target_sample_rate,
-                        target_channels as usize,
-                    ) {
-                        Ok(t) => {
-                            log::debug!("Preloaded next track {} for crossfade", t.song.id);
-                            next = Some(t);
-                        }
-                        Err(e) => {
-                            log::warn!("Crossfade preload failed: {e}");
-                            next = None;
-                        }
-                    }
-                }
-                Ok(AudioCommand::ClearPreload) => {
-                    if transition.is_none() {
-                        next = None;
-                        current.about_to_finish_sent = false;
-                    }
-                }
-                Err(mpsc::TryRecvError::Empty) => {}
-                Err(mpsc::TryRecvError::Disconnected) => break 'decode,
-                Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => {} // already playing
-                Ok(AudioCommand::Cue(_)) => {} // already playing
-            }
+                    let start_samples = samples_for_ns(
+                        cur_pos,
+                        session.target_sample_rate,
+                        session.target_channels,
+                    );
+                    new_out
+                        .played_samples
+                        .store(start_samples, Ordering::Relaxed);
+                    session.pushed_samples = start_samples;
+                    session.transition = None;
 
-            // Complete a pending gapless handover once the output callback
-            // has actually consumed the finished track's last sample.
-            if let Some(t) = transition.as_ref() {
-                let played = out.played_samples.load(Ordering::Relaxed);
-                if played >= t.boundary_samples {
-                    let next_start_samples =
-                        samples_for_ns(current.start_ns, target_sample_rate, target_channels);
-                    // Rebase the sample counter onto the new track's
-                    // timeline. fetch_sub composes safely with the callback's
-                    // concurrent fetch_add.
-                    if t.boundary_samples >= next_start_samples {
-                        let delta = t.boundary_samples - next_start_samples;
-                        out.played_samples.fetch_sub(delta, Ordering::Relaxed);
-                        pushed_samples -= delta;
-                    } else {
-                        let delta = next_start_samples - t.boundary_samples;
-                        out.played_samples.fetch_add(delta, Ordering::Relaxed);
-                        pushed_samples += delta;
-                    }
-                    position.store(current.start_ns, Ordering::Relaxed);
-                    let finished_song_id = t.finished_song.id;
-                    let _ = event_tx.send(AudioEvent::TrackTransitioned {
-                        finished_song_id,
-                        song_id: current.song.id,
-                    });
-                    transition = None;
-                }
-            }
-
-            // "About to finish" signal: fires once per track when the
-            // audible position enters the preload window before the end
-            // boundary. Suppressed while a handover is draining (the
-            // position still belongs to the previous track then). Checked
-            // before the EOF branch so short, already-fully-decoded tracks
-            // still request their preload.
-            if !current.about_to_finish_sent && transition.is_none() {
-                if let Some(about_end) = current.about_end_ns {
-                    let pos = position.load(Ordering::Relaxed);
-                    if pos + PRELOAD_LEAD_NS >= about_end {
-                        current.about_to_finish_sent = true;
-                        let _ = event_tx.send(AudioEvent::AboutToFinish {
-                            song_id: current.song.id,
+                    if let Err(e) = new_out.stream.play() {
+                        let _ = event_tx.send(AudioEvent::Error {
+                            message: format!("CPAL stream play failed: {e}"),
                         });
                     }
+                    *output = Some(new_out);
+                }
+                Err(message) => {
+                    let _ = event_tx.send(AudioEvent::Error { message });
+                    return DeviceCheckOutcome::BreakDecode;
                 }
             }
+        }
+    }
+    DeviceCheckOutcome::Ok
+}
 
-            if current.eof {
-                if transition.is_some() {
-                    // Waiting for the boundary to be consumed before the
-                    // next (already fully decoded) track can take over.
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    continue 'decode;
-                }
-                if let Some(n) = next.take() {
-                    // Gapless handover: continue decoding the preloaded
-                    // track into the same ring buffer — no drain, no pause.
-                    transition = Some(PendingTransition {
-                        boundary_samples: pushed_samples,
-                        finished_song: std::mem::replace(&mut current, n).song,
-                    });
-                    continue 'decode;
-                }
+/// Drives step 2 of one `'decode` iteration: handle exactly one
+/// `AudioCommand` variant received via `try_recv()` (or none pending).
+#[allow(clippy::too_many_arguments)]
+fn handle_decode_command(
+    cmd: Result<AudioCommand, mpsc::TryRecvError>,
+    out: &mut AudioOutput,
+    session: &mut DecodeSession,
+    play_state: &Arc<Mutex<PlayState>>,
+    volume: &Arc<Mutex<f32>>,
+    fade_gain: &Arc<AtomicU32>,
+    position: &Arc<AtomicU64>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+    paused_req: &mut Option<PlayRequest>,
+) -> CmdOutcome {
+    match cmd {
+        Ok(AudioCommand::Pause) => {
+            let _ = out.stream.pause();
+            if let Ok(mut s) = play_state.lock() {
+                *s = PlayState::Paused;
+            }
+            let _ = event_tx.send(AudioEvent::Paused);
+            // Position still belongs to the finished track while a
+            // transition is draining — resume must reopen that song.
+            let song_for_resume = match session.transition.as_ref() {
+                Some(t) => t.finished_song.clone(),
+                None => session.current.song.clone(),
+            };
+            *paused_req = Some(PlayRequest {
+                song: song_for_resume,
+                start_nanosec: position.load(Ordering::Relaxed),
+            });
+            CmdOutcome::BreakDecode
+        }
+        Ok(AudioCommand::PauseWithFade(dur_ms)) => {
+            apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
+            let _ = out.stream.pause();
+            fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
+            if let Ok(mut s) = play_state.lock() {
+                *s = PlayState::Paused;
+            }
+            let _ = event_tx.send(AudioEvent::Paused);
+            let song_for_resume = match session.transition.as_ref() {
+                Some(t) => t.finished_song.clone(),
+                None => session.current.song.clone(),
+            };
+            *paused_req = Some(PlayRequest {
+                song: song_for_resume,
+                start_nanosec: position.load(Ordering::Relaxed),
+            });
+            CmdOutcome::BreakDecode
+        }
+        Ok(AudioCommand::Stop) => {
+            let _ = out.stream.pause();
+            if let Ok(mut s) = play_state.lock() {
+                *s = PlayState::Stopped;
+            }
+            let _ = event_tx.send(AudioEvent::Stopped);
+            CmdOutcome::BreakDecode
+        }
+        Ok(AudioCommand::StopWithFade(dur_ms)) => {
+            apply_fade_ramp(fade_gain, 1.0, 0.0, dur_ms);
+            let _ = out.stream.pause();
+            fade_gain.store(1.0f32.to_bits(), Ordering::Relaxed);
+            if let Ok(mut s) = play_state.lock() {
+                *s = PlayState::Stopped;
+            }
+            let _ = event_tx.send(AudioEvent::Stopped);
+            CmdOutcome::BreakDecode
+        }
+        Ok(AudioCommand::Play(new_req)) => {
+            let _ = event_tx.send(AudioEvent::Stopped);
+            CmdOutcome::RequeuePlay(new_req)
+        }
+        Ok(AudioCommand::SeekTo(target_ns)) => {
+            log::debug!("SeekTo command received. target_ns: {target_ns}");
 
-                // No preloaded next — classic drain-then-finish path.
-                let is_empty = out.producer.occupied_len() == 0;
-                if is_empty {
-                    let _ = event_tx.send(AudioEvent::TrackFinished {
-                        song_id: current.song.id,
-                    });
-                    let _ = out.stream.pause();
-                    if let Ok(mut s) = play_state.lock() {
-                        *s = PlayState::Stopped;
+            if let Some(t) = session.transition.take() {
+                // Mid-handover seek: the audible position is still in
+                // the finished track but its decoder is gone — reopen
+                // it fresh at the target. The preload is dropped so
+                // AboutToFinish re-arms naturally on the new track.
+                session.next = None;
+                match ActiveTrack::open(
+                    t.finished_song,
+                    target_ns,
+                    session.target_sample_rate,
+                    session.target_channels as usize,
+                ) {
+                    Ok(t) => session.current = t,
+                    Err(message) => {
+                        let _ = event_tx.send(AudioEvent::Error { message });
+                        return CmdOutcome::BreakDecode;
                     }
-                    break 'decode;
-                } else {
-                    // Buffer still has remaining audio, wait for it to be played
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                    continue 'decode;
                 }
+            } else {
+                let target_time = symphonia::core::units::Time::from_nanos(target_ns as i64);
+                let seek_res = session.current.format.seek(
+                    symphonia::core::formats::SeekMode::Accurate,
+                    symphonia::core::formats::SeekTo::Time {
+                        time: target_time,
+                        track_id: Some(session.current.track_id),
+                    },
+                );
+                match seek_res {
+                    Ok(seeked_to) => {
+                        session.current.decoder.reset();
+                        log::info!("Seek successful: {seeked_to:?}");
+                    }
+                    Err(e) => {
+                        log::error!("Seek failed: {e:?}");
+                    }
+                }
+                session.current.decoded_pos_ns = target_ns;
+                session.current.eof = false;
+                session.current.resampler = Resampler::new(
+                    session.current.src_rate,
+                    session.target_sample_rate,
+                    session.target_channels as usize,
+                );
             }
 
-            // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
-            let is_full = out.producer.occupied_len()
-                > (target_sample_rate as usize * target_channels as usize * 3 / 2);
-
-            if is_full {
-                std::thread::sleep(std::time::Duration::from_millis(20));
-                continue 'decode;
+            // Clear the buffer after seek to avoid stale audio
+            if let Ok(mut consumer) = out.consumer.lock() {
+                while consumer.try_pop().is_some() {}
             }
-
-            match current.format.next_packet() {
-                Ok(Some(packet)) => {
-                    if packet.track_id != current.track_id {
-                        continue;
-                    }
-                    match current.decoder.decode(&packet) {
-                        Ok(decoded) => {
-                            let mut sample_vec: Vec<f32> = Vec::new();
-                            decoded.copy_to_vec_interleaved(&mut sample_vec);
-                            let mut samples: &[f32] = &sample_vec;
-
-                            // Enforce the CUE end boundary (`end_nanosec`):
-                            // truncate the packet at the cut and treat the
-                            // remainder of the file as EOF.
-                            let frames = samples.len() / current.src_channels;
-                            let packet_ns =
-                                (frames as f64 * 1_000_000_000.0 / current.src_rate as f64) as u64;
-                            if let Some(end_ns) = current.end_ns {
-                                if current.decoded_pos_ns >= end_ns {
-                                    current.eof = true;
-                                    continue 'decode;
-                                }
-                                if current.decoded_pos_ns + packet_ns > end_ns {
-                                    let keep_frames = ((end_ns - current.decoded_pos_ns) as f64
-                                        * current.src_rate as f64
-                                        / 1_000_000_000.0)
-                                        as usize;
-                                    samples = &samples[..keep_frames * current.src_channels];
-                                    current.eof = true;
-                                }
-                            }
-                            current.decoded_pos_ns += packet_ns;
-
-                            let channel_converted = convert_channels(
-                                samples,
-                                current.src_channels,
-                                target_channels as usize,
-                            );
-                            let resampled = current.resampler.resample(&channel_converted);
-
-                            let mut pushed = 0;
-                            while pushed < resampled.len() {
-                                let written = out.producer.push_slice(&resampled[pushed..]);
-                                if written == 0 {
-                                    // Ring buffer is full, sleep a bit and try again
-                                    std::thread::sleep(std::time::Duration::from_millis(5));
-                                } else {
-                                    pushed += written;
-                                }
-                            }
-                            pushed_samples += resampled.len() as u64;
-                        }
-                        Err(SymphoniaError::DecodeError(_)) => continue,
-                        Err(_) => break 'decode,
-                    }
-                }
-                Ok(None) => {
-                    current.eof = true;
-                    continue 'decode;
-                }
-                Err(SymphoniaError::IoError(ref e))
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
-                {
-                    current.eof = true;
-                    continue 'decode;
+            let target_samples = samples_for_ns(
+                target_ns,
+                session.target_sample_rate,
+                session.target_channels,
+            );
+            out.played_samples.store(target_samples, Ordering::Relaxed);
+            session.pushed_samples = target_samples;
+            position.store(target_ns, Ordering::Relaxed);
+            CmdOutcome::Continue
+        }
+        Ok(AudioCommand::SetVolume(v)) => {
+            if let Ok(mut vol) = volume.lock() {
+                *vol = v.clamp(0.0, 1.0);
+            }
+            CmdOutcome::Continue
+        }
+        Ok(AudioCommand::PreloadNext(preq)) => {
+            match ActiveTrack::open(
+                preq.song,
+                preq.start_nanosec,
+                session.target_sample_rate,
+                session.target_channels as usize,
+            ) {
+                Ok(t) => {
+                    log::debug!("Preloaded next track {} for gapless", t.song.id);
+                    session.next = Some(t);
                 }
                 Err(e) => {
-                    let _ = event_tx.send(AudioEvent::Error {
-                        message: format!("Decode error: {e}"),
-                    });
-                    break 'decode;
+                    // Fall back to the drain + TrackFinished path;
+                    // the player will issue a normal Play.
+                    log::warn!("Gapless preload failed: {e}");
+                    session.next = None;
                 }
             }
+            CmdOutcome::Continue
+        }
+        Ok(AudioCommand::PreloadNextCrossfade(preq, _secs)) => {
+            match ActiveTrack::open(
+                preq.song,
+                preq.start_nanosec,
+                session.target_sample_rate,
+                session.target_channels as usize,
+            ) {
+                Ok(t) => {
+                    log::debug!("Preloaded next track {} for crossfade", t.song.id);
+                    session.next = Some(t);
+                }
+                Err(e) => {
+                    log::warn!("Crossfade preload failed: {e}");
+                    session.next = None;
+                }
+            }
+            CmdOutcome::Continue
+        }
+        Ok(AudioCommand::ClearPreload) => {
+            if session.transition.is_none() {
+                session.next = None;
+                session.current.about_to_finish_sent = false;
+            }
+            CmdOutcome::Continue
+        }
+        Err(mpsc::TryRecvError::Empty) => CmdOutcome::Continue,
+        Err(mpsc::TryRecvError::Disconnected) => CmdOutcome::BreakDecode,
+        Ok(AudioCommand::Resume) | Ok(AudioCommand::ResumeWithFade(_)) => CmdOutcome::Continue, // already playing
+        Ok(AudioCommand::Cue(_)) => CmdOutcome::Continue, // already playing
+    }
+}
+
+/// Drives steps 3+4 of one `'decode` iteration: complete a pending gapless
+/// handover once its boundary has been played, then fire the one-shot
+/// `AboutToFinish` signal if the preload window has been entered. Neither
+/// original block branches the loop's control flow, so both stay combined
+/// here as plain side-effecting steps.
+fn advance_transition_and_preload_signal(
+    out: &AudioOutput,
+    session: &mut DecodeSession,
+    position: &Arc<AtomicU64>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+) {
+    // Complete a pending gapless handover once the output callback has
+    // actually consumed the finished track's last sample.
+    if let Some(t) = session.transition.as_ref() {
+        let played = out.played_samples.load(Ordering::Relaxed);
+        if played >= t.boundary_samples {
+            let next_start_samples = samples_for_ns(
+                session.current.start_ns,
+                session.target_sample_rate,
+                session.target_channels,
+            );
+            // Rebase the sample counter onto the new track's timeline.
+            // fetch_sub composes safely with the callback's concurrent
+            // fetch_add.
+            if t.boundary_samples >= next_start_samples {
+                let delta = t.boundary_samples - next_start_samples;
+                out.played_samples.fetch_sub(delta, Ordering::Relaxed);
+                session.pushed_samples -= delta;
+            } else {
+                let delta = next_start_samples - t.boundary_samples;
+                out.played_samples.fetch_add(delta, Ordering::Relaxed);
+                session.pushed_samples += delta;
+            }
+            position.store(session.current.start_ns, Ordering::Relaxed);
+            let finished_song_id = t.finished_song.id;
+            let _ = event_tx.send(AudioEvent::TrackTransitioned {
+                finished_song_id,
+                song_id: session.current.song.id,
+            });
+            session.transition = None;
+        }
+    }
+
+    // "About to finish" signal: fires once per track when the audible
+    // position enters the preload window before the end boundary.
+    // Suppressed while a handover is draining (the position still belongs
+    // to the previous track then).
+    if !session.current.about_to_finish_sent && session.transition.is_none() {
+        if let Some(about_end) = session.current.about_end_ns {
+            let pos = position.load(Ordering::Relaxed);
+            if pos + PRELOAD_LEAD_NS >= about_end {
+                session.current.about_to_finish_sent = true;
+                let _ = event_tx.send(AudioEvent::AboutToFinish {
+                    song_id: session.current.song.id,
+                });
+            }
+        }
+    }
+}
+
+/// Drives step 5 of one `'decode` iteration: end-of-track handling — wait
+/// out an in-progress transition, start a new one when a preloaded `next`
+/// track is ready, or drain the buffer then emit `TrackFinished`.
+fn handle_eof(
+    out: &mut AudioOutput,
+    session: &mut DecodeSession,
+    play_state: &Arc<Mutex<PlayState>>,
+    event_tx: &mpsc::Sender<AudioEvent>,
+) -> EofOutcome {
+    if !session.current.eof {
+        return EofOutcome::NotEof;
+    }
+
+    if session.transition.is_some() {
+        // Waiting for the boundary to be consumed before the next (already
+        // fully decoded) track can take over.
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        return EofOutcome::ContinueDecode;
+    }
+    if let Some(n) = session.next.take() {
+        // Gapless handover: continue decoding the preloaded track into the
+        // same ring buffer — no drain, no pause.
+        session.transition = Some(PendingTransition {
+            boundary_samples: session.pushed_samples,
+            finished_song: std::mem::replace(&mut session.current, n).song,
+        });
+        return EofOutcome::ContinueDecode;
+    }
+
+    // No preloaded next — classic drain-then-finish path.
+    let is_empty = out.producer.occupied_len() == 0;
+    if is_empty {
+        let _ = event_tx.send(AudioEvent::TrackFinished {
+            song_id: session.current.song.id,
+        });
+        let _ = out.stream.pause();
+        if let Ok(mut s) = play_state.lock() {
+            *s = PlayState::Stopped;
+        }
+        EofOutcome::BreakDecode
+    } else {
+        // Buffer still has remaining audio, wait for it to be played
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        EofOutcome::ContinueDecode
+    }
+}
+
+/// Drives steps 6+7 of one `'decode` iteration: the ring-buffer-full rate
+/// limit, then decoding one packet (CUE end-boundary truncation, channel
+/// conversion, resampling, and pushing into the ring buffer).
+fn decode_one_packet(
+    out: &mut AudioOutput,
+    session: &mut DecodeSession,
+    event_tx: &mpsc::Sender<AudioEvent>,
+) -> DecodeStepOutcome {
+    // Rate limit: if the buffer is full (more than 1.5 seconds of audio), sleep
+    let is_full = out.producer.occupied_len()
+        > (session.target_sample_rate as usize * session.target_channels as usize * 3 / 2);
+
+    if is_full {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        return DecodeStepOutcome::ContinueDecode;
+    }
+
+    match session.current.format.next_packet() {
+        Ok(Some(packet)) => {
+            if packet.track_id != session.current.track_id {
+                return DecodeStepOutcome::ContinueDecode;
+            }
+            match session.current.decoder.decode(&packet) {
+                Ok(decoded) => {
+                    let mut sample_vec: Vec<f32> = Vec::new();
+                    decoded.copy_to_vec_interleaved(&mut sample_vec);
+                    let mut samples: &[f32] = &sample_vec;
+
+                    // Enforce the CUE end boundary (`end_nanosec`):
+                    // truncate the packet at the cut and treat the
+                    // remainder of the file as EOF.
+                    let frames = samples.len() / session.current.src_channels;
+                    let packet_ns =
+                        (frames as f64 * 1_000_000_000.0 / session.current.src_rate as f64) as u64;
+                    if let Some(end_ns) = session.current.end_ns {
+                        if session.current.decoded_pos_ns >= end_ns {
+                            session.current.eof = true;
+                            return DecodeStepOutcome::ContinueDecode;
+                        }
+                        if session.current.decoded_pos_ns + packet_ns > end_ns {
+                            let keep_frames = ((end_ns - session.current.decoded_pos_ns) as f64
+                                * session.current.src_rate as f64
+                                / 1_000_000_000.0)
+                                as usize;
+                            samples = &samples[..keep_frames * session.current.src_channels];
+                            session.current.eof = true;
+                        }
+                    }
+                    session.current.decoded_pos_ns += packet_ns;
+
+                    let channel_converted = convert_channels(
+                        samples,
+                        session.current.src_channels,
+                        session.target_channels as usize,
+                    );
+                    let resampled = session.current.resampler.resample(&channel_converted);
+
+                    let mut pushed = 0;
+                    while pushed < resampled.len() {
+                        let written = out.producer.push_slice(&resampled[pushed..]);
+                        if written == 0 {
+                            // Ring buffer is full, sleep a bit and try again
+                            std::thread::sleep(std::time::Duration::from_millis(5));
+                        } else {
+                            pushed += written;
+                        }
+                    }
+                    session.pushed_samples += resampled.len() as u64;
+                    DecodeStepOutcome::Decoded
+                }
+                Err(SymphoniaError::DecodeError(_)) => DecodeStepOutcome::ContinueDecode,
+                Err(_) => DecodeStepOutcome::BreakDecode,
+            }
+        }
+        Ok(None) => {
+            session.current.eof = true;
+            DecodeStepOutcome::ContinueDecode
+        }
+        Err(SymphoniaError::IoError(ref e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            session.current.eof = true;
+            DecodeStepOutcome::ContinueDecode
+        }
+        Err(e) => {
+            let _ = event_tx.send(AudioEvent::Error {
+                message: format!("Decode error: {e}"),
+            });
+            DecodeStepOutcome::BreakDecode
         }
     }
 }

@@ -85,15 +85,19 @@ pub fn parse_playlist<P: AsRef<Path>>(file_path: P) -> Result<ParsedPlaylist> {
     let raw_content = if bytes.starts_with(&[0xFF, 0xFE]) {
         // UTF-16LE with BOM
         let u16_units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         String::from_utf16_lossy(&u16_units)
     } else if bytes.starts_with(&[0xFE, 0xFF]) {
         // UTF-16BE with BOM
         let u16_units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_be_bytes(*c))
             .collect();
         String::from_utf16_lossy(&u16_units)
     } else if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
@@ -102,8 +106,10 @@ pub fn parse_playlist<P: AsRef<Path>>(file_path: P) -> Result<ParsedPlaylist> {
     } else if bytes.len() >= 4 && bytes.iter().step_by(2).skip(1).all(|&b| b == 0) {
         // UTF-16LE without BOM
         let u16_units: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         String::from_utf16_lossy(&u16_units)
     } else {

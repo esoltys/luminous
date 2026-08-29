@@ -64,7 +64,7 @@
   }
 </script>
 
-<div class="flex items-center justify-center w-full h-full my-auto select-none">
+<div class="flex items-center {direction === 'left' ? 'justify-end' : 'justify-center'} w-full h-full my-auto select-none">
   {#if activeCovers.length > 0}
     {#if activeCovers.length === 1}
       <div class="{sizeClass} overflow-hidden relative">
@@ -95,11 +95,11 @@
       </div>
     {/if}
   {:else if fallbackName}
-    <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0 mx-auto">
+    <div class="w-24 h-24 bg-gradient-to-br {getArtistGradient(fallbackName)} rounded-full flex items-center justify-center text-white border border-brand-border/40 font-bold text-2xl shadow-md shrink-0 {direction === 'left' ? 'ml-auto' : 'mx-auto'}">
       {fallbackName ? fallbackName.charAt(0).toUpperCase() : "?"}
     </div>
   {:else}
-    <div class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative mx-auto">
+    <div class="{sizeClass} bg-brand-main flex items-center justify-center text-brand-accent-text border border-brand-border overflow-hidden relative {direction === 'left' ? 'ml-auto' : 'mx-auto'}">
       <CoverArt
         songId={undefined}
         artEmbedded={false}

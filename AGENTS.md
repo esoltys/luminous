@@ -22,6 +22,25 @@ Metal, or Symphonic Metal — genre is often too broad and any subgenre taxonomy
 personal/subjective. A user-defined tag system for exactly this (see #224) isn't scope creep
 into Picard's territory; it's a different, complementary axis Picard was never meant to cover.
 
+## Branching & PR Rules
+
+- NEVER commit or push directly to `main`. All changes ship via PR, even release version bumps and docs-only edits.
+- NEVER merge PRs yourself. Open the PR, provide the PR link to the user, and let the user review and merge the PR on GitHub once CI checks complete (the assistant does not need to monitor or wait for CI).
+- PR base branch depends on the target issue's milestone — see Branching Model below (2.0-milestone work targets `next`; everything else targets `main`).
+- Before creating a branch, confirm the base: `git fetch origin && git switch -c <branch> origin/<base>`.
+
+## Destructive Operations
+
+- NEVER use `rm -rf`, `git clean`, or unconditional deletes on directories that may contain untracked files. Run `git status --porcelain --ignored` first and list what would be lost.
+- `git mv` only works on tracked files — for untracked assets use plain `mv` and verify afterward.
+- Prefer moving to a temp dir over deleting; let the user do the final delete.
+
+## Worktrees
+
+- All feature work happens in a dedicated worktree under the standard worktree root (`.claude/worktrees/` for Claude, `.worktrees/<name>/` for other assistants — see Version Control below). NEVER edit files in the main checkout while a worktree exists for that branch.
+- Before any Edit/Write, run `pwd` and confirm the path is the intended worktree.
+- Never run `bun install` or `cargo build` in the main checkout during worktree work — it dirties `bun.lock`/lockfiles.
+
 ## Tech Stack
 
 - **Frontend**: SvelteKit + Svelte 5 (Runes) + TypeScript + Tailwind CSS v4
@@ -196,25 +215,20 @@ verify with the user, not a reason to skip telling them.
   user-facing observes the milestone). Repeat this pattern for future interim releases as more
   2.0 work completes ahead of the full 2.0 cut.
 
+## Issue & PR Formatting
+
+- Never hand-wrap lines in GitHub issue/PR bodies — GitHub renders single newlines as hard breaks. Write paragraphs as one long line.
+- Always use the repo PR template and the Epic/issue templates in `.github/`.
+- Do NOT apply priority labels to issues. Priority lives in the Project board only.
+
 ## Issue Priority
 
 **NEVER apply a `P1`/`P2`/`P3`/`P4` label to an issue, and never pass `--label P1` (or P2–P4) to
 `gh issue create` or `gh issue edit`.** This has happened repeatedly — priority is not a label in
-this repo. Open issues in the "2.0" milestone have a priority (P1–P4) indicating when they should
-be worked on after 1.0 ships, tracked exclusively as a field on the "Luminous Music Player" GitHub
-Project. If you determine an issue's priority, set it via the Project board (or leave it for the
-user to set) — do not create a `P1`–`P4` label as a substitute, even if no priority field is
-readily settable through the `gh` CLI. Use this scheme when picking up 2.0 work or triaging a new
-issue into it:
-
-- **P1** — real (non-cosmetic) bugs, plus foundational/first-run work that other issues depend on.
-- **P2** — features touched often, expected for parity with comparable desktop music players, or
-  that encourage exploring the library (cover art, artist bios and connections, browsing by
-  genre) rather than just playing tracks.
-- **P3** — lower-frequency or power-user features, and cosmetic/low-severity bugs.
-- **P4** — speculative, large-scope, or low-demand work; revisit after core 2.0 features ship.
-
-Don't default new issues to P2/P3 — assign a priority using the same criteria above.
+this repo; it's tracked exclusively as a field on the "Luminous Music Player" GitHub Project. See
+[docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the P1–P4 scheme, and for the `gh project`
+commands (with field/option IDs) to read and set both Priority and Status directly — no need to
+punt either to the user.
 
 ## Version Control
 
@@ -222,9 +236,12 @@ Don't default new issues to P2/P3 — assign a priority using the same criteria 
 - Use conventional commit messages: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`.
 - Stage all relevant files with `git add -A` before committing unless selective staging is needed.
 - Proactively search and view GitHub issues using the `gh` command tool (e.g., `gh issue list` and `gh issue view <id>`) when asked to "fix a bug" or "work on a feature".
-- When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not merge the temporary branch or delete the worktree until the user has approved the changes.
-- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before merging. Do NOT run `bun run tauri dev` as a background task (it does not work as expected). Ask the user to run the dev server (`bun run tauri dev`) and check manually.
-- Only after the user has reviewed the Walkthrough and approved the changes may you merge the temporary branch, clean up (remove) the worktree, and update/comment on and close the relevant GitHub issues using the `gh` CLI tool. Note that an issue must not be closed until the corresponding changes have been successfully merged into the target branch.
+- When working on a bug or feature, always work in a dedicated git worktree. Note that Claude uses its own worktree flow in `.claude/worktrees/`, while all other AI assistants and agents must place their dedicated worktree in the `.worktrees/` directory (e.g., `.worktrees/<feature-or-bug-name>`). Do not delete the worktree until the changes have been reviewed, merged, and approved for cleanup by the user.
+- As soon as you start working a tracked issue, set its Status to "In Progress" on the Project board (see [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) for the `gh project item-edit` command) — don't leave it sitting at "Todo" while work is underway.
+- Present the Walkthrough (`walkthrough.md`) to the user and wait for their explicit feedback and approval before opening or finalizing a PR. Do NOT run `bun run tauri dev` as a background task (it does not work as expected). Ask the user to run the dev server (`bun run tauri dev`) and check manually.
+- **NEVER merge pull requests yourself.** The assistant must never execute `gh pr merge`, `git merge`, or auto-merge PRs. Pull requests must be reviewed and merged exclusively by the user on GitHub after all CI checks have passed.
+- After creating a PR, provide the PR link directly to the user for review and merge. You do not need to monitor or wait for CI checks — the user will make sure the checks complete before merging.
+- Only after the user has reviewed and merged the PR on GitHub should the corresponding issues be confirmed closed and their Status set to "Done" on the Project board. On Windows, `git worktree remove` fails with "Permission denied" on the worktree the current session is running from (open file handles keep it locked) — hand the `git worktree remove`/`git branch -d` commands to the user to run themselves in that case instead of retrying.
 - **Creating Issues & Pull Requests**:
   1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`) when creating issues.
   2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
@@ -236,7 +253,11 @@ Don't default new issues to P2/P3 — assign a priority using the same criteria 
      - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
        field, not a label.
   6. Verify the created issue by running `gh issue view <id>`.
-  7. Before opening a PR that closes/fixes an issue, check that issue's Milestone
+  7. Add the issue to the "Luminous Music Player" Project board, set Status to "Todo", and assign
+     a Priority using the scheme in [docs/ISSUE_PRIORITY.md](docs/ISSUE_PRIORITY.md) (which also
+     has the `gh project item-add` / `item-edit` commands and field/option IDs). Do this for every
+     bug or feature issue you create — don't leave the fields unset or punt them to the user.
+  8. Before opening a PR that closes/fixes an issue, check that issue's Milestone
      (`gh issue view <id> --json milestone`): if it's "2.0", branch from and target the PR at
      `next`, not `main` (see Branching Model above). Everything else targets `main`. Do this even
      when a branch name was already assigned for the task — the assigned branch name doesn't
@@ -262,9 +283,6 @@ Don't default new issues to P2/P3 — assign a priority using the same criteria 
 
 ## Troubleshooting
 
-- **Tauri dev won't start**: ensure the git hook is installed (`bun run install:git-hooks`), check the Rust toolchain (`cargo --version`), or clear the Tauri cache (`rm -rf src-tauri/target`).
-- **Frontend type errors after a dependency update**: run `bun run check`. Svelte 5 Runes don't need destructuring (`$`-prefixed variables are already reactive).
-- **Audio playback crackling/stuttering**: verify no allocations happen in the `audio.rs` playback loop; profile with `cargo flamegraph` if CPU-bound.
-- **Tests fail in CI but pass locally**: Vitest in CI uses jsdom (not a browser) — confirm jsdom-compatible selectors; for Rust, check for platform-specific code (especially file paths).
-- **`bun run take-screenshots` (`scripts/take-screenshots.ts`)**: regenerates `docs/user-guide/screenshots/*.png` by driving the app in Playwright against the mocked Tauri IPC bridge (`scripts/tauri-ipc-mock.ts`). In a remote/sandboxed environment where Playwright's own downloaded browser is unavailable and a Chromium is pre-installed at a fixed path instead, `chromium.launch()` needs `executablePath` pointed at it to run at all — but that path is environment-specific, so never commit it; apply it locally, capture, then revert before committing. If the mock is missing a command the app now calls, `invoke()` warns `[Tauri Mock] Unhandled command: ...` in the page console and returns `null` rather than failing capture outright — but a command whose *return value* the store actually reads (e.g. `get_library_snapshot`) will throw and abort store init instead, so treat any "Unhandled command" warning during a screenshot run as something to add a handler for in `tauri-ipc-mock.ts`, not just noise.
-- **Do not commit `docs/user-guide/screenshots/*.png` output from `take-screenshots.ts`.** The committed screenshots are captured manually against a real library, not the mocked fixture data — running the script is for verifying the capture flow itself still works (dev server boots, every page renders, every mock command resolves), not for producing docs assets. If you run it while debugging the script or the mock, revert the resulting `docs/user-guide/screenshots/*.png` changes before committing.
+Common dev-environment issues (Tauri won't start, type errors, audio crackling, CI-only test
+failures, screenshot script quirks) are in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) —
+check there before debugging from scratch.

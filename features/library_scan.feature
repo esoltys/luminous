@@ -10,10 +10,10 @@ Feature: Local Music Library Scanning
     And the watched directories list should return "/home/user/Music"
 
   Scenario: Rescanning folders indexes audio files
-    Given a watched directory "/home/user/Music" containing:
-      | path                      | artist      | album          | title         | filetype | length_sec |
-      | /home/user/Music/track1.mp3| Artist One  | Album Gold     | Song Alpha    | MP3      | 180        |
-      | /home/user/Music/track2.wav| Artist Two  | Album Silver   | Song Beta     | WAV      | 240        |
+    Given a watched directory containing:
+      | fixture         |
+      | song_alpha.mp3   |
+      | song_beta.wav     |
     When I trigger a library scan
     Then 2 songs should be indexed in the database
     And searching for "Song Alpha" should return the first song
@@ -21,6 +21,6 @@ Feature: Local Music Library Scanning
 
   Scenario: Incremental scan skips unmodified files
     Given the library has already been scanned
-    And the file "/home/user/Music/track1.mp3" has not been modified
+    And the file "song_alpha.mp3" has not been modified
     When I trigger a library scan
-    Then the database should skip re-parsing "/home/user/Music/track1.mp3"
+    Then the database should skip re-parsing "song_alpha.mp3"

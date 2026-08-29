@@ -67,19 +67,12 @@ async fn smoke_full_pipeline() {
     // --- Tag writing (real lofty write to a real file on disk) ---
     tageditor::write_tags(
         &song_path,
-        "Smoke Test Tone",
-        "Smoke Test Artist",
-        "Smoke Test Album",
-        "",
-        "",
-        "",
-        None,
-        None,
-        None,
-        "",
-        None,
-        "",
-        false,
+        &tageditor::TagWriteRequest {
+            title: "Smoke Test Tone",
+            artist: "Smoke Test Artist",
+            album: "Smoke Test Album",
+            ..Default::default()
+        },
     )
     .expect("write_tags should succeed against a real audio file");
     println!("[ok] tag writing (lofty)");

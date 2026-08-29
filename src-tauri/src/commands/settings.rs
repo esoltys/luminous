@@ -45,6 +45,9 @@ pub struct UiPreferences {
     pub playlists_auto_view_mode: String,
     pub playlists_custom_view_mode: String,
     pub genre_view_mode: String,
+    pub genre_cards_view_mode: String,
+    pub genre_sort_field: String,
+    pub genre_sort_asc: bool,
 }
 
 impl Default for UiPreferences {
@@ -58,6 +61,9 @@ impl Default for UiPreferences {
             playlists_auto_view_mode: "cards".into(),
             playlists_custom_view_mode: "cards".into(),
             genre_view_mode: "genre".into(),
+            genre_cards_view_mode: "cards".into(),
+            genre_sort_field: "name".into(),
+            genre_sort_asc: true,
         }
     }
 }
@@ -65,11 +71,12 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 8] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 10] {
         const RATING: &[&str] = &["heart", "stars"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
         const GENRE_VIEW: &[&str] = &["genre", "tags"];
+        const GENRE_SORT: &[&str] = &["name", "count"];
         const ANY: &[&str] = &[];
         [
             ("rating_style", &mut self.rating_style, RATING),
@@ -88,6 +95,12 @@ impl UiPreferences {
                 VIEW,
             ),
             ("genre_view_mode", &mut self.genre_view_mode, GENRE_VIEW),
+            (
+                "genre_cards_view_mode",
+                &mut self.genre_cards_view_mode,
+                VIEW,
+            ),
+            ("genre_sort_field", &mut self.genre_sort_field, GENRE_SORT),
         ]
     }
 }
@@ -114,6 +127,16 @@ pub fn get_ui_preferences(state: State<'_, AppState>) -> UiPreferences {
             }
         }
     }
+    // `genre_sort_asc` is a bool, not a domain-checked String, so it's not
+    // part of the `fields()` mapping above — persisted the same way the
+    // FadeSettings bools are (a literal "true"/"false" string).
+    if let Ok(v) = conn.query_row(
+        "SELECT value FROM app_state WHERE key = 'genre_sort_asc'",
+        [],
+        |row| row.get::<_, String>(0),
+    ) {
+        prefs.genre_sort_asc = v == "true";
+    }
     prefs
 }
 
@@ -128,6 +151,7 @@ pub async fn set_ui_preferences(
         log::error!("Failed to persist UI preferences: no DB connection");
         return Ok(());
     };
+    let genre_sort_asc = prefs.genre_sort_asc;
     for (key, slot, _) in prefs.fields() {
         if let Err(e) = conn.execute(
             "INSERT OR REPLACE INTO app_state (key, value) VALUES (?1, ?2)",
@@ -135,6 +159,12 @@ pub async fn set_ui_preferences(
         ) {
             log::error!("Failed to persist UI preference '{key}': {e}");
         }
+    }
+    if let Err(e) = conn.execute(
+        "INSERT OR REPLACE INTO app_state (key, value) VALUES ('genre_sort_asc', ?1)",
+        rusqlite::params![genre_sort_asc.to_string()],
+    ) {
+        log::error!("Failed to persist UI preference 'genre_sort_asc': {e}");
     }
     Ok(())
 }
@@ -331,4 +361,27 @@ pub async fn set_fade_settings(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn genre_sort_defaults_match_genre_view_defaults() {
+        let prefs = UiPreferences::default();
+        assert_eq!(prefs.genre_sort_field, "name");
+        assert!(prefs.genre_sort_asc);
+    }
+
+    #[test]
+    fn genre_sort_field_is_mapped_alongside_sibling_genre_view_fields() {
+        let mut prefs = UiPreferences::default();
+        let mapped = prefs
+            .fields()
+            .into_iter()
+            .find(|(key, _, _)| *key == "genre_sort_field")
+            .expect("genre_sort_field must be part of the persisted field mapping");
+        assert_eq!(mapped.2, &["name", "count"]);
+    }
 }
