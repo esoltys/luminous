@@ -22,7 +22,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag } from "lucide-svelte";
+  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp } from "lucide-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -101,6 +101,7 @@
   let displayName = $derived.by(() => {
     if (kind === "favourites") return i18n.t("playlists.autoFavourites");
     if (kind === "recently_added") return i18n.t("playlists.autoRecentlyAdded");
+    if (kind === "most_played") return i18n.t("playlists.autoMostPlayed");
     if (kind === "history") return i18n.t("playlists.autoHistory");
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
@@ -160,6 +161,7 @@
     }
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
+    if (k === "most_played") return invoke<Song[]>("get_most_played_songs", { limit: 50 });
     if (k === "history") return invoke<Song[]>("get_recently_played_songs", { limit: 100 });
     if (k === "decade") return invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 });
     if (k === "bpm") return invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 });
@@ -348,7 +350,7 @@
       if (song) {
         applySongStats(song, event.payload);
       }
-      if (kind === "history" || kind === "favourites" || kind === "recently_added") {
+      if (kind === "history" || kind === "favourites" || kind === "recently_added" || kind === "most_played") {
         try {
           songs = await fetchSongs(kind, genre, artistTag, decade, bpm, playlistId);
         } catch (err) {
@@ -554,6 +556,10 @@
         {:else if kind === "recently_added"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_28px_3px_rgba(250,204,21,0.4)]">
             <Clock class="w-16 h-16 text-[#CA8A04]" />
+          </div>
+        {:else if kind === "most_played"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DC2626]/25 to-[#F87171]/15 flex items-center justify-center overflow-hidden border border-[#F87171]/30 shadow-[0_0_28px_3px_rgba(248,113,113,0.4)]">
+            <TrendingUp class="w-16 h-16 text-[#DC2626]" />
           </div>
         {:else if kind === "history"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_28px_3px_rgba(167,139,250,0.4)]">

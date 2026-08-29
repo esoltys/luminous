@@ -21,6 +21,22 @@
   let isLoading = $state(true);
   let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
 
+  /** Routes "Top Artists" to Collection → Artists, pre-sorted by popularity
+   * (total plays). CollectionView reads its initial sort from localStorage
+   * on mount, so writing it here before navigating is enough — see #169. */
+  function viewTopArtists() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sort_artist_field", "total_playcount");
+      localStorage.setItem("sort_artist_asc", "false");
+    }
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    navigationStore.selectedArtistName = null;
+    navigationStore.selectedAlbumName = null;
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "artists";
+  }
+
   function getTimeOfDayGreeting(): string {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return i18n.t("home.greetingMorning");
@@ -93,7 +109,7 @@
       </div>
     {:else}
       {#if topArtists.length > 0}
-        <HorizontalScrollRow title={i18n.t('home.topArtists')}>
+        <HorizontalScrollRow title={i18n.t('home.topArtists')} onHeaderClick={viewTopArtists}>
           {#each topArtists as artist (artist.name)}
             <div class="w-44 shrink-0 snap-start">
               <ArtistCard
@@ -110,12 +126,22 @@
       {#if frequentlyPlayed.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if frequentlyPlayed.length > 0}
-            <HomeRowList title={i18n.t('home.mostPlayed')} items={frequentlyPlayed} variant="rank" />
+            <HomeRowList
+              title={i18n.t('home.mostPlayed')}
+              items={frequentlyPlayed}
+              variant="rank"
+              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "most_played" })}
+            />
           {:else if featuredAlbums.length > 0}
             <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
           {/if}
           {#if recentlyAdded.length > 0}
-            <HomeRowList title={i18n.t('home.recentlyAdded')} items={recentlyAdded} variant="added" />
+            <HomeRowList
+              title={i18n.t('home.recentlyAdded')}
+              items={recentlyAdded}
+              variant="added"
+              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
+            />
           {/if}
         </div>
       {/if}

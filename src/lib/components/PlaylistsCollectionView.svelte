@@ -26,7 +26,7 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -118,6 +118,14 @@
         kind: "recently_added",
         label: i18n.t("playlists.autoRecentlyAdded"),
         trackCount: playlistsStore.recentlyAddedCount,
+      });
+    }
+    if (playlistsStore.mostPlayedCount > 0) {
+      defs.push({
+        id: "auto:most_played",
+        kind: "most_played",
+        label: i18n.t("playlists.autoMostPlayed"),
+        trackCount: playlistsStore.mostPlayedCount,
       });
     }
     defs.push({

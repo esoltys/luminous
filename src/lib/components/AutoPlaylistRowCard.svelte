@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag } from "lucide-svelte";
+  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -8,7 +8,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -36,6 +36,7 @@
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    if (kind === "most_played") return i18n.t("playlists.mostPlayedAutoPlaylist");
     if (kind === "history") return i18n.t("playlists.historyAutoPlaylist");
     return i18n.t("playlists.genreAutoPlaylist");
   });
@@ -63,14 +64,18 @@
             ? 'bg-[#E879F9]/15 border-[#E879F9]/30'
             : kind === 'favourites'
               ? 'bg-[#F43F5E]/15 border-[#F43F5E]/30'
-              : kind === 'history'
-                ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
-                : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+              : kind === 'most_played'
+                ? 'bg-[#DC2626]/15 border-[#DC2626]/30'
+                : kind === 'history'
+                  ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
+                  : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
   >
     {#if kind === "favourites"}
       <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
     {:else if kind === "recently_added"}
       <Clock class="w-5 h-5 text-[#CA8A04]" />
+    {:else if kind === "most_played"}
+      <TrendingUp class="w-5 h-5 text-[#DC2626]" />
     {:else if kind === "history"}
       <Hourglass class="w-5 h-5 text-[#8B5CF6]" />
     {:else if kind === "decade"}

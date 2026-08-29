@@ -173,6 +173,17 @@ pub async fn get_recently_added_songs(
 }
 
 #[tauri::command]
+pub async fn get_most_played_songs(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_most_played_songs(limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn get_top_artists(
     limit: Option<i64>,
     state: State<'_, AppState>,

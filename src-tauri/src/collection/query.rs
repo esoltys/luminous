@@ -358,6 +358,32 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs ranked by total play count, most-played first. Unlike
+    /// `get_most_frequently_played` (which mixes in album/playlist context
+    /// cards for the Home screen), this groups strictly by `song_id` for a
+    /// flat song list, matching `get_recently_added_songs`'s shape.
+    pub fn get_most_played_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {SONG_SELECT_COLS_QUALIFIED}
+             FROM songs s
+             JOIN (
+                 SELECT song_id, COUNT(*) AS play_count
+                 FROM play_history
+                 GROUP BY song_id
+             ) ph ON ph.song_id = s.id
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY ph.play_count DESC, s.added DESC
+             LIMIT ?1"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     /// Distinct non-empty genres present in the library, used to build one
     /// auto-playlist per genre.
     pub fn get_library_genres(&self) -> Result<Vec<String>> {
@@ -721,6 +747,7 @@ impl CollectionScanner {
                     "name": row.get::<_, Option<String>>(0)?,
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
+                    "total_playcount": row.get::<_, i32>(3)?,
                     "genre": row.get::<_, Option<String>>(4)?,
                 }))
             })?
@@ -2055,6 +2082,72 @@ mod tests {
 
         let high = &top_artists[0];
         assert_eq!(high["song_count"].as_i64(), Some(2));
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = &top_artists[1];
+        assert_eq!(low["total_playcount"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_most_played_songs_ranks_by_play_history_count() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_most_played_songs_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, title: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+
+        let most_played_id = seed(r"C:\Music\a.mp3", "Most Played Song");
+        let less_played_id = seed(r"C:\Music\b.mp3", "Less Played Song");
+        let _unplayed_id = seed(r"C:\Music\c.mp3", "Unplayed Song");
+
+        for played_at in 0..3 {
+            record_play(most_played_id, played_at);
+        }
+        record_play(less_played_id, 0);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let most_played = scanner.get_most_played_songs(10).unwrap();
+
+        // Only songs with at least one play appear, ranked by play count.
+        let titles: Vec<&str> = most_played
+            .iter()
+            .map(|s| s.title.as_deref().unwrap())
+            .collect();
+        assert_eq!(titles, vec!["Most Played Song", "Less Played Song"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

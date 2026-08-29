@@ -15,15 +15,19 @@
   import GenreChips from "./GenreChips.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { ChevronRight } from "lucide-svelte";
 
   interface Props {
     title?: string;
     items: HomeItem[];
     /** "rank" shows a 01-05 numeral + track duration; "added" shows a relative added date. */
     variant: "rank" | "added";
+    /** When provided, the title becomes a clickable button that navigates to
+     * the category's full expanded view (see #169). */
+    onHeaderClick?: () => void;
   }
 
-  let { title, items, variant }: Props = $props();
+  let { title, items, variant, onHeaderClick }: Props = $props();
 
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
 
@@ -124,7 +128,16 @@
 </script>
 
 <div class="space-y-4">
-  {#if title}
+  {#if title && onHeaderClick}
+    <button
+      type="button"
+      onclick={onHeaderClick}
+      class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
+    >
+      {title}
+      <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  {:else if title}
     <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
   {/if}
 
