@@ -57,8 +57,9 @@ export const fr = {
     topArtists: "Artistes populaires",
     mostPlayed: "Top 5 des plus écoutés",
     recentlyAdded: "Ajoutés récemment",
+    pinned: "Épinglé",
     exploreLibrary: "Explorez votre bibliothèque",
-    libraryOverview: "Explorez votre collection musicale : {songs} titres • {albums} albums • {artists} artistes",
+    libraryOverview: "Explorez votre collection musicale : {artists} artistes • {albums} albums • {songs} titres",
     emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées"
   },
   emptyLibrary: {
@@ -525,6 +526,8 @@ export const fr = {
     contextMenuGoArtist: "Aller à l'artiste",
     contextMenuGoAlbum: "Aller à l'album",
     contextMenuEditTags: "Éditer les étiquettes",
+    contextMenuPinHome: "Épingler à l'accueil",
+    contextMenuUnpinHome: "Détacher de l'accueil",
     noFilterResults: "Aucune chanson ne correspond à \"{query}\"",
     editSmartPlaylistBtn: "Modifier les règles",
     smartRulePlaylistLabel: "Liste intelligente",
@@ -835,6 +838,8 @@ export const fr = {
     shuffleAndPlay: "Lecture aléatoire",
     editArtist: "Modifier",
     editArtistTooltip: "Modifier les détails de l'artiste, site web, tags et liens",
+    pinHome: "Épingler à l'accueil",
+    unpinHome: "Détacher de l'accueil",
     about: "À propos",
     links: "LIENS",
     showMore: "Afficher plus",

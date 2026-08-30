@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 20;
+pub const CURRENT_SCHEMA_VERSION: i32 = 21;
 
 struct Migration {
     version: i32,
@@ -133,6 +133,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 21,
+        description: "pinned_items table for user-curated Home shelf (#222)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_21)?),
     },
 ];
 
@@ -621,6 +626,16 @@ WHERE dynamic_enabled = 1
 // ---------------------------------------------------------------------------
 const MIGRATION_20: &str = "
 ALTER TABLE songs ADD COLUMN genresort TEXT;
+";
+
+const MIGRATION_21: &str = "
+CREATE TABLE IF NOT EXISTS pinned_items (
+    item_type TEXT NOT NULL,
+    ref_key   TEXT NOT NULL,
+    position  INTEGER NOT NULL DEFAULT 0,
+    pinned_at INTEGER NOT NULL,
+    PRIMARY KEY (item_type, ref_key)
+);
 ";
 
 // ---------------------------------------------------------------------------

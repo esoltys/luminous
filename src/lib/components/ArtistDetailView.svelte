@@ -5,6 +5,7 @@
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
@@ -17,13 +18,14 @@
   import { tagsStore } from "../stores/tags.svelte";
   import TagEditor from "./TagEditor.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
+  import IconActionButton from "./IconActionButton.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import PlayShuffleButtons from "./PlayShuffleButtons.svelte";
   import ArtistProfileEditor from "./ArtistProfileEditor.svelte";
   import SocialIcon from "./SocialIcon.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Edit3, ExternalLink } from "lucide-svelte";
+  import { Edit3, ExternalLink, Pin, PinOff } from "lucide-svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile } from "../types";
   import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
@@ -357,15 +359,26 @@
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
-          <button
-            type="button"
+          <IconActionButton
             onclick={() => { isEditorOpen = true; }}
-            class="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand-sidebar/80 hover:bg-brand-sidebar text-brand-text-primary border border-brand-border hover:border-brand-accent/40 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
             title={i18n.t("artistDetail.editArtistTooltip", {}, "Edit artist details, website, tags, and links")}
           >
-            <Edit3 class="w-3.5 h-3.5 text-brand-accent" />
-            <span>{i18n.t("artistDetail.editArtist", {}, "Edit")}</span>
-          </button>
+            {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
+            onclick={() => pinnedStore.toggle("artist", artistName)}
+            title={pinnedStore.isPinned("artist", artistName)
+              ? i18n.t("artistDetail.unpinHome")
+              : i18n.t("artistDetail.pinHome")}
+          >
+            {#snippet icon()}
+              {#if pinnedStore.isPinned("artist", artistName)}
+                <PinOff class="w-4 h-4" />
+              {:else}
+                <Pin class="w-4 h-4" />
+              {/if}
+            {/snippet}
+          </IconActionButton>
           {#if singleSongs.length > 0}
             <ColumnSelector align="left" iconOnly />
           {/if}

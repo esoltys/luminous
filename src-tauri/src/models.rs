@@ -767,6 +767,31 @@ pub enum HomeItem {
     Playlist { playlist: Playlist },
 }
 
+/// Represents an artist summary, typed equivalent of the ad-hoc JSON shape
+/// returned by `CollectionScanner::get_artists`/`get_top_artists` — used here
+/// so a pinned artist (see `PinnedItem`) has a concrete Rust type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistItem {
+    pub name: Option<String>,
+    pub sort_artist: Option<String>,
+    pub album_count: i32,
+    pub song_count: i32,
+    pub total_playcount: Option<i32>,
+    pub genre: Option<String>,
+}
+
+/// A user-pinned Home-shelf entry (#222) — a superset of `HomeItem` that also
+/// allows Artist, since pins (unlike the system-curated rank/added rows) are
+/// explicitly user-curated across all four browsable entity types.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PinnedItem {
+    Song { song: Box<Song> },
+    Album { album: AlbumItem },
+    Artist { artist: ArtistItem },
+    Playlist { playlist: Playlist },
+}
+
 /// A social media or external platform link associated with an artist (#473).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct ArtistSocialLink {

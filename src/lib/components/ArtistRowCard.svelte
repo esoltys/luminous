@@ -27,9 +27,9 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
-  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+  class="group grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
-  <div class="relative shrink-0 overflow-hidden">
+  <div class="row-span-2 relative overflow-hidden">
     <CoverArt
       songId={frontCover?.songId}
       artEmbedded={frontCover?.artEmbedded ?? false}
@@ -39,16 +39,15 @@
     />
   </div>
 
-  <div class="min-w-0 flex-1">
-    <p class="truncate text-sm font-semibold text-brand-text-primary">{artist.name || i18n.t('collection.unknownArtist')}</p>
+  <p class="col-span-2 min-w-0 truncate text-sm font-semibold text-brand-text-primary">{artist.name || i18n.t('collection.unknownArtist')}</p>
+
+  <div class="min-w-0">
     {#if hasGenre}
-      <div class="min-w-0 mt-0.5"><GenreChips genre={artist.genre} /></div>
+      <GenreChips genre={artist.genre} />
     {:else}
       <p class="truncate text-xs text-brand-text-secondary font-medium">{i18n.t('artistDetail.unknownGenre')}</p>
     {/if}
   </div>
 
-  <div class="shrink-0 max-w-40 text-right">
-    <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
-  </div>
+  <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate text-right">{i18n.t('playlists.songsCount', { count: artist.song_count })}</p>
 </div>

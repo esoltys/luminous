@@ -24,6 +24,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod organizer;
+pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
@@ -847,6 +848,11 @@ pub fn run() {
             commands::player::refresh_playback_queue,
             commands::player::set_shuffle_mode,
             commands::player::set_repeat_mode,
+            // Pinned Home shelf commands (#222)
+            commands::pins::pin_item,
+            commands::pins::unpin_item,
+            commands::pins::get_pinned_items,
+            commands::pins::reorder_pinned_items,
             // Playlist commands
             commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,

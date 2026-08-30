@@ -630,8 +630,8 @@
     class="grid items-center border-b border-brand-border/40 hover:bg-brand-sidebar/40 group transition-colors py-2.5 px-4 text-sm
       {disabled ? 'opacity-50 cursor-not-allowed' : ''}
       {onReorder ? 'cursor-grab active:cursor-grabbing' : ''}
-      {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'border-t-2! border-brand-accent' : ''}
-      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && rowIsPlaying(row) ? 'bg-brand-accent/10' : '')}"
+      {selectedKeys.has(row.key) ? 'bg-brand-accent/20 border-l-2 border-brand-accent text-brand-accent-text-hover' : (song && rowIsPlaying(row) ? 'bg-brand-accent/10' : '')}
+      {draggedIndex !== null && dragOverIndex === row.underlyingIndex ? 'bg-brand-accent/30!' : ''}"
   >
     {@render leadingCell(row, displayIndex)}
     {#if song}
