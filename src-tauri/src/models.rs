@@ -780,16 +780,48 @@ pub struct ArtistItem {
     pub genre: Option<String>,
 }
 
+/// A materialized or virtual auto-playlist referenced by a Home pin — mirrors
+/// the frontend's `AutoPlaylistRef` shape so `AutoPlaylistCard` can render a
+/// pinned auto-playlist without a second code path. Favourites/Recently
+/// Added/Most Played/History have no backing playlist row (`playlist_id`/
+/// `updated` are `None`); genre/decade/bpm/artist_tag are materialized rows,
+/// so those are populated from the matching `Playlist`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoPlaylistItem {
+    pub kind: String,
+    pub genre: Option<String>,
+    pub artist_tag: Option<String>,
+    pub decade: Option<String>,
+    pub bpm: Option<String>,
+    pub playlist_id: Option<i64>,
+    pub updated: Option<i64>,
+    pub track_count: i32,
+}
+
 /// A user-pinned Home-shelf entry (#222) — a superset of `HomeItem` that also
 /// allows Artist, since pins (unlike the system-curated rank/added rows) are
 /// explicitly user-curated across all four browsable entity types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PinnedItem {
-    Song { song: Box<Song> },
-    Album { album: AlbumItem },
-    Artist { artist: ArtistItem },
-    Playlist { playlist: Playlist },
+    Song {
+        song: Box<Song>,
+    },
+    Album {
+        album: AlbumItem,
+    },
+    Artist {
+        artist: ArtistItem,
+    },
+    Playlist {
+        playlist: Playlist,
+    },
+    #[serde(rename = "auto_playlist")]
+    AutoPlaylist {
+        #[serde(rename = "autoPlaylist")]
+        auto_playlist: AutoPlaylistItem,
+    },
 }
 
 /// A social media or external platform link associated with an artist (#473).
@@ -951,5 +983,34 @@ mod tests {
         };
 
         assert!(s1.is_same_album_or_cue_sibling(&s2));
+    }
+
+    // Regression test for a real bug: `#[serde(rename_all = "camelCase")]` on
+    // the `PinnedItem` enum only renames the variant tag, not the fields
+    // *inside* a struct variant — so `auto_playlist: AutoPlaylistItem` would
+    // silently serialize its key as `"auto_playlist"` while the frontend
+    // (types/index.ts) reads `item.autoPlaylist`, leaving it `undefined` and
+    // crashing `PinnedRow.svelte` on the very first render.
+    #[test]
+    fn pinned_item_auto_playlist_serializes_with_camel_case_type_and_field() {
+        let item = PinnedItem::AutoPlaylist {
+            auto_playlist: AutoPlaylistItem {
+                kind: "favourites".to_string(),
+                genre: None,
+                artist_tag: None,
+                decade: None,
+                bpm: None,
+                playlist_id: None,
+                updated: None,
+                track_count: 3,
+            },
+        };
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(value["type"], "auto_playlist");
+        assert!(
+            value.get("autoPlaylist").is_some(),
+            "expected a camelCase \"autoPlaylist\" key, got: {value}"
+        );
+        assert_eq!(value["autoPlaylist"]["trackCount"], 3);
     }
 }
