@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp } from "lucide-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
@@ -13,7 +13,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -45,6 +45,7 @@
     if (kind === "genre" || genre) return i18n.t("playlists.genreAutoPlaylist");
     if (kind === "favourites") return i18n.t("playlists.favouritesAutoPlaylist");
     if (kind === "recently_added") return i18n.t("playlists.recentlyAddedAutoPlaylist");
+    if (kind === "most_played") return i18n.t("playlists.mostPlayedAutoPlaylist");
     if (kind === "history") return i18n.t("playlists.historyAutoPlaylist");
     return i18n.t("playlists.genreAutoPlaylist");
   });
@@ -68,9 +69,11 @@
           ? invoke<Song[]>("get_favourite_songs")
           : k === "recently_added"
             ? invoke<Song[]>("get_recently_added_songs", { limit: 50 })
-            : k === "history"
-              ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
-              : k === "decade"
+            : k === "most_played"
+              ? invoke<Song[]>("get_most_played_songs", { limit: 50 })
+              : k === "history"
+                ? invoke<Song[]>("get_recently_played_songs", { limit: 50 })
+                : k === "decade"
                 ? invoke<Song[]>("get_songs_by_decade", { decade: d ?? "", limit: 50 })
                 : k === "bpm"
                   ? invoke<Song[]>("get_songs_by_bpm", { spec: b ?? "", limit: 50 })
@@ -103,6 +106,7 @@
       case "bpm": return "bg-[#C026D3] text-white";
       case "favourites": return "bg-[#DB2777] text-white";
       case "recently_added": return "bg-[#CA8A04] text-white";
+      case "most_played": return "bg-[#DC2626] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
     }
   });
@@ -131,6 +135,10 @@
     {:else if kind === "recently_added"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#CA8A04]/25 to-[#FACC15]/15 flex items-center justify-center overflow-hidden border border-[#FACC15]/30 shadow-[0_0_20px_2px_rgba(250,204,21,0.35)]">
         <Clock class="w-10 h-10 text-[#CA8A04]" />
+      </div>
+    {:else if kind === "most_played"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#DC2626]/25 to-[#F87171]/15 flex items-center justify-center overflow-hidden border border-[#F87171]/30 shadow-[0_0_20px_2px_rgba(248,113,113,0.35)]">
+        <TrendingUp class="w-10 h-10 text-[#DC2626]" />
       </div>
     {:else if kind === "history"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#8B5CF6]/25 to-[#A78BFA]/15 flex items-center justify-center overflow-hidden border border-[#A78BFA]/30 shadow-[0_0_20px_2px_rgba(167,139,250,0.35)]">

@@ -175,12 +175,12 @@
     typeof window !== "undefined" ? localStorage.getItem("sort_album_asc") !== "false" : true
   );
 
-  let artistSortField = $state<"name" | "genre" | "song_count">(
+  let artistSortField = $state<"name" | "genre" | "song_count" | "total_playcount">(
     (() => {
       if (typeof window === "undefined") return "name";
       const saved = localStorage.getItem("sort_artist_field");
       if (saved === "album_count") return "genre";
-      return (saved as "name" | "genre" | "song_count") || "name";
+      return (saved as "name" | "genre" | "song_count" | "total_playcount") || "name";
     })()
   );
   let artistSortAsc = $state(
@@ -452,7 +452,7 @@
                   value={`${artistSortField}-${artistSortAsc}`}
                   onchange={(e) => {
                     const [field, asc] = e.currentTarget.value.split("-");
-                    artistSortField = field as "name" | "genre" | "song_count";
+                    artistSortField = field as "name" | "genre" | "song_count" | "total_playcount";
                     artistSortAsc = asc === "true";
                   }}
                   class="bg-brand-sidebar border border-brand-border hover:border-brand-accent/60 text-brand-text-secondary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
@@ -463,6 +463,8 @@
                   <option value="genre-false">▼ {i18n.t('collection.tableHeaderGenre')}</option>
                   <option value="song_count-true">▲ {i18n.t('collection.sortLabelSongs')}</option>
                   <option value="song_count-false">▼ {i18n.t('collection.sortLabelSongs')}</option>
+                  <option value="total_playcount-true">▲ {i18n.t('collection.sortLabelPopularity')}</option>
+                  <option value="total_playcount-false">▼ {i18n.t('collection.sortLabelPopularity')}</option>
                 </Select>
               </div>
             {/if}

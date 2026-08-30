@@ -69,14 +69,14 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 let mockTopArtists: ArtistItem[] = [];
-let mockFrequentlyPlayed: HomeItem[] = [];
+let mockFrequentlyPlayed: Song[] = [];
 let mockRecentlyAdded: HomeItem[] = [];
 let mockFeaturedAlbums: HomeItem[] = [];
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string) => {
     if (cmd === "get_top_artists") return Promise.resolve(mockTopArtists);
-    if (cmd === "get_most_frequently_played") return Promise.resolve(mockFrequentlyPlayed);
+    if (cmd === "get_most_played_songs") return Promise.resolve(mockFrequentlyPlayed);
     if (cmd === "get_recently_added") return Promise.resolve(mockRecentlyAdded);
     if (cmd === "get_featured_albums") return Promise.resolve(mockFeaturedAlbums);
     // collectionStore initializes itself on module load and expects this shape.
@@ -109,7 +109,7 @@ describe("HomeView.svelte", () => {
 
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("get_top_artists", { limit: 15 });
-      expect(invoke).toHaveBeenCalledWith("get_most_frequently_played", { limit: 5 });
+      expect(invoke).toHaveBeenCalledWith("get_most_played_songs", { limit: 5 });
       expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 5 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
     });
@@ -146,7 +146,7 @@ describe("HomeView.svelte", () => {
   });
 
   it("hides the Explore Your Library row in favor of Most Played once play history exists", async () => {
-    mockFrequentlyPlayed = [{ type: "song", song: makeSong({ title: "Most Played Song" }) }];
+    mockFrequentlyPlayed = [makeSong({ title: "Most Played Song" })];
     mockFeaturedAlbums = [{ type: "album", album: makeAlbum({ album: "Discover Me" }) }];
 
     render(HomeView);

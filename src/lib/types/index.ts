@@ -260,6 +260,7 @@ export interface ArtistItem {
   sort_artist?: string | null;
   album_count: number;
   song_count: number;
+  total_playcount?: number;
   genre?: string | null;
 }
 

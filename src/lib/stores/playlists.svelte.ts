@@ -20,6 +20,7 @@ class PlaylistsStore {
   /** Live song counts for the virtual (non-materialized) auto-playlists. */
   favouritesCount = $state(0);
   recentlyAddedCount = $state(0);
+  mostPlayedCount = $state(0);
   historyCount = $state(0);
 
   /** Count of auto-playlists that currently have at least one song — used for
@@ -30,6 +31,7 @@ class PlaylistsStore {
       genreCount +
       (this.favouritesCount > 0 ? 1 : 0) +
       (this.recentlyAddedCount > 0 ? 1 : 0) +
+      (this.mostPlayedCount > 0 ? 1 : 0) +
       (this.historyCount > 0 ? 1 : 0)
     );
   });
@@ -140,13 +142,15 @@ class PlaylistsStore {
 
   async refreshAutoPlaylistCounts() {
     try {
-      const [favourites, recentlyAdded, history] = await Promise.all([
+      const [favourites, recentlyAdded, mostPlayed, history] = await Promise.all([
         invoke<Song[]>("get_favourite_songs"),
         invoke<Song[]>("get_recently_added_songs", { limit: 50 }),
+        invoke<Song[]>("get_most_played_songs", { limit: 50 }),
         invoke<Song[]>("get_recently_played_songs", { limit: 100 }),
       ]);
       this.favouritesCount = Array.isArray(favourites) ? favourites.length : 0;
       this.recentlyAddedCount = Array.isArray(recentlyAdded) ? recentlyAdded.length : 0;
+      this.mostPlayedCount = Array.isArray(mostPlayed) ? mostPlayed.length : 0;
       this.historyCount = Array.isArray(history) ? history.length : 0;
       await this.refreshPlaylists();
     } catch (err) {

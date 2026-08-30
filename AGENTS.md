@@ -148,6 +148,12 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
   `src/lib/locales/en.ts` hint/tooltip strings specifically — section headings and status/value labels
   are fine as descriptive text.
 
+- **i18n is not optional**: every new user-facing string key added to `src/lib/locales/en.ts` must be
+  added to `src/lib/locales/fr.ts` (with an actual French translation, not a copy of the English text)
+  in the same change. `i18n.t()` silently falls back to the English string when a key is missing from a
+  non-English locale, so a skipped `fr.ts` update won't fail CI or show up in testing — it just quietly
+  ships English text to French users. Don't rely on that fallback as a substitute for translating.
+
 ## Development Workflow
 
 **Adding a frontend feature:**

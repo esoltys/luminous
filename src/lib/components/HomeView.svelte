@@ -5,7 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, ArtistItem, ScanProgress } from "../types";
+  import type { HomeItem, ArtistItem, Song, ScanProgress } from "../types";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
@@ -21,6 +21,22 @@
   let isLoading = $state(true);
   let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
 
+  /** Routes "Top Artists" to Collection → Artists, pre-sorted by popularity
+   * (total plays). CollectionView reads its initial sort from localStorage
+   * on mount, so writing it here before navigating is enough — see #169. */
+  function viewTopArtists() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sort_artist_field", "total_playcount");
+      localStorage.setItem("sort_artist_asc", "false");
+    }
+    collectionStore.searchQuery = "";
+    collectionStore.searchResults = [];
+    navigationStore.selectedArtistName = null;
+    navigationStore.selectedAlbumName = null;
+    navigationStore.activeTab = "collection";
+    navigationStore.activeSubTab = "artists";
+  }
+
   function getTimeOfDayGreeting(): string {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return i18n.t("home.greetingMorning");
@@ -34,12 +50,16 @@
     try {
       const [artists, frequent, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
-        invoke<HomeItem[]>("get_most_frequently_played", { limit: 5 }),
+        invoke<Song[]>("get_most_played_songs", { limit: 5 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 5 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
-      frequentlyPlayed = frequent;
+      // Flat per-song ranking (same definition/query as the "Most Played"
+      // auto-playlist, see #169) rather than the old context-grouped mix of
+      // Album/Song/Playlist cards — that grouping could show a whole album
+      // as "most played" from a single repeatedly-played track.
+      frequentlyPlayed = frequent.map((song) => ({ type: "song", song }) as const);
       recentlyAdded = added;
       featuredAlbums = featured;
     } catch (err) {
@@ -93,7 +113,7 @@
       </div>
     {:else}
       {#if topArtists.length > 0}
-        <HorizontalScrollRow title={i18n.t('home.topArtists')}>
+        <HorizontalScrollRow title={i18n.t('home.topArtists')} onHeaderClick={viewTopArtists}>
           {#each topArtists as artist (artist.name)}
             <div class="w-44 shrink-0 snap-start">
               <ArtistCard
@@ -110,12 +130,22 @@
       {#if frequentlyPlayed.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if frequentlyPlayed.length > 0}
-            <HomeRowList title={i18n.t('home.mostPlayed')} items={frequentlyPlayed} variant="rank" />
+            <HomeRowList
+              title={i18n.t('home.mostPlayed')}
+              items={frequentlyPlayed}
+              variant="rank"
+              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "most_played" })}
+            />
           {:else if featuredAlbums.length > 0}
             <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
           {/if}
           {#if recentlyAdded.length > 0}
-            <HomeRowList title={i18n.t('home.recentlyAdded')} items={recentlyAdded} variant="added" />
+            <HomeRowList
+              title={i18n.t('home.recentlyAdded')}
+              items={recentlyAdded}
+              variant="added"
+              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "recently_added" })}
+            />
           {/if}
         </div>
       {/if}

@@ -358,6 +358,33 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs ranked by total play count, most-played first, grouped strictly
+    /// by `song_id` (not by listening context) — matches
+    /// `get_recently_added_songs`'s shape. Backs both the Home screen's
+    /// "Most Played" preview and the "Most Played" auto-playlist, so the two
+    /// always agree (#169).
+    pub fn get_most_played_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {SONG_SELECT_COLS_QUALIFIED}
+             FROM songs s
+             JOIN (
+                 SELECT song_id, COUNT(*) AS play_count
+                 FROM play_history
+                 GROUP BY song_id
+             ) ph ON ph.song_id = s.id
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY ph.play_count DESC, s.added DESC
+             LIMIT ?1"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     /// Distinct non-empty genres present in the library, used to build one
     /// auto-playlist per genre.
     pub fn get_library_genres(&self) -> Result<Vec<String>> {
@@ -604,7 +631,7 @@ impl CollectionScanner {
                 GROUP BY album
              ),
              base AS (
-                SELECT s.id, s.album,
+                SELECT s.id, s.album, s.playcount,
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
@@ -613,7 +640,8 @@ impl CollectionScanner {
              grouped AS (
                 SELECT MIN(effective_artist) AS effective_artist,
                        MIN(sort_artist) AS sort_artist,
-                       COUNT(*) AS song_count
+                       COUNT(*) AS song_count,
+                       SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
              )
@@ -635,7 +663,8 @@ impl CollectionScanner {
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre,
-                g.sort_artist
+                g.sort_artist,
+                g.total_playcount
              FROM grouped g
              ORDER BY g.sort_artist COLLATE NOCASE",
         )?;
@@ -647,6 +676,7 @@ impl CollectionScanner {
                     "song_count": row.get::<_, i32>(2)?,
                     "genre": row.get::<_, Option<String>>(3)?,
                     "sort_artist": row.get::<_, Option<String>>(4)?,
+                    "total_playcount": row.get::<_, i32>(5)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -721,6 +751,7 @@ impl CollectionScanner {
                     "name": row.get::<_, Option<String>>(0)?,
                     "album_count": row.get::<_, i32>(1)?,
                     "song_count": row.get::<_, i32>(2)?,
+                    "total_playcount": row.get::<_, i32>(3)?,
                     "genre": row.get::<_, Option<String>>(4)?,
                 }))
             })?
@@ -870,87 +901,6 @@ impl CollectionScanner {
             limit as usize,
             &playlists_by_id,
         ))
-    }
-
-    /// Most frequently played, grouped the same way as `get_recently_played`
-    /// (Album/Playlist/Song by recorded context) but ordered by total play
-    /// count per context instead of recency.
-    pub fn get_most_frequently_played(&self, limit: i64) -> Result<Vec<HomeItem>> {
-        let conn = self.db.pool.get()?;
-        let sql = "
-            SELECT
-                ph.context_type,
-                ph.playlist_id,
-                COUNT(*) as play_count,
-                MAX(ph.played_at) as last_played,
-                MAX(ph.song_id) as representative_song_id
-            FROM play_history ph
-            JOIN songs s ON s.id = ph.song_id
-            WHERE s.source IN (1, 2) AND s.unavailable = 0
-              AND NOT (
-                  ph.context_type = 'playlist'
-                  AND ph.playlist_id IN (
-                      SELECT id FROM playlists WHERE dynamic_enabled = 0 AND LOWER(name) = 'queue'
-                  )
-              )
-            GROUP BY
-                ph.context_type,
-                CASE ph.context_type WHEN 'playlist' THEN ph.playlist_id END,
-                CASE ph.context_type WHEN 'album' THEN s.album END,
-                CASE ph.context_type WHEN 'album' THEN COALESCE(s.album_artist, s.artist) END,
-                CASE ph.context_type WHEN 'song' THEN ph.song_id END
-            ORDER BY play_count DESC, last_played DESC
-            LIMIT ?1
-        ";
-        let mut stmt = conn.prepare(sql)?;
-        struct AggRow {
-            context_type: String,
-            playlist_id: Option<i64>,
-            representative_song_id: i64,
-        }
-        let agg_rows: Vec<AggRow> = stmt
-            .query_map(params![limit], |row| {
-                Ok(AggRow {
-                    context_type: row.get(0)?,
-                    playlist_id: row.get(1)?,
-                    representative_song_id: row.get(4)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        let playlist_ids: Vec<i64> = {
-            use std::collections::HashSet;
-            agg_rows
-                .iter()
-                .filter(|r| r.context_type == "playlist")
-                .filter_map(|r| r.playlist_id)
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect()
-        };
-        let playlists_by_id = get_playlists_by_ids(&conn, &playlist_ids)?;
-
-        let song_ids: Vec<i64> = agg_rows.iter().map(|r| r.representative_song_id).collect();
-        let songs_by_id = get_songs_by_ids(&conn, &song_ids)?;
-
-        let mut items: Vec<HomeItem> = agg_rows
-            .into_iter()
-            .filter_map(|row| {
-                let (song, album_track_count, album_disc_count) =
-                    songs_by_id.get(&row.representative_song_id)?.clone();
-                Some(home_item_for_context(
-                    &row.context_type,
-                    row.playlist_id,
-                    song,
-                    album_track_count,
-                    album_disc_count,
-                    &playlists_by_id,
-                ))
-            })
-            .collect();
-        attach_album_ratings(&conn, &mut items)?;
-        Ok(items)
     }
 
     /// Recently added songs grouped into Album cards where an album's other
@@ -1305,29 +1255,6 @@ fn get_playlists_by_ids(
     Ok(map)
 }
 
-fn get_songs_by_ids(
-    conn: &rusqlite::Connection,
-    ids: &[i64],
-) -> Result<std::collections::HashMap<i64, (Song, i64, i64)>> {
-    if ids.is_empty() {
-        return Ok(std::collections::HashMap::new());
-    }
-    let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let home_item_select_cols = home_item_select_cols();
-    let sql = format!("SELECT {home_item_select_cols} FROM songs s WHERE s.id IN ({placeholders})");
-    let mut stmt = conn.prepare(&sql)?;
-    let map = stmt
-        .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
-            let song = row_to_song(row)?;
-            let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
-            let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
-            Ok((song.id, (song, album_track_count, album_disc_count)))
-        })?
-        .filter_map(|r| r.ok())
-        .collect();
-    Ok(map)
-}
-
 /// SQL `WHERE`-clause fragment testing whether `column_expr` (assumed to be
 /// a `; `-delimited multi-value column like `artist`/`album_artist`, or a
 /// `COALESCE`/`NULLIF` expression over one) contains `param` — bound via
@@ -1353,7 +1280,7 @@ fn multi_value_contains_pattern(value: &str) -> String {
 
 /// `SONG_SELECT_COLS_QUALIFIED` plus correlated `album_track_count` and
 /// `album_disc_count` subqueries. Shared by the home-screen queries
-/// (`get_recently_played`, `get_most_frequently_played`, `get_recently_added`),
+/// (`get_recently_played`, `get_recently_added`),
 /// which all join on `songs s`.
 fn home_item_select_cols() -> String {
     format!(
@@ -1718,6 +1645,62 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 
+    /// Regression test for #169: the Artists tab's "Popularity" sort relies
+    /// on `get_artists()` exposing the same `total_playcount` aggregate as
+    /// `get_top_artists()`, so the two views agree on ranking.
+    #[test]
+    fn test_get_artists_exposes_total_playcount() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artists_playcount_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, artist: &str, title: &str, playcount: i32| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "UPDATE songs SET playcount = ?1 WHERE path = ?2",
+                params![playcount, path],
+            )
+            .unwrap();
+        };
+
+        seed(r"C:\Music\Artist High\a.mp3", "Artist High", "A", 6);
+        seed(r"C:\Music\Artist High\b.mp3", "Artist High", "B", 4);
+        seed(r"C:\Music\Artist Low\a.mp3", "Artist Low", "A", 1);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let high = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist High"))
+            .unwrap();
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist Low"))
+            .unwrap();
+        assert_eq!(low["total_playcount"].as_i64(), Some(1));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
     /// Regression test for #295: songs whose artist tag only differs in case
     /// (e.g. from albums organized/tagged at different times) must be merged
     /// into a single artist entry rather than shown as two separate artists.
@@ -2055,6 +2038,72 @@ mod tests {
 
         let high = &top_artists[0];
         assert_eq!(high["song_count"].as_i64(), Some(2));
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = &top_artists[1];
+        assert_eq!(low["total_playcount"].as_i64(), Some(2));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_get_most_played_songs_ranks_by_play_history_count() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_most_played_songs_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, title: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+
+        let most_played_id = seed(r"C:\Music\a.mp3", "Most Played Song");
+        let less_played_id = seed(r"C:\Music\b.mp3", "Less Played Song");
+        let _unplayed_id = seed(r"C:\Music\c.mp3", "Unplayed Song");
+
+        for played_at in 0..3 {
+            record_play(most_played_id, played_at);
+        }
+        record_play(less_played_id, 0);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let most_played = scanner.get_most_played_songs(10).unwrap();
+
+        // Only songs with at least one play appear, ranked by play count.
+        let titles: Vec<&str> = most_played
+            .iter()
+            .map(|s| s.title.as_deref().unwrap())
+            .collect();
+        assert_eq!(titles, vec!["Most Played Song", "Less Played Song"]);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
@@ -2235,27 +2284,7 @@ mod tests {
             other => panic!("expected standalone Song last, got {other:?}"),
         }
 
-        // Most frequently played: play the standalone song two more times so it
-        // outranks the (2-play) album and (1-play) playlist contexts.
-        conn.execute(
-            "INSERT INTO play_history (context_type, song_id, playlist_id, played_at) VALUES ('song', ?1, NULL, 400)",
-            params![standalone_id],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO play_history (context_type, song_id, playlist_id, played_at) VALUES ('song', ?1, NULL, 500)",
-            params![standalone_id],
-        )
-        .unwrap();
-
-        let frequent = scanner.get_most_frequently_played(10).unwrap();
-        assert_eq!(frequent.len(), 3);
-        match &frequent[0] {
-            HomeItem::Song { song } => assert_eq!(song.id, standalone_id),
-            other => panic!("expected most-played standalone Song first, got {other:?}"),
-        }
-
-        // Test exclusion of internal 'Queue' playlist from recently played & most frequently played
+        // Test exclusion of internal 'Queue' playlist from recently played
         conn.execute(
             "INSERT INTO playlists (name, dynamic_enabled) VALUES ('Queue', 0)",
             params![],
@@ -2280,26 +2309,6 @@ mod tests {
                 assert_ne!(playlist.id, queue_playlist_id);
             }
         }
-
-        // Verify that 'Queue' does not show up in most frequently played (still length 3)
-        let frequent_after_queue = scanner.get_most_frequently_played(10).unwrap();
-        assert_eq!(frequent_after_queue.len(), 3);
-        for item in &frequent_after_queue {
-            if let HomeItem::Playlist { playlist } = item {
-                assert_ne!(playlist.id, queue_playlist_id);
-            }
-        }
-
-        // Verify that plays with explicit album context are attributed to their album
-        for i in 0..15 {
-            conn.execute(
-                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('album', ?1, ?2)",
-                params![album_track_1, 2000 + i],
-            )
-            .unwrap();
-        }
-        let frequent_after_album = scanner.get_most_frequently_played(10).unwrap();
-        assert!(frequent_after_album.iter().any(|item| matches!(item, HomeItem::Album { album, .. } if album.album.as_deref() == Some("Album A"))));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
