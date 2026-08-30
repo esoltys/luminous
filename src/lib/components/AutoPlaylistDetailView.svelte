@@ -6,6 +6,8 @@
   import { navigationStore, type AutoPlaylistRef } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
+  import { autoPlaylistRefKeyFor } from "../types";
   import { songsToCoverStack } from "../utils/covers";
   import CoverStack from "./CoverStack.svelte";
   import TagEditor from "./TagEditor.svelte";
@@ -22,7 +24,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp } from "lucide-svelte";
+  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp, Pin, PinOff } from "lucide-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -56,6 +58,7 @@
   let bpm = $derived(view.bpm);
   let playlistId = $derived(view.playlistId);
   let updated = $derived(view.updated);
+  let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
 
   let songs = $state<Song[]>([]);
   let loading = $state(true);
@@ -472,6 +475,21 @@
             disabled={loading || songs.length === 0}
             class="shrink-0"
           />
+          <IconActionButton
+            onclick={() => pinnedStore.toggle("auto_playlist", pinRefKey)}
+            title={pinnedStore.isPinned("auto_playlist", pinRefKey)
+              ? i18n.t("playlists.contextMenuUnpinHome")
+              : i18n.t("playlists.contextMenuPinHome")}
+            class="shrink-0"
+          >
+            {#snippet icon()}
+              {#if pinnedStore.isPinned("auto_playlist", pinRefKey)}
+                <PinOff class="w-4 h-4" />
+              {:else}
+                <Pin class="w-4 h-4" />
+              {/if}
+            {/snippet}
+          </IconActionButton>
           <ColumnSelector align="left" iconOnly />
         </div>
 

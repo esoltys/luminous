@@ -129,6 +129,27 @@ pub async fn get_pinned_items(state: State<'_, AppState>) -> Result<Vec<PinnedIt
                     });
                 }
             }
+            "auto_playlist" => {
+                let playlists = match &playlists_cache {
+                    Some(p) => p,
+                    None => {
+                        let p = state
+                            .playlists
+                            .lock()
+                            .await
+                            .get_playlists()
+                            .map_err(|e| e.to_string())?;
+                        playlists_cache = Some(p);
+                        playlists_cache.as_ref().unwrap()
+                    }
+                };
+                if let Some(auto_playlist) =
+                    pins::resolve_auto_playlist(&scanner, playlists, &ref_key)
+                        .map_err(|e| e.to_string())?
+                {
+                    items.push(PinnedItem::AutoPlaylist { auto_playlist });
+                }
+            }
             _ => {}
         }
     }

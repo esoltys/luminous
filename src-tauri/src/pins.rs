@@ -5,7 +5,7 @@
 //! `commands::stats` split.
 
 use crate::collection::{row_to_song, CollectionScanner, SONG_SELECT_COLS};
-use crate::models::{AlbumItem, ArtistItem, Song};
+use crate::models::{AlbumItem, ArtistItem, AutoPlaylistItem, Playlist, Song};
 use anyhow::Result;
 use rusqlite::{params, Connection};
 
@@ -180,6 +180,94 @@ pub fn artist_item_from_json(value: &serde_json::Value) -> Result<ArtistItem> {
 /// `CollectionScanner` directly.
 pub fn all_albums(scanner: &CollectionScanner) -> Result<Vec<serde_json::Value>> {
     scanner.get_albums()
+}
+
+/// Splits an auto-playlist ref_key into its kind and (for genre/decade/bpm/
+/// artist_tag) selector — e.g. `"genre:Rock"` -> `("genre", Some("Rock"))`,
+/// `"favourites"` -> `("favourites", None)`. Split on the *first* colon only,
+/// so a selector value that itself contains a colon is preserved intact.
+fn parse_auto_playlist_ref(ref_key: &str) -> (&str, Option<&str>) {
+    match ref_key.split_once(':') {
+        Some((kind, selector)) => (kind, Some(selector)),
+        None => (ref_key, None),
+    }
+}
+
+/// Resolves a pinned auto-playlist reference against live data. Favourites/
+/// Recently Added/Most Played/History have no backing playlist row, so their
+/// resolution just recomputes the same song list the auto-playlist card/view
+/// would show and reports its length. Genre/decade/bpm/artist_tag are
+/// materialized (dynamic_enabled) playlist rows, keyed by their stable
+/// selector value rather than `Playlist.id` — the row can be dropped and
+/// recreated by a sync, but the selector (a genre name, decade, etc.) is what
+/// the user actually pinned. Returns `None` (not an error) when the kind is
+/// unknown or the auto-playlist currently has no songs — mirrors
+/// `resolve_song`'s silent-drop-on-stale-pin behavior.
+pub fn resolve_auto_playlist(
+    scanner: &CollectionScanner,
+    playlists: &[Playlist],
+    ref_key: &str,
+) -> Result<Option<AutoPlaylistItem>> {
+    let (kind, selector) = parse_auto_playlist_ref(ref_key);
+
+    let virtual_item = |kind: &str, track_count: i32| AutoPlaylistItem {
+        kind: kind.to_string(),
+        genre: None,
+        artist_tag: None,
+        decade: None,
+        bpm: None,
+        playlist_id: None,
+        updated: None,
+        track_count,
+    };
+
+    let item = match kind {
+        "favourites" => {
+            let count = scanner.get_favourite_songs()?.len() as i32;
+            (count > 0).then(|| virtual_item(kind, count))
+        }
+        "recently_added" => {
+            let count = scanner.get_recently_added_songs(50)?.len() as i32;
+            (count > 0).then(|| virtual_item(kind, count))
+        }
+        "most_played" => {
+            let count = scanner.get_most_played_songs(50)?.len() as i32;
+            (count > 0).then(|| virtual_item(kind, count))
+        }
+        "history" => {
+            let count = scanner.get_recently_played_songs(100)?.len() as i32;
+            (count > 0).then(|| virtual_item(kind, count))
+        }
+        "genre" | "decade" | "bpm" | "artist_tag" => {
+            let selector = selector.unwrap_or("").to_string();
+            let prefix = match kind {
+                "genre" => "tag:",
+                "decade" => "decade:",
+                "bpm" => "bpmrange:",
+                _ => "artisttag:",
+            };
+            let expected_spec = format!("{prefix}{selector}");
+            playlists
+                .iter()
+                .find(|p| {
+                    p.dynamic_enabled
+                        && p.track_count > 0
+                        && p.dynamic_spec.as_deref() == Some(expected_spec.as_str())
+                })
+                .map(|p| AutoPlaylistItem {
+                    kind: kind.to_string(),
+                    genre: (kind == "genre").then(|| selector.clone()),
+                    artist_tag: (kind == "artist_tag").then(|| selector.clone()),
+                    decade: (kind == "decade").then(|| selector.clone()),
+                    bpm: (kind == "bpm").then_some(selector),
+                    playlist_id: Some(p.id),
+                    updated: Some(p.updated),
+                    track_count: p.track_count,
+                })
+        }
+        _ => None,
+    };
+    Ok(item)
 }
 
 pub fn all_artists(scanner: &CollectionScanner) -> Result<Vec<serde_json::Value>> {
@@ -393,5 +481,118 @@ mod tests {
         assert!(find_artist(&artists, "the war on drugs").is_some());
         assert!(find_artist(&artists, "THE WAR ON DRUGS").is_some());
         assert!(find_artist(&artists, "Someone Else").is_none());
+    }
+
+    #[test]
+    fn parse_auto_playlist_ref_splits_on_first_colon_only() {
+        assert_eq!(parse_auto_playlist_ref("favourites"), ("favourites", None));
+        assert_eq!(
+            parse_auto_playlist_ref("genre:Rock"),
+            ("genre", Some("Rock"))
+        );
+        // A selector containing its own colon stays intact.
+        assert_eq!(
+            parse_auto_playlist_ref("bpm:60-90:extra"),
+            ("bpm", Some("60-90:extra"))
+        );
+    }
+
+    fn test_playlist(id: i64, dynamic_spec: &str, track_count: i32) -> Playlist {
+        Playlist {
+            id,
+            name: dynamic_spec.to_string(),
+            dynamic_enabled: true,
+            dynamic_spec: Some(dynamic_spec.to_string()),
+            population_mode: Default::default(),
+            last_played_row: None,
+            created: 0,
+            updated: 42,
+            track_count,
+            is_queue: false,
+        }
+    }
+
+    #[test]
+    fn resolve_auto_playlist_favourites_reflects_live_favourite_count() {
+        let (db, dir) = test_db();
+        {
+            let conn = db.pool.get().unwrap();
+            let id = insert_song(&conn, "/tmp/favourite.flac");
+            conn.execute(
+                "UPDATE songs SET rating = 5, source = 1 WHERE id = ?1",
+                params![id],
+            )
+            .unwrap();
+        }
+        let scanner = CollectionScanner::new(std::sync::Arc::new(db));
+
+        let resolved = resolve_auto_playlist(&scanner, &[], "favourites").unwrap();
+        let item = resolved.expect("favourites should resolve while a favourite exists");
+        assert_eq!(item.kind, "favourites");
+        assert_eq!(item.track_count, 1);
+        assert_eq!(item.playlist_id, None);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn resolve_auto_playlist_virtual_kind_drops_when_empty() {
+        let (db, dir) = test_db();
+        let scanner = CollectionScanner::new(std::sync::Arc::new(db));
+
+        // No songs at all in the library — favourites/most_played/history all resolve to None.
+        assert!(resolve_auto_playlist(&scanner, &[], "favourites")
+            .unwrap()
+            .is_none());
+        assert!(resolve_auto_playlist(&scanner, &[], "most_played")
+            .unwrap()
+            .is_none());
+        assert!(resolve_auto_playlist(&scanner, &[], "history")
+            .unwrap()
+            .is_none());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn resolve_auto_playlist_materialized_kind_matches_by_selector_not_id() {
+        let (db, dir) = test_db();
+        let scanner = CollectionScanner::new(std::sync::Arc::new(db));
+        let playlists = vec![
+            test_playlist(1, "tag:Rock", 12),
+            test_playlist(2, "decade:1980s", 4),
+            test_playlist(3, "bpmrange:60-90", 7),
+            test_playlist(4, "artisttag:Progressive Metal", 3),
+        ];
+
+        let genre = resolve_auto_playlist(&scanner, &playlists, "genre:Rock")
+            .unwrap()
+            .expect("genre:Rock should resolve against playlist id 1");
+        assert_eq!(genre.playlist_id, Some(1));
+        assert_eq!(genre.genre.as_deref(), Some("Rock"));
+        assert_eq!(genre.track_count, 12);
+
+        let decade = resolve_auto_playlist(&scanner, &playlists, "decade:1980s")
+            .unwrap()
+            .expect("decade:1980s should resolve");
+        assert_eq!(decade.decade.as_deref(), Some("1980s"));
+
+        let bpm = resolve_auto_playlist(&scanner, &playlists, "bpm:60-90")
+            .unwrap()
+            .expect("bpm:60-90 should resolve");
+        assert_eq!(bpm.bpm.as_deref(), Some("60-90"));
+
+        let artist_tag =
+            resolve_auto_playlist(&scanner, &playlists, "artist_tag:Progressive Metal")
+                .unwrap()
+                .expect("artist_tag:Progressive Metal should resolve");
+        assert_eq!(artist_tag.artist_tag.as_deref(), Some("Progressive Metal"));
+
+        // A selector that no longer matches any row (renamed/deleted) self-heals to None.
+        assert!(resolve_auto_playlist(&scanner, &playlists, "genre:Jazz")
+            .unwrap()
+            .is_none());
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

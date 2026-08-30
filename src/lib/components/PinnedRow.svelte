@@ -1,20 +1,44 @@
 <script lang="ts">
-  import type { PinnedItem, PinnedItemType } from "../types";
+  import type { AutoPlaylistItem, PinnedItem, PinnedItemType } from "../types";
   import { pinnedRefKeyFor } from "../types";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
+  import { playlistsStore } from "../stores/playlists.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
+  import { getPlaylistDisplayName } from "../utils/playlist";
   import { collectionStore } from "../stores/collection.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import AlbumCard from "./AlbumCard.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import PlaylistCard from "./PlaylistCard.svelte";
+  import AutoPlaylistCard from "./AutoPlaylistCard.svelte";
   import PinnedSongCard from "./PinnedSongCard.svelte";
 
   function keyFor(item: PinnedItem): string {
     return `${item.type}:${pinnedRefKeyFor(item)}`;
+  }
+
+  // Mirrors PlaylistsCollectionView's autoDefs label derivation — Favourites/
+  // Recently Added/Most Played/History use fixed i18n labels, while genre/
+  // decade/bpm/artist_tag defer to the materialized playlist's own display
+  // name (falling back to the raw selector if the row hasn't resolved yet).
+  function autoPlaylistLabel(ap: AutoPlaylistItem): string {
+    switch (ap.kind) {
+      case "favourites":
+        return i18n.t("playlists.autoFavourites");
+      case "recently_added":
+        return i18n.t("playlists.autoRecentlyAdded");
+      case "most_played":
+        return i18n.t("playlists.autoMostPlayed");
+      case "history":
+        return i18n.t("playlists.autoHistory");
+      default: {
+        const pl = playlistsStore.playlists.find((p) => p.id === ap.playlistId);
+        return pl ? getPlaylistDisplayName(pl) : (ap.genre ?? ap.decade ?? ap.bpm ?? ap.artistTag ?? ap.kind);
+      }
+    }
   }
 
   function openItem(item: PinnedItem) {
@@ -30,6 +54,17 @@
         break;
       case "playlist":
         navigationStore.viewPlaylist(item.playlist.id);
+        break;
+      case "auto_playlist":
+        navigationStore.viewAutoPlaylist({
+          kind: item.autoPlaylist.kind,
+          genre: item.autoPlaylist.genre,
+          artistTag: item.autoPlaylist.artistTag,
+          decade: item.autoPlaylist.decade,
+          bpm: item.autoPlaylist.bpm,
+          playlistId: item.autoPlaylist.playlistId,
+          updated: item.autoPlaylist.updated,
+        });
         break;
     }
   }
@@ -140,6 +175,19 @@
           />
         {:else if item.type === "playlist"}
           <PlaylistCard playlist={item.playlist} onClick={() => openItem(item)} />
+        {:else if item.type === "auto_playlist"}
+          <AutoPlaylistCard
+            label={autoPlaylistLabel(item.autoPlaylist)}
+            kind={item.autoPlaylist.kind}
+            genre={item.autoPlaylist.genre}
+            artistTag={item.autoPlaylist.artistTag}
+            decade={item.autoPlaylist.decade}
+            bpm={item.autoPlaylist.bpm}
+            playlistId={item.autoPlaylist.playlistId}
+            updated={item.autoPlaylist.updated}
+            trackCount={item.autoPlaylist.trackCount}
+            onClick={() => openItem(item)}
+          />
         {:else}
           <PinnedSongCard song={item.song} onclick={() => openItem(item)} />
         {/if}

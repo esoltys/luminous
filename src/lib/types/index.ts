@@ -379,13 +379,57 @@ export type HomeItem =
 /** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
  * also allows Artist, since pins are explicitly user-curated across all four
  * browsable entity types. */
-export type PinnedItemType = "song" | "album" | "artist" | "playlist";
+export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_playlist";
+
+/** A pinned auto-playlist (genre/decade/BPM/artist-tag/Favourites/Recently
+ * Added/Most Played/History) — enough of {@link AutoPlaylistRef}'s shape for
+ * `AutoPlaylistCard` to render it directly. Favourites/Recently Added/Most
+ * Played/History have no backing playlist row, so `playlistId`/`updated` are
+ * absent for those kinds. */
+export interface AutoPlaylistItem {
+  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+  genre?: string;
+  artistTag?: string;
+  decade?: string;
+  bpm?: string;
+  playlistId?: number;
+  updated?: number;
+  trackCount: number;
+}
 
 export type PinnedItem =
   | { type: "song"; song: Song }
   | { type: "album"; album: AlbumItem }
   | { type: "artist"; artist: ArtistItem }
-  | { type: "playlist"; playlist: Playlist };
+  | { type: "playlist"; playlist: Playlist }
+  | { type: "auto_playlist"; autoPlaylist: AutoPlaylistItem };
+
+/** The stable ref_key for a pinned auto-playlist: the bare kind for
+ * Favourites/Recently Added/Most Played/History (no backing row to key on),
+ * or `kind:selector` for genre/decade/bpm/artist_tag — keyed by the selector
+ * value (genre name, decade, bpm spec, artist tag) rather than the
+ * materialized playlist's id, since that row can be dropped and recreated by
+ * a background sync while the selector stays stable. */
+export function autoPlaylistRefKeyFor(ref: {
+  kind: string;
+  genre?: string;
+  decade?: string;
+  bpm?: string;
+  artistTag?: string;
+}): string {
+  switch (ref.kind) {
+    case "genre":
+      return `genre:${ref.genre ?? ""}`;
+    case "decade":
+      return `decade:${ref.decade ?? ""}`;
+    case "bpm":
+      return `bpm:${ref.bpm ?? ""}`;
+    case "artist_tag":
+      return `artist_tag:${ref.artistTag ?? ""}`;
+    default:
+      return ref.kind;
+  }
+}
 
 /** The `(item_type, ref_key)` identity Luminous stores for a pin — song/playlist
  * id as a string, bare album title, or effective-artist name. Shared by the
@@ -401,6 +445,8 @@ export function pinnedRefKeyFor(item: PinnedItem): string {
       return item.artist.name ?? "";
     case "playlist":
       return String(item.playlist.id);
+    case "auto_playlist":
+      return autoPlaylistRefKeyFor(item.autoPlaylist);
   }
 }
 

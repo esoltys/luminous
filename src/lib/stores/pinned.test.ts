@@ -13,6 +13,7 @@ describe("PinnedStore", () => {
     { type: "album", album: { album: "Album A", artist: "Artist A" } as any },
     { type: "artist", artist: { name: "Artist A" } as any },
     { type: "playlist", playlist: { id: 5, name: "Playlist A" } as any },
+    { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: 12 } as any },
   ];
 
   beforeEach(() => {
@@ -36,11 +37,12 @@ describe("PinnedStore", () => {
 
   it("loads pinned items on refresh and reports isPinned per type/refKey", async () => {
     await pinnedStore.refresh();
-    expect(pinnedStore.items).toHaveLength(4);
+    expect(pinnedStore.items).toHaveLength(5);
     expect(pinnedStore.isPinned("song", "10")).toBe(true);
     expect(pinnedStore.isPinned("album", "Album A")).toBe(true);
     expect(pinnedStore.isPinned("artist", "Artist A")).toBe(true);
     expect(pinnedStore.isPinned("playlist", "5")).toBe(true);
+    expect(pinnedStore.isPinned("auto_playlist", "favourites")).toBe(true);
     expect(pinnedStore.isPinned("song", "999")).toBe(false);
   });
 

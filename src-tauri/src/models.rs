@@ -780,16 +780,47 @@ pub struct ArtistItem {
     pub genre: Option<String>,
 }
 
+/// A materialized or virtual auto-playlist referenced by a Home pin — mirrors
+/// the frontend's `AutoPlaylistRef` shape so `AutoPlaylistCard` can render a
+/// pinned auto-playlist without a second code path. Favourites/Recently
+/// Added/Most Played/History have no backing playlist row (`playlist_id`/
+/// `updated` are `None`); genre/decade/bpm/artist_tag are materialized rows,
+/// so those are populated from the matching `Playlist`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoPlaylistItem {
+    pub kind: String,
+    pub genre: Option<String>,
+    pub artist_tag: Option<String>,
+    pub decade: Option<String>,
+    pub bpm: Option<String>,
+    pub playlist_id: Option<i64>,
+    pub updated: Option<i64>,
+    pub track_count: i32,
+}
+
 /// A user-pinned Home-shelf entry (#222) — a superset of `HomeItem` that also
 /// allows Artist, since pins (unlike the system-curated rank/added rows) are
 /// explicitly user-curated across all four browsable entity types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PinnedItem {
-    Song { song: Box<Song> },
-    Album { album: AlbumItem },
-    Artist { artist: ArtistItem },
-    Playlist { playlist: Playlist },
+    Song {
+        song: Box<Song>,
+    },
+    Album {
+        album: AlbumItem,
+    },
+    Artist {
+        artist: ArtistItem,
+    },
+    Playlist {
+        playlist: Playlist,
+    },
+    #[serde(rename = "auto_playlist")]
+    AutoPlaylist {
+        auto_playlist: AutoPlaylistItem,
+    },
 }
 
 /// A social media or external platform link associated with an artist (#473).
