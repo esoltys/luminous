@@ -1,0 +1,72 @@
+name: Close Linked Issues
+
+# GitHub's own "Fixes #N"/"Closes #N" auto-close only fires when a PR merges
+# into the repository's default branch (main). This repo also merges 2.0 work
+# into `next` (see the Branching Model in AGENTS.md), so PRs merged there need
+# the same closing-keyword handling done explicitly.
+on:
+  pull_request:
+    types: [closed]
+    branches: [ "next" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  close-linked-issues:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues referenced by closing keywords
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            const keywordPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*#(\d+)/gi;
+            const text = `${context.payload.pull_request.title}\n${context.payload.pull_request.body ?? ""}`;
+            const issueNumbers = [...new Set([...text.matchAll(keywordPattern)].map(m => Number(m[1])))];
+
+            if (issueNumbers.length === 0) {
+              core.info("No closing keywords found in PR title/body.");
+              return;
+            }
+
+            for (const issueNumber of issueNumbers) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
+
+                if (issue.pull_request) {
+                  core.info(`#${issueNumber} is a pull request, not an issue — skipping.`);
+                  continue;
+                }
+                if (issue.state === "closed") {
+                  core.info(`#${issueNumber} is already closed.`);
+                  continue;
+                }
+
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  state: "closed",
+                  state_reason: "completed",
+                });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: `Closed by #${context.payload.pull_request.number}.`,
+                });
+                core.info(`Closed #${issueNumber}.`);
+              } catch (err) {
+                core.warning(`Could not close #${issueNumber}: ${err.message}`);
+              }
+            }

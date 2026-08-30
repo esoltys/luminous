@@ -207,6 +207,17 @@ verify with the user, not a reason to skip telling them.
 - Keep `next` current by periodically merging `main` into it (`git merge origin/main`, no
   automated sync) — at minimum before starting a new round of 2.0 work, and always right before
   eventually merging `next` back into `main`.
+- If the prior main→next sync landed as a squash commit (single parent, not a real merge — check
+  with `git show --no-patch --format='%P' <sync-commit>`), a plain `git merge origin/main` will
+  walk the full pre-squash history and throw spurious conflicts in every file `next` has touched
+  since, even where `main` hasn't changed that file at all since the last sync. Before resolving
+  any conflict by hand, diff the file between the last real sync point and current `main`
+  (`git diff <last-sync-commit> origin/main -- <file>`) — if it's empty, the conflict is a git
+  artifact and it's safe to keep `next`'s side (`git checkout --ours -- <file>`); only do real
+  content-level resolution where `main` actually changed the file. Also double check `package.json`
+  / `Cargo.toml` / `Cargo.lock` / `tauri.conf.json` version fields after any merge like this — a
+  clean (non-conflicting) auto-merge can still silently revert `next`'s version forward to
+  `main`'s, since git applies the one-sided line change without knowing it's semantically wrong.
 - When the "2.0" Milestone's issues are done, `next` merges into `main` via PR and becomes the
   new baseline. A fresh `next` (or renamed successor) gets cut for whatever comes after that.
 - **Interim releases**: 2.0 work that's already done and stable doesn't have to wait for the
