@@ -819,6 +819,7 @@ pub enum PinnedItem {
     },
     #[serde(rename = "auto_playlist")]
     AutoPlaylist {
+        #[serde(rename = "autoPlaylist")]
         auto_playlist: AutoPlaylistItem,
     },
 }
@@ -982,5 +983,34 @@ mod tests {
         };
 
         assert!(s1.is_same_album_or_cue_sibling(&s2));
+    }
+
+    // Regression test for a real bug: `#[serde(rename_all = "camelCase")]` on
+    // the `PinnedItem` enum only renames the variant tag, not the fields
+    // *inside* a struct variant — so `auto_playlist: AutoPlaylistItem` would
+    // silently serialize its key as `"auto_playlist"` while the frontend
+    // (types/index.ts) reads `item.autoPlaylist`, leaving it `undefined` and
+    // crashing `PinnedRow.svelte` on the very first render.
+    #[test]
+    fn pinned_item_auto_playlist_serializes_with_camel_case_type_and_field() {
+        let item = PinnedItem::AutoPlaylist {
+            auto_playlist: AutoPlaylistItem {
+                kind: "favourites".to_string(),
+                genre: None,
+                artist_tag: None,
+                decade: None,
+                bpm: None,
+                playlist_id: None,
+                updated: None,
+                track_count: 3,
+            },
+        };
+        let value = serde_json::to_value(&item).unwrap();
+        assert_eq!(value["type"], "auto_playlist");
+        assert!(
+            value.get("autoPlaylist").is_some(),
+            "expected a camelCase \"autoPlaylist\" key, got: {value}"
+        );
+        assert_eq!(value["autoPlaylist"]["trackCount"], 3);
     }
 }
