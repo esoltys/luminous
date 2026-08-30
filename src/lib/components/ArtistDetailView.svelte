@@ -522,7 +522,7 @@
     {#if singleSongs.length > 0}
       <div class="flex flex-col gap-3">
         <h2 class="text-xl font-semibold text-brand-text-primary">{i18n.t('artistDetail.singlesFilter', { count: singleSongs.length })}</h2>
-        <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden">
+        <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
           <SongTable
             rows={singleTableRows}
             mode="track"
