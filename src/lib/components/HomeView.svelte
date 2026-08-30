@@ -5,7 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, ArtistItem, ScanProgress } from "../types";
+  import type { HomeItem, ArtistItem, Song, ScanProgress } from "../types";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
@@ -50,12 +50,16 @@
     try {
       const [artists, frequent, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
-        invoke<HomeItem[]>("get_most_frequently_played", { limit: 5 }),
+        invoke<Song[]>("get_most_played_songs", { limit: 5 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 5 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
-      frequentlyPlayed = frequent;
+      // Flat per-song ranking (same definition/query as the "Most Played"
+      // auto-playlist, see #169) rather than the old context-grouped mix of
+      // Album/Song/Playlist cards — that grouping could show a whole album
+      // as "most played" from a single repeatedly-played track.
+      frequentlyPlayed = frequent.map((song) => ({ type: "song", song }) as const);
       recentlyAdded = added;
       featuredAlbums = featured;
     } catch (err) {

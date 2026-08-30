@@ -223,17 +223,6 @@ pub async fn clear_play_history(state: State<'_, AppState>) -> Result<(), String
 }
 
 #[tauri::command]
-pub async fn get_most_frequently_played(
-    limit: Option<i64>,
-    state: State<'_, AppState>,
-) -> Result<Vec<HomeItem>, String> {
-    let scanner = CollectionScanner::new(state.db.clone());
-    scanner
-        .get_most_frequently_played(limit.unwrap_or(10))
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn get_recently_added(
     limit: Option<i64>,
     state: State<'_, AppState>,
