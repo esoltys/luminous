@@ -410,19 +410,8 @@ pub async fn lookup_acoustid(
         _ => return Err(anyhow!("NO_API_KEY")),
     };
 
-    let masked_key = if client_key.len() > 4 {
-        format!(
-            "{}***{}",
-            &client_key[..2],
-            &client_key[client_key.len() - 2..]
-        )
-    } else {
-        "***".to_string()
-    };
-
     eprintln!(
-        "[Luminous Backend] AcoustID: Querying API lookup service via POST (client key: {}, duration: {}s)...",
-        masked_key,
+        "[Luminous Backend] AcoustID: Querying API lookup service via POST (duration: {}s)...",
         duration_sec
     );
 
