@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers } from "lucide-svelte";
+  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers, Pin, PinOff } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
@@ -106,6 +107,14 @@
         onclick={() => { onGoToAlbum?.(); onClose(); }}
       />
     {/if}
+
+    <ContextMenuItem
+      icon={pinnedStore.isPinned("song", String(song.id)) ? PinOff : Pin}
+      label={pinnedStore.isPinned("song", String(song.id))
+        ? i18n.t("playlists.contextMenuUnpinHome")
+        : i18n.t("playlists.contextMenuPinHome")}
+      onclick={() => { pinnedStore.toggle("song", String(song.id)); onClose(); }}
+    />
   {/if}
 
   <ContextMenuDivider />

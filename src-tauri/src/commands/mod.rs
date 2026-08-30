@@ -4,6 +4,7 @@ pub mod equalizer;
 pub mod loudness;
 pub mod lyrics;
 pub mod organizer;
+pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod settings;

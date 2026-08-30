@@ -511,7 +511,7 @@
       <div class="pt-2">
         {#if navigationStore.activeSubTab === "albums"}
         {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
             {#each sortedAlbums as album}
               <AlbumRowCard
                 {album}
@@ -534,7 +534,7 @@
         {/if}
         {:else if navigationStore.activeSubTab === "artists"}
         {#if activeViewMode === "rows"}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-2">
             {#each sortedArtists as artist}
               {@const artistAlbums = getArtistAlbumsFor(artist.name)}
               {@const artistSongs = getArtistSongsFor(artist.name)}

@@ -33,7 +33,7 @@
   tabindex="0"
   onclick={(e) => customClick?.(e)}
   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); customClick?.(e as unknown as MouseEvent); } }}
-  class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-center text-center outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
+  class="artist-card group bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col items-start text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
     <CoverStack
@@ -44,23 +44,23 @@
   </div>
 
   <span
-    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-center truncate w-full"
+    class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 text-left truncate w-full"
     title={i18n.t('collection.filterByArtist', { artist: artist.name || i18n.t('collection.unknownArtist') })}
   >
     {artist.name || i18n.t('collection.unknownArtist')}
   </span>
-  <div class="w-full mt-1.5 flex justify-center">
+  <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-left">
+    {i18n.t('playlists.songsCount', { count: artist.song_count })}
+  </span>
+  <div class="w-full mt-1.5 flex justify-start">
     {#if hasGenre}
       <GenreChips genre={artist.genre} />
     {:else}
-      <span class="text-xs text-brand-text-secondary font-medium truncate text-center">
+      <span class="text-xs text-brand-text-secondary font-medium truncate text-left">
         {i18n.t('artistDetail.unknownGenre')}
       </span>
     {/if}
   </div>
-  <span class="text-xs text-brand-text-secondary font-medium truncate w-full mt-0.5 text-center">
-    {i18n.t('playlists.songsCount', { count: artist.song_count })}
-  </span>
 </div>
 
 <style>

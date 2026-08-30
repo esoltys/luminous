@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -28,7 +29,9 @@
     MoreHorizontal,
     Eraser,
     Sparkles,
-    FolderPlus
+    FolderPlus,
+    Pin,
+    PinOff
   } from "lucide-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -725,6 +728,23 @@
                 <Radio class="w-4 h-4" />
                 <span>{i18n.t("playlists.makeActiveBtn")}</span>
               </Button>
+            {/if}
+            {#if !isQueue && activePlaylist}
+              <IconActionButton
+                onclick={() => pinnedStore.toggle("playlist", String(activePlaylist!.id))}
+                title={pinnedStore.isPinned("playlist", String(activePlaylist.id))
+                  ? i18n.t("playlists.contextMenuUnpinHome")
+                  : i18n.t("playlists.contextMenuPinHome")}
+                class="shrink-0"
+              >
+                {#snippet icon()}
+                  {#if pinnedStore.isPinned("playlist", String(activePlaylist.id))}
+                    <PinOff class="w-4 h-4" />
+                  {:else}
+                    <Pin class="w-4 h-4" />
+                  {/if}
+                {/snippet}
+              </IconActionButton>
             {/if}
             <ColumnSelector align="left" iconOnly />
           </div>

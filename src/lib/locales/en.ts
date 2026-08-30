@@ -57,8 +57,9 @@ export const en = {
     topArtists: "Top Artists",
     mostPlayed: "Top 5 Most Played",
     recentlyAdded: "Recently Added",
+    pinned: "Pinned",
     exploreLibrary: "Explore Your Library",
-    libraryOverview: "Explore your music collection: {songs} Songs • {albums} Albums • {artists} Artists",
+    libraryOverview: "Explore your music collection: {artists} Artists • {albums} Albums • {songs} Songs",
     emptyState: "Start adding music to see your personalized collections"
   },
   emptyLibrary: {
@@ -526,6 +527,8 @@ export const en = {
     contextMenuGoArtist: "Go to Artist",
     contextMenuGoAlbum: "Go to Album",
     contextMenuEditTags: "Edit Tags",
+    contextMenuPinHome: "Pin to Home",
+    contextMenuUnpinHome: "Unpin from Home",
     noFilterResults: "No songs match \"{query}\"",
     editSmartPlaylistBtn: "Edit Rules",
     smartRulePlaylistLabel: "Smart Rule Playlist",
@@ -803,6 +806,8 @@ export const en = {
     shuffleAndPlay: "Shuffle Play",
     editArtist: "Edit",
     editArtistTooltip: "Edit artist details, website, tags, and links",
+    pinHome: "Pin to Home",
+    unpinHome: "Unpin from Home",
     about: "About",
     links: "LINKS",
     showMore: "Show more",

@@ -10,6 +10,7 @@
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
   import HomeRowList from "./HomeRowList.svelte";
+  import PinnedRow from "./PinnedRow.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -112,6 +113,8 @@
         <div class="text-brand-text-secondary">{i18n.t('home.loading')}</div>
       </div>
     {:else}
+      <PinnedRow />
+
       {#if topArtists.length > 0}
         <HorizontalScrollRow title={i18n.t('home.topArtists')} onHeaderClick={viewTopArtists}>
           {#each topArtists as artist (artist.name)}

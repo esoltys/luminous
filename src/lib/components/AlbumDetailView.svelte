@@ -7,6 +7,7 @@
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
+  import { pinnedStore } from "../stores/pinned.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
@@ -23,7 +24,7 @@
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Plus, Edit3, RefreshCw } from "lucide-svelte";
+  import { Plus, Edit3, RefreshCw, Pin, PinOff } from "lucide-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -423,6 +424,20 @@
             title={i18n.t('albumDetail.refreshTooltip')}
           >
             {#snippet icon()}<RefreshCw class="w-4 h-4 {refreshing || collectionStore.isScanning ? 'animate-spin' : ''}" />{/snippet}
+          </IconActionButton>
+          <IconActionButton
+            onclick={() => pinnedStore.toggle("album", albumName)}
+            title={pinnedStore.isPinned("album", albumName)
+              ? i18n.t("playlists.contextMenuUnpinHome")
+              : i18n.t("playlists.contextMenuPinHome")}
+          >
+            {#snippet icon()}
+              {#if pinnedStore.isPinned("album", albumName)}
+                <PinOff class="w-4 h-4" />
+              {:else}
+                <Pin class="w-4 h-4" />
+              {/if}
+            {/snippet}
           </IconActionButton>
           <ColumnSelector align="left" iconOnly />
         </div>

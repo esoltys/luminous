@@ -376,6 +376,34 @@ export type HomeItem =
   | { type: "album"; album: AlbumItem }
   | { type: "playlist"; playlist: Playlist };
 
+/** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
+ * also allows Artist, since pins are explicitly user-curated across all four
+ * browsable entity types. */
+export type PinnedItemType = "song" | "album" | "artist" | "playlist";
+
+export type PinnedItem =
+  | { type: "song"; song: Song }
+  | { type: "album"; album: AlbumItem }
+  | { type: "artist"; artist: ArtistItem }
+  | { type: "playlist"; playlist: Playlist };
+
+/** The `(item_type, ref_key)` identity Luminous stores for a pin — song/playlist
+ * id as a string, bare album title, or effective-artist name. Shared by the
+ * pinned store and every pin/unpin entry point so they agree on how to key
+ * each item type. */
+export function pinnedRefKeyFor(item: PinnedItem): string {
+  switch (item.type) {
+    case "song":
+      return String(item.song.id);
+    case "album":
+      return item.album.album ?? "";
+    case "artist":
+      return item.artist.name ?? "";
+    case "playlist":
+      return String(item.playlist.id);
+  }
+}
+
 // What the user was inside when a play started — lets "Recently Played"
 // show an Album/Playlist card instead of always collapsing to a Song.
 export type PlayContext =
