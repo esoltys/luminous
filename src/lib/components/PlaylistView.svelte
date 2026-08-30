@@ -597,26 +597,18 @@
 <svelte:window onkeydown={handleDeleteKey} />
 
 <div class="flex-1 flex flex-col overflow-hidden bg-brand-main text-brand-text-secondary h-full relative select-none">
-  {#if currentCoverUrl}
+  {#if currentCoverUrl && isQueue}
     <div class="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
-      {#if isQueue}
-        {#key currentCoverUrl}
-          <img
-            src={currentCoverUrl}
-            alt=""
-            class="absolute inset-0 w-full h-full object-cover blur-2xl"
-            style="will-change: filter; transform: translateZ(0) scale(1.5);"
-            in:fade={{ duration: 400 }}
-          />
-        {/key}
-        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
-      {:else}
-        <div
-          class="absolute inset-0 bg-cover bg-center opacity-[0.12] scale-105 blur-[60px] saturate-[180%] transition-all duration-1000"
-          style="background-image: url('{currentCoverUrl}');"
-        ></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-transparent to-brand-main/20"></div>
-      {/if}
+      {#key currentCoverUrl}
+        <img
+          src={currentCoverUrl}
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover blur-2xl"
+          style="will-change: filter; transform: translateZ(0) scale(1.5);"
+          in:fade={{ duration: 400 }}
+        />
+      {/key}
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-brand-main"></div>
     </div>
   {/if}
 
@@ -825,7 +817,7 @@
     </div>
 
     <div class="p-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
+      <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden table-surface-blur">
         <SongTable
           rows={tableRows}
           rangeSelectionOrder={rangeSelectionRows}

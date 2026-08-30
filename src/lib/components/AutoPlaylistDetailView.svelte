@@ -590,7 +590,7 @@
   </div>
 
   <div class="px-6 py-6 flex flex-col" class:pb-28={!!playerStore.currentSong}>
-    <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden">
+    <div class="border border-brand-border/60 rounded-xl bg-brand-sidebar/30 backdrop-blur-md relative overflow-hidden table-surface-blur">
       <SongTable
         rows={tableRows}
         mode="position"
