@@ -630,7 +630,7 @@ impl CollectionScanner {
                 GROUP BY album
              ),
              base AS (
-                SELECT s.id, s.album,
+                SELECT s.id, s.album, s.playcount,
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
@@ -639,7 +639,8 @@ impl CollectionScanner {
              grouped AS (
                 SELECT MIN(effective_artist) AS effective_artist,
                        MIN(sort_artist) AS sort_artist,
-                       COUNT(*) AS song_count
+                       COUNT(*) AS song_count,
+                       SUM(COALESCE(playcount, 0)) AS total_playcount
                 FROM base
                 GROUP BY effective_artist COLLATE NOCASE
              )
@@ -661,7 +662,8 @@ impl CollectionScanner {
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
                 ) AS genre,
-                g.sort_artist
+                g.sort_artist,
+                g.total_playcount
              FROM grouped g
              ORDER BY g.sort_artist COLLATE NOCASE",
         )?;
@@ -673,6 +675,7 @@ impl CollectionScanner {
                     "song_count": row.get::<_, i32>(2)?,
                     "genre": row.get::<_, Option<String>>(3)?,
                     "sort_artist": row.get::<_, Option<String>>(4)?,
+                    "total_playcount": row.get::<_, i32>(5)?,
                 }))
             })?
             .filter_map(|r| r.ok())
@@ -1741,6 +1744,62 @@ mod tests {
             .unwrap();
         assert_eq!(full_artist["album_count"].as_i64(), Some(1));
         assert_eq!(full_artist["song_count"].as_i64(), Some(8));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Regression test for #169: the Artists tab's "Popularity" sort relies
+    /// on `get_artists()` exposing the same `total_playcount` aggregate as
+    /// `get_top_artists()`, so the two views agree on ranking.
+    #[test]
+    fn test_get_artists_exposes_total_playcount() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_artists_playcount_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, artist: &str, title: &str, playcount: i32| {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some(artist.to_string()),
+                    title: Some(title.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.execute(
+                "UPDATE songs SET playcount = ?1 WHERE path = ?2",
+                params![playcount, path],
+            )
+            .unwrap();
+        };
+
+        seed(r"C:\Music\Artist High\a.mp3", "Artist High", "A", 6);
+        seed(r"C:\Music\Artist High\b.mp3", "Artist High", "B", 4);
+        seed(r"C:\Music\Artist Low\a.mp3", "Artist Low", "A", 1);
+
+        let scanner = CollectionScanner::new(db.clone());
+        let artists = scanner.get_artists().unwrap();
+
+        let high = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist High"))
+            .unwrap();
+        assert_eq!(high["total_playcount"].as_i64(), Some(10));
+
+        let low = artists
+            .iter()
+            .find(|a| a["name"].as_str() == Some("Artist Low"))
+            .unwrap();
+        assert_eq!(low["total_playcount"].as_i64(), Some(1));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
