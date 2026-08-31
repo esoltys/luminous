@@ -1,6 +1,8 @@
 use crate::{
     collection::CollectionScanner,
-    models::{ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song},
+    models::{
+        ArtistProfile, HomeItem, LibraryStats, MusicDirectory, PruneResult, Song, TopAlbumItem,
+    },
     AppState,
 };
 use tauri::{AppHandle, State};
@@ -241,6 +243,17 @@ pub async fn get_featured_albums(
     let scanner = CollectionScanner::new(state.db.clone());
     scanner
         .get_featured_albums(limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_top_albums(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<TopAlbumItem>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_top_albums(limit.unwrap_or(10))
         .map_err(|e| e.to_string())
 }
 

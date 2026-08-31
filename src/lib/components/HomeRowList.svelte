@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
+  import type { HomeItem, Song, Playlist, AlbumItem, TopAlbumChartInfo } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -15,13 +15,15 @@
   import GenreChips from "./GenreChips.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
-  import { ChevronRight } from "lucide-svelte";
+  import { ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-svelte";
 
   interface Props {
     title?: string;
     items: HomeItem[];
-    /** "rank" shows a 01-05 numeral + track duration; "added" shows a relative added date. */
-    variant: "rank" | "added";
+    /** "rank" shows a 01-05 numeral + track duration; "added" shows a relative
+     * added date; "chart" shows each album's weekly chart rank, a movement
+     * indicator, and a peak-rank/weeks-on-chart stat (Home "Top Albums", #662). */
+    variant: "rank" | "added" | "chart";
     /** When provided, the title becomes a clickable button that navigates to
      * the category's full expanded view (see #169). */
     onHeaderClick?: () => void;
@@ -80,6 +82,24 @@
   function addedDateFor(item: HomeItem): string {
     if (variant !== "added" || item.type !== "song") return "";
     return formatRelativeDate(item.song.added);
+  }
+
+  function rankFor(item: HomeItem, index: number): number {
+    if (variant === "chart" && item.type === "album" && item.chart) return item.chart.rank;
+    return index + 1;
+  }
+
+  function movementLabel(movement: "new" | "rising" | "falling" | "steady"): string {
+    if (movement === "new") return i18n.t("home.chartNew");
+    if (movement === "rising") return i18n.t("home.chartRising");
+    if (movement === "falling") return i18n.t("home.chartFalling");
+    return i18n.t("home.chartSteady");
+  }
+
+  function peakWeeksLabel(chart: TopAlbumChartInfo): string {
+    return chart.weeks_on_chart === 1
+      ? i18n.t("home.chartPeakWeek", { peak: chart.peak_rank })
+      : i18n.t("home.chartPeakWeeks", { peak: chart.peak_rank, weeks: chart.weeks_on_chart });
   }
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
@@ -153,9 +173,9 @@
         onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(item); } }}
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
-        {#if variant === "rank"}
+        {#if variant === "rank" || variant === "chart"}
           <span class="w-5 shrink-0 text-center text-sm font-bold text-brand-text-secondary tabular-nums">
-            {String(i + 1).padStart(2, "0")}
+            {String(rankFor(item, i)).padStart(2, "0")}
           </span>
         {/if}
 
@@ -194,6 +214,29 @@
               <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
               <span class="shrink-0"><SongRating rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" /></span>
             </div>
+            {#if variant === "chart" && item.chart}
+              {@const chart = item.chart}
+              <div class="flex items-center justify-between gap-2">
+                <span
+                  class="flex items-center gap-1 text-xs font-semibold {chart.movement === 'rising' ? 'text-green-400' : chart.movement === 'falling' ? 'text-red-400' : 'text-brand-text-secondary'}"
+                  aria-label={movementLabel(chart.movement)}
+                  title={movementLabel(chart.movement)}
+                >
+                  {#if chart.movement === "new"}
+                    <span class="uppercase tracking-wide">{i18n.t('home.chartNew')}</span>
+                  {:else if chart.movement === "rising"}
+                    <TrendingUp class="w-3.5 h-3.5" />
+                  {:else if chart.movement === "falling"}
+                    <TrendingDown class="w-3.5 h-3.5" />
+                  {:else}
+                    <Minus class="w-3.5 h-3.5" />
+                  {/if}
+                </span>
+                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
+                  {peakWeeksLabel(chart)}
+                </span>
+              </div>
+            {/if}
           </div>
         {:else}
           <div class="min-w-0 flex-1">
