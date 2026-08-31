@@ -758,6 +758,27 @@ pub struct AlbumItem {
     pub total_duration_nanosec: i64,
 }
 
+/// One album's entry in the Home "Top Albums" weekly chart (#662) — an
+/// `AlbumItem` plus its position and trend within the current UTC calendar
+/// week, derived from `album_chart_history` snapshots (see
+/// `CollectionScanner::get_top_albums`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopAlbumItem {
+    pub album: AlbumItem,
+    pub rank: i32,
+    /// Rank in the prior UTC calendar week, or `None` if the album wasn't in
+    /// last week's top chart (shown as "new" rather than a numeric jump).
+    pub previous_rank: Option<i32>,
+    /// Best (lowest) rank this album has ever held across all recorded weeks,
+    /// including the current one.
+    pub peak_rank: i32,
+    /// Number of distinct weeks this album has appeared in the chart,
+    /// including the current one.
+    pub weeks_on_chart: i32,
+    /// "new" | "rising" | "falling" | "steady".
+    pub movement: String,
+}
+
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]

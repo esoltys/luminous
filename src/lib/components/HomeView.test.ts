@@ -5,7 +5,7 @@ import HomeView from "./HomeView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { HomeItem, ArtistItem, AlbumItem, Song, ScanProgress } from "../types";
+import type { HomeItem, ArtistItem, AlbumItem, TopAlbumItem, ScanProgress } from "../types";
 
 function makeArtist(overrides: Partial<ArtistItem> = {}): ArtistItem {
   return {
@@ -34,25 +34,14 @@ function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
   };
 }
 
-function makeSong(overrides: Partial<Song> = {}): Song {
+function makeTopAlbum(overrides: Partial<TopAlbumItem> = {}): TopAlbumItem {
   return {
-    id: 1,
-    source: "local_file",
-    filetype: "MP3",
-    title: "Wildflowers",
-    artist: "Tom Petty",
-    album: "Wildflowers",
-    art_embedded: false,
-    art_unset: false,
-    compilation: false,
-    beginning_nanosec: 0,
-    end_nanosec: 0,
-    rating: -1,
-    playcount: 0,
-    skipcount: 0,
-    length_nanosec: 195_000_000_000,
-    added: 1_700_000_000,
-    unavailable: false,
+    album: makeAlbum(),
+    rank: 1,
+    previous_rank: null,
+    peak_rank: 1,
+    weeks_on_chart: 1,
+    movement: "new",
     ...overrides,
   };
 }
@@ -69,14 +58,14 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 let mockTopArtists: ArtistItem[] = [];
-let mockFrequentlyPlayed: Song[] = [];
+let mockTopAlbums: TopAlbumItem[] = [];
 let mockRecentlyAdded: HomeItem[] = [];
 let mockFeaturedAlbums: HomeItem[] = [];
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string) => {
     if (cmd === "get_top_artists") return Promise.resolve(mockTopArtists);
-    if (cmd === "get_most_played_songs") return Promise.resolve(mockFrequentlyPlayed);
+    if (cmd === "get_top_albums") return Promise.resolve(mockTopAlbums);
     if (cmd === "get_recently_added") return Promise.resolve(mockRecentlyAdded);
     if (cmd === "get_featured_albums") return Promise.resolve(mockFeaturedAlbums);
     // collectionStore initializes itself on module load and expects this shape.
@@ -90,7 +79,7 @@ describe("HomeView.svelte", () => {
     vi.clearAllMocks();
     for (const key of Object.keys(listenCallbacks)) delete listenCallbacks[key];
     mockTopArtists = [];
-    mockFrequentlyPlayed = [];
+    mockTopAlbums = [];
     mockRecentlyAdded = [];
     mockFeaturedAlbums = [];
     collectionStore.stats = {
@@ -109,7 +98,7 @@ describe("HomeView.svelte", () => {
 
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("get_top_artists", { limit: 15 });
-      expect(invoke).toHaveBeenCalledWith("get_most_played_songs", { limit: 5 });
+      expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
       expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 5 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
     });
@@ -145,14 +134,14 @@ describe("HomeView.svelte", () => {
     });
   });
 
-  it("hides the Explore Your Library row in favor of Most Played once play history exists", async () => {
-    mockFrequentlyPlayed = [makeSong({ title: "Most Played Song" })];
+  it("hides the Explore Your Library row in favor of Top 10 Albums once play history exists", async () => {
+    mockTopAlbums = [makeTopAlbum({ album: makeAlbum({ album: "Chart Topper" }) })];
     mockFeaturedAlbums = [{ type: "album", album: makeAlbum({ album: "Discover Me" }) }];
 
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getByText("Top 5 Most Played")).toBeInTheDocument();
+      expect(screen.getByText("Top 10 Albums")).toBeInTheDocument();
     });
     expect(screen.queryByText("Explore Your Library")).not.toBeInTheDocument();
   });

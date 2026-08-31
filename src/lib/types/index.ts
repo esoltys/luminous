@@ -255,6 +255,19 @@ export interface AlbumItem {
   total_duration_nanosec: number;
 }
 
+/** One album's entry in the Home "Top Albums" weekly chart (#662). */
+export interface TopAlbumItem {
+  album: AlbumItem;
+  rank: number;
+  /** Rank in the prior UTC calendar week, or null if not in last week's chart ("new"). */
+  previous_rank: number | null;
+  /** Best (lowest) rank this album has ever held, including the current week. */
+  peak_rank: number;
+  /** Distinct weeks this album has appeared in the chart, including the current one. */
+  weeks_on_chart: number;
+  movement: "new" | "rising" | "falling" | "steady";
+}
+
 export interface ArtistItem {
   name: string | null;
   sort_artist?: string | null;
@@ -373,8 +386,13 @@ export function resolveArtUrl(art: string | null | undefined): string | null {
 
 export type HomeItem =
   | { type: "song"; song: Song }
-  | { type: "album"; album: AlbumItem }
+  | { type: "album"; album: AlbumItem; chart?: TopAlbumChartInfo }
   | { type: "playlist"; playlist: Playlist };
+
+/** Chart metadata attached to an Album {@link HomeItem} for `HomeRowList`'s
+ * `variant="chart"` (the Home "Top Albums" row, #662) — carries the same
+ * fields as {@link TopAlbumItem} minus the (redundant) nested `album`. */
+export type TopAlbumChartInfo = Omit<TopAlbumItem, "album">;
 
 /** A user-pinned Home-shelf entry (#222) — a superset of {@link HomeItem} that
  * also allows Artist, since pins are explicitly user-curated across all four

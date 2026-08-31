@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 21;
+pub const CURRENT_SCHEMA_VERSION: i32 = 22;
 
 struct Migration {
     version: i32,
@@ -138,6 +138,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 21,
         description: "pinned_items table for user-curated Home shelf (#222)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_21)?),
+    },
+    Migration {
+        version: 22,
+        description: "album_chart_history table for the weekly Top Albums chart (#662)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_22)?),
     },
 ];
 
@@ -636,6 +641,27 @@ CREATE TABLE IF NOT EXISTS pinned_items (
     pinned_at INTEGER NOT NULL,
     PRIMARY KEY (item_type, ref_key)
 );
+";
+
+// ---------------------------------------------------------------------------
+// Migration 22: album_chart_history — weekly snapshot of the Home "Top
+// Albums" chart ranking (#662). Written lazily (no scheduler): each call to
+// `CollectionScanner::get_top_albums` upserts the current UTC calendar
+// week's rows, then reads prior weeks from this table to derive movement,
+// peak rank, and weeks-on-chart. `album_key` matches the raw album title
+// convention already used by `album_ratings` (see `stats::set_album_rating`).
+// ---------------------------------------------------------------------------
+const MIGRATION_22: &str = "
+CREATE TABLE IF NOT EXISTS album_chart_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period_start INTEGER NOT NULL,
+    album_key TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    play_count INTEGER NOT NULL,
+    UNIQUE(period_start, album_key)
+);
+CREATE INDEX IF NOT EXISTS idx_album_chart_history_album_key ON album_chart_history(album_key);
+CREATE INDEX IF NOT EXISTS idx_album_chart_history_period ON album_chart_history(period_start DESC);
 ";
 
 // ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ use super::{
 };
 use crate::models::{
     AlbumItem, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats, Playlist,
-    QueuePopulationMode, Song,
+    QueuePopulationMode, Song, TopAlbumItem,
 };
 use anyhow::Result;
 use rusqlite::{params, ToSql};
@@ -965,7 +965,173 @@ impl CollectionScanner {
         attach_album_ratings(&conn, &mut items)?;
         Ok(items)
     }
+
+    /// Weekly "Top Albums" chart (#662): albums ranked by play count within
+    /// the current UTC calendar week (Monday 00:00 UTC through Sunday
+    /// 23:59:59 UTC), with movement (new/rising/falling/steady) against the
+    /// prior week, peak rank, and weeks-on-chart. Backed by a snapshot table
+    /// (`album_chart_history`, migration 22) written lazily on each call —
+    /// there's no scheduler in this codebase, so the current week's rows are
+    /// upserted here every time, which is idempotent and keeps the snapshot
+    /// current as new plays land during the week.
+    pub fn get_top_albums(&self, limit: i64) -> Result<Vec<TopAlbumItem>> {
+        self.get_top_albums_at(limit, chrono::Utc::now().timestamp())
+    }
+
+    /// `now`-parameterized core of `get_top_albums`, split out so tests can
+    /// drive multiple synthetic weeks deterministically.
+    fn get_top_albums_at(&self, limit: i64, now: i64) -> Result<Vec<TopAlbumItem>> {
+        let conn = self.db.pool.get()?;
+        let period_start = week_start_utc(now);
+
+        // Rank this week's albums by play count. Every result must be an
+        // Album card regardless of track count (unlike
+        // group_songs_into_home_items, which falls back to a Song card for
+        // single-track "albums"), so this dedups by album name directly
+        // instead of reusing that helper.
+        let query_limit = limit * 20;
+        let home_item_select_cols = home_item_select_cols();
+        let sql = format!(
+            "SELECT {home_item_select_cols}, wc.week_plays
+             FROM songs s
+             JOIN (
+                 SELECT s2.album AS album, COUNT(*) AS week_plays
+                 FROM play_history ph
+                 JOIN songs s2 ON s2.id = ph.song_id
+                 WHERE ph.played_at >= ?1
+                   AND s2.source IN (1, 2) AND s2.unavailable = 0
+                   AND s2.album IS NOT NULL AND s2.album != ''
+                 GROUP BY s2.album
+             ) wc ON wc.album = s.album
+             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             ORDER BY wc.week_plays DESC, s.added DESC
+             LIMIT ?2"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows: Vec<(Song, i64, i64, i64)> = stmt
+            .query_map(params![period_start, query_limit], |row| {
+                let song = row_to_song(row)?;
+                let album_track_count: i64 = row.get(SONG_SELECT_COL_COUNT)?;
+                let album_disc_count: i64 = row.get(SONG_SELECT_COL_COUNT + 1)?;
+                let week_plays: i64 = row.get(SONG_SELECT_COL_COUNT + 2)?;
+                Ok((song, album_track_count, album_disc_count, week_plays))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut seen_albums = std::collections::HashSet::new();
+        let mut ranked: Vec<(AlbumItem, i64)> = Vec::new();
+        for (song, album_track_count, album_disc_count, week_plays) in rows {
+            if ranked.len() >= limit as usize {
+                break;
+            }
+            let Some(album_name) = song.album.clone() else {
+                continue;
+            };
+            if album_name.trim().is_empty() || !seen_albums.insert(album_name.clone()) {
+                continue;
+            }
+            let artist_name = song
+                .album_artist
+                .clone()
+                .or_else(|| song.artist.clone())
+                .unwrap_or_default();
+            ranked.push((
+                AlbumItem {
+                    artist: Some(artist_name),
+                    album: Some(album_name),
+                    year: song.year,
+                    track_count: album_track_count as i32,
+                    disc_count: album_disc_count as i32,
+                    art_embedded: song.art_embedded,
+                    art_automatic: song.art_automatic.clone(),
+                    art_manual: song.art_manual.clone(),
+                    genre: song.genre.clone(),
+                    sample_song_id: Some(song.id),
+                    rating: crate::stats::RATING_UNRATED,
+                    total_duration_nanosec: 0,
+                },
+                week_plays,
+            ));
+        }
+
+        // Upsert this week's snapshot before reading history, so a "new"
+        // entry's own row already counts toward its weeks-on-chart/peak-rank
+        // below.
+        for (i, (album, week_plays)) in ranked.iter().enumerate() {
+            let rank = (i + 1) as i32;
+            if let Some(ref name) = album.album {
+                conn.execute(
+                    "INSERT INTO album_chart_history (period_start, album_key, rank, play_count)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(period_start, album_key)
+                     DO UPDATE SET rank = excluded.rank, play_count = excluded.play_count",
+                    params![period_start, name, rank, week_plays],
+                )?;
+            }
+        }
+
+        let previous_period_start = period_start - SECONDS_PER_WEEK;
+        let mut result = Vec::with_capacity(ranked.len());
+        for (i, (mut album, _week_plays)) in ranked.into_iter().enumerate() {
+            let rank = (i + 1) as i32;
+            let name = album.album.clone().unwrap_or_default();
+            album.rating = crate::stats::get_album_rating(&conn, &name)?;
+
+            let previous_rank: Option<i32> = conn
+                .query_row(
+                    "SELECT rank FROM album_chart_history WHERE period_start = ?1 AND album_key = ?2",
+                    params![previous_period_start, name],
+                    |r| r.get(0),
+                )
+                .ok();
+            let peak_rank: i32 = conn
+                .query_row(
+                    "SELECT MIN(rank) FROM album_chart_history WHERE album_key = ?1",
+                    params![name],
+                    |r| r.get(0),
+                )
+                .unwrap_or(rank);
+            let weeks_on_chart: i32 = conn
+                .query_row(
+                    "SELECT COUNT(DISTINCT period_start) FROM album_chart_history WHERE album_key = ?1",
+                    params![name],
+                    |r| r.get(0),
+                )
+                .unwrap_or(1);
+            let movement = match previous_rank {
+                None => "new",
+                Some(prev) if prev > rank => "rising",
+                Some(prev) if prev < rank => "falling",
+                _ => "steady",
+            }
+            .to_string();
+
+            result.push(TopAlbumItem {
+                album,
+                rank,
+                previous_rank,
+                peak_rank,
+                weeks_on_chart,
+                movement,
+            });
+        }
+        Ok(result)
+    }
 }
+
+/// Start (UTC unix timestamp, Monday 00:00:00) of the calendar week
+/// containing `now`. Pure integer arithmetic on the UTC unix timestamp — no
+/// DST to account for in UTC, so no need for chrono here. 1970-01-01 (day 0)
+/// was a Thursday, i.e. Monday-based weekday index 3.
+fn week_start_utc(now: i64) -> i64 {
+    const SECONDS_PER_DAY: i64 = 86_400;
+    let days_since_epoch = now.div_euclid(SECONDS_PER_DAY);
+    let weekday = (days_since_epoch + 3).rem_euclid(7);
+    (days_since_epoch - weekday) * SECONDS_PER_DAY
+}
+
+const SECONDS_PER_WEEK: i64 = 7 * 86_400;
 
 fn group_songs_into_home_items(
     songs_with_counts: Vec<(Song, i64, i64)>,
@@ -2595,6 +2761,132 @@ mod tests {
         let all = get_all_artist_profiles_conn(&conn).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].artist_key, "Shania Twain");
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_week_start_utc_rounds_down_to_monday() {
+        // Wed 2024-01-10 12:00:00 UTC -> Mon 2024-01-08 00:00:00 UTC.
+        assert_eq!(week_start_utc(1_704_888_000), 1_704_672_000);
+        // Exactly a Monday midnight is its own week start.
+        assert_eq!(week_start_utc(1_704_672_000), 1_704_672_000);
+        // Sun 2024-01-14 23:59:59 UTC is still the same week as the above Monday.
+        assert_eq!(week_start_utc(1_705_276_799), 1_704_672_000);
+    }
+
+    #[test]
+    fn test_get_top_albums_tracks_movement_peak_and_weeks_on_chart() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_top_albums_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let conn = db.pool.get().unwrap();
+
+        let seed = |path: &str, album: &str| -> i64 {
+            upsert_song(
+                &conn,
+                &Song {
+                    artist: Some("Some Artist".to_string()),
+                    album: Some(album.to_string()),
+                    title: Some(path.to_string()),
+                    source: SongSource::LocalFile,
+                    path: Some(path.to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            conn.query_row(
+                "SELECT id FROM songs WHERE path = ?1",
+                params![path],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+
+        let record_play = |song_id: i64, played_at: i64| {
+            conn.execute(
+                "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
+                params![song_id, played_at],
+            )
+            .unwrap();
+        };
+
+        let rising_id = seed(r"C:\Music\rising.mp3", "Rising Album");
+        let falling_id = seed(r"C:\Music\falling.mp3", "Falling Album");
+        let steady_id = seed(r"C:\Music\steady.mp3", "Steady Album");
+        let new_id = seed(r"C:\Music\brandnew.mp3", "Brand New Album");
+
+        let scanner = CollectionScanner::new(db.clone());
+
+        // Week 1 (Monday 2024-01-01 00:00:00 UTC): everything is "new".
+        let week1_now = 1_704_153_600 + 3600; // a bit into week 1
+        for _ in 0..1 {
+            record_play(rising_id, 1_704_153_600 + 10);
+        }
+        for _ in 0..5 {
+            record_play(falling_id, 1_704_153_600 + 20);
+        }
+        for _ in 0..3 {
+            record_play(steady_id, 1_704_153_600 + 30);
+        }
+        let week1 = scanner.get_top_albums_at(10, week1_now).unwrap();
+        let by_album = |items: &[TopAlbumItem], album: &str| -> TopAlbumItem {
+            items
+                .iter()
+                .find(|i| i.album.album.as_deref() == Some(album))
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(by_album(&week1, "Falling Album").rank, 1);
+        assert_eq!(by_album(&week1, "Falling Album").movement, "new");
+        assert_eq!(by_album(&week1, "Falling Album").peak_rank, 1);
+        assert_eq!(by_album(&week1, "Falling Album").weeks_on_chart, 1);
+
+        // Week 2 (Monday 2024-01-08): rising overtakes falling, steady stays
+        // put, and a brand-new album enters the chart.
+        let week2_base = 1_704_672_000;
+        let week2_now = week2_base + 3600;
+        for _ in 0..10 {
+            record_play(rising_id, week2_base + 10);
+        }
+        for _ in 0..1 {
+            record_play(falling_id, week2_base + 20);
+        }
+        for _ in 0..3 {
+            record_play(steady_id, week2_base + 30);
+        }
+        for _ in 0..2 {
+            record_play(new_id, week2_base + 40);
+        }
+        let week2 = scanner.get_top_albums_at(10, week2_now).unwrap();
+
+        let rising = by_album(&week2, "Rising Album");
+        assert_eq!(rising.rank, 1);
+        assert_eq!(rising.previous_rank, Some(3));
+        assert_eq!(rising.movement, "rising");
+        assert_eq!(rising.peak_rank, 1);
+        assert_eq!(rising.weeks_on_chart, 2);
+
+        let falling = by_album(&week2, "Falling Album");
+        assert_eq!(falling.previous_rank, Some(1));
+        assert_eq!(falling.movement, "falling");
+        assert_eq!(falling.peak_rank, 1);
+        assert_eq!(falling.weeks_on_chart, 2);
+
+        let steady = by_album(&week2, "Steady Album");
+        assert_eq!(steady.previous_rank, Some(2));
+        assert_eq!(steady.rank, steady.previous_rank.unwrap());
+        assert_eq!(steady.movement, "steady");
+
+        let brand_new = by_album(&week2, "Brand New Album");
+        assert_eq!(brand_new.previous_rank, None);
+        assert_eq!(brand_new.movement, "new");
+        assert_eq!(brand_new.weeks_on_chart, 1);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

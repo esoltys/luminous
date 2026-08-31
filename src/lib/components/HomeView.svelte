@@ -5,7 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, ArtistItem, Song, ScanProgress } from "../types";
+  import type { HomeItem, ArtistItem, TopAlbumItem, ScanProgress } from "../types";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import ArtistCard from "./ArtistCard.svelte";
@@ -16,7 +16,7 @@
   import { rememberScroll } from "../utils/scrollMemory";
 
   let topArtists = $state<ArtistItem[]>([]);
-  let frequentlyPlayed = $state<HomeItem[]>([]);
+  let topAlbums = $state<HomeItem[]>([]);
   let recentlyAdded = $state<HomeItem[]>([]);
   let featuredAlbums = $state<HomeItem[]>([]);
   let isLoading = $state(true);
@@ -49,18 +49,23 @@
   async function loadCuratedData() {
     isLoading = true;
     try {
-      const [artists, frequent, added, featured] = await Promise.all([
+      const [artists, top, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
-        invoke<Song[]>("get_most_played_songs", { limit: 5 }),
+        invoke<TopAlbumItem[]>("get_top_albums", { limit: 10 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 5 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
-      // Flat per-song ranking (same definition/query as the "Most Played"
-      // auto-playlist, see #169) rather than the old context-grouped mix of
-      // Album/Song/Playlist cards — that grouping could show a whole album
-      // as "most played" from a single repeatedly-played track.
-      frequentlyPlayed = frequent.map((song) => ({ type: "song", song }) as const);
+      // Album-scoped, trend-aware ranking (#662) — replaces the old flat
+      // all-time play-count mix of Album/Song/Playlist cards.
+      topAlbums = top.map(
+        (t) =>
+          ({
+            type: "album",
+            album: t.album,
+            chart: { rank: t.rank, previous_rank: t.previous_rank, peak_rank: t.peak_rank, weeks_on_chart: t.weeks_on_chart, movement: t.movement },
+          }) as const
+      );
       recentlyAdded = added;
       featuredAlbums = featured;
     } catch (err) {
@@ -130,15 +135,10 @@
         </HorizontalScrollRow>
       {/if}
 
-      {#if frequentlyPlayed.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
+      {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {#if frequentlyPlayed.length > 0}
-            <HomeRowList
-              title={i18n.t('home.mostPlayed')}
-              items={frequentlyPlayed}
-              variant="rank"
-              onHeaderClick={() => navigationStore.viewAutoPlaylist({ kind: "most_played" })}
-            />
+          {#if topAlbums.length > 0}
+            <HomeRowList title={i18n.t('home.topAlbums')} items={topAlbums} variant="chart" />
           {:else if featuredAlbums.length > 0}
             <HomeRowList title={i18n.t('home.exploreLibrary')} items={featuredAlbums} variant="added" />
           {/if}
@@ -153,7 +153,7 @@
         </div>
       {/if}
 
-      {#if topArtists.length === 0 && frequentlyPlayed.length === 0 && recentlyAdded.length === 0}
+      {#if topArtists.length === 0 && topAlbums.length === 0 && recentlyAdded.length === 0}
         <div class="flex items-center justify-center py-16">
           <LibraryWelcome />
         </div>
