@@ -372,16 +372,27 @@ impl TagManager {
     // -----------------------------------------------------------------
 
     /// The persisted hierarchy: one [`TagGroup`] per `tag_groups` row, each
-    /// with its assigned children and current song counts (any-position
-    /// match, matching [`Self::list_all_tags`]'s semantics). A tag that's
-    /// also the name of some `tag_groups` row never appears as a child here
-    /// — `reconcile_hierarchy` strips that link before this is read.
+    /// with its assigned children. A child's `song_count` is an any-position
+    /// match on its own literal tag value, matching [`Self::list_all_tags`]'s
+    /// semantics. A card's own `song_count` is a *rollup* (#651): the number
+    /// of distinct songs carrying the card's own genre value or any of its
+    /// curated children's values, so dragging a chip between cards (which
+    /// only rewrites `tag_assignments`, never a song's `genre` column) is
+    /// reflected in both cards' totals — a song matching more than one of a
+    /// card's genres is still only counted once. A tag that's also the name
+    /// of some `tag_groups` row never appears as a child here —
+    /// `reconcile_hierarchy` strips that link before this is read.
     pub fn get_tag_hierarchy(&self) -> Result<Vec<TagGroup>> {
         let conn = self.db.pool.get()?;
-        let counts = Self::compute_tags(&self.all_song_genre_lists()?)
+        let lists = self.all_song_genre_lists()?;
+        let counts = Self::compute_tags(&lists)
             .into_iter()
             .map(|t| (t.name.to_lowercase(), t.song_count))
             .collect::<HashMap<_, _>>();
+        let song_key_sets: Vec<HashSet<String>> = lists
+            .iter()
+            .map(|values| values.iter().map(|v| v.to_lowercase()).collect())
+            .collect();
 
         let mut group_stmt = conn.prepare(
             "SELECT id, name, color_index FROM tag_groups ORDER BY sort_order, name COLLATE NOCASE",
@@ -402,7 +413,7 @@ impl TagManager {
         let groups = groups_raw
             .into_iter()
             .map(|(id, name, color_index)| {
-                let children = children_raw
+                let children: Vec<TagGroupChild> = children_raw
                     .iter()
                     .filter(|(group_id, _)| *group_id == id)
                     .map(|(_, child_name)| TagGroupChild {
@@ -410,8 +421,17 @@ impl TagManager {
                         name: child_name.clone(),
                     })
                     .collect();
+
+                let mut rollup_keys: HashSet<String> =
+                    children.iter().map(|c| c.name.to_lowercase()).collect();
+                rollup_keys.insert(name.to_lowercase());
+                let song_count = song_key_sets
+                    .iter()
+                    .filter(|song_keys| !song_keys.is_disjoint(&rollup_keys))
+                    .count() as i64;
+
                 TagGroup {
-                    song_count: counts.get(&name.to_lowercase()).copied().unwrap_or(0),
+                    song_count,
                     color_index,
                     name,
                     children,
@@ -1321,6 +1341,62 @@ mod tests {
             .children
             .iter()
             .any(|c| c.name == "Progressive Metal"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// #651: a card's own `song_count` must be a rollup of itself plus its
+    /// curated children, so dragging a chip between cards (which only
+    /// rewrites `tag_assignments`) moves song count between the two card
+    /// totals instead of leaving both unchanged.
+    #[test]
+    fn test_card_song_count_is_a_rollup_of_its_curated_children() {
+        let (db, dir) = test_db();
+        let manager = TagManager::new(db.clone());
+
+        // Seed the hierarchy first so "Soft Rock" gets curated under "Pop"
+        // (it's never a song's position-0 value, so it's never mistaken for
+        // a root of its own) before adding the rest of the library.
+        insert_song(&db, "/seed.mp3", "Pop; Soft Rock");
+        manager.reconcile_hierarchy().unwrap();
+
+        insert_song(&db, "/pop-2.mp3", "Pop");
+        insert_song(&db, "/pop-3.mp3", "Pop");
+        insert_song(&db, "/pop-4.mp3", "Pop");
+        // Only carries "Soft Rock" literally, no "Pop" — reaches Pop's
+        // rollup purely through the curated child, matching the drag
+        // scenario's intent that these songs "belong" to whichever card the
+        // chip is under.
+        insert_song(&db, "/soft-rock.mp3", "Soft Rock");
+        insert_song(&db, "/rock-1.mp3", "Rock");
+        insert_song(&db, "/rock-2.mp3", "Rock");
+        insert_song(&db, "/rock-3.mp3", "Rock");
+        manager.reconcile_hierarchy().unwrap();
+
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+        let pop = hierarchy.iter().find(|g| g.name == "Pop").unwrap();
+        assert_eq!(
+            pop.song_count, 5,
+            "seed + 3 Pop-only + the Soft-Rock-only song via rollup"
+        );
+        let rock = hierarchy.iter().find(|g| g.name == "Rock").unwrap();
+        assert_eq!(rock.song_count, 3, "no children yet, just the 3 Rock songs");
+
+        manager.reparent_tag("Soft Rock", "Rock").unwrap();
+        let hierarchy = manager.get_tag_hierarchy().unwrap();
+
+        let pop = hierarchy.iter().find(|g| g.name == "Pop").unwrap();
+        assert_eq!(
+            pop.song_count, 4,
+            "loses the Soft-Rock-only song's rollup contribution"
+        );
+        let rock = hierarchy.iter().find(|g| g.name == "Rock").unwrap();
+        assert_eq!(
+            rock.song_count, 5,
+            "gains the rollup contribution of both songs carrying Soft Rock — \
+             the dedicated Soft-Rock-only song and the seed song, which \
+             also carries Soft Rock even though its main tag is Pop"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }
