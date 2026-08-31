@@ -163,6 +163,12 @@ pub async fn save_song_tags(
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
+    // Close the timing race the coarse guard above can't (#514): the OS's own
+    // change notification for this write may arrive after the guard's grace
+    // window elapses, so track the exact path too.
+    state
+        .self_writes
+        .mark_written(std::iter::once(path.clone()));
 
     // 2. Write metadata back to disk (blocking lofty write in threadpool)
     // The single-song tag editor has no compilation toggle (that's an
@@ -336,6 +342,12 @@ pub async fn save_album_tags(
         }
     }
 
+    // See save_song_tags — close the timing race the coarse guard above can't
+    // (#514) by tracking every path this batch is about to write.
+    state
+        .self_writes
+        .mark_written(songs_data.iter().map(|m| std::path::PathBuf::from(&m.path)));
+
     let album_c = album.clone();
     let albumsort_c = albumsort.clone();
     // Normalize to the canonical `; `-delimited, trimmed, deduped form
@@ -438,6 +450,10 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
+    // See save_song_tags — close the timing race the coarse guard above can't (#514).
+    state
+        .self_writes
+        .mark_written(std::iter::once(path.clone()));
     let path_clone = path.clone();
     tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
         .await
@@ -484,6 +500,11 @@ pub async fn clear_album_cover_art(
             paths.push((song_id, std::path::PathBuf::from(path_str)));
         }
     }
+
+    // See save_song_tags — close the timing race the coarse guard above can't (#514).
+    state
+        .self_writes
+        .mark_written(paths.iter().map(|(_, p)| p.clone()));
 
     let cleared: Vec<(i64, std::path::PathBuf)> = tauri::async_runtime::spawn_blocking(move || {
         paths
