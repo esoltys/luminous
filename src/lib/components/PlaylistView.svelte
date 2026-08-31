@@ -64,7 +64,7 @@
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const PLAYLIST_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     title: "2fr", artist: "1.5fr", album: "1.5fr",
-    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px",
+    composer: "1.5fr", album_artist: "1.5fr", format: "64px", year: "60px", originalyear: "60px",
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
