@@ -671,6 +671,8 @@ export const en = {
     albumField: "Album",
     trackField: "Track Number",
     yearField: "Year",
+    originalYearField: "Original Year",
+    originalYearTooltip: "Year of the original release, if this is a reissue or remaster",
     genreField: "Genre",
     genrePlaceholder: "Add a genre...",
     genreTooltip: "Drag chips to reorder — the first value is treated as the main genre in the Genres tab, the rest as subgenres of it.",

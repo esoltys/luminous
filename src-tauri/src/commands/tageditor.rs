@@ -28,6 +28,7 @@ pub struct SongDetails {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
+    pub originalyear: Option<u32>,
     pub grouping: String,
     pub bpm: Option<f32>,
     pub initial_key: String,
@@ -44,7 +45,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                grouping, bpm, initial_key, rating, compilation, art_embedded
+                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -66,12 +67,13 @@ pub async fn get_song_details(
                 track: row.get(14).ok(),
                 disc: row.get(15).ok(),
                 year: row.get(16).ok(),
-                grouping: row.get(17).unwrap_or_default(),
-                bpm: row.get(18).ok(),
-                initial_key: row.get(19).unwrap_or_default(),
-                rating: row.get(20).unwrap_or(crate::stats::RATING_UNRATED),
-                compilation: row.get(21).unwrap_or(false),
-                art_embedded: row.get(22).unwrap_or(false),
+                originalyear: row.get(17).ok(),
+                grouping: row.get(18).unwrap_or_default(),
+                bpm: row.get(19).ok(),
+                initial_key: row.get(20).unwrap_or_default(),
+                rating: row.get(21).unwrap_or(crate::stats::RATING_UNRATED),
+                compilation: row.get(22).unwrap_or(false),
+                art_embedded: row.get(23).unwrap_or(false),
             })
         },
     )
@@ -143,6 +145,7 @@ pub async fn save_song_tags(
     track: Option<u32>,
     disc: Option<u32>,
     year: Option<u32>,
+    originalyear: Option<u32>,
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
@@ -215,6 +218,7 @@ pub async fn save_song_tags(
                 track,
                 disc,
                 year,
+                originalyear,
                 grouping: &grouping_c,
                 bpm,
                 initial_key: &initial_key_c,
@@ -244,10 +248,11 @@ pub async fn save_song_tags(
             track = ?13,
             disc = ?14,
             year = ?15,
-            grouping = ?16,
-            bpm = ?17,
-            initial_key = ?18
-         WHERE id = ?19",
+            originalyear = ?16,
+            grouping = ?17,
+            bpm = ?18,
+            initial_key = ?19
+         WHERE id = ?20",
         rusqlite::params![
             title,
             titlesort,
@@ -264,6 +269,7 @@ pub async fn save_song_tags(
             track,
             disc,
             year,
+            originalyear,
             grouping,
             bpm,
             initial_key,
@@ -310,6 +316,7 @@ pub async fn save_album_tags(
         composer: String,
         composersort: Option<String>,
         track: Option<u32>,
+        originalyear: Option<u32>,
         grouping: String,
         bpm: Option<f32>,
         initial_key: String,
@@ -318,7 +325,7 @@ pub async fn save_album_tags(
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, grouping, bpm, initial_key
+            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
@@ -331,9 +338,10 @@ pub async fn save_album_tags(
                     composer: row.get(5).unwrap_or_default(),
                     composersort: row.get(6).ok(),
                     track: row.get(7).ok(),
-                    grouping: row.get(8).unwrap_or_default(),
-                    bpm: row.get(9).ok(),
-                    initial_key: row.get(10).unwrap_or_default(),
+                    originalyear: row.get(8).ok(),
+                    grouping: row.get(9).unwrap_or_default(),
+                    bpm: row.get(10).ok(),
+                    initial_key: row.get(11).unwrap_or_default(),
                 })
             },
         );
@@ -381,6 +389,7 @@ pub async fn save_album_tags(
                     track: item.track,
                     disc,
                     year,
+                    originalyear: item.originalyear,
                     grouping: &item.grouping,
                     bpm: item.bpm,
                     initial_key: &item.initial_key,

@@ -703,6 +703,8 @@ export const fr = {
     albumField: "Album",
     trackField: "Numéro de piste",
     yearField: "Année",
+    originalYearField: "Année d'origine",
+    originalYearTooltip: "Année de la sortie originale, s'il s'agit d'une réédition ou d'un remaster",
     genreField: "Genre",
     genrePlaceholder: "Ajouter un genre...",
     genreTooltip: "Glissez les tags pour les réorganiser — la première valeur est traitée comme le genre principal dans l'onglet Genres, les autres comme ses sous-genres.",
