@@ -44,6 +44,7 @@ export interface VisibleColumns {
   path: boolean;
   samplerate: boolean;
   year: boolean;
+  originalyear: boolean;
   // Luminous-derived columns
   actions: boolean;
   added: boolean;
@@ -131,6 +132,7 @@ class CollectionStore {
         path: false,
         samplerate: false,
         year: true,
+        originalyear: false,
         // Luminous-derived columns
         actions: true,
         added: false,

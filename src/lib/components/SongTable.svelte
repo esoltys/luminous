@@ -319,6 +319,7 @@
     artist_tag: { i18nKey: "collection.tableHeaderArtistTag", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     format: { i18nKey: "collection.tableHeaderFormat", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     year: { i18nKey: "collection.tableHeaderYear", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
+    originalyear: { i18nKey: "collection.tableHeaderOriginalYear", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     genre: { i18nKey: "collection.tableHeaderGenre", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     grouping: { i18nKey: "collection.tableHeaderGrouping", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     bpm: { i18nKey: "collection.tableHeaderBpm", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
@@ -475,6 +476,10 @@
   {:else if col.key === "year"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.year || "—"}
+    </div>
+  {:else if col.key === "originalyear"}
+    <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
+      {song.originalyear || "—"}
     </div>
   {:else if col.key === "genre"}
     <div class="truncate pr-2 min-w-0" title={song.genre}>

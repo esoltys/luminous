@@ -37,6 +37,7 @@
   let track = $state<number | null>(null);
   let disc = $state<number | null>(null);
   let year = $state<number | null>(null);
+  let originalYear = $state<number | null>(null);
   let grouping = $state("");
   let bpm = $state<number | null>(null);
   let initialKey = $state("");
@@ -91,6 +92,7 @@
         track: number | null;
         disc: number | null;
         year: number | null;
+        originalyear: number | null;
         grouping: string;
         bpm: number | null;
         initial_key: string;
@@ -114,6 +116,7 @@
       track = details.track;
       disc = details.disc;
       year = details.year;
+      originalYear = details.originalyear;
       grouping = details.grouping;
       bpm = details.bpm;
       initialKey = details.initial_key;
@@ -205,6 +208,7 @@
         track,
         disc,
         year,
+        originalyear: originalYear,
         grouping,
         bpm,
         initialKey,
@@ -442,6 +446,21 @@
                 }}
                 size="sm"
                 highlighted={changedFields.has('year')}
+                class="w-full"
+              />
+            </FormField>
+
+            <FormField label={i18n.t('tagEditor.originalYearField')} for="tag-originalyear" tooltip={i18n.t('tagEditor.originalYearTooltip')}>
+              <Input
+                id="tag-originalyear"
+                type="number"
+                value={originalYear ?? ""}
+                disabled={isSaving}
+                oninput={(e) => {
+                  const val = parseInt(e.currentTarget.value, 10);
+                  originalYear = isNaN(val) ? null : val;
+                }}
+                size="sm"
                 class="w-full"
               />
             </FormField>

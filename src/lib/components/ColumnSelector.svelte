@@ -80,6 +80,7 @@
     { key: "genre",       label: "collection.columnGenre" },
     { key: "grouping",    label: "collection.columnGrouping" },
     { key: "initial_key", label: "collection.columnInitialKey" },
+    { key: "originalyear",label: "collection.columnOriginalYear" },
     { key: "path",        label: "collection.columnPath" },
     { key: "samplerate",  label: "collection.columnSampleRate" },
     { key: "title",       label: "collection.columnTitle" },

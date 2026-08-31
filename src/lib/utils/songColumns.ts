@@ -20,6 +20,7 @@ export const SONG_TABLE_COLUMNS: { key: keyof VisibleColumns; field?: keyof Song
   { key: "artist_tag",   field: "artist_tag" as keyof Song, label: "collection.columnArtistTag" },
   { key: "format",       field: "filetype",       label: "collection.columnFormat" },
   { key: "year",         field: "year",           label: "collection.columnYear" },
+  { key: "originalyear", field: "originalyear",   label: "collection.columnOriginalYear" },
   { key: "genre",        field: "genre",          label: "collection.columnGenre" },
   { key: "grouping",     field: "grouping",       label: "collection.columnGrouping" },
   { key: "bpm",          field: "bpm",            label: "collection.columnBpm" },

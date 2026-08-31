@@ -106,6 +106,7 @@ pub struct TagWriteRequest<'a> {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<u32>,
+    pub originalyear: Option<u32>,
     pub grouping: &'a str,
     pub bpm: Option<f32>,
     pub initial_key: &'a str,
@@ -114,7 +115,7 @@ pub struct TagWriteRequest<'a> {
 
 /// Write the given tag fields to `path`'s primary tag, creating one if the
 /// file has none yet. Every field is written unconditionally — `Option`
-/// fields (`track`, `disc`, `year`, `bpm`) are cleared from the file when
+/// fields (`track`, `disc`, `year`, `originalyear`, `bpm`) are cleared from the file when
 /// `None` rather than left untouched, so callers must pass the full desired
 /// state, not a partial patch. Preserves any existing embedded cover art,
 /// which lofty's tag-mutation calls would otherwise silently drop (#106).
@@ -137,6 +138,7 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         track,
         disc,
         year,
+        originalyear,
         grouping,
         bpm,
         initial_key,
@@ -276,6 +278,17 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
     } else {
         tag.remove_date();
         tag.remove_key(lofty::tag::ItemKey::Year);
+    }
+
+    if let Some(y) = originalyear {
+        // No Accessor helper exists for the original release date (unlike
+        // set_date()/RecordingDate), so write ItemKey::OriginalReleaseDate
+        // (ID3v2 TDOR, MP4/Vorbis equivalents) directly as a plain year
+        // string — read_tags() parses it back with the same relaxed
+        // Timestamp parsing used for RecordingDate.
+        tag.insert_text(lofty::tag::ItemKey::OriginalReleaseDate, y.to_string());
+    } else {
+        tag.remove_key(lofty::tag::ItemKey::OriginalReleaseDate);
     }
 
     if tag.pictures().is_empty() && !original_pictures.is_empty() {
@@ -801,6 +814,51 @@ mod tests {
         assert_eq!(song.composer.as_deref(), Some("McCartney"));
         assert_eq!(song.composersort.as_deref(), Some("McCartney, Paul"));
         assert_eq!(song.genre.as_deref(), Some("Rock"));
+    }
+
+    #[test]
+    fn test_write_tags_round_trips_originalyear() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock",
+                year: Some(2009),
+                originalyear: Some(1969),
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let song = crate::collection::read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.year, Some(2009));
+        assert_eq!(song.originalyear, Some(1969));
+
+        // Clearing originalyear (None) must remove it from the file without
+        // touching the unrelated year field, mirroring how every other
+        // Option field in TagWriteRequest is cleared rather than left as-is.
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock",
+                year: Some(2009),
+                ..Default::default()
+            },
+        )
+        .expect("write_tags with cleared originalyear should succeed");
+
+        let song = crate::collection::read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.year, Some(2009));
+        assert_eq!(song.originalyear, None);
     }
 
     #[tokio::test]
