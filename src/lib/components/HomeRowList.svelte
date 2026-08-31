@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { HomeItem, Song, Playlist, AlbumItem } from "../types";
+  import type { HomeItem, Song, Playlist, AlbumItem, TopAlbumChartInfo } from "../types";
   import { playerStore } from "../stores/player.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -94,6 +94,12 @@
     if (movement === "rising") return i18n.t("home.chartRising");
     if (movement === "falling") return i18n.t("home.chartFalling");
     return i18n.t("home.chartSteady");
+  }
+
+  function peakWeeksLabel(chart: TopAlbumChartInfo): string {
+    return chart.weeks_on_chart === 1
+      ? i18n.t("home.chartPeakWeek", { peak: chart.peak_rank })
+      : i18n.t("home.chartPeakWeeks", { peak: chart.peak_rank, weeks: chart.weeks_on_chart });
   }
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
@@ -227,7 +233,7 @@
                   {/if}
                 </span>
                 <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
-                  {i18n.t('home.chartPeakWeeks', { peak: chart.peak_rank, weeks: chart.weeks_on_chart })}
+                  {peakWeeksLabel(chart)}
                 </span>
               </div>
             {/if}
