@@ -60,6 +60,8 @@ pub struct AppState {
     /// without one's release re-arming the watcher while the other is still
     /// writing.
     pub watcher_paused: Arc<std::sync::atomic::AtomicU32>,
+    /// Path-aware companion to `watcher_paused` — see `collection::SelfWriteTracker` (#514).
+    pub self_writes: Arc<collection::SelfWriteTracker>,
     pub startup_file: Mutex<Option<String>>,
     /// OS "Now Playing" integration handle (#80) — `None` when the platform
     /// integration failed to initialize (unsupported desktop, no session
@@ -718,6 +720,7 @@ pub fn run() {
             }
 
             let watcher_paused = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            let self_writes = Arc::new(collection::SelfWriteTracker::new());
 
             let state = AppState {
                 db,
@@ -728,6 +731,7 @@ pub fn run() {
                 cover_manager,
                 watcher,
                 watcher_paused,
+                self_writes,
                 startup_file: Mutex::new(startup_path),
                 media_session,
                 minimize_to_tray,

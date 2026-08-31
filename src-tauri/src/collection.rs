@@ -47,7 +47,7 @@ mod query;
 mod reconcile;
 mod watcher;
 pub(crate) use reconcile::resolve_case_insensitive_path;
-pub use watcher::{start_watcher, WatcherPauseGuard};
+pub use watcher::{start_watcher, SelfWriteTracker, WatcherPauseGuard};
 
 #[derive(Debug)]
 pub struct CollectionScanner {

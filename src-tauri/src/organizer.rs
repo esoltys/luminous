@@ -918,6 +918,7 @@ fn verify_case_on_disk(path: &Path) -> io::Result<bool> {
 pub fn execute_apply(
     db: &Database,
     watcher_paused: &Arc<AtomicU32>,
+    self_writes: &Arc<crate::collection::SelfWriteTracker>,
     items: &[OrganizeApplyItem],
     clean_empty_dirs: bool,
     move_extra_files: bool,
@@ -925,6 +926,15 @@ pub fn execute_apply(
 ) -> Result<OrganizeResult> {
     let _watcher_pause_guard =
         crate::collection::WatcherPauseGuard::new(Arc::clone(watcher_paused));
+
+    // See tageditor's save_song_tags — close the timing race the coarse guard
+    // above can't (#514) by tracking both halves of every move: the source
+    // path (about to disappear) and the destination path (about to appear).
+    self_writes.mark_written(
+        items
+            .iter()
+            .flat_map(|item| [PathBuf::from(&item.from_path), PathBuf::from(&item.to_path)]),
+    );
 
     let mut moved_count = 0;
     let mut skipped_count = 0;
@@ -1645,7 +1655,9 @@ mod tests {
         }];
 
         let watcher_paused = Arc::new(AtomicU32::new(0));
-        let result = execute_apply(&db, &watcher_paused, &items, true, true, None).unwrap();
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result =
+            execute_apply(&db, &watcher_paused, &self_writes, &items, true, true, None).unwrap();
         assert_eq!(result.moved_count, 1);
         assert!(result.errors.is_empty());
 
@@ -1725,7 +1737,17 @@ mod tests {
         }];
 
         let watcher_paused = Arc::new(AtomicU32::new(0));
-        let result = execute_apply(&db, &watcher_paused, &items, false, false, None).unwrap();
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result = execute_apply(
+            &db,
+            &watcher_paused,
+            &self_writes,
+            &items,
+            false,
+            false,
+            None,
+        )
+        .unwrap();
         assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
         assert_eq!(result.moved_count, 1);
 
@@ -1856,7 +1878,17 @@ mod tests {
             .collect();
 
         let watcher_paused = Arc::new(AtomicU32::new(0));
-        let result = execute_apply(&db, &watcher_paused, &apply_items, false, false, None).unwrap();
+        let self_writes = Arc::new(crate::collection::SelfWriteTracker::new());
+        let result = execute_apply(
+            &db,
+            &watcher_paused,
+            &self_writes,
+            &apply_items,
+            false,
+            false,
+            None,
+        )
+        .unwrap();
         assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
 
         // Re-running preview after Apply must show every song as Unchanged now —

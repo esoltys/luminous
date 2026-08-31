@@ -12,11 +12,13 @@ use anyhow::Result;
 use notify::Watcher;
 use rusqlite::params;
 use std::{
-    path::PathBuf,
+    collections::HashMap,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, AtomicU64, Ordering},
         Arc,
     },
+    time::Instant,
 };
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -59,6 +61,66 @@ impl Drop for WatcherPauseGuard {
             std::thread::sleep(WATCHER_UNPAUSE_GRACE);
             flag.fetch_sub(1, Ordering::Relaxed);
         });
+    }
+}
+
+/// How long a path stays "recently self-written" after [`SelfWriteTracker::mark_written`].
+/// Generous relative to `WATCHER_UNPAUSE_GRACE` on purpose: this is the
+/// fallback for when the OS's own change notification arrives *later* than
+/// that grace window already covers (#514) — 30s comfortably covers even a
+/// heavily loaded disk/AV scan without risking suppressing a genuine external
+/// edit to the same file made shortly after Luminous's own write.
+const SELF_WRITE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Tracks paths Luminous itself just wrote, independent of and in addition to
+/// [`WatcherPauseGuard`]. The guard's pause window is purely time-based and
+/// covers the whole watcher regardless of path — if the OS's own change
+/// notification for a self-inflicted write is delayed past that window
+/// (plausible under disk/AV/cloud-sync load, more likely the more files one
+/// guarded operation touches), the watcher can't tell it apart from a
+/// genuine external change and re-reports it, producing a spurious
+/// "songs updated" toast for an edit the user already knows about (#514).
+///
+/// Callers that know the exact path(s) they're about to write should call
+/// [`Self::mark_written`] once they've resolved them (typically right after
+/// acquiring a `WatcherPauseGuard`, once the path is read from the DB); the
+/// watcher thread then skips any event for a tracked path regardless of how
+/// late it arrives, until the entry expires after [`SELF_WRITE_TTL`].
+#[derive(Default)]
+pub struct SelfWriteTracker {
+    inner: parking_lot::Mutex<HashMap<PathBuf, Instant>>,
+}
+
+impl SelfWriteTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Records `paths` as just-written and sweeps out any previously tracked
+    /// path that's aged past [`SELF_WRITE_TTL`], keeping the map from growing
+    /// unbounded without needing a separate background sweep thread.
+    pub fn mark_written(&self, paths: impl IntoIterator<Item = PathBuf>) {
+        self.mark_written_at(paths, Instant::now());
+    }
+
+    fn mark_written_at(&self, paths: impl IntoIterator<Item = PathBuf>, now: Instant) {
+        let mut map = self.inner.lock();
+        for path in paths {
+            map.insert(path, now);
+        }
+        map.retain(|_, marked_at| now.duration_since(*marked_at) < SELF_WRITE_TTL);
+    }
+
+    /// Whether `path` was marked written within the last [`SELF_WRITE_TTL`].
+    pub fn contains_recent(&self, path: &Path) -> bool {
+        self.contains_recent_at(path, Instant::now())
+    }
+
+    fn contains_recent_at(&self, path: &Path, now: Instant) -> bool {
+        self.inner
+            .lock()
+            .get(path)
+            .is_some_and(|marked_at| now.duration_since(*marked_at) < SELF_WRITE_TTL)
     }
 }
 
@@ -298,6 +360,7 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     // Spawn the background thread to handle watcher events
     let db_for_thread = Arc::clone(&db);
     let watcher_paused = Arc::clone(&state.watcher_paused);
+    let self_writes = Arc::clone(&state.self_writes);
     std::thread::Builder::new()
         .name("luminous-watcher".to_string())
         .spawn(move || {
@@ -384,6 +447,15 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
                         continue;
                     };
                     for path in event.paths {
+                        // A late-arriving OS notification for a path Luminous
+                        // itself just wrote (tag edit, cover art, organize
+                        // move, ...) — skip it regardless of whether the
+                        // coarse `watcher_paused` window above has already
+                        // elapsed, since that's exactly the race this exists
+                        // to close (#514).
+                        if self_writes.contains_recent(&path) {
+                            continue;
+                        }
                         if !path.exists() {
                             removed_paths.insert(path);
                         } else if path.is_file() && super::is_audio_file(&path) {
@@ -618,6 +690,47 @@ mod tests {
             RemoveKind::File
         )));
         assert!(is_mutating_watcher_event(&EventKind::Any));
+    }
+
+    #[test]
+    fn test_self_write_tracker_suppresses_recent_path() {
+        let tracker = SelfWriteTracker::new();
+        let path = PathBuf::from("/music/song.mp3");
+        tracker.mark_written(std::iter::once(path.clone()));
+        assert!(tracker.contains_recent(&path));
+    }
+
+    #[test]
+    fn test_self_write_tracker_ignores_unmarked_path() {
+        let tracker = SelfWriteTracker::new();
+        tracker.mark_written(std::iter::once(PathBuf::from("/music/a.mp3")));
+        assert!(!tracker.contains_recent(&PathBuf::from("/music/b.mp3")));
+    }
+
+    #[test]
+    fn test_self_write_tracker_expires_after_ttl() {
+        let tracker = SelfWriteTracker::new();
+        let path = PathBuf::from("/music/song.mp3");
+        let now = Instant::now();
+        let marked_at = now - (SELF_WRITE_TTL + std::time::Duration::from_secs(1));
+        tracker.mark_written_at(std::iter::once(path.clone()), marked_at);
+        assert!(!tracker.contains_recent_at(&path, now));
+    }
+
+    #[test]
+    fn test_self_write_tracker_mark_written_sweeps_expired_entries() {
+        let tracker = SelfWriteTracker::new();
+        let stale_path = PathBuf::from("/music/stale.mp3");
+        let fresh_path = PathBuf::from("/music/fresh.mp3");
+        let now = Instant::now();
+        let stale_at = now - (SELF_WRITE_TTL + std::time::Duration::from_secs(1));
+        tracker.mark_written_at(std::iter::once(stale_path.clone()), stale_at);
+
+        // A later mark_written call should sweep the stale entry out.
+        tracker.mark_written_at(std::iter::once(fresh_path.clone()), now);
+
+        assert!(!tracker.contains_recent_at(&stale_path, now));
+        assert!(tracker.contains_recent_at(&fresh_path, now));
     }
 
     #[test]

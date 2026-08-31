@@ -1,5 +1,5 @@
 use crate::{
-    collection::WatcherPauseGuard,
+    collection::{SelfWriteTracker, WatcherPauseGuard},
     models::{GenreGroup, QueuePopulationMode, Song, Tag, TagGroup},
     tags::TagManager,
     AppState,
@@ -218,10 +218,16 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
 /// whose on-disk write succeeded.
 async fn rewrite_genre_and_persist(
     conn: r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>,
+    self_writes: &Arc<SelfWriteTracker>,
     song_ids: &[i64],
     rewrite_genre: impl Fn(&str) -> String + Send + 'static,
 ) -> Result<u32, String> {
     let metas = load_full_metadata(&conn, song_ids);
+
+    // See tageditor's save_song_tags — close the timing race the coarse
+    // watcher-pause guard can't (#514) by tracking every path about to be
+    // rewritten.
+    self_writes.mark_written(metas.iter().map(|m| std::path::PathBuf::from(&m.path)));
 
     let (updated_count, writes): (u32, Vec<(i64, String)>) =
         tauri::async_runtime::spawn_blocking(move || {
@@ -301,10 +307,11 @@ pub async fn merge_tags(
 
     let from_c = from.clone();
     let into_c = into.clone();
-    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
-        TagManager::rewrite_genre_for_merge(genre, &from_c, &into_c)
-    })
-    .await?;
+    let updated_count =
+        rewrite_genre_and_persist(conn, &state.self_writes, &song_ids, move |genre| {
+            TagManager::rewrite_genre_for_merge(genre, &from_c, &into_c)
+        })
+        .await?;
 
     manager
         .apply_merge_hierarchy(&from, &into)
@@ -339,10 +346,11 @@ pub async fn delete_tags(
     let song_ids: Vec<i64> = affected.iter().map(|(id, _, _)| *id).collect();
 
     let names_c = names.clone();
-    let updated_count = rewrite_genre_and_persist(conn, &song_ids, move |genre| {
-        TagManager::rewrite_genre_for_delete(genre, &names_c)
-    })
-    .await?;
+    let updated_count =
+        rewrite_genre_and_persist(conn, &state.self_writes, &song_ids, move |genre| {
+            TagManager::rewrite_genre_for_delete(genre, &names_c)
+        })
+        .await?;
 
     manager
         .apply_delete_hierarchy(&names)
