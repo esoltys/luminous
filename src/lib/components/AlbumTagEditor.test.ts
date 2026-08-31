@@ -333,6 +333,21 @@ describe("AlbumTagEditor.svelte", () => {
     });
   });
 
+  it("shows the real Album Artist as an editable field for a compilation-flagged album whose artist isn't literally Various Artists", async () => {
+    const onClose = vi.fn();
+    const { getByLabelText, getByText, queryByText } = render(AlbumTagEditor, {
+      songIds: [101],
+      initialAlbum: "Greatest Hits",
+      initialAlbumArtist: "Artist A",
+      initialCompilation: true,
+      onClose,
+    });
+
+    expect(getByLabelText("Album Artist")).toBeInTheDocument();
+    expect(getByText("Artist A")).toBeInTheDocument();
+    expect(queryByText("Various Artists")).not.toBeInTheDocument();
+  });
+
   it("disables Clear Embedded Artwork when no track in the album has embedded art", async () => {
     const onClose = vi.fn();
     const { getByRole } = render(AlbumTagEditor, {

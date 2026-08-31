@@ -204,7 +204,7 @@
           </FormField>
 
           <FormField label={i18n.t('albumTagEditor.albumArtistField')} for="album-tag-albumartist" span2>
-            {#if compilation}
+            {#if compilation && albumArtist === VARIOUS_ARTISTS}
               <div class="flex items-center h-9">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
                   {VARIOUS_ARTISTS}

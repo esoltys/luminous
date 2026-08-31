@@ -89,6 +89,25 @@ describe("TagEditor.svelte", () => {
     expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
   });
 
+  it("shows the real Album Artist in the read-only pill for a compilation-flagged track whose artist isn't literally Various Artists", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, album_artist: "Artist A", compilation: true };
+      }
+      if (cmd === "get_library_snapshot") return { songs: [], albums: [], artists: [] };
+      return null;
+    });
+
+    const onClose = vi.fn();
+    const { getByText, queryByText, queryByLabelText } = render(TagEditor, { songId: 10, onClose });
+
+    await waitFor(() => {
+      expect(getByText("Artist A")).toBeInTheDocument();
+    });
+    expect(queryByText("Various Artists")).not.toBeInTheDocument();
+    expect(queryByLabelText("Album Artist")).not.toBeInTheDocument();
+  });
+
   it("calls onClose when cancel button is clicked", async () => {
     const onClose = vi.fn();
     const { getByRole } = render(TagEditor, { songId: 10, onClose });
