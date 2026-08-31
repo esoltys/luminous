@@ -4,8 +4,8 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "error: cargo is not installed or not on PATH." >&2
+if ! command -v rustfmt >/dev/null 2>&1; then
+  echo "error: rustfmt is not installed or not on PATH." >&2
   exit 1
 fi
 
@@ -20,14 +20,10 @@ if [ ${#rust_files[@]} -eq 0 ]; then
   exit 0
 fi
 
-echo "Formatting staged Rust files in src-tauri with cargo fmt..."
-cargo fmt --manifest-path src-tauri/Cargo.toml
+echo "Formatting staged Rust files in src-tauri with rustfmt..."
+rustfmt --edition 2021 "${rust_files[@]}"
 
 echo "Re-adding formatted Rust files to the index..."
-while IFS= read -r -d '' file; do
-  case "$file" in
-    *.rs) git add -- "$file" ;;
-  esac
-done < <(git diff --name-only -z --diff-filter=AM -- src-tauri)
+git add -- "${rust_files[@]}"
 
-echo "cargo fmt completed and rust files in src-tauri have been re-staged."
+echo "rustfmt completed and staged rust files in src-tauri have been re-staged."
