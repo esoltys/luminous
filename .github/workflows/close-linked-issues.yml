@@ -59,12 +59,6 @@ jobs:
                   state: "closed",
                   state_reason: "completed",
                 });
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body: `Closed by #${context.payload.pull_request.number}.`,
-                });
                 core.info(`Closed #${issueNumber}.`);
               } catch (err) {
                 core.warning(`Could not close #${issueNumber}: ${err.message}`);
