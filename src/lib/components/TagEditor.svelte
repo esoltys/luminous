@@ -414,7 +414,7 @@
               {#if compilation}
                 <div class="flex items-center h-9">
                   <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand-border bg-brand-main text-xs font-semibold text-brand-text-primary">
-                    Various Artists
+                    {albumArtist}
                     <Lock class="w-3 h-3 text-brand-text-secondary shrink-0" />
                   </span>
                 </div>
