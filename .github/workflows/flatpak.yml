@@ -36,7 +36,7 @@ jobs:
       - name: Lint manifest
         run: |
           docker run --rm -v "$PWD":/mnt ghcr.io/flathub/flatpak-builder-lint:latest \
-            manifest --gha-format /mnt/flatpak/org.luminous.music.yml
+            manifest --gha-format /mnt/flatpak/io.github.esoltys.Luminous.yml
 
       - name: Lint AppStream metainfo
         run: |
@@ -59,11 +59,11 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: luminous.flatpak
-          manifest-path: flatpak/org.luminous.music.yml
+          manifest-path: flatpak/io.github.esoltys.Luminous.yml
           # Keyed on the manifest and dependency-source files (not github.sha) so
           # unrelated commits reuse the cache; only manifest/dependency changes
           # invalidate it. See #520 (analogous to #390's rust-cache fix).
-          cache-key: flatpak-builder-${{ hashFiles('flatpak/org.luminous.music.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/io.github.esoltys.Luminous.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
           build-bundle: true
           run-tests: false
           upload-artifact: true

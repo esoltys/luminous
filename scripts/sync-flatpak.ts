@@ -91,7 +91,7 @@ function currentVersion(): string {
 // understand bun.lock) can vendor JS deps for an offline build. `playwright`
 // is dropped so the generator doesn't try to vendor a Chromium download —
 // browser-driven tests aren't run as part of building the app. See the
-// comment above build-commands in flatpak/org.luminous.music.yml.
+// comment above build-commands in flatpak/io.github.esoltys.Luminous.yml.
 function syncNodeSnapshot(targetDir: string) {
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, "package.json"), "utf-8"));
   delete pkg.devDependencies?.playwright;

@@ -6,17 +6,17 @@
 //   1. New-app submission (this script's default target): open a PR against
 //      a NEW BRANCH named after the app id on flathub/flathub, containing
 //      just the manifest + generated sources at the branch root. Flathub's
-//      infra creates flathub/org.luminous.music from that branch once merged
-//      — see https://docs.flathub.org/docs/for-app-authors/submission.
-//   2. Post-acceptance updates: once flathub/org.luminous.music exists, point
-//      REPO at "flathub/org.luminous.music" instead and this script opens a
-//      normal PR against its main branch. .github/workflows/flatpak-publish.yml
-//      is an alternative to this step — it pushes an accepted build straight
-//      into Flathub's build pipeline via flat-manager on every release tag,
-//      once a FLATHUB_TOKEN repo secret exists (see #476).
+//      infra creates flathub/io.github.esoltys.Luminous from that branch once
+//      merged — see https://docs.flathub.org/docs/for-app-authors/submission.
+//   2. Post-acceptance updates: once flathub/io.github.esoltys.Luminous exists,
+//      point REPO at "flathub/io.github.esoltys.Luminous" instead and this
+//      script opens a normal PR against its main branch.
+//      .github/workflows/flatpak-publish.yml is an alternative to this step —
+//      it pushes an accepted build straight into Flathub's build pipeline via
+//      flat-manager on every release tag, once a FLATHUB_TOKEN repo secret
+//      exists (see #476).
 //
-// This has not been run against the real flathub/flathub repo yet — dry-run
-// (--dry-run) and read the diff in scratch/ before ever pushing/opening a PR
+// Always dry-run (--dry-run) and read the diff before pushing/opening a PR
 // for a real submission.
 import { execSync } from "child_process";
 import * as fs from "fs";
@@ -27,9 +27,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-const APP_ID = "org.luminous.music";
+// Deliberately not org.luminous.music (the app's internal Tauri identifier,
+// used by .deb/.rpm) — Flathub requires a controlled domain for a reverse-DNS
+// id, which music.luminous.org isn't. See the comment atop
+// flatpak/io.github.esoltys.Luminous.yml for the full rationale.
+const APP_ID = "io.github.esoltys.Luminous";
 
-// Switch to "esoltys/org.luminous.music" (or wherever it lands) once accepted.
+// Switch to "esoltys/io.github.esoltys.Luminous" (or wherever it lands) once accepted.
 const REPO = process.env.FLATHUB_SUBMIT_REPO ?? "flathub/flathub";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
 
@@ -51,8 +55,8 @@ async function main() {
   const branchName = REPO === "flathub/flathub" ? APP_ID : "master";
   // New-app submissions branch off flathub/flathub's `new-pr` branch, not its
   // `master` — see https://github.com/flathub/flathub/blob/master/CONTRIBUTING.md.
-  // Post-acceptance updates against flathub/org.luminous.music branch off its
-  // normal `master`.
+  // Post-acceptance updates against flathub/io.github.esoltys.Luminous branch
+  // off its normal `master`.
   const baseBranch = REPO === "flathub/flathub" ? "new-pr" : "master";
 
   // Build the submission manifest: same as the in-repo one, but with the
