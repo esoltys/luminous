@@ -134,8 +134,14 @@ async function main() {
   console.log(`Pushing branch ${branchName}...`);
   execSync(`git push -u origin ${branchName} --force`, { cwd: tmpDir, stdio: "inherit" });
 
+  // Flathub's submission-checker bot hard-requires this exact title format
+  // for a NEW submission ("Add $FLATPAK_ID") — confirmed by a real rejection
+  // ("PR title is 'Add $FLATPAK_ID'"). Post-acceptance updates aren't new
+  // submissions, so they keep the old descriptive title.
+  const prTitle = REPO === "flathub/flathub" ? `Add ${APP_ID}` : `${APP_ID}: ${tagArg}`;
+
   console.log(`Creating Pull Request to ${REPO} (base: ${baseBranch})...`);
-  const prCmd = `gh pr create --repo ${REPO} --head esoltys:${branchName} --base ${baseBranch} --title "${APP_ID}: ${tagArg}" --body "Update Luminous Flatpak manifest to ${tagArg}."`;
+  const prCmd = `gh pr create --repo ${REPO} --head esoltys:${branchName} --base ${baseBranch} --title "${prTitle}" --body "Update Luminous Flatpak manifest to ${tagArg}."`;
   execSync(prCmd, { cwd: tmpDir, stdio: "inherit" });
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
