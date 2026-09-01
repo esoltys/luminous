@@ -120,13 +120,7 @@ async function main() {
     console.log("\n--- Running Cargo Check ---");
     runCommand("cargo check --manifest-path src-tauri/Cargo.toml");
 
-    // 3. Sync Flatpak dependency sources + metainfo release history (#476) —
-    // runs before the commit so `git add -A` below picks up the regenerated
-    // files automatically, same as the winget sync later in this flow.
-    console.log("\n--- Syncing Flatpak dependency sources ---");
-    runCommand("bun run scripts/sync-flatpak.ts");
-
-    // 4. Git Commit
+    // 3. Git Commit
     console.log("\n--- Staging and committing changes ---");
     runCommand("git add -A");
     try {
@@ -135,7 +129,7 @@ async function main() {
       console.log("No changes to commit, continuing...");
     }
 
-    // 5. Git Tag
+    // 4. Git Tag
     console.log(`\n--- Creating tag ${tagName} ---`);
     try {
       runCommand(`git tag -d ${tagName}`);
@@ -156,7 +150,7 @@ async function main() {
       return;
     }
 
-    // 6. Git Push and Monitor
+    // 5. Git Push and Monitor
     console.log("\n--- Pushing main and tag to trigger GitHub Action ---");
     runCommand("git push origin main");
     runCommand(`git push origin ${tagName}`);
@@ -212,7 +206,7 @@ async function main() {
       }
     }
 
-    // 7. Regenerate the winget manifest from the built release assets, now
+    // 6. Regenerate the winget manifest from the built release assets, now
     // that the Windows installer .exe is uploaded. This only updates the
     // local manifest + commits it to main — submitting the PR to
     // microsoft/winget-pkgs stays a separate, explicit step:
