@@ -1,4 +1,15 @@
-id: org.luminous.music
+# This is deliberately NOT org.luminous.music, unlike the app's internal Tauri
+# `identifier` (tauri.conf.json) and the .deb/.rpm packaging that reuses it —
+# Flathub requires an app ID's reverse-DNS domain to be one the developer
+# actually controls (with .well-known verification), and music.luminous.org
+# isn't. io.github.esoltys.Luminous is the standard fallback for submitters
+# without a matching domain. Tauri's base `identifier` stays org.luminous.music
+# because it's already baked into published .deb/.rpm builds as the real
+# app-data-dir path — changing it would silently orphan existing users' data
+# (see docs/release-notes/v0.90.0.md for the same kind of migration before).
+# Windows already has its own fully independent identity the same way, via
+# tauri.windows.conf.json.
+id: io.github.esoltys.Luminous
 
 runtime: org.gnome.Platform
 runtime-version: "50"
@@ -128,14 +139,34 @@ modules:
       # src-tauri/target/ — confirmed via the build log's own "Built
       # application at:" line.
       - install -Dm755 luminous/target/release/LuminousMusicPlayer /app/bin/LuminousMusicPlayer
-      - install -Dm644 -t /app/share/metainfo/ luminous/src-tauri/icons/org.luminous.music.metainfo.xml
-      - install -Dm644 -t /app/share/applications/ luminous/flatpak/org.luminous.music.desktop
 
-      - install -Dm644 luminous/src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.luminous.music.png
-      - install -Dm644 luminous/src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/org.luminous.music.png
-      - install -Dm644 luminous/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.luminous.music.png
-      - install -Dm644 luminous/src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/org.luminous.music.png
-      - install -Dm644 luminous/src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/org.luminous.music.png
+      # The canonical metainfo file's <id> is org.luminous.music (shared with
+      # .deb/.rpm packaging via tauri.conf.json) — Flathub requires the
+      # installed metainfo's <id> to match this manifest's own `id:` above, so
+      # generate a Flatpak-specific copy with the id swapped rather than
+      # maintaining two near-duplicate metainfo files.
+      - cd luminous && sed 's/org\.luminous\.music/io.github.esoltys.Luminous/' src-tauri/icons/org.luminous.music.metainfo.xml > io.github.esoltys.Luminous.metainfo.xml
+      - install -Dm644 -t /app/share/metainfo/ luminous/io.github.esoltys.Luminous.metainfo.xml
+      - install -Dm644 -t /app/share/applications/ luminous/flatpak/io.github.esoltys.Luminous.desktop
+
+      # flatpak-builder's export step silently drops any icon whose filename
+      # doesn't match this manifest's own app id (confirmed empirically: icons
+      # installed as org.luminous.music.png were dropped at export with
+      # "non-allowed export filename") — so unlike StartupWMClass below,
+      # Icon=/the installed icon filenames must be io.github.esoltys.Luminous,
+      # not the compiled binary's actual GTK application id.
+      - install -Dm644 luminous/src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.esoltys.Luminous.png
+      - install -Dm644 luminous/src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github.esoltys.Luminous.png
+      - install -Dm644 luminous/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.esoltys.Luminous.png
+      - install -Dm644 luminous/src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.esoltys.Luminous.png
+      - install -Dm644 luminous/src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github.esoltys.Luminous.png
+
+      # StartupWMClass in io.github.esoltys.Luminous.desktop stays
+      # org.luminous.music — it needs to match the actual compiled binary's
+      # GTK application id (from Tauri's base `identifier`, shared with
+      # .deb/.rpm), not the outer Flatpak package id, or taskbar/window
+      # grouping breaks. Unlike Icon=, flatpak-builder does not validate or
+      # rewrite this field at export time.
 
     post-install:
-      - install -Dm644 luminous/LICENSE /app/share/licenses/org.luminous.music/LICENSE
+      - install -Dm644 luminous/LICENSE /app/share/licenses/io.github.esoltys.Luminous/LICENSE

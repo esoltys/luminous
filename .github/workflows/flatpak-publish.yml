@@ -6,7 +6,7 @@ name: Flatpak Publish
 # updates — see #476/#478.
 #
 # Inert until Flathub accepts Luminous: publishing requires a per-repo token
-# that Flathub only issues once flathub/org.luminous.music exists (a
+# that Flathub only issues once flathub/io.github.esoltys.Luminous exists (a
 # one-time manual step at https://hub.flathub.org/ once accepted), stored
 # here as the FLATHUB_TOKEN repo secret. Until that secret exists, the
 # publish job is skipped entirely — this workflow runs on every release tag
@@ -57,8 +57,8 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: luminous.flatpak
-          manifest-path: flatpak/org.luminous.music.yml
-          cache-key: flatpak-builder-${{ hashFiles('flatpak/org.luminous.music.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
+          manifest-path: flatpak/io.github.esoltys.Luminous.yml
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/io.github.esoltys.Luminous.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
           build-bundle: true
           run-tests: false
           upload-artifact: false
