@@ -106,12 +106,6 @@ chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
 rand = "0.10"
 percent-encoding = "2"
-# Polls the OS for the live Shift-key state at drag-and-drop time. OS file
-# drags don't give the target window keyboard focus while hovering, so DOM
-# keydown/keyup never fire — this reads the physical key state directly
-# instead, independent of window focus.
-device_query = "4.0.1"
-
 # --- Data-parallel tag reading during library scan ---
 rayon = "1"
 
@@ -120,6 +114,8 @@ rayon = "1"
 # gated to the Windows target only.
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
+# Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
+windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
