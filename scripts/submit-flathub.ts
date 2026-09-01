@@ -10,7 +10,10 @@
 //      — see https://docs.flathub.org/docs/for-app-authors/submission.
 //   2. Post-acceptance updates: once flathub/org.luminous.music exists, point
 //      REPO at "flathub/org.luminous.music" instead and this script opens a
-//      normal PR against its main branch.
+//      normal PR against its main branch. .github/workflows/flatpak-publish.yml
+//      is an alternative to this step — it pushes an accepted build straight
+//      into Flathub's build pipeline via flat-manager on every release tag,
+//      once a FLATHUB_TOKEN repo secret exists (see #476).
 //
 // This has not been run against the real flathub/flathub repo yet — dry-run
 // (--dry-run) and read the diff in scratch/ before ever pushing/opening a PR

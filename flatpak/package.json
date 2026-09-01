@@ -1,6 +1,6 @@
 {
   "name": "luminous",
-  "version": "2.0.0",
+  "version": "1.5.0",
   "description": "A high-performance home for the music you already own",
   "author": "Eric James Soltys <ericjamessoltys@outlook.com>",
   "license": "MIT",
@@ -15,7 +15,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
     "tauri": "NO_STRIP=true tauri",
-    "icon": "tauri icon app-icon.svg",
+    "icon": "tauri icon app-icon.svg && bun run scripts/generate-msix-assets.ts",
+    "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
     "test:run": "vitest run",
     "test:perf": "vitest run --config vite.perf.config.js",
@@ -39,7 +40,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.6",
-    "@sveltejs/kit": "^2.70.2",
+    "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -47,12 +48,12 @@
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "jsdom": "^30.0.1",
-    "music-metadata": "^11.14.0",
-    "svelte": "^5.56.8",
+    "music-metadata": "^11.15.0",
+    "svelte": "^5.56.10",
     "svelte-check": "^4.7.5",
     "typescript": "~6.0.3",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
     "@choochmeque/tauri-windows-bundle": "^0.1.28"
   },
   "overrides": {

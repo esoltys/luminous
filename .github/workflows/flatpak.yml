@@ -8,6 +8,8 @@ on:
       - "src-tauri/icons/org.luminous.music.metainfo.xml"
       - ".github/workflows/flatpak.yml"
       - "Cargo.lock"
+      - "package.json"
+      - "bun.lock"
   pull_request:
     branches: [ "main", "next" ]
     paths:
@@ -15,6 +17,8 @@ on:
       - "src-tauri/icons/org.luminous.music.metainfo.xml"
       - ".github/workflows/flatpak.yml"
       - "Cargo.lock"
+      - "package.json"
+      - "bun.lock"
 
 permissions:
   contents: read
