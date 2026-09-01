@@ -114,8 +114,7 @@ jobs:
 
       # Runs the full Vitest suite, including the regression tests under
       # src/lib/build/ added for this audit (backdrop-filter minification,
-      # MSIX manifest fields, release-workflow anti-race, winget script
-      # shell safety).
+      # MSIX manifest fields, release-workflow anti-race).
       - name: Run Vitest regression suite
         run: bun run test:run
 

@@ -206,30 +206,6 @@ async function main() {
       }
     }
 
-    // 6. Regenerate the winget manifest from the built release assets, now
-    // that the Windows installer .exe is uploaded. This only updates the
-    // local manifest + commits it to main — submitting the PR to
-    // microsoft/winget-pkgs stays a separate, explicit step:
-    //   bun run scripts/submit-winget.ts <version> --push
-    if (success) {
-      console.log("\n--- Syncing winget manifest ---");
-      try {
-        runCommand(`bun run scripts/submit-winget.ts ${version}`);
-        runCommand("git add winget/manifests");
-        try {
-          runCommand(`git commit -m "chore: sync winget manifest for v${version}"`);
-          runCommand("git push origin main");
-        } catch {
-          console.log("No winget manifest changes to commit.");
-        }
-      } catch (err: any) {
-        console.warn(`[WARNING] winget manifest sync failed: ${err.message}`);
-        if (beeper) {
-          await beeper.sendNotification(`⚠️ **winget manifest sync failed** for \`${tagName}\`\n${err.message}`);
-        }
-      }
-    }
-
     // Final notification
     if (beeper) {
       if (success) {
