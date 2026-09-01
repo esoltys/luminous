@@ -541,23 +541,26 @@ pub async fn add_paths_to_queue(
 /// keyboard focus while hovering, so the frontend's keydown/keyup listeners
 /// never fire during a drag-and-drop — this is the only reliable way to tell
 /// a plain drop (replace Queue) apart from a Shift-drop (append to Queue).
-/// `DeviceState` isn't `Send`/`Sync` on Linux (it holds an `Rc` for its X11
-/// connection), so it's constructed fresh per call rather than cached —
-/// cheap enough at the once-per-drop, poll-every-~150ms-while-dragging rate
-/// this is actually called at.
 #[tauri::command]
 pub fn is_shift_key_held() -> bool {
-    use device_query::{DeviceQuery, DeviceState, Keycode};
-    use std::panic::{catch_unwind, AssertUnwindSafe};
+    platform_is_shift_key_held()
+}
 
-    // DeviceState::new() panics (rather than returning a Result) if it can't
-    // open an X11 display — the common case on a Wayland session without
-    // XWayland. Degrade to "not held" instead of taking the command down.
-    catch_unwind(AssertUnwindSafe(|| {
-        let keys = DeviceState::new().get_keys();
-        keys.contains(&Keycode::LShift) || keys.contains(&Keycode::RShift)
-    }))
-    .unwrap_or(false)
+#[cfg(windows)]
+fn platform_is_shift_key_held() -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_SHIFT};
+
+    // High bit set means the key is currently down. Safe to call from any
+    // thread; doesn't require window focus.
+    (unsafe { GetAsyncKeyState(VK_SHIFT as i32) } as u16 & 0x8000) != 0
+}
+
+// No X11/Wayland key-state API is wired up on Linux, so this degrades to
+// "not held" rather than pulling in an X11 dependency for a minor
+// drag-and-drop modifier — Shift-drop just isn't available there yet.
+#[cfg(not(windows))]
+fn platform_is_shift_key_held() -> bool {
+    false
 }
 
 #[tauri::command]
@@ -645,12 +648,14 @@ mod tests {
     }
 
     #[test]
-    fn is_shift_key_held_degrades_to_false_instead_of_panicking() {
-        // In this test environment there's no X11 display, so
-        // DeviceState::new() panics internally — the exact case this needs
-        // to survive. Just asserting it returns rather than panicking is
-        // the meaningful check; the actual boolean depends on real input
-        // state and isn't something a unit test can control either way.
+    fn is_shift_key_held_does_not_panic() {
+        // On Windows the actual boolean depends on real input state and
+        // isn't something a unit test can control; just assert it returns.
+        // On every other platform it's a fixed `false` (see
+        // `platform_is_shift_key_held`).
+        #[cfg(not(windows))]
+        assert!(!is_shift_key_held());
+        #[cfg(windows)]
         let _ = is_shift_key_held();
     }
 }
