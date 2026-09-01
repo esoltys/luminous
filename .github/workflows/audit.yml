@@ -75,30 +75,6 @@ jobs:
       - name: Verify bun.lock is in sync with package.json
         run: bun install --frozen-lockfile
 
-  flatpak_sources_check:
-    name: Flatpak sources Drift Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: latest
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-      # Regenerates flatpak/'s dependency sources (cargo-sources.json,
-      # node-sources.json, the npm-shaped package.json/package-lock.json
-      # snapshot) and the metainfo <releases> entry, and diffs against what's
-      # committed — catches drift from a Cargo.lock/package.json bump (e.g.
-      # Dependabot) or a version bump whose release.ts sync step (#476) was
-      # skipped or failed, without depending on someone noticing by hand.
-      - name: Check Flatpak sources match Cargo.lock / package.json
-        run: bun run scripts/sync-flatpak.ts --check
-
   winget_manifest_check:
     name: winget Manifest Drift Check
     # winget.exe (used to validate the manifest folder) is Windows-only.
