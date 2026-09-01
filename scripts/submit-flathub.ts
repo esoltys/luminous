@@ -45,32 +45,7 @@ async function main() {
   const commit = execSync(`git rev-list -n 1 ${tagArg}`, { cwd: rootDir }).toString().trim();
   console.log(`Resolved ${tagArg} -> ${commit}`);
 
-  const scratchDir = path.join(rootDir, "scratch", "flathub-submit");
-  const tmpDir = path.join(scratchDir, "target-repo");
-  fs.mkdirSync(scratchDir, { recursive: true });
-  if (fs.existsSync(tmpDir)) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-
   const branchName = REPO === "flathub/flathub" ? APP_ID : "master";
-
-  console.log(`Forking ${REPO}...`);
-  try {
-    execSync(`gh repo fork ${REPO} --clone=false`, { stdio: "inherit" });
-  } catch {
-    console.log("Fork already exists or succeeded with notice.");
-  }
-
-  console.log(`Cloning esoltys/${REPO_NAME} (shallow)...`);
-  execSync(`git clone --depth=1 https://github.com/esoltys/${REPO_NAME}.git "${tmpDir}"`, {
-    stdio: "inherit",
-  });
-
-  try {
-    execSync(`git checkout -b ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
-  } catch {
-    execSync(`git checkout ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
-  }
 
   // Build the submission manifest: same as the in-repo one, but with the
   // `type: dir` local-checkout source swapped for a pinned `type: git` source
@@ -94,7 +69,37 @@ async function main() {
     console.log("--- Dry run: would write the following to the target repo ---");
     console.log(`${APP_ID}.yml:\n${manifest}`);
     console.log(`Plus copied as-is: ${filesToCopy.join(", ")}`);
+    console.log(`(No fork, clone, or push performed — nothing touched on GitHub.)`);
     return;
+  }
+
+  // Everything below here talks to GitHub (fork/clone/push/PR) — only runs
+  // once dryRun above has returned.
+  const scratchDir = path.join(rootDir, "scratch", "flathub-submit");
+  const tmpDir = path.join(scratchDir, "target-repo");
+  fs.mkdirSync(scratchDir, { recursive: true });
+  if (fs.existsSync(tmpDir)) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  console.log(`Forking ${REPO}...`);
+  try {
+    // No --default-branch-only: forks all branches, matching CONTRIBUTING.md's
+    // "Copy the master branch only" left unchecked.
+    execSync(`gh repo fork ${REPO} --clone=false`, { stdio: "inherit" });
+  } catch {
+    console.log("Fork already exists or succeeded with notice.");
+  }
+
+  console.log(`Cloning esoltys/${REPO_NAME} (shallow)...`);
+  execSync(`git clone --depth=1 https://github.com/esoltys/${REPO_NAME}.git "${tmpDir}"`, {
+    stdio: "inherit",
+  });
+
+  try {
+    execSync(`git checkout -b ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
+  } catch {
+    execSync(`git checkout ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
   }
 
   fs.writeFileSync(path.join(tmpDir, `${APP_ID}.yml`), manifest);
@@ -112,8 +117,14 @@ async function main() {
   console.log(`Pushing branch ${branchName}...`);
   execSync(`git push -u origin ${branchName} --force`, { cwd: tmpDir, stdio: "inherit" });
 
-  console.log(`Creating Pull Request to ${REPO}...`);
-  const prCmd = `gh pr create --repo ${REPO} --head esoltys:${branchName} --base master --title "${APP_ID}: ${tagArg}" --body "Update Luminous Flatpak manifest to ${tagArg}."`;
+  // New-app submissions land on flathub/flathub's `new-pr` branch, not
+  // `master` — see https://github.com/flathub/flathub/blob/master/CONTRIBUTING.md.
+  // Post-acceptance updates against flathub/org.luminous.music use its normal
+  // `master` branch, matching `branchName` above.
+  const baseBranch = REPO === "flathub/flathub" ? "new-pr" : "master";
+
+  console.log(`Creating Pull Request to ${REPO} (base: ${baseBranch})...`);
+  const prCmd = `gh pr create --repo ${REPO} --head esoltys:${branchName} --base ${baseBranch} --title "${APP_ID}: ${tagArg}" --body "Update Luminous Flatpak manifest to ${tagArg}."`;
   execSync(prCmd, { cwd: tmpDir, stdio: "inherit" });
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
