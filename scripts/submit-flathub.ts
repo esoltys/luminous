@@ -46,6 +46,11 @@ async function main() {
   console.log(`Resolved ${tagArg} -> ${commit}`);
 
   const branchName = REPO === "flathub/flathub" ? APP_ID : "master";
+  // New-app submissions branch off flathub/flathub's `new-pr` branch, not its
+  // `master` — see https://github.com/flathub/flathub/blob/master/CONTRIBUTING.md.
+  // Post-acceptance updates against flathub/org.luminous.music branch off its
+  // normal `master`.
+  const baseBranch = REPO === "flathub/flathub" ? "new-pr" : "master";
 
   // Build the submission manifest: same as the in-repo one, but with the
   // `type: dir` local-checkout source swapped for a pinned `type: git` source
@@ -91,10 +96,15 @@ async function main() {
     console.log("Fork already exists or succeeded with notice.");
   }
 
-  console.log(`Cloning esoltys/${REPO_NAME} (shallow)...`);
-  execSync(`git clone --depth=1 https://github.com/esoltys/${REPO_NAME}.git "${tmpDir}"`, {
-    stdio: "inherit",
-  });
+  // Clone directly at baseBranch (not the fork's default branch) — a plain
+  // `git clone --depth=1` grabs the default branch (master), and master has
+  // no shared history with new-pr on flathub/flathub, which makes GitHub
+  // reject the PR later ("no history in common").
+  console.log(`Cloning esoltys/${REPO_NAME} (shallow, base: ${baseBranch})...`);
+  execSync(
+    `git clone --depth=1 --branch ${baseBranch} https://github.com/esoltys/${REPO_NAME}.git "${tmpDir}"`,
+    { stdio: "inherit" },
+  );
 
   try {
     execSync(`git checkout -b ${branchName}`, { cwd: tmpDir, stdio: "inherit" });
@@ -116,12 +126,6 @@ async function main() {
 
   console.log(`Pushing branch ${branchName}...`);
   execSync(`git push -u origin ${branchName} --force`, { cwd: tmpDir, stdio: "inherit" });
-
-  // New-app submissions land on flathub/flathub's `new-pr` branch, not
-  // `master` — see https://github.com/flathub/flathub/blob/master/CONTRIBUTING.md.
-  // Post-acceptance updates against flathub/org.luminous.music use its normal
-  // `master` branch, matching `branchName` above.
-  const baseBranch = REPO === "flathub/flathub" ? "new-pr" : "master";
 
   console.log(`Creating Pull Request to ${REPO} (base: ${baseBranch})...`);
   const prCmd = `gh pr create --repo ${REPO} --head esoltys:${branchName} --base ${baseBranch} --title "${APP_ID}: ${tagArg}" --body "Update Luminous Flatpak manifest to ${tagArg}."`;
