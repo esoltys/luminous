@@ -1,0 +1,75 @@
+name: Flatpak Publish
+
+# Pushes a Flathub-accepted build straight into Flathub's build pipeline via
+# flat-manager (flatpak/flatpak-github-actions), instead of the manifest-
+# update-PR flow scripts/submit-flathub.ts implements for post-acceptance
+# updates — see #476/#478.
+#
+# Inert until Flathub accepts Luminous: publishing requires a per-repo token
+# that Flathub only issues once flathub/org.luminous.music exists (a
+# one-time manual step at https://hub.flathub.org/ once accepted), stored
+# here as the FLATHUB_TOKEN repo secret. Until that secret exists, the
+# publish job is skipped entirely — this workflow runs on every release tag
+# but does nothing until then.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-token:
+    name: Check for Flathub token
+    runs-on: ubuntu-latest
+    outputs:
+      has-token: ${{ steps.check.outputs.has-token }}
+    steps:
+      - id: check
+        env:
+          FLATHUB_TOKEN: ${{ secrets.FLATHUB_TOKEN }}
+        run: echo "has-token=${{ env.FLATHUB_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Build and Push to Flathub
+    needs: check-token
+    if: needs.check-token.outputs.has-token == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: recursive
+
+      # build-bundle: true also produces the local ostree "repo" dir that
+      # the flat-manager push step below reads from — the bundle itself
+      # isn't used here (upload-artifact: false), only that side effect.
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: luminous.flatpak
+          manifest-path: flatpak/org.luminous.music.yml
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/org.luminous.music.yml', 'flatpak/cargo-sources.json', 'flatpak/node-sources.json') }}
+          build-bundle: true
+          run-tests: false
+          upload-artifact: false
+
+      # repository: stable — Flathub's flat-manager instance also has a
+      # "beta" repository for pre-release builds; switch to that (or make it
+      # branch-conditional) if Luminous ever wants a Flathub beta channel.
+      - name: Push to Flathub
+        uses: flatpak/flatpak-github-actions/flat-manager@v6
+        with:
+          flat-manager-url: https://hub.flathub.org/
+          repository: stable
+          token: ${{ secrets.FLATHUB_TOKEN }}
+          build-log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
