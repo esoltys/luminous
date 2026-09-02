@@ -7,9 +7,8 @@
   <summary>A high-performance home for the music you already own</summary>
   <description>
     <p>
-      Luminous is a fast, beautifully designed desktop music player featuring gapless playback,
-      10-band and 20-band DSP equalizer, synchronized LRCLIB lyrics, automatic cover art extraction,
-      and advanced music library management.
+      Luminous is a fast, local-first player for your own audio library — no streaming, no
+      subscriptions, no cloud. Just your files, indexed, searchable, and beautifully played.
     </p>
   </description>
   <developer_name>Eric James Soltys</developer_name>
