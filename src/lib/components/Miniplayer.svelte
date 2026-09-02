@@ -9,6 +9,7 @@
   import CoverArt from "./CoverArt.svelte";
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SongRating from "./SongRating.svelte";
+  import { isLinux } from "../platform";
   import {
     Play,
     Pause,
@@ -132,8 +133,6 @@
       default: return "";
     }
   }
-
-  const isLinux = typeof navigator !== "undefined" && (/linux/i.test(navigator.userAgent) || /linux/i.test(navigator.platform));
 
   function handleStartDrag(e: PointerEvent) {
     invoke("start_window_drag").catch(() => {});

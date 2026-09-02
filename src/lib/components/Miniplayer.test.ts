@@ -5,6 +5,7 @@ import Miniplayer from "./Miniplayer.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { windowLayoutStore } from "../stores/windowLayout.svelte";
+import { isLinux } from "../platform";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -171,7 +172,7 @@ describe("Miniplayer.svelte", () => {
     expect(hoverMask.className).toContain("opacity-0");
 
     // Opaque background class bg-brand-main is used on Linux, acrylic blur on other platforms
-    if (/linux/i.test(navigator.userAgent) || /linux/i.test(navigator.platform)) {
+    if (isLinux) {
       expect(hoverMask.className).toContain("bg-brand-main");
     } else {
       expect(hoverMask.className).toContain("bg-brand-main/85");
