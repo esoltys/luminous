@@ -13,7 +13,6 @@
     MusicNotesIcon as Music,
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
-    ColumnsIcon as Columns,
     SquaresFourIcon as LayoutGrid,
     RowsIcon as Rows3
   } from "phosphor-svelte";
