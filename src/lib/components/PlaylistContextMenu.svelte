@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { Play, Trash2, Mic2, DiscAlbum, Edit3 } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    TrashIcon as Trash2,
+    MicrophoneStageIcon as Mic2,
+    DiscIcon as DiscAlbum,
+    PencilSimpleIcon as Edit3
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";

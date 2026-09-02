@@ -8,28 +8,28 @@
   import { windowLayoutStore } from "../stores/windowLayout.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import {
-    Trash2,
-    ListMusic,
-    RotateCcw,
-    RotateCw,
-    AlertTriangle,
-    Play,
-    FolderInput,
-    FileOutput,
-    Pencil,
-    Check,
-    X,
-    CopyPlus,
-    Music,
-    Shuffle,
-    Search,
-    Radio,
-    Layers,
-    MoreHorizontal,
-    Eraser,
-    Sparkles,
-    FolderPlus
-  } from "lucide-svelte";
+    TrashIcon as Trash2,
+    PlaylistIcon as ListMusic,
+    ArrowCounterClockwiseIcon as RotateCcw,
+    ArrowClockwiseIcon as RotateCw,
+    WarningIcon as AlertTriangle,
+    PlayIcon as Play,
+    FolderOpenIcon as FolderInput,
+    ExportIcon as FileOutput,
+    PencilSimpleIcon as Pencil,
+    CheckIcon as Check,
+    XIcon as X,
+    CopyIcon as CopyPlus,
+    MusicNotesIcon as Music,
+    ShuffleIcon as Shuffle,
+    MagnifyingGlassIcon as Search,
+    RadioIcon as Radio,
+    StackIcon as Layers,
+    DotsThreeIcon as MoreHorizontal,
+    EraserIcon as Eraser,
+    SparkleIcon as Sparkles,
+    FolderPlusIcon as FolderPlus
+  } from "phosphor-svelte";
   import { resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import type { PlaylistItem, Song } from "../types";

@@ -120,18 +120,24 @@ async function main() {
   process.on("SIGINT", () => { process.exit(0); });
   process.on("SIGTERM", () => { process.exit(0); });
 
-  // 3. Poll server until active
+  // 3. Poll server until active and dependency optimization is complete
   console.log("Waiting for Vite server on http://localhost:1420...");
   let ready = false;
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 100; i++) {
     try {
       const res = await fetch("http://localhost:1420");
       if (res.ok) {
-        ready = true;
-        break;
+        // Probe the root layout component so Vite completes its initial optimizeDeps
+        // pass before launching the browser. During cold startup, Vite optimizes
+        // dependencies and returns 504 on in-flight requests until the bundle is written.
+        const layoutRes = await fetch("http://localhost:1420/src/routes/+layout.svelte");
+        if (layoutRes.ok) {
+          ready = true;
+          break;
+        }
       }
     } catch (e) {}
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   if (!ready) {
@@ -306,19 +312,34 @@ async function main() {
     // sit below the fold and Chromium never fetches them without a real
     // scroll, so they'd never fire load/error and this would hang forever.
     // Forcing eager loading makes every image actually fetch.
-    await page.evaluate(async () => {
-      const imgs = Array.from(document.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map((img) => {
-          if (img.loading === "lazy") img.loading = "eager";
-          if (img.complete) return;
-          return new Promise((resolve) => {
-            img.addEventListener("load", resolve);
-            img.addEventListener("error", resolve);
-          });
-        })
-      );
-    });
+    const ensureImagesLoaded = async () => {
+      await page.evaluate(async () => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        await Promise.all(
+          imgs.map((img) => {
+            if (img.loading === "lazy") img.loading = "eager";
+            if (img.complete) return;
+            return new Promise((resolve) => {
+              img.addEventListener("load", resolve);
+              img.addEventListener("error", resolve);
+            });
+          })
+        );
+      });
+    };
+    try {
+      await ensureImagesLoaded();
+    } catch (err: unknown) {
+      if (String(err).includes("Execution context was destroyed")) {
+        await page.waitForSelector(".flex-1", { timeout: 30000 });
+        if (afterLoad) {
+          await afterLoad(page, featured, language);
+        }
+        await ensureImagesLoaded();
+      } else {
+        throw err;
+      }
+    }
     // Settle transitions
     await page.waitForTimeout(400);
 

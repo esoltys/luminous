@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GripVertical } from "lucide-svelte";
+  import { DotsSixVerticalIcon as GripVertical } from "phosphor-svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -448,7 +448,7 @@
 
 <style>
   /* app.css resets cursor to default everywhere for this desktop app, and
-     `cursor` doesn't reliably inherit into a lucide-svelte icon's rendered
+     `cursor` doesn't reliably inherit into a phosphor-svelte icon's rendered
      <svg> from its wrapping element (confirmed via devtools: the <svg>'s
      own computed cursor stayed "default" even though its parent <span>
      correctly computed "grab") — so these drag handles set cursor

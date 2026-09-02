@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { ComponentType, SvelteComponent } from "svelte";
-  import { FilterX } from "lucide-svelte";
+  import type { Component } from "svelte";
+  import { FunnelXIcon as FilterX } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import Button from "./Button.svelte";
 
   interface Props {
-    icon: ComponentType<SvelteComponent<{ class?: string }>>;
+    icon: Component<{ class?: string }>;
     title: string;
     matchQueryText: string;
     query: string;

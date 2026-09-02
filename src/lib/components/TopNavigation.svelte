@@ -1,5 +1,18 @@
 <script lang="ts">
-  import { Menu, ChevronLeft, ChevronRight, Search, FolderOpen, User, Disc, ListMusic, Music, History, X, Sparkles } from "lucide-svelte";
+  import {
+    ListIcon as Menu,
+    CaretLeftIcon as ChevronLeft,
+    CaretRightIcon as ChevronRight,
+    MagnifyingGlassIcon as Search,
+    FolderOpenIcon as FolderOpen,
+    UserIcon as User,
+    DiscIcon as Disc,
+    PlaylistIcon as ListMusic,
+    MusicNotesIcon as Music,
+    ClockCounterClockwiseIcon as History,
+    XIcon as X,
+    SparkleIcon as Sparkles
+  } from "phosphor-svelte";
   import { parseSearchRules, hasAdvancedSearchTerms, isSmartPlaylistSpec } from "../utils/filterParser";
   import { invoke } from "@tauri-apps/api/core";
   import { collectionStore } from "../stores/collection.svelte";

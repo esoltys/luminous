@@ -37,7 +37,17 @@
   import CoverArt from "./CoverArt.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import EmptyState from "./EmptyState.svelte";
-  import { Play, Plus, Edit3, Trash2, GripVertical, AlertTriangle, Music, Clock, DiscAlbum } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    PencilSimpleIcon as Edit3,
+    TrashIcon as Trash2,
+    DotsSixVerticalIcon as GripVertical,
+    WarningIcon as AlertTriangle,
+    MusicNotesIcon as Music,
+    ClockIcon as Clock,
+    DiscIcon as DiscAlbum
+  } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
 

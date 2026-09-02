@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { X } from "lucide-svelte";
+  import { XIcon as X } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
 

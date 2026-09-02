@@ -19,7 +19,15 @@
   import EmptyState from "./EmptyState.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
-  import { FolderInput, Plus, ListMusic, Sparkles, LayoutGrid, Rows3, RefreshCw } from "lucide-svelte";
+  import {
+    FolderOpenIcon as FolderInput,
+    PlusIcon as Plus,
+    PlaylistIcon as ListMusic,
+    SparkleIcon as Sparkles,
+    SquaresFourIcon as LayoutGrid,
+    RowsIcon as Rows3,
+    ArrowsClockwiseIcon as RefreshCw
+  } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { rememberScroll } from "../utils/scrollMemory";

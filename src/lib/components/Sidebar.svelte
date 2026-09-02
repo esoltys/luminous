@@ -7,7 +7,21 @@
   import { i18n } from "../stores/i18n.svelte";
   import { updaterStore } from "../stores/updater.svelte";
   import { tagsStore } from "../stores/tags.svelte";
-  import { Library, ListMusic, Sparkles, Settings, FileText, Home, Mic2, DiscAlbum, Music, Tag, ArrowUp, HelpCircle, Layers } from "lucide-svelte";
+  import {
+    BooksIcon as Library,
+    PlaylistIcon as ListMusic,
+    SparkleIcon as Sparkles,
+    GearIcon as Settings,
+    FileTextIcon as FileText,
+    HouseIcon as Home,
+    MicrophoneStageIcon as Mic2,
+    DiscIcon as DiscAlbum,
+    MusicNotesIcon as Music,
+    TagIcon as Tag,
+    ArrowUpIcon as ArrowUp,
+    QuestionIcon as HelpCircle,
+    StackIcon as Layers
+  } from "phosphor-svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { SIDEBAR_MIN_WIDTH_PX } from "../constants";

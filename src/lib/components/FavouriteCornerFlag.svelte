@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart } from "lucide-svelte";
+  import { HeartIcon as Heart } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -30,5 +30,5 @@
   <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
     <polygon points="0,0 100,0 100,100" class="fill-brand-accent" />
   </svg>
-  <Heart class="absolute {currentSize.icon} text-brand-accent-contrast fill-current" />
+  <Heart weight="fill" class="absolute {currentSize.icon} text-brand-accent-contrast" />
 </div>
