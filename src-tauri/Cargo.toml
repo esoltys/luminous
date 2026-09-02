@@ -79,12 +79,6 @@ bs1770 = "1"
 # --- File watching ---
 notify = { version = "8", features = ["serde"] }
 
-# --- OS "Now Playing" integration: SMTC (Windows), MPRIS2 (Linux), ---
-# --- MPNowPlayingInfoCenter (macOS) (#80) ---
-# `use_zbus` gives a pure-Rust D-Bus client on Linux, avoiding a build-time
-# dependency on libdbus-1-dev (the default `use_dbus` feature links libdbus).
-souvlaki = { version = "0.8", default-features = false, features = ["use_zbus"] }
-
 # --- HTTP client ---
 # Use rustls to avoid requiring libssl-dev system package
 reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls"] }
@@ -116,9 +110,27 @@ rayon = "1"
 tauri-plugin-prevent-default = { version = "5", features = ["platform-windows"] }
 # Polls the live Shift-key state at drag-and-drop time via GetAsyncKeyState.
 windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# --- OS "Now Playing" integration: SMTC (#576) ---
+# Registers our window with System Media Transport Controls via
+# `ISystemMediaTransportControlsInterop::GetForWindow` (Win32_System_WinRT),
+# the same interop mechanism the previous `souvlaki` dependency used
+# internally, without pulling in souvlaki's own legacy `windows 0.44` pin.
+windows = { version = "0.61", features = [
+    "Media_Control",
+    "Foundation",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_WinRT",
+] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+# --- OS "Now Playing" integration: MPRIS2 (#576) ---
+# Hand-rolled org.mpris.MediaPlayer2(.Player) D-Bus interfaces via zbus's
+# pure-Rust client, replacing souvlaki's `use_zbus` backend.
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+zvariant = "5"
 
 [dev-dependencies]
 cucumber = { version = "0.23", features = ["macros"] }
