@@ -30,10 +30,10 @@ const DEFAULT_SEEK_STEP: Duration = Duration::from_secs(10);
 
 /// An inbound OS media control event, routed to `state.player`.
 ///
-/// `Toggle`/`Seek`/`SeekBy` are only ever constructed on Linux — SMTC's
-/// Windows API only exposes discrete buttons and an absolute
-/// `SetPosition`, not relative seeking or a play/pause toggle — hence the
-/// `dead_code` allowance on non-Linux targets.
+/// `Toggle`/`Seek`/`SeekBy`/`SetVolume` are only ever constructed on Linux —
+/// SMTC's Windows API only exposes discrete buttons and an absolute
+/// `SetPosition`; volume is controlled by the Windows system mixer, not
+/// SMTC. Hence the `dead_code` allowance on non-Linux targets.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 enum MediaCommand {
     Play,
@@ -45,6 +45,11 @@ enum MediaCommand {
     SetPosition(Duration),
     Seek(SeekDirection),
     SeekBy(SeekDirection, Duration),
+    /// MPRIS `Volume` (0.0-1.0). Some desktop environments (e.g. GNOME's
+    /// media-keys handler) route hardware volume-up/down keys to the
+    /// active MPRIS player's `Volume` property instead of the system
+    /// mixer, so this needs to be wired to something real — see #576.
+    SetVolume(f64),
 }
 
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
@@ -63,6 +68,7 @@ enum Command {
         cover_url: Option<String>,
         status: PlayState,
         position: Duration,
+        volume: f32,
     },
 }
 
@@ -83,7 +89,7 @@ trait PlatformMediaSession: Sized {
         cover_url: Option<&str>,
     );
 
-    fn set_playback(&mut self, status: PlayState, position: Duration);
+    fn set_playback(&mut self, status: PlayState, position: Duration, volume: f32);
 }
 
 #[cfg(target_os = "windows")]
@@ -112,7 +118,7 @@ impl PlatformMediaSession for NoopMediaSession {
     ) {
     }
 
-    fn set_playback(&mut self, _status: PlayState, _position: Duration) {}
+    fn set_playback(&mut self, _status: PlayState, _position: Duration, _volume: f32) {}
 }
 
 /// Handle for pushing "Now Playing" updates to the dedicated media-session
@@ -139,6 +145,7 @@ impl MediaSessionHandle {
             cover_url,
             status: playback.state,
             position: Duration::from_nanos(playback.position_nanosec.max(0) as u64),
+            volume: playback.volume,
         };
         let _ = self.tx.send(cmd);
     }
@@ -229,6 +236,7 @@ pub fn spawn(
                         cover_url,
                         status,
                         position,
+                        volume,
                     } => {
                         platform.set_metadata(
                             title.as_deref(),
@@ -237,7 +245,7 @@ pub fn spawn(
                             duration,
                             cover_url.as_deref(),
                         );
-                        platform.set_playback(status, position);
+                        platform.set_playback(status, position, volume);
                     }
                 }
             }
@@ -294,6 +302,7 @@ fn handle_event(app: AppHandle, event: MediaCommand) {
                     .seek_to(seek_target(current, direction, amount))
                     .await
             }
+            MediaCommand::SetVolume(vol) => player.set_volume(vol.clamp(0.0, 1.0) as f32).await,
         };
 
         match result {

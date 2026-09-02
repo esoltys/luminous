@@ -17,16 +17,9 @@ use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{ObjectPath, OwnedValue, Value};
 use zbus::{interface, Connection};
 
-// Brings `SignalEmitter::seeked` into scope — the `#[interface]` macro
-// generates this trait (impl'd for both `SignalEmitter` and
-// `InterfaceRef<PlayerIface>`) from the `#[zbus(signal)] fn seeked(..)`
-// declaration in `PlayerIface`'s impl block below.
-use self::PlayerIfaceSignals as _;
-
 const OBJECT_PATH: &str = "/org/mpris/MediaPlayer2";
 const BUS_NAME: &str = "org.mpris.MediaPlayer2.luminous";
 
-#[derive(Default)]
 struct SharedState {
     title: Option<String>,
     artist: Option<String>,
@@ -35,6 +28,22 @@ struct SharedState {
     cover_url: Option<String>,
     status: Option<PlayState>,
     position: Duration,
+    volume: f64,
+}
+
+impl Default for SharedState {
+    fn default() -> Self {
+        Self {
+            title: None,
+            artist: None,
+            album: None,
+            duration: None,
+            cover_url: None,
+            status: None,
+            position: Duration::ZERO,
+            volume: 1.0,
+        }
+    }
 }
 
 struct MediaPlayer2Iface;
@@ -184,6 +193,23 @@ impl PlayerIface {
         self.state.lock().unwrap().position.as_micros() as i64
     }
 
+    // Some desktop environments (e.g. GNOME's media-keys handler) route
+    // hardware volume-up/down keys to the active MPRIS player's Volume
+    // property (get current, set current +/- step) instead of the system
+    // mixer, so this needs to be backed by the real player volume.
+    #[zbus(property)]
+    fn volume(&self) -> f64 {
+        self.state.lock().unwrap().volume
+    }
+
+    #[zbus(property)]
+    async fn set_volume(&self, value: f64) {
+        handle_event(
+            self.app_handle.clone(),
+            MediaCommand::SetVolume(value.clamp(0.0, 1.0)),
+        );
+    }
+
     #[zbus(property)]
     fn can_play(&self) -> bool {
         true
@@ -276,14 +302,32 @@ impl PlatformMediaSession for LinuxMediaSession {
         self.emit_property_changed("Metadata");
     }
 
-    fn set_playback(&mut self, status: PlayState, position: Duration) {
-        {
+    fn set_playback(&mut self, status: PlayState, position: Duration, volume: f32) {
+        let jumped = {
             let mut state = self.state.lock().unwrap();
+            let previous_position = state.position;
             state.status = Some(status);
             state.position = position;
-        }
+            state.volume = volume as f64;
+            // `mirror_state` is also called ~once/sec by the routine
+            // position-tick loop, not just after real seeks; MPRIS's
+            // `Seeked` signal is only for out-of-band jumps (spec
+            // explicitly excludes `Position` from `PropertiesChanged`
+            // because clients are meant to interpolate normal playback
+            // progression themselves). A delta bigger than a couple of
+            // tick intervals is treated as a genuine seek/track-change.
+            let delta = if position > previous_position {
+                position - previous_position
+            } else {
+                previous_position - position
+            };
+            delta > Duration::from_secs(2)
+        };
         self.emit_property_changed("PlaybackStatus");
-        self.emit_property_changed("Position");
+        self.emit_property_changed("Volume");
+        if jumped {
+            self.emit_property_changed("Seeked");
+        }
     }
 }
 
@@ -304,7 +348,8 @@ impl LinuxMediaSession {
             let result = match property {
                 "Metadata" => iface.metadata_changed(&ctx).await,
                 "PlaybackStatus" => iface.playback_status_changed(&ctx).await,
-                "Position" => ctx.seeked(iface.position()).await,
+                "Volume" => iface.volume_changed(&ctx).await,
+                "Seeked" => ctx.seeked(iface.position()).await,
                 _ => Ok(()),
             };
             if let Err(e) = result {

@@ -157,7 +157,10 @@ impl PlatformMediaSession for WindowsMediaSession {
         let _ = updater.Update();
     }
 
-    fn set_playback(&mut self, status: PlayState, _position: Duration) {
+    fn set_playback(&mut self, status: PlayState, _position: Duration, _volume: f32) {
+        // SMTC has no per-app volume concept of its own — Windows routes
+        // volume keys through the system/app mixer (SndVol), not the
+        // transport controls.
         let smtc_status = match status {
             PlayState::Playing => MediaPlaybackStatus::Playing,
             PlayState::Paused => MediaPlaybackStatus::Paused,
