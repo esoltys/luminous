@@ -59,8 +59,8 @@ while ($frontier.Count -gt 0) {
   $frontier = $next
 }
 $ws = 0; $priv = 0; $count = 0
-foreach ($pid in $pids) {
-  $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+foreach ($procId in $pids) {
+  $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
   if ($proc) {
     $ws += $proc.WorkingSet64
     $priv += $proc.PrivateMemorySize64

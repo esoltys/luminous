@@ -1,0 +1,6 @@
+timestamp,label,process_count,working_set_mb,private_bytes_mb
+2026-09-02T17:45:42.706Z,idle,7,494.9,481.3
+2026-09-02T17:57:03.642Z,after-full-scan,7,553.9,441.0
+2026-09-02T17:57:10.080Z,after-full-scan-recheck,7,553.7,436.5
+2026-09-02T17:57:57.938Z,playback-eq-analyzer,7,606.8,431.6
+2026-09-02T17:58:04.496Z,playback-eq-analyzer-recheck,7,603.6,427.4
