@@ -1,11 +1,17 @@
 <script lang="ts">
-  import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme } from "../stores/theme.svelte";
+  import { themeStore, PREDEFINED_THEMES, LUMINOUS_DARK_COLORS, LUMINOUS_LIGHT_COLORS, type ThemeColors, type Theme, type ColorSchemeMode } from "../stores/theme.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { onDestroy } from "svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { Palette, Trash2, RotateCcw, Sun, Moon } from "lucide-svelte";
+  import { Palette, Trash2, RotateCcw, Sun, Moon, SlidersHorizontal } from "lucide-svelte";
+
+  const COLOR_SCHEME_MODE_OPTIONS: { mode: ColorSchemeMode; labelKey: string; icon: typeof Sun }[] = [
+    { mode: "light", labelKey: "colorSchemeModeLight", icon: Sun },
+    { mode: "dark", labelKey: "colorSchemeModeDark", icon: Moon },
+    { mode: "system", labelKey: "colorSchemeModeSystem", icon: SlidersHorizontal }
+  ];
 
   let editingThemeId = $state<string | null>(null);
 
@@ -29,7 +35,7 @@
   // use the current system scheme so its swatch matches what's on screen.
   function getPreviewColors(theme: Theme): ThemeColors {
     if (theme.id === "system") {
-      return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      return themeStore.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     if (theme.id === "dynamic-artwork") {
       return themeStore.resolvedColors;
@@ -126,39 +132,83 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {#each DYNAMIC_THEMES as theme}
         {@const previewColors = getPreviewColors(theme)}
-        <button
-          onclick={() => themeStore.setTheme(theme.id)}
-          class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
-        >
-          <div class="flex items-center justify-between w-full">
-            <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
-              {#if theme.id === 'system'}
-                <span title={themeStore.systemColorScheme === 'dark' ? i18n.t('settings.systemThemeDark') : i18n.t('settings.systemThemeLight')}>
-                  {#if themeStore.systemColorScheme === 'dark'}
-                    <Moon class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {:else}
-                    <Sun class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {/if}
+        {#if theme.id === 'system'}
+          <!-- Not a single <button>: the segmented Light/Dark/System control
+               below is itself interactive, so this card uses an inner
+               button (selects the System theme) plus a separate control
+               region, rather than nesting buttons. -->
+          <div class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}">
+            <button
+              type="button"
+              onclick={() => themeStore.setTheme(theme.id)}
+              class="flex flex-col items-start gap-3 text-left w-full group"
+            >
+              <div class="flex items-center justify-between w-full">
+                <span class="font-semibold text-sm text-brand-text-primary">
+                  {i18n.t('themes.' + theme.id, {}, theme.name)}
                 </span>
-              {/if}
-              {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
-            </span>
+              </div>
+              <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
+              <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+                <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+                <div class="flex-1" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+                <div class="flex-1" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+                <div class="flex-1" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+                <div class="flex-1" style="background-color: {previewColors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
+                <div class="flex-1" style="background-color: {previewColors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
+              </div>
+              <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.systemFootnote', {}, 'Switches between light and dark to match your OS')}</span>
+            </button>
+
+            <!-- Explicit Light/Dark/System appearance override (#692) — a
+                 sub-setting of the System theme, scoped to this card. -->
+            <div class="w-full space-y-1.5">
+              <span class="text-[10px] text-brand-text-secondary/80 font-semibold tracking-wider uppercase">{i18n.t('settings.colorSchemeModeLabel', {}, 'Select Theme')}</span>
+              <div
+                class="flex items-center gap-0.5 p-0.5 rounded-full border border-brand-border bg-brand-main/40 select-none"
+                role="tablist"
+                aria-label={i18n.t('settings.colorSchemeModeLabel', {}, 'Select Theme')}
+              >
+                {#each COLOR_SCHEME_MODE_OPTIONS as opt (opt.mode)}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={themeStore.colorSchemeMode === opt.mode}
+                    onclick={() => themeStore.setColorSchemeMode(opt.mode)}
+                    class="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors
+                      {themeStore.colorSchemeMode === opt.mode
+                      ? 'bg-brand-accent text-brand-accent-contrast shadow-sm'
+                      : 'text-brand-text-secondary/70 hover:text-brand-text-primary hover:bg-brand-sidebar'}"
+                  >
+                    <opt.icon class="w-3.5 h-3.5" />
+                    {i18n.t('settings.' + opt.labelKey, {}, opt.mode)}
+                  </button>
+                {/each}
+              </div>
+            </div>
           </div>
-          <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
-          <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
-            <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
-            <div class="flex-1" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
-            <div class="flex-1" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
-            <div class="flex-1" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
-            <div class="flex-1" style="background-color: {previewColors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
-            <div class="flex-1" style="background-color: {previewColors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
-          </div>
-          {#if theme.id === 'dynamic-artwork'}
+        {:else}
+          <button
+            onclick={() => themeStore.setTheme(theme.id)}
+            class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+          >
+            <div class="flex items-center justify-between w-full">
+              <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
+                {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
+              </span>
+            </div>
+            <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
+            <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
+              <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
+              <div class="flex-1" style="background-color: {previewColors['bg-sidebar']}" title={i18n.t('settings.sidebarLabel')}></div>
+              <div class="flex-1" style="background-color: {previewColors['bg-playerbar']}" title={i18n.t('settings.playerBarLabel')}></div>
+              <div class="flex-1" style="background-color: {previewColors['color-accent']}" title={i18n.t('settings.accentLabel')}></div>
+              <div class="flex-1" style="background-color: {previewColors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
+              <div class="flex-1" style="background-color: {previewColors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
+            </div>
             <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.luminousFootnote', {}, 'Colors shift to match whatever album art is playing now')}</span>
-          {:else if theme.id === 'system'}
-            <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.systemFootnote', {}, 'Switches between light and dark to match your OS')}</span>
-          {/if}
-        </button>
+          </button>
+        {/if}
       {/each}
     </div>
   </div>

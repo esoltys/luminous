@@ -166,6 +166,89 @@ describe("Custom Theme Builder & ThemeStore", () => {
     expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
   });
 
+  describe("colorSchemeMode (#692 explicit Light/Dark/System override)", () => {
+    it("defaults to system mode and tracks the OS preference", () => {
+      themeStore.activeThemeId = "system";
+      expect(themeStore.colorSchemeMode).toBe("system");
+
+      themeStore.systemColorScheme = "dark";
+      expect(themeStore.effectiveColorScheme).toBe("dark");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
+
+      themeStore.systemColorScheme = "light";
+      expect(themeStore.effectiveColorScheme).toBe("light");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+    });
+
+    it("setColorSchemeMode pins Light regardless of the OS preference", async () => {
+      themeStore.activeThemeId = "system";
+      themeStore.systemColorScheme = "dark";
+
+      await themeStore.setColorSchemeMode("light");
+
+      expect(themeStore.colorSchemeMode).toBe("light");
+      expect(themeStore.effectiveColorScheme).toBe("light");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_LIGHT_COLORS);
+      expect(invoke).toHaveBeenCalledWith("set_app_setting", {
+        key: "color_scheme_mode",
+        value: "light"
+      });
+    });
+
+    it("setColorSchemeMode pins Dark regardless of the OS preference", async () => {
+      themeStore.activeThemeId = "system";
+      themeStore.systemColorScheme = "light";
+
+      await themeStore.setColorSchemeMode("dark");
+
+      expect(themeStore.colorSchemeMode).toBe("dark");
+      expect(themeStore.effectiveColorScheme).toBe("dark");
+      expect(themeStore.resolvedColors).toEqual(LUMINOUS_DARK_COLORS);
+    });
+
+    it("does not change activeThemeId away from 'system' when setting the mode", async () => {
+      themeStore.activeThemeId = "system";
+      await themeStore.setColorSchemeMode("dark");
+      expect(themeStore.activeThemeId).toBe("system");
+    });
+
+    it("ignores OS prefers-color-scheme changes while pinned to Light/Dark", async () => {
+      themeStore.activeThemeId = "system";
+      await themeStore.setColorSchemeMode("light");
+      const spy = vi.spyOn(themeStore, "applyActiveTheme");
+
+      // Simulate what the matchMedia change listener does internally.
+      themeStore.systemColorScheme = "dark";
+      if (themeStore.activeThemeId === "system" && themeStore.colorSchemeMode === "system") {
+        themeStore.applyActiveTheme();
+      }
+
+      expect(spy).not.toHaveBeenCalled();
+      expect(themeStore.effectiveColorScheme).toBe("light");
+    });
+
+    it("loads a persisted color_scheme_mode on init", async () => {
+      vi.mocked(invoke).mockResolvedValueOnce({
+        active_theme_id: "system",
+        color_scheme_mode: "dark"
+      } as any);
+
+      await themeStore.init();
+
+      expect(themeStore.colorSchemeMode).toBe("dark");
+    });
+
+    it("ignores an invalid persisted color_scheme_mode value", async () => {
+      vi.mocked(invoke).mockResolvedValueOnce({
+        color_scheme_mode: "not-a-real-mode"
+      } as any);
+
+      await themeStore.init();
+
+      expect(themeStore.colorSchemeMode).toBe("system");
+    });
+  });
+
   it("resolves dynamic artwork colors with fallback when artworkColors is null", () => {
     themeStore.activeThemeId = "dynamic-artwork";
     themeStore.artworkColors = null;
