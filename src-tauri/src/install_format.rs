@@ -2,8 +2,8 @@
 //! whether an in-app update is possible or the user must update through
 //! their package manager/app store instead.
 //!
-//! Detection is best-effort heuristics (env vars set by AppImage/Flatpak/
-//! Snap runners, and installation path conventions for system packages) —
+//! Detection is best-effort heuristics (env vars set by AppImage/Snap
+//! runners, and installation path conventions for system packages) —
 //! there's no authoritative "installed via X" marker on any platform, so a
 //! result of `linux_generic`/fallthrough just means none of the known
 //! signals matched, not that detection failed.
@@ -15,7 +15,7 @@ use std::env;
 /// other call sites that branch on it); `human_name` is the user-facing
 /// label. `supports_self_update` gates whether the frontend offers in-app
 /// updates (`SettingsGeneral.svelte`) — false for anything managed by an
-/// external package manager (deb/rpm/flatpak/snap), which would just have
+/// external package manager (deb/rpm/snap), which would just have
 /// its files overwritten out from under it, or reverted, by a self-update,
 /// and false for AppImage, which can't be cleanly patched in place either.
 #[derive(Debug, Clone, Serialize)]
@@ -30,7 +30,7 @@ pub fn get_install_format() -> InstallFormatInfo {
     detect_install_format()
 }
 
-/// Checked in order: packaging-runtime env vars (AppImage/Flatpak/Snap),
+/// Checked in order: packaging-runtime env vars (AppImage/Snap),
 /// then — on Linux only — whether the executable lives under `/usr/` with a
 /// distro release file present, indicating a native deb/rpm install. On
 /// Windows every path currently resolves to the same installer info (both
@@ -47,14 +47,6 @@ pub fn detect_install_format() -> InstallFormatInfo {
             return InstallFormatInfo {
                 format: "appimage".to_string(),
                 human_name: "Linux AppImage".to_string(),
-                supports_self_update: false,
-            };
-        }
-
-        if env::var("FLATPAK_ID").is_ok() || std::path::Path::new("/.flatpak-info").exists() {
-            return InstallFormatInfo {
-                format: "flatpak".to_string(),
-                human_name: "Flatpak Package".to_string(),
                 supports_self_update: false,
             };
         }
@@ -171,7 +163,7 @@ mod tests {
 
     // AppImages are standalone bundles the user must manually re-download and
     // replace; there's no way to patch the running binary in place, so this
-    // must behave like the managed-package formats (deb/rpm/flatpak/snap)
+    // must behave like the managed-package formats (deb/rpm/snap)
     // rather than like a real in-app-updatable install (#411).
     #[cfg(target_os = "linux")]
     #[test]
