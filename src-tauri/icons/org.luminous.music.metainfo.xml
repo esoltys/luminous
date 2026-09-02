@@ -14,6 +14,20 @@
   </description>
   <developer_name>Eric James Soltys</developer_name>
   <launchable type="desktop-id">org.luminous.music.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Library view with cover art and metadata</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/home-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Synchronized lyrics view</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/lyrics-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Theming and color schemes</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/themes-EN.png</image>
+    </screenshot>
+  </screenshots>
   <url type="homepage">https://esoltys.dev/luminous/</url>
   <url type="vcs-browser">https://github.com/esoltys/luminous</url>
   <url type="bugtracker">https://github.com/esoltys/luminous/issues</url>
