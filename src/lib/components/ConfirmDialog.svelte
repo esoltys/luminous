@@ -35,7 +35,7 @@
   <div class="h-14 flex items-center justify-between px-6 border-b border-brand-border shrink-0 bg-brand-main">
     <div class="flex items-center gap-2">
       <AlertTriangle class="w-4 h-4 {danger ? 'text-red-400' : 'text-brand-accent-text'}" />
-      <h3 class="text-sm font-bold">{title}</h3>
+      <h3 class="text-sm font-bold text-balance">{title}</h3>
     </div>
     <button onclick={onCancel} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
       <X class="w-4 h-4" />
@@ -43,7 +43,7 @@
   </div>
 
   <div class="p-6">
-    <p class="text-sm text-brand-text-secondary">{message}</p>
+    <p class="text-sm text-brand-text-secondary text-pretty">{message}</p>
   </div>
 
   <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-brand-border bg-brand-main">

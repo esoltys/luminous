@@ -366,7 +366,7 @@
           <h3 class="font-bold text-sm text-brand-text-primary">
             {mode === "parametric20" ? i18n.t('equalizer.titleParametric') : i18n.t('equalizer.title')}
           </h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">
+          <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">
             {mode === "parametric20" ? i18n.t('equalizer.subtitleParametric') : i18n.t('equalizer.subtitle')}
           </p>
         </div>
@@ -574,7 +574,7 @@
           </div>
           <div class="space-y-1 min-w-0">
             <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('loudness.title')}</h3>
-            <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('loudness.subtitle')}</p>
+            <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('loudness.subtitle')}</p>
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -635,7 +635,7 @@
             suffix="dB"
             size={80}
           />
-          <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4">{i18n.t('loudness.fallbackGainHint')}</span>
+          <span class="text-[11px] text-brand-text-secondary text-center mt-2 px-4 text-pretty">{i18n.t('loudness.fallbackGainHint')}</span>
         </div>
       </div>
 
@@ -658,7 +658,7 @@
         </div>
         <div class="space-y-1 min-w-0">
           <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('fades.title')}</h3>
-          <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('fades.subtitle')}</p>
+          <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('fades.subtitle')}</p>
         </div>
       </div>
 

@@ -26,8 +26,8 @@
     {/if}
   </div>
   {#if dbNewer}
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('dbNewerThanApp.title')}</h3>
-    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">
+    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('dbNewerThanApp.title')}</h3>
+    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">
       {i18n.t('dbNewerThanApp.text', {
         dbVersion: collectionStore.dbSchemaStatus?.db_version,
         appVersion: collectionStore.dbSchemaStatus?.app_version,
@@ -37,8 +37,8 @@
       {i18n.t('sidebar.settings')}
     </Button>
   {:else}
-    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5">{i18n.t('emptyLibrary.title')}</h3>
-    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed">{i18n.t('emptyLibrary.text')}</p>
+    <h3 class="text-base font-semibold text-brand-text-primary mb-1.5 text-balance">{i18n.t('emptyLibrary.title')}</h3>
+    <p class="text-xs text-brand-text-secondary mb-5 leading-relaxed text-pretty">{i18n.t('emptyLibrary.text')}</p>
     <div class="flex items-center gap-2">
       <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
         <FolderClosed class="w-3.5 h-3.5" />
