@@ -306,19 +306,34 @@ async function main() {
     // sit below the fold and Chromium never fetches them without a real
     // scroll, so they'd never fire load/error and this would hang forever.
     // Forcing eager loading makes every image actually fetch.
-    await page.evaluate(async () => {
-      const imgs = Array.from(document.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map((img) => {
-          if (img.loading === "lazy") img.loading = "eager";
-          if (img.complete) return;
-          return new Promise((resolve) => {
-            img.addEventListener("load", resolve);
-            img.addEventListener("error", resolve);
-          });
-        })
-      );
-    });
+    const ensureImagesLoaded = async () => {
+      await page.evaluate(async () => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        await Promise.all(
+          imgs.map((img) => {
+            if (img.loading === "lazy") img.loading = "eager";
+            if (img.complete) return;
+            return new Promise((resolve) => {
+              img.addEventListener("load", resolve);
+              img.addEventListener("error", resolve);
+            });
+          })
+        );
+      });
+    };
+    try {
+      await ensureImagesLoaded();
+    } catch (err: unknown) {
+      if (String(err).includes("Execution context was destroyed")) {
+        await page.waitForSelector(".flex-1", { timeout: 30000 });
+        if (afterLoad) {
+          await afterLoad(page, featured, language);
+        }
+        await ensureImagesLoaded();
+      } else {
+        throw err;
+      }
+    }
     // Settle transitions
     await page.waitForTimeout(400);
 
