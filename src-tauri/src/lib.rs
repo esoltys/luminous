@@ -703,7 +703,7 @@ pub fn run() {
 
             let watcher = Arc::new(parking_lot::Mutex::new(None));
 
-            // souvlaki needs an HWND on Windows to register SMTC for our window.
+            // SMTC needs an HWND on Windows to register for our window (#576).
             #[cfg(target_os = "windows")]
             let media_hwnd: Option<*mut std::ffi::c_void> = app
                 .get_webview_window("main")
@@ -715,7 +715,7 @@ pub fn run() {
             let media_session = media_session::spawn(app.handle().clone(), media_hwnd);
             if media_session.is_none() {
                 eprintln!(
-                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2/Now Playing) unavailable; continuing without it."
+                    "[Luminous Backend] OS media session integration (SMTC/MPRIS2) unavailable; continuing without it."
                 );
             }
 
