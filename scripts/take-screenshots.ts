@@ -127,11 +127,11 @@ async function main() {
     try {
       const res = await fetch("http://localhost:1420");
       if (res.ok) {
-        // Also probe the root layout module so Vite finishes bundling optimizeDeps upfront.
-        // During startup, Vite optimizes dependencies like phosphor-svelte and returns 504
-        // until the initial bundle is written to disk.
-        const clientRes = await fetch("http://localhost:1420/.svelte-kit/generated/client/nodes/0.js");
-        if (clientRes.ok) {
+        // Probe the root layout component so Vite completes its initial optimizeDeps
+        // pass before launching the browser. During cold startup, Vite optimizes
+        // dependencies and returns 504 on in-flight requests until the bundle is written.
+        const layoutRes = await fetch("http://localhost:1420/src/routes/+layout.svelte");
+        if (layoutRes.ok) {
           ready = true;
           break;
         }
