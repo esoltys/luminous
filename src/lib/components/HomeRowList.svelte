@@ -6,13 +6,11 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
-  import { formatRelativeDate } from "../utils/date";
   import CoverArt from "./CoverArt.svelte";
   import PlaylistCoverThumb from "./PlaylistCoverThumb.svelte";
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
-  import GenreChips from "./GenreChips.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
 
@@ -54,28 +52,24 @@
     return playlistCategoryFor(item.playlist);
   }
 
-  // Album items render their own title/year + artist/rating layout instead
-  // of this trailing block (see the template), so these only need to cover
-  // song and playlist.
+  function yearFor(item: HomeItem): string {
+    if (item.type === "song") return item.song.year ? String(item.song.year) : "";
+    if (item.type === "album") return item.album.year ? String(item.album.year) : "";
+    return "";
+  }
+
   function trailingLabel(item: HomeItem): string {
-    if (item.type === "song") return i18n.t("playerBar.songLabel");
     if (item.type === "playlist") return i18n.t("playlists.playlistTypeLabel");
     return "";
   }
 
-  function genreFor(item: HomeItem): string {
-    if (item.type === "song") return item.song.genre || "";
+  function trackCountFor(item: HomeItem): string {
     if (item.type === "playlist") {
       return item.playlist.track_count === 1
         ? i18n.t("playlists.oneSong")
         : i18n.t("playlists.songsCount", { count: item.playlist.track_count });
     }
     return "";
-  }
-
-  function addedDateFor(item: HomeItem): string {
-    if (variant !== "added" || item.type !== "song") return "";
-    return formatRelativeDate(item.song.added);
   }
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
@@ -171,40 +165,33 @@
           {/if}
         </div>
 
-        {#if item.type === "album"}
+        {#if item.type === "album" || item.type === "song"}
           <div class="min-w-0 flex-1 flex flex-col gap-0.5">
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
-              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{item.album.year || ""}</span>
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{yearFor(item)}</span>
             </div>
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
-              <span class="shrink-0"><SongRating rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" /></span>
+              <span class="shrink-0">
+                {#if item.type === "song"}
+                  <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} size="sm" />
+                {:else}
+                  <SongRating rating={item.album.rating} onRate={(r) => rateAlbum(item.album, r)} size="sm" />
+                {/if}
+              </span>
             </div>
           </div>
         {:else}
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <p class="truncate text-sm font-semibold text-brand-text-primary">{titleFor(item)}</p>
-              {#if item.type === "song"}
-                <span class="shrink-0">
-                  <SongRating rating={item.song.rating} onRate={(r) => rateSong(item.song, r)} />
-                </span>
-              {/if}
+          <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
+              <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{trailingLabel(item)}</span>
             </div>
-            <p class="truncate text-xs text-brand-text-secondary font-medium">{subtitleFor(item)}</p>
-          </div>
-
-          <div class="shrink-0 max-w-40 flex flex-col items-end gap-0.5">
-            <p class="text-xs text-brand-text-secondary font-medium tabular-nums truncate">{trailingLabel(item)}</p>
-            {#if item.type === "song" && item.song.genre}
-              <GenreChips genre={item.song.genre} />
-            {:else if genreFor(item)}
-              <p class="text-xs text-brand-text-secondary truncate">{genreFor(item)}</p>
-            {/if}
-            {#if addedDateFor(item)}
-              <p class="text-xs text-brand-text-secondary/70 truncate">{addedDateFor(item)}</p>
-            {/if}
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-xs text-brand-text-secondary font-medium min-w-0">{subtitleFor(item)}</p>
+              <span class="text-xs text-brand-text-secondary truncate shrink-0">{trackCountFor(item)}</span>
+            </div>
           </div>
         {/if}
       </div>
