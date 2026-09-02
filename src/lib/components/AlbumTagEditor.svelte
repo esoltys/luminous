@@ -1,7 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, LoaderCircle, Layers, Lock, ImageOff } from "lucide-svelte";
+  import {
+    SlidersIcon as Sliders,
+    FloppyDiskIcon as Save,
+    XIcon as X,
+    CircleNotchIcon as LoaderCircle,
+    StackIcon as Layers,
+    LockIcon as Lock,
+    ImageBrokenIcon as ImageOff
+  } from "phosphor-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";

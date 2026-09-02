@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LoaderCircle } from "lucide-svelte";
+  import { CircleNotchIcon as LoaderCircle } from "phosphor-svelte";
 
   interface Props {
     label: string;

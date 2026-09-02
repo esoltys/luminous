@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, Layers } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    ListPlusIcon as ListPlus,
+    MicrophoneStageIcon as Mic2,
+    StackIcon as Layers
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { toastStore } from "../stores/toast.svelte";

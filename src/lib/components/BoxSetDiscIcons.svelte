@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Disc } from "lucide-svelte";
+  import { DiscIcon as Disc } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {

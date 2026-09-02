@@ -1,7 +1,13 @@
 <script lang="ts">
   import { i18n } from "../stores/i18n.svelte";
   import { openExternalUrl } from "../utils/openExternalUrl";
-  import { Home, Info, Shield, MessageCircle, Bug } from "lucide-svelte";
+  import {
+    HouseIcon as Home,
+    InfoIcon as Info,
+    ShieldIcon as Shield,
+    ChatCircleIcon as MessageCircle,
+    BugIcon as Bug
+  } from "phosphor-svelte";
 </script>
 
 <div class="space-y-6 max-w-4xl">

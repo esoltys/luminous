@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Star, CircleSlash } from "lucide-svelte";
+  import { StarIcon as Star, ProhibitIcon as CircleSlash } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -79,7 +79,7 @@
           class="absolute inset-0 overflow-hidden pointer-events-none"
           style="width: {fillFraction(star) * 100}%"
         >
-          <Star class="{starClass} fill-current text-brand-accent-text" />
+          <Star weight="fill" class="{starClass} text-brand-accent-text" />
         </span>
       {/if}
     </button>

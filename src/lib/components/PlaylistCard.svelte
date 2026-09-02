@@ -1,6 +1,13 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Calendar, Music, Radio, Layers, Sparkles } from "lucide-svelte";
+  import {
+    PlaylistIcon as ListMusic,
+    CalendarIcon as Calendar,
+    MusicNotesIcon as Music,
+    RadioIcon as Radio,
+    StackIcon as Layers,
+    SparkleIcon as Sparkles
+  } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { Playlist, PlaylistItem } from "../types";
   import { songsToCoverStack } from "../utils/covers";

@@ -14,7 +14,7 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
-  import { Music, UploadCloud } from 'lucide-svelte';
+  import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
   import { prefs } from '../lib/stores/prefs.svelte';
@@ -295,8 +295,9 @@
   }
 </script>
 
-<div class="relative flex flex-col h-screen overflow-hidden bg-brand-main">
-  {#if windowLayoutStore.isMiniplayer}
+<IconContext values={{ weight: 'duotone' }}>
+  <div class="relative flex flex-col h-screen overflow-hidden bg-brand-main">
+    {#if windowLayoutStore.isMiniplayer}
     <div class="w-full h-full">
       <Miniplayer />
     </div>
@@ -504,7 +505,8 @@
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
 {/if}
 
-<Toast />
+  <Toast />
+</IconContext>
 
 <style>
   .flip-perspective {

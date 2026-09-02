@@ -7,7 +7,16 @@
   import CoverArt from "./CoverArt.svelte";
   import SongRating from "./SongRating.svelte";
   import TagEditor from "./TagEditor.svelte";
-  import { Play, Plus, Music, DiscAlbum, Mic2, Columns, LayoutGrid, Rows3 } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    MusicNotesIcon as Music,
+    DiscIcon as DiscAlbum,
+    MicrophoneStageIcon as Mic2,
+    ColumnsIcon as Columns,
+    SquaresFourIcon as LayoutGrid,
+    RowsIcon as Rows3
+  } from "phosphor-svelte";
   import type { Song, AlbumItem, ArtistItem } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";

@@ -1,5 +1,14 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    ListPlusIcon as ListPlus,
+    MicrophoneStageIcon as Mic2,
+    DiscIcon as DiscAlbum,
+    PencilSimpleIcon as Edit3,
+    FolderIcon as Folder,
+    StackIcon as Layers
+  } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";

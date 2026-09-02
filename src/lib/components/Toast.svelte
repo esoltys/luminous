@@ -1,6 +1,13 @@
 <script lang="ts">
   import { fly, fade } from "svelte/transition";
-  import { AlertTriangle, CheckCircle2, Info, CheckCheck, Sparkles, X } from "lucide-svelte";
+  import {
+    WarningIcon as AlertTriangle,
+    CheckCircleIcon as CheckCircle2,
+    InfoIcon as Info,
+    ChecksIcon as CheckCheck,
+    SparkleIcon as Sparkles,
+    XIcon as X
+  } from "phosphor-svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { portal } from "../utils/portal";
 

@@ -1,7 +1,18 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { Sliders, Save, X, Sparkles, LoaderCircle, AlertTriangle, Check, SearchX, Lock, ImageOff } from "lucide-svelte";
+  import {
+    SlidersIcon as Sliders,
+    FloppyDiskIcon as Save,
+    XIcon as X,
+    SparkleIcon as Sparkles,
+    CircleNotchIcon as LoaderCircle,
+    WarningIcon as AlertTriangle,
+    CheckIcon as Check,
+    MagnifyingGlassMinusIcon as SearchX,
+    LockIcon as Lock,
+    ImageBrokenIcon as ImageOff
+  } from "phosphor-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";

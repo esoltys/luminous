@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Shuffle } from "lucide-svelte";
+  import { PlayIcon as Play, ShuffleIcon as Shuffle } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import Button from "./Button.svelte";
 
@@ -15,7 +15,7 @@
 </script>
 
 <Button onclick={onPlayAll} {disabled} variant="primary" class={extraClass}>
-  <Play class="w-4 h-4 fill-current" /> {i18n.t('artistDetail.playAll')}
+  <Play class="w-4 h-4" weight="fill" /> {i18n.t('artistDetail.playAll')}
 </Button>
 <Button onclick={onShufflePlay} {disabled} variant="secondary" class={extraClass}>
   <Shuffle class="w-4 h-4" /> {i18n.t('artistDetail.shuffleAndPlay')}

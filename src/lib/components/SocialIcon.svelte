@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Globe, Link } from "lucide-svelte";
+  import { GlobeIcon as Globe, LinkIcon as Link } from "phosphor-svelte";
   import {
     siThreads,
     siSpotify,

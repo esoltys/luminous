@@ -5,7 +5,16 @@
   import { onMount } from "svelte";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
-  import { Folder, Plus, Trash2, RefreshCw, RotateCcw, Clock, Activity, AlertTriangle } from "lucide-svelte";
+  import {
+    FolderIcon as Folder,
+    PlusIcon as Plus,
+    TrashIcon as Trash2,
+    ArrowsClockwiseIcon as RefreshCw,
+    ArrowCounterClockwiseIcon as RotateCcw,
+    ClockIcon as Clock,
+    PulseIcon as Activity,
+    WarningIcon as AlertTriangle
+  } from "phosphor-svelte";
 
   onMount(() => {
     loudnessStore.init();

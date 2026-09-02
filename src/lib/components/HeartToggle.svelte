@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart } from "lucide-svelte";
+  import { HeartIcon as Heart } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
 
   interface Props {
@@ -62,5 +62,5 @@
   title={favorite ? i18n.t('rating.unfavoriteTooltip') : i18n.t('rating.favoriteTooltip')}
   aria-pressed={favorite}
 >
-  <Heart class="{sizeClass} {favorite ? 'fill-current' : ''} {justFavorited ? 'anim-heart-pulse' : ''}" />
+  <Heart weight={favorite ? "fill" : "duotone"} class="{sizeClass} {justFavorited ? 'anim-heart-pulse' : ''}" />
 </button>

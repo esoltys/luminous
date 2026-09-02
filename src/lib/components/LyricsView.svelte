@@ -1,7 +1,14 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
-  import { FileText, Edit3, Save, X, RefreshCw, Music2 } from "lucide-svelte";
+  import {
+    FileTextIcon as FileText,
+    PencilSimpleIcon as Edit3,
+    FloppyDiskIcon as Save,
+    XIcon as X,
+    ArrowsClockwiseIcon as RefreshCw,
+    MusicNotesIcon as Music2
+  } from "phosphor-svelte";
   import LoadingSpinner from "./LoadingSpinner.svelte";
   import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";

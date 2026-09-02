@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle, X } from "lucide-svelte";
+  import { WarningIcon as AlertTriangle, XIcon as X } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
   import Button from "./Button.svelte";
 

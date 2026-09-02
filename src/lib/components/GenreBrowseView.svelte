@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { Tag as TagIcon, CheckSquare, LayoutGrid, Rows3 } from "lucide-svelte";
+  import {
+    TagIcon,
+    CheckSquareIcon as CheckSquare,
+    SquaresFourIcon as LayoutGrid,
+    RowsIcon as Rows3
+  } from "phosphor-svelte";
   import { genreColorHsl } from "../utils/genrePalette";
   import { onMount } from "svelte";
   import { tagsStore } from "../stores/tags.svelte";

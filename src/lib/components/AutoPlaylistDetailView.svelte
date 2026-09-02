@@ -22,7 +22,24 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag } from "lucide-svelte";
+  import {
+    ClockIcon as Clock,
+    PlusIcon as Plus,
+    FolderPlusIcon as FolderPlus,
+    MusicNotesIcon as Music,
+    GaugeIcon as Gauge,
+    ArrowsClockwiseIcon as RefreshCw,
+    HeartIcon as Heart,
+    CalendarIcon as Calendar,
+    HourglassIcon as Hourglass,
+    MagnifyingGlassIcon as Search,
+    ArrowCounterClockwiseIcon as RotateCcw,
+    ArrowClockwiseIcon as RotateCw,
+    DotsThreeIcon as MoreHorizontal,
+    XIcon as X,
+    EraserIcon as Eraser,
+    TagIcon as Tag
+  } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";

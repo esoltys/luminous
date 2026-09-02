@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Keyboard, X } from "lucide-svelte";
+  import { KeyboardIcon as Keyboard, XIcon as X } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
   import { i18n } from "../stores/i18n.svelte";
 
