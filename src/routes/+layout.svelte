@@ -433,20 +433,20 @@
 
               <!-- Song Details Info: hidden below md, where it would stack
                    under the cover art instead of sitting beside it. -->
-              <div class="hidden md:flex flex-col text-center md:text-left space-y-4 max-w-md">
+              <div class="hidden md:flex flex-col text-center md:text-left w-full max-w-md">
                 <div>
                   <span class="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-brand-accent/15 text-brand-accent-text border border-brand-border rounded-full select-none">
                     {i18n.t('playerBar.nowPlaying')}
                   </span>
                 </div>
-                <h1 class="text-3xl md:text-5xl font-black text-brand-text-primary leading-tight tracking-tight select-text">
+                <h1 class="mt-3 text-4xl md:text-6xl font-black text-brand-text-primary leading-[0.95] tracking-tight select-text">
                   {playerStore.currentSong.title || i18n.t('collection.unknownSong')}
                 </h1>
-                <p class="text-lg md:text-xl text-brand-text-secondary select-text font-medium">
-                  {playerStore.currentSong.artist || i18n.t('collection.unknownArtist')}
-                </p>
-                <p class="text-sm text-brand-text-secondary/60 italic truncate select-text">
+                <p class="mt-3 text-lg md:text-xl text-brand-text-secondary select-text font-semibold">
                   {playerStore.currentSong.album || i18n.t('collection.unknownAlbum')}
+                </p>
+                <p class="mt-0.5 text-base md:text-lg text-brand-text-secondary/70 select-text font-medium">
+                  {playerStore.currentSong.artist || i18n.t('collection.unknownArtist')}
                 </p>
               </div>
             {:else}

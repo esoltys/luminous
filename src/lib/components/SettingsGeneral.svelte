@@ -112,7 +112,6 @@
       case "appimage": return i18n.t('settings.formatAppImage', {}, fallback);
       case "deb": return i18n.t('settings.formatDeb', {}, fallback);
       case "rpm": return i18n.t('settings.formatRpm', {}, fallback);
-      case "flatpak": return i18n.t('settings.formatFlatpak', {}, fallback);
       case "snap": return i18n.t('settings.formatSnap', {}, fallback);
       case "system_pkg": return i18n.t('settings.formatSystemPkg', {}, fallback);
       default: return fallback;
@@ -238,18 +237,12 @@
     <div class="min-w-0 space-y-1">
       {#if updaterStore.externallyManagedFormat !== 'msix'}
         <h4 class="font-bold text-sm text-brand-text-primary">
-          {#if updaterStore.externallyManagedFormat === 'flatpak'}
-            {i18n.t('settings.updateManagedByFlatpakTitle', {}, 'Managed by Flatpak')}
-          {:else}
-            {i18n.t('settings.updateManagedByPackageManagerTitle', {}, 'Managed by your package manager')}
-          {/if}
+          {i18n.t('settings.updateManagedByPackageManagerTitle', {}, 'Managed by your package manager')}
         </h4>
       {/if}
       <p class="text-xs text-brand-text-secondary leading-relaxed">
         {#if updaterStore.externallyManagedFormat === 'msix'}
           {i18n.t('settings.updateManagedByStoreDesc', {}, 'Updates are installed automatically.')}
-        {:else if updaterStore.externallyManagedFormat === 'flatpak'}
-          {i18n.t('settings.updateManagedByFlatpakDesc', {}, 'Run flatpak update, or update through your software center.')}
         {:else}
           {i18n.t('settings.updateManagedByPackageManagerDesc', { format: getFormatName(updaterStore.installFormat.format, updaterStore.installFormat.human_name) }, 'Updates for your {format} install are handled by your system package manager.')}
         {/if}

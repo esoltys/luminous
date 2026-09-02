@@ -256,19 +256,19 @@
       "deb": {
         "files": {
           "/usr/share/icons/hicolor": "icons/hicolor",
-          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "metainfo/org.luminous.music.metainfo.xml"
         }
       },
       "rpm": {
         "files": {
           "/usr/share/icons/hicolor": "icons/hicolor",
-          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "metainfo/org.luminous.music.metainfo.xml"
         }
       },
       "appimage": {
         "files": {
           "/usr/share/icons/hicolor": "icons/hicolor",
-          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "icons/org.luminous.music.metainfo.xml"
+          "/usr/share/metainfo/org.luminous.music.metainfo.xml": "metainfo/org.luminous.music.metainfo.xml"
         }
       }
     }

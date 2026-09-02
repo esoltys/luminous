@@ -153,6 +153,20 @@
   box-shadow: var(--glass-shadow, none);
 }
 
+/*
+ * Song table surfaces (SongTable wrapper in PlaylistView, AutoPlaylistDetailView,
+ * AlbumDetailView, ArtistDetailView) use a raw backdrop-blur-* Tailwind utility
+ * rather than .glass/.glass-surface. Row hover triggers frequent repaints
+ * (background-color + opacity transitions) inside that blurred region; without
+ * pinning it to its own GPU layer the backdrop-filter can be re-rasterized
+ * against a stale frame, leaving a smeared/blurred patch behind a hovered row
+ * that doesn't clear until something else forces a full repaint.
+ */
+.table-surface-blur {
+  will-change: backdrop-filter;
+  transform: translateZ(0);
+}
+
 .bg-brand-sidebar.glass-surface,
 aside.glass-surface,
 header.glass-surface {
