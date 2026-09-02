@@ -15,39 +15,39 @@
   <launchable type="desktop-id">org.luminous.music.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <caption>Library view with cover art and metadata</caption>
+      <caption>A high-performance home for the music you already own</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/home-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Album grid</caption>
+      <caption>Your library, indexed and instant</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/albums-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Automatic playlists</caption>
+      <caption>Playlists that build themselves</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/playlist-auto-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Genre browsing</caption>
+      <caption>Genres, curated your way</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/genres-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Mini player</caption>
+      <caption>A miniplayer for quick skips, without the whole window</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/miniplayer-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Mini player, expanded on hover</caption>
+      <caption>A miniplayer for quick skips, without the whole window</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/miniplayer-hover-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Theming and color schemes</caption>
+      <caption>A player that matches your music, not the other way around</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/themes-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Synchronized lyrics view</caption>
+      <caption>Follow along, line by line</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/lyrics-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Advanced search</caption>
+      <caption>Find any track by the rules you set</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/advanced-search-EN.png</image>
     </screenshot>
   </screenshots>
