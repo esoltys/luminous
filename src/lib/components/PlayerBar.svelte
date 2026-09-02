@@ -251,7 +251,7 @@
           />
         {/if}
       </div>
-      {#if playerStore.currentSong?.album}
+      {#if playerStore.currentSong?.album?.trim()}
         <LinkButton
           onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(playerStore.currentSong?.album || ""); }}
           class="text-xs text-brand-text-secondary/70 truncate"
@@ -259,10 +259,6 @@
         >
           {playerStore.currentSong.album}
         </LinkButton>
-      {:else if playerStore.currentSong}
-        <span class="text-xs text-brand-text-secondary/70 truncate">
-          {i18n.t('collection.unknownAlbum')}
-        </span>
       {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton

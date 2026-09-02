@@ -77,6 +77,24 @@ describe("PlayerBar.svelte", () => {
     expect(getByText("Test Artist")).toBeInTheDocument();
   });
 
+  it("hides the album row entirely when the current song has no album (#428)", () => {
+    playerStore.currentSong = { ...mockSong, album: "" };
+    playerStore.state = "playing";
+
+    const { queryByText, getByText } = render(PlayerBar);
+    expect(getByText("Test Track Title")).toBeInTheDocument();
+    expect(queryByText("Test Album")).not.toBeInTheDocument();
+    expect(queryByText(/unknown album/i)).not.toBeInTheDocument();
+  });
+
+  it("hides the album row when the album is whitespace-only (#428)", () => {
+    playerStore.currentSong = { ...mockSong, album: "   " };
+    playerStore.state = "playing";
+
+    const { queryByText } = render(PlayerBar);
+    expect(queryByText(/unknown album/i)).not.toBeInTheDocument();
+  });
+
   it("navigates to album when album title is clicked", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";

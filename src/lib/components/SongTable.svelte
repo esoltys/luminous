@@ -447,7 +447,7 @@
           {song.album}
         </LinkButton>
       {:else}
-        <span class="{secondaryColor(song)} truncate min-w-0">{i18n.t("collection.unknownAlbum")}</span>
+        <span class="{secondaryColor(song)} truncate min-w-0">—</span>
       {/if}
     </div>
   {:else if col.key === "composer"}
