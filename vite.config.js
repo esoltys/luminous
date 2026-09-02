@@ -4,7 +4,6 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { tauriIpcMockPlugin } from "./scripts/vite-mock-plugin.ts";
-import { sveltePhosphorOptimize } from "phosphor-svelte/vite";
 
 import { execSync } from "child_process";
 
@@ -68,7 +67,7 @@ export default defineConfig(async () => ({
   define: {
     "import.meta.env.VITE_COMMIT_HASH": JSON.stringify(commitHash),
   },
-  plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin(), sveltePhosphorOptimize()],
+  plugins: [sveltekit(), safeTailwindcss(), svelteTesting(), tauriIpcMockPlugin()],
 
   // These are only reachable once specific views actually render (icons,
   // Tauri API shims, the virtualized song list), not from the initial
