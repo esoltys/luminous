@@ -77,7 +77,7 @@ const FILE_TYPES = [
 ] as const;
 
 /** The subset of per-screenshot settings that also have a run-wide fallback under `default`. */
-export interface MockConfigDefaults {
+interface MockConfigDefaults {
   theme?: string;
   sidebarOpen?: boolean;
   rightPanelOpen?: boolean;
@@ -147,7 +147,7 @@ export function resolveScreenshotSettings(
  * counts are attached — those depend on the (possibly limited) `songs` set
  * actually loaded, so they're computed IPC-mock-side against real song data,
  * not here. */
-export interface MockTagGroup {
+interface MockTagGroup {
   name: string;
   color_index: number;
   children: string[];
@@ -191,7 +191,7 @@ export function loadMockConfig(): MockConfig {
   return {};
 }
 
-export function deriveAlbums(songs: Song[]): AlbumItem[] {
+function deriveAlbums(songs: Song[]): AlbumItem[] {
   const byKey = new Map<string, AlbumItem>();
   for (const song of songs) {
     if (!song.album) continue;
@@ -226,7 +226,7 @@ export function deriveAlbums(songs: Song[]): AlbumItem[] {
   return [...byKey.values()];
 }
 
-export function deriveArtists(songs: Song[]): ArtistItem[] {
+function deriveArtists(songs: Song[]): ArtistItem[] {
   const albumTrackCounts = new Map<string, number>();
   for (const song of songs) {
     if (song.album) {

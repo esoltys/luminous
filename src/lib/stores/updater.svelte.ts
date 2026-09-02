@@ -2,16 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-export interface InstallFormatInfo {
+interface InstallFormatInfo {
   format: string;
   human_name: string;
   supports_self_update: boolean;
 }
 
-export type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
-export type InstallStatus = "idle" | "downloading" | "ready-to-restart" | "error";
-export type UpdatePolicy = "never" | "notify" | "auto";
-export interface DownloadProgress {
+type CheckStatus = "idle" | "checking" | "available" | "up-to-date" | "error";
+type InstallStatus = "idle" | "downloading" | "ready-to-restart" | "error";
+type UpdatePolicy = "never" | "notify" | "auto";
+interface DownloadProgress {
   downloaded: number;
   total: number | null;
 }

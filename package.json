@@ -12,8 +12,9 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "install:git-hooks": "git config core.hooksPath .githooks",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo && bun run knip",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
+    "knip": "knip",
     "tauri": "NO_STRIP=true tauri",
     "icon": "tauri icon app-icon.svg && bun run scripts/generate-msix-assets.ts",
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
@@ -30,7 +31,6 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-positioner": "^2.3.3",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
     "lucide-svelte": "^1.0.1",
@@ -39,6 +39,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@choochmeque/tauri-windows-bundle": "^0.1.28",
     "@sveltejs/adapter-static": "^3.0.6",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
@@ -47,15 +48,16 @@
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.2.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "image-js": "^1.7.0",
     "jsdom": "^30.0.1",
+    "knip": "^6.34.0",
     "music-metadata": "^11.15.0",
     "playwright": "^1.62.1",
     "svelte": "^5.56.10",
     "svelte-check": "^4.7.5",
     "typescript": "~6.0.3",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11",
-    "@choochmeque/tauri-windows-bundle": "^0.1.28"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "postcss": "^8.5.18",

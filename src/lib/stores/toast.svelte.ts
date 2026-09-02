@@ -1,8 +1,8 @@
 import { TOAST_DURATION_MS } from "../constants";
 
-export type ToastVariant = "info" | "error" | "success" | "milestone" | "warning";
+type ToastVariant = "info" | "error" | "success" | "milestone" | "warning";
 
-export interface ToastMessage {
+interface ToastMessage {
   id: number;
   text: string;
   variant: ToastVariant;
