@@ -120,18 +120,24 @@ async function main() {
   process.on("SIGINT", () => { process.exit(0); });
   process.on("SIGTERM", () => { process.exit(0); });
 
-  // 3. Poll server until active
+  // 3. Poll server until active and dependency optimization is complete
   console.log("Waiting for Vite server on http://localhost:1420...");
   let ready = false;
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 100; i++) {
     try {
       const res = await fetch("http://localhost:1420");
       if (res.ok) {
-        ready = true;
-        break;
+        // Also probe the root layout module so Vite finishes bundling optimizeDeps upfront.
+        // During startup, Vite optimizes dependencies like phosphor-svelte and returns 504
+        // until the initial bundle is written to disk.
+        const clientRes = await fetch("http://localhost:1420/.svelte-kit/generated/client/nodes/0.js");
+        if (clientRes.ok) {
+          ready = true;
+          break;
+        }
       }
     } catch (e) {}
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   if (!ready) {
