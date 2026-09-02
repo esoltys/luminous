@@ -24,16 +24,12 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Default hop size for a bare [`MediaCommand::Seek`] (no explicit duration),
-/// mirroring typical desktop media-key seek granularity.
-const DEFAULT_SEEK_STEP: Duration = Duration::from_secs(10);
-
 /// An inbound OS media control event, routed to `state.player`.
 ///
-/// `Toggle`/`Seek`/`SeekBy`/`SetVolume` are only ever constructed on Linux —
-/// SMTC's Windows API only exposes discrete buttons and an absolute
-/// `SetPosition`; volume is controlled by the Windows system mixer, not
-/// SMTC. Hence the `dead_code` allowance on non-Linux targets.
+/// `Toggle`/`SeekBy`/`SetVolume` are only ever constructed on Linux — SMTC's
+/// Windows API only exposes discrete buttons and an absolute `SetPosition`;
+/// volume is controlled by the Windows system mixer, not SMTC. Hence the
+/// `dead_code` allowance on non-Linux targets.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 enum MediaCommand {
     Play,
@@ -43,7 +39,6 @@ enum MediaCommand {
     Previous,
     Stop,
     SetPosition(Duration),
-    Seek(SeekDirection),
     SeekBy(SeekDirection, Duration),
     /// MPRIS `Volume` (0.0-1.0). Some desktop environments (e.g. GNOME's
     /// media-keys handler) route hardware volume-up/down keys to the
@@ -290,12 +285,6 @@ fn handle_event(app: AppHandle, event: MediaCommand) {
             MediaCommand::Previous => player.previous_track().await,
             MediaCommand::Stop => player.stop().await,
             MediaCommand::SetPosition(pos) => player.seek_to(pos.as_nanos() as u64).await,
-            MediaCommand::Seek(direction) => {
-                let current = player.get_state().await.position_nanosec;
-                player
-                    .seek_to(seek_target(current, direction, DEFAULT_SEEK_STEP))
-                    .await
-            }
             MediaCommand::SeekBy(direction, amount) => {
                 let current = player.get_state().await.position_nanosec;
                 player
