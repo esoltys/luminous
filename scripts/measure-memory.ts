@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const BINARY_NAME = "LuminousMusicPlayer";
 const CSV_HEADER = "timestamp,label,process_count,working_set_mb,private_bytes_mb\n";
@@ -90,7 +90,12 @@ function snapshotLinux(): Snapshot {
   // Sum RSS (proxy for working set) and Pss/Private (proxy for private
   // bytes, via /proc/<pid>/smaps_rollup) across the main binary and any
   // child processes (e.g. a WebKitGTK web process).
-  const pidsOut = execFileSync("pgrep", ["-f", BINARY_NAME], { encoding: "utf8" }).trim();
+  // Anchor to a path/start boundary so this doesn't match an unrelated
+  // process that merely has the binary name as a substring elsewhere in
+  // its argv (e.g. a shell command referencing the binary name in a string).
+  const pidsOut = execFileSync("pgrep", ["-f", `(^|/)${BINARY_NAME}(\\s|$)`], {
+    encoding: "utf8",
+  }).trim();
   if (!pidsOut) {
     throw new Error(`Process matching '${BINARY_NAME}' not found. Is Luminous running?`);
   }
@@ -122,12 +127,12 @@ function snapshotLinux(): Snapshot {
   let count = 0;
   for (const pid of allPids) {
     try {
-      const status = execFileSync("cat", [`/proc/${pid}/status`], { encoding: "utf8" });
+      const status = readFileSync(`/proc/${pid}/status`, { encoding: "utf8" });
       const rssMatch = status.match(/^VmRSS:\s+(\d+)/m);
       if (rssMatch) rssKb += Number(rssMatch[1]);
 
       try {
-        const rollup = execFileSync("cat", [`/proc/${pid}/smaps_rollup`], { encoding: "utf8" });
+        const rollup = readFileSync(`/proc/${pid}/smaps_rollup`, { encoding: "utf8" });
         const clean = rollup.match(/^Private_Clean:\s+(\d+)/m);
         const dirty = rollup.match(/^Private_Dirty:\s+(\d+)/m);
         privateKb += Number(clean?.[1] ?? 0) + Number(dirty?.[1] ?? 0);

@@ -4,3 +4,12 @@ timestamp,label,process_count,working_set_mb,private_bytes_mb
 2026-09-02T17:57:10.080Z,after-full-scan-recheck,7,553.7,436.5
 2026-09-02T17:57:57.938Z,playback-eq-analyzer,7,606.8,431.6
 2026-09-02T17:58:04.496Z,playback-eq-analyzer-recheck,7,603.6,427.4
+2026-09-02T18:18:37.381Z,idle,3,500.7,289.5
+2026-09-02T18:18:58.396Z,idle,3,500.5,289.3
+2026-09-02T18:21:32.129Z,after-full-scan,6,507.3,281.5
+2026-09-02T18:21:43.569Z,after-full-scan,3,486.5,275.8
+2026-09-02T18:22:08.161Z,playback-eq-analyzer,6,536.3,310.2
+2026-09-02T18:22:19.634Z,playback-eq-analyzer,6,640.2,405.8
+2026-09-02T18:22:35.121Z,playback-eq-analyzer,6,564.9,338.7
+2026-09-02T18:22:51.102Z,playback-eq-analyzer,3,543.7,332.7
+2026-09-02T18:22:58.590Z,playback-eq-analyzer-recheck,3,543.7,332.6
