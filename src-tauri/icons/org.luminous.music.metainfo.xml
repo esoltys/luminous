@@ -20,12 +20,36 @@
       <image type="source">https://esoltys.dev/luminous/landing-assets/home-EN.png</image>
     </screenshot>
     <screenshot>
-      <caption>Synchronized lyrics view</caption>
-      <image type="source">https://esoltys.dev/luminous/landing-assets/lyrics-EN.png</image>
+      <caption>Album grid</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/albums-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Automatic playlists</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/playlist-auto-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Genre browsing</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/genres-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Mini player</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/miniplayer-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Mini player, expanded on hover</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/miniplayer-hover-EN.png</image>
     </screenshot>
     <screenshot>
       <caption>Theming and color schemes</caption>
       <image type="source">https://esoltys.dev/luminous/landing-assets/themes-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Synchronized lyrics view</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/lyrics-EN.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Advanced search</caption>
+      <image type="source">https://esoltys.dev/luminous/landing-assets/advanced-search-EN.png</image>
     </screenshot>
   </screenshots>
   <url type="homepage">https://esoltys.dev/luminous/</url>
