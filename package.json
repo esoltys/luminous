@@ -24,7 +24,8 @@
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
-    "tauri:windows:build": "tauri-windows-bundle build"
+    "tauri:windows:build": "tauri-windows-bundle build",
+    "measure-memory": "bun run scripts/measure-memory.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

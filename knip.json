@@ -2,5 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["scripts/tauri-ipc-mock.ts"],
   "ignore": ["docs/**"],
-  "ignoreDependencies": ["@typescript/native-preview"]
+  "ignoreDependencies": ["@typescript/native-preview"],
+  "ignoreBinaries": ["pgrep"]
 }
