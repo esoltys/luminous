@@ -5,7 +5,7 @@ export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyri
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */
-export type PlaylistsSubTab = "auto" | "custom";
+type PlaylistsSubTab = "auto" | "custom";
 
 /** An auto-playlist reference (Favourites, Recently Added, genre, decade, BPM,
  * or the genre-less "No Genre" group), for the auto-playlist detail view. */

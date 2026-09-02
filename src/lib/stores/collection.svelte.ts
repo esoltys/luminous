@@ -61,7 +61,7 @@ export interface VisibleColumns {
  * their compile-time defaults.  A single shared map is used for all four table views
  * (Collection, AlbumDetail, Playlist, AutoPlaylist).
  */
-export type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
+type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
 
 /** Song-count milestones that trigger Milestone-tier celebrations. */
 const MILESTONE_THRESHOLDS = [100, 500, 1000, 2500, 5000, 10000];
