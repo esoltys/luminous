@@ -17,6 +17,12 @@ use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{ObjectPath, OwnedValue, Value};
 use zbus::{interface, Connection};
 
+// Brings `SignalEmitter::seeked` into scope — the `#[interface]` macro
+// generates this trait (impl'd for both `SignalEmitter` and
+// `InterfaceRef<PlayerIface>`) from the `#[zbus(signal)] fn seeked(..)`
+// declaration in `PlayerIface`'s impl block below.
+use self::PlayerIfaceSignals as _;
+
 const OBJECT_PATH: &str = "/org/mpris/MediaPlayer2";
 const BUS_NAME: &str = "org.mpris.MediaPlayer2.luminous";
 
@@ -207,6 +213,12 @@ impl PlayerIface {
     fn can_control(&self) -> bool {
         true
     }
+
+    /// MPRIS explicitly excludes `Position` from `PropertiesChanged`
+    /// (clients are expected to poll/interpolate it); `Seeked` is the
+    /// spec-correct notification for an out-of-band position jump.
+    #[zbus(signal)]
+    async fn seeked(signal_emitter: &SignalEmitter<'_>, position: i64) -> zbus::Result<()>;
 }
 
 pub struct LinuxMediaSession {
@@ -292,12 +304,7 @@ impl LinuxMediaSession {
             let result = match property {
                 "Metadata" => iface.metadata_changed(&ctx).await,
                 "PlaybackStatus" => iface.playback_status_changed(&ctx).await,
-                "Position" => {
-                    // MPRIS explicitly excludes Position from PropertiesChanged
-                    // (clients are expected to poll/interpolate it); emitting
-                    // the Seeked signal instead is the spec-correct notification.
-                    iface.seeked(&ctx, iface.position()).await
-                }
+                "Position" => ctx.seeked(iface.position()).await,
                 _ => Ok(()),
             };
             if let Err(e) = result {
