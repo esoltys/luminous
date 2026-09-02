@@ -16,8 +16,7 @@
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
-
-  const isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+  import { isLinux } from "../platform";
 
   // Responsive control trimming (issue #413, refined against real usage,
   // padding/seekbar fixed under #543): three named tiers as this floating

@@ -21,6 +21,7 @@
   import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
+  import { isLinux as platformIsLinux } from '../lib/platform';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -48,7 +49,7 @@
   );
 
   onMount(() => {
-    isLinux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+    isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));

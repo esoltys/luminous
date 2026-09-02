@@ -1,5 +1,7 @@
 // Frontend TypeScript types matching Rust models in models.rs
 
+import { isWindows } from "../platform";
+
 export type SongSource =
   | "unknown"
   | "local_file"
@@ -357,7 +359,6 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       }
       return `/fixtures/${cleanPath}`;
     }
-    const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
     if (isWindows) {
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
     }
