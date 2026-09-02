@@ -108,6 +108,6 @@ manual.
 - [ ] Update the [opendesktop.org listing](https://www.opendesktop.org/c/2370163/) with the
       new `.deb`/`.rpm` (via "Add URL" pointing at the GitHub release assets, not a
       re-upload) and a changelog entry. This is a manual listing with no automated sync —
-      it'll silently go stale the same way the winget manifest did (#476) if skipped.
+      easy to let it silently go stale if skipped.
 - [ ] Close/link the GitHub issues resolved by this release; update the milestone if one's
       in use.
