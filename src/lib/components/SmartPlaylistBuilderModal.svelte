@@ -254,8 +254,8 @@
           <Sparkles class="w-5 h-5" />
         </div>
         <div>
-          <h2 class="text-base font-bold text-brand-text-primary">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
-          <p class="text-xs text-brand-text-secondary/70">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
+          <h2 class="text-base font-bold text-brand-text-primary text-balance">{editing ? i18n.t("smartPlaylistBuilder.editTitle") : i18n.t("smartPlaylistBuilder.createTitle")}</h2>
+          <p class="text-xs text-brand-text-secondary/70 text-pretty">{i18n.t("smartPlaylistBuilder.subtitle")}</p>
         </div>
       </div>
       <button

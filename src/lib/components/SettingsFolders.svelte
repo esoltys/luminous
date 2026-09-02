@@ -42,7 +42,7 @@
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.watchedFoldersTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.watchedFoldersSubtitle', {}, 'Manage directories to scan for music files.')}</p>
       </div>
     </div>
     <Button onclick={() => collectionStore.addDirectoryDialog()} variant="primary" size="sm">
@@ -91,7 +91,7 @@
       <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">
         <Folder class="w-12 h-12 mx-auto mb-2 text-brand-text-secondary/50" />
         <h4 class="font-semibold text-brand-text-primary mb-1">{i18n.t('settings.noFoldersTitle')}</h4>
-        <p class="text-xs text-brand-text-secondary mb-4">{i18n.t('settings.noFoldersText')}</p>
+        <p class="text-xs text-brand-text-secondary mb-4 text-pretty">{i18n.t('settings.noFoldersText')}</p>
       </div>
     {/if}
   </div>
@@ -105,7 +105,7 @@
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.rescanTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.rescanSubtitle')}</p>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.rescanSubtitle')}</p>
       </div>
     </div>
   </div>
@@ -157,7 +157,7 @@
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.watchRealtimeLabel')}</span>
-        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.watchRealtimeHint')}</p>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.watchRealtimeHint')}</p>
       </div>
       <Toggle
         checked={collectionStore.watchFoldersRealtime}
@@ -169,7 +169,7 @@
     <div class="flex items-center justify-between gap-4">
       <div class="flex flex-col gap-0.5 min-w-0">
         <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.scanOnStartupLabel')}</span>
-        <p class="text-xs text-brand-text-secondary">{i18n.t('settings.scanOnStartupHint')}</p>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.scanOnStartupHint')}</p>
       </div>
       <Toggle
         checked={collectionStore.scanOnStartup}

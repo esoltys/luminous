@@ -50,12 +50,12 @@
         <button
           type="button"
           onclick={() => openExternalUrl(toast.url!)}
-          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          class="flex-1 text-left underline decoration-dotted underline-offset-2 hover:decoration-solid text-pretty"
         >
           {toast.text}
         </button>
       {:else}
-        <span class="flex-1">{toast.text}</span>
+        <span class="flex-1 text-pretty">{toast.text}</span>
       {/if}
       <button
         onclick={() => toastStore.dismiss(toast.id)}

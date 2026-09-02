@@ -313,7 +313,7 @@
               <p
                 data-index={idx}
                 onclick={() => playerStore.seek(line.timeMs * 1_000_000)}
-                class="text-xl md:text-2xl font-bold transition-all duration-300 transform {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
+                class="text-xl md:text-2xl font-bold transition-all duration-300 transform text-balance {isActive ? 'text-brand-text-primary scale-105 filter drop-shadow-[0_0_8px_var(--color-brand-accent)] font-extrabold' : 'text-brand-text-secondary/30 hover:text-brand-text-secondary/60'}"
               >
                 {line.text || "•••"}
               </p>
@@ -324,7 +324,7 @@
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
             {i18n.t('lyrics.plainTextNotice', {}, "Synced lyrics not available. Showing plain text.")}
           </div>
-          <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans">
+          <div class="whitespace-pre-line text-lg leading-relaxed text-brand-text-secondary/80 select-text pb-20 font-medium font-sans text-pretty">
             {lyricsText.startsWith("[synced:false]\n")
               ? lyricsText.substring("[synced:false]\n".length)
               : (lyricsText.startsWith("[synced:false]") ? lyricsText.substring("[synced:false]".length) : lyricsText)}
