@@ -105,5 +105,9 @@ manual.
 - [ ] Verify the in-app updater picks up the new release from an older installed version
       (the app checks for updates on launch — confirm the prompt/flow actually works end
       to end, not just that the build has `createUpdaterArtifacts` set).
+- [ ] Update the [opendesktop.org listing](https://www.opendesktop.org/c/2370163/) with the
+      new `.deb`/`.rpm` (via "Add URL" pointing at the GitHub release assets, not a
+      re-upload) and a changelog entry. This is a manual listing with no automated sync —
+      easy to let it silently go stale if skipped.
 - [ ] Close/link the GitHub issues resolved by this release; update the milestone if one's
       in use.
