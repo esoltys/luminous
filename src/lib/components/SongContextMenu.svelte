@@ -2,6 +2,7 @@
   import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers, Pin, PinOff, Disc3 } from "lucide-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -142,6 +143,8 @@
       icon={Disc3}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
+      disabled={!picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
     />
   {/if}
 </ContextMenu>

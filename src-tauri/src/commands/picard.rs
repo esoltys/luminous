@@ -46,10 +46,13 @@ pub async fn open_in_picard(state: State<'_, AppState>, song_ids: Vec<i64>) -> R
     picard::launch_picard(&exe, &paths).map_err(|e| e.to_string())
 }
 
-/// Cheap existence check so the frontend can hide/grey the "Open in Picard"
-/// action instead of always showing it and failing on click.
+/// Resolves the Picard executable's current path, if found — `None` means
+/// not installed/not locatable. Serves both the cheap "is it available"
+/// check the frontend uses to disable "Open in Picard" actions, and the
+/// Settings page's integration status display (which also wants the actual
+/// path, not just a bool).
 #[tauri::command]
-pub async fn is_picard_available(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn get_picard_path(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let custom_path = read_custom_picard_path(&state)?;
-    Ok(picard::find_picard(custom_path.as_deref()).is_some())
+    Ok(picard::find_picard(custom_path.as_deref()).map(|p| p.to_string_lossy().to_string()))
 }

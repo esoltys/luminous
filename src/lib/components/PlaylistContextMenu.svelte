@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Play, Trash2, Mic2, DiscAlbum, Edit3, Disc3 } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -77,6 +78,8 @@
       icon={Disc3}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
+      disabled={!picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
     />
   {/if}
 

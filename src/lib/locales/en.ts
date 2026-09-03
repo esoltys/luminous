@@ -981,7 +981,17 @@ export const en = {
   picard: {
     openInPicard: "Open in Picard",
     openAllInPicard: "Open All in Picard",
-    openSelectedInPicard: "Open {count} in Picard"
+    openSelectedInPicard: "Open {count} in Picard",
+    notFoundTooltip: "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings.",
+    integrationTitle: "MusicBrainz Picard Integration",
+    integrationDesc1: "Hand off songs to",
+    integrationDesc2: "for canonical tag lookups and fixes, then rescan to pick up the changes.",
+    foundAt: "Found at {path}",
+    notFound: "Not found — install it from picard.musicbrainz.org, or set a custom path below.",
+    customPathLabel: "Custom Path (optional)",
+    customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
+    browseBtn: "Browse...",
+    recheckTooltip: "Re-check for Picard"
   },
   smartPlaylistBuilder: {
     fallbackName: "Smart Playlist",

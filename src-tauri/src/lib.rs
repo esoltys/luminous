@@ -956,7 +956,7 @@ pub fn run() {
             commands::tageditor::clear_album_cover_art,
             // MusicBrainz Picard bridge commands (#367)
             commands::picard::open_in_picard,
-            commands::picard::is_picard_available,
+            commands::picard::get_picard_path,
             // Genre/tag browsing commands (#224) — read the existing
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,

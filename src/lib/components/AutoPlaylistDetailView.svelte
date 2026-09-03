@@ -33,6 +33,7 @@
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
+  import { picardStore } from "../stores/picard.svelte";
   import { compareSongs } from "../utils/songSort";
   import { toTitleCase } from "../utils/formatters";
   import Modal from "./Modal.svelte";
@@ -761,7 +762,8 @@
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}
         onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
-        disabled={loading || songs.length === 0}
+        disabled={loading || songs.length === 0 || !picardStore.available}
+        title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
       />
     {/if}
 

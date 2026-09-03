@@ -20,6 +20,7 @@
   import { prefs } from '../lib/stores/prefs.svelte';
   import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
+  import { picardStore } from '../lib/stores/picard.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { isLinux as platformIsLinux } from '../lib/platform';
   import { onMount } from 'svelte';
@@ -54,6 +55,7 @@
     prefs.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
+    picardStore.init();
     void getCurrentWindow().show().catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {

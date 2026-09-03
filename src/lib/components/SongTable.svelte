@@ -21,6 +21,7 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
@@ -583,8 +584,9 @@
       {#if onOpenInPicard}
         <button
           onclick={() => onOpenInPicard?.(song)}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors"
-          title={i18n.t("picard.openInPicard")}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled={!picardStore.available}
+          title={picardStore.available ? i18n.t("picard.openInPicard") : i18n.t("picard.notFoundTooltip")}
         >
           <Disc3 class="w-4 h-4" />
         </button>
