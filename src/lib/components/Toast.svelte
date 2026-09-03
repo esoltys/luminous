@@ -6,10 +6,17 @@
     InfoIcon as Info,
     ChecksIcon as CheckCheck,
     SparkleIcon as Sparkles,
-    XIcon as X
+    XIcon as X,
+    ClipboardIcon as Clipboard,
+    CheckIcon as Check
   } from "phosphor-svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { i18n } from "../stores/i18n.svelte";
   import { portal } from "../utils/portal";
+
+  const COPY_FEEDBACK_DURATION_MS = 1500;
+  let copiedToastId = $state<number | null>(null);
+  let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
   async function openExternalUrl(url: string) {
     try {
@@ -19,6 +26,38 @@
       window.open(url, "_blank");
     }
   }
+
+  async function copyToClipboard(id: number, text: string) {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+      }
+      if (copyTimeout) clearTimeout(copyTimeout);
+      copiedToastId = id;
+      copyTimeout = setTimeout(() => {
+        if (copiedToastId === id) copiedToastId = null;
+      }, COPY_FEEDBACK_DURATION_MS);
+    } catch (err) {
+      console.error("Failed to copy error to clipboard:", err);
+    }
+  }
+
+  $effect(() => {
+    return () => {
+      if (copyTimeout) clearTimeout(copyTimeout);
+    };
+  });
 </script>
 
 <div
@@ -64,12 +103,42 @@
       {:else}
         <span class="flex-1">{toast.text}</span>
       {/if}
-      <button
-        onclick={() => toastStore.dismiss(toast.id)}
-        class="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
-      >
-        <X class="w-3.5 h-3.5" />
-      </button>
+      <div class="flex items-center gap-1 shrink-0">
+        {#if toast.variant === "error"}
+          <button
+            type="button"
+            onclick={() => copyToClipboard(toast.id, toast.text)}
+            class="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+            title={copiedToastId === toast.id
+              ? i18n.t('toast.copied', {}, 'Copied to clipboard')
+              : i18n.t('toast.copyError', {}, 'Copy error to clipboard')}
+            aria-label={copiedToastId === toast.id
+              ? i18n.t('toast.copied', {}, 'Copied to clipboard')
+              : i18n.t('toast.copyError', {}, 'Copy error to clipboard')}
+          >
+            {#if copiedToastId === toast.id}
+              <Check class="w-3.5 h-3.5 text-emerald-400" />
+            {:else}
+              <Clipboard class="w-3.5 h-3.5" />
+            {/if}
+          </button>
+        {/if}
+        <button
+          type="button"
+          onclick={() => {
+            if (copiedToastId === toast.id) {
+              if (copyTimeout) clearTimeout(copyTimeout);
+              copiedToastId = null;
+            }
+            toastStore.dismiss(toast.id);
+          }}
+          class="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+          title={i18n.t('toast.dismiss', {}, 'Dismiss notification')}
+          aria-label={i18n.t('toast.dismiss', {}, 'Dismiss notification')}
+        >
+          <X class="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   {/each}
 </div>
