@@ -24,7 +24,7 @@
     MusicNotesIcon as Music,
     ShuffleIcon as Shuffle,
     MagnifyingGlassIcon as Search,
-    RadioIcon as Radio,
+    BroadcastIcon as Radio,
     StackIcon as Layers,
     DotsThreeIcon as MoreHorizontal,
     EraserIcon as Eraser,
