@@ -5,7 +5,7 @@ use crate::{
     },
     AppState,
 };
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[tauri::command]
 pub async fn add_directory(
@@ -285,4 +285,39 @@ pub async fn get_all_artist_profiles(
 ) -> Result<Vec<ArtistProfile>, String> {
     let scanner = CollectionScanner::new(state.db.clone());
     scanner.get_all_artist_profiles().map_err(|e| e.to_string())
+}
+
+/// Marks (or unmarks) one or more songs "Not included" (#104): excluded from
+/// auto/smart-playlist generation and Auto-Play refill, but still fully
+/// visible and playable in Album/Artist views. Fires a `song-stats-changed`
+/// event per song (the same event ratings/playcounts use to patch cached
+/// `Song` rows in place, e.g. `AlbumDetailView`'s badge/context-menu label)
+/// so open views update immediately, plus `library-changed` so dynamic
+/// playlists reconcile their membership.
+#[tauri::command]
+pub async fn set_songs_not_included(
+    app: AppHandle,
+    song_ids: Vec<i64>,
+    not_included: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if song_ids.is_empty() {
+        return Ok(());
+    }
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let placeholders = song_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!("UPDATE songs SET not_included = ?1 WHERE id IN ({placeholders})");
+    let mut params: Vec<&dyn rusqlite::ToSql> = vec![&not_included];
+    params.extend(song_ids.iter().map(|id| id as &dyn rusqlite::ToSql));
+    conn.execute(&sql, params.as_slice())
+        .map_err(|e| e.to_string())?;
+
+    for song_id in &song_ids {
+        let _ = app.emit(
+            "song-stats-changed",
+            serde_json::json!({ "song_id": song_id, "not_included": not_included }),
+        );
+    }
+    let _ = app.emit("library-changed", ());
+    Ok(())
 }

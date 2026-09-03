@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 22;
+pub const CURRENT_SCHEMA_VERSION: i32 = 23;
 
 struct Migration {
     version: i32,
@@ -143,6 +143,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 22,
         description: "album_chart_history table for the weekly Top Albums chart (#662)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_22)?),
+    },
+    Migration {
+        version: 23,
+        description: "not_included flag to exclude songs from auto/smart-playlist generation (#104)",
+        apply: |conn| {
+            let has_not_included: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'not_included'")?
+                .exists([])?;
+            if !has_not_included {
+                conn.execute_batch(MIGRATION_23)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -662,6 +675,14 @@ CREATE TABLE IF NOT EXISTS album_chart_history (
 );
 CREATE INDEX IF NOT EXISTS idx_album_chart_history_album_key ON album_chart_history(album_key);
 CREATE INDEX IF NOT EXISTS idx_album_chart_history_period ON album_chart_history(period_start DESC);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 23: not_included flag (#104)
+// ---------------------------------------------------------------------------
+
+const MIGRATION_23: &str = "
+ALTER TABLE songs ADD COLUMN not_included BOOLEAN NOT NULL DEFAULT 0;
 ";
 
 // ---------------------------------------------------------------------------

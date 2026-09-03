@@ -1187,7 +1187,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
     replaygain_track_gain, replaygain_album_gain,
-    is_vbr, is_instrumental, added
+    is_vbr, is_instrumental, not_included, added
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -1210,9 +1210,9 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental, s.added";
+    s.is_vbr, s.is_instrumental, s.not_included, s.added";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 57;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 58;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -1297,7 +1297,8 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         replaygain_album_gain: row.get(col(53))?,
         is_vbr: row.get(col(54))?,
         is_instrumental: row.get::<_, Option<bool>>(col(55))?.unwrap_or(false),
-        added: row.get(col(56))?,
+        not_included: row.get::<_, Option<bool>>(col(56))?.unwrap_or(false),
+        added: row.get(col(57))?,
         ..Default::default()
     })
 }

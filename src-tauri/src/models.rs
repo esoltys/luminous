@@ -269,6 +269,11 @@ pub struct Song {
 
     /// Set to `true` when marked as an instrumental track (suppresses online lyrics fetching).
     pub is_instrumental: bool,
+
+    /// Set to `true` when the user has marked this song "Not included" (#104) — it stays fully
+    /// visible and playable in Album/Artist views but is excluded from auto/smart-playlist
+    /// generation and Auto-Play refill.
+    pub not_included: bool,
 }
 
 impl Song {

@@ -10,7 +10,9 @@
     StackIcon as Layers,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    ArrowSquareOutIcon as OpenInPicard
+    ArrowSquareOutIcon as OpenInPicard,
+    EyeSlashIcon as EyeSlash,
+    EyeIcon as Eye
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -61,6 +63,17 @@
     const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
     toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
   }
+
+  async function handleToggleNotIncluded() {
+    const ids = selectedSongIds && selectedSongIds.length > 0 ? selectedSongIds : [song.id];
+    const notIncluded = !song.not_included;
+    await invoke("set_songs_not_included", { songIds: ids, notIncluded });
+    const name = ids.length > 1 ? `${ids.length} songs` : (song.title || i18n.t("collection.unknownSong"));
+    const message = notIncluded
+      ? i18n.t("playlists.markedNotIncluded", { name })
+      : i18n.t("playlists.unmarkedNotIncluded", { name });
+    toastStore.show(message);
+  }
 </script>
 
 <ContextMenu {x} {y} {onClose} estimatedHeight={280}>
@@ -103,6 +116,14 @@
       onclick={() => { onAddToPlaylist?.(); onClose(); }}
     />
   {/if}
+
+  <ContextMenuItem
+    icon={song.not_included ? Eye : EyeSlash}
+    label={song.not_included
+      ? i18n.t("playlists.contextMenuIncludeInPlaylists")
+      : i18n.t("playlists.contextMenuMarkNotIncluded")}
+    onclick={() => { handleToggleNotIncluded(); onClose(); }}
+  />
 
   {#if selectedCount === 1}
     <ContextMenuDivider />

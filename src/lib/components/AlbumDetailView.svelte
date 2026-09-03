@@ -209,6 +209,12 @@
     return [...songs].sort((a, b) => compareSongs(a, b, field, sortAsc));
   });
 
+  // "Not included" tracks stay visible and individually playable (clicking
+  // a row plays the full `sortedSongs` list, that track included), but bulk
+  // "play the whole album" actions — Play/Shuffle Play buttons, Add Album
+  // to Playlist — build their queue from this filtered list instead (#104).
+  let playableSongs = $derived(sortedSongs.filter((s) => !s.not_included));
+
   // Default column widths (px or fr) — used when no saved width exists for a column.
   const ALBUM_COL_DEFAULTS: Partial<Record<keyof typeof collectionStore.visibleColumns, string>> = {
     track: "48px", title: "2fr", artist: "1.5fr", album: "1.5fr",
@@ -247,14 +253,14 @@
   }
 
   async function handlePlayAll() {
-    if (sortedSongs.length === 0) return;
+    if (playableSongs.length === 0) return;
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(sortedSongs.map((s) => s.id), 0, undefined, albumPlayContext());
+    await playerStore.playSongs(playableSongs.map((s) => s.id), 0, undefined, albumPlayContext());
   }
 
   async function handleShufflePlay() {
-    if (sortedSongs.length === 0) return;
-    const shuffledIds = shuffleArray(sortedSongs.map((s) => s.id));
+    if (playableSongs.length === 0) return;
+    const shuffledIds = shuffleArray(playableSongs.map((s) => s.id));
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(shuffledIds, 0, undefined, albumPlayContext());
   }
@@ -265,9 +271,9 @@
   }
 
   async function handleAddAlbumToPlaylist() {
-    if (songs.length === 0) return;
+    if (playableSongs.length === 0) return;
     await playlistsStore.addSongsToActiveTarget(
-      songs.map((s) => s.id),
+      playableSongs.map((s) => s.id),
       albumName || "Album"
     );
   }

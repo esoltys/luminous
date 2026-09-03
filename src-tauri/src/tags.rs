@@ -240,6 +240,7 @@ impl TagManager {
              WHERE genre LIKE '%' || ?1 || '%'
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}",
             SONG_SELECT_COLS
@@ -310,6 +311,7 @@ impl TagManager {
             "SELECT {} FROM songs
              WHERE source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                AND genre IS NOT NULL
                AND genre != ''
                {extra_where}

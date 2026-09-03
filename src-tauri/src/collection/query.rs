@@ -99,7 +99,10 @@ impl CollectionScanner {
 
         let parsed = crate::filter_parser::parse_query(query.trim());
 
-        let mut where_clauses = vec!["unavailable = 0".to_string()];
+        let mut where_clauses = vec![
+            "unavailable = 0".to_string(),
+            "not_included = 0".to_string(),
+        ];
         if !extra_where.is_empty() {
             where_clauses.push(extra_where.trim_start_matches(" AND ").to_string());
         }
@@ -327,6 +330,7 @@ impl CollectionScanner {
              WHERE rating = 5
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
             SONG_SELECT_COLS
         );
@@ -345,6 +349,7 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                AND added IS NOT NULL
              ORDER BY added DESC
              LIMIT ?1",
@@ -373,7 +378,7 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON ph.song_id = s.id
-             WHERE s.source IN (1, 2) AND s.unavailable = 0
+             WHERE s.source IN (1, 2) AND s.unavailable = 0 AND s.not_included = 0
              ORDER BY ph.play_count DESC, s.added DESC
              LIMIT ?1"
         );
@@ -393,6 +398,7 @@ impl CollectionScanner {
             "SELECT DISTINCT genre FROM songs
              WHERE source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                AND genre IS NOT NULL
                AND genre != ''
              ORDER BY COALESCE(genresort, genre)",
@@ -413,6 +419,7 @@ impl CollectionScanner {
              FROM songs
              WHERE source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                AND COALESCE(year, originalyear) IS NOT NULL
                AND COALESCE(year, originalyear) >= 1000
                AND COALESCE(year, originalyear) <= 9999
@@ -448,6 +455,7 @@ impl CollectionScanner {
                AND COALESCE(year, originalyear) <= ?2
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
@@ -483,6 +491,7 @@ impl CollectionScanner {
                {upper_bound}
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
@@ -514,6 +523,7 @@ impl CollectionScanner {
              )
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?2",
@@ -548,6 +558,7 @@ impl CollectionScanner {
              )
                AND source IN (1, 2)
                AND unavailable = 0
+               AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
@@ -2921,6 +2932,63 @@ mod tests {
         assert_eq!(brand_new.previous_rank, None);
         assert_eq!(brand_new.movement, "new");
         assert_eq!(brand_new.weeks_on_chart, 1);
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Songs marked "Not included" (#104) must be excluded from auto-playlist
+    /// generation — Favourites and per-decade auto-playlists here — even
+    /// though they still match the playlist's own criteria (5-star rating /
+    /// decade). They should remain fully queryable through plain library
+    /// reads like `get_songs_by_album` (not exercised here, but the
+    /// intentional asymmetry this test documents).
+    #[test]
+    fn test_not_included_songs_are_excluded_from_auto_playlist_queries() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_not_included_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        let scanner = CollectionScanner::new(db.clone());
+        let conn = db.pool.get().unwrap();
+
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, not_included)
+             VALUES ('Favourite Kept', 1, 0, 5, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, rating, not_included)
+             VALUES ('Favourite Excluded', 1, 0, 5, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, year, not_included)
+             VALUES ('Decade Kept', 1, 0, 1985, 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO songs (title, source, unavailable, year, not_included)
+             VALUES ('Decade Excluded', 1, 0, 1985, 1)",
+            [],
+        )
+        .unwrap();
+
+        let favourites = scanner.get_favourite_songs().unwrap();
+        assert_eq!(favourites.len(), 1);
+        assert_eq!(favourites[0].title.as_deref(), Some("Favourite Kept"));
+
+        let decade_songs = scanner
+            .get_songs_by_decade("1980s", 100, crate::models::QueuePopulationMode::All)
+            .unwrap();
+        assert_eq!(decade_songs.len(), 1);
+        assert_eq!(decade_songs[0].title.as_deref(), Some("Decade Kept"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

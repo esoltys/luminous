@@ -52,6 +52,10 @@
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+
+  // "Not included" tracks stay visible/individually playable but drop out of
+  // the whole-artist Play/Shuffle Play actions (#104).
+  let playableSongs = $derived(songs.filter((s) => !s.not_included));
   let editingSongId = $state<number | null>(null);
   let isEditorOpen = $state(false);
   let isBioExpanded = $state(false);
@@ -316,10 +320,10 @@
   }
 
   async function handlePlayAll() {
-    if (songs.length === 0) return;
+    if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
     await playerStore.setShuffleMode("off");
-    await playerStore.playSongs(songs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
+    await playerStore.playSongs(playableSongs.map((s) => s.id), 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
       playlistsStore.selectPlaylist(queuePl.id);
       navigationStore.viewPlaylist(queuePl.id);
@@ -327,9 +331,9 @@
   }
 
   async function handleShufflePlay() {
-    if (songs.length === 0) return;
+    if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
-    const shuffledIds = shuffleArray(songs.map((s) => s.id));
+    const shuffledIds = shuffleArray(playableSongs.map((s) => s.id));
     await playerStore.setShuffleMode("off");
     await playerStore.playSongs(shuffledIds, 0, queuePl?.id, undefined, "Queue");
     if (queuePl) {
@@ -605,16 +609,18 @@
     artistName={album.artist || artistName}
     onPlay={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         const context: PlayContext = { type: "album", album: album.album || "", albumArtist: album.artist || undefined };
-        playerStore.playSongs(songs.map(s => s.id), 0, undefined, context);
+        playerStore.playSongs(playable.map(s => s.id), 0, undefined, context);
       }
     }}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          songs.map(s => s.id),
+          playable.map(s => s.id),
           album.album || i18n.t("collection.unknownAlbum")
         );
       }
