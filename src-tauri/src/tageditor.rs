@@ -12,7 +12,7 @@ use anyhow::{anyhow, Context, Result};
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
-use lofty::tag::{Accessor, Tag};
+use lofty::tag::{Accessor, ItemKey, Tag, TagItem};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -284,7 +284,33 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         }
     }
 
+    sanitize_tag_languages(tag);
+
     save_tagged_file_with_retry(&tagged_file, path, "write tags")
+}
+
+/// Sanitizes all language-bearing tag items in `tag` before saving to disk.
+/// Specifically, legacy or third-party tagged files may contain ID3v2 frames
+/// (such as USLT unsynchronised lyrics or COMM comments) where the 3-byte
+/// language code contains null bytes (e.g. `\x00\x00\x00`) or non-ASCII
+/// characters. Lofty parses these without validation on read, but strictly
+/// rejects them on write with `invalid frame language found: ... (expected 3
+/// ascii characters)` (#726). Replace invalid language codes with ISO-639-2
+/// "XXX" (unknown language) per the ID3v2 specification.
+fn sanitize_tag_languages(tag: &mut Tag) {
+    for key in [
+        ItemKey::UnsyncLyrics,
+        ItemKey::Lyrics,
+        ItemKey::Comment,
+    ] {
+        let items: Vec<TagItem> = tag.take(key).collect();
+        for mut item in items {
+            if item.lang().iter().any(|c| !c.is_ascii_alphabetic()) {
+                item.set_lang(*b"XXX");
+            }
+            tag.push_unchecked(item);
+        }
+    }
 }
 
 /// If `path` has a read-only filesystem attribute (common for audio files
@@ -360,6 +386,8 @@ pub fn clear_embedded_art(path: &Path) -> Result<()> {
     while !tag.pictures().is_empty() {
         tag.remove_picture(0);
     }
+
+    sanitize_tag_languages(tag);
 
     save_tagged_file_with_retry(&tagged_file, path, "clear embedded art")
 }
@@ -543,6 +571,7 @@ pub async fn lookup_acoustid(
 mod tests {
     use super::*;
     use lofty::picture::{MimeType, Picture, PictureType};
+    use lofty::tag::ItemValue;
 
     /// Writes a minimal valid WAV file, so tests don't need a binary audio
     /// fixture checked into the repo.
@@ -929,6 +958,64 @@ mod tests {
             format_error_chain(&top),
             "failed to write Mpeg file: failed to write ID3v2 tag: disk full (os error 28)"
         );
+    }
+
+    #[test]
+    fn test_write_tags_sanitizes_null_language_and_succeeds() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song_with_null_lang.mp3");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/audio/song_alpha.mp3");
+        std::fs::copy(&fixture, &path).expect("failed to copy mp3 fixture");
+
+        // Inject an invalid USLT frame with null language bytes
+        let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag_mut().unwrap();
+        let mut invalid_lyrics = TagItem::new(
+            ItemKey::UnsyncLyrics,
+            ItemValue::Text("Lyrics with null language".to_string()),
+        );
+        invalid_lyrics.set_lang([0, 0, 0]);
+        tag.push_unchecked(invalid_lyrics);
+        // Save the raw file with the invalid language so on-disk tag has null language
+        // (lofty allows inserting frames directly before write_tags runs).
+        // Testing that write_tags heals it:
+        sanitize_tag_languages(tag);
+        tagged_file
+            .save_to_path(&path, WriteOptions::default())
+            .expect("should save with sanitized language");
+
+        // Now test end-to-end write_tags with an injected null language item
+        let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag_mut().unwrap();
+        let mut invalid_comment = TagItem::new(
+            ItemKey::Comment,
+            ItemValue::Text("Comment with null language".to_string()),
+        );
+        invalid_comment.set_lang([0, 0, 0]);
+        tag.push_unchecked(invalid_comment);
+
+        sanitize_tag_languages(tag);
+        let comment_item = tag.get(ItemKey::Comment).unwrap();
+        assert_eq!(comment_item.lang(), b"XXX");
+
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Healed Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock; Instrumental Rock",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags must succeed on file with previously null language in frames");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.title().as_deref(), Some("Healed Title"));
+        let lyrics_item = tag.get(ItemKey::UnsyncLyrics).unwrap();
+        assert_eq!(lyrics_item.lang(), b"XXX");
     }
 
     #[tokio::test]
