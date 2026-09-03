@@ -295,9 +295,6 @@
             {i18n.t('lyrics.instrumentalDesc', {}, "This track is marked as instrumental. Online lyrics search is bypassed.")}
           </p>
         </div>
-        <Button onclick={() => toggleInstrumental(false)} variant="secondary" size="sm" class="mt-2">
-          {i18n.t('lyrics.unmarkInstrumental', {}, "Unmark Instrumental")}
-        </Button>
       </div>
     {:else if isEditing}
       <div class="max-w-2xl mx-auto h-full flex flex-col gap-3">

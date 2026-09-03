@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, waitFor } from "@testing-library/svelte";
+import { render, waitFor, fireEvent } from "@testing-library/svelte";
+import { invoke } from "@tauri-apps/api/core";
 import LyricsView from "./LyricsView.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song } from "../types";
@@ -106,5 +107,26 @@ describe("LyricsView.svelte", () => {
       expect(getByText("Just some plain, unsynced lyrics.")).toBeInTheDocument();
     });
     expect(getByText("Synced lyrics not available. Showing plain text.")).toBeInTheDocument();
+  });
+
+  it("renders only a single unmark instrumental button in the header when an instrumental track is active", async () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      is_instrumental: true,
+    };
+
+    const { getAllByText, getByText } = render(LyricsView);
+
+    expect(getByText("Instrumental Song")).toBeInTheDocument();
+    expect(getByText("This song is marked as instrumental. Online lyrics search is bypassed.")).toBeInTheDocument();
+
+    const buttons = getAllByText("Unmark Instrumental");
+    expect(buttons).toHaveLength(1);
+
+    await fireEvent.click(buttons[0]);
+    expect(invoke).toHaveBeenCalledWith("set_instrumental", {
+      songId: mockSong.id,
+      isInstrumental: false,
+    });
   });
 });
