@@ -284,6 +284,29 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         }
     }
 
+    save_tagged_file_with_retry(&tagged_file, path, "write tags")
+}
+
+/// If `path` has a read-only filesystem attribute (common for audio files
+/// ripped from CDs or imported from read-only archives/volumes), attempt to
+/// clear it so tag writing can proceed (#726).
+fn ensure_writable(path: &Path) {
+    if let Ok(meta) = std::fs::metadata(path) {
+        let mut perms = meta.permissions();
+        if perms.readonly() {
+            perms.set_readonly(false);
+            let _ = std::fs::set_permissions(path, perms);
+        }
+    }
+}
+
+fn save_tagged_file_with_retry(
+    tagged_file: &lofty::file::TaggedFile,
+    path: &Path,
+    action: &str,
+) -> Result<()> {
+    ensure_writable(path);
+
     let mut attempts = 0;
     loop {
         match tagged_file.save_to_path(path, WriteOptions::default()) {
@@ -291,8 +314,9 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
             Err(e) => {
                 attempts += 1;
                 if attempts >= 5 {
-                    return Err(e)
-                        .context("failed to write tags back to file after multiple attempts");
+                    return Err(anyhow!(
+                        "failed to {action} back to file after multiple attempts: {e:#}"
+                    ));
                 }
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
@@ -323,21 +347,7 @@ pub fn clear_embedded_art(path: &Path) -> Result<()> {
         tag.remove_picture(0);
     }
 
-    let mut attempts = 0;
-    loop {
-        match tagged_file.save_to_path(path, WriteOptions::default()) {
-            Ok(_) => break,
-            Err(e) => {
-                attempts += 1;
-                if attempts >= 5 {
-                    return Err(e)
-                        .context("failed to write tags back to file after multiple attempts");
-                }
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            }
-        }
-    }
-    Ok(())
+    save_tagged_file_with_retry(&tagged_file, path, "clear embedded art")
 }
 
 // ---------------------------------------------------------------------------
@@ -801,6 +811,39 @@ mod tests {
         assert_eq!(song.composer.as_deref(), Some("McCartney"));
         assert_eq!(song.composersort.as_deref(), Some("McCartney, Paul"));
         assert_eq!(song.genre.as_deref(), Some("Rock"));
+    }
+
+    #[test]
+    fn test_write_tags_clears_readonly_attribute_and_succeeds() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("readonly_song.wav");
+        write_test_wav(&path);
+
+        // Mark the file read-only on disk
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+        assert!(
+            std::fs::metadata(&path).unwrap().permissions().readonly(),
+            "fixture must be marked read-only"
+        );
+
+        // write_tags should clear the readonly flag and succeed (#726)
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "Updated Title",
+                artist: "Artist",
+                album: "Album",
+                genre: "Rock; Instrumental Rock",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags must succeed on read-only file by clearing readonly attribute");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.title().as_deref(), Some("Updated Title"));
     }
 
     #[tokio::test]

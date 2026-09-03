@@ -253,8 +253,14 @@ async fn rewrite_genre_and_persist(
                         compilation: item.compilation,
                     },
                 );
-                if write_res.is_ok() {
-                    count += 1;
+                match write_res {
+                    Ok(_) => count += 1,
+                    Err(ref e) => {
+                        log::warn!(
+                            "Failed to persist updated genre to disk for song {}: {e:#}",
+                            item.id
+                        );
+                    }
                 }
                 writes.push((item.id, new_genre));
             }

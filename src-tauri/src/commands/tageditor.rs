@@ -218,7 +218,7 @@ pub async fn save_song_tags(
     })
     .await
     .map_err(|e| e.to_string())?
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("{e:#}"))?;
 
     // 3. Update SQLite database cache in-place
     conn.execute(
@@ -296,6 +296,7 @@ pub async fn save_album_tags(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
     struct SongMetadata {
+        id: i64,
         path: String,
         title: String,
         titlesort: Option<String>,
@@ -317,6 +318,7 @@ pub async fn save_album_tags(
             rusqlite::params![song_id],
             |row| {
                 Ok(SongMetadata {
+                    id: song_id,
                     path: row.get(0)?,
                     title: row.get(1).unwrap_or_default(),
                     titlesort: row.get(2).ok(),
@@ -375,8 +377,14 @@ pub async fn save_album_tags(
                     compilation,
                 },
             );
-            if write_res.is_ok() {
-                count += 1;
+            match write_res {
+                Ok(_) => count += 1,
+                Err(ref e) => {
+                    log::warn!(
+                        "Failed to persist tags to disk for song {}: {e:#}",
+                        item.id
+                    );
+                }
             }
         }
         count
@@ -442,7 +450,7 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
     tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
         .await
         .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("{e:#}"))?;
 
     let folder_art = state
         .cover_manager
