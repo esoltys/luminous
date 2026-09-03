@@ -138,20 +138,6 @@
   </div>
 </div>
 
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
-  <div class="flex flex-wrap items-center gap-3">
-    <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
-      <Eraser class="w-4 h-4" />
-      {i18n.t('settings.pruneMissingBtn')}
-    </Button>
-    <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
-
-    {#if pruneMsg}
-      <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
-    {/if}
-  </div>
-</div>
-
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
@@ -200,5 +186,19 @@
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+  <div class="flex flex-wrap items-center gap-3">
+    <Button onclick={handlePruneMissing} disabled={collectionStore.isScanning} variant="secondary" size="sm">
+      <Eraser class="w-4 h-4" />
+      {i18n.t('settings.pruneMissingBtn')}
+    </Button>
+    <span class="text-xs text-brand-text-secondary">{i18n.t('settings.pruneMissingHint')}</span>
+
+    {#if pruneMsg}
+      <span class="text-xs text-brand-accent-text font-medium transition-all">{pruneMsg}</span>
+    {/if}
   </div>
 </div>
