@@ -99,7 +99,7 @@ describe("HomeView.svelte", () => {
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("get_top_artists", { limit: 15 });
       expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
-      expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 5 });
+      expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 10 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
     });
   });

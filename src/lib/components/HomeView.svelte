@@ -52,7 +52,7 @@
       const [artists, top, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
         invoke<TopAlbumItem[]>("get_top_albums", { limit: 10 }),
-        invoke<HomeItem[]>("get_recently_added", { limit: 5 }),
+        invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
