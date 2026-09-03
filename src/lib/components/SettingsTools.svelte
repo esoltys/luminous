@@ -11,7 +11,17 @@
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { Eraser, Sparkles, Check, Eye, EyeOff, Disc3, AlertTriangle, RefreshCw, FolderOpen } from "lucide-svelte";
+  import {
+    EraserIcon as Eraser,
+    SparkleIcon as Sparkles,
+    CheckIcon as Check,
+    EyeIcon as Eye,
+    EyeSlashIcon as EyeOff,
+    DiscIcon as Disc3,
+    WarningIcon as AlertTriangle,
+    ArrowsClockwiseIcon as RefreshCw,
+    FolderOpenIcon as FolderOpen
+  } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
 

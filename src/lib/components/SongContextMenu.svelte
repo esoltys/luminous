@@ -1,5 +1,17 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, DiscAlbum, Edit3, Folder, Layers, Pin, PinOff, Disc3 } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    ListPlusIcon as ListPlus,
+    MicrophoneStageIcon as Mic2,
+    DiscIcon as DiscAlbum,
+    PencilSimpleIcon as Edit3,
+    FolderIcon as Folder,
+    StackIcon as Layers,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff,
+    DiscIcon as Disc3
+  } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";

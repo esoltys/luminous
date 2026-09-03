@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { X, Plus, Trash2, Globe, Tag as TagIcon, Link as LinkIcon, User, Save, LoaderCircle } from "lucide-svelte";
+  import {
+    XIcon as X,
+    PlusIcon as Plus,
+    TrashIcon as Trash2,
+    GlobeIcon as Globe,
+    TagIcon,
+    LinkIcon,
+    UserIcon as User,
+    FloppyDiskIcon as Save,
+    CircleNotchIcon as LoaderCircle
+  } from "phosphor-svelte";
   import Button from "./Button.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { toastStore } from "../stores/toast.svelte";

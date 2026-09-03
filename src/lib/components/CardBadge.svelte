@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ComponentType, SvelteComponent } from "svelte";
+  import type { Component } from "svelte";
 
   interface Props {
-    icon: ComponentType<SvelteComponent<{ class?: string }>>;
+    icon: Component<{ class?: string }>;
     label: string;
     title?: string;
     /** Spins the icon (e.g. a refresh/auto-refill indicator). */

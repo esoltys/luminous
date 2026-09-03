@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FolderClosed, RefreshCw } from "lucide-svelte";
+  import { FolderSimpleIcon as FolderClosed, ArrowsClockwiseIcon as RefreshCw } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";

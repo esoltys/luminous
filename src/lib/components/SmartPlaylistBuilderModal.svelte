@@ -5,7 +5,12 @@
   import { playlistsStore } from "../stores/playlists.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { X, Plus, Sparkles, SlidersHorizontal } from "lucide-svelte";
+  import {
+    XIcon as X,
+    PlusIcon as Plus,
+    SparkleIcon as Sparkles,
+    SlidersHorizontalIcon as SlidersHorizontal
+  } from "phosphor-svelte";
   import type { Rule } from "../utils/filterParser";
   import type { QueuePopulationMode } from "../types";
   import PopulationModeTabs from "./PopulationModeTabs.svelte";

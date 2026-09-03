@@ -1,6 +1,10 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { Music, Disc, LoaderCircle } from "lucide-svelte";
+  import {
+    MusicNotesIcon as Music,
+    DiscIcon as Disc,
+    CircleNotchIcon as LoaderCircle
+  } from "phosphor-svelte";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
 

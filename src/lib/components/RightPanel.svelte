@@ -1,7 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { Music, Clock } from "lucide-svelte";
+  import { MusicNotesIcon as Music, ClockIcon as Clock } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
   import GenreChips from "./GenreChips.svelte";

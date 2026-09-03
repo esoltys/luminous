@@ -25,7 +25,12 @@
   import SocialIcon from "./SocialIcon.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Edit3, ExternalLink, Pin, PinOff } from "lucide-svelte";
+  import {
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as ExternalLink,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff
+  } from "phosphor-svelte";
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile } from "../types";
   import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";

@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { Play, Plus, ListPlus, Mic2, Layers, Pin, PinOff } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    ListPlusIcon as ListPlus,
+    MicrophoneStageIcon as Mic2,
+    StackIcon as Layers,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";

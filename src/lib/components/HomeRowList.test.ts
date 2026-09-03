@@ -21,6 +21,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     skipcount: 0,
     length_nanosec: 195_000_000_000,
     added: 1_700_000_000,
+    year: 1994,
     unavailable: false,
     ...overrides,
   };
@@ -57,14 +58,24 @@ function makePlaylist(overrides: Partial<Playlist> = {}): Playlist {
 }
 
 describe("HomeRowList.svelte", () => {
-  it("renders a rank numeral and 'Song' label for song rows in the rank variant", () => {
+  it("renders a rank numeral, title/year, and artist/rating for song rows in the rank variant", () => {
     const items: HomeItem[] = [{ type: "song", song: makeSong() }];
-    const { getByText } = render(HomeRowList, { props: { items, variant: "rank" } });
+    const { getByText, queryByText, container } = render(HomeRowList, { props: { items, variant: "rank" } });
 
     expect(getByText("01")).toBeInTheDocument();
     expect(getByText("Wildflowers")).toBeInTheDocument();
+    expect(getByText("1994")).toBeInTheDocument();
     expect(getByText("Tom Petty")).toBeInTheDocument();
-    expect(getByText("Song")).toBeInTheDocument();
+    expect(container.querySelector('[aria-pressed]')).toBeInTheDocument();
+    expect(queryByText("Song")).not.toBeInTheDocument();
+  });
+
+  it("omits the year when the song has none", () => {
+    const items: HomeItem[] = [{ type: "song", song: makeSong({ year: undefined }) }];
+    const { getByText, queryByText } = render(HomeRowList, { props: { items, variant: "rank" } });
+
+    expect(getByText("Wildflowers")).toBeInTheDocument();
+    expect(queryByText("1994")).not.toBeInTheDocument();
   });
 
   it("omits the rank numeral in the added variant", () => {

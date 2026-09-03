@@ -236,6 +236,7 @@ verify with the user, not a reason to skip telling them.
 
 - Never hand-wrap lines in GitHub issue/PR bodies — GitHub renders single newlines as hard breaks. Write paragraphs as one long line.
 - Always use the repo PR template and the Epic/issue templates in `.github/`.
+- For Epic issues: do not list sub-issues in the description body — GitHub automatically shows them below the description if they are properly added as sub-issues (e.g. `gh issue edit <epic-id> --add-sub-issue <ids>`). If there are no related issues, leave the `## Related` section out entirely.
 - Do NOT apply priority labels to issues. Priority lives in the Project board only.
 
 ## Issue Priority
@@ -260,13 +261,14 @@ punt either to the user.
 - After creating a PR, provide the PR link directly to the user for review and merge. You do not need to monitor or wait for CI checks — the user will make sure the checks complete before merging.
 - Only after the user has reviewed and merged the PR on GitHub should the corresponding issues be confirmed closed and their Status set to "Done" on the Project board. On Windows, `git worktree remove` fails with "Permission denied" on the worktree the current session is running from (open file handles keep it locked) — hand the `git worktree remove`/`git branch -d` commands to the user to run themselves in that case instead of retrying.
 - **Creating Issues & Pull Requests**:
-  1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`) when creating issues.
+  1. Inspect the relevant templates under `.github/ISSUE_TEMPLATE/` (e.g., `bug_report.md`, `feature_request.md`, `epic.md`) when creating issues.
   2. Inspect `.github/PULL_REQUEST_TEMPLATE.md` when preparing or creating Pull Requests.
   3. Perform a codebase search or analysis to fill out the template's sections (Description, Root Cause Analysis, Affected Components & Code Locations, Proposed Solution) accurately.
   4. Write the issue or PR body to a temporary scratch file in the workspace or the artifacts scratch directory.
   5. Create the issue using the GitHub CLI:
      - For bugs: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --label "bug" --milestone "<Milestone>"`
      - For features: `gh issue create --title "<Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed)
+     - For epics: `gh issue create --title "Epic: <Title>" --body-file "<PathToScratchFile>" --milestone "<Milestone>"` (no label needed). After creating the epic, link its sub-issues with `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...`. Never list sub-issues in the issue description body (GitHub automatically shows them below the description when added as sub-issues). If there are no related issues, leave the `## Related` section out entirely.
      - Never add `--label P1`/`P2`/`P3`/`P4` (see Issue Priority above) — priority is a Project
        field, not a label.
   6. Verify the created issue by running `gh issue view <id>`.

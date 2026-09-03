@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight } from "lucide-svelte";
+  import { CaretLeftIcon as ChevronLeft, CaretRightIcon as ChevronRight } from "phosphor-svelte";
   import type { Snippet } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
 

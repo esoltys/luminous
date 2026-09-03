@@ -5,7 +5,15 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { portal } from "../utils/portal";
-  import { X, Folder, Sparkles, Check, AlertTriangle, RefreshCw, Layers } from "lucide-svelte";
+  import {
+    XIcon as X,
+    FolderIcon as Folder,
+    SparkleIcon as Sparkles,
+    CheckIcon as Check,
+    WarningIcon as AlertTriangle,
+    ArrowsClockwiseIcon as RefreshCw,
+    StackIcon as Layers
+  } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";

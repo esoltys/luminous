@@ -923,6 +923,11 @@ export const fr = {
     expand: "Développer",
     collapse: "Réduire"
   },
+  toast: {
+    copyError: "Copier l'erreur dans le presse-papiers",
+    copied: "Copié dans le presse-papiers",
+    dismiss: "Fermer la notification"
+  },
   organizer: {
     title: "Organiser les fichiers",
     subtitle: "Renommer et réorganiser les fichiers selon un modèle de tags",

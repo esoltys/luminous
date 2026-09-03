@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp, AlertTriangle } from "lucide-svelte";
+  import {
+    HeartIcon as Heart,
+    ClockIcon as Clock,
+    HourglassIcon as Hourglass,
+    CalendarIcon as Calendar,
+    MusicNotesIcon as Music,
+    GaugeIcon as Gauge,
+    TagIcon as Tag,
+    TrendUpIcon as TrendingUp,
+    WarningIcon as AlertTriangle
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";

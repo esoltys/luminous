@@ -1,7 +1,7 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { Settings } from "lucide-svelte";
+  import { GearIcon as Settings } from "phosphor-svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { rememberScroll } from "../utils/scrollMemory";
