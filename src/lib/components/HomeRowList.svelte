@@ -13,6 +13,7 @@
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { formatChartWeekRange } from "../utils/date";
   import {
     CaretRightIcon as ChevronRight,
     TrendUpIcon as TrendingUp,
@@ -154,10 +155,18 @@
       class="group flex items-center gap-1 text-xl font-semibold text-brand-text-primary hover:text-brand-accent-text transition-colors"
     >
       {title}
+      {#if variant === "chart"}
+        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange()}</span>
+      {/if}
       <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   {:else if title}
-    <h2 class="text-xl font-semibold text-brand-text-primary">{title}</h2>
+    <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
+      {title}
+      {#if variant === "chart"}
+        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange()}</span>
+      {/if}
+    </h2>
   {/if}
 
   <div class="flex flex-col gap-2">

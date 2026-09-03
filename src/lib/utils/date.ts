@@ -38,6 +38,18 @@ export function formatDateAdded(timestampSec: number | undefined | null): string
   return formatDate(timestampSec);
 }
 
+/** The current UTC calendar week (Monday-Sunday) as a locale-formatted range,
+ * e.g. "Aug 20-26" or "Aug 28 - Sep 3" — mirrors the backend's
+ * `week_start_utc` window that `get_top_albums`'s chart is computed over
+ * (#662), so the Home "Top Albums" header can show what period it covers. */
+export function formatChartWeekRange(): string {
+  const now = new Date();
+  const diffToMonday = (now.getUTCDay() + 6) % 7;
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToMonday));
+  const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6));
+  return new Intl.DateTimeFormat(i18n.currentLocale, { month: "short", day: "numeric" }).formatRange(monday, sunday);
+}
+
 export function formatRelativeDate(timestampSec: number | undefined | null): string {
   if (!timestampSec) return "";
   const diffDays = diffDaysFromNow(timestampSec);
