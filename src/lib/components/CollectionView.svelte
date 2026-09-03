@@ -30,6 +30,7 @@
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
 
   // activeSubTab and activeTab are managed globally via collectionStore
 
@@ -381,6 +382,7 @@
           onRate={rateSong}
           onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
           onEditTags={(song) => openTagEditor(song.id)}
+          onOpenInPicard={(song) => openInPicard([song.id])}
           virtualized
           scrollMemoryKey="collection:songs"
           emptyState={songsEmptyState}
@@ -602,6 +604,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

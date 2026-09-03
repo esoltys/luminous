@@ -24,7 +24,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp, Pin, PinOff } from "lucide-svelte";
+  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp, Pin, PinOff, AlertTriangle, Disc3 } from "lucide-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -32,6 +32,8 @@
   import { getPopulationModeSuffix, getBpmBucketLabel } from "../utils/playlist";
   import { genreColorHsl, resolveGenreColorIndex } from "../utils/genrePalette";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
+  import { picardStore } from "../stores/picard.svelte";
   import { compareSongs } from "../utils/songSort";
   import { toTitleCase } from "../utils/formatters";
   import Modal from "./Modal.svelte";
@@ -106,6 +108,10 @@
     if (kind === "recently_added") return i18n.t("playlists.autoRecentlyAdded");
     if (kind === "most_played") return i18n.t("playlists.autoMostPlayed");
     if (kind === "history") return i18n.t("playlists.autoHistory");
+    // Missing Metadata (#367) is a diagnostic singleton — always bare, no
+    // population-mode suffix (population mode has no meaning here: the
+    // point is to surface every affected song, not bias toward favourites).
+    if (kind === "missing_metadata") return i18n.t("playlists.autoMissingMetadata");
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
       : kind === "bpm"
@@ -145,7 +151,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata") || updated === undefined) return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -158,7 +164,7 @@
   });
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag") && pid !== undefined) {
+    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
     }
@@ -242,6 +248,15 @@
   async function handleAddSongToPlaylist(songId: number) {
     const songObj = songs.find((s) => s.id === songId);
     await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
+  }
+
+  /** Bulk "Open in Picard" from the Missing Metadata playlist's overflow menu
+   * (#367) — the primary entry point for handing everything in the list off
+   * to Picard at once. Opens just the current selection if any songs are
+   * selected, otherwise every song in the list. */
+  function handleOpenAllInPicard() {
+    const ids = selectedKeys.size > 0 ? Array.from(selectedKeys, Number) : songs.map((s) => s.id);
+    openInPicard(ids);
   }
 
   async function handleAddAllToPlaylist() {
@@ -599,6 +614,10 @@
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_28px_3px_rgba(100,116,139,0.3)]">
             <Music class="w-16 h-16 text-slate-300" />
           </div>
+        {:else if kind === "missing_metadata"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
+            <AlertTriangle class="w-16 h-16 text-amber-500" />
+          </div>
         {:else}
           <div
             class="w-full h-full bg-brand-main flex items-center justify-center overflow-hidden border"
@@ -633,6 +652,7 @@
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
         onEditTags={(song) => openTagEditor(song.id)}
         onEditAlbum={openAlbumEditor}
+        onOpenInPicard={(song) => openInPicard([song.id])}
       />
     </div>
 
@@ -690,6 +710,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}
@@ -724,12 +745,25 @@
       disabled={loading || songs.length === 0}
     />
 
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm") && playlistId !== undefined}
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
         onclick={() => { handleRefreshAutoPlaylist(); overflowMenuPos = null; }}
         disabled={loading || isRefreshing}
+      />
+    {/if}
+
+    {#if kind === "missing_metadata"}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={Disc3}
+        label={selectedKeys.size > 0
+          ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
+          : i18n.t("picard.openAllInPicard")}
+        onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
+        disabled={loading || songs.length === 0 || !picardStore.available}
+        title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
       />
     {/if}
 

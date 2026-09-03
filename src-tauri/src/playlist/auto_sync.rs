@@ -47,6 +47,7 @@ impl PlaylistManager {
         self.sync_decade_auto_playlists()?;
         self.sync_bpm_auto_playlists()?;
         self.sync_artist_tag_auto_playlists()?;
+        self.sync_missing_metadata_auto_playlist()?;
         Ok(())
     }
 
@@ -503,6 +504,79 @@ impl PlaylistManager {
                     params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
                 )?;
             }
+        }
+
+        Ok(())
+    }
+
+    /// Regenerates the single "Missing Metadata" auto-playlist (#367) — a
+    /// system-managed `playlists` row with `dynamic_enabled = 1` and
+    /// `dynamic_spec = "missingmeta"` — if missing or its `updated`
+    /// timestamp is more than 24h old. Unlike genre/decade/BPM/artist-tag
+    /// auto-playlists there is exactly one row and no
+    /// `MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST` gate: the point is to surface
+    /// library health issues even when only one song is affected. The row
+    /// is created unconditionally (even at 0 matches) so it never has to
+    /// wait for a first offending song; the frontend hides the card when
+    /// `track_count == 0`, the same convention used for genre/decade/BPM at
+    /// 0 songs.
+    pub fn sync_missing_metadata_auto_playlist(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        const SPEC: &str = "missingmeta";
+        const NAME: &str = "Missing Metadata";
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing_row: Option<(i64, i64, String)> = conn
+            .query_row(
+                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                params![SPEC],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .ok();
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+
+        let needs_generation = match existing_row {
+            None => true,
+            Some((_, updated, _)) => now - updated > STALE_AFTER_SECS,
+        };
+        if !needs_generation {
+            return Ok(());
+        }
+
+        let songs = scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?;
+
+        let playlist_id = match existing_row {
+            Some((id, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                    params![now, id],
+                )?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                id
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![NAME, SPEC, now],
+                )?;
+                conn.last_insert_rowid()
+            }
+        };
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
         }
 
         Ok(())
@@ -986,6 +1060,78 @@ mod tests {
                 .iter()
                 .any(|p| p.dynamic_spec.as_deref() == Some("artisttag:canadian")),
             "artisttag:canadian must be pruned when 0 songs remain"
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_missing_metadata_auto_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Complete — should not appear.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('Complete Song', 'Artist', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Missing artist (empty string, not NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('No Artist', '', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Missing album (NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, source, unavailable) VALUES ('No Album', 'Artist', 1, 0)",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        // Unlike genre/decade/BPM/artist-tag, this must be created even with
+        // only a couple of matching songs — no 25-song threshold gate.
+        manager.sync_missing_metadata_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("missingmeta"))
+            .expect("Missing Metadata auto-playlist should always be created, even below any song-count threshold");
+        assert_eq!(pl.name, "Missing Metadata");
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles: Vec<_> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
+            .collect();
+        assert_eq!(titles.len(), 2);
+        assert!(titles.contains(&"No Artist".to_string()));
+        assert!(titles.contains(&"No Album".to_string()));
+        assert!(!titles.contains(&"Complete Song".to_string()));
+
+        // Fixing the tags and reconciling should drop the songs out again.
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET artist = 'Artist' WHERE title = 'No Artist'",
+                [],
+            )
+            .unwrap();
+        let mut manager = manager;
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert!(deltas.iter().any(|d| d.playlist_id == pl.id));
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("No Album")
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

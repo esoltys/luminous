@@ -527,6 +527,40 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// Songs missing one or more core tags (title/artist/album — the minimum
+    /// set needed to identify a track), selected per `mode`'s bias, for the
+    /// "Missing Metadata" auto-playlist (#367). NULL and empty-string are
+    /// both treated as "missing" since tag reads/writes use either
+    /// convention depending on the column.
+    pub fn get_songs_missing_core_tags(
+        &self,
+        limit: i64,
+        mode: QueuePopulationMode,
+    ) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let (extra_where, order_by) = mode_query_fragments(mode);
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE (
+                 title IS NULL OR TRIM(title) = ''
+                 OR artist IS NULL OR TRIM(artist) = ''
+                 OR album IS NULL OR TRIM(album) = ''
+             )
+               AND source IN (1, 2)
+               AND unavailable = 0
+               {extra_where}
+             ORDER BY {order_by}
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     /// Distinct artist tags across all artist profiles in the library.
     pub fn get_library_artist_tags(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;

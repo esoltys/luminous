@@ -35,6 +35,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
   import { compareSongs } from "../utils/songSort";
 
   let { artistName }: { artistName: string } = $props();
@@ -231,25 +232,25 @@
     songs.length === 1 ? i18n.t("playlists.oneSong") : i18n.t("playlists.songsCount", { count: songs.length })
   );
 
-  // Some artists have no proper album releases at all (every track is a loose
-  // single with no album tag), so getArtistAlbums() returns nothing and the
-  // Albums/Singles/Popular filters all end up empty. Fall back to showing the
-  // artist's individual songs directly rather than an empty "no releases" state.
-  // Mutually exclusive with `singles` (albums.length is 0 whenever this is
-  // populated), so combining the two counts is safe.
+  // Songs with no album tag at all are excluded from get_albums() entirely
+  // (it requires a non-empty album), so they'd never surface via `albums`/
+  // `singles`. Surface each such song individually as its own "loose
+  // single" — computed directly from this artist's songs rather than gated
+  // on "this artist has zero proper albums", which used to make every
+  // blank-album song vanish the moment the artist had even one real album
+  // elsewhere (its `albums.length` going from 0 to 1 turned this fallback
+  // off entirely, even though the loose songs and real albums are disjoint
+  // sets and can coexist).
   let looseSongs = $derived(
-    albums.length === 0 ? [...songs].sort((a, b) => (a.title || "").localeCompare(b.title || "")) : []
+    songs.filter((s) => !s.album).sort((a, b) => (a.title || "").localeCompare(b.title || ""))
   );
 
   // Grouped singles are AlbumItems (track_count === 1), but they render as a
   // song table alongside loose singles — resolve each back to its one song.
-  let singleSongs = $derived(
-    singles.length > 0
-      ? singles
-          .map((a) => songs.find((s) => s.album === a.album))
-          .filter((s): s is Song => s !== undefined)
-      : looseSongs
-  );
+  let singleSongs = $derived([
+    ...singles.map((a) => songs.find((s) => s.album === a.album)).filter((s): s is Song => s !== undefined),
+    ...looseSongs,
+  ]);
 
   let sortedSingleSongs = $derived.by(() => {
     if (singleSortField === "track") {
@@ -551,6 +552,7 @@
             onRate={rateSingle}
             onAddToPlaylist={(song) => handleAddSingleToPlaylist(song.id)}
             onEditTags={(song) => openTagEditor(song.id)}
+            onOpenInPicard={(song) => openInPicard([song.id])}
           />
         </div>
       </div>
@@ -640,6 +642,7 @@
       }
     }}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { singleContextMenuState = null; }}
   />
 {/if}
