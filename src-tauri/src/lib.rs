@@ -871,6 +871,7 @@ pub fn run() {
             commands::collection::get_artist_profile,
             commands::collection::set_artist_profile,
             commands::collection::get_all_artist_profiles,
+            commands::collection::set_songs_not_included,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

@@ -45,6 +45,7 @@
     TrashIcon as Trash2,
     DotsSixVerticalIcon as GripVertical,
     WarningIcon as AlertTriangle,
+    EyeSlashIcon as EyeSlash,
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     DiscIcon as DiscAlbum,
@@ -622,6 +623,13 @@
       <div class="flex items-center justify-center gap-0.5 h-3.5 w-3.5 absolute group-hover:opacity-0 transition-opacity">
         <NowPlayingBars />
       </div>
+    {:else if song?.not_included}
+      <span
+        class="absolute group-hover:opacity-0 transition-opacity"
+        title={i18n.t("playlists.notIncludedBadgeTooltip")}
+      >
+        <EyeSlash class="w-3.5 h-3.5 text-brand-text-secondary/70" />
+      </span>
     {:else if mode === "position"}
       <span class="absolute text-xs font-medium text-brand-text-secondary group-hover:opacity-0 transition-opacity">{displayIndex + 1}</span>
     {/if}

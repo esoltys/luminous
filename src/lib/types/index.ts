@@ -139,6 +139,8 @@ export interface Song {
   unavailable: boolean;
   /** True when track is marked instrumental (online lyrics fetch bypassed). */
   is_instrumental?: boolean;
+  /** True when the user marked this song "Not included" — hidden from auto/smart playlists and Auto-Play refill, but still visible and playable in Album/Artist views. */
+  not_included?: boolean;
 }
 
 export type PlaylistItemType = "song" | "stream" | "streaming_service";

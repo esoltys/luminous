@@ -295,8 +295,9 @@
     let songs = await invoke<Song[]>("get_songs_by_album", {
       album: albumName,
     });
-    if (songs.length > 0) {
-      const songIds = songs.map((s) => s.id);
+    const playable = songs.filter((s) => !s.not_included);
+    if (playable.length > 0) {
+      const songIds = playable.map((s) => s.id);
       playerStore.playSongs(songIds, 0);
     }
   }
@@ -627,9 +628,10 @@
     onPlay={() => handlePlayAlbum(album.album || "")}
     onAddToPlaylist={async () => {
       let songs = await invoke<Song[]>("get_songs_by_album", { album: album.album || "" });
-      if (songs.length > 0) {
+      const playable = songs.filter((s) => !s.not_included);
+      if (playable.length > 0) {
         await playlistsStore.addSongsToActiveTarget(
-          songs.map(s => s.id),
+          playable.map(s => s.id),
           album.album || i18n.t("collection.unknownAlbum")
         );
       }
