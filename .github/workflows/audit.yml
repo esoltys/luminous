@@ -24,6 +24,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # rustsec/audit-check installs cargo-audit via a plain `cargo install
+      # cargo-audit` with no version pin and no --locked, so it re-resolves
+      # cargo-audit's own dependencies fresh. That currently pulls tinyvec
+      # 1.13.0, which fails to compile on the runner's Rust toolchain
+      # (upstream tinyvec/rustc edition-resolution bug). Installing here
+      # with --locked (using cargo-audit's own tested Cargo.lock, which
+      # pins an older working tinyvec) puts a working binary on PATH first,
+      # so the action's own install step just finds and reuses it.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
       - name: Security audit Cargo.lock
         uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
