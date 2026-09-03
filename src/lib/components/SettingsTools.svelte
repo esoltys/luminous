@@ -115,19 +115,21 @@
     </button>
   </div>
 
-  <div class="flex flex-col gap-1.5 max-w-md">
+  <div class="flex flex-col gap-1.5">
     <label for="picard-custom-path-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
       {i18n.t('picard.customPathLabel')}
     </label>
     <div class="flex items-center gap-2">
-      <Input
-        id="picard-custom-path-input"
-        type="text"
-        bind:value={picardCustomPath}
-        onchange={handlePicardCustomPathChange}
-        placeholder={i18n.t('picard.customPathPlaceholder')}
-        class="flex-1"
-      />
+      <div class="max-w-md flex-1">
+        <Input
+          id="picard-custom-path-input"
+          type="text"
+          bind:value={picardCustomPath}
+          onchange={handlePicardCustomPathChange}
+          placeholder={i18n.t('picard.customPathPlaceholder')}
+          class="w-full"
+        />
+      </div>
       <Button onclick={handleBrowsePicardPath} variant="secondary" size="sm">
         <FolderOpen class="w-4 h-4" />
         {i18n.t('picard.browseBtn')}
