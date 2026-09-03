@@ -17,7 +17,7 @@
     CheckIcon as Check,
     EyeIcon as Eye,
     EyeSlashIcon as EyeOff,
-    DiscIcon as Disc3,
+    AppWindowIcon as PicardIcon,
     WarningIcon as AlertTriangle,
     ArrowsClockwiseIcon as RefreshCw,
     FolderOpenIcon as FolderOpen
@@ -94,7 +94,7 @@
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Disc3 class="w-5 h-5" />
+        <PicardIcon class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>

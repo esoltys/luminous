@@ -5,7 +5,7 @@
     MicrophoneStageIcon as Mic2,
     DiscIcon as DiscAlbum,
     PencilSimpleIcon as Edit3,
-    DiscIcon as Disc3
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
@@ -82,7 +82,7 @@
   {#if onOpenInPicard}
     <ContextMenuDivider />
     <ContextMenuItem
-      icon={Disc3}
+      icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
       disabled={!picardStore.available}

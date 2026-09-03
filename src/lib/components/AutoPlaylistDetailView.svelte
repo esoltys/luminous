@@ -45,7 +45,7 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     WarningIcon as AlertTriangle,
-    DiscIcon as Disc3
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
@@ -779,7 +779,7 @@
     {#if kind === "missing_metadata"}
       <ContextMenuDivider />
       <ContextMenuItem
-        icon={Disc3}
+        icon={OpenInPicard}
         label={selectedKeys.size > 0
           ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
           : i18n.t("picard.openAllInPicard")}

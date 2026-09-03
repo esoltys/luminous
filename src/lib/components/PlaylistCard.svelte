@@ -4,7 +4,7 @@
     PlaylistIcon as ListMusic,
     CalendarIcon as Calendar,
     MusicNotesIcon as Music,
-    RadioIcon as Radio,
+    BroadcastIcon as Radio,
     StackIcon as Layers,
     SparkleIcon as Sparkles
   } from "phosphor-svelte";

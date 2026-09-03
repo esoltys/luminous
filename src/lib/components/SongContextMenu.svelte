@@ -10,7 +10,7 @@
     StackIcon as Layers,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    DiscIcon as Disc3
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
@@ -152,7 +152,7 @@
 
   {#if onOpenInPicard}
     <ContextMenuItem
-      icon={Disc3}
+      icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
       disabled={!picardStore.available}

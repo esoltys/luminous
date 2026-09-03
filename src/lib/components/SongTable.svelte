@@ -48,7 +48,7 @@
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     DiscIcon as DiscAlbum,
-    DiscIcon as Disc3
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
@@ -599,7 +599,7 @@
           disabled={!picardStore.available}
           title={picardStore.available ? i18n.t("picard.openInPicard") : i18n.t("picard.notFoundTooltip")}
         >
-          <Disc3 class="w-4 h-4" />
+          <OpenInPicard class="w-4 h-4" />
         </button>
       {/if}
       {#if onRemoveFromPlaylist}
