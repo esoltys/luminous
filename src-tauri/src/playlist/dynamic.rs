@@ -78,8 +78,9 @@ impl PlaylistManager {
     }
 
     /// Every library song matching a dynamic spec, in the order the spec's
-    /// population mode dictates. The single dispatch point for all four spec
-    /// kinds (decade:, bpmrange:, tag:, smart-rule query).
+    /// population mode dictates. The single dispatch point for all spec
+    /// kinds (decade:, bpmrange:, artisttag:, missingmeta, tag:, smart-rule
+    /// query).
     fn songs_for_spec(&self, spec: &str, mode: QueuePopulationMode) -> Result<Vec<Song>> {
         let scanner = CollectionScanner::new(self.db.clone());
         if let Some(decade) = spec.strip_prefix("decade:") {
@@ -91,6 +92,8 @@ impl PlaylistManager {
             scanner.get_songs_by_bpm_range(min, max, NO_SONG_LIMIT, mode)
         } else if let Some(tag) = spec.strip_prefix("artisttag:") {
             scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)
+        } else if spec == "missingmeta" {
+            scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)
         } else if let Some(name) = spec.strip_prefix("tag:") {
             // A system genre auto-playlist, keyed on a curated tag name
             // (#548) rather than a Smart Playlist rule spec (which always

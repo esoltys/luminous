@@ -24,6 +24,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod organizer;
+pub mod picard;
 pub mod pins;
 pub mod player;
 pub mod playlist;
@@ -953,6 +954,9 @@ pub fn run() {
             commands::tageditor::save_album_tags,
             commands::tageditor::clear_song_cover_art,
             commands::tageditor::clear_album_cover_art,
+            // MusicBrainz Picard bridge commands (#367)
+            commands::picard::open_in_picard,
+            commands::picard::is_picard_available,
             // Genre/tag browsing commands (#224) — read the existing
             // songs.genre column above; editing goes through save_song_tags.
             commands::tags::get_songs_by_tag,

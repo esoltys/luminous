@@ -55,7 +55,15 @@ export function getPlaylistDisplayName(
   // required (a chip's own card already exists separately, so there's
   // nothing to strip a parent's name out of).
   const baseName = getBpmBucketLabel(playlist.dynamic_spec, playlist.name);
-  if (!playlist.dynamic_enabled || isSmartPlaylistSpec(playlist.dynamic_spec)) {
+  // Missing Metadata (#367) is a diagnostic singleton, not a library-data
+  // category — a population-mode suffix ("Missing Metadata (Favourites)")
+  // wouldn't mean anything useful, so it's excluded the same way Smart
+  // Playlists are.
+  if (
+    !playlist.dynamic_enabled ||
+    isSmartPlaylistSpec(playlist.dynamic_spec) ||
+    playlist.dynamic_spec === "missingmeta"
+  ) {
     return baseName;
   }
   const suffix = getPopulationModeSuffix(playlist.population_mode);

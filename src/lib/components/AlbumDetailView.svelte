@@ -31,6 +31,7 @@
   import { toastStore } from "../stores/toast.svelte";
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
 
   let { albumName }: { albumName: string } = $props();
 
@@ -484,6 +485,7 @@
         onRate={rateSong}
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
         onEditTags={(song) => openTagEditor(song.id)}
+        onOpenInPicard={(song) => openInPicard([song.id])}
       />
     </div>
   </div>
@@ -542,6 +544,7 @@
     onGoToArtist={() => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "")}
     onGoToAlbum={() => navigationStore.viewAlbum(song.album || "")}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

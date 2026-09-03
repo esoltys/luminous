@@ -413,6 +413,7 @@ export const en = {
     autoRecentlyAdded: "Recently Added",
     autoMostPlayed: "Most Played",
     autoHistory: "History",
+    autoMissingMetadata: "Missing Metadata",
     updatedOn: "Updated {date}",
     saveAsCustomTooltip: "Save as Custom Playlist",
     activePlaylistTitle: "Playlists",
@@ -485,6 +486,7 @@ export const en = {
     artistTagAutoPlaylist: "Artist Tag",
     decadeAutoPlaylist: "Decade",
     bpmAutoPlaylist: "BPM",
+    missingMetadataAutoPlaylist: "Missing Metadata",
     bpmDownTempo: "Down-Tempo BPM",
     bpmMidTempo: "Mid-Tempo BPM",
     bpmUptempo: "Uptempo BPM",
@@ -975,6 +977,9 @@ export const en = {
     unknownError: "Unknown error",
     applying: "Applying...",
     close: "Close"
+  },
+  picard: {
+    openInPicard: "Open in Picard"
   },
   smartPlaylistBuilder: {
     fallbackName: "Smart Playlist",

@@ -26,7 +26,7 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -92,6 +92,11 @@
       .filter((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("bpmrange:"))
       .sort((a, b) => BPM_BUCKET_ORDER.indexOf(a.name) - BPM_BUCKET_ORDER.indexOf(b.name))
   );
+  // Missing Metadata (#367) is a singleton diagnostic auto-playlist, not a
+  // per-value category like genre/decade/BPM/artist tag.
+  let missingMetadataAutoPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")
+  );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
@@ -134,6 +139,16 @@
       label: i18n.t("playlists.autoHistory"),
       trackCount: playlistsStore.historyCount,
     });
+    if (missingMetadataAutoPlaylist && missingMetadataAutoPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:missing_metadata:${missingMetadataAutoPlaylist.id}`,
+        kind: "missing_metadata",
+        label: getPlaylistDisplayName(missingMetadataAutoPlaylist),
+        playlistId: missingMetadataAutoPlaylist.id,
+        updated: missingMetadataAutoPlaylist.updated,
+        trackCount: missingMetadataAutoPlaylist.track_count,
+      });
+    }
     for (const p of decadeAutoPlaylists) {
       if (p.track_count > 0) {
         const dec = p.dynamic_spec?.replace(/^decade:/, "") ?? p.name;
@@ -280,7 +295,9 @@
             ? { kind: "decade", decade: def.decade, playlistId: def.playlistId, updated: def.updated }
             : def.kind === "bpm"
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
-              : { kind: def.kind }
+              : def.kind === "missing_metadata"
+                ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
+                : { kind: def.kind }
     );
   }
 

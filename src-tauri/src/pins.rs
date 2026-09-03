@@ -238,6 +238,28 @@ pub fn resolve_auto_playlist(
             let count = scanner.get_recently_played_songs(100)?.len() as i32;
             (count > 0).then(|| virtual_item(kind, count))
         }
+        "missing_metadata" => {
+            // Materialized like genre/decade/bpm/artist_tag (a real
+            // dynamic_enabled row), but a fixed singleton spec rather than
+            // one keyed by a selector value (#367).
+            playlists
+                .iter()
+                .find(|p| {
+                    p.dynamic_enabled
+                        && p.track_count > 0
+                        && p.dynamic_spec.as_deref() == Some("missingmeta")
+                })
+                .map(|p| AutoPlaylistItem {
+                    kind: kind.to_string(),
+                    genre: None,
+                    artist_tag: None,
+                    decade: None,
+                    bpm: None,
+                    playlist_id: Some(p.id),
+                    updated: Some(p.updated),
+                    track_count: p.track_count,
+                })
+        }
         "genre" | "decade" | "bpm" | "artist_tag" => {
             let selector = selector.unwrap_or("").to_string();
             let prefix = match kind {
@@ -592,6 +614,35 @@ mod tests {
         assert!(resolve_auto_playlist(&scanner, &playlists, "genre:Jazz")
             .unwrap()
             .is_none());
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn resolve_auto_playlist_missing_metadata_matches_fixed_spec_with_no_selector() {
+        let (db, dir) = test_db();
+        let scanner = CollectionScanner::new(std::sync::Arc::new(db));
+        let playlists = vec![test_playlist(1, "missingmeta", 3)];
+
+        let item = resolve_auto_playlist(&scanner, &playlists, "missing_metadata")
+            .unwrap()
+            .expect("missing_metadata should resolve against the singleton row");
+        assert_eq!(item.playlist_id, Some(1));
+        assert_eq!(item.track_count, 3);
+        assert!(
+            item.genre.is_none()
+                && item.decade.is_none()
+                && item.bpm.is_none()
+                && item.artist_tag.is_none()
+        );
+
+        // Dropped to 0 songs (or the row deleted) self-heals to None.
+        let empty_playlists = vec![test_playlist(1, "missingmeta", 0)];
+        assert!(
+            resolve_auto_playlist(&scanner, &empty_playlists, "missing_metadata")
+                .unwrap()
+                .is_none()
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     }

@@ -38,6 +38,7 @@
   import type { PlaylistItem, Song } from "../types";
   import { parseSearchRules, isSmartPlaylistSpec } from "../utils/filterParser";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import TagEditor from "./TagEditor.svelte";
@@ -518,6 +519,18 @@
     }
   }
 
+  function openSelectedInPicard(fallbackSongId?: number) {
+    const selectedTracks = playlistsStore.activePlaylistTracks.filter(
+      (t) => selectedUuids.has(t.uuid) && t.song
+    );
+    const songIds = selectedTracks.length > 0
+      ? selectedTracks.map((t) => t.song!.id)
+      : fallbackSongId !== undefined
+        ? [fallbackSongId]
+        : [];
+    openInPicard(songIds);
+  }
+
   async function handlePlayAll() {
     if (!activePlaylist || playlistsStore.activePlaylistTracks.length === 0) return;
     const availableTracks = playlistsStore.activePlaylistTracks.filter((t) => t.song && !isItemUnavailable(t));
@@ -854,6 +867,7 @@
           onRowContextMenu={handleRowContextMenu}
           onRate={rateSong}
           onEditTags={(song) => openTagEditor(song.id)}
+          onOpenInPicard={(song) => openSelectedInPicard(song.id)}
           onRemoveFromPlaylist={(row) => handleRemoveItem(row.key)}
           onReorder={handleReorder}
           isRowPlaying={(row) => (!!playerStore.playlistItemUuid && playerStore.playlistItemUuid === row.key) || (!!playerStore.currentSong && !!row.song && playerStore.currentSong.id === row.song.id)}
@@ -913,6 +927,7 @@
     onGoToArtist={singleItem.song?.artist ? () => navigationStore.viewArtist(singleItem.song?.album_artist?.trim() || singleItem.song?.artist || "") : undefined}
     onGoToAlbum={singleItem.song?.album ? () => navigationStore.viewAlbum(singleItem.song?.album || "") : undefined}
     onEditTags={singleItem.song?.id && !isItemUnavailable(singleItem) ? () => openTagEditor(singleItem.song!.id) : undefined}
+    onOpenInPicard={singleItem.song?.id ? () => openSelectedInPicard(singleItem.song!.id) : undefined}
     onClose={() => { contextMenuState = null; }}
   />
 {/if}

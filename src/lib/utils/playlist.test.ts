@@ -157,4 +157,19 @@ describe("playlist utils", () => {
     };
     expect(getPlaylistDisplayName(playlist)).toBe("Metal; Death Metal Favourites (Smart)");
   });
+
+  it("never appends a population-mode suffix to the Missing Metadata auto-playlist (#367)", () => {
+    const playlist: Playlist = {
+      id: 11,
+      name: "Missing Metadata",
+      dynamic_spec: "missingmeta",
+      population_mode: "favourites",
+      created: 100,
+      updated: 100,
+      track_count: 3,
+      dynamic_enabled: true,
+      is_queue: false,
+    };
+    expect(getPlaylistDisplayName(playlist)).toBe("Missing Metadata");
+  });
 });

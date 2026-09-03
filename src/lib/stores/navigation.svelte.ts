@@ -8,9 +8,20 @@ export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 type PlaylistsSubTab = "auto" | "custom";
 
 /** An auto-playlist reference (Favourites, Recently Added, genre, decade, BPM,
- * or the genre-less "No Genre" group), for the auto-playlist detail view. */
+ * Missing Metadata, or the genre-less "No Genre" group), for the auto-playlist
+ * detail view. */
 export interface AutoPlaylistRef {
-  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "no_genre" | "artist_tag";
+  kind:
+    | "favourites"
+    | "recently_added"
+    | "most_played"
+    | "history"
+    | "genre"
+    | "decade"
+    | "bpm"
+    | "no_genre"
+    | "artist_tag"
+    | "missing_metadata";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */

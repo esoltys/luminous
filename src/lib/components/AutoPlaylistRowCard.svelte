@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp } from "lucide-svelte";
+  import { Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp, AlertTriangle } from "lucide-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -8,7 +8,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -22,7 +22,7 @@
   let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined) {
+    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata") && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -30,6 +30,7 @@
   });
 
   let subtitleLabel = $derived.by(() => {
+    if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
@@ -42,7 +43,7 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata") || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -68,7 +69,9 @@
                 ? 'bg-[#DC2626]/15 border-[#DC2626]/30'
                 : kind === 'history'
                   ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
-                  : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+                  : kind === 'missing_metadata'
+                    ? 'bg-amber-500/15 border-amber-500/30'
+                    : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
   >
     {#if kind === "favourites"}
       <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
@@ -84,6 +87,8 @@
       <Tag class="w-5 h-5 text-[#FB923C]" />
     {:else if kind === "bpm"}
       <Gauge class="w-5 h-5 text-[#E879F9]" />
+    {:else if kind === "missing_metadata"}
+      <AlertTriangle class="w-5 h-5 text-amber-500" />
     {:else}
       <Music class="w-5 h-5 text-[#34D399]" />
     {/if}

@@ -35,6 +35,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { openInPicard } from "../utils/picard";
   import { compareSongs } from "../utils/songSort";
 
   let { artistName }: { artistName: string } = $props();
@@ -551,6 +552,7 @@
             onRate={rateSingle}
             onAddToPlaylist={(song) => handleAddSingleToPlaylist(song.id)}
             onEditTags={(song) => openTagEditor(song.id)}
+            onOpenInPicard={(song) => openInPicard([song.id])}
           />
         </div>
       </div>
@@ -640,6 +642,7 @@
       }
     }}
     onEditTags={() => openTagEditor(song.id)}
+    onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { singleContextMenuState = null; }}
   />
 {/if}

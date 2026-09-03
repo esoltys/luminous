@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp } from "lucide-svelte";
+  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp, AlertTriangle } from "lucide-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";
@@ -13,7 +13,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -31,7 +31,7 @@
   let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined) {
+    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata") && playlistId !== undefined) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -39,6 +39,7 @@
   });
 
   let subtitleLabel = $derived.by(() => {
+    if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
@@ -61,7 +62,7 @@
     const pid = playlistId;
 
     const request =
-      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag") && pid !== undefined
+      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
@@ -108,11 +109,12 @@
       case "recently_added": return "bg-[#CA8A04] text-white";
       case "most_played": return "bg-[#DC2626] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
+      case "missing_metadata": return "bg-amber-600 text-white";
     }
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag") || updated === undefined) return null;
+    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata") || updated === undefined) return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -159,6 +161,10 @@
     {:else if kind === "bpm"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#C026D3]/25 to-[#E879F9]/15 flex items-center justify-center overflow-hidden border border-[#E879F9]/30 shadow-[0_0_20px_2px_rgba(232,121,249,0.35)]">
         <Gauge class="w-10 h-10 text-[#E879F9]" />
+      </div>
+    {:else if kind === "missing_metadata"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]">
+        <AlertTriangle class="w-10 h-10 text-amber-500" />
       </div>
     {:else}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">
