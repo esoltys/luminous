@@ -300,6 +300,19 @@ fn ensure_writable(path: &Path) {
     }
 }
 
+fn format_error_chain(err: &dyn std::error::Error) -> String {
+    let mut parts = vec![err.to_string()];
+    let mut current = err.source();
+    while let Some(cause) = current {
+        let msg = cause.to_string();
+        if !parts.contains(&msg) {
+            parts.push(msg);
+        }
+        current = cause.source();
+    }
+    parts.join(": ")
+}
+
 fn save_tagged_file_with_retry(
     tagged_file: &lofty::file::TaggedFile,
     path: &Path,
@@ -315,7 +328,8 @@ fn save_tagged_file_with_retry(
                 attempts += 1;
                 if attempts >= 5 {
                     return Err(anyhow!(
-                        "failed to {action} back to file after multiple attempts: {e:#}"
+                        "failed to {action} back to file after multiple attempts: {}",
+                        format_error_chain(&e)
                     ));
                 }
                 std::thread::sleep(std::time::Duration::from_millis(100));
@@ -844,6 +858,77 @@ mod tests {
         let tagged_file = Probe::open(&path).unwrap().read().unwrap();
         let tag = tagged_file.primary_tag().unwrap();
         assert_eq!(tag.title().as_deref(), Some("Updated Title"));
+    }
+
+    #[test]
+    fn test_write_tags_mp3_multiple_genres() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("test.mp3");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/audio/song_alpha.mp3");
+        std::fs::copy(&fixture, &path).expect("failed to copy mp3 fixture");
+
+        write_tags(
+            &path,
+            &TagWriteRequest {
+                title: "MP3 Title",
+                artist: "MP3 Artist",
+                album: "MP3 Album",
+                genre: "Rock; Instrumental Rock",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags must succeed on mp3 file");
+
+        let tagged_file = Probe::open(&path).unwrap().read().unwrap();
+        let tag = tagged_file.primary_tag().unwrap();
+        assert_eq!(tag.title().as_deref(), Some("MP3 Title"));
+        let genres: Vec<&str> = tag.get_strings(lofty::tag::ItemKey::Genre).collect();
+        assert_eq!(genres, vec!["Rock", "Instrumental Rock"]);
+    }
+
+    #[test]
+    fn test_format_error_chain_unpacks_nested_sources() {
+        #[derive(Debug)]
+        struct Level2;
+        impl std::fmt::Display for Level2 {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "disk full (os error 28)")
+            }
+        }
+        impl std::error::Error for Level2 {}
+
+        #[derive(Debug)]
+        struct Level1(Level2);
+        impl std::fmt::Display for Level1 {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "failed to write ID3v2 tag")
+            }
+        }
+        impl std::error::Error for Level1 {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        #[derive(Debug)]
+        struct Top(Level1);
+        impl std::fmt::Display for Top {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "failed to write Mpeg file")
+            }
+        }
+        impl std::error::Error for Top {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        let top = Top(Level1(Level2));
+        assert_eq!(
+            format_error_chain(&top),
+            "failed to write Mpeg file: failed to write ID3v2 tag: disk full (os error 28)"
+        );
     }
 
     #[tokio::test]
