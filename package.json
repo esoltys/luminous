@@ -45,7 +45,7 @@
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "jsdom": "^30.0.1",
     "music-metadata": "^11.15.0",
