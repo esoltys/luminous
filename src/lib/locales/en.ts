@@ -487,6 +487,7 @@ export const en = {
     decadeAutoPlaylist: "Decade",
     bpmAutoPlaylist: "BPM",
     missingMetadataAutoPlaylist: "Missing Metadata",
+    daypartAutoPlaylist: "Daypart Mix",
     bpmDownTempo: "Down-Tempo BPM",
     bpmMidTempo: "Mid-Tempo BPM",
     bpmUptempo: "Uptempo BPM",

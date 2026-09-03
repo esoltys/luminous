@@ -408,7 +408,7 @@ export type PinnedItemType = "song" | "album" | "artist" | "playlist" | "auto_pl
  * Played/History have no backing playlist row, so `playlistId`/`updated` are
  * absent for those kinds. */
 export interface AutoPlaylistItem {
-  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
+  kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
   genre?: string;
   artistTag?: string;
   decade?: string;

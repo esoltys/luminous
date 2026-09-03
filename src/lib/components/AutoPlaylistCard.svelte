@@ -10,7 +10,8 @@
     GaugeIcon as Gauge,
     TagIcon as Tag,
     TrendUpIcon as TrendingUp,
-    WarningIcon as AlertTriangle
+    WarningIcon as AlertTriangle,
+    SunHorizonIcon as SunHorizon
   } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
@@ -24,7 +25,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -42,7 +43,10 @@
   let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
 
   let displayLabel = $derived.by(() => {
-    if ((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata") && playlistId !== undefined) {
+    if (
+      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "daypart") &&
+      playlistId !== undefined
+    ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
       if (pl) return getPlaylistDisplayName(pl);
     }
@@ -51,6 +55,7 @@
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
+    if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
     if (kind === "artist_tag" || artistTag) return i18n.t("playlists.artistTagAutoPlaylist");
@@ -73,7 +78,7 @@
     const pid = playlistId;
 
     const request =
-      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata") && pid !== undefined
+      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "daypart") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
@@ -108,7 +113,9 @@
   // they're rebuilt from the whole library on every load, so a coverstack of
   // whichever songs happen to be in them right now reads as arbitrary rather
   // than representative (unlike a genre, decade, BPM, or user playlist).
-  let topCovers = $derived(kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" ? songsToCoverStack(songs) : []);
+  let topCovers = $derived(
+    kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart" ? songsToCoverStack(songs) : []
+  );
 
   let badgeColorClass = $derived.by(() => {
     switch (kind) {
@@ -121,11 +128,16 @@
       case "most_played": return "bg-[#DC2626] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
       case "missing_metadata": return "bg-amber-600 text-white";
+      case "daypart": return "bg-[#0D9488] text-white";
     }
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata") || updated === undefined) return null;
+    if (
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "daypart") ||
+      updated === undefined
+    )
+      return null;
     return formatRelativeDate(updated);
   });
 </script>
@@ -137,8 +149,8 @@
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && topCovers.length > 0}
-      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_20px_2px_rgba(232,121,249,0.35)]' : kind === 'artist_tag' ? 'from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart") && topCovers.length > 0}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_20px_2px_rgba(56,189,248,0.35)]' : kind === 'bpm' ? 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_20px_2px_rgba(232,121,249,0.35)]' : kind === 'artist_tag' ? 'from-[#EA580C]/25 to-[#FB923C]/15 border-[#FB923C]/30 shadow-[0_0_20px_2px_rgba(251,146,60,0.35)]' : kind === 'daypart' ? 'from-[#0D9488]/25 to-[#2DD4BF]/15 border-[#2DD4BF]/30 shadow-[0_0_20px_2px_rgba(45,212,191,0.35)]' : 'from-[#059669]/25 to-[#34D399]/15 border-[#34D399]/30 shadow-[0_0_20px_2px_rgba(52,211,153,0.35)]'} flex items-center justify-center overflow-hidden border relative">
         <CoverStack covers={topCovers} hoverEffect={true} sizeClass="w-[82%] h-[82%]" />
       </div>
     {:else if kind === "favourites"}
@@ -176,6 +188,10 @@
     {:else if kind === "missing_metadata"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]">
         <AlertTriangle class="w-10 h-10 text-amber-500" />
+      </div>
+    {:else if kind === "daypart"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_20px_2px_rgba(45,212,191,0.35)]">
+        <SunHorizon class="w-10 h-10 text-[#2DD4BF]" />
       </div>
     {:else}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-slate-700/40 to-slate-900/30 flex items-center justify-center overflow-hidden border border-slate-400/20 shadow-[0_0_20px_2px_rgba(100,116,139,0.25)]">

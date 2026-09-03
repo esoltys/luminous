@@ -34,7 +34,7 @@
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -105,6 +105,13 @@
   let missingMetadataAutoPlaylist = $derived(
     playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")
   );
+  // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
+  // dynamic_spec changes content (bucket/date/genre) every time the daypart
+  // boundary crosses — matched by prefix, not exact spec, so the same row
+  // (and any Home pin keyed on its id) is found across every crossing.
+  let daypartMixPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))
+  );
   let customPlaylists = $derived.by(() => {
     // Include non-dynamic playlists + user-created Smart playlists
     const list = playlistsStore.playlists.filter((p) => !p.dynamic_enabled || isSmartPlaylistSpec(p.dynamic_spec));
@@ -155,6 +162,16 @@
         playlistId: missingMetadataAutoPlaylist.id,
         updated: missingMetadataAutoPlaylist.updated,
         trackCount: missingMetadataAutoPlaylist.track_count,
+      });
+    }
+    if (daypartMixPlaylist && daypartMixPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:daypart:${daypartMixPlaylist.id}`,
+        kind: "daypart",
+        label: getPlaylistDisplayName(daypartMixPlaylist),
+        playlistId: daypartMixPlaylist.id,
+        updated: daypartMixPlaylist.updated,
+        trackCount: daypartMixPlaylist.track_count,
       });
     }
     for (const p of decadeAutoPlaylists) {
@@ -305,7 +322,9 @@
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
               : def.kind === "missing_metadata"
                 ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                : { kind: def.kind }
+                : def.kind === "daypart"
+                  ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
+                  : { kind: def.kind }
     );
   }
 

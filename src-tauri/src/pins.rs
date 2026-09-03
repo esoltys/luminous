@@ -260,6 +260,32 @@ pub fn resolve_auto_playlist(
                     track_count: p.track_count,
                 })
         }
+        "daypart" => {
+            // Singleton like "missing_metadata", but resolved by *prefix*
+            // rather than exact spec match (#223) — the row's spec changes
+            // (new bucket/date/genre) every time the daypart boundary
+            // crosses, and the pin must survive that: it's keyed on
+            // `Playlist.id`, which never changes, not on the spec's content.
+            playlists
+                .iter()
+                .find(|p| {
+                    p.dynamic_enabled
+                        && p.track_count > 0
+                        && p.dynamic_spec
+                            .as_deref()
+                            .is_some_and(|s| s.starts_with("daypart:"))
+                })
+                .map(|p| AutoPlaylistItem {
+                    kind: kind.to_string(),
+                    genre: None,
+                    artist_tag: None,
+                    decade: None,
+                    bpm: None,
+                    playlist_id: Some(p.id),
+                    updated: Some(p.updated),
+                    track_count: p.track_count,
+                })
+        }
         "genre" | "decade" | "bpm" | "artist_tag" => {
             let selector = selector.unwrap_or("").to_string();
             let prefix = match kind {

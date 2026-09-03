@@ -45,7 +45,8 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     WarningIcon as AlertTriangle,
-    ArrowSquareOutIcon as OpenInPicard
+    ArrowSquareOutIcon as OpenInPicard,
+    SunHorizonIcon as SunHorizon
   } from "phosphor-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
@@ -146,14 +147,26 @@
               const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
               return pl?.name || toTitleCase(artistTag || "") || i18n.t("playlists.artistTagAutoPlaylist");
             })()
-          : kind === "no_genre"
+          : kind === "daypart"
+            ? (() => {
+                // The row's own `name` IS the current bucket's mix name
+                // (e.g. "Afternoon Mix") — updated in place by the backend
+                // every time the daypart boundary crosses (#223).
+                const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
+                return pl?.name || i18n.t("playlists.daypartAutoPlaylist");
+              })()
+            : kind === "no_genre"
             ? i18n.t("songTags.noGenre", {}, "No Genre")
             : genre || i18n.t("artistDetail.unknownGenre");
     const suffix = getPopulationModeSuffix(populationMode);
     return suffix ? i18n.t("playlists.populationModeTitleFormat", { base, suffix }) : base;
   });
 
-  let topCovers = $derived((kind === "genre" || kind === "decade" || kind === "bpm" || kind === "no_genre" || kind === "artist_tag") ? songsToCoverStack(songs) : []);
+  let topCovers = $derived(
+    (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "no_genre" || kind === "artist_tag" || kind === "daypart")
+      ? songsToCoverStack(songs)
+      : []
+  );
 
   /** Genre auto-playlist header color (#548): follows the curated tag's own
    * color — a chip's playlist uses its parent card's color — instead of the
@@ -173,7 +186,11 @@
   });
 
   let updatedLabel = $derived.by(() => {
-    if ((kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata") || updated === undefined) return null;
+    if (
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "daypart") ||
+      updated === undefined
+    )
+      return null;
     return new Date(updated * 1000).toLocaleDateString();
   });
 
@@ -186,7 +203,7 @@
   });
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata") && pid !== undefined) {
+    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "daypart") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
     }
@@ -570,7 +587,7 @@
           </div>
         </div>
 
-        {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag") && playlistId !== undefined}
+        {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "daypart") && playlistId !== undefined}
           <div class="flex flex-wrap items-center gap-2.5 mt-2.5 select-none relative z-40">
             <!-- Queue population mode tabs (#120): what bias to (re)populate this auto-playlist with -->
             <PopulationModeTabs
@@ -598,6 +615,10 @@
           </div>
         {:else if (kind === "decade" || kind === "bpm") && topCovers.length > 0}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br {kind === 'decade' ? 'from-[#2563EB]/25 to-[#38BDF8]/15 border-[#38BDF8]/30 shadow-[0_0_28px_3px_rgba(56,189,248,0.4)]' : 'from-[#C026D3]/25 to-[#E879F9]/15 border-[#E879F9]/30 shadow-[0_0_28px_3px_rgba(232,121,249,0.4)]'} flex items-center justify-center overflow-hidden border relative">
+            <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
+          </div>
+        {:else if kind === "daypart" && topCovers.length > 0}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)] flex items-center justify-center overflow-hidden border relative">
             <CoverStack covers={topCovers} sizeClass="w-[82%] h-[82%]" />
           </div>
         {:else if kind === "no_genre" && topCovers.length > 0}
@@ -639,6 +660,10 @@
         {:else if kind === "missing_metadata"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
             <AlertTriangle class="w-16 h-16 text-amber-500" />
+          </div>
+        {:else if kind === "daypart"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)]">
+            <SunHorizon class="w-16 h-16 text-[#2DD4BF]" />
           </div>
         {:else}
           <div
@@ -767,7 +792,7 @@
       disabled={loading || songs.length === 0}
     />
 
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata") && playlistId !== undefined}
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "daypart") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}

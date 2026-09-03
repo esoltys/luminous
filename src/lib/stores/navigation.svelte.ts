@@ -21,7 +21,8 @@ export interface AutoPlaylistRef {
     | "bpm"
     | "no_genre"
     | "artist_tag"
-    | "missing_metadata";
+    | "missing_metadata"
+    | "daypart";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way
    * (see `viewGenreTag`). */

@@ -14,6 +14,7 @@
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { getDaypartBucket } from "../utils/daypart";
 
   let topArtists = $state<ArtistItem[]>([]);
   let topAlbums = $state<HomeItem[]>([]);
@@ -39,11 +40,12 @@
   }
 
   function getTimeOfDayGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return i18n.t("home.greetingMorning");
-    if (hour >= 12 && hour < 17) return i18n.t("home.greetingAfternoon");
-    if (hour >= 17 && hour < 21) return i18n.t("home.greetingEvening");
-    return i18n.t("home.greetingNight");
+    switch (getDaypartBucket()) {
+      case "morning": return i18n.t("home.greetingMorning");
+      case "afternoon": return i18n.t("home.greetingAfternoon");
+      case "evening": return i18n.t("home.greetingEvening");
+      case "latenight": return i18n.t("home.greetingNight");
+    }
   }
 
   async function loadCuratedData() {

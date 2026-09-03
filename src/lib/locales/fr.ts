@@ -484,6 +484,8 @@ export const fr = {
     artistTagAutoPlaylist: "Tag d'artiste",
     decadeAutoPlaylist: "Décennie",
     bpmAutoPlaylist: "BPM",
+    missingMetadataAutoPlaylist: "Métadonnées manquantes",
+    daypartAutoPlaylist: "Mix du moment",
     bpmDownTempo: "Tempo lent BPM",
     bpmMidTempo: "Tempo moyen BPM",
     bpmUptempo: "Tempo enlevé BPM",
