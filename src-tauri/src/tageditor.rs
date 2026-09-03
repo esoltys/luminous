@@ -320,7 +320,22 @@ fn ensure_writable(path: &Path) {
     if let Ok(meta) = std::fs::metadata(path) {
         let mut perms = meta.permissions();
         if perms.readonly() {
-            perms.set_readonly(false);
+            // `set_readonly(false)` clears the write-protect bit for owner, group,
+            // and other on Unix (making the file world-writable), whereas on
+            // Windows it only toggles the read-only file attribute. Restrict the
+            // Unix case to the owner's write bit to avoid over-widening permissions.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                perms.set_mode(perms.mode() | 0o200);
+            }
+            #[cfg(not(unix))]
+            {
+                // Windows' read-only bit has no world-writable implication, so
+                // clippy's Unix-focused advice doesn't apply on this path.
+                #[allow(clippy::permissions_set_readonly_false)]
+                perms.set_readonly(false);
+            }
             let _ = std::fs::set_permissions(path, perms);
         }
     }
