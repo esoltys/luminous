@@ -24,7 +24,7 @@
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp, Pin, PinOff, AlertTriangle } from "lucide-svelte";
+  import { Clock, Plus, FolderPlus, Music, Gauge, RefreshCw, Heart, Calendar, Hourglass, Search, RotateCcw, RotateCw, MoreHorizontal, X, Eraser, Tag, TrendingUp, Pin, PinOff, AlertTriangle, Disc3 } from "lucide-svelte";
   import { shuffleArray } from "../utils/shuffle";
   import type { PlaylistItem, QueuePopulationMode, Song } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -247,6 +247,15 @@
   async function handleAddSongToPlaylist(songId: number) {
     const songObj = songs.find((s) => s.id === songId);
     await playlistsStore.addSongsToActiveTarget([songId], songObj?.title || "Song");
+  }
+
+  /** Bulk "Open in Picard" from the Missing Metadata playlist's overflow menu
+   * (#367) — the primary entry point for handing everything in the list off
+   * to Picard at once. Opens just the current selection if any songs are
+   * selected, otherwise every song in the list. */
+  function handleOpenAllInPicard() {
+    const ids = selectedKeys.size > 0 ? Array.from(selectedKeys, Number) : songs.map((s) => s.id);
+    openInPicard(ids);
   }
 
   async function handleAddAllToPlaylist() {
@@ -741,6 +750,18 @@
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
         onclick={() => { handleRefreshAutoPlaylist(); overflowMenuPos = null; }}
         disabled={loading || isRefreshing}
+      />
+    {/if}
+
+    {#if kind === "missing_metadata"}
+      <ContextMenuDivider />
+      <ContextMenuItem
+        icon={Disc3}
+        label={selectedKeys.size > 0
+          ? i18n.t("picard.openSelectedInPicard", { count: selectedKeys.size })
+          : i18n.t("picard.openAllInPicard")}
+        onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
+        disabled={loading || songs.length === 0}
       />
     {/if}
 

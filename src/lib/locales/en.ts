@@ -979,7 +979,9 @@ export const en = {
     close: "Close"
   },
   picard: {
-    openInPicard: "Open in Picard"
+    openInPicard: "Open in Picard",
+    openAllInPicard: "Open All in Picard",
+    openSelectedInPicard: "Open {count} in Picard"
   },
   smartPlaylistBuilder: {
     fallbackName: "Smart Playlist",
