@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ComponentType, SvelteComponent } from "svelte";
+  import type { Component } from "svelte";
 
   interface Props {
-    icon: ComponentType<SvelteComponent<{ class?: string }>>;
+    icon: Component<{ class?: string }>;
     title: string;
     subtitle?: string;
     /** Whether the icon plays its bounce/pulse animation. */

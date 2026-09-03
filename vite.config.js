@@ -78,15 +78,17 @@ export default defineConfig(async () => ({
   // arbitrary views) never hits that reload.
   optimizeDeps: {
     include: [
-      "lucide-svelte",
+      "phosphor-svelte",
       "@tauri-apps/api/core",
       "@tauri-apps/api/event",
       "@tauri-apps/api/window",
+      "@tauri-apps/api/webview",
       "@tauri-apps/api/app",
       "@tauri-apps/plugin-dialog",
       "@tauri-apps/plugin-opener",
       "@tauri-apps/plugin-updater",
       "@tauri-apps/plugin-process",
+      "simple-icons",
       "svelte-virtual-list-ts",
     ],
   },

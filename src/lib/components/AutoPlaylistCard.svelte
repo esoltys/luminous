@@ -1,6 +1,17 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { ListMusic, Heart, Clock, Hourglass, Calendar, Music, Gauge, Tag, TrendingUp, AlertTriangle } from "lucide-svelte";
+  import {
+    PlaylistIcon as ListMusic,
+    HeartIcon as Heart,
+    ClockIcon as Clock,
+    HourglassIcon as Hourglass,
+    CalendarIcon as Calendar,
+    MusicNotesIcon as Music,
+    GaugeIcon as Gauge,
+    TagIcon as Tag,
+    TrendUpIcon as TrendingUp,
+    WarningIcon as AlertTriangle
+  } from "phosphor-svelte";
   import CardBadge from "./CardBadge.svelte";
   import type { PlaylistItem, Song } from "../types";
   import { songsToCoverStack } from "../utils/covers";

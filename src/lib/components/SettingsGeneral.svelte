@@ -8,7 +8,15 @@
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Button from "./Button.svelte";
-  import { Settings, Check, RefreshCw, ArrowUp, Download, AlertTriangle, Package } from "lucide-svelte";
+  import {
+    GearIcon as Settings,
+    CheckIcon as Check,
+    ArrowsClockwiseIcon as RefreshCw,
+    ArrowUpIcon as ArrowUp,
+    DownloadSimpleIcon as Download,
+    WarningIcon as AlertTriangle,
+    PackageIcon as Package
+  } from "phosphor-svelte";
 
   const COPY_FEEDBACK_DURATION_MS = 1500;
 

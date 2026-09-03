@@ -24,7 +24,13 @@
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import { Plus, Edit3, RefreshCw, Pin, PinOff } from "lucide-svelte";
+  import {
+    PlusIcon as Plus,
+    PencilSimpleIcon as Edit3,
+    ArrowsClockwiseIcon as RefreshCw,
+    PushPinIcon as Pin,
+    PushPinSlashIcon as PinOff
+  } from "phosphor-svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";

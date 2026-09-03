@@ -11,20 +11,20 @@
   import SongRating from "./SongRating.svelte";
   import { isLinux } from "../platform";
   import {
-    Play,
-    Pause,
-    SkipBack,
-    SkipForward,
-    Shuffle,
-    Repeat,
-    Maximize2,
-    Volume2,
-    VolumeX,
-    DiscAlbum,
-    Mic2,
-    ListMusic,
-    Music
-  } from "lucide-svelte";
+    PlayIcon as Play,
+    PauseIcon as Pause,
+    SkipBackIcon as SkipBack,
+    SkipForwardIcon as SkipForward,
+    ShuffleIcon as Shuffle,
+    RepeatIcon as Repeat,
+    CornersOutIcon as Maximize2,
+    SpeakerHighIcon as Volume2,
+    SpeakerSimpleSlashIcon as VolumeX,
+    DiscIcon as DiscAlbum,
+    MicrophoneStageIcon as Mic2,
+    PlaylistIcon as ListMusic,
+    MusicNotesIcon as Music
+  } from "phosphor-svelte";
 
   // Volume slider gradient style (mirrors PlayerBar.svelte's volume control)
   let volumePercent = $derived(playerStore.volume * 100);
@@ -73,7 +73,7 @@
   // disambiguate modes that would otherwise share the same base icon (e.g.
   // "Shuffle Albums" and "Shuffle Inside Album" both pair with DiscAlbum) —
   // rendered full-size next to the icon rather than as a tiny overlay badge,
-  // so it stays legible. Reuses the same Lucide icons as the rest of the app.
+  // so it stays legible. Reuses the same Phosphor icons as the rest of the app.
   function shuffleTypeIcon(mode: import("../types").ShuffleMode) {
     switch (mode) {
       case "inside_album": return DiscAlbum;

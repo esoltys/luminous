@@ -5,7 +5,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { portal } from "../utils/portal";
   import { SONG_TABLE_COLUMNS } from "../utils/songColumns";
-  import { Columns } from "lucide-svelte";
+  import { TableIcon as Columns } from "phosphor-svelte";
 
   interface Props {
     align?: "left" | "right";

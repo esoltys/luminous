@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { Info } from "lucide-svelte";
+  import { InfoIcon as Info } from "phosphor-svelte";
 
   interface Props {
     label: string;

@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { ListMusic, Calendar, Music, Layers, Sparkles } from "lucide-svelte";
+  import {
+    PlaylistIcon as ListMusic,
+    CalendarIcon as Calendar,
+    MusicNotesIcon as Music,
+    StackIcon as Layers,
+    SparkleIcon as Sparkles
+  } from "phosphor-svelte";
   import type { Playlist } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { formatRelativeDate } from "../utils/date";

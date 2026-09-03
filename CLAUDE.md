@@ -31,6 +31,7 @@ A release is only complete when **all three** of the following hold. Never repor
 
 ## GitHub issue/PR body formatting
 - GitHub renders a single `\n` within a paragraph as a hard line break (not CommonMark's soft-wrap-to-space behavior). Never hand-wrap prose paragraphs in an issue/PR body at ~80-100 cols like source code — write each paragraph and each bullet as one unwrapped line, or the rendered body shows spurious mid-sentence line breaks.
+- Epic issues: do not list sub-issues in the description body — GitHub automatically shows them below the description if they are properly added as sub-issues (`gh issue edit <epic-id> --add-sub-issue <ids>`). If there are no related issues, leave the `## Related` section out entirely.
 
 ## Claude Code specifics
 

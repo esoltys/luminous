@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ComponentType, SvelteComponent } from "svelte";
+  import type { Component } from "svelte";
 
   interface Props {
-    icon: ComponentType<SvelteComponent<{ class?: string }>>;
+    icon: Component<{ class?: string }>;
     label: string;
     onclick: () => void;
     /** Highlights the item as the menu's primary action (e.g. Play). */

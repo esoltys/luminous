@@ -11,7 +11,17 @@
   import OrganizeFiles from "./OrganizeFiles.svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { Eraser, Sparkles, Check, Eye, EyeOff, Disc3, AlertTriangle, RefreshCw, FolderOpen } from "lucide-svelte";
+  import {
+    EraserIcon as Eraser,
+    SparkleIcon as Sparkles,
+    CheckIcon as Check,
+    EyeIcon as Eye,
+    EyeSlashIcon as EyeOff,
+    AppWindowIcon as PicardIcon,
+    WarningIcon as AlertTriangle,
+    ArrowsClockwiseIcon as RefreshCw,
+    FolderOpenIcon as FolderOpen
+  } from "phosphor-svelte";
 
   const PRUNE_MESSAGE_DURATION_MS = 8000;
 
@@ -84,7 +94,7 @@
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
       <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Disc3 class="w-5 h-5" />
+        <PicardIcon class="w-5 h-5" />
       </div>
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>

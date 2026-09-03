@@ -38,7 +38,18 @@
   import CoverArt from "./CoverArt.svelte";
   import NowPlayingBars from "./NowPlayingBars.svelte";
   import EmptyState from "./EmptyState.svelte";
-  import { Play, Plus, Edit3, Trash2, GripVertical, AlertTriangle, Music, Clock, DiscAlbum, Disc3 } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    PlusIcon as Plus,
+    PencilSimpleIcon as Edit3,
+    TrashIcon as Trash2,
+    DotsSixVerticalIcon as GripVertical,
+    WarningIcon as AlertTriangle,
+    MusicNotesIcon as Music,
+    ClockIcon as Clock,
+    DiscIcon as DiscAlbum,
+    ArrowSquareOutIcon as OpenInPicard
+  } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
 
@@ -588,7 +599,7 @@
           disabled={!picardStore.available}
           title={picardStore.available ? i18n.t("picard.openInPicard") : i18n.t("picard.notFoundTooltip")}
         >
-          <Disc3 class="w-4 h-4" />
+          <OpenInPicard class="w-4 h-4" />
         </button>
       {/if}
       {#if onRemoveFromPlaylist}

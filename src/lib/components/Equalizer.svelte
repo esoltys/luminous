@@ -3,7 +3,11 @@
   import { onMount } from "svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { loudnessStore } from "../stores/loudness.svelte";
-  import { Sliders, Activity, ArrowLeftRight } from "lucide-svelte";
+  import {
+    SlidersIcon as Sliders,
+    PulseIcon as Activity,
+    ArrowsLeftRightIcon as ArrowLeftRight
+  } from "phosphor-svelte";
   import Toggle from "./Toggle.svelte";
   import Select from "./Select.svelte";
   import Knob from "./Knob.svelte";

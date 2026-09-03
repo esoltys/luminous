@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { Play, Trash2, Mic2, DiscAlbum, Edit3, Disc3 } from "lucide-svelte";
+  import {
+    PlayIcon as Play,
+    TrashIcon as Trash2,
+    MicrophoneStageIcon as Mic2,
+    DiscIcon as DiscAlbum,
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import ContextMenu from "./ContextMenu.svelte";
@@ -75,7 +82,7 @@
   {#if onOpenInPicard}
     <ContextMenuDivider />
     <ContextMenuItem
-      icon={Disc3}
+      icon={OpenInPicard}
       label={i18n.t("picard.openInPicard")}
       onclick={() => { onOpenInPicard?.(); onClose(); }}
       disabled={!picardStore.available}

@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { Pencil, ArrowUpToLine, Trash2 } from "lucide-svelte";
+  import {
+    PencilSimpleIcon as Pencil,
+    ArrowLineUpIcon as ArrowUpToLine,
+    TrashIcon as Trash2
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";

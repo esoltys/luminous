@@ -5,7 +5,13 @@
   import { onDestroy } from "svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
-  import { Palette, Trash2, RotateCcw, Sun, Moon } from "lucide-svelte";
+  import {
+    PaletteIcon as Palette,
+    TrashIcon as Trash2,
+    ArrowCounterClockwiseIcon as RotateCcw,
+    SunIcon as Sun,
+    MoonIcon as Moon
+  } from "phosphor-svelte";
 
   let editingThemeId = $state<string | null>(null);
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Play, Plus } from "lucide-svelte";
+  import { PlayIcon as Play, PlusIcon as Plus } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";

@@ -10,10 +10,9 @@ labels: []
 
 This issue tracks the overall effort at a glance. Implementation detail lives in the sub-issues below, not here.
 
-## Sub-issues
-<!-- Checklist of the issues that make up this epic. Check off closed ones; leave open ones unchecked. -->
+<!-- Note: Do NOT list sub-issues in the description body — GitHub automatically displays them below the description if they are properly added as sub-issues (e.g. `gh issue edit <epic-id> --add-sub-issue <id1>,<id2>...` or via the GitHub web UI). -->
 
-- [ ] #0 — <!-- short description -->
-
+<!-- Optional: If there are adjacent issues that inform or overlap with this epic but aren't part of its scope, include a ## Related section below. If there are no related issues, leave the section out entirely.
 ## Related
-<!-- Optional: adjacent issues that inform or overlap with this epic but aren't part of its scope. -->
+- #0 — short description
+-->
