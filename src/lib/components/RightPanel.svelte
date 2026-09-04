@@ -105,43 +105,6 @@
        above the dock instead of running the full sidebar height behind it. -->
   <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
-      <div class="space-y-2">
-        {#if currentSong.filetype}
-          <div class="flex items-start justify-between gap-3 text-xs">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
-            <span class="text-brand-text-primary uppercase text-right break-words min-w-0">{currentSong.filetype}</span>
-          </div>
-        {/if}
-        {#if currentSong.bitrate}
-          <div class="flex items-start justify-between gap-3 text-xs">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
-            <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps{currentSong.is_vbr ? ` (${i18n.t('playerBar.bitrateVbrSuffix', {}, 'avg')})` : ''}</span>
-          </div>
-        {/if}
-        {#if currentSong.samplerate}
-          <div class="flex items-start justify-between gap-3 text-xs">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
-            <span class="text-brand-text-primary text-right break-words min-w-0">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
-          </div>
-        {/if}
-        {#if currentSong.channels}
-          <div class="flex items-start justify-between gap-3 text-xs">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.channelsLabel', {}, 'Channels')}</span>
-            <span class="text-brand-text-primary text-right break-words min-w-0">{formatChannels(currentSong.channels)}</span>
-          </div>
-        {/if}
-        {#if playerStore.loudnessSource !== "disabled"}
-          <div class="flex items-start justify-between gap-3 text-xs">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
-            <span class="text-brand-text-primary text-right break-words min-w-0">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
-          </div>
-        {/if}
-        <div class="flex items-start justify-between gap-3 text-xs">
-          <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
-          <span class="text-brand-text-primary text-right break-words min-w-0">{lyricsStatusLabel()}</span>
-        </div>
-      </div>
-
       <div class="space-y-2 text-xs">
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
@@ -189,6 +152,43 @@
           {/each}
         </div>
       {/if}
+
+      <div class="space-y-2">
+        {#if currentSong.filetype}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.formatLabel', {}, 'Format')}</span>
+            <span class="text-brand-text-primary uppercase text-right break-words min-w-0">{currentSong.filetype}</span>
+          </div>
+        {/if}
+        {#if currentSong.bitrate}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.bitrateLabel', {}, 'Bitrate')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{currentSong.bitrate} kbps{currentSong.is_vbr ? ` (${i18n.t('playerBar.bitrateVbrSuffix', {}, 'avg')})` : ''}</span>
+          </div>
+        {/if}
+        {#if currentSong.samplerate}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.sampleRateLabel', {}, 'Sample Rate')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{(currentSong.samplerate / 1000).toFixed(1)} kHz</span>
+          </div>
+        {/if}
+        {#if currentSong.channels}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.channelsLabel', {}, 'Channels')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{formatChannels(currentSong.channels)}</span>
+          </div>
+        {/if}
+        {#if playerStore.loudnessSource !== "disabled"}
+          <div class="flex items-start justify-between gap-3 text-xs">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.loudnessLabel', {}, 'Loudness')}</span>
+            <span class="text-brand-text-primary text-right break-words min-w-0">{loudnessSourceLabel()}{loudnessGainText ? ` · ${loudnessGainText}` : ""}</span>
+          </div>
+        {/if}
+        <div class="flex items-start justify-between gap-3 text-xs">
+          <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
+          <span class="text-brand-text-primary text-right break-words min-w-0">{lyricsStatusLabel()}</span>
+        </div>
+      </div>
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />
