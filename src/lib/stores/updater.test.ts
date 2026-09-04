@@ -8,7 +8,8 @@ function fakeUpdate(overrides: Partial<{ version: string }> = {}) {
   return {
     version: overrides.version ?? "1.2.3",
     currentVersion: "1.0.0",
-    downloadAndInstall: vi.fn().mockResolvedValue(undefined),
+    download: vi.fn().mockResolvedValue(undefined),
+    install: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
   } as any;
 }
@@ -115,7 +116,7 @@ describe("UpdaterStore", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(update.downloadAndInstall).toHaveBeenCalled();
+    expect(update.download).toHaveBeenCalled();
   });
 
   it("does not auto-install when the format does not support self-update", async () => {
@@ -127,16 +128,18 @@ describe("UpdaterStore", () => {
     await updaterStore.checkForUpdates();
     await Promise.resolve();
 
-    expect(update.downloadAndInstall).not.toHaveBeenCalled();
+    expect(update.download).not.toHaveBeenCalled();
   });
 
-  it("downloadAndInstall transitions to ready-to-restart on success", async () => {
+  it("downloadAndInstall downloads only (not install) and transitions to ready-to-restart on success", async () => {
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
 
     await updaterStore.checkForUpdates();
     await updaterStore.downloadAndInstall();
 
+    expect(update.download).toHaveBeenCalled();
+    expect(update.install).not.toHaveBeenCalled();
     expect(updaterStore.installStatus).toBe("ready-to-restart");
   });
 
@@ -161,7 +164,7 @@ describe("UpdaterStore", () => {
       expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function) });
     });
 
-    it("wires the toast's restart action to restartNow()", async () => {
+    it("wires the toast's restart action to restartNow(), which installs then relaunches", async () => {
       const showSpy = vi.spyOn(toastStore, "show");
       const update = fakeUpdate({ version: "2.0.0" });
       vi.mocked(check).mockResolvedValueOnce(update);
@@ -172,13 +175,26 @@ describe("UpdaterStore", () => {
       const action = showSpy.mock.calls[0][4];
       action!.onClick();
       await Promise.resolve();
+      await Promise.resolve();
 
+      expect(update.install).toHaveBeenCalled();
       expect(relaunch).toHaveBeenCalled();
     });
   });
 
   it("restartNow calls relaunch", async () => {
     await updaterStore.restartNow();
+    expect(relaunch).toHaveBeenCalled();
+  });
+
+  it("restartNow installs the pending update before relaunching", async () => {
+    const update = fakeUpdate({ version: "2.0.0" });
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+
+    await updaterStore.restartNow();
+
+    expect(update.install).toHaveBeenCalled();
     expect(relaunch).toHaveBeenCalled();
   });
 

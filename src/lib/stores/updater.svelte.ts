@@ -225,7 +225,14 @@ class UpdaterStore {
     this.errorMessage = null;
 
     try {
-      await this.pendingUpdate.downloadAndInstall((event) => {
+      // Deliberately `download()` only, not `downloadAndInstall()`: on Windows the
+      // native install step exits the process synchronously (`std::process::exit(0)`
+      // inside the plugin's Rust installer call) before this promise could ever
+      // resolve, so `installStatus` would never reach "ready-to-restart" and the
+      // user would never see a restart prompt — the update would silently install
+      // and relaunch the app out from under them. Installing is deferred to
+      // `restartNow()`, run only once the user acts on the prompt.
+      await this.pendingUpdate.download((event) => {
         switch (event.event) {
           case "Started":
             this.downloadProgress = { downloaded: 0, total: event.data.contentLength ?? null };
@@ -262,6 +269,13 @@ class UpdaterStore {
 
   async restartNow() {
     try {
+      // `install()` performs the actual file replacement. On Windows this exits the
+      // current process itself and the installer relaunches the app, so `relaunch()`
+      // below is unreachable there; on macOS/Linux `install()` just swaps files and
+      // relaunch() is what actually restarts the app.
+      if (this.pendingUpdate) {
+        await this.pendingUpdate.install();
+      }
       await relaunch();
     } catch (err) {
       console.error("Failed to restart for update:", err);
