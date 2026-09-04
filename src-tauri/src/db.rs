@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 20;
+pub const CURRENT_SCHEMA_VERSION: i32 = 24;
 
 struct Migration {
     version: i32,
@@ -130,6 +130,27 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_genresort {
                 conn.execute_batch(MIGRATION_20)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        // Several other in-flight worktrees on this machine already claim
+        // schema versions 21-23 for unrelated changes, and all worktrees'
+        // dev builds share one app-data DB (same tauri.conf.json
+        // `identifier`) — picking 21 here got silently skipped against that
+        // shared DB once one of those other builds ran first and recorded a
+        // higher version. 24 is clear of every sibling worktree's version as
+        // of this writing; whichever of these PRs merges to main first keeps
+        // its number, and the others get renumbered in a rebase.
+        version: 24,
+        description: "release type/country/barcode/catalog number columns on songs table (#752)",
+        apply: |conn| {
+            let has_release_type: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'musicbrainz_release_type'")?
+                .exists([])?;
+            if !has_release_type {
+                conn.execute_batch(MIGRATION_24)?;
             }
             Ok(())
         },
@@ -621,6 +642,18 @@ WHERE dynamic_enabled = 1
 // ---------------------------------------------------------------------------
 const MIGRATION_20: &str = "
 ALTER TABLE songs ADD COLUMN genresort TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 24: release type/country/barcode/catalog number columns (#752).
+// Adjacent to the MusicBrainz IDs but not IDs themselves — descriptive
+// release metadata Picard writes alongside them.
+// ---------------------------------------------------------------------------
+const MIGRATION_24: &str = "
+ALTER TABLE songs ADD COLUMN musicbrainz_release_type TEXT;
+ALTER TABLE songs ADD COLUMN musicbrainz_release_country TEXT;
+ALTER TABLE songs ADD COLUMN barcode TEXT;
+ALTER TABLE songs ADD COLUMN catalog_number TEXT;
 ";
 
 // ---------------------------------------------------------------------------

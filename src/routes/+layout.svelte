@@ -84,6 +84,7 @@
           windowLayoutStore.toggleImmersiveMode();
           break;
         case '3':
+        case 'i':
           e.preventDefault();
           windowLayoutStore.toggleRightPanel();
           break;

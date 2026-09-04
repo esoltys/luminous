@@ -66,6 +66,25 @@
     return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
   });
 
+  /** Descriptive release metadata Picard writes alongside the MusicBrainz
+      IDs, but not IDs themselves — no entity page to link to, so these
+      render as plain text rows rather than clickable rows like `musicbrainzRows`. */
+  const musicbrainzMetaRows = $derived.by(() => {
+    if (!currentSong) return [];
+    const entries: { label: string; value?: string }[] = [
+      {
+        label: i18n.t('playerBar.musicbrainzReleaseTypeLabel', {}, 'Type'),
+        value: currentSong.musicbrainz_release_type
+          ? currentSong.musicbrainz_release_type.charAt(0).toUpperCase() + currentSong.musicbrainz_release_type.slice(1)
+          : undefined,
+      },
+      { label: i18n.t('playerBar.musicbrainzReleaseCountryLabel', {}, 'Country'), value: currentSong.musicbrainz_release_country },
+      { label: i18n.t('playerBar.barcodeLabel', {}, 'Barcode'), value: currentSong.barcode },
+      { label: i18n.t('playerBar.catalogNumberLabel', {}, 'Catalog #'), value: currentSong.catalog_number },
+    ];
+    return entries.filter((e): e is { label: string; value: string } => !!e.value);
+  });
+
   function formatChannels(channels?: number): string {
     if (!channels) return "";
     if (channels === 1) return i18n.t('playerBar.channelsMono', {}, 'Mono');
@@ -80,7 +99,11 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
+  <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
+       the bottom of the app on top of this panel — a bottom *margin* (rather than
+       inner padding) actually shrinks this div's own box, so its scrollbar ends
+       above the dock instead of running the full sidebar height behind it. -->
+  <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <div class="space-y-2">
         {#if currentSong.filetype}
@@ -142,7 +165,7 @@
         {/if}
       </div>
 
-      {#if musicbrainzRows.length > 0}
+      {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0}
         <div class="space-y-2 text-xs">
           <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
           {#each musicbrainzRows as row (row.label)}
@@ -156,6 +179,12 @@
                 <row.icon size={12} class="shrink-0" />
                 <span>{row.name || row.id}</span>
               </button>
+            </div>
+          {/each}
+          {#each musicbrainzMetaRows as row (row.label)}
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+              <span class="text-brand-text-secondary text-right break-words min-w-0">{row.value}</span>
             </div>
           {/each}
         </div>

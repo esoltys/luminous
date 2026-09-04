@@ -1002,6 +1002,39 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
                 .get_string(ItemKey::MusicBrainzWorkId)
                 .map(|s| s.to_string());
         }
+
+        // AcoustID fingerprint match (written by Luminous's own AcoustID lookup
+        // flow in tageditor.rs, or by another tagger) — same dead-columns bug
+        // as the MusicBrainz IDs above (#752).
+        if song.acoustid_id.is_none() {
+            song.acoustid_id = tag.get_string(ItemKey::AcoustId).map(|s| s.to_string());
+        }
+        if song.acoustid_fingerprint.is_none() {
+            song.acoustid_fingerprint = tag
+                .get_string(ItemKey::AcoustIdFingerprint)
+                .map(|s| s.to_string());
+        }
+
+        // Release metadata Picard writes alongside the MusicBrainz IDs, but
+        // not IDs themselves (#752).
+        if song.musicbrainz_release_type.is_none() {
+            song.musicbrainz_release_type = tag
+                .get_string(ItemKey::MusicBrainzReleaseType)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_release_country.is_none() {
+            song.musicbrainz_release_country = tag
+                .get_string(ItemKey::ReleaseCountry)
+                .map(|s| s.to_string());
+        }
+        if song.barcode.is_none() {
+            song.barcode = tag.get_string(ItemKey::Barcode).map(|s| s.to_string());
+        }
+        if song.catalog_number.is_none() {
+            song.catalog_number = tag
+                .get_string(ItemKey::CatalogNumber)
+                .map(|s| s.to_string());
+        }
     }
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
@@ -1145,6 +1178,12 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     musicbrainz_recording_id=excluded.musicbrainz_recording_id,
                     musicbrainz_track_id=excluded.musicbrainz_track_id,
                     musicbrainz_work_id=excluded.musicbrainz_work_id,
+                    acoustid_id=excluded.acoustid_id,
+                    acoustid_fingerprint=excluded.acoustid_fingerprint,
+                    musicbrainz_release_type=excluded.musicbrainz_release_type,
+                    musicbrainz_release_country=excluded.musicbrainz_release_country,
+                    barcode=excluded.barcode,
+                    catalog_number=excluded.catalog_number,
                     unavailable=0",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
         ),
@@ -1194,6 +1233,12 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.musicbrainz_recording_id,
             song.musicbrainz_track_id,
             song.musicbrainz_work_id,
+            song.acoustid_id,
+            song.acoustid_fingerprint,
+            song.musicbrainz_release_type,
+            song.musicbrainz_release_country,
+            song.barcode,
+            song.catalog_number,
         ],
     )?;
     Ok(())
@@ -1253,7 +1298,8 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     is_vbr, is_instrumental, added,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id
+    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
+    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -1279,9 +1325,10 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.is_vbr, s.is_instrumental, s.added,
     s.musicbrainz_artist_id, s.musicbrainz_album_artist_id, s.musicbrainz_album_id,
     s.musicbrainz_release_group_id, s.musicbrainz_recording_id, s.musicbrainz_track_id,
-    s.musicbrainz_work_id";
+    s.musicbrainz_work_id, s.acoustid_id, s.acoustid_fingerprint,
+    s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 64;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 70;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -1292,11 +1339,12 @@ const SONG_INSERT_COLS: &str = "
     replaygain_track_gain, replaygain_album_gain, is_vbr,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id
+    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
+    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -1377,6 +1425,12 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         musicbrainz_recording_id: row.get(col(61))?,
         musicbrainz_track_id: row.get(col(62))?,
         musicbrainz_work_id: row.get(col(63))?,
+        acoustid_id: row.get(col(64))?,
+        acoustid_fingerprint: row.get(col(65))?,
+        musicbrainz_release_type: row.get(col(66))?,
+        musicbrainz_release_country: row.get(col(67))?,
+        barcode: row.get(col(68))?,
+        catalog_number: row.get(col(69))?,
         ..Default::default()
     })
 }
@@ -1631,6 +1685,74 @@ mod tests {
             song.musicbrainz_album_artist_id.as_deref(),
             Some("album-artist-uuid")
         );
+    }
+
+    /// Unlike the three MusicBrainz release/release-group/track keys above,
+    /// `AcoustId`/`AcoustIdFingerprint` *are* on lofty's ID3v2 TXXX write
+    /// allowlist, so this exercises the full `write_tags()` -> `read_tags()`
+    /// round trip directly rather than hand-poking the tag (#752).
+    #[test]
+    fn test_write_tags_then_read_tags_acoustid_round_trip() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                acoustid_id: Some("acoustid-uuid"),
+                acoustid_fingerprint: Some("AQADtEmI"),
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.acoustid_id.as_deref(), Some("acoustid-uuid"));
+        assert_eq!(song.acoustid_fingerprint.as_deref(), Some("AQADtEmI"));
+    }
+
+    /// `write_tags()` has no support for these (Luminous's tag editor doesn't
+    /// expose them for editing), so — like the MusicBrainz IDs test above —
+    /// this hand-inserts the tag items directly to simulate a file already
+    /// tagged by Picard, and only exercises `read_tags()` (#752).
+    #[test]
+    fn test_read_tags_release_metadata_round_trip() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let mut tagged_file = Probe::open(&path)
+            .expect("probe")
+            .read()
+            .expect("read tagged file");
+        let tag = tagged_file.primary_tag_mut().expect("primary tag");
+        tag.insert_text(ItemKey::MusicBrainzReleaseType, "album".to_string());
+        tag.insert_text(ItemKey::ReleaseCountry, "JP".to_string());
+        tag.insert_text(ItemKey::Barcode, "4988011329586".to_string());
+        tag.insert_text(ItemKey::CatalogNumber, "PHCR-1144".to_string());
+        tagged_file
+            .save_to_path(&path, lofty::config::WriteOptions::default())
+            .expect("save tagged file");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.musicbrainz_release_type.as_deref(), Some("album"));
+        assert_eq!(song.musicbrainz_release_country.as_deref(), Some("JP"));
+        assert_eq!(song.barcode.as_deref(), Some("4988011329586"));
+        assert_eq!(song.catalog_number.as_deref(), Some("PHCR-1144"));
     }
 
     #[test]

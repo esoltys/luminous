@@ -421,7 +421,7 @@
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
           onclick={() => windowLayoutStore.toggleRightPanel()}
-          class="flex items-center justify-center transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-accent-text'}"
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''}"
           title={i18n.t('topNav.toggleRightPanel')}
         >
           <Info class="w-5 h-5" />

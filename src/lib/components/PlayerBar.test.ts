@@ -334,7 +334,7 @@ describe("PlayerBar.svelte", () => {
     windowLayoutStore.rightPanelOpen = false;
     const { getByTitle } = render(PlayerBar);
 
-    const infoBtn = getByTitle("Show Info Panel");
+    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
     await fireEvent.click(infoBtn);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
@@ -344,11 +344,11 @@ describe("PlayerBar.svelte", () => {
     windowLayoutStore.viewportWidth = 1280;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
     const { queryByTitle } = render(PlayerBar);
-    expect(queryByTitle("Show Info Panel")).not.toBeNull();
+    expect(queryByTitle("Show Info Panel (Ctrl+I)")).not.toBeNull();
 
     windowLayoutStore.viewportWidth = 800;
     expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
     const { queryByTitle: queryByTitleNarrow } = render(PlayerBar);
-    expect(queryByTitleNarrow("Show Info Panel")).toBeNull();
+    expect(queryByTitleNarrow("Show Info Panel (Ctrl+I)")).toBeNull();
   });
 });

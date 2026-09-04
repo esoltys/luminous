@@ -249,6 +249,13 @@ pub struct Song {
     pub musicbrainz_release_group_id: Option<String>,
     pub musicbrainz_work_id: Option<String>,
 
+    // Release metadata adjacent to the MusicBrainz IDs, but not IDs
+    // themselves — descriptive fields Picard writes alongside them (#752).
+    pub musicbrainz_release_type: Option<String>,
+    pub musicbrainz_release_country: Option<String>,
+    pub barcode: Option<String>,
+    pub catalog_number: Option<String>,
+
     // EBU R128 loudness
     pub ebur128_integrated_loudness_lufs: Option<f64>,
     pub ebur128_loudness_range_lu: Option<f64>,
