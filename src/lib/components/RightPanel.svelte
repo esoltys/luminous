@@ -103,7 +103,7 @@
        the bottom of the app on top of this panel — a bottom *margin* (rather than
        inner padding) actually shrinks this div's own box, so its scrollbar ends
        above the dock instead of running the full sidebar height behind it. -->
-  <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
+  <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
       <div class="space-y-2">
         {#if currentSong.filetype}
