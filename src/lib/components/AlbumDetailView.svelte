@@ -10,6 +10,7 @@
   import { pinnedStore } from "../stores/pinned.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import CoverArt from "./CoverArt.svelte";
+  import CoverStack from "./CoverStack.svelte";
   import SongRating from "./SongRating.svelte";
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
@@ -100,6 +101,11 @@
   let albumItem = $derived(
     collectionStore.albums.find((a) => a.album === albumName) || null
   );
+
+  /** Any one track's id, used to look up extended local artwork (#98/#760)
+   * for this album's directory — there's no dedicated album id in the
+   * schema (see #758), so a representative song stands in for one. */
+  let representativeSongId = $derived(songs[0]?.id);
 
   let artistName = $derived.by(() => {
     if (albumItem?.artist) return albumItem.artist;
@@ -459,11 +465,13 @@
       {#if !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="relative w-40 h-40 hidden sm:block shrink-0">
         <div class="absolute inset-0 overflow-hidden border border-brand-border/60 shadow-2xl">
-          <CoverArt
-            songId={undefined}
-            artEmbedded={albumItem?.art_embedded}
-            artAutomatic={albumItem?.art_automatic}
-            artManual={albumItem?.art_manual}
+          <CoverStack
+            covers={[{
+              artEmbedded: albumItem?.art_embedded,
+              artAutomatic: albumItem?.art_automatic,
+              artManual: albumItem?.art_manual,
+            }]}
+            extendedArtworkSongId={representativeSongId}
             sizeClass="w-full h-full object-cover"
           />
           {#if albumItem && albumItem.rating === 5}

@@ -891,6 +891,8 @@ export const en = {
     scrollLeft: "Scroll left",
     scrollRight: "Scroll right",
     albumArtAlt: "Album Art",
+    openImages: "Open images",
+    openImagesCount: "Open {count} images",
     enableLogoPulse: "Click to enable logo pulsing",
     disableLogoPulse: "Click to disable logo pulsing",
     toggleLogoPulsing: "Toggle Luminous logo pulsing",

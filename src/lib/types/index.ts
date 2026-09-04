@@ -440,6 +440,24 @@ export function resolveArtUrl(art: string | null | undefined): string | null {
   return getCoverArtUrl(`luminous-art://local/${art}`);
 }
 
+/**
+ * Extracts the raw filesystem path from a `luminous-art://local/...` URI —
+ * the reverse of `local_artwork_uri()` in covermanager.rs. Extended artwork
+ * URIs (#98) are always in this form, since `scan_extended_artwork` only
+ * ever returns absolute filesystem paths. Returns null for any other URI
+ * shape (e.g. a cached `luminous-art://album-....jpg` single-cover URI,
+ * which has no real folder path for the OS image viewer to open).
+ */
+export function extractLocalArtworkPath(uri: string | null | undefined): string | null {
+  if (!uri) return null;
+  const prefix = "luminous-art://local/";
+  if (!uri.startsWith(prefix)) return null;
+  // Not percent-decoded: `local_artwork_uri()` in covermanager.rs writes the
+  // path unencoded (see its doc comment), so this is the exact inverse —
+  // decoding here would wrongly throw on a path containing a literal '%'.
+  return uri.slice(prefix.length);
+}
+
 export type HomeItem =
   | { type: "song"; song: Song }
   | { type: "album"; album: AlbumItem; chart?: TopAlbumChartInfo }
