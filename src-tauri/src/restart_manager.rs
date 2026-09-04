@@ -44,6 +44,63 @@ pub fn should_notify_update(format: &str, stored: Option<&str>, current: &str) -
     format == "msix" && stored.is_some_and(|s| s != current)
 }
 
+/// Reads this process's own AppUserModelID via `GetCurrentApplicationUserModelId`
+/// — the same identifier Windows registered for it when the MSIX package was
+/// installed (`{PackageFamilyName}!{ApplicationId}`). `tauri-plugin-notification`
+/// instead hardcodes the Tauri config's `identifier` string as the toast's
+/// AUMID, which Windows doesn't recognize as a real registered app for an
+/// MSIX install, so toasts sent through it are silently dropped there (#744).
+/// Returns `None` if the call fails, e.g. because the process isn't running
+/// with package identity (not an MSIX/APPX install).
+#[cfg(target_os = "windows")]
+fn current_application_user_model_id() -> Option<String> {
+    use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
+    use windows::Win32::Storage::Packaging::Appx::GetCurrentApplicationUserModelId;
+    use windows::core::PWSTR;
+
+    unsafe {
+        let mut len: u32 = 0;
+        let probe = GetCurrentApplicationUserModelId(&mut len, None);
+        if probe != ERROR_INSUFFICIENT_BUFFER || len == 0 {
+            return None;
+        }
+
+        let mut buf: Vec<u16> = vec![0; len as usize];
+        let result =
+            GetCurrentApplicationUserModelId(&mut len, Some(PWSTR(buf.as_mut_ptr())));
+        if result != ERROR_SUCCESS {
+            return None;
+        }
+
+        // `len` includes the null terminator on success.
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        Some(String::from_utf16_lossy(&buf[..end]))
+    }
+}
+
+/// Shows the "Luminous updated to vX.Y.Z" OS notification directly via
+/// `tauri-winrt-notification` (the same crate `tauri-plugin-notification`
+/// uses internally), built with this process's real AUMID rather than the
+/// plugin's hardcoded, MSIX-incompatible one. Fire-and-forget: failures are
+/// logged, never surfaced to the UI.
+#[cfg(target_os = "windows")]
+pub fn show_update_notification(current_version: &str) {
+    use tauri_winrt_notification::Toast;
+
+    let Some(aumid) = current_application_user_model_id() else {
+        log::warn!(
+            "Could not read AppUserModelID (not running with package identity?); \
+             skipping update notification"
+        );
+        return;
+    };
+
+    let body = format!("Luminous updated to v{current_version}");
+    if let Err(e) = Toast::new(&aumid).title("Luminous").text1(&body).show() {
+        log::warn!("Failed to show update notification: {e:?}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

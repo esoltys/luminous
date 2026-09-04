@@ -26,6 +26,11 @@ scripts/mock-config.local.json
 .cargo/
 *.cargo/config.toml
 
+# Local dev self-signed cert/key for manually sideloading an unsigned MSIX
+# build (see docs/TROUBLESHOOTING.md) — never commit a private key.
+*.pfx
+*.cer
+
 # Cargo build output
 /target/
 /src-tauri/target/

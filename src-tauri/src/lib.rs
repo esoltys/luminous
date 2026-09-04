@@ -40,8 +40,6 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, ShortcutState};
-#[cfg(target_os = "windows")]
-use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 
 pub use audio::AudioEngine;
@@ -698,11 +696,7 @@ pub fn run() {
                     let current = env!("CARGO_PKG_VERSION");
                     if restart_manager::should_notify_update(&info.format, stored.as_deref(), current)
                     {
-                        let body = format!("Luminous updated to v{current}");
-                        if let Err(e) = app.notification().builder().title("Luminous").body(&body).show()
-                        {
-                            log::warn!("Failed to show update notification: {e}");
-                        }
+                        restart_manager::show_update_notification(current);
                     }
                 }
             }
