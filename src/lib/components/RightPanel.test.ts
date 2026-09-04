@@ -104,28 +104,53 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("MusicBrainz")).not.toBeInTheDocument();
   });
 
-  it("shows only the MusicBrainz fields present on the song", () => {
+  it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", () => {
     playerStore.currentSong = {
       ...mockSong,
+      album_artist: "Other Artist",
       musicbrainz_artist_id: "artist-uuid",
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
     const { getByText, queryByText } = render(RightPanel);
 
     expect(getByText("MusicBrainz")).toBeInTheDocument();
-    expect(getByText("artist-uuid")).toBeInTheDocument();
-    expect(getByText("album-artist-uuid")).toBeInTheDocument();
+    expect(getByText("Test Artist")).toBeInTheDocument();
+    expect(getByText("Other Artist")).toBeInTheDocument();
+    expect(queryByText("artist-uuid")).not.toBeInTheDocument();
     expect(queryByText("Release")).not.toBeInTheDocument();
   });
 
-  it("opens the MusicBrainz entity page when a MusicBrainz ID is clicked", async () => {
+  it("hides Album Artist when it's the same MusicBrainz entity as Artist", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_artist_id: "same-uuid",
+      musicbrainz_album_artist_id: "same-uuid",
+    };
+    const { getByText, queryByText } = render(RightPanel);
+
+    expect(getByText("Artist")).toBeInTheDocument();
+    expect(queryByText("Album Artist")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the raw ID when no matching name field is available", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      title: "",
+      musicbrainz_recording_id: "recording-uuid",
+    };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("recording-uuid")).toBeInTheDocument();
+  });
+
+  it("opens the MusicBrainz entity page when a MusicBrainz row is clicked", async () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_recording_id: "recording-uuid",
     };
     const { getByText } = render(RightPanel);
 
-    await fireEvent.click(getByText("recording-uuid"));
+    await fireEvent.click(getByText("Test Track Title"));
 
     expect(openExternalUrlMock).toHaveBeenCalledWith(
       "https://musicbrainz.org/recording/recording-uuid"
