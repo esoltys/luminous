@@ -12,7 +12,6 @@
   import { lyricsStatus } from "../utils/lyrics";
   import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
-  import SocialIcon from "./SocialIcon.svelte";
 
   interface Props {
     isOpen?: boolean;
@@ -146,10 +145,7 @@
 
       {#if musicbrainzRows.length > 0}
         <div class="space-y-2 text-xs">
-          <div class="flex items-center gap-1.5 text-brand-text-secondary/80">
-            <SocialIcon platform="musicbrainz" size={14} />
-            <span class="text-xs font-semibold tracking-wide">{i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')}</span>
-          </div>
+          <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
           {#each musicbrainzRows as row (row.label)}
             <div class="flex items-start justify-between gap-3">
               <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>

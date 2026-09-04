@@ -655,22 +655,15 @@
     {/if}
   </div>
 
-  {#if !windowLayoutStore.isRightPanelAutoHidden}
-    <button
-      onclick={() => windowLayoutStore.toggleRightPanel()}
-      class="flex items-center justify-center w-9 h-9 rounded-full border border-brand-border/60 ml-auto flex-shrink-0 select-none transition-all {windowLayoutStore.rightPanelOpen ? 'bg-brand-accent text-white shadow-sm' : 'bg-brand-main/60 text-brand-text-secondary hover:text-brand-accent-text-hover hover:bg-brand-accent/10'}"
-      title={i18n.t('topNav.toggleRightPanel')}
-    >
-      <span class="font-serif font-bold italic text-lg leading-none" aria-hidden="true">i</span>
-    </button>
-  {/if}
-
   <!-- overflow-hidden + isolate scoped to just this wrapper (not the header,
        which needs overflow-visible for the search dropdown popover) so the
        logo's SVG glow filter can never bleed into the sidebar/header layers.
        Purely decorative, so it's the first thing to drop as the header
-       narrows (issue #413) — hidden from the medium breakpoint down. -->
-  <div class="hidden lg:flex items-center justify-center flex-shrink-0 overflow-hidden isolate">
+       narrows (issue #413) — hidden from the medium breakpoint down. ml-auto
+       (moved here from the removed info-panel toggle button, see PlayerBar's
+       own info-panel toggle) keeps the logo pinned to the header's right
+       edge instead of drifting up against the search box. -->
+  <div class="hidden lg:flex items-center justify-center flex-shrink-0 overflow-hidden isolate ml-auto">
     <ReactiveLogoBrand size="lg" />
   </div>
 </header>

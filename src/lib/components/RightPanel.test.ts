@@ -99,9 +99,9 @@ describe("RightPanel.svelte", () => {
 
   it("hides the MusicBrainz section when no MusicBrainz IDs are present", () => {
     playerStore.currentSong = mockSong;
-    const { queryByText } = render(RightPanel);
+    const { queryByAltText } = render(RightPanel);
 
-    expect(queryByText("MusicBrainz")).not.toBeInTheDocument();
+    expect(queryByAltText("MusicBrainz")).not.toBeInTheDocument();
   });
 
   it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", () => {
@@ -111,9 +111,9 @@ describe("RightPanel.svelte", () => {
       musicbrainz_artist_id: "artist-uuid",
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
-    const { getByText, queryByText } = render(RightPanel);
+    const { getByText, getByAltText, queryByText } = render(RightPanel);
 
-    expect(getByText("MusicBrainz")).toBeInTheDocument();
+    expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
     expect(getByText("Other Artist")).toBeInTheDocument();
     expect(queryByText("artist-uuid")).not.toBeInTheDocument();
