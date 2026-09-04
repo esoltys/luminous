@@ -102,6 +102,7 @@ pkexec apt-get install -y libasound2-dev libssl-dev pkg-config libayatana-appind
 - **Frontend tests**: `bun run test:run` (Vitest)
 - **Backend tests**: `cd src-tauri && cargo test`
 - **Release build**: `bun run tauri build`
+- **MSIX build (Windows)**: `bun run tauri:windows:build`, but only after `bun run tauri build` (or a `cargo build --release`) has produced the exe — and only with `CARGO_TARGET_DIR` set to the workspace-root `target/` dir, or it looks in the wrong place. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Testing
 
