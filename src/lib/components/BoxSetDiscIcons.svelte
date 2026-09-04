@@ -35,7 +35,8 @@
   >
     {#each Array(visibleDiscs) as _, i (i)}
       <Disc
-        class="{currentSize.icon} text-white fill-black/40 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] {i > 0 ? currentSize.overlap : ''}"
+        weight="fill"
+        class="{currentSize.icon} text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] {i > 0 ? currentSize.overlap : ''}"
         style="z-index: {visibleDiscs - i}"
       />
     {/each}
