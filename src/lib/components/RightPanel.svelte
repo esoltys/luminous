@@ -4,8 +4,7 @@
   import {
     MusicNotesIcon as Music,
     ClockIcon as Clock,
-    MicrophoneStageIcon as ArtistIcon,
-    DiscIcon as ReleaseIcon
+    ArrowSquareOutIcon as ExternalLink
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
@@ -50,18 +49,18 @@
 
   const musicbrainzRows = $derived.by(() => {
     if (!currentSong) return [];
-    const entries: { label: string; id?: string; entityPath: string; name?: string; icon: typeof ArtistIcon }[] = [
-      { label: i18n.t('playerBar.musicbrainzArtistLabel', {}, 'Artist'), id: currentSong.musicbrainz_artist_id, entityPath: "artist", name: currentSong.artist, icon: ArtistIcon },
+    const entries: { label: string; id?: string; entityPath: string; name?: string }[] = [
+      { label: i18n.t('playerBar.musicbrainzArtistLabel', {}, 'Artist'), id: currentSong.musicbrainz_artist_id, entityPath: "artist", name: currentSong.artist },
       // Skip Album Artist when it's the same MusicBrainz entity as Artist (the common case for a
       // non-compilation release) — showing the identical name/link twice is just noise.
       ...(currentSong.musicbrainz_album_artist_id && currentSong.musicbrainz_album_artist_id !== currentSong.musicbrainz_artist_id
-        ? [{ label: i18n.t('playerBar.musicbrainzAlbumArtistLabel', {}, 'Album Artist'), id: currentSong.musicbrainz_album_artist_id, entityPath: "artist", name: currentSong.album_artist, icon: ArtistIcon }]
+        ? [{ label: i18n.t('playerBar.musicbrainzAlbumArtistLabel', {}, 'Album Artist'), id: currentSong.musicbrainz_album_artist_id, entityPath: "artist", name: currentSong.album_artist }]
         : []),
-      { label: i18n.t('playerBar.musicbrainzReleaseLabel', {}, 'Release'), id: currentSong.musicbrainz_album_id, entityPath: "release", name: currentSong.album, icon: ReleaseIcon },
-      { label: i18n.t('playerBar.musicbrainzReleaseGroupLabel', {}, 'Release Group'), id: currentSong.musicbrainz_release_group_id, entityPath: "release-group", name: currentSong.album, icon: ReleaseIcon },
-      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id, entityPath: "recording", name: currentSong.title, icon: Music },
-      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id, entityPath: "track", name: currentSong.title, icon: Music },
-      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id, entityPath: "work", name: currentSong.title, icon: Music },
+      { label: i18n.t('playerBar.musicbrainzReleaseLabel', {}, 'Release'), id: currentSong.musicbrainz_album_id, entityPath: "release", name: currentSong.album },
+      { label: i18n.t('playerBar.musicbrainzReleaseGroupLabel', {}, 'Release Group'), id: currentSong.musicbrainz_release_group_id, entityPath: "release-group", name: currentSong.album },
+      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id, entityPath: "recording", name: currentSong.title },
+      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id, entityPath: "track", name: currentSong.title },
+      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id, entityPath: "work", name: currentSong.title },
     ];
     return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
   });
@@ -137,17 +136,17 @@
               <button
                 type="button"
                 onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
-                class="flex items-center gap-1 text-brand-accent hover:underline text-right break-words min-w-0"
+                class="group flex items-center gap-1 text-right transition-colors cursor-pointer min-w-0"
               >
-                <row.icon size={12} class="shrink-0" />
-                <span>{row.name || row.id}</span>
+                <span class="text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">{row.name || row.id}</span>
+                <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </button>
             </div>
           {/each}
           {#each musicbrainzMetaRows as row (row.label)}
             <div class="flex items-start justify-between gap-3">
               <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-              <span class="text-brand-text-secondary text-right break-words min-w-0">{row.value}</span>
+              <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
             </div>
           {/each}
         </div>
