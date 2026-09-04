@@ -277,23 +277,45 @@
     showAlbumTagEditor = true;
   }
 
-  function handleTagEditorSaved() {
+  async function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
     tagsStore.load();
     loading = true;
-    invoke<Song[]>("get_songs_by_album", { album: albumName })
-      .then((fetchedSongs) => {
-        let filtered = [...fetchedSongs];
-        filtered.sort((a, b) => {
-          if (a.disc !== b.disc) {
-            return (a.disc ?? 1) - (b.disc ?? 1);
-          }
-          return (a.track ?? 0) - (b.track ?? 0);
-        });
-        songs = filtered;
-      })
-      .catch((err) => console.error(err))
-      .finally(() => loading = false);
+
+    // The album-level editor renames every song currently loaded here at once,
+    // so if it changed the album name, this view's `albumName` prop is now
+    // stale and re-querying by it would come up empty. Resolve the current
+    // name from one of the album's own songs and hand off to navigationStore
+    // so the album-name effect refetches under the new name. A single-song
+    // edit only ever touches one track, so it's left to the normal refetch
+    // below, which naturally drops that song if it moved to a different album.
+    if (showAlbumTagEditor && songs[0]?.id !== undefined) {
+      try {
+        const details = await invoke<{ album: string }>("get_song_details", { songId: songs[0].id });
+        if (details.album && details.album !== albumName) {
+          navigationStore.selectedAlbumName = details.album;
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to resolve current album name after tag edit:", err);
+      }
+    }
+
+    try {
+      const fetchedSongs = await invoke<Song[]>("get_songs_by_album", { album: albumName });
+      let filtered = [...fetchedSongs];
+      filtered.sort((a, b) => {
+        if (a.disc !== b.disc) {
+          return (a.disc ?? 1) - (b.disc ?? 1);
+        }
+        return (a.track ?? 0) - (b.track ?? 0);
+      });
+      songs = filtered;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      loading = false;
+    }
   }
 
   async function rateSong(song: Song, rating: number) {
