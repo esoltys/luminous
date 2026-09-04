@@ -436,11 +436,15 @@
       {#if !windowLayoutStore.isDetailHeaderCollapsed && (artistPortraitUrl || headerCovers.length > 0)}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           {#if artistPortraitUrl}
-            <img
-              src={artistPortraitUrl}
-              alt={artistName}
-              class="w-28 h-28 rounded-full object-cover border border-brand-border/60 shadow-2xl"
-            />
+            <div class="flex items-center justify-end w-full h-full my-auto select-none">
+              <div class="w-28 h-28 overflow-hidden relative rounded-full">
+                <img
+                  src={artistPortraitUrl}
+                  alt={artistName}
+                  class="w-full h-full object-cover"
+                />
+              </div>
+            </div>
           {:else}
             <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
           {/if}
