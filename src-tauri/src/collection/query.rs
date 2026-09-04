@@ -572,6 +572,32 @@ impl CollectionScanner {
         Ok(songs)
     }
 
+    /// A random cross-section of the library — the fallback used by the
+    /// Daypart Mix auto-playlist (#223) when no single genre grouping has
+    /// enough songs on its own. Unlike every other query in this file, this
+    /// intentionally ignores population-mode bias in favor of a flat
+    /// `ORDER BY RANDOM()` (the same idiom `get_featured_albums` already
+    /// uses) — a "some songs from anywhere" fallback has nothing meaningful
+    /// to bias toward.
+    pub fn get_random_songs(&self, limit: i64) -> Result<Vec<Song>> {
+        let conn = self.db.pool.get()?;
+        let sql = format!(
+            "SELECT {} FROM songs
+             WHERE source IN (1, 2)
+               AND unavailable = 0
+               AND not_included = 0
+             ORDER BY RANDOM()
+             LIMIT ?1",
+            SONG_SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let songs = stmt
+            .query_map(params![limit], row_to_song)?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(songs)
+    }
+
     /// Distinct artist tags across all artist profiles in the library.
     pub fn get_library_artist_tags(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;

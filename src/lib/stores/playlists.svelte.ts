@@ -4,6 +4,13 @@ import type { Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types
 import { applySongStats, type SongStatsPayload } from "../utils/stats";
 import { toastStore } from "./toast.svelte";
 import { i18n } from "./i18n.svelte";
+import { getDaypartBucket } from "../utils/daypart";
+
+/** How often to check whether the Daypart Mix's local-time bucket has
+ * crossed a boundary while the app stays open (#223) — cheap since the
+ * backend sync is a no-op unless the bucket actually changed, so a modest
+ * interval is fine without needing second-level precision. */
+const DAYPART_BOUNDARY_CHECK_INTERVAL_MS = 60_000;
 
 class PlaylistsStore {
   playlists = $state<Playlist[]>([]);
@@ -132,6 +139,34 @@ class PlaylistsStore {
     } catch (err) {
       console.error("Failed to initialize PlaylistsStore:", err);
     }
+    this.startDaypartBoundaryWatch();
+  }
+
+  private lastKnownDaypartBucket = getDaypartBucket();
+  private daypartBoundaryTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Genre/decade/BPM/artist-tag auto-playlists only need to resync on a
+   * scan or an explicit refresh — the Daypart Mix (#223) also needs to
+   * resync at exact clock boundaries even while the app just sits open
+   * (e.g. left on the Home page across Morning -> Afternoon), which none of
+   * those call sites cover. `sync_all_auto_playlists` is cheap to call
+   * redundantly (the daypart sync is a same-bucket no-op otherwise), so
+   * this just re-checks the current bucket periodically and resyncs only
+   * when it actually changed — mirrors `updaterStore`'s own periodic-check
+   * timer for its own unrelated concern. */
+  private startDaypartBoundaryWatch() {
+    if (this.daypartBoundaryTimer) return;
+    this.daypartBoundaryTimer = setInterval(async () => {
+      const bucket = getDaypartBucket();
+      if (bucket === this.lastKnownDaypartBucket) return;
+      this.lastKnownDaypartBucket = bucket;
+      try {
+        await invoke("sync_all_auto_playlists");
+        await this.refreshPlaylists();
+      } catch (err) {
+        console.error("Failed to resync Daypart Mix on boundary change:", err);
+      }
+    }, DAYPART_BOUNDARY_CHECK_INTERVAL_MS);
   }
 
   async refreshPlaylists() {

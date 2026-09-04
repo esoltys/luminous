@@ -14,6 +14,7 @@
   import LibraryWelcome from "./LibraryWelcome.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
+  import { getDaypartBucket } from "../utils/daypart";
 
   let topArtists = $state<ArtistItem[]>([]);
   let topAlbums = $state<HomeItem[]>([]);
@@ -21,6 +22,14 @@
   let featuredAlbums = $state<HomeItem[]>([]);
   let isLoading = $state(true);
   let libraryChangedDebounce: ReturnType<typeof setTimeout> | undefined;
+
+  /** Polled rather than computed once, so the greeting (and the Daypart Mix
+   * pin's implicit "current bucket") actually flips while the user sits on
+   * Home across a boundary, instead of only updating on the next unrelated
+   * re-render (#223). Matches playlists.svelte.ts's own boundary-check
+   * cadence. */
+  let daypartBucket = $state(getDaypartBucket());
+  let daypartPollTimer: ReturnType<typeof setInterval> | undefined;
 
   /** Routes "Top Artists" to Collection → Artists, pre-sorted by popularity
    * (total plays). CollectionView reads its initial sort from localStorage
@@ -38,13 +47,14 @@
     navigationStore.activeSubTab = "artists";
   }
 
-  function getTimeOfDayGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return i18n.t("home.greetingMorning");
-    if (hour >= 12 && hour < 17) return i18n.t("home.greetingAfternoon");
-    if (hour >= 17 && hour < 21) return i18n.t("home.greetingEvening");
-    return i18n.t("home.greetingNight");
-  }
+  const timeOfDayGreeting = $derived.by((): string => {
+    switch (daypartBucket) {
+      case "morning": return i18n.t("home.greetingMorning");
+      case "afternoon": return i18n.t("home.greetingAfternoon");
+      case "evening": return i18n.t("home.greetingEvening");
+      case "latenight": return i18n.t("home.greetingNight");
+    }
+  });
 
   async function loadCuratedData() {
     isLoading = true;
@@ -87,8 +97,13 @@
       libraryChangedDebounce = setTimeout(loadCuratedData, 500);
     });
 
+    daypartPollTimer = setInterval(() => {
+      daypartBucket = getDaypartBucket();
+    }, 60_000);
+
     return () => {
       clearTimeout(libraryChangedDebounce);
+      clearInterval(daypartPollTimer);
       unlistenScan.then((fn) => fn());
       unlistenLibrary.then((fn) => fn());
     };
@@ -99,7 +114,7 @@
   <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
     <div class="px-6 pt-8">
       <h1 class="text-3xl font-heading font-bold text-brand-text-primary">
-        {getTimeOfDayGreeting()}
+        {timeOfDayGreeting}
       </h1>
       <p class="text-sm text-brand-text-secondary mt-1">
         {collectionStore.stats.total_songs > 0
