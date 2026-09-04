@@ -180,6 +180,15 @@ class UpdaterStore {
   async checkForUpdates() {
     if (this.isExternallyManaged) return;
 
+    // Never clobber an in-flight download or one already sitting ready to
+    // restart — re-checking (the periodic timer, or another manual click)
+    // would silently close and discard `pendingUpdate`, and a later restart
+    // click would then call `install()` on a fresh Update that was never
+    // actually downloaded, which the plugin rejects.
+    if (this.installStatus === "downloading" || this.installStatus === "ready-to-restart") {
+      return;
+    }
+
     this.checkStatus = "checking";
     this.errorMessage = null;
     this.installStatus = "idle";
@@ -279,6 +288,12 @@ class UpdaterStore {
       await relaunch();
     } catch (err) {
       console.error("Failed to restart for update:", err);
+      this.installStatus = "error";
+      this.errorMessage = extractErrorMessage(err, "Failed to restart for update");
+      toastStore.show(
+        i18n.t("settings.updateInstallError", {}, "Update failed."),
+        "error"
+      );
     }
   }
 }

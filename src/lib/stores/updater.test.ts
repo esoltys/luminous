@@ -131,6 +131,24 @@ describe("UpdaterStore", () => {
     expect(update.download).not.toHaveBeenCalled();
   });
 
+  it("checkForUpdates is a no-op while a download is in flight or ready to restart, so it can't discard pendingUpdate out from under a later restart click", async () => {
+    const update = fakeUpdate({ version: "2.0.0" });
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+    await updaterStore.downloadAndInstall();
+    expect(updaterStore.installStatus).toBe("ready-to-restart");
+
+    vi.mocked(check).mockClear();
+    await updaterStore.checkForUpdates();
+
+    expect(check).not.toHaveBeenCalled();
+    expect(update.close).not.toHaveBeenCalled();
+    expect(updaterStore.installStatus).toBe("ready-to-restart");
+
+    await updaterStore.restartNow();
+    expect(update.install).toHaveBeenCalled();
+  });
+
   it("downloadAndInstall downloads only (not install) and transitions to ready-to-restart on success", async () => {
     const update = fakeUpdate({ version: "2.0.0" });
     vi.mocked(check).mockResolvedValueOnce(update);
@@ -196,6 +214,25 @@ describe("UpdaterStore", () => {
 
     expect(update.install).toHaveBeenCalled();
     expect(relaunch).toHaveBeenCalled();
+  });
+
+  it("restartNow surfaces a visible error instead of silently failing when install() rejects", async () => {
+    // e.g. `pendingUpdate` got replaced by a fresh, not-yet-downloaded Update
+    // object — the plugin's `install()` rejects with "called before download".
+    const update = fakeUpdate({ version: "2.0.0" });
+    update.install = vi.fn().mockRejectedValue(new Error("Update.install called before Update.download"));
+    vi.mocked(check).mockResolvedValueOnce(update);
+    await updaterStore.checkForUpdates();
+    const showSpy = vi.spyOn(toastStore, "show");
+
+    await updaterStore.restartNow();
+
+    expect(relaunch).not.toHaveBeenCalled();
+    expect(updaterStore.installStatus).toBe("error");
+    expect(updaterStore.errorMessage).toBe("Update.install called before Update.download");
+    expect(showSpy).toHaveBeenCalledWith(expect.any(String), "error");
+
+    showSpy.mockRestore();
   });
 
   it("records lastCheckedAt after a successful check", async () => {
