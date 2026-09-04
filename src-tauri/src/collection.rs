@@ -953,6 +953,55 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
                 .get_string(ItemKey::ComposerSortOrder)
                 .map(|s| s.to_string());
         }
+
+        // MusicBrainz identifiers (#752). Only the keys lofty maps to a typed
+        // ItemKey are read here — `musicbrainz_disc_id`,
+        // `musicbrainz_original_artist_id`, and `musicbrainz_original_album_id`
+        // have no such mapping in lofty 0.25 (Picard writes them as raw TXXX
+        // frames) and are left unpopulated rather than hand-parsing per-format
+        // frames for them.
+        //
+        // Note for future tag-*writing* support: lofty 0.25's ID3v2 write
+        // path silently drops `MusicBrainzReleaseId`/`ReleaseGroupId`/
+        // `TrackId` when converting a generic `Tag` back to frames (they're
+        // missing from its TXXX write allowlist), even though it reads them
+        // back from an existing frame just fine — see the round-trip test
+        // below for details. Read-only use here is unaffected.
+        if song.musicbrainz_artist_id.is_none() {
+            song.musicbrainz_artist_id = tag
+                .get_string(ItemKey::MusicBrainzArtistId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_album_artist_id.is_none() {
+            song.musicbrainz_album_artist_id = tag
+                .get_string(ItemKey::MusicBrainzReleaseArtistId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_album_id.is_none() {
+            song.musicbrainz_album_id = tag
+                .get_string(ItemKey::MusicBrainzReleaseId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_release_group_id.is_none() {
+            song.musicbrainz_release_group_id = tag
+                .get_string(ItemKey::MusicBrainzReleaseGroupId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_recording_id.is_none() {
+            song.musicbrainz_recording_id = tag
+                .get_string(ItemKey::MusicBrainzRecordingId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_track_id.is_none() {
+            song.musicbrainz_track_id = tag
+                .get_string(ItemKey::MusicBrainzTrackId)
+                .map(|s| s.to_string());
+        }
+        if song.musicbrainz_work_id.is_none() {
+            song.musicbrainz_work_id = tag
+                .get_string(ItemKey::MusicBrainzWorkId)
+                .map(|s| s.to_string());
+        }
     }
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
@@ -1089,6 +1138,13 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     replaygain_track_gain=excluded.replaygain_track_gain,
                     replaygain_album_gain=excluded.replaygain_album_gain,
                     is_vbr=excluded.is_vbr,
+                    musicbrainz_artist_id=excluded.musicbrainz_artist_id,
+                    musicbrainz_album_artist_id=excluded.musicbrainz_album_artist_id,
+                    musicbrainz_album_id=excluded.musicbrainz_album_id,
+                    musicbrainz_release_group_id=excluded.musicbrainz_release_group_id,
+                    musicbrainz_recording_id=excluded.musicbrainz_recording_id,
+                    musicbrainz_track_id=excluded.musicbrainz_track_id,
+                    musicbrainz_work_id=excluded.musicbrainz_work_id,
                     unavailable=0",
             SONG_INSERT_COLS, SONG_INSERT_PLACEHOLDERS
         ),
@@ -1131,6 +1187,13 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.replaygain_track_gain,
             song.replaygain_album_gain,
             song.is_vbr,
+            song.musicbrainz_artist_id,
+            song.musicbrainz_album_artist_id,
+            song.musicbrainz_album_id,
+            song.musicbrainz_release_group_id,
+            song.musicbrainz_recording_id,
+            song.musicbrainz_track_id,
+            song.musicbrainz_work_id,
         ],
     )?;
     Ok(())
@@ -1187,7 +1250,10 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu,
     unavailable,
     replaygain_track_gain, replaygain_album_gain,
-    is_vbr, is_instrumental, added
+    is_vbr, is_instrumental, added,
+    musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
+    musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
+    musicbrainz_work_id
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -1210,9 +1276,12 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.cue_path,
     s.ebur128_integrated_loudness_lufs, s.ebur128_loudness_range_lu,
     s.unavailable, s.replaygain_track_gain, s.replaygain_album_gain,
-    s.is_vbr, s.is_instrumental, s.added";
+    s.is_vbr, s.is_instrumental, s.added,
+    s.musicbrainz_artist_id, s.musicbrainz_album_artist_id, s.musicbrainz_album_id,
+    s.musicbrainz_release_group_id, s.musicbrainz_recording_id, s.musicbrainz_track_id,
+    s.musicbrainz_work_id";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 57;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 64;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -1220,11 +1289,14 @@ const SONG_INSERT_COLS: &str = "
     grouping, bpm, initial_key,
     length_nanosec, bitrate, samplerate, channels, bitdepth,
     filesize, mtime, art_embedded, art_automatic, art_unset,
-    replaygain_track_gain, replaygain_album_gain, is_vbr
+    replaygain_track_gain, replaygain_album_gain, is_vbr,
+    musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
+    musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
+    musicbrainz_work_id
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -1298,6 +1370,13 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         is_vbr: row.get(col(54))?,
         is_instrumental: row.get::<_, Option<bool>>(col(55))?.unwrap_or(false),
         added: row.get(col(56))?,
+        musicbrainz_artist_id: row.get(col(57))?,
+        musicbrainz_album_artist_id: row.get(col(58))?,
+        musicbrainz_album_id: row.get(col(59))?,
+        musicbrainz_release_group_id: row.get(col(60))?,
+        musicbrainz_recording_id: row.get(col(61))?,
+        musicbrainz_track_id: row.get(col(62))?,
+        musicbrainz_work_id: row.get(col(63))?,
         ..Default::default()
     })
 }
@@ -1498,6 +1577,60 @@ mod tests {
             Some("Album Artist A; Album Artist B")
         );
         assert_eq!(song.composer.as_deref(), Some("Composer A; Composer B"));
+    }
+
+    /// Covers `MusicBrainzArtistId`/`MusicBrainzReleaseArtistId` — the two
+    /// MusicBrainz keys confirmed (both here and via `exiftool` against a
+    /// real Picard-tagged file, Def Leppard's *Hysteria*, 1991) to round-trip
+    /// cleanly through ID3v2. The other five `musicbrainz_*` `read_tags()`
+    /// reads (`MusicBrainzReleaseId`/`ReleaseGroupId`/`RecordingId`/
+    /// `TrackId`/`WorkId`) aren't exercised by a round-trip test here: lofty
+    /// 0.25's ID3v2 *write* path doesn't reliably re-serialize a `Tag` that
+    /// was only mutated in memory via `insert_text` for those keys (observed
+    /// empirically — e.g. `MusicBrainzWorkId` and `MusicBrainzRecordingId`
+    /// silently vanish on save despite being set), even though its read path
+    /// parses an already-on-disk frame for any of them the same way it does
+    /// for `MusicBrainzArtistId` (see `item::init_key_map`'s unconditional
+    /// ID3v2 TXXX/UFID table). Since Luminous only *reads* these fields (no
+    /// tag-editor support for writing them), that write-side gap doesn't
+    /// affect the scanner — it's just not practically testable via lofty's
+    /// public write API without hand-building raw ID3v2 frames (#752).
+    #[test]
+    fn test_read_tags_musicbrainz_ids_round_trip() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let path = temp_dir.path().join("song.wav");
+        write_test_wav(&path);
+        crate::tageditor::write_tags(
+            &path,
+            &crate::tageditor::TagWriteRequest {
+                title: "Title",
+                artist: "Artist",
+                album: "Album",
+                ..Default::default()
+            },
+        )
+        .expect("write_tags should succeed");
+
+        let mut tagged_file = Probe::open(&path)
+            .expect("probe")
+            .read()
+            .expect("read tagged file");
+        let tag = tagged_file.primary_tag_mut().expect("primary tag");
+        tag.insert_text(ItemKey::MusicBrainzArtistId, "artist-uuid".to_string());
+        tag.insert_text(
+            ItemKey::MusicBrainzReleaseArtistId,
+            "album-artist-uuid".to_string(),
+        );
+        tagged_file
+            .save_to_path(&path, lofty::config::WriteOptions::default())
+            .expect("save tagged file");
+
+        let song = read_tags(&path).expect("read_tags should succeed");
+        assert_eq!(song.musicbrainz_artist_id.as_deref(), Some("artist-uuid"));
+        assert_eq!(
+            song.musicbrainz_album_artist_id.as_deref(),
+            Some("album-artist-uuid")
+        );
     }
 
     #[test]

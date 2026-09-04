@@ -1,12 +1,17 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent } from "@testing-library/svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
+}));
+
+const openExternalUrlMock = vi.fn();
+vi.mock("../utils/openExternalUrl", () => ({
+  openExternalUrl: (url: string) => openExternalUrlMock(url),
 }));
 
 describe("RightPanel.svelte", () => {
@@ -90,5 +95,40 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("Channels")).toBeInTheDocument();
     expect(getByText("5.1 Surround")).toBeInTheDocument();
+  });
+
+  it("hides the MusicBrainz section when no MusicBrainz IDs are present", () => {
+    playerStore.currentSong = mockSong;
+    const { queryByText } = render(RightPanel);
+
+    expect(queryByText("MusicBrainz")).not.toBeInTheDocument();
+  });
+
+  it("shows only the MusicBrainz fields present on the song", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_artist_id: "artist-uuid",
+      musicbrainz_album_artist_id: "album-artist-uuid",
+    };
+    const { getByText, queryByText } = render(RightPanel);
+
+    expect(getByText("MusicBrainz")).toBeInTheDocument();
+    expect(getByText("artist-uuid")).toBeInTheDocument();
+    expect(getByText("album-artist-uuid")).toBeInTheDocument();
+    expect(queryByText("Release")).not.toBeInTheDocument();
+  });
+
+  it("opens the MusicBrainz entity page when a MusicBrainz ID is clicked", async () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_recording_id: "recording-uuid",
+    };
+    const { getByText } = render(RightPanel);
+
+    await fireEvent.click(getByText("recording-uuid"));
+
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://musicbrainz.org/recording/recording-uuid"
+    );
   });
 });

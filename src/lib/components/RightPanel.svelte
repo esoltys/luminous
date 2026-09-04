@@ -4,6 +4,7 @@
   import { MusicNotesIcon as Music, ClockIcon as Clock } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
+  import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
 
   interface Props {
@@ -41,6 +42,20 @@
       default: return i18n.t('playerBar.lyricsNone', {}, 'Not downloaded');
     }
   }
+
+  const musicbrainzRows = $derived.by(() => {
+    if (!currentSong) return [];
+    const entries: { label: string; id: string; entityPath: string }[] = [
+      { label: i18n.t('playerBar.musicbrainzArtistLabel', {}, 'Artist'), id: currentSong.musicbrainz_artist_id ?? "", entityPath: "artist" },
+      { label: i18n.t('playerBar.musicbrainzAlbumArtistLabel', {}, 'Album Artist'), id: currentSong.musicbrainz_album_artist_id ?? "", entityPath: "artist" },
+      { label: i18n.t('playerBar.musicbrainzReleaseLabel', {}, 'Release'), id: currentSong.musicbrainz_album_id ?? "", entityPath: "release" },
+      { label: i18n.t('playerBar.musicbrainzReleaseGroupLabel', {}, 'Release Group'), id: currentSong.musicbrainz_release_group_id ?? "", entityPath: "release-group" },
+      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id ?? "", entityPath: "recording" },
+      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id ?? "", entityPath: "track" },
+      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id ?? "", entityPath: "work" },
+    ];
+    return entries.filter((e) => e.id);
+  });
 
   function formatChannels(channels?: number): string {
     if (!channels) return "";
@@ -117,6 +132,23 @@
           </div>
         {/if}
       </div>
+
+      {#if musicbrainzRows.length > 0}
+        <div class="space-y-2 text-xs">
+          <span class="text-brand-text-secondary/60 uppercase text-[10px] tracking-wide">{i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')}</span>
+          {#each musicbrainzRows as row (row.label)}
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+              <button
+                type="button"
+                onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
+                class="text-brand-accent hover:underline text-right break-all min-w-0 font-mono text-[10px]"
+                title={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')}
+              >{row.id}</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">
         <Music class="w-12 h-12 text-brand-text-secondary/30 mb-3" />
