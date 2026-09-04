@@ -123,7 +123,18 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_System_Com",
     "Win32_System_WinRT",
+    "Win32_System_Recovery",
+    "Win32_Storage_Packaging_Appx",
 ] }
+# tauri-plugin-notification hardcodes the toast's AppUserModelID to the Tauri
+# `identifier` config value, which Windows only accepts for apps registered
+# under that exact AUMID — an MSIX/Store install's real AUMID is
+# `{PackageFamilyName}!{ApplicationId}`, so toasts sent through the plugin
+# are silently dropped by the OS for msix builds (#744). This is the same
+# crate the plugin uses internally (re-exported there as `winrt_notification`)
+# — used directly here, with the AUMID read at runtime via
+# GetCurrentApplicationUserModelId, only for the msix update-notification path.
+tauri-winrt-notification = "0.7"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"

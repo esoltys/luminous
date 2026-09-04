@@ -2943,6 +2943,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tauri-runtime",
+ "tauri-winrt-notification",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
