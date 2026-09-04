@@ -279,6 +279,14 @@ export interface ArtistItem {
   song_count: number;
   total_playcount?: number;
   genre?: string | null;
+  /** Locally-discovered artist visuals (#98/#761) — not returned by
+   * `get_artists()`; populated on demand via
+   * `collectionStore.getExtendedArtworkForArtist()` (see `ExtendedArtworkResponse`),
+   * since scanning every artist's folder eagerly for a list view would be
+   * far too expensive. `undefined` means "not fetched yet", not "none found". */
+  portrait_uri?: string | null;
+  band_logo_uri?: string | null;
+  fanart_uri?: string | null;
 }
 
 export interface ArtistSocialLink {
@@ -292,6 +300,51 @@ export interface ArtistProfile {
   tags: string[];
   social_links: ArtistSocialLink[];
   bio?: string | null;
+  /** Same on-demand artist visuals as {@link ArtistItem} — see there for why
+   * these aren't populated by `get_artist_profile()`/`get_all_artist_profiles()`. */
+  portrait_uri?: string | null;
+  band_logo_uri?: string | null;
+  fanart_uri?: string | null;
+}
+
+/**
+ * Category within the Standardized Artwork Hierarchy (#98) — mirrors
+ * `ArtworkCategory::as_str()` in `covermanager.rs` exactly. Don't rename a
+ * value here without updating there.
+ */
+export type ExtendedArtworkCategory =
+  | "primary_cover"
+  | "back_cover"
+  | "disc_media"
+  | "booklet"
+  | "matrix"
+  | "artist_portrait"
+  | "band_logo"
+  | "fanart_banner"
+  | "subfolder";
+
+/** One discovered artwork file, as returned by `get_extended_artwork_for_song`/
+ * `get_extended_artwork_for_artist`. `uri` is a raw `luminous-art://` URI —
+ * resolve it with {@link getCoverArtUrl} before using it in an `<img>` src,
+ * same as any other cover art URI in this codebase. */
+export interface ExtendedArtworkItem {
+  category: ExtendedArtworkCategory;
+  uri: string;
+}
+
+/** Response shape for `get_extended_artwork_for_song`/`_for_artist` (#758).
+ * `items` carries every discovered file in hierarchy order; the `*_uri`
+ * fields pull out the ones most callers actually need without having to
+ * scan `items` themselves. `primary_uri` is the album cover-stack's
+ * thumbnail and "Open Images" target (#760); the artist fields feed
+ * `ArtistDetailView`/`ArtistCard`/`TopNavigation` (#761). */
+export interface ExtendedArtworkResponse {
+  count: number;
+  primary_uri: string | null;
+  artist_portrait_uri: string | null;
+  band_logo_uri: string | null;
+  fanart_uri: string | null;
+  items: ExtendedArtworkItem[];
 }
 
 /** A Luminous-native song tag (#224), independent of the embedded `Song.genre`. */

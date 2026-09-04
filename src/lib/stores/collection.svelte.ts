@@ -12,6 +12,7 @@ import type {
   AlbumItem,
   ArtistItem,
   ArtistProfile,
+  ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
 } from "../types";
@@ -66,6 +67,19 @@ type ColumnWidths = Partial<Record<keyof VisibleColumns, number>>;
 /** Song-count milestones that trigger Milestone-tier celebrations. */
 const MILESTONE_THRESHOLDS = [100, 500, 1000, 2500, 5000, 10000];
 
+/** Fallback for a failed extended-artwork fetch (#98/#759) — an empty result
+ * rather than throwing, so callers (cover-stack badge, artist visuals) can
+ * treat "scan failed" the same as "nothing found" without their own
+ * try/catch. */
+const EMPTY_EXTENDED_ARTWORK: ExtendedArtworkResponse = {
+  count: 0,
+  primary_uri: null,
+  artist_portrait_uri: null,
+  band_logo_uri: null,
+  fanart_uri: null,
+  items: [],
+};
+
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
   stats = $state<LibraryStats>({
@@ -103,6 +117,21 @@ class CollectionStore {
   albums = $state<AlbumItem[]>([]);
   artists = $state<ArtistItem[]>([]);
   artistProfiles = $state<Record<string, ArtistProfile>>({});
+  /** On-demand extended-artwork cache (#98/#759), keyed by song id — unlike
+   * `artistProfiles`, this is never bulk-loaded: scanning every song's album
+   * folder eagerly would be far too expensive, so entries are fetched lazily
+   * by `getExtendedArtworkForSong()` and kept here so the same song showing
+   * up in multiple places (e.g. a cover-stack re-rendering) doesn't re-scan
+   * the filesystem every time. */
+  extendedArtworkBySong = $state<Record<number, ExtendedArtworkResponse>>({});
+  /** Same idea as {@link extendedArtworkBySong}, keyed by lowercased artist
+   * name (matching `artistProfiles`' key convention) via
+   * `getExtendedArtworkForArtist()`. */
+  extendedArtworkByArtist = $state<Record<string, ExtendedArtworkResponse>>({});
+  /** In-flight extended-artwork fetches, so concurrent callers for the same
+   * key (e.g. `ArtistCard` and `TopNavigation` rendering the same artist at
+   * once) share one backend call instead of each firing their own. */
+  private extendedArtworkFetches = new Map<string, Promise<ExtendedArtworkResponse>>();
   searchResults = $state<Song[]>([]);
   searchQuery = $state<string>("");
   searchLoading = $state<boolean>(false);
@@ -497,6 +526,74 @@ class CollectionStore {
       };
     }
     return saved;
+  }
+
+  /** Cached extended-artwork lookup for a song's album (#98/#760) — returns
+   * the cached result if already fetched, otherwise scans on demand via
+   * `get_extended_artwork_for_song` and caches the result. Concurrent calls
+   * for the same `songId` share one in-flight request. */
+  async getExtendedArtworkForSong(songId: number): Promise<ExtendedArtworkResponse> {
+    const cached = this.extendedArtworkBySong[songId];
+    if (cached) return cached;
+
+    const fetchKey = `song:${songId}`;
+    const inFlight = this.extendedArtworkFetches.get(fetchKey);
+    if (inFlight) return inFlight;
+
+    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_song", { songId })
+      .then((result) => {
+        this.extendedArtworkBySong = { ...this.extendedArtworkBySong, [songId]: result };
+        return result;
+      })
+      .catch((err) => {
+        console.error("Failed to load extended artwork for song:", err);
+        return EMPTY_EXTENDED_ARTWORK;
+      })
+      .finally(() => {
+        this.extendedArtworkFetches.delete(fetchKey);
+      });
+
+    this.extendedArtworkFetches.set(fetchKey, promise);
+    return promise;
+  }
+
+  /** Cached extended-artwork lookup for an artist's portrait/logo/fanart
+   * (#98/#761) — same lazy-fetch-and-cache pattern as
+   * {@link getExtendedArtworkForSong}, keyed by lowercased artist name to
+   * match `artistProfiles`. */
+  async getExtendedArtworkForArtist(artistName: string | null | undefined): Promise<ExtendedArtworkResponse> {
+    if (!artistName) return EMPTY_EXTENDED_ARTWORK;
+    const key = artistName.toLowerCase();
+
+    const cached = this.extendedArtworkByArtist[key];
+    if (cached) return cached;
+
+    const fetchKey = `artist:${key}`;
+    const inFlight = this.extendedArtworkFetches.get(fetchKey);
+    if (inFlight) return inFlight;
+
+    const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", { artist: artistName })
+      .then((result) => {
+        this.extendedArtworkByArtist = { ...this.extendedArtworkByArtist, [key]: result };
+        return result;
+      })
+      .catch((err) => {
+        console.error("Failed to load extended artwork for artist:", err);
+        return EMPTY_EXTENDED_ARTWORK;
+      })
+      .finally(() => {
+        this.extendedArtworkFetches.delete(fetchKey);
+      });
+
+    this.extendedArtworkFetches.set(fetchKey, promise);
+    return promise;
+  }
+
+  /** Opens a discovered artwork file (a raw filesystem path, not a
+   * `luminous-art://` URI) in the OS's default image viewer — the "Open
+   * Images" hover action (#760). */
+  async openArtworkPath(path: string): Promise<void> {
+    await invoke("open_artwork_path", { path });
   }
 
   async addDirectory(path: string) {
