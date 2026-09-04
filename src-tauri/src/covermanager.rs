@@ -11,10 +11,261 @@
 
 use crate::db::Database;
 use anyhow::{Context, Result};
-use lofty::{file::TaggedFileExt, probe::Probe};
+use lofty::{file::TaggedFileExt, picture::PictureType, probe::Probe};
 use rusqlite::params;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+/// Position in the Standardized Artwork Hierarchy (#98). Declaration order is
+/// significant: `derive(PartialOrd, Ord)` sorts variants in this order, which
+/// is exactly the discovery priority the issue specifies — primary cover
+/// first, unnamed subfolder finds last. Embedded tag pictures are folded into
+/// the same ordering via `category_for_picture_type` so a `CoverFront` image
+/// embedded in the file and a `cover.jpg` sitting next to it rank the same.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ArtworkCategory {
+    PrimaryCover,
+    BackCover,
+    DiscMedia,
+    Booklet,
+    Matrix,
+    ArtistPortrait,
+    BandLogo,
+    FanartBanner,
+    /// Catch-all for files found in a nested artwork subfolder (`Artwork/`,
+    /// `Scans/`, etc.) whose name doesn't match any of the categories above.
+    Subfolder,
+}
+
+/// One discovered artwork file, categorized and ready to sort by
+/// `ArtworkCategory` (primary key) then filename (tiebreaker) — see
+/// `ExtendedArtworkSet::sorted`.
+#[derive(Debug, Clone)]
+pub struct ArtworkEntry {
+    pub category: ArtworkCategory,
+    pub path: PathBuf,
+}
+
+/// Result of a hierarchical local-filesystem artwork scan for one song, built
+/// by `scan_extended_artwork`. Purely a discovery/ordering result — callers
+/// decide what to do with the paths (cache, expose via IPC, etc.).
+#[derive(Debug, Clone, Default)]
+pub struct ExtendedArtworkSet {
+    pub entries: Vec<ArtworkEntry>,
+}
+
+impl ExtendedArtworkSet {
+    /// Entries ordered by the Standardized Artwork Hierarchy (category, then
+    /// filename as a tiebreaker) — not flat alphabetical, which would put
+    /// e.g. `booklet.jpg` ahead of `cover.jpg`.
+    pub fn sorted(mut self) -> Self {
+        self.entries.sort_by(|a, b| {
+            a.category.cmp(&b.category).then_with(|| {
+                let a_name = a
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase());
+                let b_name = b
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase());
+                a_name.cmp(&b_name)
+            })
+        });
+        self
+    }
+
+    /// The top-ranked entry, if any — the album cover-stack's thumbnail and
+    /// the file the "Open Images" action opens first (#760).
+    pub fn primary(&self) -> Option<&ArtworkEntry> {
+        self.entries.first()
+    }
+}
+
+const PRIMARY_COVER_NAMES: &[&str] = &[
+    "cover",
+    "folder",
+    "front",
+    "album",
+    "albumart",
+    "albumartsmall",
+];
+const BACK_COVER_NAMES: &[&str] = &["back", "rear", "backcover"];
+const DISC_MEDIA_NAMES: &[&str] = &["disc", "cd", "discart", "medium"];
+const BOOKLET_NAMES: &[&str] = &["booklet", "insert", "inlay", "liner"];
+const MATRIX_NAMES: &[&str] = &["tray", "matrix", "spine"];
+const ARTIST_PORTRAIT_NAMES: &[&str] = &["artist", "folder", "thumb", "photo"];
+const BAND_LOGO_NAMES: &[&str] = &["logo", "clearlogo"];
+const FANART_NAMES: &[&str] = &["fanart", "backdrop", "background", "banner"];
+const SUBFOLDER_DIR_NAMES: &[&str] = &["artwork", "art", "scans", "extrafanart"];
+const EXTENDED_ARTWORK_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+
+/// Categorize a same-album-directory (or subfolder) filename stem against the
+/// album-level categories (Primary Cover, Back Cover, Disc/Vinyl Media,
+/// Booklet & Inserts, Matrix/Tray), plus an exact `{AlbumName}.*` match for
+/// Primary Cover. Returns `None` for names that don't match any album-level
+/// category (artist/band/fanart names are matched separately by
+/// `categorize_artist_folder_name`, since they only apply in the parent
+/// artist directory).
+fn categorize_album_art_name(
+    stem_lower: &str,
+    album_name: Option<&str>,
+) -> Option<ArtworkCategory> {
+    if PRIMARY_COVER_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::PrimaryCover);
+    }
+    if let Some(album) = album_name {
+        let album_lower = album.trim().to_lowercase();
+        if !album_lower.is_empty() && stem_lower == album_lower {
+            return Some(ArtworkCategory::PrimaryCover);
+        }
+    }
+    if BACK_COVER_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::BackCover);
+    }
+    if DISC_MEDIA_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::DiscMedia);
+    }
+    if BOOKLET_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::Booklet);
+    }
+    if MATRIX_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::Matrix);
+    }
+    None
+}
+
+/// Categorize a filename stem found in the *parent* (artist-level) directory
+/// against the artist/band categories (Artist Portraits, Band Logos,
+/// Background & Hero Banners). Returns `None` for names that don't match.
+fn categorize_artist_folder_name(stem_lower: &str) -> Option<ArtworkCategory> {
+    if ARTIST_PORTRAIT_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::ArtistPortrait);
+    }
+    if BAND_LOGO_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::BandLogo);
+    }
+    if FANART_NAMES.contains(&stem_lower) {
+        return Some(ArtworkCategory::FanartBanner);
+    }
+    None
+}
+
+fn has_extended_artwork_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| EXTENDED_ARTWORK_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+/// Map a lofty embedded-picture `PictureType` onto the same hierarchy used
+/// for filesystem finds, so an embedded `CoverFront` picture and a
+/// `cover.jpg` on disk sort identically. Unmapped/`Other` types fall back to
+/// `Subfolder`, the lowest-priority category, per #98's ordering rules.
+pub fn category_for_picture_type(picture_type: PictureType) -> ArtworkCategory {
+    match picture_type {
+        PictureType::CoverFront => ArtworkCategory::PrimaryCover,
+        PictureType::CoverBack => ArtworkCategory::BackCover,
+        PictureType::Leaflet => ArtworkCategory::Booklet,
+        PictureType::Media => ArtworkCategory::DiscMedia,
+        PictureType::Artist | PictureType::LeadArtist => ArtworkCategory::ArtistPortrait,
+        PictureType::Band => ArtworkCategory::ArtistPortrait,
+        PictureType::BandLogo => ArtworkCategory::BandLogo,
+        _ => ArtworkCategory::Subfolder,
+    }
+}
+
+/// Scan one directory (non-recursively) for files matching `categorize`,
+/// pushing a categorized `ArtworkEntry` for each match into `out`.
+fn scan_dir_for_category(
+    dir: &Path,
+    categorize: impl Fn(&str) -> Option<ArtworkCategory>,
+    out: &mut Vec<ArtworkEntry>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() || !has_extended_artwork_extension(&path) {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if let Some(category) = categorize(stem.to_lowercase().as_str()) {
+            out.push(ArtworkEntry { category, path });
+        }
+    }
+}
+
+/// Scan a nested artwork subfolder (`Artwork/`, `Scans/`, etc.): files whose
+/// name matches an album-level or artist-level category keep that category;
+/// everything else with a supported extension falls back to `Subfolder`, per
+/// #98's "Common Subfolder Conventions" — content is still discoverable, it
+/// just sorts after the named categories.
+fn scan_subfolder(dir: &Path, album_name: Option<&str>, out: &mut Vec<ArtworkEntry>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() || !has_extended_artwork_extension(&path) {
+            continue;
+        }
+        let stem_lower = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let category = categorize_album_art_name(&stem_lower, album_name)
+            .or_else(|| categorize_artist_folder_name(&stem_lower))
+            .unwrap_or(ArtworkCategory::Subfolder);
+        out.push(ArtworkEntry { category, path });
+    }
+}
+
+/// Full hierarchical artwork scan for a song at `audio_path`, per #98's
+/// Standardized Artwork Hierarchy: the album directory (primary/secondary
+/// categories, including an exact `{album_name}.*` match), its artwork
+/// subfolders (`Artwork/`, `Art/`, `Scans/`, `extrafanart/`), and the parent
+/// (artist-level) directory (artist portraits, band logos, fanart/backdrop
+/// banners). Purely a discovery pass — doesn't touch the DB or copy/cache
+/// anything; call `.sorted()` on the result for hierarchy order.
+pub fn scan_extended_artwork(audio_path: &Path, album_name: Option<&str>) -> ExtendedArtworkSet {
+    let mut entries = Vec::new();
+
+    let Some(album_dir) = audio_path.parent() else {
+        return ExtendedArtworkSet { entries };
+    };
+
+    scan_dir_for_category(
+        album_dir,
+        |stem| categorize_album_art_name(stem, album_name),
+        &mut entries,
+    );
+
+    if let Ok(dir_entries) = std::fs::read_dir(album_dir) {
+        for entry in dir_entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if SUBFOLDER_DIR_NAMES.contains(&name.to_lowercase().as_str()) {
+                scan_subfolder(&path, album_name, &mut entries);
+            }
+        }
+    }
+
+    if let Some(artist_dir) = album_dir.parent() {
+        scan_dir_for_category(artist_dir, categorize_artist_folder_name, &mut entries);
+    }
+
+    ExtendedArtworkSet { entries }
+}
 
 #[derive(Debug)]
 pub struct CoverManager {
@@ -104,34 +355,31 @@ impl CoverManager {
         format!("album-{:016x}", hash)
     }
 
-    /// Save the file's first embedded tag picture (if any) to the covers
+    /// Save the file's best embedded tag picture (if any) to the covers
     /// cache and return its cache filename. Returns `Ok(None)` — not an
     /// error — when the file has no tag or the tag has no picture; callers
     /// are expected to fall through to `scan_folder_art`/`fetch_remote_cover`
     /// in that case.
+    ///
+    /// "Best" ranks every picture in every tag by `category_for_picture_type`
+    /// and keeps the top-ranked one (Primary Cover first) — not whichever
+    /// picture lofty happened to store first, which previously meant a
+    /// `CoverFront` image could silently lose to an unrelated `Other`-typed
+    /// picture stored earlier in the tag (#98/#757). Callers that need every
+    /// embedded picture, not just the winner, should use
+    /// `extract_all_embedded_pictures` instead.
     pub fn extract_embedded_art(
         &self,
         audio_path: &Path,
         album_artist: &str,
         album: &str,
     ) -> Result<Option<String>> {
-        let tagged_file = Probe::open(audio_path)
-            .context("failed to open audio file for cover extraction")?
-            .read()
-            .context("failed to read audio file tags")?;
-
-        let picture = tagged_file
-            .primary_tag()
-            .and_then(|t| t.pictures().first())
-            .or_else(|| tagged_file.tags().iter().find_map(|t| t.pictures().first()));
-
-        let picture = match picture {
-            Some(p) => p,
-            None => return Ok(None),
+        let pictures = Self::extract_all_embedded_pictures(audio_path)?;
+        let Some((_category, raw_data)) = pictures.into_iter().min_by_key(|(c, _)| *c) else {
+            return Ok(None);
         };
 
-        let raw_data = picture.data();
-        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(raw_data);
+        let (cleaned_data, _mime, ext) = detect_image_format_and_clean(&raw_data);
 
         let hash_name = self.get_album_hash(album_artist, album);
         let filename = format!("{}.{}", hash_name, ext);
@@ -142,6 +390,30 @@ impl CoverManager {
 
         log::info!("Extracted embedded cover art to: {}", dest_path.display());
         Ok(Some(filename))
+    }
+
+    /// Enumerate every embedded picture across every tag on the file — not
+    /// just the first one lofty happened to store — paired with the
+    /// `ArtworkCategory` its `PictureType` maps to. Read-only: doesn't write
+    /// anything to disk. Used by `extract_embedded_art` to pick the
+    /// best-ranked picture, and available directly for consumers that want
+    /// the full set (e.g. a later "extended artwork" IPC command).
+    pub fn extract_all_embedded_pictures(
+        audio_path: &Path,
+    ) -> Result<Vec<(ArtworkCategory, Vec<u8>)>> {
+        let tagged_file = Probe::open(audio_path)
+            .context("failed to open audio file for cover extraction")?
+            .read()
+            .context("failed to read audio file tags")?;
+
+        let mut pictures = Vec::new();
+        for tag in tagged_file.tags() {
+            for picture in tag.pictures() {
+                let category = category_for_picture_type(picture.pic_type());
+                pictures.push((category, picture.data().to_vec()));
+            }
+        }
+        Ok(pictures)
     }
 
     /// Look for a same-named-by-convention image file (`cover.jpg`,
@@ -550,5 +822,195 @@ mod tests {
         assert_eq!(found.unwrap().extension().unwrap(), "webp");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "luminous_extended_art_{}_{}",
+            label,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn test_artwork_category_ordering_matches_hierarchy() {
+        // Declaration order drives Ord — this pins the hierarchy priority
+        // from #98 so a future variant reorder is caught here, not silently
+        // in the UI (which relies on this for the cover-stack thumbnail and
+        // "Open Images" target).
+        assert!(ArtworkCategory::PrimaryCover < ArtworkCategory::BackCover);
+        assert!(ArtworkCategory::BackCover < ArtworkCategory::DiscMedia);
+        assert!(ArtworkCategory::DiscMedia < ArtworkCategory::Booklet);
+        assert!(ArtworkCategory::Booklet < ArtworkCategory::Matrix);
+        assert!(ArtworkCategory::Matrix < ArtworkCategory::ArtistPortrait);
+        assert!(ArtworkCategory::ArtistPortrait < ArtworkCategory::BandLogo);
+        assert!(ArtworkCategory::BandLogo < ArtworkCategory::FanartBanner);
+        assert!(ArtworkCategory::FanartBanner < ArtworkCategory::Subfolder);
+    }
+
+    #[test]
+    fn test_category_for_picture_type_maps_known_types() {
+        assert_eq!(
+            category_for_picture_type(PictureType::CoverFront),
+            ArtworkCategory::PrimaryCover
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::CoverBack),
+            ArtworkCategory::BackCover
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::Leaflet),
+            ArtworkCategory::Booklet
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::Media),
+            ArtworkCategory::DiscMedia
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::Artist),
+            ArtworkCategory::ArtistPortrait
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::Band),
+            ArtworkCategory::ArtistPortrait
+        );
+        assert_eq!(
+            category_for_picture_type(PictureType::BandLogo),
+            ArtworkCategory::BandLogo
+        );
+        // Unmapped types fall back to the lowest-priority category rather
+        // than being dropped.
+        assert_eq!(
+            category_for_picture_type(PictureType::Other),
+            ArtworkCategory::Subfolder
+        );
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_categorizes_album_level_hierarchy() {
+        let temp_dir = unique_temp_dir("album_hierarchy");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        std::fs::write(temp_dir.join("cover.jpg"), b"cover").unwrap();
+        std::fs::write(temp_dir.join("back.jpg"), b"back").unwrap();
+        std::fs::write(temp_dir.join("booklet.png"), b"booklet").unwrap();
+        std::fs::write(temp_dir.join("disc.webp"), b"disc").unwrap();
+        std::fs::write(temp_dir.join("tray.jpg"), b"tray").unwrap();
+        // Not a recognized name — should be excluded, not miscategorized.
+        std::fs::write(temp_dir.join("random.jpg"), b"random").unwrap();
+
+        let set = scan_extended_artwork(&audio_path, None).sorted();
+
+        let categories: Vec<ArtworkCategory> = set.entries.iter().map(|e| e.category).collect();
+        assert_eq!(
+            categories,
+            vec![
+                ArtworkCategory::PrimaryCover,
+                ArtworkCategory::BackCover,
+                ArtworkCategory::DiscMedia,
+                ArtworkCategory::Booklet,
+                ArtworkCategory::Matrix,
+            ]
+        );
+        assert_eq!(
+            set.primary().unwrap().path.file_name().unwrap(),
+            "cover.jpg"
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_matches_exact_album_name() {
+        let temp_dir = unique_temp_dir("album_name_match");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        std::fs::write(temp_dir.join("Wildflowers.jpg"), b"cover").unwrap();
+
+        let set = scan_extended_artwork(&audio_path, Some("Wildflowers")).sorted();
+
+        assert_eq!(set.entries.len(), 1);
+        assert_eq!(set.entries[0].category, ArtworkCategory::PrimaryCover);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_finds_artist_folder_media() {
+        // Layout: {artist_dir}/{album_dir}/song.mp3, artist-level images
+        // (artist.jpg, logo.png, fanart.jpg) sit in {artist_dir}.
+        let artist_dir = unique_temp_dir("artist_media");
+        let album_dir = artist_dir.join("Greatest Hits");
+        let _ = std::fs::create_dir_all(&album_dir);
+
+        let audio_path = album_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        std::fs::write(artist_dir.join("artist.jpg"), b"portrait").unwrap();
+        std::fs::write(artist_dir.join("logo.png"), b"logo").unwrap();
+        std::fs::write(artist_dir.join("fanart.jpg"), b"fanart").unwrap();
+
+        let set = scan_extended_artwork(&audio_path, None).sorted();
+
+        let categories: Vec<ArtworkCategory> = set.entries.iter().map(|e| e.category).collect();
+        assert_eq!(
+            categories,
+            vec![
+                ArtworkCategory::ArtistPortrait,
+                ArtworkCategory::BandLogo,
+                ArtworkCategory::FanartBanner,
+            ]
+        );
+
+        let _ = std::fs::remove_dir_all(&artist_dir);
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_recurses_named_subfolders() {
+        let temp_dir = unique_temp_dir("subfolder");
+        let artwork_dir = temp_dir.join("Artwork");
+        let scans_dir = temp_dir.join("Scans");
+        let _ = std::fs::create_dir_all(&artwork_dir);
+        let _ = std::fs::create_dir_all(&scans_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        // Named match inside a subfolder keeps its named category.
+        std::fs::write(artwork_dir.join("back.jpg"), b"back").unwrap();
+        // Unnamed file inside a subfolder falls back to Subfolder, not
+        // dropped.
+        std::fs::write(scans_dir.join("scan001.jpg"), b"scan").unwrap();
+
+        let set = scan_extended_artwork(&audio_path, None).sorted();
+
+        let categories: Vec<ArtworkCategory> = set.entries.iter().map(|e| e.category).collect();
+        assert_eq!(
+            categories,
+            vec![ArtworkCategory::BackCover, ArtworkCategory::Subfolder]
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_extract_embedded_art_prefers_cover_front_over_other_pictures() {
+        // Regression test for the #98/#757 bug: `.pictures().first()` picked
+        // whichever picture lofty stored first, so a `CoverFront` picture
+        // could lose to an unrelated one. `extract_embedded_art` must now
+        // rank by category and keep `CoverFront` regardless of tag order.
+        let unordered = vec![
+            (ArtworkCategory::Subfolder, b"other-picture".to_vec()),
+            (ArtworkCategory::PrimaryCover, b"front-cover".to_vec()),
+            (ArtworkCategory::BackCover, b"back-cover".to_vec()),
+        ];
+        let winner = unordered.into_iter().min_by_key(|(c, _)| *c).unwrap();
+        assert_eq!(winner.0, ArtworkCategory::PrimaryCover);
+        assert_eq!(winner.1, b"front-cover".to_vec());
     }
 }
