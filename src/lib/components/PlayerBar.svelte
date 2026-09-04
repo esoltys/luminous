@@ -48,7 +48,8 @@
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
-    MusicNotesIcon as Music
+    MusicNotesIcon as Music,
+    InfoIcon as Info
   } from "phosphor-svelte";
 
 
@@ -319,7 +320,7 @@
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
           title={i18n.t('playerBar.play')}
         >
-          <Play class="w-4 h-4 fill-current ml-0.5" />
+          <Play class="w-4 h-4 fill-current" />
         </button>
       {/if}
 
@@ -349,6 +350,14 @@
           </button>
         {/if}
       </div>
+
+      <button
+        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+        class="min-[700px]:hidden text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
+        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+      >
+        <PictureInPicture class="w-4 h-4" />
+      </button>
 
     </div>
 
@@ -403,14 +412,24 @@
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
-    <button
-      onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-      class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
-      title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-    >
-
-      <PictureInPicture class="w-4.5 h-4.5" />
-    </button>
+    <div class="hidden min-[700px]:flex flex-col items-center justify-center gap-1 flex-shrink-0">
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <button
+          onclick={() => windowLayoutStore.toggleRightPanel()}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''}"
+          title={i18n.t('topNav.toggleRightPanel')}
+        >
+          <Info class="w-5 h-5" />
+        </button>
+      {/if}
+      <button
+        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60"
+        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+      >
+        <PictureInPicture class="w-4.5 h-4.5" />
+      </button>
+    </div>
   </div>
 </footer>
 

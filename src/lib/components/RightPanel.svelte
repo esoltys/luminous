@@ -1,9 +1,14 @@
 <script lang="ts">
   import { playerStore } from "../stores/player.svelte";
   import { themeStore } from "../stores/theme.svelte";
-  import { MusicNotesIcon as Music, ClockIcon as Clock } from "phosphor-svelte";
+  import {
+    MusicNotesIcon as Music,
+    ClockIcon as Clock,
+    ArrowSquareOutIcon as ExternalLink
+  } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
+  import { openExternalUrl } from "../utils/openExternalUrl";
   import GenreChips from "./GenreChips.svelte";
 
   interface Props {
@@ -42,6 +47,43 @@
     }
   }
 
+  const musicbrainzRows = $derived.by(() => {
+    if (!currentSong) return [];
+    const entries: { label: string; id?: string; entityPath: string; name?: string }[] = [
+      { label: i18n.t('playerBar.musicbrainzArtistLabel', {}, 'Artist'), id: currentSong.musicbrainz_artist_id, entityPath: "artist", name: currentSong.artist },
+      // Skip Album Artist when it's the same MusicBrainz entity as Artist (the common case for a
+      // non-compilation release) — showing the identical name/link twice is just noise.
+      ...(currentSong.musicbrainz_album_artist_id && currentSong.musicbrainz_album_artist_id !== currentSong.musicbrainz_artist_id
+        ? [{ label: i18n.t('playerBar.musicbrainzAlbumArtistLabel', {}, 'Album Artist'), id: currentSong.musicbrainz_album_artist_id, entityPath: "artist", name: currentSong.album_artist }]
+        : []),
+      { label: i18n.t('playerBar.musicbrainzReleaseLabel', {}, 'Release'), id: currentSong.musicbrainz_album_id, entityPath: "release", name: currentSong.album },
+      { label: i18n.t('playerBar.musicbrainzReleaseGroupLabel', {}, 'Release Group'), id: currentSong.musicbrainz_release_group_id, entityPath: "release-group", name: currentSong.album },
+      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id, entityPath: "recording", name: currentSong.title },
+      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id, entityPath: "track", name: currentSong.title },
+      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id, entityPath: "work", name: currentSong.title },
+    ];
+    return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
+  });
+
+  /** Descriptive release metadata Picard writes alongside the MusicBrainz
+      IDs, but not IDs themselves — no entity page to link to, so these
+      render as plain text rows rather than clickable rows like `musicbrainzRows`. */
+  const musicbrainzMetaRows = $derived.by(() => {
+    if (!currentSong) return [];
+    const entries: { label: string; value?: string }[] = [
+      {
+        label: i18n.t('playerBar.musicbrainzReleaseTypeLabel', {}, 'Type'),
+        value: currentSong.musicbrainz_release_type
+          ? currentSong.musicbrainz_release_type.charAt(0).toUpperCase() + currentSong.musicbrainz_release_type.slice(1)
+          : undefined,
+      },
+      { label: i18n.t('playerBar.musicbrainzReleaseCountryLabel', {}, 'Country'), value: currentSong.musicbrainz_release_country },
+      { label: i18n.t('playerBar.barcodeLabel', {}, 'Barcode'), value: currentSong.barcode },
+      { label: i18n.t('playerBar.catalogNumberLabel', {}, 'Catalog #'), value: currentSong.catalog_number },
+    ];
+    return entries.filter((e): e is { label: string; value: string } => !!e.value);
+  });
+
   function formatChannels(channels?: number): string {
     if (!channels) return "";
     if (channels === 1) return i18n.t('playerBar.channelsMono', {}, 'Mono');
@@ -56,8 +98,60 @@
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >
-  <div class="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-6">
+  <!-- The floating PlayerBar dock (h-20 + bottom-4 inset = 96px = mb-24) overlays
+       the bottom of the app on top of this panel — a bottom *margin* (rather than
+       inner padding) actually shrinks this div's own box, so its scrollbar ends
+       above the dock instead of running the full sidebar height behind it. -->
+  <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
+      <div class="space-y-2 text-xs">
+        {#if currentSong.year}
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.year}</span>
+          </div>
+        {/if}
+        {#if currentSong.genre}
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
+            <div class="min-w-0 flex justify-end">
+              <GenreChips genre={currentSong.genre} variant="full" />
+            </div>
+          </div>
+        {/if}
+        {#if currentSong.composer}
+          <div class="flex items-start justify-between gap-3">
+            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.composerLabel', {}, 'Composer')}</span>
+            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.composer}</span>
+          </div>
+        {/if}
+      </div>
+
+      {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0}
+        <div class="space-y-2 text-xs">
+          <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
+          {#each musicbrainzRows as row (row.label)}
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+              <button
+                type="button"
+                onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
+                class="group relative text-right transition-colors cursor-pointer min-w-0"
+              >
+                <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
+                <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            </div>
+          {/each}
+          {#each musicbrainzMetaRows as row (row.label)}
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+              <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
       <div class="space-y-2">
         {#if currentSong.filetype}
           <div class="flex items-start justify-between gap-3 text-xs">
@@ -93,29 +187,6 @@
           <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.lyricsStatusLabel', {}, 'Lyrics')}</span>
           <span class="text-brand-text-primary text-right break-words min-w-0">{lyricsStatusLabel()}</span>
         </div>
-      </div>
-
-      <div class="space-y-2 text-xs">
-        {#if currentSong.year}
-          <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.releasedLabel', {}, 'Released')}</span>
-            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.year}</span>
-          </div>
-        {/if}
-        {#if currentSong.genre}
-          <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.genreLabel', {}, 'Genre')}</span>
-            <div class="min-w-0 flex justify-end">
-              <GenreChips genre={currentSong.genre} variant="full" />
-            </div>
-          </div>
-        {/if}
-        {#if currentSong.composer}
-          <div class="flex items-start justify-between gap-3">
-            <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.composerLabel', {}, 'Composer')}</span>
-            <span class="text-brand-text-secondary text-right break-words min-w-0">{currentSong.composer}</span>
-          </div>
-        {/if}
       </div>
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center">

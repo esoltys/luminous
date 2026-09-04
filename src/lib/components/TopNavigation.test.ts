@@ -33,18 +33,6 @@ describe("TopNavigation.svelte", () => {
     expect(windowLayoutStore.sidebarWidth).toBe(256);
   });
 
-  it("hides the right-panel toggle at the same breakpoint that auto-hides the panel itself", () => {
-    windowLayoutStore.viewportWidth = 1280;
-    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
-    const { queryByTitle } = render(TopNavigation);
-    expect(queryByTitle("Show Info Panel")).not.toBeNull();
-
-    windowLayoutStore.viewportWidth = 800;
-    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
-    const { queryByTitle: queryByTitleNarrow } = render(TopNavigation);
-    expect(queryByTitleNarrow("Show Info Panel")).toBeNull();
-  });
-
   it("hides the sidebar compact/expand toggle at the same breakpoint that auto-collapses it", () => {
     windowLayoutStore.viewportWidth = 1280;
     expect(windowLayoutStore.isSidebarAutoCollapsed).toBe(false);

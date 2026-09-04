@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 23;
+pub const CURRENT_SCHEMA_VERSION: i32 = 24;
 
 struct Migration {
     version: i32,
@@ -153,6 +153,19 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_not_included {
                 conn.execute_batch(MIGRATION_23)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 24,
+        description: "release type/country/barcode/catalog number columns on songs table (#752)",
+        apply: |conn| {
+            let has_release_type: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'musicbrainz_release_type'")?
+                .exists([])?;
+            if !has_release_type {
+                conn.execute_batch(MIGRATION_24)?;
             }
             Ok(())
         },
@@ -683,6 +696,18 @@ CREATE INDEX IF NOT EXISTS idx_album_chart_history_period ON album_chart_history
 
 const MIGRATION_23: &str = "
 ALTER TABLE songs ADD COLUMN not_included BOOLEAN NOT NULL DEFAULT 0;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 24: release type/country/barcode/catalog number columns (#752).
+// Adjacent to the MusicBrainz IDs but not IDs themselves — descriptive
+// release metadata Picard writes alongside them.
+// ---------------------------------------------------------------------------
+const MIGRATION_24: &str = "
+ALTER TABLE songs ADD COLUMN musicbrainz_release_type TEXT;
+ALTER TABLE songs ADD COLUMN musicbrainz_release_country TEXT;
+ALTER TABLE songs ADD COLUMN barcode TEXT;
+ALTER TABLE songs ADD COLUMN catalog_number TEXT;
 ";
 
 // ---------------------------------------------------------------------------

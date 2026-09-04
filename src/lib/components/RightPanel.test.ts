@@ -1,12 +1,17 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/svelte";
+import { render, fireEvent } from "@testing-library/svelte";
 import RightPanel from "./RightPanel.svelte";
 import { playerStore } from "../stores/player.svelte";
 import type { Song } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(null),
+}));
+
+const openExternalUrlMock = vi.fn();
+vi.mock("../utils/openExternalUrl", () => ({
+  openExternalUrl: (url: string) => openExternalUrlMock(url),
 }));
 
 describe("RightPanel.svelte", () => {
@@ -90,5 +95,94 @@ describe("RightPanel.svelte", () => {
 
     expect(getByText("Channels")).toBeInTheDocument();
     expect(getByText("5.1 Surround")).toBeInTheDocument();
+  });
+
+  it("hides the MusicBrainz section when no MusicBrainz IDs are present", () => {
+    playerStore.currentSong = mockSong;
+    const { queryByAltText } = render(RightPanel);
+
+    expect(queryByAltText("MusicBrainz")).not.toBeInTheDocument();
+  });
+
+  it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      album_artist: "Other Artist",
+      musicbrainz_artist_id: "artist-uuid",
+      musicbrainz_album_artist_id: "album-artist-uuid",
+    };
+    const { getByText, getByAltText, queryByText } = render(RightPanel);
+
+    expect(getByAltText("MusicBrainz")).toBeInTheDocument();
+    expect(getByText("Test Artist")).toBeInTheDocument();
+    expect(getByText("Other Artist")).toBeInTheDocument();
+    expect(queryByText("artist-uuid")).not.toBeInTheDocument();
+    expect(queryByText("Release")).not.toBeInTheDocument();
+  });
+
+  it("hides Album Artist when it's the same MusicBrainz entity as Artist", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_artist_id: "same-uuid",
+      musicbrainz_album_artist_id: "same-uuid",
+    };
+    const { getByText, queryByText } = render(RightPanel);
+
+    expect(getByText("Artist")).toBeInTheDocument();
+    expect(queryByText("Album Artist")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the raw ID when no matching name field is available", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      title: "",
+      musicbrainz_recording_id: "recording-uuid",
+    };
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("recording-uuid")).toBeInTheDocument();
+  });
+
+  it("opens the MusicBrainz entity page when a MusicBrainz row is clicked", async () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_recording_id: "recording-uuid",
+    };
+    const { getByText } = render(RightPanel);
+
+    await fireEvent.click(getByText("Test Track Title"));
+
+    expect(openExternalUrlMock).toHaveBeenCalledWith(
+      "https://musicbrainz.org/recording/recording-uuid"
+    );
+  });
+
+  it("shows release type/country/barcode/catalog # as plain text, title-casing the release type", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      musicbrainz_release_type: "album",
+      musicbrainz_release_country: "JP",
+      barcode: "4988011329586",
+      catalog_number: "PHCR-1144",
+    };
+    const { getByText, getByAltText } = render(RightPanel);
+
+    expect(getByAltText("MusicBrainz")).toBeInTheDocument();
+    expect(getByText("Album")).toBeInTheDocument();
+    expect(getByText("JP")).toBeInTheDocument();
+    expect(getByText("4988011329586")).toBeInTheDocument();
+    expect(getByText("PHCR-1144")).toBeInTheDocument();
+  });
+
+  it("shows the MusicBrainz section for release metadata alone, with no MusicBrainz IDs at all", () => {
+    playerStore.currentSong = {
+      ...mockSong,
+      barcode: "4988011329586",
+    };
+    const { getByText, getByAltText, queryByText } = render(RightPanel);
+
+    expect(getByAltText("MusicBrainz")).toBeInTheDocument();
+    expect(getByText("Barcode")).toBeInTheDocument();
+    expect(queryByText("Artist")).not.toBeInTheDocument();
   });
 });

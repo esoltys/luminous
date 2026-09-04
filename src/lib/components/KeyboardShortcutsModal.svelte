@@ -36,7 +36,7 @@
       entries: [
         { keys: ["Ctrl", "1"], label: i18n.t("shortcuts.toggleSidebar") },
         { keys: ["Ctrl", "2"], label: i18n.t("shortcuts.toggleImmersive") },
-        { keys: ["Ctrl", "3"], label: i18n.t("shortcuts.toggleRightPanel") },
+        { keys: ["Ctrl", "I"], label: i18n.t("shortcuts.toggleRightPanel") },
         { keys: ["Ctrl", "M"], label: i18n.t("shortcuts.toggleMiniplayer") },
         { keys: ["Ctrl", ","], label: i18n.t("shortcuts.openSettings") },
         { keys: ["Ctrl", "/"], label: i18n.t("shortcuts.showShortcuts") }

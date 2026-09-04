@@ -137,16 +137,34 @@
     editingSongId = songId;
   }
 
-  function refetchSongs() {
-    invoke<Song[]>("get_songs_by_artist", { artist: artistName }).then((fetchedSongs) => {
-      songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
-    });
+  async function refetchSongs() {
+    const fetchedSongs = await invoke<Song[]>("get_songs_by_artist", { artist: artistName });
+    songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
   }
 
-  function handleTagEditorSaved() {
+  async function handleTagEditorSaved() {
     collectionStore.refreshLibrary();
     tagsStore.load();
-    refetchSongs();
+
+    const editedSongId = editingSongId;
+    await refetchSongs();
+
+    // Renaming the just-edited track's (album) artist can leave this artist
+    // with none of its previously-loaded songs still matching `artistName` —
+    // get_songs_by_artist then comes back empty even though the artist still
+    // exists, just under a new name. Follow it instead of showing a stale,
+    // empty page.
+    if (songs.length === 0 && editedSongId !== null) {
+      try {
+        const details = await invoke<{ artist: string; album_artist: string }>("get_song_details", { songId: editedSongId });
+        const newArtist = details.album_artist || details.artist;
+        if (newArtist && newArtist !== artistName) {
+          navigationStore.selectedArtistName = newArtist;
+        }
+      } catch (err) {
+        console.error("Failed to resolve current artist name after tag edit:", err);
+      }
+    }
   }
 
   async function rateSingle(song: Song, rating: number) {

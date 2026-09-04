@@ -35,6 +35,8 @@ pub struct SongDetails {
     pub rating: f32,
     pub compilation: bool,
     pub art_embedded: bool,
+    pub acoustid_id: Option<String>,
+    pub acoustid_fingerprint: Option<String>,
 }
 
 #[tauri::command]
@@ -45,7 +47,7 @@ pub async fn get_song_details(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT id, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort, composer, composersort, genre, genresort, track, disc, year,
-                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded
+                originalyear, grouping, bpm, initial_key, rating, compilation, art_embedded, acoustid_id, acoustid_fingerprint
          FROM songs WHERE id = ?1",
         rusqlite::params![song_id],
         |row| {
@@ -74,6 +76,8 @@ pub async fn get_song_details(
                 rating: row.get(21).unwrap_or(crate::stats::RATING_UNRATED),
                 compilation: row.get(22).unwrap_or(false),
                 art_embedded: row.get(23).unwrap_or(false),
+                acoustid_id: row.get(24).ok(),
+                acoustid_fingerprint: row.get(25).ok(),
             })
         },
     )
@@ -149,6 +153,11 @@ pub async fn save_song_tags(
     grouping: String,
     bpm: Option<f32>,
     initial_key: String,
+    // Set only when the caller just ran a fresh AcoustID lookup (#752) — `None`
+    // means "no change," not "clear it," so an ordinary tag edit falls back to
+    // whatever's already on the song rather than wiping a prior match.
+    acoustid_id: Option<String>,
+    acoustid_fingerprint: Option<String>,
 ) -> Result<(), String> {
     // Written tags are an app-driven change Luminous already knows about, not
     // an external addition — without this, the realtime watcher would pick up
@@ -157,13 +166,20 @@ pub async fn save_song_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let (path_str, compilation): (String, bool) = conn
+    let (path_str, compilation, existing_acoustid_id, existing_acoustid_fingerprint): (
+        String,
+        bool,
+        Option<String>,
+        Option<String>,
+    ) = conn
         .query_row(
-            "SELECT path, compilation FROM songs WHERE id = ?1",
+            "SELECT path, compilation, acoustid_id, acoustid_fingerprint FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
+    let acoustid_id = acoustid_id.or(existing_acoustid_id);
+    let acoustid_fingerprint = acoustid_fingerprint.or(existing_acoustid_fingerprint);
 
     let path = std::path::PathBuf::from(path_str);
     // Close the timing race the coarse guard above can't (#514): the OS's own
@@ -199,6 +215,8 @@ pub async fn save_song_tags(
     let genre_c = genre_str.clone();
     let grouping_c = grouping.clone();
     let initial_key_c = initial_key.clone();
+    let acoustid_id_c = acoustid_id.clone();
+    let acoustid_fingerprint_c = acoustid_fingerprint.clone();
 
     tauri::async_runtime::spawn_blocking(move || {
         crate::tageditor::write_tags(
@@ -223,6 +241,8 @@ pub async fn save_song_tags(
                 bpm,
                 initial_key: &initial_key_c,
                 compilation,
+                acoustid_id: acoustid_id_c.as_deref(),
+                acoustid_fingerprint: acoustid_fingerprint_c.as_deref(),
             },
         )
     })
@@ -251,8 +271,10 @@ pub async fn save_song_tags(
             originalyear = ?16,
             grouping = ?17,
             bpm = ?18,
-            initial_key = ?19
-         WHERE id = ?20",
+            initial_key = ?19,
+            acoustid_id = ?20,
+            acoustid_fingerprint = ?21
+         WHERE id = ?22",
         rusqlite::params![
             title,
             titlesort,
@@ -273,6 +295,8 @@ pub async fn save_song_tags(
             grouping,
             bpm,
             initial_key,
+            acoustid_id,
+            acoustid_fingerprint,
             song_id
         ],
     )
@@ -321,12 +345,14 @@ pub async fn save_album_tags(
         grouping: String,
         bpm: Option<f32>,
         initial_key: String,
+        acoustid_id: Option<String>,
+        acoustid_fingerprint: Option<String>,
     }
 
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key
+            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key, acoustid_id, acoustid_fingerprint
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
@@ -344,6 +370,8 @@ pub async fn save_album_tags(
                     grouping: row.get(9).unwrap_or_default(),
                     bpm: row.get(10).ok(),
                     initial_key: row.get(11).unwrap_or_default(),
+                    acoustid_id: row.get(12).ok(),
+                    acoustid_fingerprint: row.get(13).ok(),
                 })
             },
         );
@@ -396,6 +424,8 @@ pub async fn save_album_tags(
                     bpm: item.bpm,
                     initial_key: &item.initial_key,
                     compilation,
+                    acoustid_id: item.acoustid_id.as_deref(),
+                    acoustid_fingerprint: item.acoustid_fingerprint.as_deref(),
                 },
             );
             match write_res {
