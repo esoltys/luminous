@@ -17,6 +17,7 @@ describe("TopNavigation.svelte", () => {
     collectionStore.artists = [];
     collectionStore.searchQuery = "";
     collectionStore.extendedArtworkByArtist = {};
+    collectionStore.recentSearches = [];
   });
 
   it("toggles sidebar compact state when clicking the hamburger menu button", async () => {
@@ -82,5 +83,66 @@ describe("TopNavigation.svelte", () => {
     const portrait = await findByAltText("Dave Hawkins");
     expect(portrait.tagName).toBe("IMG");
     expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+  });
+
+  it("shows a discovered artist portrait instead of the generic icon in Recent Searches (#98/#761)", async () => {
+    collectionStore.recentSearches = [
+      { id: "1", kind: "artist", title: "Dave Hawkins", subtitle: "Artist", timestamp: Date.now() },
+    ];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_extended_artwork_for_artist") {
+        return {
+          count: 1,
+          primary_uri: null,
+          artist_portrait_uri: "luminous-art://local/C:/Music/Dave Hawkins/artist.jpg",
+          band_logo_uri: null,
+          fanart_uri: null,
+          items: [],
+        };
+      }
+      return null;
+    });
+
+    const { getByPlaceholderText, findByAltText } = render(TopNavigation);
+    const searchInput = getByPlaceholderText(/search/i) as HTMLInputElement;
+    // Empty-query focus shows Recent Searches, not live suggestions.
+    await fireEvent.focus(searchInput);
+
+    const portrait = await findByAltText("Dave Hawkins");
+    expect(portrait.tagName).toBe("IMG");
+    expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
+  });
+
+  it("falls back to the stored artUrl for a Recent Searches artist with no discovered portrait", async () => {
+    collectionStore.recentSearches = [
+      {
+        id: "1",
+        kind: "artist",
+        title: "Old Style Artist",
+        subtitle: "Artist",
+        artUrl: "luminous-art://album-abc123.jpg",
+        timestamp: Date.now(),
+      },
+    ];
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_extended_artwork_for_artist") {
+        return {
+          count: 0,
+          primary_uri: null,
+          artist_portrait_uri: null,
+          band_logo_uri: null,
+          fanart_uri: null,
+          items: [],
+        };
+      }
+      return null;
+    });
+
+    const { getByPlaceholderText, findByAltText } = render(TopNavigation);
+    const searchInput = getByPlaceholderText(/search/i) as HTMLInputElement;
+    await fireEvent.focus(searchInput);
+
+    const img = await findByAltText(/Album Art/i);
+    expect(img.tagName).toBe("IMG");
   });
 });

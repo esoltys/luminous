@@ -618,18 +618,44 @@
                 class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
               >
                 <div class="flex items-center gap-3 min-w-0 flex-1">
-                  {#if item.artUrl}
+                  {#if item.kind === 'artist'}
+                    {#await collectionStore.getExtendedArtworkForArtist(item.title)}
+                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                    {:then artwork}
+                      {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                      {#if portraitUrl}
+                        <div class="w-9 h-9 flex-shrink-0 overflow-hidden bg-brand-sidebar border border-brand-border">
+                          <img src={portraitUrl} alt={item.title} class="w-full h-full object-cover" />
+                        </div>
+                      {:else if item.artUrl}
+                        <CoverArt
+                          songId={typeof item.entityId === 'number' ? item.entityId : undefined}
+                          artManual={item.artUrl}
+                          artAutomatic={item.artUrl}
+                          sizeClass="w-9 h-9 rounded-full"
+                        />
+                      {:else}
+                        <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                          <User class="w-4 h-4 text-brand-text-secondary" />
+                        </div>
+                      {/if}
+                    {:catch}
+                      <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden rounded-full">
+                        <User class="w-4 h-4 text-brand-text-secondary" />
+                      </div>
+                    {/await}
+                  {:else if item.artUrl}
                     <CoverArt
                       songId={typeof item.entityId === 'number' ? item.entityId : undefined}
                       artManual={item.artUrl}
                       artAutomatic={item.artUrl}
-                      sizeClass="w-9 h-9 {item.kind === 'artist' ? 'rounded-full' : ''}"
+                      sizeClass="w-9 h-9"
                     />
                   {:else}
-                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden {item.kind === 'artist' ? 'rounded-full' : ''}">
-                      {#if item.kind === 'artist'}
-                        <User class="w-4 h-4 text-brand-text-secondary" />
-                      {:else if item.kind === 'album'}
+                    <div class="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                      {#if item.kind === 'album'}
                         <Disc class="w-4 h-4 text-brand-text-secondary" />
                       {:else if item.kind === 'playlist'}
                         <ListMusic class="w-4 h-4 text-brand-text-secondary" />
