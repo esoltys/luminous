@@ -40,6 +40,8 @@ class PrefsStore {
   genreSortAsc = $state<boolean>(true);
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
+  /** Off by default; mirrors the OS's actual registration, queried fresh on init. */
+  autostartEnabled = $state<boolean>(false);
 
   async init() {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
@@ -55,6 +57,11 @@ class PrefsStore {
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
+    try {
+      this.autostartEnabled = await invoke<boolean>("get_autostart_enabled");
+    } catch (e) {
+      console.error("Failed to read autostart state:", e);
+    }
   }
 
   /** Persist the whole current state — fire-and-forget on the backend. */
@@ -135,6 +142,20 @@ class PrefsStore {
   setMinimizeToTray(enabled: boolean) {
     this.minimizeToTray = enabled;
     invoke("set_minimize_to_tray_enabled", { enabled });
+  }
+
+  /** Proxies straight to the OS via the plugin, which can fail (permissions,
+   * sandboxed install) — awaits the result and reverts the toggle rather than
+   * assuming success. */
+  async setAutostart(enabled: boolean) {
+    const previous = this.autostartEnabled;
+    this.autostartEnabled = enabled;
+    try {
+      await invoke("set_autostart_enabled", { enabled });
+    } catch (e) {
+      console.error("Failed to set autostart:", e);
+      this.autostartEnabled = previous;
+    }
   }
 }
 

@@ -12,6 +12,7 @@
     "positioner:default",
     "updater:default",
     "process:allow-restart",
+    "autostart:default",
     {
       "identifier": "fs:allow-read",
       "allow": [

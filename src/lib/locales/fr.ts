@@ -236,6 +236,8 @@ export const fr = {
     ratingStyleHint: "Choisissez Cœur pour marquer les chansons comme favorites, ou 5 étoiles pour des notes par demi-étoile — les deux utilisent la même note.",
     minimizeToTrayLabel: "Réduire dans la barre système",
     minimizeToTrayHint: "Fermer la fenêtre masque Luminous dans la barre système au lieu de quitter l'application.",
+    launchAtLoginLabel: "Lancer au démarrage",
+    launchAtLoginHint: "Démarre Luminous automatiquement à l'ouverture de session.",
     appAndUpdatesTitle: "Application & Mises à jour",
     updateCheckNowBtn: "Rechercher des mises à jour",
     updateChecking: "Vérification...",

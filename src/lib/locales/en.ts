@@ -236,6 +236,8 @@ export const en = {
     ratingStyleHint: "Choose Heart to mark songs as favourites, or 5-star for half-step ratings — both save to the same rating.",
     minimizeToTrayLabel: "Minimize to tray",
     minimizeToTrayHint: "Closing the window hides Luminous to the system tray instead of quitting.",
+    launchAtLoginLabel: "Launch at login",
+    launchAtLoginHint: "Starts Luminous automatically when you sign in.",
     appAndUpdatesTitle: "Application & Updates",
     updateCheckNowBtn: "Check for Updates",
     updateChecking: "Checking...",
