@@ -355,6 +355,14 @@
         {/if}
       </div>
 
+      <button
+        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+        class="min-[700px]:hidden text-brand-text-secondary hover:text-brand-accent-text transition-colors flex-shrink-0"
+        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+      >
+        <PictureInPicture class="w-4 h-4" />
+      </button>
+
     </div>
 
     <div class="hidden min-[700px]:flex items-center gap-2.5 w-full text-[10px] text-brand-text-secondary/60">
@@ -413,7 +421,6 @@
       class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
       title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
     >
-
       <PictureInPicture class="w-4.5 h-4.5" />
     </button>
   </div>

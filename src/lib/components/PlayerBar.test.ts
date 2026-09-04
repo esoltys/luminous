@@ -282,15 +282,22 @@ describe("PlayerBar.svelte", () => {
     const { getAllByTitle, getByTitle, container } = render(PlayerBar);
 
     // Gone by Compact (Full-only): shuffle, repeat, the seek row, and the
-    // whole right column (volume/mute + expand) — the transport block takes
-    // the freed space instead, sticking to the right edge via ml-auto.
+    // volume/mute controls in the right column — the transport block takes
+    // the freed space instead, sticking to the right edge via ml-auto. The
+    // miniplayer toggle itself must stay visible at every tier (issue: it
+    // should never disappear), so it has two instances that swap places at
+    // the 700px boundary: one alongside volume/mute (Full only) and one in
+    // the transport row (Compact/Minimal only, hidden again once the
+    // right-column instance takes over).
     const shuffleBtn = getAllByTitle(/shuffle/i).find(el => el.querySelector("svg"))!;
     const repeatBtn = getAllByTitle(/repeat/i).find(el => el.querySelector("svg"))!;
     expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
     expect(repeatBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
     const volumeSlider = container.querySelector('input[type="range"]');
     expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
-    expect(getByTitle(/picture-in-picture/i)).toHaveClass("hidden", "min-[700px]:block");
+    const [transportToggle, rightColumnToggle] = getAllByTitle(/picture-in-picture/i);
+    expect(transportToggle).toHaveClass("min-[700px]:hidden");
+    expect(rightColumnToggle).toHaveClass("hidden", "min-[700px]:block");
     const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
     expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
