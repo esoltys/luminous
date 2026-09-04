@@ -29,6 +29,7 @@ pub mod pins;
 pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
+pub mod restart_manager;
 pub mod stats;
 pub mod tageditor;
 pub mod tags;
@@ -39,6 +40,8 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, ShortcutState};
+#[cfg(target_os = "windows")]
+use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 
 pub use audio::AudioEngine;
@@ -674,6 +677,35 @@ pub fn run() {
                 Database::new(app.path().app_data_dir().expect("no app data dir"))
                     .expect("failed to initialize database"),
             );
+
+            // Graceful Store (MSIX) update handling (#744): register for
+            // Restart Manager-driven relaunch, and fire a one-time "app
+            // updated" OS notification if the previous launch's persisted
+            // version differs from this one.
+            #[cfg(target_os = "windows")]
+            {
+                restart_manager::register_for_restart();
+
+                let info = crate::install_format::detect_install_format();
+                if let Ok(conn) = db.pool.get() {
+                    let stored: Option<String> = conn
+                        .query_row(
+                            "SELECT value FROM app_state WHERE key = 'launched_version'",
+                            [],
+                            |row| row.get(0),
+                        )
+                        .ok();
+                    let current = env!("CARGO_PKG_VERSION");
+                    if restart_manager::should_notify_update(&info.format, stored.as_deref(), current)
+                    {
+                        let body = format!("Luminous updated to v{current}");
+                        if let Err(e) = app.notification().builder().title("Luminous").body(&body).show()
+                        {
+                            log::warn!("Failed to show update notification: {e}");
+                        }
+                    }
+                }
+            }
 
             let audio_engine = AudioEngine::new();
             restore_equalizer_from_db(&db, &audio_engine);
