@@ -324,7 +324,7 @@
           class="w-8 h-8 rounded-full bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast flex items-center justify-center transition-colors"
           title={i18n.t('playerBar.play')}
         >
-          <Play class="w-4 h-4 fill-current ml-0.5" />
+          <Play class="w-4 h-4 fill-current" />
         </button>
       {/if}
 
