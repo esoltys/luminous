@@ -59,11 +59,13 @@
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">
     {#if artistPortraitUrl}
-      <img
-        src={artistPortraitUrl}
-        alt={artist.name || i18n.t('collection.unknownArtist')}
-        class="w-36 h-36 object-cover border border-brand-border"
-      />
+      <div class="w-36 h-36 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
+        <img
+          src={artistPortraitUrl}
+          alt={artist.name || i18n.t('collection.unknownArtist')}
+          class="w-full h-full object-cover"
+        />
+      </div>
     {:else}
       <CoverStack
         covers={covers}

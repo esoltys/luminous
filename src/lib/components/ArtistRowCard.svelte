@@ -52,11 +52,13 @@
 >
   <div class="row-span-2 relative overflow-hidden">
     {#if artistPortraitUrl}
-      <img
-        src={artistPortraitUrl}
-        alt={artist.name || i18n.t('collection.unknownArtist')}
-        class="w-11 h-11 object-cover border border-brand-border"
-      />
+      <div class="w-11 h-11 relative overflow-hidden bg-brand-sidebar border border-brand-border shrink-0">
+        <img
+          src={artistPortraitUrl}
+          alt={artist.name || i18n.t('collection.unknownArtist')}
+          class="w-full h-full object-cover"
+        />
+      </div>
     {:else}
       <CoverArt
         songId={frontCover?.songId}

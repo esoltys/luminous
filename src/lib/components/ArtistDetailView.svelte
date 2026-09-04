@@ -437,7 +437,7 @@
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
           {#if artistPortraitUrl}
             <div class="flex items-center justify-end w-full h-full my-auto select-none">
-              <div class="w-28 h-28 overflow-hidden relative border border-brand-border">
+              <div class="w-28 h-28 overflow-hidden relative bg-brand-sidebar border border-brand-border">
                 <img
                   src={artistPortraitUrl}
                   alt={artistName}
