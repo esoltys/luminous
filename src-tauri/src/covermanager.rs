@@ -37,6 +37,25 @@ pub enum ArtworkCategory {
     Subfolder,
 }
 
+impl ArtworkCategory {
+    /// Stable snake_case key used across the IPC boundary (#758) — the
+    /// frontend's `ExtendedArtworkCategory` union type (#759) mirrors these
+    /// exact values, so don't rename a variant here without updating there.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ArtworkCategory::PrimaryCover => "primary_cover",
+            ArtworkCategory::BackCover => "back_cover",
+            ArtworkCategory::DiscMedia => "disc_media",
+            ArtworkCategory::Booklet => "booklet",
+            ArtworkCategory::Matrix => "matrix",
+            ArtworkCategory::ArtistPortrait => "artist_portrait",
+            ArtworkCategory::BandLogo => "band_logo",
+            ArtworkCategory::FanartBanner => "fanart_banner",
+            ArtworkCategory::Subfolder => "subfolder",
+        }
+    }
+}
+
 /// One discovered artwork file, categorized and ready to sort by
 /// `ArtworkCategory` (primary key) then filename (tiebreaker) — see
 /// `ExtendedArtworkSet::sorted`.
@@ -265,6 +284,15 @@ pub fn scan_extended_artwork(audio_path: &Path, album_name: Option<&str>) -> Ext
     }
 
     ExtendedArtworkSet { entries }
+}
+
+/// Build a `luminous-art://local/` webview URI for an absolute filesystem
+/// path discovered by `scan_extended_artwork` — same convention the existing
+/// single-cover folder-art path uses (see `get_cover_art_uri`'s
+/// `local/` branch), so the frontend `<img>` tag handling doesn't need a
+/// second code path for extended artwork.
+pub fn local_artwork_uri(path: &Path) -> String {
+    format!("luminous-art://local/{}", path.to_string_lossy())
 }
 
 #[derive(Debug)]

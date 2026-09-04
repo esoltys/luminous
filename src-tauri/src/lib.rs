@@ -967,6 +967,9 @@ pub fn run() {
             // Cover Art commands
             commands::cover::get_cover_art_uri,
             commands::cover::fetch_remote_cover,
+            commands::cover::get_extended_artwork_for_song,
+            commands::cover::get_extended_artwork_for_artist,
+            commands::cover::open_artwork_path,
             // Visualizer commands
             commands::visualizer::get_waveform_data,
             commands::visualizer::get_band_waveform_data,
