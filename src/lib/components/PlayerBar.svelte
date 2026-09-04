@@ -441,6 +441,12 @@
      the shared variable itself. */
   :global(footer.glass-surface) {
     position: relative;
+    /* Establishes a local stacking context so .art-backdrop's negative
+       z-index (below) stays trapped behind this footer's own children
+       instead of escaping to whatever ancestor stacking context is next
+       up the tree — without this, the blurred art painted behind the
+       whole app layout (sidebar/content) instead of behind the bar. */
+    isolation: isolate;
     -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
     backdrop-filter: blur(20px) saturate(180%) !important;
     background-color: var(--glass-bg-playerbar) !important;
