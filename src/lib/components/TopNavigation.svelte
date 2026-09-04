@@ -400,7 +400,22 @@
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
-                        <User class="w-4 h-4 text-brand-text-secondary" />
+                        {#if artist.name}
+                          {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          {:then artwork}
+                            {@const portraitUrl = getCoverArtUrl(artwork.artist_portrait_uri)}
+                            {#if portraitUrl}
+                              <img src={portraitUrl} alt={artist.name} class="w-full h-full object-cover" />
+                            {:else}
+                              <User class="w-4 h-4 text-brand-text-secondary" />
+                            {/if}
+                          {:catch}
+                            <User class="w-4 h-4 text-brand-text-secondary" />
+                          {/await}
+                        {:else}
+                          <User class="w-4 h-4 text-brand-text-secondary" />
+                        {/if}
                       </div>
                       <div class="flex flex-col min-w-0 flex-1">
                         <span class="text-sm font-medium text-brand-text-primary truncate group-hover:text-brand-accent-text transition-colors">

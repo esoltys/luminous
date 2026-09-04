@@ -1,12 +1,22 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { invoke } from "@tauri-apps/api/core";
 import ArtistRowCard from "./ArtistRowCard.svelte";
 import type { ArtistItem, AlbumItem } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: vi.fn(() => ({
+    onResized: vi.fn(() => Promise.resolve(() => {})),
+    onMoved: vi.fn(() => Promise.resolve(() => {})),
+  })),
+}));
+
+import { collectionStore } from "../stores/collection.svelte";
 
 describe("ArtistRowCard.svelte", () => {
   const mockArtist: ArtistItem = {
@@ -31,6 +41,7 @@ describe("ArtistRowCard.svelte", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    collectionStore.extendedArtworkByArtist = {};
   });
 
   it("renders artist name, genre chip, and song count", () => {
@@ -69,5 +80,29 @@ describe("ArtistRowCard.svelte", () => {
 
     await fireEvent.click(getByText("Dave Hawkins"));
     expect(handleClick).toHaveBeenCalled();
+  });
+
+  it("renders a discovered artist portrait instead of the album-art front cover (#98/#761)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_extended_artwork_for_artist") {
+        return {
+          count: 1,
+          primary_uri: null,
+          artist_portrait_uri: "luminous-art://local/C:/Music/Dave Hawkins/artist.jpg",
+          band_logo_uri: null,
+          fanart_uri: null,
+          items: [],
+        };
+      }
+      return [];
+    });
+
+    const { findByAltText } = render(ArtistRowCard, {
+      props: { artist: mockArtist, artistAlbums: [mockAlbum] },
+    });
+
+    const portrait = await findByAltText("Dave Hawkins");
+    expect(portrait.tagName).toBe("IMG");
+    expect(portrait.getAttribute("src")).toBe("luminous-art://local/C:/Music/Dave Hawkins/artist.jpg");
   });
 });
