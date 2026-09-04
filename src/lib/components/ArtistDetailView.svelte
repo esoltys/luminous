@@ -368,7 +368,7 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} overflow-hidden">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6 min-h-48'} overflow-hidden">
     {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
         <img src={fanartBannerUrl} alt="" class="w-full h-full object-cover opacity-25" />
@@ -382,7 +382,7 @@
           <img
             src={bandLogoUrl}
             alt={artistName}
-            class="max-h-14 sm:max-h-20 w-auto object-contain object-left"
+            class="h-10 sm:h-12 w-auto max-w-full object-contain object-left"
           />
         {:else}
           <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
