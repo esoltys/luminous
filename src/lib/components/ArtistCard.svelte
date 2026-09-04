@@ -62,7 +62,7 @@
       <img
         src={artistPortraitUrl}
         alt={artist.name || i18n.t('collection.unknownArtist')}
-        class="w-36 h-36 rounded-full object-cover border border-brand-border/40"
+        class="w-36 h-36 object-cover border border-brand-border"
       />
     {:else}
       <CoverStack

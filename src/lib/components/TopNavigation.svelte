@@ -399,7 +399,7 @@
                     class="search-result-item group flex items-center justify-between p-2 rounded-lg hover:bg-brand-main/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-accent"
                   >
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border/40 overflow-hidden">
+                      <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-brand-main/60 border border-brand-border overflow-hidden">
                         {#if artist.name}
                           {#await collectionStore.getExtendedArtworkForArtist(artist.name)}
                             <User class="w-4 h-4 text-brand-text-secondary" />
