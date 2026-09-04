@@ -2,11 +2,17 @@ import { TOAST_DURATION_MS } from "../constants";
 
 type ToastVariant = "info" | "error" | "success" | "milestone" | "warning";
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastMessage {
   id: number;
   text: string;
   variant: ToastVariant;
   url?: string;
+  action?: ToastAction;
 }
 
 class ToastStore {
@@ -14,9 +20,15 @@ class ToastStore {
   private nextId = 0;
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  show(text: string, variant: ToastVariant = "info", durationMs?: number, url?: string) {
+  show(
+    text: string,
+    variant: ToastVariant = "info",
+    durationMs?: number,
+    url?: string,
+    action?: ToastAction
+  ) {
     const id = this.nextId++;
-    this.messages.push({ id, text, variant, url });
+    this.messages.push({ id, text, variant, url, action });
     this.scheduleDismiss(id, durationMs);
     return id;
   }

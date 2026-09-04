@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 interface InstallFormatInfo {
   format: string;
@@ -241,6 +243,16 @@ class UpdaterStore {
         }
       });
       this.installStatus = "ready-to-restart";
+      toastStore.show(
+        i18n.t("settings.updateReadyToRestart", {}, "Update downloaded — restart to finish installing."),
+        "success",
+        undefined,
+        undefined,
+        {
+          label: i18n.t("settings.updateRestartBtn", {}, "Restart to Update"),
+          onClick: () => this.restartNow(),
+        }
+      );
     } catch (err: unknown) {
       console.error("Failed to download and install update:", err);
       this.installStatus = "error";

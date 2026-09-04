@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { updaterStore } from "./updater.svelte";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { toastStore } from "./toast.svelte";
 
 function fakeUpdate(overrides: Partial<{ version: string }> = {}) {
   return {
@@ -137,6 +138,43 @@ describe("UpdaterStore", () => {
     await updaterStore.downloadAndInstall();
 
     expect(updaterStore.installStatus).toBe("ready-to-restart");
+  });
+
+  describe("downloadAndInstall toast notification", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("fires a persistent toast with a restart action on success", async () => {
+      const showSpy = vi.spyOn(toastStore, "show");
+      const update = fakeUpdate({ version: "2.0.0" });
+      vi.mocked(check).mockResolvedValueOnce(update);
+
+      await updaterStore.checkForUpdates();
+      await updaterStore.downloadAndInstall();
+
+      expect(showSpy).toHaveBeenCalledTimes(1);
+      const [, variant, durationMs, url, action] = showSpy.mock.calls[0];
+      expect(variant).toBe("success");
+      expect(durationMs).toBeUndefined();
+      expect(url).toBeUndefined();
+      expect(action).toEqual({ label: expect.any(String), onClick: expect.any(Function) });
+    });
+
+    it("wires the toast's restart action to restartNow()", async () => {
+      const showSpy = vi.spyOn(toastStore, "show");
+      const update = fakeUpdate({ version: "2.0.0" });
+      vi.mocked(check).mockResolvedValueOnce(update);
+
+      await updaterStore.checkForUpdates();
+      await updaterStore.downloadAndInstall();
+
+      const action = showSpy.mock.calls[0][4];
+      action!.onClick();
+      await Promise.resolve();
+
+      expect(relaunch).toHaveBeenCalled();
+    });
   });
 
   it("restartNow calls relaunch", async () => {
