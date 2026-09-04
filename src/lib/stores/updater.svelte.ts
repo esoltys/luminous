@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { toastStore } from "./toast.svelte";
+import { i18n } from "./i18n.svelte";
 
 interface InstallFormatInfo {
   format: string;
@@ -178,6 +180,15 @@ class UpdaterStore {
   async checkForUpdates() {
     if (this.isExternallyManaged) return;
 
+    // Never clobber an in-flight download or one already sitting ready to
+    // restart — re-checking (the periodic timer, or another manual click)
+    // would silently close and discard `pendingUpdate`, and a later restart
+    // click would then call `install()` on a fresh Update that was never
+    // actually downloaded, which the plugin rejects.
+    if (this.installStatus === "downloading" || this.installStatus === "ready-to-restart") {
+      return;
+    }
+
     this.checkStatus = "checking";
     this.errorMessage = null;
     this.installStatus = "idle";
@@ -223,7 +234,14 @@ class UpdaterStore {
     this.errorMessage = null;
 
     try {
-      await this.pendingUpdate.downloadAndInstall((event) => {
+      // Deliberately `download()` only, not `downloadAndInstall()`: on Windows the
+      // native install step exits the process synchronously (`std::process::exit(0)`
+      // inside the plugin's Rust installer call) before this promise could ever
+      // resolve, so `installStatus` would never reach "ready-to-restart" and the
+      // user would never see a restart prompt — the update would silently install
+      // and relaunch the app out from under them. Installing is deferred to
+      // `restartNow()`, run only once the user acts on the prompt.
+      await this.pendingUpdate.download((event) => {
         switch (event.event) {
           case "Started":
             this.downloadProgress = { downloaded: 0, total: event.data.contentLength ?? null };
@@ -241,6 +259,16 @@ class UpdaterStore {
         }
       });
       this.installStatus = "ready-to-restart";
+      toastStore.show(
+        i18n.t("settings.updateReadyToRestart", {}, "Update downloaded — restart to finish installing."),
+        "success",
+        undefined,
+        undefined,
+        {
+          label: i18n.t("settings.updateRestartBtn", {}, "Restart to Update"),
+          onClick: () => this.restartNow(),
+        }
+      );
     } catch (err: unknown) {
       console.error("Failed to download and install update:", err);
       this.installStatus = "error";
@@ -250,9 +278,22 @@ class UpdaterStore {
 
   async restartNow() {
     try {
+      // `install()` performs the actual file replacement. On Windows this exits the
+      // current process itself and the installer relaunches the app, so `relaunch()`
+      // below is unreachable there; on macOS/Linux `install()` just swaps files and
+      // relaunch() is what actually restarts the app.
+      if (this.pendingUpdate) {
+        await this.pendingUpdate.install();
+      }
       await relaunch();
     } catch (err) {
       console.error("Failed to restart for update:", err);
+      this.installStatus = "error";
+      this.errorMessage = extractErrorMessage(err, "Failed to restart for update");
+      toastStore.show(
+        i18n.t("settings.updateInstallError", {}, "Update failed."),
+        "error"
+      );
     }
   }
 }

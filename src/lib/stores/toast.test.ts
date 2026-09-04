@@ -59,4 +59,23 @@ describe("ToastStore", () => {
     expect(() => vi.advanceTimersByTime(500)).not.toThrow();
     expect(toastStore.messages).toHaveLength(0);
   });
+
+  it("show() stores an optional action and invoking its onClick calls the provided callback", () => {
+    const onClick = vi.fn();
+    toastStore.show("Update ready", "success", undefined, undefined, { label: "Restart", onClick });
+
+    expect(toastStore.messages).toHaveLength(1);
+    expect(toastStore.messages[0].action).toEqual({ label: "Restart", onClick });
+
+    toastStore.messages[0].action!.onClick();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("a toast shown without durationMs persists indefinitely, action or not", () => {
+    toastStore.show("Update ready", "success", undefined, undefined, { label: "Restart", onClick: vi.fn() });
+
+    vi.advanceTimersByTime(10 * 60 * 1000);
+
+    expect(toastStore.messages).toHaveLength(1);
+  });
 });
