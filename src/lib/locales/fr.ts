@@ -922,6 +922,8 @@ export const fr = {
     scrollLeft: "Défiler vers la gauche",
     scrollRight: "Défiler vers la droite",
     albumArtAlt: "Pochette d'album",
+    openImages: "Ouvrir les images",
+    openImagesCount: "Ouvrir {count} images",
     enableLogoPulse: "Cliquez pour activer la pulsation du logo",
     disableLogoPulse: "Cliquez pour désactiver la pulsation du logo",
     toggleLogoPulsing: "Basculer la pulsation du logo Luminous",

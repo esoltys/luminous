@@ -39,6 +39,9 @@ describe("ArtistDetailView", () => {
         bio: "Canadian music icon",
       },
     };
+    // Extended-artwork cache is on the singleton store — must not leak
+    // between tests (#98/#761).
+    collectionStore.extendedArtworkByArtist = {};
   });
 
   it("renders artist name and action buttons including Edit", async () => {
@@ -127,5 +130,82 @@ describe("ArtistDetailView", () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     expect(await screen.findByText("Unknown genre")).toBeTruthy();
+  });
+
+  describe("extended artist artwork (#98/#761)", () => {
+    it("renders a discovered artist portrait and band logo instead of the album-art composite and text heading", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string, args?: any) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") {
+          return Promise.resolve({
+            artist_key: args?.artist || "Shania Twain",
+            website: "https://www.shaniatwain.com",
+            tags: [],
+            social_links: [],
+            bio: null,
+          });
+        }
+        if (cmd === "get_extended_artwork_for_artist") {
+          return Promise.resolve({
+            count: 2,
+            primary_uri: null,
+            artist_portrait_uri: "luminous-art://local/C:/Music/Shania Twain/artist.jpg",
+            band_logo_uri: "luminous-art://local/C:/Music/Shania Twain/logo.png",
+            fanart_uri: null,
+            items: [],
+          });
+        }
+        return Promise.resolve();
+      });
+
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+      const images = await screen.findAllByAltText("Shania Twain");
+      expect(images.length).toBe(2); // portrait + band logo
+      expect(screen.queryByRole("heading", { name: "Shania Twain" })).toBeNull();
+    });
+
+    it("falls back to the plain text heading when no band logo was discovered", async () => {
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+      expect(await screen.findByRole("heading", { name: "Shania Twain" })).toBeTruthy();
+    });
+
+    it("shows a derived fanart.tv link when a MusicBrainz link with a recognizable MBID is present", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string, args?: any) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") {
+          return Promise.resolve({
+            artist_key: args?.artist || "Shania Twain",
+            website: null,
+            tags: [],
+            social_links: [
+              { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
+            ],
+            bio: null,
+          });
+        }
+        return Promise.resolve();
+      });
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          tags: [],
+          social_links: [
+            { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
+          ],
+        },
+      };
+
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+
+      expect(await screen.findByText("Fanart.tv")).toBeTruthy();
+    });
   });
 });

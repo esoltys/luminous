@@ -31,8 +31,9 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff
   } from "phosphor-svelte";
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile } from "../types";
-  import { resolveSocialUrl, formatDisplayLabel } from "../utils/artistSocials";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
+  import { getCoverArtUrl } from "../types";
+  import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
   import { songsToCoverStack } from "../utils/covers";
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
@@ -67,6 +68,29 @@
   let hasBio = $derived(!!artistProfile?.bio);
   let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
   let hasProfileContent = $derived(hasWebsite || hasTags || hasBio || hasSocials);
+
+  // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
+  // fetched on demand per artist since scanning every artist's folder
+  // eagerly would be far too expensive (see #758's design notes).
+  let artistArtwork = $state<ExtendedArtworkResponse | null>(null);
+  $effect(() => {
+    const name = artistName;
+    let cancelled = false;
+    collectionStore.getExtendedArtworkForArtist(name).then((result) => {
+      if (!cancelled) artistArtwork = result;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+  let artistPortraitUrl = $derived(getCoverArtUrl(artistArtwork?.artist_portrait_uri));
+  let bandLogoUrl = $derived(getCoverArtUrl(artistArtwork?.band_logo_uri));
+  let fanartBannerUrl = $derived(getCoverArtUrl(artistArtwork?.fanart_uri));
+
+  // Derived, read-only fanart.tv link (#98/#761) from the user-entered
+  // MusicBrainz social link's MBID — not a fetch, just a computed URL, same
+  // as any other link in this section.
+  let fanartTvUrl = $derived(deriveFanartTvUrl(artistProfile?.social_links));
 
   function handleTagClick(tag: string) {
     collectionStore.searchQuery = `artist-tag:${tag}`;
@@ -344,11 +368,25 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6 min-h-48'} overflow-hidden">
+    {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
+      <div class="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
+        <img src={fanartBannerUrl} alt="" class="w-full h-full object-cover opacity-25" />
+        <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"></div>
+      </div>
+    {/if}
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
-        <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+        {#if bandLogoUrl}
+          <img
+            src={bandLogoUrl}
+            alt={artistName}
+            class="h-10 sm:h-12 w-auto max-w-full object-contain object-left"
+          />
+        {:else}
+          <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
+        {/if}
 
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           {#if rawGenre}
@@ -395,9 +433,21 @@
         </div>
       </div>
 
-      {#if !windowLayoutStore.isDetailHeaderCollapsed && headerCovers.length > 0}
+      {#if !windowLayoutStore.isDetailHeaderCollapsed && (artistPortraitUrl || headerCovers.length > 0)}
         <div class="relative w-48 h-36 hidden sm:block shrink-0 flex items-center justify-end">
-          <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
+          {#if artistPortraitUrl}
+            <div class="flex items-center justify-end w-full h-full my-auto select-none">
+              <div class="w-28 h-28 overflow-hidden relative bg-brand-sidebar border border-brand-border">
+                <img
+                  src={artistPortraitUrl}
+                  alt={artistName}
+                  class="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          {:else}
+            <CoverStack covers={headerCovers} direction="left" sizeClass="w-28 h-28" />
+          {/if}
         </div>
       {/if}
     </div>
@@ -498,6 +548,27 @@
                   </div>
                 </button>
               {/each}
+
+              <!-- Derived Fanart.tv link (#98/#761) — computed from the
+                   MusicBrainz link's MBID above, not a stored/user-editable
+                   social link, so it isn't part of the {#each} above. -->
+              {#if fanartTvUrl}
+                <button
+                  type="button"
+                  onclick={() => handleOpenUrl(fanartTvUrl)}
+                  class="flex items-center gap-2.5 sm:gap-3 group text-left transition-colors cursor-pointer min-w-0"
+                >
+                  <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-brand-main/60 border border-brand-border flex items-center justify-center text-brand-text-secondary group-hover:text-brand-accent group-hover:border-brand-accent/40 transition-colors shrink-0 shadow-2xs">
+                    <SocialIcon platform="fanart_tv" size={14} />
+                  </div>
+                  <div class="flex items-center gap-1 min-w-0 flex-1">
+                    <span class="text-xs font-medium text-brand-text-primary group-hover:text-brand-accent truncate transition-colors">
+                      Fanart.tv
+                    </span>
+                    <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  </div>
+                </button>
+              {/if}
             </div>
           </div>
         {/if}

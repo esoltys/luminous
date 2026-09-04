@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSocialUrl, formatDisplayLabel, getPlatformInfo, SOCIAL_PLATFORMS } from "./artistSocials";
+import { resolveSocialUrl, formatDisplayLabel, getPlatformInfo, SOCIAL_PLATFORMS, deriveFanartTvUrl } from "./artistSocials";
 
 describe("artistSocials", () => {
   it("provides info for all known platforms", () => {
@@ -41,5 +41,32 @@ describe("artistSocials", () => {
     expect(formatDisplayLabel("website", "https://shaniatwain.com/tour")).toBe("shaniatwain.com/tour");
     expect(formatDisplayLabel("instagram", "@shaniatwain")).toBe("Instagram");
     expect(formatDisplayLabel("youtube", "@ShaniaTwain")).toBe("YouTube");
+  });
+
+  describe("deriveFanartTvUrl (#98/#761)", () => {
+    it("derives a fanart.tv URL from a stored MusicBrainz link's MBID", () => {
+      const url = deriveFanartTvUrl([
+        { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249b899-8db8-43e7-9e6e-22f1e736024e" },
+      ]);
+      expect(url).toBe("https://fanart.tv/artist/7249b899-8db8-43e7-9e6e-22f1e736024e");
+    });
+
+    it("lowercases a mixed-case MBID", () => {
+      const url = deriveFanartTvUrl([
+        { platform: "musicbrainz", handle_or_url: "https://musicbrainz.org/artist/7249B899-8DB8-43E7-9E6E-22F1E736024E" },
+      ]);
+      expect(url).toBe("https://fanart.tv/artist/7249b899-8db8-43e7-9e6e-22f1e736024e");
+    });
+
+    it("returns null when there is no musicbrainz link", () => {
+      expect(deriveFanartTvUrl([{ platform: "discogs", handle_or_url: "https://discogs.com/artist/82343" }])).toBeNull();
+      expect(deriveFanartTvUrl([])).toBeNull();
+      expect(deriveFanartTvUrl(undefined)).toBeNull();
+      expect(deriveFanartTvUrl(null)).toBeNull();
+    });
+
+    it("returns null when the musicbrainz link has no recognizable MBID", () => {
+      expect(deriveFanartTvUrl([{ platform: "musicbrainz", handle_or_url: "not-a-valid-mbid" }])).toBeNull();
+    });
   });
 });
