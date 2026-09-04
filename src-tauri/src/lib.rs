@@ -694,6 +694,12 @@ pub fn run() {
                         )
                         .ok();
                     let current = env!("CARGO_PKG_VERSION");
+                    log::debug!(
+                        "MSIX update-notification check: format={:?} stored={:?} current={:?}",
+                        info.format,
+                        stored,
+                        current
+                    );
                     if restart_manager::should_notify_update(&info.format, stored.as_deref(), current)
                     {
                         restart_manager::show_update_notification(current);

@@ -94,10 +94,12 @@ pub fn show_update_notification(current_version: &str) {
         );
         return;
     };
+    log::debug!("Resolved AUMID for update notification: {aumid:?}");
 
     let body = format!("Luminous updated to v{current_version}");
-    if let Err(e) = Toast::new(&aumid).title("Luminous").text1(&body).show() {
-        log::warn!("Failed to show update notification: {e:?}");
+    match Toast::new(&aumid).title("Luminous").text1(&body).show() {
+        Ok(()) => log::info!("Sent MSIX update notification (updated to v{current_version})"),
+        Err(e) => log::warn!("Failed to show update notification: {e:?}"),
     }
 }
 
