@@ -71,6 +71,12 @@
   let composersort = $state("");
   let genresort = $state("");
 
+  /** Loaded from the song on open, then overwritten by a fresh AcoustID
+      lookup (#752) — always sent on save so an unrelated edit never wipes
+      out a previously-recorded AcoustID match. */
+  let acoustidId = $state<string | null>(null);
+  let acoustidFingerprint = $state<string | null>(null);
+
   let isLoading = $state(false);
   let isSaving = $state(false);
   let isLookingUp = $state(false);
@@ -110,6 +116,8 @@
         rating: number;
         compilation: boolean;
         art_embedded: boolean;
+        acoustid_id: string | null;
+        acoustid_fingerprint: string | null;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -135,6 +143,8 @@
       rating = details.rating;
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
+      acoustidId = details.acoustid_id;
+      acoustidFingerprint = details.acoustid_fingerprint;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
@@ -156,6 +166,8 @@
         artist: string | null;
         album: string | null;
         year: number | null;
+        acoustid_id: string | null;
+        fingerprint: string | null;
       }>("lookup_acoustid_tags", { songId });
 
       const next = new Set<string>();
@@ -176,6 +188,8 @@
         next.add("year");
       }
       changedFields = next;
+      acoustidId = suggestions.acoustid_id;
+      acoustidFingerprint = suggestions.fingerprint;
       lookupSucceeded = true;
     } catch (e: any) {
       console.error("AcoustID lookup failed:", e);
@@ -223,6 +237,8 @@
         grouping,
         bpm,
         initialKey,
+        acoustidId,
+        acoustidFingerprint,
       });
 
       await collectionStore.refreshStats();

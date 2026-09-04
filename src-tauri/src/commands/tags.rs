@@ -169,6 +169,8 @@ struct SongFullMetadata {
     bpm: Option<f32>,
     initial_key: String,
     compilation: bool,
+    acoustid_id: Option<String>,
+    acoustid_fingerprint: Option<String>,
 }
 
 /// Reads each song via the canonical `SONG_SELECT_COLS`/`row_to_song` mapping
@@ -206,6 +208,8 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
                 bpm: song.bpm,
                 initial_key: song.initial_key.unwrap_or_default(),
                 compilation: song.compilation,
+                acoustid_id: song.acoustid_id,
+                acoustid_fingerprint: song.acoustid_fingerprint,
             });
         }
     }
@@ -260,6 +264,8 @@ async fn rewrite_genre_and_persist(
                         bpm: item.bpm,
                         initial_key: &item.initial_key,
                         compilation: item.compilation,
+                        acoustid_id: item.acoustid_id.as_deref(),
+                        acoustid_fingerprint: item.acoustid_fingerprint.as_deref(),
                     },
                 );
                 match write_res {
