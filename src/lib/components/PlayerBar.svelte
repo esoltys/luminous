@@ -223,7 +223,22 @@
   }
 </script>
 
-<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''}">
+<footer transition:fly={{ y: 40, duration: 300, easing: cubicOut }} class="h-20 max-w-[1200px] mx-auto bg-brand-playerbar border border-brand-border rounded-[2rem] flex items-center justify-between gap-3 px-8 text-brand-text-secondary select-none {themeStore.isGlassTheme || isLinux ? 'glass-surface' : ''} {isLinux ? 'opaque-linux' : ''} {isLinux && playerStore.currentSong ? 'has-art-backdrop' : ''}">
+  {#if isLinux && playerStore.currentSong}
+    <!-- Linux fallback for lost acrylic (backdrop-filter doesn't composite
+         reliably in WebKitGTK, see #360): a plain `filter: blur()` on the
+         cover art itself sidesteps the compositor entirely — it blurs the
+         image's own pixels rather than requiring backdrop compositing. -->
+    <div class="art-backdrop" aria-hidden="true">
+      <CoverArt
+        songId={playerStore.currentSong?.id}
+        artEmbedded={playerStore.currentSong?.art_embedded}
+        artAutomatic={playerStore.currentSong?.art_automatic}
+        artManual={playerStore.currentSong?.art_manual}
+        sizeClass="w-full h-full"
+      />
+    </div>
+  {/if}
   <div class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
@@ -438,6 +453,34 @@
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 35px 4px var(--color-accent), 0 0 90px 12px var(--color-accent) !important;
+  }
+
+  /* When the art backdrop is rendering, let it (plus its own tint scrim)
+     supply the surface color instead of the flat opaque-linux fallback. */
+  :global(footer.glass-surface.opaque-linux.has-art-backdrop) {
+    background-color: transparent !important;
+  }
+
+  .art-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .art-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: var(--bg-playerbar, #191b23);
+    opacity: 0.55;
+  }
+
+  :global(.art-backdrop img) {
+    transform: scale(1.4);
+    filter: blur(32px) saturate(160%) brightness(0.55);
   }
 
   /* Liquid-glass "shine": a light-catching specular highlight on top of the

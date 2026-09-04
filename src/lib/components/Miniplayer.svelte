@@ -235,8 +235,14 @@
     <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onpointerdown={(e) => handleStartResize("south-east", e)}></div>
   {/if}
   {#if playerStore.currentSong}
+    <!-- On non-Linux this is a subtle accent layered under the working
+         backdrop-filter glass. On Linux, backdrop-filter doesn't composite
+         reliably in WebKitGTK (#360) and opaque-linux falls back to a flat
+         color, so this same layer is boosted to stand in as the primary
+         acrylic replacement instead — same fix as PlayerBar's art-backdrop
+         (PlayerBar.svelte). -->
     <div
-      class="absolute inset-0 z-0 opacity-25 blur-2xl pointer-events-none"
+      class="absolute inset-0 z-0 {isLinux ? 'opacity-70' : 'opacity-25'} blur-2xl pointer-events-none"
       style="will-change: filter; transform: translateZ(0) scale(1.25);"
     >
       <CoverArt
