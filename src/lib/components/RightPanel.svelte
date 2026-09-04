@@ -5,8 +5,7 @@
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     MicrophoneStageIcon as ArtistIcon,
-    DiscIcon as ReleaseIcon,
-    MusicNoteIcon as RecordingIcon
+    DiscIcon as ReleaseIcon
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
@@ -60,9 +59,9 @@
         : []),
       { label: i18n.t('playerBar.musicbrainzReleaseLabel', {}, 'Release'), id: currentSong.musicbrainz_album_id, entityPath: "release", name: currentSong.album, icon: ReleaseIcon },
       { label: i18n.t('playerBar.musicbrainzReleaseGroupLabel', {}, 'Release Group'), id: currentSong.musicbrainz_release_group_id, entityPath: "release-group", name: currentSong.album, icon: ReleaseIcon },
-      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id, entityPath: "recording", name: currentSong.title, icon: RecordingIcon },
-      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id, entityPath: "track", name: currentSong.title, icon: RecordingIcon },
-      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id, entityPath: "work", name: currentSong.title, icon: RecordingIcon },
+      { label: i18n.t('playerBar.musicbrainzRecordingLabel', {}, 'Recording'), id: currentSong.musicbrainz_recording_id, entityPath: "recording", name: currentSong.title, icon: Music },
+      { label: i18n.t('playerBar.musicbrainzTrackLabel', {}, 'Track'), id: currentSong.musicbrainz_track_id, entityPath: "track", name: currentSong.title, icon: Music },
+      { label: i18n.t('playerBar.musicbrainzWorkLabel', {}, 'Work'), id: currentSong.musicbrainz_work_id, entityPath: "work", name: currentSong.title, icon: Music },
     ];
     return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
   });
