@@ -138,7 +138,7 @@
                 onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
                 class="group relative text-right transition-colors cursor-pointer min-w-0"
               >
-                <span class="text-brand-text-primary group-hover:text-brand-accent break-words transition-colors">{row.name || row.id}</span>
+                <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
                 <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             </div>
