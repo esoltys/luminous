@@ -223,6 +223,31 @@ pub async fn set_minimize_to_tray_enabled(
     Ok(())
 }
 
+/// Source of truth is the OS registration itself (registry key / LaunchAgent /
+/// XDG autostart entry), read via the plugin's manager — no DB shadow copy,
+/// so this can never drift from what's actually installed on the system.
+#[tauri::command]
+pub fn get_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Unlike the fire-and-forget settings writes above, this can genuinely fail
+/// (sandboxed install, permissions, a relocated AppImage) — so it returns a
+/// real error the frontend awaits and reverts the toggle on, instead of
+/// assuming success.
+#[tauri::command]
+pub fn set_autostart_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    }
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn get_commit_hash() -> String {
     option_env!("BUILD_COMMIT_HASH").unwrap_or("").to_string()

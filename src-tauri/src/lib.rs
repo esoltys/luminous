@@ -37,6 +37,7 @@ pub mod waveform;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, ShortcutState};
 use tokio::sync::Mutex;
 
@@ -631,6 +632,10 @@ pub fn run() {
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // `MacosLauncher::LaunchAgent` is required by the plugin's cross-platform
+        // API but inert on the platforms Luminous actually ships (Windows/Linux) —
+        // it only takes effect on a macOS build, which this project doesn't target.
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(build_prevent_default_plugin())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             tray::restore_main_window(app);
@@ -984,6 +989,8 @@ pub fn run() {
             commands::settings::set_fade_settings,
             commands::settings::get_minimize_to_tray_enabled,
             commands::settings::set_minimize_to_tray_enabled,
+            commands::settings::get_autostart_enabled,
+            commands::settings::set_autostart_enabled,
             install_format::get_install_format,
             // Stats commands
             commands::stats::set_song_rating,
