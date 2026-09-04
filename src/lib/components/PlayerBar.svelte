@@ -239,7 +239,7 @@
       />
     </div>
   {/if}
-  <div class="flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
+  <div class="z-10 flex items-center gap-3 flex-1 min-[700px]:w-1/3 min-[700px]:flex-none min-w-[90px] min-[400px]:min-w-[140px] min-[700px]:min-w-[200px] max-w-sm">
     <button
       onclick={handleCoverClick}
       disabled={!playerStore.currentSong}
@@ -296,7 +296,7 @@
     </div>
   </div>
 
-  <div class="flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
+  <div class="z-10 flex flex-col items-center gap-1.5 min-[400px]:min-w-[220px] min-[400px]:ml-auto min-[700px]:w-1/3 min-[700px]:flex-none min-[700px]:ml-0 max-w-[600px]">
     <div class="flex items-center gap-3 min-[700px]:gap-5">
       <div class="hidden min-[700px]:block relative">
         {#if playerStore.shuffleMode !== 'off'}
@@ -397,7 +397,7 @@
     </div>
   </div>
 
-  <div class="hidden min-[700px]:flex items-center justify-end gap-1.5 min-[700px]:gap-3 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
+  <div class="z-10 hidden min-[700px]:flex items-center justify-end gap-1.5 min-[700px]:gap-3 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
     <div class="w-24 h-7 mr-2 hidden md:block">
       <SpectrumVisualizer />
     </div>
@@ -470,7 +470,14 @@
   .art-backdrop {
     position: absolute;
     inset: 0;
-    z-index: -1;
+    /* Non-negative on purpose: this WebKitGTK build appears to fail to
+       paint a position:absolute descendant using z-index: -1 inside an
+       isolation: isolate ancestor at all (confirmed by forcing
+       `background: red !important` on it directly and seeing no visual
+       change whatsoever) rather than just mis-ordering it. Staying above
+       zero and instead raising the three real content divs (z-10) sidesteps
+       whatever that bug is. */
+    z-index: 0;
     overflow: hidden;
     border-radius: inherit;
     pointer-events: none;
