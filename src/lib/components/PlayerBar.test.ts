@@ -297,7 +297,7 @@ describe("PlayerBar.svelte", () => {
     expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
     const [transportToggle, rightColumnToggle] = getAllByTitle(/picture-in-picture/i);
     expect(transportToggle).toHaveClass("min-[700px]:hidden");
-    expect(rightColumnToggle).toHaveClass("hidden", "min-[700px]:block");
+    expect(rightColumnToggle.closest(".hidden")).toHaveClass("min-[700px]:flex");
     const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
     expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
@@ -327,5 +327,28 @@ describe("PlayerBar.svelte", () => {
     // Unmute
     await fireEvent.click(volumeBtn);
     expect(volSpy).toHaveBeenCalledWith(0.8);
+  });
+
+  it("toggles the right (info) panel from the button above the miniplayer toggle", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.rightPanelOpen = false;
+    const { getByTitle } = render(PlayerBar);
+
+    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
+    await fireEvent.click(infoBtn);
+    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+  });
+
+  it("hides the info-panel toggle at the same breakpoint that auto-hides the panel itself", () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.viewportWidth = 1280;
+    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(false);
+    const { queryByTitle } = render(PlayerBar);
+    expect(queryByTitle("Show Info Panel (Ctrl+I)")).not.toBeNull();
+
+    windowLayoutStore.viewportWidth = 800;
+    expect(windowLayoutStore.isRightPanelAutoHidden).toBe(true);
+    const { queryByTitle: queryByTitleNarrow } = render(PlayerBar);
+    expect(queryByTitleNarrow("Show Info Panel (Ctrl+I)")).toBeNull();
   });
 });

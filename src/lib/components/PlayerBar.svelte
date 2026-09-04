@@ -49,7 +49,8 @@
     DiscIcon as DiscAlbum,
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
-    MusicNotesIcon as Music
+    MusicNotesIcon as Music,
+    InfoIcon as Info
   } from "phosphor-svelte";
 
 
@@ -416,13 +417,24 @@
       aria-label={i18n.t('playerBar.volumeSlider')}
       title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
     />
-    <button
-      onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-      class="hidden min-[700px]:block text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 flex-shrink-0"
-      title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
-    >
-      <PictureInPicture class="w-4.5 h-4.5" />
-    </button>
+    <div class="hidden min-[700px]:flex flex-col items-center justify-center gap-1 flex-shrink-0">
+      {#if !windowLayoutStore.isRightPanelAutoHidden}
+        <button
+          onclick={() => windowLayoutStore.toggleRightPanel()}
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''}"
+          title={i18n.t('topNav.toggleRightPanel')}
+        >
+          <Info class="w-5 h-5" />
+        </button>
+      {/if}
+      <button
+        onclick={() => windowLayoutStore.toggleMiniplayerMode()}
+        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60"
+        title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
+      >
+        <PictureInPicture class="w-4.5 h-4.5" />
+      </button>
+    </div>
   </div>
 </footer>
 

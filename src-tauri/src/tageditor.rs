@@ -34,6 +34,14 @@ pub struct SuggestedTags {
     pub artist: Option<String>,
     pub album: Option<String>,
     pub year: Option<u32>,
+    /// The matched AcoustID recording's own UUID (#752) — set whenever a
+    /// match was found, independent of whether any of title/artist/album/year
+    /// also had values, so the caller can persist it even for a match with
+    /// otherwise-sparse metadata.
+    pub acoustid_id: Option<String>,
+    /// The fingerprint that was looked up, echoed back so the caller can
+    /// persist it alongside `acoustid_id` without recomputing it (#752).
+    pub fingerprint: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -70,6 +78,7 @@ struct AcoustIdRecording {
 
 #[derive(Deserialize)]
 struct AcoustIdResult {
+    id: String,
     score: f64,
     recordings: Option<Vec<AcoustIdRecording>>,
 }
@@ -110,6 +119,13 @@ pub struct TagWriteRequest<'a> {
     pub bpm: Option<f32>,
     pub initial_key: &'a str,
     pub compilation: bool,
+    /// The matched AcoustID recording's UUID and the fingerprint it was
+    /// matched against (#752) — `None` clears any existing values, same as
+    /// every other `Option` field here, so callers must pass the song's
+    /// current values through unchanged on saves that aren't a fresh
+    /// AcoustID lookup, not just omit them.
+    pub acoustid_id: Option<&'a str>,
+    pub acoustid_fingerprint: Option<&'a str>,
 }
 
 /// Write the given tag fields to `path`'s primary tag, creating one if the
@@ -141,6 +157,8 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         bpm,
         initial_key,
         compilation,
+        acoustid_id,
+        acoustid_fingerprint,
     } = *req;
 
     let mut tagged_file = Probe::open(path)
@@ -179,6 +197,8 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
     set_or_remove_sort(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
     set_or_remove_sort(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
     set_or_remove_sort(lofty::tag::ItemKey::ComposerSortOrder, composersort);
+    set_or_remove_sort(lofty::tag::ItemKey::AcoustId, acoustid_id);
+    set_or_remove_sort(lofty::tag::ItemKey::AcoustIdFingerprint, acoustid_fingerprint);
 
     // Genre, Artist, Album Artist, and Composer are all written as one
     // `TagItem` per value rather than a single `set_*()`/`insert_text()`
@@ -568,6 +588,8 @@ pub async fn lookup_acoustid(
                     artist,
                     album,
                     year,
+                    acoustid_id: Some(r.id.clone()),
+                    fingerprint: Some(fingerprint.to_string()),
                 };
                 eprintln!(
                     "[Luminous Backend] AcoustID: Successfully matched track. Suggestions: {:?}",

@@ -120,6 +120,12 @@ export interface Song {
   musicbrainz_release_group_id?: string;
   musicbrainz_work_id?: string;
 
+  // Release metadata adjacent to the MusicBrainz IDs, but not IDs themselves
+  musicbrainz_release_type?: string;
+  musicbrainz_release_country?: string;
+  barcode?: string;
+  catalog_number?: string;
+
   // EBU R128 loudness
   ebur128_integrated_loudness_lufs?: number;
   ebur128_loudness_range_lu?: number;
