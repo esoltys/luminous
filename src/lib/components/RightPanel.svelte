@@ -77,7 +77,6 @@
           ? currentSong.musicbrainz_release_type.charAt(0).toUpperCase() + currentSong.musicbrainz_release_type.slice(1)
           : undefined,
       },
-      { label: i18n.t('playerBar.musicbrainzReleaseCountryLabel', {}, 'Country'), value: currentSong.musicbrainz_release_country },
       { label: i18n.t('playerBar.barcodeLabel', {}, 'Barcode'), value: currentSong.barcode },
       { label: i18n.t('playerBar.catalogNumberLabel', {}, 'Catalog #'), value: currentSong.catalog_number },
     ];

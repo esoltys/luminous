@@ -157,21 +157,20 @@ describe("RightPanel.svelte", () => {
     );
   });
 
-  it("shows release type/country/barcode/catalog # as plain text, title-casing the release type", () => {
+  it("shows release type/barcode/catalog # as plain text, title-casing the release type", () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_release_type: "album",
-      musicbrainz_release_country: "JP",
       barcode: "4988011329586",
       catalog_number: "PHCR-1144",
     };
-    const { getByText, getByAltText } = render(RightPanel);
+    const { getByText, getByAltText, queryByText } = render(RightPanel);
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
-    expect(getByText("JP")).toBeInTheDocument();
     expect(getByText("4988011329586")).toBeInTheDocument();
     expect(getByText("PHCR-1144")).toBeInTheDocument();
+    expect(queryByText("Country")).not.toBeInTheDocument();
   });
 
   it("shows the MusicBrainz section for release metadata alone, with no MusicBrainz IDs at all", () => {
