@@ -38,6 +38,20 @@ pub async fn get_directories(state: State<'_, AppState>) -> Result<Vec<MusicDire
 }
 
 #[tauri::command]
+pub async fn update_directory_metadata(
+    id: i64,
+    nickname: Option<String>,
+    icon: Option<String>,
+    color: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .update_directory_metadata(id, nickname, icon, color)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn scan_directories(
     app: AppHandle,
     force: Option<bool>,

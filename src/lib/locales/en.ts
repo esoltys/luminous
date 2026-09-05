@@ -161,6 +161,7 @@ export const en = {
     columnFileSize: "File Size",
     columnAdded: "Date Added",
     columnPath: "File Path",
+    columnLibrary: "Library",
     columnLastPlayed: "Last Played",
     columnActions: "Actions",
     columnTrack: "Track #",
@@ -186,6 +187,7 @@ export const en = {
     tableHeaderFileSize: "Size",
     tableHeaderAdded: "Added",
     tableHeaderPath: "Path",
+    tableHeaderLibrary: "Library",
     tableHeaderLastPlayed: "Last Played",
     noTracksMatchQuery: "No songs match your query:",
     resetSearchFilters: "Reset Search & Filters"
@@ -287,6 +289,15 @@ export const en = {
     folderItemRecursive: "Recursive scanning active",
     folderItemRecursiveWatchOff: "Recursive scanning (real-time watching off)",
     folderItemStopWatch: "Stop watching this folder",
+    folderItemEdit: "Edit folder details",
+    folderItemUnavailable: "Unavailable (Drive disconnected?)",
+    editFolderTitle: "Edit Folder Details",
+    folderNickname: "Nickname",
+    folderNicknamePlaceholder: "e.g. Fast SSD, NAS, Vinyl Rips",
+    folderIcon: "Icon",
+    folderColor: "Badge Colour",
+    folderColorDefault: "Default",
+    folderPreview: "Preview",
     loudnessAnalysisActive: "Loudness Normalization is analyzing {remaining} song(s) in the background — this can look like scanning even when folder watching is off. Disable it in the Equalizer tab to stop.",
     noFoldersTitle: "No Watched Folders",
     noFoldersText: "Click \"Add Folder\" above to add your music directory.",
@@ -887,7 +898,8 @@ export const en = {
     editInfoTooltip: "Edit album info",
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
-    refreshError: "Failed to refresh album metadata"
+    refreshError: "Failed to refresh album metadata",
+    multiLibraries: "{count} Libraries",
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."

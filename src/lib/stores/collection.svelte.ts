@@ -51,6 +51,7 @@ export interface VisibleColumns {
   added: boolean;
   duration: boolean;
   lastplayed: boolean;
+  library: boolean;
   playcount: boolean;
   rating: boolean;
   skipcount: boolean;
@@ -167,6 +168,7 @@ class CollectionStore {
         added: false,
         duration: true,
         lastplayed: false,
+        library: false,
         playcount: false,
         rating: true,
         skipcount: false,
@@ -457,6 +459,71 @@ class CollectionStore {
 
   async refreshDirectories() {
     this.directories = await invoke("get_directories");
+  }
+
+  async updateDirectoryMetadata(
+    id: number,
+    metadata: { nickname?: string | null; icon?: string | null; color?: string | null }
+  ) {
+    await invoke("update_directory_metadata", {
+      id,
+      nickname: metadata.nickname ?? null,
+      icon: metadata.icon ?? null,
+      color: metadata.color ?? null,
+    });
+    await this.refreshDirectories();
+  }
+
+  /**
+   * Resolves the watched directory for a given song file path by finding the
+   * longest matching directory root. Normalizes path separators and casing.
+   */
+  getDirectoryForPath(path: string | null | undefined): MusicDirectory | undefined {
+    if (!path) return undefined;
+    const normalized = path.replace(/\\/g, "/").toLowerCase();
+    let bestMatch: MusicDirectory | undefined = undefined;
+    let longestPrefix = 0;
+    for (const dir of this.directories) {
+      const dirNorm = dir.path.replace(/\\/g, "/").toLowerCase();
+      const prefix = dirNorm.endsWith("/") ? dirNorm : dirNorm + "/";
+      if (normalized.startsWith(prefix) || normalized === dirNorm) {
+        if (dir.path.length > longestPrefix) {
+          longestPrefix = dir.path.length;
+          bestMatch = dir;
+        }
+      }
+    }
+    return bestMatch;
+  }
+
+  /**
+   * Resolves all distinct watched directories that contain songs for the specified album name.
+   */
+  getDirectoriesForAlbum(albumName: string | null | undefined): MusicDirectory[] {
+    if (!albumName) return [];
+    const matched = new Map<number, MusicDirectory>();
+    for (const song of this.songs) {
+      if (song.album === albumName && song.path) {
+        const dir = this.getDirectoryForPath(song.path);
+        if (dir) matched.set(dir.id, dir);
+      }
+    }
+    return Array.from(matched.values());
+  }
+
+  /**
+   * Resolves a representative watched directory for an album item, checking
+   * its sample song first, then falling back to an album-name lookup.
+   */
+  getDirectoryForAlbum(album: AlbumItem): MusicDirectory | undefined {
+    if (album.sample_song_id) {
+      const song = this.songs.find((s) => s.id === album.sample_song_id);
+      if (song?.path) {
+        return this.getDirectoryForPath(song.path);
+      }
+    }
+    const dirs = this.getDirectoriesForAlbum(album.album);
+    return dirs[0];
   }
 
   /**

@@ -5,16 +5,22 @@
   import { onMount } from "svelte";
   import Toggle from "./Toggle.svelte";
   import Button from "./Button.svelte";
+  import LibraryBadge from "./LibraryBadge.svelte";
+  import FolderEditModal from "./FolderEditModal.svelte";
+  import type { MusicDirectory } from "../types";
   import {
     FolderIcon as Folder,
     PlusIcon as Plus,
     TrashIcon as Trash2,
+    PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
     ArrowCounterClockwiseIcon as RotateCcw,
     ClockIcon as Clock,
     PulseIcon as Activity,
     WarningIcon as AlertTriangle
   } from "phosphor-svelte";
+
+  let editingDirectory = $state<MusicDirectory | null>(null);
 
   onMount(() => {
     loudnessStore.init();
@@ -69,10 +75,13 @@
   <div class="space-y-2">
     {#each collectionStore.directories as dir}
       <div class="flex items-center justify-between bg-brand-main/50 border border-brand-border/60 rounded-xl p-4 hover:border-brand-border transition-colors">
-        <div class="flex items-center gap-3.5 min-w-0">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-brand-text-primary truncate" title={dir.path}>{dir.path}</p>
-            <p class="text-xs mt-0.5" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+          <div class="min-w-0 space-y-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <LibraryBadge directory={dir} size="sm" />
+              <p class="text-xs text-brand-text-secondary truncate font-mono" title={dir.path}>{dir.path}</p>
+            </div>
+            <p class="text-xs" class:text-brand-text-secondary={dir.is_available !== false} class:text-red-400={dir.is_available === false}>
               {#if dir.is_available === false}
                 <span class="flex items-center gap-1">
                   <AlertTriangle class="w-3 h-3" />
@@ -86,15 +95,31 @@
             </p>
           </div>
         </div>
-        <button
-          onclick={() => handleRemoveDirectory(dir.path)}
-          class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
-          title={i18n.t('settings.folderItemStopWatch')}
-        >
-          <Trash2 class="w-4 h-4 text-brand-accent-text" />
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0 ml-3">
+          <button
+            onclick={() => { editingDirectory = dir; }}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.folderItemEdit', {}, 'Edit folder details')}
+          >
+            <Edit3 class="w-4 h-4" />
+          </button>
+          <button
+            onclick={() => handleRemoveDirectory(dir.path)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            title={i18n.t('settings.folderItemStopWatch')}
+          >
+            <Trash2 class="w-4 h-4 text-brand-accent-text" />
+          </button>
+        </div>
       </div>
     {/each}
+
+    {#if editingDirectory}
+      <FolderEditModal
+        directory={editingDirectory}
+        onClose={() => { editingDirectory = null; }}
+      />
+    {/if}
 
     {#if collectionStore.directories.length === 0}
       <div class="border border-dashed border-brand-border rounded-xl py-12 text-center text-brand-text-secondary">

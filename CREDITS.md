@@ -11,7 +11,7 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 - **Frontend Architecture**: [Svelte 5 (Runes)](https://svelte.dev/) & [TypeScript](https://www.typescriptlang.org/)
 - **Database Engine**: [SQLite](https://sqlite.org/) via `rusqlite` & `r2d2`
 - **UI Framework & Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Icons**: [Phosphor Icons](https://phosphoricons.com/)
+- **Icons**: [Phosphor Icons](https://phosphoricons.com/) and [Simple Icons](https://simpleicons.org/)
 - **Typography**: [Inter](https://rsms.me/inter/) font family by Rasmus Andersson
 
 ### Audio Engine & Signal Processing

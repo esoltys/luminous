@@ -37,5 +37,6 @@ export const SONG_TABLE_COLUMNS: { key: keyof VisibleColumns; field?: keyof Song
   { key: "added",        field: "added",          label: "collection.columnAdded" },
   { key: "duration",     field: "length_nanosec", label: "collection.columnDuration" },
   { key: "path",         field: "path",           label: "collection.columnPath" },
-  { key: "actions",      label: "collection.columnActions" },
+  { key: "library",                               label: "collection.columnLibrary" },
+  { key: "actions",                               label: "collection.columnActions" },
 ];

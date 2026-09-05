@@ -11,6 +11,7 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import BoxSetDiscIcons from "./BoxSetDiscIcons.svelte";
   import GenreChips from "./GenreChips.svelte";
+  import LibraryBadge from "./LibraryBadge.svelte";
  
   interface Props {
     album: AlbumItem;
@@ -53,6 +54,7 @@
     album.rating = await invoke<number>("set_album_rating", { album: album.album, rating });
   }
 
+  let albumDirectory = $derived(collectionStore.getDirectoryForAlbum(album));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -75,6 +77,11 @@
     {/if}
     {#if album.disc_count > 1}
       <BoxSetDiscIcons discCount={album.disc_count} size="md" />
+    {/if}
+    {#if albumDirectory}
+      <div class="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none max-w-[calc(100%-1rem)]">
+        <LibraryBadge directory={albumDirectory} size="xs" />
+      </div>
     {/if}
   </div>
   <div class="p-3.5 flex flex-col flex-1">
