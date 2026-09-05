@@ -13,6 +13,8 @@ pub struct LyricsWorld {
     title: String,
     cached_lyrics: Option<String>,
     displayed_lyrics: Option<String>,
+    audio_path: Option<std::path::PathBuf>,
+    expected_sidecar_lyrics: Option<String>,
     /// Derived from how long the real `get_lyrics_for_song` call took — see
     /// `open_lyrics_panel` for why elapsed time is a reliable proxy for
     /// "did this reach the network".
@@ -31,6 +33,8 @@ impl Default for LyricsWorld {
             title: String::new(),
             cached_lyrics: None,
             displayed_lyrics: None,
+            audio_path: None,
+            expected_sidecar_lyrics: None,
             network_call_made: false,
         }
     }
@@ -43,16 +47,54 @@ fn song_is_playing(w: &mut LyricsWorld) {
     w.artist = "Coldplay".to_string();
 }
 
+#[given("a song is playing with a local audio file")]
+fn song_playing_local_audio(w: &mut LyricsWorld) {
+    w.song_id = 2;
+    w.title = "Big Guns".to_string();
+    w.artist = "Dorothy".to_string();
+
+    let audio_file = w._temp_dir.path().join("1-02 Big Guns.flac");
+    std::fs::write(&audio_file, b"dummy flac content").expect("failed to write audio file");
+    w.audio_path = Some(audio_file.clone());
+
+    let conn = w.db.pool.get().expect("db conn failed");
+    conn.execute(
+        "INSERT OR REPLACE INTO songs (id, title, artist, path, source, filetype, unavailable, track)
+         VALUES (?1, ?2, ?3, ?4, 1, 1, 0, 2)",
+        rusqlite::params![w.song_id, w.title, w.artist, audio_file.to_str().unwrap()],
+    )
+    .unwrap();
+}
+
+#[given("a sidecar .lrc file exists next to the audio file")]
+fn sidecar_lrc_exists(w: &mut LyricsWorld) {
+    let sidecar_file = w
+        ._temp_dir
+        .path()
+        .join("Dorothy - Gifts From the Holy Ghost - 02 Big Guns.lrc");
+    let lyrics = "[00:07.61] Not gonna play the fool, big boss (when you kiss me)\n[00:11.40] Not gonna be the sad wife, babe (like the '50s)";
+    std::fs::write(&sidecar_file, lyrics.as_bytes()).expect("failed to write sidecar lrc");
+    w.expected_sidecar_lyrics = Some(lyrics.to_string());
+}
+
 #[given("the database already has cached lyrics for this song")]
 fn db_has_cached_lyrics(w: &mut LyricsWorld) {
     let lyrics = "[00:12.00] Look at the stars\n[00:18.00] Look how they shine for you";
     let conn = w.db.pool.get().expect("db conn failed");
-    conn.execute(
-        "INSERT OR REPLACE INTO songs (id, title, artist, lyrics, source, filetype, unavailable)
-         VALUES (?1, ?2, ?3, ?4, 1, 1, 0)",
-        rusqlite::params![w.song_id, w.title, w.artist, lyrics],
-    )
-    .unwrap();
+    if let Some(ref _audio_path) = w.audio_path {
+        conn.execute(
+            "UPDATE songs SET lyrics = ?1 WHERE id = ?2",
+            rusqlite::params![lyrics, w.song_id],
+        )
+        .unwrap();
+    } else {
+        conn.execute(
+            "INSERT OR REPLACE INTO songs (id, title, artist, lyrics, source, filetype, unavailable)
+             VALUES (?1, ?2, ?3, ?4, 1, 1, 0)",
+            rusqlite::params![w.song_id, w.title, w.artist, lyrics],
+        )
+        .unwrap();
+    }
     w.cached_lyrics = Some(lyrics.to_string());
 }
 
@@ -82,6 +124,12 @@ async fn open_lyrics_panel(w: &mut LyricsWorld) {
 #[then("the system should display the cached lyrics immediately without making a network request")]
 fn check_cached_displayed(w: &mut LyricsWorld) {
     assert!(w.displayed_lyrics.is_some());
+    assert!(!w.network_call_made, "Network call was made unexpectedly");
+}
+
+#[then("the system should display the sidecar lyrics immediately without making a network request")]
+fn check_sidecar_displayed(w: &mut LyricsWorld) {
+    assert_eq!(w.displayed_lyrics, w.expected_sidecar_lyrics);
     assert!(!w.network_call_made, "Network call was made unexpectedly");
 }
 
