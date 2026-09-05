@@ -161,6 +161,7 @@ export const fr = {
     columnFileSize: "Taille du fichier",
     columnAdded: "Date d'ajout",
     columnPath: "Chemin du fichier",
+    columnLibrary: "Bibliothèque",
     columnLastPlayed: "Dernière lecture",
     columnActions: "Actions",
     columnTrack: "N° piste",
@@ -186,6 +187,7 @@ export const fr = {
     tableHeaderFileSize: "Taille",
     tableHeaderAdded: "Ajouté",
     tableHeaderPath: "Chemin",
+    tableHeaderLibrary: "Bibliothèque",
     tableHeaderLastPlayed: "Dernière lecture",
     noTracksMatchQuery: "Aucune chanson ne correspond à votre recherche :",
     resetSearchFilters: "Réinitialiser la recherche et les filtres"
@@ -287,6 +289,15 @@ export const fr = {
     folderItemRecursive: "Analyse récursive active",
     folderItemRecursiveWatchOff: "Analyse récursive (surveillance en temps réel désactivée)",
     folderItemStopWatch: "Ne plus surveiller ce dossier",
+    folderItemEdit: "Modifier les détails du dossier",
+    folderItemUnavailable: "Indisponible (Disque déconnecté ?)",
+    editFolderTitle: "Modifier les détails du dossier",
+    folderNickname: "Surnom",
+    folderNicknamePlaceholder: "ex. SSD rapide, NAS, Vinyles",
+    folderIcon: "Icône",
+    folderColor: "Couleur du badge",
+    folderColorDefault: "Par défaut",
+    folderPreview: "Aperçu",
     loudnessAnalysisActive: "La normalisation du volume analyse {remaining} chanson(s) en arrière-plan — cela peut ressembler à une analyse même lorsque la surveillance des dossiers est désactivée. Désactivez-la dans l'onglet Égaliseur pour l'arrêter.",
     noFoldersTitle: "Aucun dossier surveillé",
     noFoldersText: "Cliquez sur « Ajouter un dossier » ci-dessus pour ajouter votre répertoire musical.",
@@ -918,7 +929,8 @@ export const fr = {
     editInfoTooltip: "Modifier les infos de l'album",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
-    refreshError: "Échec de l'actualisation de l'album"
+    refreshError: "Échec de l'actualisation de l'album",
+    multiLibraries: "{count} bibliothèques"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."

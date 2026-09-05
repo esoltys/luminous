@@ -25,14 +25,16 @@
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import LibraryBadge from "./LibraryBadge.svelte";
   import {
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
     PushPinIcon as Pin,
-    PushPinSlashIcon as PinOff
+    PushPinSlashIcon as PinOff,
+    FoldersIcon as Folders
   } from "phosphor-svelte";
-  import type { Song, AlbumItem, PlayContext } from "../types";
+  import type { Song, AlbumItem, PlayContext, MusicDirectory } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -106,6 +108,17 @@
    * for this album's directory — there's no dedicated album id in the
    * schema (see #758), so a representative song stands in for one. */
   let representativeSongId = $derived(songs[0]?.id);
+
+  let albumDirectories = $derived.by(() => {
+    const map = new Map<number, MusicDirectory>();
+    for (const song of songs) {
+      if (song.path) {
+        const dir = collectionStore.getDirectoryForPath(song.path);
+        if (dir) map.set(dir.id, dir);
+      }
+    }
+    return Array.from(map.values());
+  });
 
   let artistName = $derived.by(() => {
     if (albumItem?.artist) return albumItem.artist;
@@ -228,7 +241,7 @@
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
 
   function songToRow(song: Song): SongTableRow {
@@ -433,6 +446,19 @@
           {#if albumItem}
             <span>•</span>
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
+          {/if}
+          {#if albumDirectories.length === 1}
+            <span>•</span>
+            <LibraryBadge directory={albumDirectories[0]} size="sm" />
+          {:else if albumDirectories.length > 1}
+            <span>•</span>
+            <span
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-brand-sidebar/80 border border-brand-border/70 text-brand-text-secondary select-none"
+              title={albumDirectories.map((d) => d.nickname || d.path).join(", ")}
+            >
+              <Folders class="w-3.5 h-3.5 text-brand-accent-text" />
+              <span>{i18n.t('albumDetail.multiLibraries', { count: albumDirectories.length }, `${albumDirectories.length} Libraries`)}</span>
+            </span>
           {/if}
         </div>
         {/if}

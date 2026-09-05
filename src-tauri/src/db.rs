@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 24;
+pub const CURRENT_SCHEMA_VERSION: i32 = 25;
 
 struct Migration {
     version: i32,
@@ -166,6 +166,19 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_release_type {
                 conn.execute_batch(MIGRATION_24)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 25,
+        description: "nickname, icon, and color metadata columns on directories table (#124)",
+        apply: |conn| {
+            let has_nickname: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('directories') WHERE name = 'nickname'")?
+                .exists([])?;
+            if !has_nickname {
+                conn.execute_batch(MIGRATION_25)?;
             }
             Ok(())
         },
@@ -711,6 +724,15 @@ ALTER TABLE songs ADD COLUMN catalog_number TEXT;
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 25: nickname, icon, and color columns on directories table (#124).
+// ---------------------------------------------------------------------------
+const MIGRATION_25: &str = "
+ALTER TABLE directories ADD COLUMN nickname TEXT;
+ALTER TABLE directories ADD COLUMN icon TEXT;
+ALTER TABLE directories ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -986,6 +1008,40 @@ mod tests {
             orphaned_items, 0,
             "the discarded playlist's items must go with it"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_25_adds_directory_metadata_columns() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration25_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO directories (path, subdirs, nickname, icon, color) VALUES (?1, 1, ?2, ?3, ?4)",
+            params!["/test/music", "My Library", "hard-drive", "#3b82f6"],
+        )
+        .unwrap();
+
+        let (nickname, icon, color): (Option<String>, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT nickname, icon, color FROM directories WHERE path = '/test/music'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(nickname.as_deref(), Some("My Library"));
+        assert_eq!(icon.as_deref(), Some("hard-drive"));
+        assert_eq!(color.as_deref(), Some("#3b82f6"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

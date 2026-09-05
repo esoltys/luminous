@@ -681,6 +681,9 @@ pub struct MusicDirectory {
     pub subdirs: bool,
     #[serde(default)]
     pub is_available: bool,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
 }
 
 /// Result of pruning missing/unavailable songs from the library.

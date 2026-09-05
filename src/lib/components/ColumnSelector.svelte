@@ -94,6 +94,7 @@
     { key: "added",     label: "collection.columnAdded" },
     { key: "duration",  label: "collection.columnDuration" },
     { key: "lastplayed",label: "collection.columnLastPlayed" },
+    { key: "library",   label: "collection.columnLibrary" },
     { key: "playcount", label: "collection.columnPlayCount" },
     { key: "rating",    label: "collection.columnRating" },
     { key: "skipcount", label: "collection.columnSkipCount" },

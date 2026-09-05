@@ -270,7 +270,7 @@
     genre: "1.2fr", grouping: "1.2fr", bpm: "60px", initial_key: "60px",
     bitrate: "70px", samplerate: "75px", bitdepth: "65px", channels: "70px",
     filesize: "75px", rating: "96px", playcount: "70px", skipcount: "70px",
-    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", actions: "80px",
+    lastplayed: "90px", added: "90px", duration: "80px", path: "2fr", library: "130px", actions: "80px",
   };
 
   function toggleSort(field: keyof Song) {

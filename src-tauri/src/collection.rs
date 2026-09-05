@@ -76,6 +76,9 @@ impl CollectionScanner {
             path: path.to_string(),
             subdirs: true,
             is_available: std::path::Path::new(path).exists(),
+            nickname: None,
+            icon: None,
+            color: None,
         })
     }
 
@@ -118,7 +121,7 @@ impl CollectionScanner {
     /// List all watched directories.
     pub fn get_directories(&self) -> Result<Vec<MusicDirectory>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare("SELECT id, path, subdirs FROM directories ORDER BY path")?;
+        let mut stmt = conn.prepare("SELECT id, path, subdirs, nickname, icon, color FROM directories ORDER BY path")?;
         let dirs = stmt
             .query_map([], |row| {
                 let path: String = row.get(1)?;
@@ -128,11 +131,30 @@ impl CollectionScanner {
                     path,
                     subdirs: row.get(2)?,
                     is_available,
+                    nickname: row.get(3)?,
+                    icon: row.get(4)?,
+                    color: row.get(5)?,
                 })
             })?
             .filter_map(|r| r.ok())
             .collect();
         Ok(dirs)
+    }
+
+    /// Update metadata (nickname, icon, color) for a watched directory.
+    pub fn update_directory_metadata(
+        &self,
+        id: i64,
+        nickname: Option<String>,
+        icon: Option<String>,
+        color: Option<String>,
+    ) -> Result<()> {
+        let conn = self.db.pool.get()?;
+        conn.execute(
+            "UPDATE directories SET nickname = ?1, icon = ?2, color = ?3 WHERE id = ?4",
+            params![nickname, icon, color, id],
+        )?;
+        Ok(())
     }
     /// Returns ids of songs (from `path`) whose file no longer exists on disk, excluding
     /// any song that lives under a watched directory root which is currently unreachable.

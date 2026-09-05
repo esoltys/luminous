@@ -206,6 +206,9 @@ export interface MusicDirectory {
   path: string;
   subdirs: boolean;
   is_available?: boolean;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
 }
 
 export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";

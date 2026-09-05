@@ -888,6 +888,7 @@ pub fn run() {
             commands::collection::add_directory,
             commands::collection::remove_directory,
             commands::collection::get_directories,
+            commands::collection::update_directory_metadata,
             commands::collection::get_library_stats,
             commands::collection::search_songs,
             commands::collection::get_library_snapshot,
