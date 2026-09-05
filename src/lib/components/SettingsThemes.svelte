@@ -242,7 +242,7 @@
           <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
         </Button>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         {#each themeStore.customThemes as theme}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -250,7 +250,7 @@
             onclick={() => themeStore.setTheme(theme.id)}
             role="button"
             tabindex="0"
-            class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
+            class="bg-brand-main/50 border-2 rounded-xl p-3.5 flex flex-col gap-3 text-left transition-colors w-full overflow-hidden {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
           >
             <div class="flex items-center justify-between w-full">
               <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
@@ -264,17 +264,17 @@
               <div class="flex-1" style="background-color: {theme.colors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
               <div class="flex-1" style="background-color: {theme.colors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-1.5 w-full mt-auto">
               <button
                 onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
-                class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+                class="flex-1 min-w-0 py-1 px-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors truncate text-center"
                 title={i18n.t('settings.editTheme')}
               >
                 {i18n.t('settings.editThemeShort')}
               </button>
               <button
                 onclick={(e) => { e.stopPropagation(); handleExportTheme(theme); }}
-                class="p-1 px-1.5 rounded bg-brand-main hover:bg-brand-border text-brand-text-secondary hover:text-brand-text-primary border border-brand-border transition-colors"
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-brand-border text-brand-text-secondary hover:text-brand-text-primary border border-brand-border transition-colors flex items-center justify-center"
                 title={i18n.t('settings.exportTheme')}
                 aria-label={i18n.t('settings.exportTheme')}
               >
@@ -282,7 +282,7 @@
               </button>
               <button
                 onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
-                class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors flex items-center justify-center"
                 title={i18n.t('settings.deleteTheme')}
                 aria-label={i18n.t('settings.deleteTheme')}
               >
