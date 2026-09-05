@@ -8,6 +8,7 @@ describe("LibraryBadge.svelte", () => {
   const baseDirectory: MusicDirectory = {
     id: 1,
     path: "C:\\Music\\HighRes",
+    subdirs: true,
     is_available: true,
     nickname: null,
     icon: null,
