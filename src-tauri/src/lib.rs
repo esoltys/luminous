@@ -1014,6 +1014,9 @@ pub fn run() {
             commands::tags::reorder_tag_in_group,
             commands::tags::merge_tags,
             commands::tags::delete_tags,
+            // Theme commands (#165)
+            commands::theme::import_theme,
+            commands::theme::export_theme,
             // Settings commands
             commands::settings::set_app_setting,
             commands::settings::get_all_app_settings,
