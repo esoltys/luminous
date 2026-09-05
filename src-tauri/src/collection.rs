@@ -1061,6 +1061,14 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
 
     song.art_embedded = candidate_tags.iter().any(|t| !t.pictures().is_empty());
 
+    // Check for sidecar .lrc lyrics next to the audio file (#155).
+    // Sidecar .lrc files take precedence over embedded tags because they are
+    // typically high-confidence synced lyrics intentionally placed by the user.
+    if let Some(sidecar) = crate::lyrics::read_sidecar_lrc(path, song.title.as_deref(), song.track)
+    {
+        song.lyrics = Some(sidecar);
+    }
+
     Ok(song)
 }
 
@@ -2484,6 +2492,33 @@ mod tests {
         assert_eq!(
             song.art_automatic.unwrap(),
             folder_art_path.to_string_lossy().to_string()
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_read_tags_loads_sidecar_lrc() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_sidecar_lrc_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("track.wav");
+        let lrc_path = temp_dir.join("track.lrc");
+
+        write_test_wav(&audio_path);
+        std::fs::write(&lrc_path, b"[00:05.00] Sidecar lyric line").unwrap();
+
+        let song = read_tags(&audio_path).unwrap();
+
+        assert_eq!(
+            song.lyrics,
+            Some("[00:05.00] Sidecar lyric line".to_string())
         );
 
         let _ = std::fs::remove_dir_all(&temp_dir);
