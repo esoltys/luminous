@@ -556,6 +556,32 @@ export class ThemeStore {
     }
   }
 
+  async importTheme(filePath: string): Promise<Theme> {
+    const imported = await invoke<Theme>("import_theme", { filePath });
+    const requiredColors: (keyof ThemeColors)[] = [
+      "bg-main",
+      "bg-sidebar",
+      "bg-playerbar",
+      "color-accent",
+      "color-accent-hover",
+      "color-text-primary",
+      "color-text-secondary",
+      "color-border",
+    ];
+    for (const key of requiredColors) {
+      if (!imported.colors || typeof imported.colors[key] !== "string" || !imported.colors[key].trim()) {
+        throw new Error(`Missing or invalid color: ${key}`);
+      }
+    }
+    imported.isCustom = true;
+    await this.addCustomTheme(imported);
+    return imported;
+  }
+
+  async exportTheme(theme: Theme, exportPath: string): Promise<void> {
+    await invoke("export_theme", { theme, exportPath });
+  }
+
   async updateArtworkColors(song: Song | undefined) {
     if (!song) {
       this.resetArtworkColors();

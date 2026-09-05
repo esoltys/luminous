@@ -12,5 +12,6 @@ pub mod settings;
 pub mod stats;
 pub mod tageditor;
 pub mod tags;
+pub mod theme;
 pub mod visualizer;
 pub mod window;

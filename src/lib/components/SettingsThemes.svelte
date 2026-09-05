@@ -5,12 +5,15 @@
   import { onDestroy } from "svelte";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import {
     PaletteIcon as Palette,
     TrashIcon as Trash2,
     ArrowCounterClockwiseIcon as RotateCcw,
     SunIcon as Sun,
-    MoonIcon as Moon
+    MoonIcon as Moon,
+    FolderOpenIcon as FolderInput,
+    ExportIcon as FileOutput
   } from "phosphor-svelte";
 
   let editingThemeId = $state<string | null>(null);
@@ -111,6 +114,40 @@
       newThemeName = "";
     }
   }
+
+  async function handleImportTheme() {
+    try {
+      const selected = await open({
+        multiple: false,
+        title: i18n.t('settings.importTheme'),
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      });
+      if (selected && typeof selected === "string") {
+        const imported = await themeStore.importTheme(selected);
+        toastStore.show(i18n.t('settings.themeImportSuccess', { name: imported.name }));
+      }
+    } catch (err) {
+      console.error("Failed to import theme:", err);
+      toastStore.show(i18n.t('settings.themeImportError', { error: String(err) }));
+    }
+  }
+
+  async function handleExportTheme(theme: Theme) {
+    try {
+      const savePath = await save({
+        title: i18n.t('settings.exportTheme'),
+        defaultPath: `${theme.name}.json`,
+        filters: [{ name: "Theme (*.json)", extensions: ["json"] }],
+      });
+      if (savePath && typeof savePath === "string") {
+        await themeStore.exportTheme(theme, savePath);
+        toastStore.show(i18n.t('settings.themeExportSuccess', { name: theme.name }));
+      }
+    } catch (err) {
+      console.error("Failed to export theme:", err);
+      toastStore.show(i18n.t('settings.themeExportError', { error: String(err) }));
+    }
+  }
 </script>
 
 <div class="space-y-6">
@@ -199,8 +236,13 @@
 
   {#if themeStore.customThemes.length > 0}
     <div>
-      <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.customThemes')}</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase">{i18n.t('settings.customThemes')}</h3>
+        <Button onclick={handleImportTheme} variant="secondary" size="sm" class="h-7 text-xs">
+          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
+        </Button>
+      </div>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         {#each themeStore.customThemes as theme}
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -208,7 +250,7 @@
             onclick={() => themeStore.setTheme(theme.id)}
             role="button"
             tabindex="0"
-            class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col gap-3 text-left transition-colors w-full {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
+            class="bg-brand-main/50 border-2 rounded-xl p-3.5 flex flex-col gap-3 text-left transition-colors w-full overflow-hidden {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60 hover:border-brand-border'}"
           >
             <div class="flex items-center justify-between w-full">
               <span class="font-semibold text-sm text-brand-text-primary truncate">{theme.name}</span>
@@ -222,18 +264,27 @@
               <div class="flex-1" style="background-color: {theme.colors['color-accent-hover']}" title={i18n.t('settings.accentHoverLabel')}></div>
               <div class="flex-1" style="background-color: {theme.colors['color-border']}" title={i18n.t('settings.bordersLabel')}></div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-1.5 w-full mt-auto">
               <button
                 onclick={(e) => { e.stopPropagation(); editingThemeId = theme.id; }}
-                class="flex-1 px-2 py-1 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors"
+                class="flex-1 min-w-0 py-1 px-1.5 rounded text-xs font-semibold bg-brand-accent hover:bg-brand-accent-hover text-brand-accent-contrast transition-colors truncate text-center"
                 title={i18n.t('settings.editTheme')}
               >
                 {i18n.t('settings.editThemeShort')}
               </button>
               <button
+                onclick={(e) => { e.stopPropagation(); handleExportTheme(theme); }}
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-brand-border text-brand-text-secondary hover:text-brand-text-primary border border-brand-border transition-colors flex items-center justify-center"
+                title={i18n.t('settings.exportTheme')}
+                aria-label={i18n.t('settings.exportTheme')}
+              >
+                <FileOutput class="w-3.5 h-3.5" />
+              </button>
+              <button
                 onclick={(e) => { e.stopPropagation(); themeStore.deleteCustomTheme(theme.id); }}
-                class="p-1 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+                class="p-1 shrink-0 rounded bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors flex items-center justify-center"
                 title={i18n.t('settings.deleteTheme')}
+                aria-label={i18n.t('settings.deleteTheme')}
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -255,11 +306,16 @@
           {editingTheme ? i18n.t('settings.editingThemeTitle', { name: editingTheme.name }) : i18n.t('settings.customThemeBuilderTitle')}
         </h4>
       </div>
-      {#if editingThemeId}
-        <Button onclick={() => { editingThemeId = null; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
-          {i18n.t('settings.cancel')}
+      <div class="flex items-center gap-2">
+        <Button onclick={handleImportTheme} variant="secondary" size="sm" class="h-8 text-xs">
+          <FolderInput class="w-3.5 h-3.5 text-brand-accent-text" /> {i18n.t('settings.importTheme')}
         </Button>
-      {/if}
+        {#if editingThemeId}
+          <Button onclick={() => { editingThemeId = null; themeStore.applyActiveTheme(); }} variant="secondary" size="sm">
+            {i18n.t('settings.cancel')}
+          </Button>
+        {/if}
+      </div>
     </div>
 
     <div class="space-y-5">
