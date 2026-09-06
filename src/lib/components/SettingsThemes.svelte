@@ -208,15 +208,15 @@
 
   <div>
     <h4 class="text-xs text-brand-text-secondary font-bold tracking-wider uppercase mb-3">{i18n.t('settings.predefinedThemes', {}, 'Predefined Themes')}</h4>
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
       {#each STATIC_PREDEFINED_THEMES as theme}
         {@const previewColors = getPreviewColors(theme)}
         <button
           onclick={() => themeStore.setTheme(theme.id)}
-          class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
+          class="bg-brand-main/50 border-2 rounded-xl p-3.5 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full overflow-hidden relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
           <div class="flex items-center justify-between w-full">
-            <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
+            <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5 truncate">
               {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
             </span>
           </div>
@@ -296,7 +296,7 @@
   {/if}
   </div>
 
-  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
+  <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5 @container">
     <div class="flex items-center justify-between border-b border-brand-border pb-3">
       <div class="flex items-center gap-3">
         <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
@@ -319,7 +319,7 @@
     </div>
 
     <div class="space-y-5">
-        <div class="flex flex-col md:flex-row gap-4 items-end justify-between">
+        <div class="flex flex-col sm:flex-row gap-4 sm:items-end justify-between">
           <div class="flex flex-col gap-1.5 flex-1 max-w-sm">
             <label for="theme-name-input" class="text-xs text-brand-text-secondary font-semibold">{i18n.t('settings.themeNameLabel')}</label>
             <Input
@@ -336,76 +336,76 @@
           </Button>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-6 pt-2">
+        <div class="grid grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3 gap-x-6 gap-y-5 pt-2">
           <!-- Dark Muted (Main Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-main']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-main']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.mainViewLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.mainViewDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.mainViewLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.mainViewDescription')}</span>
             </div>
           </div>
 
           <!-- Dark Vibrant (Sidebar Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-sidebar']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-sidebar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.sidebarLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.sidebarDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.sidebarLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.sidebarDescription')}</span>
             </div>
           </div>
 
           <!-- Light Muted (Player Bar Background) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['bg-playerbar']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['bg-playerbar']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.playerBarLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.playerBarDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.playerBarLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.playerBarDescription')}</span>
             </div>
           </div>
 
           <!-- Vibrant (Accent Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-accent']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-accent']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.accentLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.accentDescription')}</span>
             </div>
           </div>
 
           <!-- Light Vibrant (Accent Hover Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-accent-hover']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-accent-hover']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.accentHoverLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.accentHoverDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.accentHoverLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.accentHoverDescription')}</span>
             </div>
           </div>
 
           <!-- Muted (Border Color) -->
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <div class="flex items-center rounded border border-brand-border bg-brand-main overflow-hidden shrink-0">
-              <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 bg-transparent border-none shrink-0" />
+              <input type="color" bind:value={customColors['color-border']} class="w-9 h-9 bg-transparent border-none shrink-0 cursor-pointer" />
               <input type="text" bind:value={customColors['color-border']} maxlength="7" class="w-16 h-9 px-2 text-[11px] bg-transparent text-brand-text-primary outline-none font-mono uppercase" />
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('settings.bordersLabel')}</span>
-              <span class="text-[10px] text-brand-text-secondary font-medium">{i18n.t('settings.bordersDescription')}</span>
+              <span class="text-xs font-semibold text-brand-text-primary leading-snug">{i18n.t('settings.bordersLabel')}</span>
+              <span class="text-[10px] text-brand-text-secondary font-medium leading-tight">{i18n.t('settings.bordersDescription')}</span>
             </div>
           </div>
         </div>
