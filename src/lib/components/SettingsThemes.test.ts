@@ -74,4 +74,22 @@ describe("SettingsThemes.svelte", () => {
     }));
     expect(exportSpy).toHaveBeenCalledWith(customTheme, "/path/to/exported-vapor.json");
   });
+
+  it("applies matching auto-fill responsive grid classes to predefined themes", async () => {
+    const { findByText } = render(SettingsThemes);
+    const predefinedHeading = await findByText("Predefined Themes");
+    const predefinedGrid = predefinedHeading.nextElementSibling;
+    expect(predefinedGrid).not.toBeNull();
+    expect(predefinedGrid?.className).toContain("grid-cols-[repeat(auto-fill,minmax(160px,1fr))]");
+  });
+
+  it("applies container-responsive grid classes to custom theme builder", async () => {
+    const { findByText } = render(SettingsThemes);
+    const mainBgLabel = await findByText("Main Background");
+    const colorGrid = mainBgLabel.closest(".grid");
+    expect(colorGrid).not.toBeNull();
+    expect(colorGrid?.className).toContain("grid-cols-1");
+    expect(colorGrid?.className).toContain("@md:grid-cols-2");
+    expect(colorGrid?.className).toContain("@2xl:grid-cols-3");
+  });
 });
