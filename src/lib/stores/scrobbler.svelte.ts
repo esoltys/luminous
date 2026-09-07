@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface ScrobblerSettings {
   listenbrainz_enabled: boolean;
@@ -51,6 +52,21 @@ class ScrobblerStore {
       this.minDurationSecs = settings.min_duration_secs;
     } catch (e) {
       console.error("Failed to load scrobbler settings:", e);
+    }
+
+    try {
+      await listen<ScrobblerSettings>("scrobbler-settings-changed", (event) => {
+        const s = event.payload;
+        this.enabled = s.listenbrainz_enabled;
+        this.token = s.listenbrainz_token;
+        this.username = s.listenbrainz_username;
+        this.nowPlayingEnabled = s.scrobble_now_playing;
+        this.ratingsEnabled = s.scrobble_ratings;
+        this.paused = s.scrobble_paused;
+        this.minDurationSecs = s.min_duration_secs;
+      });
+    } catch (e) {
+      console.error("Failed to register scrobbler-settings-changed listener:", e);
     }
 
     await this.refreshCacheStatus();

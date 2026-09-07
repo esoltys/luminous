@@ -134,6 +134,7 @@ pub struct ScrobblerManager {
     db: Arc<Database>,
     client: Client,
     settings: Arc<Mutex<ScrobblerSettings>>,
+    paused: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ScrobblerManager {
@@ -145,11 +146,13 @@ impl ScrobblerManager {
             .unwrap_or_default();
 
         let initial_settings = Self::load_settings_from_db(&db);
+        let paused = Arc::new(std::sync::atomic::AtomicBool::new(initial_settings.scrobble_paused));
 
         Self {
             db,
             client,
             settings: Arc::new(Mutex::new(initial_settings)),
+            paused,
         }
     }
 
@@ -208,9 +211,22 @@ impl ScrobblerManager {
                 );
             }
         }
+        self.paused.store(new_settings.scrobble_paused, std::sync::atomic::Ordering::Relaxed);
         let mut s = self.settings.lock().await;
         *s = new_settings;
         Ok(())
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub async fn toggle_paused(&self) -> bool {
+        let mut s = self.get_settings().await;
+        s.scrobble_paused = !s.scrobble_paused;
+        let new_paused = s.scrobble_paused;
+        let _ = self.save_settings(s).await;
+        new_paused
     }
 
     pub async fn get_settings(&self) -> ScrobblerSettings {

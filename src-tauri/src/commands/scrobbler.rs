@@ -9,16 +9,32 @@ pub async fn get_scrobbler_settings(
     Ok(state.scrobbler.get_settings().await)
 }
 
+use tauri::Emitter;
+
 #[tauri::command]
 pub async fn set_scrobbler_settings(
     settings: ScrobblerSettings,
     state: State<'_, AppState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
     state
         .scrobbler
-        .save_settings(settings)
+        .save_settings(settings.clone())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("scrobbler-settings-changed", &settings);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn toggle_scrobble_pause(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<bool, String> {
+    let paused = state.scrobbler.toggle_paused().await;
+    let settings = state.scrobbler.get_settings().await;
+    let _ = app.emit("scrobbler-settings-changed", &settings);
+    Ok(paused)
 }
 
 #[tauri::command]
