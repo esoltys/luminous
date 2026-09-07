@@ -19,8 +19,13 @@
 //     never for exercising clicks that mutate state (ratings, deletes,
 //     playlist edits, etc.).
 //   bunx tsx scripts/inspect-app.ts screenshot <output.png>
+//   bunx tsx scripts/inspect-app.ts screenshot <output.png> --css "<selector>"
+//     Crops to just that element (via the driver, no manual DPI math) —
+//     use this over a full-page screenshot when checking pixel-level detail
+//     like a hover outline/corner treatment.
 //   bunx tsx scripts/inspect-app.ts click --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts click --text "<visible text>"
+//   bunx tsx scripts/inspect-app.ts hover --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts type --css "<selector>" "<text>"
 //   bunx tsx scripts/inspect-app.ts source
 //   bunx tsx scripts/inspect-app.ts url
@@ -31,8 +36,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   clickElement,
+  elementScreenshot,
   getSource,
   getUrl,
+  hoverElement,
   screenshot,
   startSession,
   stopSession,
@@ -104,11 +111,17 @@ async function cmdStop() {
 
 async function cmdScreenshot(args: string[]) {
   const outPath = args[0];
-  if (!outPath) throw new Error('Usage: screenshot <output.png>');
+  if (!outPath) throw new Error('Usage: screenshot <output.png> [--css/--text <sel>]');
   const session = asSession(loadState());
-  const base64 = await screenshot(session);
+  const hasSelector = args.includes('--css') || args.includes('--text');
+  const base64 = hasSelector ? await elementScreenshot(session, ...selectorFor(args.slice(1))) : await screenshot(session);
   writeFileSync(path.resolve(outPath), Buffer.from(base64, 'base64'));
   console.log(`Saved screenshot to ${path.resolve(outPath)}`);
+}
+
+function selectorFor(args: string[]): [string, string] {
+  const { using, value } = parseSelectorArgs(args);
+  return [using, value];
 }
 
 function parseSelectorArgs(args: string[]): { using: string; value: string; rest: string[] } {
@@ -127,6 +140,13 @@ async function cmdClick(args: string[]) {
   const session = asSession(loadState());
   await clickElement(session, using, value);
   console.log(`Clicked ${using}=${value}`);
+}
+
+async function cmdHover(args: string[]) {
+  const { using, value } = parseSelectorArgs(args);
+  const session = asSession(loadState());
+  await hoverElement(session, using, value);
+  console.log(`Hovering ${using}=${value}`);
 }
 
 async function cmdType(args: string[]) {
@@ -165,6 +185,8 @@ async function main() {
       return cmdScreenshot(args);
     case 'click':
       return cmdClick(args);
+    case 'hover':
+      return cmdHover(args);
     case 'type':
       return cmdType(args);
     case 'source':
@@ -172,7 +194,7 @@ async function main() {
     case 'url':
       return cmdUrl();
     default:
-      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|type --css/--text <sel> <text>|source|url>');
+      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|hover --css/--text <sel>|type --css/--text <sel> <text>|source|url>');
       process.exitCode = 1;
   }
 }
