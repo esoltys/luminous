@@ -251,10 +251,18 @@ impl ScrobblerManager {
             .ok_or_else(|| "Validated, but no username returned".to_string())?;
 
         // If validation succeeds and matches current token, update username
-        let mut s = self.settings.lock().await;
-        if s.listenbrainz_token == trimmed {
-            s.listenbrainz_username = Some(username.clone());
-            let _ = self.save_settings(s.clone()).await;
+        let updated_settings = {
+            let mut s = self.settings.lock().await;
+            if s.listenbrainz_token == trimmed {
+                s.listenbrainz_username = Some(username.clone());
+                Some(s.clone())
+            } else {
+                None
+            }
+        };
+
+        if let Some(s) = updated_settings {
+            let _ = self.save_settings(s).await;
         }
 
         Ok(username)
