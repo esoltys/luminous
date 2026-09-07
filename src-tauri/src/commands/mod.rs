@@ -8,6 +8,7 @@ pub mod picard;
 pub mod pins;
 pub mod player;
 pub mod playlist;
+pub mod scrobbler;
 pub mod settings;
 pub mod stats;
 pub mod tageditor;

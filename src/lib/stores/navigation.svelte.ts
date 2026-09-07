@@ -22,6 +22,7 @@ export interface AutoPlaylistRef {
     | "no_genre"
     | "artist_tag"
     | "missing_metadata"
+    | "missing_musicbrainz"
     | "daypart";
   /** For kind "genre": the curated tag's plain name (#548) — a top-level
    * card name or a sub-genre chip name, resolved the same way either way

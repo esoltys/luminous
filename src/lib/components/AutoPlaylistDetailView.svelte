@@ -81,8 +81,38 @@
   let artistTag = $derived(view.artistTag);
   let decade = $derived(view.decade);
   let bpm = $derived(view.bpm);
-  let playlistId = $derived(view.playlistId);
-  let updated = $derived(view.updated);
+  let playlistId = $derived.by(() => {
+    if (view.playlistId !== undefined) return view.playlistId;
+    if (view.kind === "missing_musicbrainz") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")?.id;
+    }
+    if (view.kind === "missing_metadata") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")?.id;
+    }
+    if (view.kind === "daypart") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))?.id;
+    }
+    if (view.kind === "decade" && view.decade) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`)?.id;
+    }
+    if (view.kind === "bpm" && view.bpm) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`)?.id;
+    }
+    if (view.kind === "artist_tag" && view.artistTag) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`)?.id;
+    }
+    if (view.kind === "genre" && view.genre) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`)?.id;
+    }
+    return undefined;
+  });
+  let updated = $derived.by(() => {
+    if (view.updated !== undefined) return view.updated;
+    if (playlistId !== undefined) {
+      return playlistsStore.playlists.find((p) => p.id === playlistId)?.updated;
+    }
+    return undefined;
+  });
   let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
 
   let songs = $state<Song[]>([]);
@@ -135,6 +165,7 @@
     // population-mode suffix (population mode has no meaning here: the
     // point is to surface every affected song, not bias toward favourites).
     if (kind === "missing_metadata") return i18n.t("playlists.autoMissingMetadata");
+    if (kind === "missing_musicbrainz") return i18n.t("playlists.autoMissingMusicBrainz");
     const base = kind === "decade"
       ? (decade || i18n.t("artistDetail.unknownYear"))
       : kind === "bpm"
@@ -187,7 +218,7 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "daypart") ||
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
       updated === undefined
     )
       return null;
@@ -203,9 +234,25 @@
   });
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "daypart") && pid !== undefined) {
+    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
+    }
+    if (k === "missing_musicbrainz") {
+      if (pid !== undefined) {
+        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
+        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
+        if (songs.length > 0) return songs;
+      }
+      return invoke<Song[]>("get_songs_missing_musicbrainz_id");
+    }
+    if (k === "missing_metadata") {
+      if (pid !== undefined) {
+        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
+        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
+        if (songs.length > 0) return songs;
+      }
+      return invoke<Song[]>("get_songs_missing_metadata");
     }
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });
@@ -661,6 +708,10 @@
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_28px_3px_rgba(245,158,11,0.4)]">
             <AlertTriangle class="w-16 h-16 text-amber-500" />
           </div>
+        {:else if kind === "missing_musicbrainz"}
+          <div class="w-full h-full bg-brand-main bg-gradient-to-br from-indigo-600/25 to-indigo-400/15 flex items-center justify-center overflow-hidden border border-indigo-400/30 shadow-[0_0_28px_3px_rgba(99,102,241,0.4)]">
+            <AlertTriangle class="w-16 h-16 text-indigo-400" />
+          </div>
         {:else if kind === "daypart"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)]">
             <SunHorizon class="w-16 h-16 text-[#2DD4BF]" />
@@ -792,7 +843,7 @@
       disabled={loading || songs.length === 0}
     />
 
-    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "daypart") && playlistId !== undefined}
+    {#if (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") && playlistId !== undefined}
       <ContextMenuItem
         icon={RefreshCw}
         label={i18n.t("playlists.refreshPlaylistBtn", {}, "Refresh Playlist")}
@@ -801,7 +852,7 @@
       />
     {/if}
 
-    {#if kind === "missing_metadata"}
+    {#if kind === "missing_metadata" || kind === "missing_musicbrainz"}
       <ContextMenuDivider />
       <ContextMenuItem
         icon={OpenInPicard}

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import ArtistDetailView from "./ArtistDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
+import { picardStore } from "../stores/picard.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -44,13 +45,13 @@ describe("ArtistDetailView", () => {
     collectionStore.extendedArtworkByArtist = {};
   });
 
-  it("renders artist name and action buttons including Edit", async () => {
+  it("renders artist name and action buttons including overflow menu", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
     expect(screen.getByText("Shania Twain")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Shuffle Play/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Edit/i })).toBeTruthy();
+    expect(screen.getByTitle("More actions")).toBeTruthy();
   });
 
   it("renders Profile Card with About, Tags, Bio, and Links", async () => {
@@ -76,13 +77,44 @@ describe("ArtistDetailView", () => {
     expect(navigationStore.activeSubTab).toBe("artists");
   });
 
-  it("clicking Edit button opens the ArtistProfileEditor modal", async () => {
+  it("clicking Edit Artist Details in overflow menu opens the ArtistProfileEditor modal", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-    const editBtn = screen.getByRole("button", { name: /Edit/i });
+    const moreBtn = screen.getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+
+    const editBtn = screen.getByText("Edit Artist Details");
     await fireEvent.click(editBtn);
 
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("clicking Open All in Picard in overflow menu invokes open_in_picard", async () => {
+    picardStore.path = "/mock/picard";
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          { id: 10, title: "Song 1", artist: "Shania Twain", genre: "Country", length_nanosec: 180_000_000_000 } as any,
+          { id: 11, title: "Song 2", artist: "Shania Twain", genre: "Pop", length_nanosec: 200_000_000_000 } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const moreBtn = screen.getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+
+    const picardBtn = screen.getByText("Open All in Picard");
+    await fireEvent.click(picardBtn);
+
+    expect(invokeMock).toHaveBeenCalledWith("open_in_picard", { songIds: [10, 11] });
   });
 
   it("renders genre chips when artist has songs with multi-value genres", async () => {

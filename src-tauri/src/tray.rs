@@ -16,7 +16,7 @@
 use crate::models::{PlayState, PlaybackState};
 use crate::AppState;
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Listener, Manager};
 
@@ -26,6 +26,15 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
     let play_pause = MenuItem::with_id(app, "tray-play-pause", "Play/Pause", true, None::<&str>)?;
     let next = MenuItem::with_id(app, "tray-next", "Next", true, None::<&str>)?;
     let previous = MenuItem::with_id(app, "tray-previous", "Previous", true, None::<&str>)?;
+    let is_paused = app.state::<AppState>().scrobbler.is_paused();
+    let pause_scrobbling = CheckMenuItem::with_id(
+        app,
+        "tray-pause-scrobbling",
+        "Pause all scrobbling",
+        true,
+        is_paused,
+        None::<&str>,
+    )?;
     let toggle_window = MenuItem::with_id(
         app,
         "tray-toggle-window",
@@ -41,6 +50,8 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
             &play_pause,
             &next,
             &previous,
+            &PredefinedMenuItem::separator(app)?,
+            &pause_scrobbling,
             &PredefinedMenuItem::separator(app)?,
             &toggle_window,
             &PredefinedMenuItem::separator(app)?,
@@ -90,6 +101,13 @@ pub fn init(app: &tauri::App) -> tauri::Result<()> {
         }
     });
 
+    let pause_scrobbling_handle = pause_scrobbling.clone();
+    app.listen("scrobbler-settings-changed", move |event| {
+        if let Ok(settings) = serde_json::from_str::<crate::scrobbler::ScrobblerSettings>(event.payload()) {
+            let _ = pause_scrobbling_handle.set_checked(settings.scrobble_paused);
+        }
+    });
+
     Ok(())
 }
 
@@ -134,6 +152,16 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id().as_ref() {
         "tray-toggle-window" => return toggle_main_window(app),
         "tray-quit" => return app.exit(0),
+        "tray-pause-scrobbling" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                let _ = state.scrobbler.toggle_paused().await;
+                let settings = state.scrobbler.get_settings().await;
+                let _ = app.emit("scrobbler-settings-changed", &settings);
+            });
+            return;
+        }
         _ => {}
     }
 

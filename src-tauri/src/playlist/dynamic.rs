@@ -105,6 +105,8 @@ impl PlaylistManager {
             scanner.get_songs_by_artist_tag(tag, NO_SONG_LIMIT, mode)
         } else if spec == "missingmeta" {
             scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)
+        } else if spec == "missingmbid" {
+            scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)
         } else if let Some(name) = spec.strip_prefix("tag:") {
             // A system genre auto-playlist, keyed on a curated tag name
             // (#548) rather than a Smart Playlist rule spec (which always

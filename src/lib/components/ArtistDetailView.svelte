@@ -25,12 +25,16 @@
   import SocialIcon from "./SocialIcon.svelte";
   import SongSelectionToolbar from "./SongSelectionToolbar.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
   import {
     PencilSimpleIcon as Edit3,
-    ArrowSquareOutIcon as ExternalLink,
+    ArrowSquareOutIcon as OpenInPicard,
     PushPinIcon as Pin,
-    PushPinSlashIcon as PinOff
+    PushPinSlashIcon as PinOff,
+    DotsThreeIcon as MoreHorizontal
   } from "phosphor-svelte";
+  const ExternalLink = OpenInPicard;
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
   import { getCoverArtUrl } from "../types";
   import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
@@ -39,6 +43,7 @@
   import { parseMultiValue, joinMultiValue } from "../utils/multiValue";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { openInPicard } from "../utils/picard";
@@ -61,6 +66,22 @@
   let isEditorOpen = $state(false);
   let isBioExpanded = $state(false);
   let selectedKeys = $state<Set<string>>(new Set());
+
+  let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+
+  function toggleOverflowMenu(e: MouseEvent) {
+    if (overflowMenuPos) {
+      overflowMenuPos = null;
+    } else {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      overflowMenuPos = { x: rect.left, y: rect.bottom + 4 };
+    }
+  }
+
+  function handleOpenAllInPicard() {
+    if (songs.length === 0) return;
+    openInPicard(songs.map((s) => s.id));
+  }
 
   let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
   let hasWebsite = $derived(!!artistProfile?.website);
@@ -428,12 +449,6 @@
             disabled={loading || songs.length === 0}
           />
           <IconActionButton
-            onclick={() => { isEditorOpen = true; }}
-            title={i18n.t("artistDetail.editArtistTooltip", {}, "Edit artist details, website, tags, and links")}
-          >
-            {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
-          </IconActionButton>
-          <IconActionButton
             onclick={() => pinnedStore.toggle("artist", artistName)}
             title={pinnedStore.isPinned("artist", artistName)
               ? i18n.t("artistDetail.unpinHome")
@@ -450,6 +465,13 @@
           {#if singleSongs.length > 0}
             <ColumnSelector align="left" iconOnly />
           {/if}
+          <button
+            onclick={toggleOverflowMenu}
+            title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs cursor-pointer"
+          >
+            <MoreHorizontal class="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -747,6 +769,27 @@
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { singleContextMenuState = null; }}
   />
+{/if}
+
+{#if overflowMenuPos}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    onClose={() => { overflowMenuPos = null; }}
+  >
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("artistDetail.editArtistDetails", {}, "Edit Artist Details")}
+      onclick={() => { isEditorOpen = true; overflowMenuPos = null; }}
+    />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openAllInPicard")}
+      onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0 || !picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+  </ContextMenu>
 {/if}
 
 {#if editingSongId !== null}

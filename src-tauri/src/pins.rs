@@ -260,6 +260,25 @@ pub fn resolve_auto_playlist(
                     track_count: p.track_count,
                 })
         }
+        "missing_musicbrainz" => {
+            playlists
+                .iter()
+                .find(|p| {
+                    p.dynamic_enabled
+                        && p.track_count > 0
+                        && p.dynamic_spec.as_deref() == Some("missingmbid")
+                })
+                .map(|p| AutoPlaylistItem {
+                    kind: kind.to_string(),
+                    genre: None,
+                    artist_tag: None,
+                    decade: None,
+                    bpm: None,
+                    playlist_id: Some(p.id),
+                    updated: Some(p.updated),
+                    track_count: p.track_count,
+                })
+        }
         "daypart" => {
             // Singleton like "missing_metadata", but resolved by *prefix*
             // rather than exact spec match (#223) — the row's spec changes

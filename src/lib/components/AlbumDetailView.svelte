@@ -26,17 +26,22 @@
   import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
+  import ContextMenu from "./ContextMenu.svelte";
+  import ContextMenuItem from "./ContextMenuItem.svelte";
   import {
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
     ArrowsClockwiseIcon as RefreshCw,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    FoldersIcon as Folders
+    FoldersIcon as Folders,
+    DotsThreeIcon as MoreHorizontal,
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import type { Song, AlbumItem, PlayContext, MusicDirectory } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { compareSongs } from "../utils/songSort";
   import { rememberScroll } from "../utils/scrollMemory";
@@ -301,6 +306,22 @@
     editingSongId = songId;
   }
 
+  let overflowMenuPos = $state<{ x: number; y: number } | null>(null);
+
+  function toggleOverflowMenu(e: MouseEvent) {
+    if (overflowMenuPos) {
+      overflowMenuPos = null;
+    } else {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      overflowMenuPos = { x: rect.left, y: rect.bottom + 4 };
+    }
+  }
+
+  function handleOpenAlbumInPicard() {
+    if (songs.length === 0) return;
+    openInPicard(songs.map((s) => s.id));
+  }
+
   function openAlbumTagEditor() {
     if (songs.length === 0) return;
     showAlbumTagEditor = true;
@@ -481,13 +502,6 @@
             {#snippet icon()}<Plus class="w-4 h-4" />{/snippet}
           </IconActionButton>
           <IconActionButton
-            onclick={openAlbumTagEditor}
-            disabled={loading || songs.length === 0}
-            title={i18n.t('albumDetail.editInfoTooltip')}
-          >
-            {#snippet icon()}<Edit3 class="w-4 h-4" />{/snippet}
-          </IconActionButton>
-          <IconActionButton
             onclick={handleRefreshAlbum}
             disabled={loading || collectionStore.isScanning || refreshing}
             title={i18n.t('albumDetail.refreshTooltip')}
@@ -509,6 +523,13 @@
             {/snippet}
           </IconActionButton>
           <ColumnSelector align="left" iconOnly />
+          <button
+            onclick={toggleOverflowMenu}
+            title={i18n.t("playlists.moreActionsTooltip", {}, "More actions")}
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-brand-border text-brand-text-secondary hover:text-brand-accent-text hover:bg-brand-sidebar transition-colors shadow-xs cursor-pointer"
+          >
+            <MoreHorizontal class="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -617,6 +638,28 @@
     onOpenInPicard={() => openInPicard(selectedKeys.size > 1 ? Array.from(selectedKeys, Number) : [song.id])}
     onClose={() => { contextMenuState = null; }}
   />
+{/if}
+
+{#if overflowMenuPos}
+  <ContextMenu
+    x={overflowMenuPos.x}
+    y={overflowMenuPos.y}
+    onClose={() => { overflowMenuPos = null; }}
+  >
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("albumDetail.editInfoTooltip")}
+      onclick={() => { openAlbumTagEditor(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0}
+    />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openInPicard")}
+      onclick={() => { handleOpenAlbumInPicard(); overflowMenuPos = null; }}
+      disabled={loading || songs.length === 0 || !picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+  </ContextMenu>
 {/if}
 
 {#if selectedKeys.size > 0}

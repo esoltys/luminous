@@ -127,6 +127,48 @@
               subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Decade`,
               ref: { kind: "decade", decade, playlistId: p.id, updated: p.updated }
             });
+          } else if (p.dynamic_spec?.startsWith("bpmrange:")) {
+            const bpm = p.dynamic_spec.replace(/^bpmrange:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:bpm:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • BPM`,
+              ref: { kind: "bpm", bpm, playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec?.startsWith("artisttag:")) {
+            const artistTag = p.dynamic_spec.replace(/^artisttag:/, "");
+            results.push({
+              type: "auto",
+              id: `auto:artist_tag:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Artist Tag`,
+              ref: { kind: "artist_tag", artistTag, playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec === "missingmeta") {
+            results.push({
+              type: "auto",
+              id: `auto:missing_metadata:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Missing Metadata`,
+              ref: { kind: "missing_metadata", playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec === "missingmbid") {
+            results.push({
+              type: "auto",
+              id: `auto:missing_musicbrainz:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Missing MusicBrainz`,
+              ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated }
+            });
+          } else if (p.dynamic_spec?.startsWith("daypart:")) {
+            results.push({
+              type: "auto",
+              id: `auto:daypart:${p.id}`,
+              label: getPlaylistDisplayName(p),
+              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Daypart Mix`,
+              ref: { kind: "daypart", playlistId: p.id, updated: p.updated }
+            });
           } else {
             const genre = p.dynamic_spec?.replace(/^tag:/, "") ?? p.name;
             results.push({

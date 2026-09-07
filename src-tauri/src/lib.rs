@@ -31,6 +31,7 @@ pub mod player;
 pub mod playlist;
 pub mod playlist_parsers;
 pub mod restart_manager;
+pub mod scrobbler;
 pub mod stats;
 pub mod tageditor;
 pub mod tags;
@@ -77,6 +78,7 @@ pub struct AppState {
     /// needs this synchronously; kept in sync with the `app_state` row of
     /// the same name by `commands::settings::set_minimize_to_tray_enabled`.
     pub minimize_to_tray: Arc<std::sync::atomic::AtomicBool>,
+    pub scrobbler: Arc<scrobbler::ScrobblerManager>,
 }
 
 /// Suppresses stock webview browser chrome — reload/find/print keybindings and
@@ -307,6 +309,11 @@ fn spawn_audio_event_loop(
                     match event {
                         crate::audio::AudioEvent::Playing { .. } => {
                             p.reset_playback_errors();
+                            if let Some(ref song) = p.current_song {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_now_playing(song).await;
+                                }
+                            }
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
@@ -342,6 +349,11 @@ fn spawn_audio_event_loop(
                         }
                         crate::audio::AudioEvent::TrackTransitioned { song_id, .. } => {
                             let _ = p.on_gapless_transition(song_id).await;
+                            if let Some(ref song) = p.current_song {
+                                if let Some(app_state) = app.try_state::<AppState>() {
+                                    app_state.scrobbler.on_now_playing(song).await;
+                                }
+                            }
                             let _ = app.emit(
                                 "track-changed",
                                 serde_json::json!({
@@ -726,6 +738,12 @@ pub fn run() {
             }
 
             let player = Arc::new(Mutex::new(Player::new(Arc::clone(&db), Arc::clone(&audio))));
+            let scrobbler = Arc::new(scrobbler::ScrobblerManager::new(Arc::clone(&db)));
+            scrobbler.trigger_flush();
+            {
+                let mut p = player.blocking_lock();
+                p.set_scrobbler(Arc::clone(&scrobbler));
+            }
             let volume_before_mute = Arc::new(Mutex::new(1.0));
 
             let manager = PlaylistManager::new(Arc::clone(&db)).expect("failed to init playlists");
@@ -812,6 +830,7 @@ pub fn run() {
                 startup_file: Mutex::new(startup_path),
                 media_session,
                 minimize_to_tray,
+                scrobbler,
             };
 
             crate::collection::start_watcher(app.handle().clone(), &state);
@@ -911,6 +930,8 @@ pub fn run() {
             commands::collection::set_artist_profile,
             commands::collection::get_all_artist_profiles,
             commands::collection::set_songs_not_included,
+            commands::collection::get_songs_missing_musicbrainz_id,
+            commands::collection::get_songs_missing_metadata,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,
@@ -1032,6 +1053,14 @@ pub fn run() {
             commands::settings::get_autostart_enabled,
             commands::settings::set_autostart_enabled,
             install_format::get_install_format,
+            // Scrobbler commands (#83)
+            commands::scrobbler::get_scrobbler_settings,
+            commands::scrobbler::set_scrobbler_settings,
+            commands::scrobbler::validate_listenbrainz_token,
+            commands::scrobbler::get_scrobble_cache_status,
+            commands::scrobbler::flush_scrobble_cache,
+            commands::scrobbler::toggle_scrobble_pause,
+            commands::scrobbler::sync_favourites_to_listenbrainz,
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,

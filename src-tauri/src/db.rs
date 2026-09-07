@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 25;
+pub const CURRENT_SCHEMA_VERSION: i32 = 26;
 
 struct Migration {
     version: i32,
@@ -182,6 +182,11 @@ const MIGRATIONS: &[Migration] = &[
             }
             Ok(())
         },
+    },
+    Migration {
+        version: 26,
+        description: "scrobble_cache table for offline scrobbles (#83)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_26)?),
     },
 ];
 
@@ -730,6 +735,32 @@ const MIGRATION_25: &str = "
 ALTER TABLE directories ADD COLUMN nickname TEXT;
 ALTER TABLE directories ADD COLUMN icon TEXT;
 ALTER TABLE directories ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 26: scrobble_cache table for offline scrobbles (#83).
+// ---------------------------------------------------------------------------
+const MIGRATION_26: &str = "
+CREATE TABLE IF NOT EXISTS scrobble_cache (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    service            TEXT NOT NULL DEFAULT 'listenbrainz',
+    artist             TEXT NOT NULL,
+    track              TEXT NOT NULL,
+    album              TEXT,
+    duration_ms        INTEGER,
+    track_number       INTEGER,
+    recording_mbid     TEXT,
+    release_mbid       TEXT,
+    artist_mbids       TEXT,
+    release_group_mbid TEXT,
+    track_mbid         TEXT,
+    listened_at        INTEGER NOT NULL,
+    attempts           INTEGER NOT NULL DEFAULT 0,
+    last_attempt       INTEGER,
+    last_error         TEXT,
+    created_at         INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_scrobble_cache_created ON scrobble_cache(created_at);
 ";
 
 // ---------------------------------------------------------------------------

@@ -6,12 +6,17 @@
     MicrophoneStageIcon as Mic2,
     StackIcon as Layers,
     PushPinIcon as Pin,
-    PushPinSlashIcon as PinOff
+    PushPinSlashIcon as PinOff,
+    PencilSimpleIcon as Edit3,
+    ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
+  import { navigationStore } from "../stores/navigation.svelte";
+  import { openInPicard } from "../utils/picard";
   import { invoke } from "@tauri-apps/api/core";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
@@ -27,6 +32,8 @@
     onAddToQueue,
     onAddToPlaylist,
     onGoToArtist,
+    onEditAlbum,
+    onOpenInPicard,
     onClose,
   }: {
     x: number;
@@ -37,6 +44,8 @@
     onAddToQueue?: () => void;
     onAddToPlaylist?: () => void;
     onGoToArtist?: () => void;
+    onEditAlbum?: () => void;
+    onOpenInPicard?: () => void;
     onClose: () => void;
   } = $props();
 
@@ -52,6 +61,17 @@
       }
     } catch (err) {
       console.error("Failed to add album to Queue:", err);
+    }
+  }
+
+  async function handleDefaultOpenInPicard() {
+    try {
+      const songs = await invoke<Song[]>("get_songs_by_album", { album: albumName || "" });
+      if (songs.length > 0) {
+        await openInPicard(songs.map((s) => s.id));
+      }
+    } catch (err) {
+      console.error("Failed to open album in Picard:", err);
     }
   }
 </script>
@@ -99,9 +119,34 @@
   {/if}
 
   {#if albumName}
-    {#if !(onGoToArtist && artistName)}
-      <ContextMenuDivider />
-    {/if}
+    <ContextMenuDivider />
+    <ContextMenuItem
+      icon={Edit3}
+      label={i18n.t("albumDetail.editInfoTooltip")}
+      onclick={() => {
+        if (onEditAlbum) {
+          onEditAlbum();
+        } else {
+          navigationStore.viewAlbum(albumName);
+        }
+        onClose();
+      }}
+    />
+    <ContextMenuItem
+      icon={OpenInPicard}
+      label={i18n.t("picard.openInPicard")}
+      onclick={async () => {
+        if (onOpenInPicard) {
+          onOpenInPicard();
+        } else {
+          await handleDefaultOpenInPicard();
+        }
+        onClose();
+      }}
+      disabled={!picardStore.available}
+      title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuDivider />
     <ContextMenuItem
       icon={pinnedStore.isPinned("album", albumName) ? PinOff : Pin}
       label={pinnedStore.isPinned("album", albumName)

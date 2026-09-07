@@ -76,6 +76,7 @@ impl PlaylistManager {
         self.sync_bpm_auto_playlists()?;
         self.sync_artist_tag_auto_playlists()?;
         self.sync_missing_metadata_auto_playlist()?;
+        self.sync_missing_musicbrainz_auto_playlist()?;
         self.sync_daypart_auto_playlist()?;
         Ok(())
     }
@@ -558,21 +559,25 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        let existing_row: Option<(i64, i64, String)> = conn
+        let existing_row: Option<(i64, i64, i64, String)> = conn
             .query_row(
-                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
                 params![SPEC],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .ok();
         let mode = existing_row
             .as_ref()
-            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
             .unwrap_or_default();
 
         let needs_generation = match existing_row {
             None => true,
-            Some((_, updated, _)) => now - updated > STALE_AFTER_SECS,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
         };
         if !needs_generation {
             return Ok(());
@@ -581,7 +586,80 @@ impl PlaylistManager {
         let songs = scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?;
 
         let playlist_id = match existing_row {
-            Some((id, _, _)) => {
+            Some((id, _, _, _)) => {
+                conn.execute(
+                    "UPDATE playlists SET updated = ?1 WHERE id = ?2",
+                    params![now, id],
+                )?;
+                conn.execute(
+                    "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                    params![id],
+                )?;
+                id
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO playlists (name, dynamic_enabled, dynamic_spec, created, updated) VALUES (?1, 1, ?2, ?3, ?3)",
+                    params![NAME, SPEC, now],
+                )?;
+                conn.last_insert_rowid()
+            }
+        };
+
+        for (position, song) in songs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO playlist_items (playlist_id, song_id, position, uuid, type) VALUES (?1, ?2, ?3, ?4, 0)",
+                params![playlist_id, song.id, position as i32, Uuid::new_v4().to_string()],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Regenerates the "Missing MusicBrainz" auto-playlist (#83) — a
+    /// system-managed `playlists` row with `dynamic_enabled = 1` and
+    /// `dynamic_spec = "missingmbid"` — if missing, empty, or its `updated`
+    /// timestamp is more than 24h old.
+    /// Surfaced in the UI when scrobbling is enabled so users can easily
+    /// identify tracks that cannot be scrobbled or loved on ListenBrainz due
+    /// to missing MusicBrainz recording IDs.
+    pub fn sync_missing_musicbrainz_auto_playlist(&self) -> Result<()> {
+        const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+        const SPEC: &str = "missingmbid";
+        const NAME: &str = "Missing MusicBrainz";
+
+        let scanner = CollectionScanner::new(self.db.clone());
+        let conn = self.db.pool.get()?;
+        let now = chrono::Utc::now().timestamp();
+
+        let existing_row: Option<(i64, i64, i64, String)> = conn
+            .query_row(
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
+                params![SPEC],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .ok();
+        let mode = existing_row
+            .as_ref()
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
+            .unwrap_or_default();
+
+        let needs_generation = match existing_row {
+            None => true,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
+        };
+        if !needs_generation {
+            return Ok(());
+        }
+
+        let songs = scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?;
+
+        let playlist_id = match existing_row {
+            Some((id, _, _, _)) => {
                 conn.execute(
                     "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                     params![now, id],
@@ -1343,6 +1421,76 @@ mod tests {
         assert_eq!(
             tracks[0].song.as_ref().unwrap().title.as_deref(),
             Some("No Album")
+        );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_missing_musicbrainz_auto_playlist() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            // Complete with MBID — should not appear.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('Song With MBID', 'Artist', 'Album', 1, 0, 'mbid-123')",
+                [],
+            )
+            .unwrap();
+            // Missing MBID (NULL).
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('Song Without MBID', 'Artist', 'Album', 1, 0)",
+                [],
+            )
+            .unwrap();
+            // Empty MBID string.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('Song With Empty MBID', 'Artist', 'Album', 1, 0, '   ')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_missing_musicbrainz_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let pl = playlists
+            .iter()
+            .find(|p| p.dynamic_spec.as_deref() == Some("missingmbid"))
+            .expect("Missing MusicBrainz auto-playlist should be created");
+        assert_eq!(pl.name, "Missing MusicBrainz");
+
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        let titles: Vec<_> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
+            .collect();
+        assert_eq!(titles.len(), 2);
+        assert!(titles.contains(&"Song Without MBID".to_string()));
+        assert!(titles.contains(&"Song With Empty MBID".to_string()));
+        assert!(!titles.contains(&"Song With MBID".to_string()));
+
+        // Tagging with MBID and reconciling should drop it from the playlist
+        db_arc
+            .pool
+            .get()
+            .unwrap()
+            .execute(
+                "UPDATE songs SET musicbrainz_recording_id = 'mbid-456' WHERE title = 'Song Without MBID'",
+                [],
+            )
+            .unwrap();
+        let mut manager = manager;
+        let deltas = manager.reconcile_dynamic_playlists().unwrap();
+        assert!(deltas.iter().any(|d| d.playlist_id == pl.id));
+        let tracks = manager.get_playlist_tracks(pl.id).unwrap();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(
+            tracks[0].song.as_ref().unwrap().title.as_deref(),
+            Some("Song With Empty MBID")
         );
 
         let _ = std::fs::remove_dir_all(temp_dir);

@@ -33,7 +33,7 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 ## Planned Web Integrations (v2.0 Milestone)
 
 The following 3rd-party services are planned for implementation in the **v2.0 Web Release**:
-- **Scrobbling & Play History**: [ListenBrainz](https://listenbrainz.org/) and [Last.fm](https://www.last.fm/) ([#83](https://github.com/esoltys/luminous/issues/83))
+- **Scrobbling & Play History**: [ListenBrainz](https://listenbrainz.org/) ([#83](https://github.com/esoltys/luminous/issues/83))
 - **Metadata Resolution**: [MusicBrainz](https://musicbrainz.org/) ([#23](https://github.com/esoltys/luminous/issues/23))
 - **Reviews & Community Ratings**: [CritiqueBrainz](https://critiquebrainz.org/), [Wikipedia API](https://en.wikipedia.org/api/rest_v1/), and [TheAudioDB](https://www.theaudiodb.com/) ([#23](https://github.com/esoltys/luminous/issues/23))
 
