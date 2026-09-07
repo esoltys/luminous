@@ -39,6 +39,9 @@ scripts/mock-config.local.json
 # version-specific to the local WebView2 Runtime, never committed.
 /e2e/.bin/
 
+# Session state for scripts/inspect-app.ts (dev-time app inspection tool)
+/.inspect-session.json
+
 # Scratch file for Claude's per-task walkthrough summaries (see .claude/CLAUDE.md) —
 # always local-only, never meant to land in a commit.
 /WALKTHROUGH.md
