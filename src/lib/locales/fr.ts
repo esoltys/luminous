@@ -1020,6 +1020,21 @@ export const fr = {
     applying: "Application en cours...",
     close: "Fermer"
   },
+  picard: {
+    openInPicard: "Ouvrir dans Picard",
+    openAllInPicard: "Tout ouvrir dans Picard",
+    openSelectedInPicard: "Ouvrir {count} dans Picard",
+    notFoundTooltip: "MusicBrainz Picard introuvable. Installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé dans les paramètres.",
+    integrationTitle: "Intégration MusicBrainz Picard",
+    integrationDesc1: "Transmettez des morceaux à",
+    integrationDesc2: "pour la recherche et la correction des métadonnées canoniques, puis réanalysez pour appliquer les modifications.",
+    foundAt: "Trouvé à {path}",
+    notFound: "Introuvable — installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé ci-dessous.",
+    customPathLabel: "Chemin personnalisé (facultatif)",
+    customPathPlaceholder: "C:\\Program Files\\MusicBrainz Picard\\picard.exe",
+    browseBtn: "Parcourir...",
+    recheckTooltip: "Revérifier la présence de Picard"
+  },
   smartPlaylistBuilder: {
     fallbackName: "Liste intelligente",
     yearPrefixPre: "Avant {value}",
