@@ -115,6 +115,17 @@ export function screenshot(session: DriverSession): Promise<string> {
   return webdriverRequest('GET', `/session/${session.sessionId}/screenshot`);
 }
 
+/**
+ * Screenshots just one element, cropped to its bounding box by the driver —
+ * no manual devicePixelRatio math needed (unlike cropping a full-page
+ * screenshot yourself, where element coordinates from getBoundingClientRect
+ * are CSS pixels but the screenshot is physical pixels).
+ */
+export async function elementScreenshot(session: DriverSession, using: string, value: string): Promise<string> {
+  const elementId = await findElement(session, using, value);
+  return webdriverRequest('GET', `/session/${session.sessionId}/element/${elementId}/screenshot`);
+}
+
 export function getSource(session: DriverSession): Promise<string> {
   return webdriverRequest('GET', `/session/${session.sessionId}/source`);
 }

@@ -19,6 +19,10 @@
 //     never for exercising clicks that mutate state (ratings, deletes,
 //     playlist edits, etc.).
 //   bunx tsx scripts/inspect-app.ts screenshot <output.png>
+//   bunx tsx scripts/inspect-app.ts screenshot <output.png> --css "<selector>"
+//     Crops to just that element (via the driver, no manual DPI math) —
+//     use this over a full-page screenshot when checking pixel-level detail
+//     like a hover outline/corner treatment.
 //   bunx tsx scripts/inspect-app.ts click --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts click --text "<visible text>"
 //   bunx tsx scripts/inspect-app.ts hover --css "<selector>"
@@ -32,6 +36,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   clickElement,
+  elementScreenshot,
   getSource,
   getUrl,
   hoverElement,
@@ -106,11 +111,17 @@ async function cmdStop() {
 
 async function cmdScreenshot(args: string[]) {
   const outPath = args[0];
-  if (!outPath) throw new Error('Usage: screenshot <output.png>');
+  if (!outPath) throw new Error('Usage: screenshot <output.png> [--css/--text <sel>]');
   const session = asSession(loadState());
-  const base64 = await screenshot(session);
+  const hasSelector = args.includes('--css') || args.includes('--text');
+  const base64 = hasSelector ? await elementScreenshot(session, ...selectorFor(args.slice(1))) : await screenshot(session);
   writeFileSync(path.resolve(outPath), Buffer.from(base64, 'base64'));
   console.log(`Saved screenshot to ${path.resolve(outPath)}`);
+}
+
+function selectorFor(args: string[]): [string, string] {
+  const { using, value } = parseSelectorArgs(args);
+  return [using, value];
 }
 
 function parseSelectorArgs(args: string[]): { using: string; value: string; rest: string[] } {
