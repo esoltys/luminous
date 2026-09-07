@@ -6,6 +6,7 @@ import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { picardStore } from "../stores/picard.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -139,5 +140,29 @@ describe("AlbumDetailView.svelte - Play vs Shuffle Play Queue navigation", () =>
 
     expect(addSongsSpy).toHaveBeenCalledWith([1, 2]);
     expect(invoke).toHaveBeenCalledWith("add_songs_to_queue", { songIds: [1, 2] });
+  });
+
+  it("opens overflow menu with Edit album info and Open in Picard", async () => {
+    picardStore.path = "/mock/picard";
+    const { getByTitle, getByText, queryByText } = render(AlbumDetailView, {
+      props: { albumName: mockAlbumName },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(queryByText("Edit album info")).toBeNull();
+    expect(queryByText("Open in Picard")).toBeNull();
+
+    const moreBtn = getByTitle("More actions");
+    await fireEvent.click(moreBtn);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const editItem = getByText("Edit album info");
+    const picardItem = getByText("Open in Picard");
+    expect(editItem).toBeInTheDocument();
+    expect(picardItem).toBeInTheDocument();
+
+    await fireEvent.click(picardItem);
+    expect(invoke).toHaveBeenCalledWith("open_in_picard", { songIds: [1, 2] });
   });
 });
