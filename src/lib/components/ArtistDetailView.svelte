@@ -349,7 +349,7 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full carousel-scroll" use:rememberScroll={`artist-detail:${artistName}`}>
+<div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full" use:rememberScroll={`artist-detail:${artistName}`}>
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
       <div class="flex flex-col justify-end gap-1.5 max-w-xl">
@@ -672,12 +672,3 @@
   />
 {/if}
 
-<style>
-  :global(.carousel-scroll) {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  :global(.carousel-scroll::-webkit-scrollbar) {
-    display: none;
-  }
-</style>

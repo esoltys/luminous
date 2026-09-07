@@ -460,7 +460,7 @@
 {/snippet}
 
 <div
-  class="flex-1 flex flex-col overflow-y-auto carousel-scroll bg-brand-main text-brand-text-secondary h-full"
+  class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full"
   use:rememberScroll={`autoplaylist:${view.kind}:${view.genre ?? view.decade ?? view.bpm ?? ""}`}
 >
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 pt-6 pb-6 shrink-0">
@@ -779,13 +779,4 @@
   </Modal>
 {/if}
 
-<style>
-  :global(.carousel-scroll) {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  :global(.carousel-scroll::-webkit-scrollbar) {
-    display: none;
-  }
-</style>
 

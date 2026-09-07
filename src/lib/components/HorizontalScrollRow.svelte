@@ -92,11 +92,11 @@
 </div>
 
 <style>
-  :global(.carousel-scroll) {
+  .carousel-scroll {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  :global(.carousel-scroll::-webkit-scrollbar) {
+  .carousel-scroll::-webkit-scrollbar {
     display: none;
   }
 </style>
