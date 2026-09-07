@@ -20,7 +20,7 @@ use std::{
     },
     time::Instant,
 };
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 /// How long to keep the watcher paused *after* a guard's write is done,
 /// before actually re-arming it. The OS delivers filesystem-change
@@ -364,11 +364,10 @@ pub fn start_watcher(app: AppHandle, state: &crate::AppState) {
     std::thread::Builder::new()
         .name("luminous-watcher".to_string())
         .spawn(move || {
-            let cover_manager = app_clone
-                .path()
-                .app_data_dir()
-                .ok()
-                .map(|dir| CoverManager::new(Arc::clone(&db_for_thread), dir));
+            let cover_manager = Some(CoverManager::new(
+                Arc::clone(&db_for_thread),
+                crate::paths::resolve_app_data_dir(&app_clone),
+            ));
 
             while let Ok(msg) = rx.recv() {
                 if watcher_paused.load(std::sync::atomic::Ordering::Relaxed) > 0 {

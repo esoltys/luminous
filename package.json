@@ -22,6 +22,7 @@
     "test:run": "vitest run",
     "test:perf": "vitest run --config vite.perf.config.js",
     "take-screenshots": "bunx tsx scripts/take-screenshots.ts",
+    "test:e2e:windows": "tauri build --debug --no-bundle && bunx tsx e2e/run-smoke.ts",
     "release": "bun run scripts/release.ts",
     "bump-version": "bun run scripts/bump-version.ts",
     "tauri:windows:build": "tauri-windows-bundle build",

@@ -3,5 +3,5 @@
   "entry": ["scripts/tauri-ipc-mock.ts"],
   "ignore": ["docs/**"],
   "ignoreDependencies": ["@typescript/native-preview"],
-  "ignoreBinaries": ["pgrep"]
+  "ignoreBinaries": ["pgrep", "tauri-driver"]
 }

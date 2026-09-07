@@ -35,6 +35,10 @@ scripts/mock-config.local.json
 /target/
 /src-tauri/target/
 
+# Downloaded msedgedriver binary for Windows e2e tests (see e2e/README.md) —
+# version-specific to the local WebView2 Runtime, never committed.
+/e2e/.bin/
+
 # Scratch file for Claude's per-task walkthrough summaries (see .claude/CLAUDE.md) —
 # always local-only, never meant to land in a commit.
 /WALKTHROUGH.md
