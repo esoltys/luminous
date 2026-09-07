@@ -63,7 +63,7 @@
   onclick={handleCardClick}
   ondblclick={handleCardDblClick}
   oncontextmenu={(e) => customContextMenu?.(e)}
-  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group hover:border-brand-accent/40 transition-all duration-200 select-none"
+  class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group relative select-none"
 >
   <div
     class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full"
@@ -87,7 +87,7 @@
   <div class="p-3.5 flex flex-col flex-1">
     <LinkButton
       onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(album.album || ""); }}
-      class="font-semibold text-sm text-brand-text-primary truncate w-full"
+      class="font-semibold text-sm text-brand-text-primary group-hover:text-brand-accent-text group-hover:underline transition-all duration-150 truncate w-full"
       title={i18n.t('collection.filterByAlbum', { album: album.album || i18n.t('collection.unknownAlbum') })}
     >
       {album.album || i18n.t('collection.unknownAlbum')}
@@ -115,4 +115,5 @@
       <span class="shrink-0"><SongRating rating={album.rating} onRate={rateAlbum} size="sm" /></span>
     </div>
   </div>
+  <div class="absolute inset-0 rounded-b-xl ring-2 ring-inset ring-transparent group-hover:ring-brand-accent transition-[box-shadow] duration-200 pointer-events-none"></div>
 </div>
