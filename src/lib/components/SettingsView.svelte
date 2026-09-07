@@ -7,12 +7,13 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import SettingsGeneral from "./SettingsGeneral.svelte";
   import SettingsFolders from "./SettingsFolders.svelte";
+  import SettingsIntegrations from "./SettingsIntegrations.svelte";
   import SettingsTools from "./SettingsTools.svelte";
   import SettingsThemes from "./SettingsThemes.svelte";
   import SettingsAbout from "./SettingsAbout.svelte";
   import Equalizer from "./Equalizer.svelte";
 
-  let settingsTab = $state<"general" | "folders" | "tools" | "themes" | "equalizer" | "about">("general");
+  let settingsTab = $state<"general" | "folders" | "integrations" | "tools" | "themes" | "equalizer" | "about">("general");
   let isTabInitialized = $state(false);
 
   onMount(async () => {
@@ -20,7 +21,7 @@
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       if (settings && settings.active_settings_tab) {
         const savedTab = settings.active_settings_tab;
-        if (savedTab === "general" || savedTab === "folders" || savedTab === "tools" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
+        if (savedTab === "general" || savedTab === "folders" || savedTab === "integrations" || savedTab === "tools" || savedTab === "themes" || savedTab === "equalizer" || savedTab === "about") {
           settingsTab = savedTab;
         }
       }
@@ -59,6 +60,12 @@
         {i18n.t('settings.tabFolders')}
       </button>
       <button
+        onclick={() => { settingsTab = "integrations"; }}
+        class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'integrations' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+      >
+        {i18n.t('settings.tabIntegrations')}
+      </button>
+      <button
         onclick={() => { settingsTab = "tools"; }}
         class="px-4 py-1.5 rounded-lg font-semibold transition-all {settingsTab === 'tools' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
       >
@@ -91,6 +98,8 @@
         <SettingsGeneral />
       {:else if settingsTab === "folders"}
         <SettingsFolders />
+      {:else if settingsTab === "integrations"}
+        <SettingsIntegrations />
       {:else if settingsTab === "tools"}
         <SettingsTools />
       {:else if settingsTab === "themes"}

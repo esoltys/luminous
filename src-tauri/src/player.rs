@@ -98,6 +98,7 @@ pub struct Player {
     /// Position at which we trigger the scrobble (50% of track length).
     scrobble_point_nanosec: Option<u64>,
     scrobbled: bool,
+    scrobbler: Option<Arc<crate::scrobbler::ScrobblerManager>>,
 
     /// Consecutive playback failures since the last successful `Playing`
     /// event — see `MAX_CONSECUTIVE_PLAYBACK_ERRORS`.
@@ -323,6 +324,7 @@ impl Player {
             queue: std::collections::VecDeque::new(),
             scrobble_point_nanosec,
             scrobbled: false,
+            scrobbler: None,
             consecutive_playback_errors: 0,
         };
 
@@ -357,6 +359,11 @@ impl Player {
         } else {
             false
         }
+    }
+
+    /// Attach the scrobbler service manager to receive scrobble notifications.
+    pub fn set_scrobbler(&mut self, scrobbler: Arc<crate::scrobbler::ScrobblerManager>) {
+        self.scrobbler = Some(scrobbler);
     }
 
     /// Load a playlist into the player and start playing the given index.
@@ -1705,7 +1712,15 @@ impl Player {
         }
         self.scrobbled = true;
         log::debug!("Scrobble point reached at {}ns", position_nanosec);
-        // TODO: dispatch to online scrobbler services here once scrobbling lands
+
+        if let (Some(scrobbler), Some(song)) = (&self.scrobbler, &self.current_song) {
+            let scrobbler = Arc::clone(scrobbler);
+            let song = song.clone();
+            let listened_at = chrono::Utc::now().timestamp();
+            tokio::spawn(async move {
+                scrobbler.on_scrobble_point(&song, listened_at).await;
+            });
+        }
 
         let song_id = self.current_song.as_ref()?.id;
         match self._db.pool.get() {

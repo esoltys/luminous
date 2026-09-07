@@ -17,13 +17,34 @@ pub async fn set_song_rating(
 
     // Keep the in-memory current song in sync so playback state snapshots
     // reflect the new rating immediately.
-    {
+    let rated_song = {
         let mut player = state.player.lock().await;
         if let Some(song) = player.current_song.as_mut() {
             if song.id == song_id {
                 song.rating = normalized;
+                Some(song.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+
+    let song_for_scrobbler = match rated_song {
+        Some(s) => Some(s),
+        None => {
+            if let Ok(conn) = state.db.pool.get() {
+                let sql = format!("SELECT {} FROM songs WHERE id = ?1", crate::collection::SONG_SELECT_COLS);
+                conn.query_row(&sql, rusqlite::params![song_id], crate::collection::row_to_song).ok()
+            } else {
+                None
             }
         }
+    };
+
+    if let Some(song) = song_for_scrobbler {
+        state.scrobbler.on_song_rating(&song, normalized).await;
     }
 
     let _ = app.emit("song-stats-changed", payload);
