@@ -94,9 +94,8 @@
           {/if}
         </div>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
-          {i18n.t('listenbrainz.integrationDesc1')}
           <button onclick={() => openExternalUrl("https://listenbrainz.org")} class="text-brand-accent hover:underline">ListenBrainz</button>
-          {i18n.t('listenbrainz.integrationDesc2')}
+          {i18n.t('listenbrainz.integrationDesc')}
         </p>
       </div>
     </div>
@@ -264,7 +263,8 @@
       <div class="space-y-1 min-w-0">
         <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('picard.integrationTitle')}</h3>
         <p class="text-xs text-brand-text-secondary leading-relaxed">
-          {i18n.t('picard.integrationDesc1')} <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button> {i18n.t('picard.integrationDesc2')}
+          <button onclick={() => openExternalUrl("https://picard.musicbrainz.org")} class="text-brand-accent hover:underline">MusicBrainz Picard</button>
+          {i18n.t('picard.integrationDesc')}
         </p>
       </div>
     </div>
