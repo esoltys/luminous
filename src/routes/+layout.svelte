@@ -174,11 +174,38 @@
         console.warn('Failed to attach drag-and-drop listener:', e);
       });
 
+    const handleWindowFocus = () => {
+      // When restoring from minimized or background occlusion on Windows,
+      // nudge the layout engine to ensure WebView2 invalidates and repaints
+      // any suspended DirectComposition surfaces (#441, #789).
+      requestAnimationFrame(() => {
+        void document.body.offsetHeight;
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
+    let focusUnlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged?.(({ payload: focused }) => {
+        if (focused) {
+          handleWindowFocus();
+        }
+      })
+      ?.then((unlisten) => {
+        focusUnlisten = unlisten;
+      })
+      .catch((e) => {
+        console.warn('Failed to attach window focus listener:', e);
+      });
+
     window.addEventListener('keydown', handleGlobalHotkeys);
     return () => {
       window.removeEventListener('keydown', handleGlobalHotkeys);
+      window.removeEventListener('focus', handleWindowFocus);
       stopShiftPolling();
       dragDropUnlisten?.();
+      focusUnlisten?.();
     };
   });
 
