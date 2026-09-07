@@ -406,13 +406,15 @@
           <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5">{artistName}</h1>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
-          {#if rawGenre}
-            <GenreChips genre={rawGenre} variant="full" />
-          {:else}
+        {#if rawGenre}
+          <GenreChips genre={rawGenre} variant="full" />
+        {:else}
+          <div class="text-xs text-brand-text-secondary font-medium">
             <span>{genreLabel}</span>
-          {/if}
-          <span>•</span>
+          </div>
+        {/if}
+
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           <span>{songsText}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
