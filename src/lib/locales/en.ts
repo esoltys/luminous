@@ -853,6 +853,7 @@ export const en = {
     playAll: "Play",
     shuffleAndPlay: "Shuffle Play",
     editArtist: "Edit",
+    editArtistDetails: "Edit Artist Details",
     editArtistTooltip: "Edit artist details, website, tags, and links",
     pinHome: "Pin to Home",
     unpinHome: "Unpin from Home",

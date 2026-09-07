@@ -885,6 +885,7 @@ export const fr = {
     playAll: "Lire",
     shuffleAndPlay: "Lecture aléatoire",
     editArtist: "Modifier",
+    editArtistDetails: "Modifier les détails de l'artiste",
     editArtistTooltip: "Modifier les détails de l'artiste, site web, tags et liens",
     pinHome: "Épingler à l'accueil",
     unpinHome: "Détacher de l'accueil",
