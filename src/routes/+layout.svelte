@@ -23,6 +23,8 @@
   import { picardStore } from '../lib/stores/picard.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { isLinux as platformIsLinux } from '../lib/platform';
+  import { themeStore } from '../lib/stores/theme.svelte';
+  import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -48,6 +50,20 @@
   let effectiveSidebarWidth = $derived(
     windowLayoutStore.isSidebarAutoCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : windowLayoutStore.sidebarWidth
   );
+
+  // Immersive ambient background: a layered-ellipse SVG gradient tinted from
+  // the current song's extracted artwork colors, seeded by song id so it's
+  // stable while a track plays and only regenerates on track change. This
+  // replaced a `blur-3xl` full-window CoverArt layer that was skipped on
+  // Linux entirely (see #452) — WebKitGTK's compositor choked on a
+  // continuous CSS blur() over a scaled image. Pure SVG with no blur/
+  // backdrop-filter renders identically (and cheaply) on every platform, so
+  // the immersive view no longer needs a Linux-specific fallback here.
+  let immersiveAmbientSvg = $derived.by(() => {
+    const art = themeStore.artworkColors;
+    const colors = art ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c) : undefined;
+    return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? 'immersive-empty' });
+  });
 
   onMount(() => {
     isLinux = platformIsLinux;
@@ -401,20 +417,13 @@
              ≈ 96px) that overlays the bottom of this face, so the content centers within the
              visible area above the dock rather than the full face height. -->
         <div class="flip-face flip-back overflow-hidden bg-brand-main flex flex-col items-center justify-center pt-8 px-4 min-[420px]:px-8 pb-32 select-none {!windowLayoutStore.effectiveImmersiveMode ? 'pointer-events-none' : 'pointer-events-auto'}">
-          <!-- Immersive Ambient Blurred Background: skipped on Linux, where the
-               `blur-3xl` filter over a full-window layer is expensive on
-               WebKitGTK's compositor and can let the translucent layer sample
-               the main UI underneath instead of the intended solid backdrop
-               (see #452) — the face's own `bg-brand-main` is fallback enough. -->
-          {#if playerStore.currentSong && !isLinux}
-            <div class="absolute inset-0 z-0 opacity-20 blur-3xl pointer-events-none scale-110">
-              <CoverArt
-                songId={playerStore.currentSong?.id}
-                artEmbedded={playerStore.currentSong?.art_embedded}
-                artAutomatic={playerStore.currentSong?.art_automatic}
-                artManual={playerStore.currentSong?.art_manual}
-                sizeClass="w-full h-full object-cover"
-              />
+          <!-- Immersive Ambient Background: a soft layered-ellipse SVG gradient
+               tinted from the current song's artwork colors (see
+               immersiveAmbientSvg above). Renders the same, cheaply, on every
+               platform — no CSS blur()/backdrop-filter involved. -->
+          {#if playerStore.currentSong}
+            <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient">
+              {@html immersiveAmbientSvg}
             </div>
           {/if}
 
@@ -513,6 +522,12 @@
 </IconContext>
 
 <style>
+  .immersive-ambient :global(svg) {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   .flip-perspective {
     perspective: none;
   }
