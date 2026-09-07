@@ -7,7 +7,13 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { getArtistAlbums, getArtistSongs } from "../utils/artist";
-  import { getPlaylistDisplayName } from "../utils/playlist";
+  import {
+    getPlaylistDisplayName,
+    queueAlbumAsPlaylist,
+    queueArtistAsPlaylist,
+    queuePlaylistAsPlaylist,
+    queueAutoPlaylistAsPlaylist
+  } from "../utils/playlist";
   import { collectionStore } from "../stores/collection.svelte";
   import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
   import AlbumCard from "./AlbumCard.svelte";
@@ -15,6 +21,11 @@
   import PlaylistCard from "./PlaylistCard.svelte";
   import AutoPlaylistCard from "./AutoPlaylistCard.svelte";
   import PinnedSongCard from "./PinnedSongCard.svelte";
+  import AlbumContextMenu from "./AlbumContextMenu.svelte";
+  import SongContextMenu from "./SongContextMenu.svelte";
+  import ArtistContextMenu from "./ArtistContextMenu.svelte";
+  import PlaylistCardContextMenu from "./PlaylistCardContextMenu.svelte";
+  import AutoPlaylistContextMenu from "./AutoPlaylistContextMenu.svelte";
 
   function keyFor(item: PinnedItem): string {
     return `${item.type}:${pinnedRefKeyFor(item)}`;
@@ -152,6 +163,14 @@
     pointerDragPointerId = null;
     pointerDragEl = null;
   }
+
+  let contextMenuState = $state<{ x: number; y: number; item: PinnedItem } | null>(null);
+
+  function handleContextMenu(e: MouseEvent, item: PinnedItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuState = { x: e.clientX, y: e.clientY, item };
+  }
 </script>
 
 {#if pinnedStore.items.length > 0}
@@ -161,20 +180,30 @@
       <div
         data-pinned-index={index}
         onpointerdown={(e) => handleCardPointerDown(e, index)}
+        oncontextmenu={(e) => handleContextMenu(e, item)}
         ondragstart={(e) => e.preventDefault()}
         class="relative w-44 shrink-0 snap-start transition-opacity rounded-xl cursor-grab active:cursor-grabbing {draggedIndex === index ? 'opacity-40' : ''}"
       >
         {#if item.type === "album"}
-          <AlbumCard album={item.album} onclick={() => openItem(item)} />
+          <AlbumCard
+            album={item.album}
+            onclick={() => openItem(item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
+          />
         {:else if item.type === "artist"}
           <ArtistCard
             artist={item.artist}
             artistAlbums={getArtistAlbums(collectionStore.albums, item.artist.name)}
             artistSongs={getArtistSongs(collectionStore.songs, item.artist.name)}
             onclick={() => openItem(item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
           />
         {:else if item.type === "playlist"}
-          <PlaylistCard playlist={item.playlist} onClick={() => openItem(item)} />
+          <PlaylistCard
+            playlist={item.playlist}
+            onClick={() => openItem(item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
+          />
         {:else if item.type === "auto_playlist"}
           <AutoPlaylistCard
             label={autoPlaylistLabel(item.autoPlaylist)}
@@ -187,9 +216,14 @@
             updated={item.autoPlaylist.updated}
             trackCount={item.autoPlaylist.trackCount}
             onClick={() => openItem(item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
           />
         {:else}
-          <PinnedSongCard song={item.song} onclick={() => openItem(item)} />
+          <PinnedSongCard
+            song={item.song}
+            onclick={() => openItem(item)}
+            oncontextmenu={(e) => handleContextMenu(e, item)}
+          />
         {/if}
         {#if dragOverIndex === index && draggedIndex !== null && draggedIndex !== index}
           <div class="absolute inset-0 bg-brand-accent/30 rounded-xl pointer-events-none"></div>
@@ -197,4 +231,54 @@
       </div>
     {/each}
   </HorizontalScrollRow>
+{/if}
+
+{#if contextMenuState}
+  {@const item = contextMenuState.item}
+  {#if item.type === "album"}
+    <AlbumContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      albumName={item.album.album || ""}
+      artistName={item.album.artist || undefined}
+      onPlay={() => queueAlbumAsPlaylist(item.album)}
+      onGoToArtist={item.album.artist ? () => navigationStore.viewArtist(item.album.artist!) : undefined}
+      onClose={() => { contextMenuState = null; }}
+    />
+  {:else if item.type === "song"}
+    <SongContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      song={item.song}
+      onPlay={() => playerStore.playSong(item.song.id)}
+      onGoToArtist={item.song.artist ? () => navigationStore.viewArtist(item.song.album_artist?.trim() || item.song.artist || "") : undefined}
+      onGoToAlbum={item.song.album ? () => navigationStore.viewAlbum(item.song.album || "") : undefined}
+      onClose={() => { contextMenuState = null; }}
+    />
+  {:else if item.type === "artist"}
+    <ArtistContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      artistName={item.artist.name || ""}
+      onPlay={() => queueArtistAsPlaylist(item.artist.name || "")}
+      onClose={() => { contextMenuState = null; }}
+    />
+  {:else if item.type === "playlist"}
+    <PlaylistCardContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      playlist={item.playlist}
+      onPlay={() => queuePlaylistAsPlaylist(item.playlist)}
+      onClose={() => { contextMenuState = null; }}
+    />
+  {:else if item.type === "auto_playlist"}
+    <AutoPlaylistContextMenu
+      x={contextMenuState.x}
+      y={contextMenuState.y}
+      autoPlaylist={item.autoPlaylist}
+      label={autoPlaylistLabel(item.autoPlaylist)}
+      onPlay={() => queueAutoPlaylistAsPlaylist(item.autoPlaylist, autoPlaylistLabel(item.autoPlaylist))}
+      onClose={() => { contextMenuState = null; }}
+    />
+  {/if}
 {/if}

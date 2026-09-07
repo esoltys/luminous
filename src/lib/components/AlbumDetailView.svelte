@@ -450,13 +450,15 @@
           {/if}
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
-          {#if rawGenre}
-            <GenreChips genre={rawGenre} variant="full" />
-          {:else}
+        {#if rawGenre}
+          <GenreChips genre={rawGenre} variant="full" />
+        {:else}
+          <div class="text-xs text-brand-text-secondary font-medium">
             <span>{genreLabel}</span>
-          {/if}
-          <span>•</span>
+          </div>
+        {/if}
+
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
           {#if yearLabel}
             <span>{yearLabel}</span>
             <span>•</span>

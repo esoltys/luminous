@@ -7,15 +7,17 @@
     song: Song;
     widthClass?: string;
     onclick?: (e: MouseEvent) => void;
+    oncontextmenu?: (e: MouseEvent) => void;
   }
 
-  let { song, widthClass = "w-full", onclick }: Props = $props();
+  let { song, widthClass = "w-full", onclick, oncontextmenu }: Props = $props();
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   {onclick}
+  oncontextmenu={(e) => oncontextmenu?.(e)}
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-b-xl overflow-hidden flex flex-col group relative select-none cursor-pointer"
 >
   <div class="aspect-square bg-brand-main flex items-center justify-center text-brand-accent-text relative overflow-hidden w-full">

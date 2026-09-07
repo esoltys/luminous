@@ -140,6 +140,18 @@ describe("ArtistDetailView", () => {
     expect(screen.getByTitle("Browse Pop")).toBeTruthy();
     expect(screen.getByTitle("Browse Rock")).toBeTruthy();
 
+    // Verify genre container is distinct from the metadata container with songs count
+    const genreContainer = countryChip.closest("div.flex.flex-wrap.gap-1");
+    expect(genreContainer).toBeTruthy();
+
+    const songsText = screen.getByText(/2 songs/i);
+    expect(songsText).toBeTruthy();
+    expect(genreContainer?.contains(songsText)).toBe(false);
+
+    const metadataRow = songsText.closest("div.flex.flex-wrap.items-center");
+    expect(metadataRow).toBeTruthy();
+    expect(metadataRow?.firstElementChild).toBe(songsText);
+
     await fireEvent.click(countryChip);
     expect(navigationStore.selectedAutoPlaylist?.genre).toBe("Country");
     expect(navigationStore.activeTab).toBe("playlists");

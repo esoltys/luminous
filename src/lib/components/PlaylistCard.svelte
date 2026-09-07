@@ -19,7 +19,19 @@
 
   import { getPlaylistDisplayName } from "../utils/playlist";
 
-  let { playlist, onClick, widthClass = "w-full" }: { playlist: Playlist; onClick: () => void; widthClass?: string } = $props();
+  let {
+    playlist,
+    onClick,
+    widthClass = "w-full",
+    oncontextmenu,
+    onContextMenu,
+  }: {
+    playlist: Playlist;
+    onClick: () => void;
+    widthClass?: string;
+    oncontextmenu?: (e: MouseEvent) => void;
+    onContextMenu?: (e: MouseEvent) => void;
+  } = $props();
 
   let cardTitle = $derived(getPlaylistDisplayName(playlist));
 
@@ -78,6 +90,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
+  oncontextmenu={(e) => { (oncontextmenu || onContextMenu)?.(e); }}
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 group relative"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center overflow-hidden">

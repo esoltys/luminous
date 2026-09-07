@@ -545,6 +545,8 @@ export const en = {
     contextMenuPlay: "Play Selected",
     contextMenuPlaySong: "Play Song",
     contextMenuPlayAlbum: "Play Album",
+    contextMenuPlayArtist: "Play Artist",
+    contextMenuPlayPlaylist: "Play Playlist",
     contextMenuAddQueue: "Add to Queue",
     addedToQueueSuccess: "Added {name} to Queue",
     addedToPlaylistSuccess: "Added to {name}",

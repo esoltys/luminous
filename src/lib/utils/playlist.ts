@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AlbumItem, Playlist, QueuePopulationMode, Song } from "../types";
+import type { AlbumItem, AutoPlaylistItem, Playlist, PlaylistItem, QueuePopulationMode, Song } from "../types";
 import { i18n } from "../stores/i18n.svelte";
 import { isSmartPlaylistSpec } from "./filterParser";
 import { collectionStore } from "../stores/collection.svelte";
 import { playerStore } from "../stores/player.svelte";
 import { playlistsStore } from "../stores/playlists.svelte";
+import { toastStore } from "../stores/toast.svelte";
 
 export function getPopulationModeSuffix(mode: QueuePopulationMode | string | undefined | null): string {
   switch (mode) {
@@ -87,3 +88,108 @@ export async function queueAlbumAsPlaylist(album: AlbumItem): Promise<void> {
     console.error("Failed to add album to Queue:", err);
   }
 }
+
+export async function queueArtistAsPlaylist(artistName: string): Promise<void> {
+  const name = artistName || i18n.t("collection.unknownArtist");
+  try {
+    const songs = await invoke<Song[]>("get_songs_by_artist", { artist: artistName || "" });
+    const playable = songs.filter((s) => !s.not_included && !s.unavailable);
+    if (playable.length > 0) {
+      const queuePl = await playlistsStore.requireQueue();
+      await playerStore.setShuffleMode("off");
+      await playerStore.playSongs(playable.map((s) => s.id), 0, queuePl?.id, undefined, name);
+    }
+  } catch (err) {
+    console.error("Failed to play artist:", err);
+  }
+}
+
+export async function addArtistToQueue(artistName: string): Promise<void> {
+  try {
+    const songs = await invoke<Song[]>("get_songs_by_artist", { artist: artistName || "" });
+    const playable = songs.filter((s) => !s.not_included && !s.unavailable);
+    if (playable.length > 0) {
+      await playlistsStore.addSongsToQueue(playable.map((s) => s.id));
+      const name = artistName || i18n.t("collection.unknownArtist");
+      toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
+    }
+  } catch (err) {
+    console.error("Failed to add artist to Queue:", err);
+  }
+}
+
+export async function queuePlaylistAsPlaylist(playlist: Playlist): Promise<void> {
+  const name = getPlaylistDisplayName(playlist);
+  try {
+    const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: playlist.id });
+    const playable = items.filter((t) => t.song && !t.song.not_included && !t.song.unavailable).map((t) => t.song as Song);
+    if (playable.length > 0) {
+      const queuePl = await playlistsStore.requireQueue();
+      await playerStore.setShuffleMode("off");
+      await playerStore.playSongs(playable.map((s) => s.id), 0, queuePl?.id, undefined, name);
+    }
+  } catch (err) {
+    console.error("Failed to play playlist:", err);
+  }
+}
+
+export async function addPlaylistToQueue(playlist: Playlist): Promise<void> {
+  try {
+    const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: playlist.id });
+    const playable = items.filter((t) => t.song && !t.song.not_included && !t.song.unavailable).map((t) => t.song as Song);
+    if (playable.length > 0) {
+      await playlistsStore.addSongsToQueue(playable.map((s) => s.id));
+      const name = getPlaylistDisplayName(playlist);
+      toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name }, `Added ${name} to Queue`));
+    }
+  } catch (err) {
+    console.error("Failed to add playlist to Queue:", err);
+  }
+}
+
+async function fetchAutoPlaylistSongs(ap: AutoPlaylistItem): Promise<Song[]> {
+  const { kind, genre, decade, bpm, artistTag, playlistId } = ap;
+  if (
+    (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "daypart") &&
+    playlistId !== undefined
+  ) {
+    const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId });
+    return items.filter((item) => !!item.song && !item.song.not_included && !item.song.unavailable).map((item) => item.song as Song);
+  }
+  let songs: Song[] = [];
+  if (kind === "favourites") songs = await invoke<Song[]>("get_favourite_songs");
+  else if (kind === "recently_added") songs = await invoke<Song[]>("get_recently_added_songs", { limit: 50 });
+  else if (kind === "most_played") songs = await invoke<Song[]>("get_most_played_songs", { limit: 50 });
+  else if (kind === "history") songs = await invoke<Song[]>("get_recently_played_songs", { limit: 100 });
+  else if (kind === "decade") songs = await invoke<Song[]>("get_songs_by_decade", { decade: decade ?? "", limit: 50 });
+  else if (kind === "bpm") songs = await invoke<Song[]>("get_songs_by_bpm", { spec: bpm ?? "", limit: 50 });
+  else if (kind === "artist_tag") songs = await invoke<Song[]>("get_songs_by_artist_tag", { tag: artistTag ?? "", limit: 500 });
+  else songs = await invoke<Song[]>("get_songs_by_curated_tag", { tagName: genre ?? "", limit: 500 });
+  return songs.filter((s) => !s.not_included && !s.unavailable);
+}
+
+export async function queueAutoPlaylistAsPlaylist(ap: AutoPlaylistItem, label: string): Promise<void> {
+  try {
+    const playable = await fetchAutoPlaylistSongs(ap);
+    if (playable.length > 0) {
+      const queuePl = await playlistsStore.requireQueue();
+      await playerStore.setShuffleMode("off");
+      await playerStore.playSongs(playable.map((s) => s.id), 0, queuePl?.id, undefined, label);
+    }
+  } catch (err) {
+    console.error("Failed to play auto-playlist:", err);
+  }
+}
+
+export async function addAutoPlaylistToQueue(ap: AutoPlaylistItem, label: string): Promise<void> {
+  try {
+    const playable = await fetchAutoPlaylistSongs(ap);
+    if (playable.length > 0) {
+      await playlistsStore.addSongsToQueue(playable.map((s) => s.id));
+      toastStore.show(i18n.t("playlists.addedToQueueSuccess", { name: label }, `Added ${label} to Queue`));
+    }
+  } catch (err) {
+    console.error("Failed to add auto-playlist to Queue:", err);
+  }
+}
+
