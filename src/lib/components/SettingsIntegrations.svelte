@@ -102,18 +102,6 @@
     </div>
   </div>
 
-  <div class="flex items-center justify-between gap-4 py-1">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.enableLabel')}</span>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.enableHint')}</p>
-    </div>
-    <Toggle
-      checked={scrobblerStore.enabled}
-      onchange={(v) => scrobblerStore.setEnabled(v)}
-      label={i18n.t('listenbrainz.enableLabel')}
-    />
-  </div>
-
   <div class="space-y-2 pt-2 border-t border-brand-border/60">
     <div class="flex items-center justify-between">
       <label for="listenbrainz-token-input" class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
@@ -134,8 +122,8 @@
         <Input
           id="listenbrainz-token-input"
           type={showListenBrainzToken ? "text" : "password"}
-          bind:value={scrobblerStore.token}
-          onchange={() => scrobblerStore.saveSettings()}
+          value={scrobblerStore.token}
+          oninput={(e) => scrobblerStore.setToken((e.target as HTMLInputElement).value)}
           placeholder={i18n.t('listenbrainz.userTokenPlaceholder')}
           class="w-full pr-10"
         />
@@ -176,79 +164,93 @@
     {/if}
   </div>
 
-  {#if scrobblerStore.enabled}
-    <div class="space-y-3 pt-3 border-t border-brand-border/60">
-      <div class="flex items-center justify-between gap-4 py-1">
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.nowPlayingLabel')}</span>
-          <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.nowPlayingHint')}</p>
-        </div>
-        <Toggle
-          checked={scrobblerStore.nowPlayingEnabled}
-          onchange={(v) => scrobblerStore.setNowPlayingEnabled(v)}
-          label={i18n.t('listenbrainz.nowPlayingLabel')}
-        />
+  {#if scrobblerStore.username}
+    <div class="flex items-center justify-between gap-4 py-1 pt-2 border-t border-brand-border/60">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.enableLabel')}</span>
+        <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.enableHint')}</p>
       </div>
-
-      <div class="flex items-center justify-between gap-4 py-1">
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.ratingsLabel')}</span>
-          <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.ratingsHint')}</p>
-        </div>
-        <Toggle
-          checked={scrobblerStore.ratingsEnabled}
-          onchange={(v) => scrobblerStore.setRatingsEnabled(v)}
-          label={i18n.t('listenbrainz.ratingsLabel')}
-        />
-      </div>
-
-      <div class="flex items-center justify-between gap-4 py-1">
-        <div class="flex flex-col gap-0.5 min-w-0">
-          <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.pauseLabel')}</span>
-          <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.pauseHint')}</p>
-        </div>
-        <Toggle
-          checked={scrobblerStore.paused}
-          onchange={(v) => scrobblerStore.setPaused(v)}
-          label={i18n.t('listenbrainz.pauseLabel')}
-        />
-      </div>
+      <Toggle
+        checked={scrobblerStore.enabled}
+        onchange={(v) => scrobblerStore.setEnabled(v)}
+        label={i18n.t('listenbrainz.enableLabel')}
+      />
     </div>
 
-    <!-- Offline cache surface -->
-    <div class="pt-3 border-t border-brand-border/60 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex flex-col gap-0.5 min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold text-brand-text-primary">
-            {scrobblerStore.pendingCount === 0
-              ? i18n.t('listenbrainz.cacheEmpty')
-              : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
-          </span>
-          {#if scrobblerStore.flushSuccessMessage}
-            <span class="text-xs text-emerald-400 font-medium">({scrobblerStore.flushSuccessMessage})</span>
+    {#if scrobblerStore.enabled}
+      <div class="space-y-3 pt-3 border-t border-brand-border/60">
+        <div class="flex items-center justify-between gap-4 py-1">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.nowPlayingLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.nowPlayingHint')}</p>
+          </div>
+          <Toggle
+            checked={scrobblerStore.nowPlayingEnabled}
+            onchange={(v) => scrobblerStore.setNowPlayingEnabled(v)}
+            label={i18n.t('listenbrainz.nowPlayingLabel')}
+          />
+        </div>
+
+        <div class="flex items-center justify-between gap-4 py-1">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.ratingsLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.ratingsHint')}</p>
+          </div>
+          <Toggle
+            checked={scrobblerStore.ratingsEnabled}
+            onchange={(v) => scrobblerStore.setRatingsEnabled(v)}
+            label={i18n.t('listenbrainz.ratingsLabel')}
+          />
+        </div>
+
+        <div class="flex items-center justify-between gap-4 py-1">
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="text-sm font-medium text-brand-text-primary">{i18n.t('listenbrainz.pauseLabel')}</span>
+            <p class="text-xs text-brand-text-secondary">{i18n.t('listenbrainz.pauseHint')}</p>
+          </div>
+          <Toggle
+            checked={scrobblerStore.paused}
+            onchange={(v) => scrobblerStore.setPaused(v)}
+            label={i18n.t('listenbrainz.pauseLabel')}
+          />
+        </div>
+      </div>
+
+      <!-- Offline cache surface -->
+      <div class="pt-3 border-t border-brand-border/60 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-brand-text-primary">
+              {scrobblerStore.pendingCount === 0
+                ? i18n.t('listenbrainz.cacheEmpty')
+                : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
+            </span>
+            {#if scrobblerStore.flushSuccessMessage}
+              <span class="text-xs text-emerald-400 font-medium">({scrobblerStore.flushSuccessMessage})</span>
+            {/if}
+          </div>
+          {#if scrobblerStore.lastError}
+            <span class="text-[11px] text-amber-500 truncate" title={scrobblerStore.lastError}>
+              {scrobblerStore.lastError}
+            </span>
+          {:else}
+            <span class="text-[11px] text-brand-text-secondary">
+              {i18n.t('listenbrainz.cacheDesc')}
+            </span>
           {/if}
         </div>
-        {#if scrobblerStore.lastError}
-          <span class="text-[11px] text-amber-500 truncate" title={scrobblerStore.lastError}>
-            {scrobblerStore.lastError}
-          </span>
-        {:else}
-          <span class="text-[11px] text-brand-text-secondary">
-            {i18n.t('listenbrainz.cacheDesc')}
-          </span>
-        {/if}
-      </div>
 
-      <Button
-        onclick={() => scrobblerStore.flushCache()}
-        disabled={scrobblerStore.isFlushing || scrobblerStore.pendingCount === 0 || !scrobblerStore.token.trim()}
-        variant="secondary"
-        size="sm"
-      >
-        <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isFlushing ? 'animate-spin' : ''}" />
-        {i18n.t('listenbrainz.syncNowBtn')}
-      </Button>
-    </div>
+        <Button
+          onclick={() => scrobblerStore.flushCache()}
+          disabled={scrobblerStore.isFlushing || scrobblerStore.pendingCount === 0 || !scrobblerStore.token.trim()}
+          variant="secondary"
+          size="sm"
+        >
+          <RefreshCw class="w-3.5 h-3.5 {scrobblerStore.isFlushing ? 'animate-spin' : ''}" />
+          {i18n.t('listenbrainz.syncNowBtn')}
+        </Button>
+      </div>
+    {/if}
   {/if}
 </div>
 

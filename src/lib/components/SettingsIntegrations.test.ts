@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
+import { tick } from "svelte";
 import SettingsIntegrations from "./SettingsIntegrations.svelte";
 import { scrobblerStore } from "../stores/scrobbler.svelte";
 
@@ -54,13 +55,23 @@ describe("SettingsIntegrations.svelte", () => {
     expect(await findByText("AcoustID Integration")).toBeInTheDocument();
   });
 
-  it("enables ListenBrainz and renders now-playing and ratings toggles", async () => {
-    const { findByText, getByLabelText } = render(SettingsIntegrations);
+  it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {
+    scrobblerStore.username = null;
+    scrobblerStore.enabled = false;
+
+    const { findByText, queryByLabelText, getByLabelText } = render(SettingsIntegrations);
 
     await findByText("ListenBrainz Scrobbler");
-    const toggle = getByLabelText("Enable ListenBrainz scrobbling");
-    await fireEvent.click(toggle);
+    expect(queryByLabelText("Enable ListenBrainz scrobbling")).not.toBeInTheDocument();
 
+    // Simulate successful token validation
+    scrobblerStore.username = "test_user";
+    await tick();
+    const toggle = getByLabelText("Enable ListenBrainz scrobbling");
+    expect(toggle).toBeInTheDocument();
+
+    await fireEvent.click(toggle);
+    await tick();
     expect(scrobblerStore.enabled).toBe(true);
     expect(await findByText("Send Now Playing status")).toBeInTheDocument();
     expect(await findByText("Synchronize track ratings")).toBeInTheDocument();

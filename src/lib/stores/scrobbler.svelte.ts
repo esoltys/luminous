@@ -127,6 +127,15 @@ class ScrobblerStore {
     }
   }
 
+  setToken(val: string) {
+    if (this.token !== val) {
+      this.token = val;
+      this.username = null;
+      this.enabled = false;
+      this.saveSettings();
+    }
+  }
+
   setEnabled(val: boolean) {
     this.enabled = val;
     this.saveSettings();
