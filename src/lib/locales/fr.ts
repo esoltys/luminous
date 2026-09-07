@@ -1037,7 +1037,7 @@ export const fr = {
   },
   listenbrainz: {
     integrationTitle: "Scrobbler ListenBrainz",
-    integrationDesc: "est un carnet d'écoute musical open source et sans but lucratif qui garde une trace de chaque morceau écouté sur différentes applications et vous permet d'explorer vos habitudes d'écoute sans vendre vos données personnelles.",
+    integrationDesc: "est un carnet d'écoute musical open source et sans but lucratif qui garde une trace de chaque morceau écouté sur différentes applications (« scrobbling ») et vous permet d'explorer vos habitudes d'écoute sans vendre vos données personnelles.",
     enableLabel: "Activer le scrobbling ListenBrainz",
     enableHint: "Transmettez vos écoutes terminées à votre profil ListenBrainz",
     userTokenLabel: "Jeton utilisateur",

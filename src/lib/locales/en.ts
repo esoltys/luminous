@@ -1039,7 +1039,7 @@ export const en = {
   },
   listenbrainz: {
     integrationTitle: "ListenBrainz Scrobbler",
-    integrationDesc: "is an open-source, non-profit music diary that keeps track of every song you listen to across different apps and lets you explore your listening habits without selling your personal data.",
+    integrationDesc: "is an open-source, non-profit music diary that keeps track of every song you listen to across different apps (\"scrobbling\") and lets you explore your listening habits without selling your personal data.",
     enableLabel: "Enable ListenBrainz scrobbling",
     enableHint: "Submit completed listens to your ListenBrainz profile",
     userTokenLabel: "User Token",
