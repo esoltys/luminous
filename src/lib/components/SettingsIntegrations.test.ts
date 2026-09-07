@@ -48,10 +48,10 @@ describe("SettingsIntegrations.svelte", () => {
   });
 
   it("renders all three integration cards: ListenBrainz, Picard, and AcoustID", async () => {
-    const { findByText } = render(SettingsIntegrations);
+    const { findByText, findByRole } = render(SettingsIntegrations);
 
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
-    expect(await findByText("MusicBrainz Picard Integration")).toBeInTheDocument();
+    expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
     expect(await findByText("AcoustID Integration")).toBeInTheDocument();
   });
 

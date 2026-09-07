@@ -254,7 +254,7 @@
   {/if}
 </div>
 
-<!-- MusicBrainz Picard Integration Card -->
+<!-- MusicBrainz Picard Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
   <div class="pb-3 flex justify-between items-center">
     <div class="flex items-center gap-3">
