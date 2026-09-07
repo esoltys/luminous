@@ -21,6 +21,7 @@
 //   bunx tsx scripts/inspect-app.ts screenshot <output.png>
 //   bunx tsx scripts/inspect-app.ts click --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts click --text "<visible text>"
+//   bunx tsx scripts/inspect-app.ts hover --css "<selector>"
 //   bunx tsx scripts/inspect-app.ts type --css "<selector>" "<text>"
 //   bunx tsx scripts/inspect-app.ts source
 //   bunx tsx scripts/inspect-app.ts url
@@ -33,6 +34,7 @@ import {
   clickElement,
   getSource,
   getUrl,
+  hoverElement,
   screenshot,
   startSession,
   stopSession,
@@ -129,6 +131,13 @@ async function cmdClick(args: string[]) {
   console.log(`Clicked ${using}=${value}`);
 }
 
+async function cmdHover(args: string[]) {
+  const { using, value } = parseSelectorArgs(args);
+  const session = asSession(loadState());
+  await hoverElement(session, using, value);
+  console.log(`Hovering ${using}=${value}`);
+}
+
 async function cmdType(args: string[]) {
   const { using, value, rest } = parseSelectorArgs(args);
   const text = rest[0];
@@ -165,6 +174,8 @@ async function main() {
       return cmdScreenshot(args);
     case 'click':
       return cmdClick(args);
+    case 'hover':
+      return cmdHover(args);
     case 'type':
       return cmdType(args);
     case 'source':
@@ -172,7 +183,7 @@ async function main() {
     case 'url':
       return cmdUrl();
     default:
-      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|type --css/--text <sel> <text>|source|url>');
+      console.error('Usage: inspect-app.ts <start [--real]|stop|screenshot <path>|click --css/--text <sel>|hover --css/--text <sel>|type --css/--text <sel> <text>|source|url>');
       process.exitCode = 1;
   }
 }
