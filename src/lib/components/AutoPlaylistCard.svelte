@@ -37,10 +37,26 @@
     updated?: number;
     trackCount: number;
     onClick: () => void;
+    oncontextmenu?: (e: MouseEvent) => void;
+    onContextMenu?: (e: MouseEvent) => void;
     widthClass?: string;
   }
 
-  let { label, kind, genre, artistTag, decade, bpm, playlistId, updated, trackCount, onClick, widthClass = "w-full" }: Props = $props();
+  let {
+    label,
+    kind,
+    genre,
+    artistTag,
+    decade,
+    bpm,
+    playlistId,
+    updated,
+    trackCount,
+    onClick,
+    oncontextmenu,
+    onContextMenu,
+    widthClass = "w-full",
+  }: Props = $props();
 
   let displayLabel = $derived.by(() => {
     if (
@@ -146,6 +162,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   onclick={onClick}
+  oncontextmenu={(e) => { (oncontextmenu || onContextMenu)?.(e); }}
   class="{widthClass} bg-brand-sidebar border border-brand-border/60 rounded-xl p-4 flex flex-col text-left hover:border-brand-accent/40 transition-all duration-200 group"
 >
   <div class="aspect-square w-full mb-3 bg-brand-main relative flex items-center justify-center">
