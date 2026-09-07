@@ -4,7 +4,7 @@
   import Sidebar from '../lib/components/Sidebar.svelte';
   import RightPanel from '../lib/components/RightPanel.svelte';
   import PlayerBar from '../lib/components/PlayerBar.svelte';
-  import { slide, fly } from 'svelte/transition';
+  import { slide, fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { collectionStore } from '../lib/stores/collection.svelte';
   import { navigationStore } from '../lib/stores/navigation.svelte';
@@ -420,11 +420,16 @@
           <!-- Immersive Ambient Background: a soft layered-ellipse SVG gradient
                tinted from the current song's artwork colors (see
                immersiveAmbientSvg above). Renders the same, cheaply, on every
-               platform — no CSS blur()/backdrop-filter involved. -->
+               platform — no CSS blur()/backdrop-filter involved. Keyed on
+               song id so a track change destroys the old layer and mounts a
+               new one; Svelte plays both transitions concurrently, giving a
+               genuine cross-dissolve rather than a hard cut. -->
           {#if playerStore.currentSong}
-            <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient">
-              {@html immersiveAmbientSvg}
-            </div>
+            {#key playerStore.currentSong.id}
+              <div class="absolute inset-0 z-0 opacity-30 pointer-events-none immersive-ambient" transition:fade={{ duration: 900 }}>
+                {@html immersiveAmbientSvg}
+              </div>
+            {/key}
           {/if}
 
           <!-- Center Container: Card and Details. Below md, the layout would
