@@ -1117,7 +1117,10 @@ impl Player {
             }
         }
 
-        // Walk backwards from current, skipping unavailable items
+        // Walk backwards from current, skipping unavailable items. Mirrors
+        // `get_next_index`'s boundary behavior: only wrap past the start
+        // under `RepeatMode::Playlist` — otherwise Previous at the first
+        // track is a no-op instead of jumping to the last track.
         if let Some(current) = self.current_index {
             let len = self.playlist_items.len();
             if len == 0 {
@@ -1125,8 +1128,10 @@ impl Player {
             }
             let mut candidate = if current > 0 {
                 current - 1
-            } else {
+            } else if self.repeat_mode == RepeatMode::Playlist {
                 len.saturating_sub(1)
+            } else {
+                return Ok(());
             };
             for _ in 0..len {
                 if self.is_playable_at(candidate) {
@@ -2009,6 +2014,68 @@ mod tests {
         player.previous_track().await.unwrap();
         assert_eq!(player.current_song.as_ref().unwrap().id, 1);
         assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    /// Pressing Previous at the very first track must not wrap around to the
+    /// last track — it should stay put, mirroring `get_next_index`'s
+    /// boundary behavior for Next. Wrapping unconditionally here silently
+    /// jumped playback to the end of the queue, which then triggered the
+    /// frontend's natural-completion handling (clearing the Queue) far
+    /// earlier than the user expected.
+    #[tokio::test]
+    async fn test_previous_track_does_not_wrap_at_start_without_repeat() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        // Start on the first track (index 0).
+        player.play_playlist(items, 0, 0, None).await.unwrap();
+        assert_eq!(player.current_index, Some(0));
+
+        player.previous_track().await.unwrap();
+        assert_eq!(
+            player.current_index,
+            Some(0),
+            "previous at the start of the queue must not wrap to the last track"
+        );
+        assert_eq!(player.current_song.as_ref().unwrap().id, 1);
+
+        // With RepeatMode::Playlist, wrapping to the last track is intended.
+        player.set_repeat_mode(RepeatMode::Playlist);
+        player.previous_track().await.unwrap();
+        assert_eq!(player.current_index, Some(2));
+        assert_eq!(player.current_song.as_ref().unwrap().id, 3);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
