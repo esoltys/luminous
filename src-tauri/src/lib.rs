@@ -135,13 +135,30 @@ const LINUX_WEBKITGTK_RENDERING_ENV_VARS: &[(&str, &str)] = &[
 /// blank surface.
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn with_webview2_occlusion_disabled(current: &str) -> String {
-    let flag = "--disable-features=CalculateNativeWinOcclusion";
-    if current.contains(flag) {
-        current.to_string()
-    } else if current.is_empty() {
-        flag.to_string()
+    let feature = "CalculateNativeWinOcclusion";
+    if current.contains(feature) {
+        return current.to_string();
+    }
+    if current.is_empty() {
+        return format!("--disable-features={}", feature);
+    }
+    const PREFIX: &str = "--disable-features=";
+    if let Some(pos) = current.find(PREFIX) {
+        let value_start = pos + PREFIX.len();
+        let value_end = current[value_start..]
+            .find(char::is_whitespace)
+            .map(|offset| value_start + offset)
+            .unwrap_or(current.len());
+
+        let before = &current[..value_end];
+        let after = &current[value_end..];
+        if current[value_start..value_end].is_empty() {
+            format!("{}{}{}", before, feature, after)
+        } else {
+            format!("{},{}{}", before, feature, after)
+        }
     } else {
-        format!("{} {}", current, flag)
+        format!("{} --disable-features={}", current, feature)
     }
 }
 
@@ -997,6 +1014,19 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_occlusion_disabled(already_set_with_other),
             already_set_with_other
+        );
+    }
+
+    #[test]
+    fn test_webview2_occlusion_flag_merged_into_existing_disable_features() {
+        assert_eq!(
+            with_webview2_occlusion_disabled("--disable-features=msWebOOUI,msPdfOOUI"),
+            "--disable-features=msWebOOUI,msPdfOOUI,CalculateNativeWinOcclusion"
+        );
+
+        assert_eq!(
+            with_webview2_occlusion_disabled("--foo --disable-features=msWebOOUI --bar"),
+            "--foo --disable-features=msWebOOUI,CalculateNativeWinOcclusion --bar"
         );
     }
 }
