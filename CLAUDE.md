@@ -37,6 +37,7 @@ A release is only complete when **all three** of the following hold. Never repor
 
 - Use the tools in this harness (Read/Edit/Grep/Glob) instead of shelling out to `cat`/`sed`/`grep`/`find`.
 - Do not run `bun run tauri dev` as a background task — it does not work as expected in this harness. Ask the user to run it themselves and verify manually (AGENTS.md's Version Control section covers the full worktree → walkthrough → approval → merge → close workflow).
+- For any change with a visible UI effect (Windows only), use `bunx tsx scripts/inspect-app.ts` to launch the real app, click/hover through the change, and screenshot it yourself — don't rely solely on non-visual checks (unit tests, type checks) before handing off. For pixel-level detail (a hover outline, a corner radius, anything a full-page screenshot makes hard to confirm), use `screenshot <path> --css/--text <sel>` to crop to just that element instead of eyeballing a full-page shot. One-time setup (`tauri-driver` + `msedgedriver`) is in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md); the tool's own subcommands are documented in its file header.
 - This project's dedicated worktree convention (`.claude/worktrees/` for Claude, `.worktrees/<name>/` for other assistants) is documented in AGENTS.md under Version Control — follow it for any bug/feature work.
 
 ## Scope Control
