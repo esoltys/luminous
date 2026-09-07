@@ -86,4 +86,25 @@ describe("scrobblerStore", () => {
     expect(scrobblerStore.flushSuccessMessage).toContain("Submitted 3 pending listens");
     expect(scrobblerStore.pendingCount).toBe(0);
   });
+
+  it("syncs favourites to listenbrainz and updates state", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "sync_favourites_to_listenbrainz") {
+        return Promise.resolve({
+          total_favourites: 10,
+          synced: 8,
+          skipped_no_mbid: 2,
+          failed: 0,
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    const res = await scrobblerStore.syncFavourites();
+    expect(res).not.toBeNull();
+    expect(scrobblerStore.syncFavouritesResult?.synced).toBe(8);
+    expect(scrobblerStore.syncFavouritesResult?.total_favourites).toBe(10);
+    expect(scrobblerStore.syncFavouritesResult?.skipped_no_mbid).toBe(2);
+    expect(scrobblerStore.syncFavouritesError).toBeNull();
+  });
 });

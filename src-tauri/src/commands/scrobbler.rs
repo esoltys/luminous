@@ -58,3 +58,10 @@ pub async fn flush_scrobble_cache(
 ) -> Result<u32, String> {
     state.scrobbler.flush_cache_now().await
 }
+
+#[tauri::command]
+pub async fn sync_favourites_to_listenbrainz(
+    state: State<'_, AppState>,
+) -> Result<crate::scrobbler::SyncFavouritesResult, String> {
+    state.scrobbler.sync_favourites().await
+}

@@ -1058,6 +1058,7 @@ pub fn run() {
             commands::scrobbler::get_scrobble_cache_status,
             commands::scrobbler::flush_scrobble_cache,
             commands::scrobbler::toggle_scrobble_pause,
+            commands::scrobbler::sync_favourites_to_listenbrainz,
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,

@@ -1057,7 +1057,12 @@ export const en = {
     cacheEmpty: "Offline cache is empty",
     cachePending: "{count} listen(s) pending in offline cache",
     cacheDesc: "Listens recorded without internet connectivity are queued and sent automatically.",
-    syncNowBtn: "Sync Now"
+    syncNowBtn: "Sync Now",
+    syncFavouritesLabel: "Sync existing Favourites",
+    syncFavouritesHint: "Submit all currently favourited songs with MusicBrainz IDs as loved tracks",
+    syncFavouritesBtn: "Sync Favourites",
+    syncingFavouritesBtn: "Syncing...",
+    syncFavouritesSuccess: "Synced {synced} of {total} favourite(s) ({skipped} skipped without MusicBrainz ID)"
   },
   smartPlaylistBuilder: {
     fallbackName: "Smart Playlist",

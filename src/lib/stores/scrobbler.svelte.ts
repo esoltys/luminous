@@ -17,6 +17,13 @@ interface ScrobbleCacheStatus {
   last_attempt: number | null;
 }
 
+interface SyncFavouritesResult {
+  total_favourites: number;
+  synced: number;
+  skipped_no_mbid: number;
+  failed: number;
+}
+
 class ScrobblerStore {
   enabled = $state(false);
   token = $state("");
@@ -32,8 +39,11 @@ class ScrobblerStore {
 
   isValidating = $state(false);
   isFlushing = $state(false);
+  isSyncingFavourites = $state(false);
   validationError = $state<string | null>(null);
   flushSuccessMessage = $state<string | null>(null);
+  syncFavouritesResult = $state<SyncFavouritesResult | null>(null);
+  syncFavouritesError = $state<string | null>(null);
 
   private initialized = false;
 
@@ -140,6 +150,22 @@ class ScrobblerStore {
       this.lastAttempt = status.last_attempt;
     } catch (e) {
       console.error("Failed to fetch scrobble cache status:", e);
+    }
+  }
+
+  async syncFavourites() {
+    this.isSyncingFavourites = true;
+    this.syncFavouritesResult = null;
+    this.syncFavouritesError = null;
+    try {
+      const res = await invoke<SyncFavouritesResult>("sync_favourites_to_listenbrainz");
+      this.syncFavouritesResult = res;
+      return res;
+    } catch (err: any) {
+      this.syncFavouritesError = typeof err === "string" ? err : err?.message ?? "Failed to sync favourites";
+      return null;
+    } finally {
+      this.isSyncingFavourites = false;
     }
   }
 

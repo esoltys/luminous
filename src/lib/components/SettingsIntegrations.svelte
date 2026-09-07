@@ -21,7 +21,8 @@
     FolderOpenIcon as FolderOpen,
     BroadcastIcon as Broadcast,
     CircleNotchIcon as LoaderCircle,
-    ArrowUpRightIcon as ArrowUpRight
+    ArrowUpRightIcon as ArrowUpRight,
+    HeartIcon as Heart
   } from "phosphor-svelte";
 
   let showAcoustidKey = $state(false);
@@ -201,6 +202,41 @@
             label={i18n.t('listenbrainz.ratingsLabel')}
           />
         </div>
+
+        {#if scrobblerStore.ratingsEnabled}
+          <div class="ml-2 pl-3 border-l-2 border-brand-accent/30 flex flex-wrap items-center justify-between gap-3 py-1">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('listenbrainz.syncFavouritesLabel')}</span>
+              <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.syncFavouritesHint')}</p>
+              {#if scrobblerStore.syncFavouritesResult}
+                <p class="text-[11px] text-emerald-400 font-medium">
+                  {i18n.t('listenbrainz.syncFavouritesSuccess', {
+                    synced: scrobblerStore.syncFavouritesResult.synced,
+                    total: scrobblerStore.syncFavouritesResult.total_favourites,
+                    skipped: scrobblerStore.syncFavouritesResult.skipped_no_mbid
+                  })}
+                </p>
+              {:else if scrobblerStore.syncFavouritesError}
+                <p class="text-[11px] text-rose-400 font-medium">{scrobblerStore.syncFavouritesError}</p>
+              {/if}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onclick={() => scrobblerStore.syncFavourites()}
+              disabled={scrobblerStore.isSyncingFavourites}
+              class="gap-1.5 shrink-0"
+            >
+              {#if scrobblerStore.isSyncingFavourites}
+                <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+                <span>{i18n.t('listenbrainz.syncingFavouritesBtn')}</span>
+              {:else}
+                <Heart weight="fill" class="w-3.5 h-3.5 text-rose-400" />
+                <span>{i18n.t('listenbrainz.syncFavouritesBtn')}</span>
+              {/if}
+            </Button>
+          </div>
+        {/if}
 
         <div class="flex items-center justify-between gap-4 py-1">
           <div class="flex flex-col gap-0.5 min-w-0">

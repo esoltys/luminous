@@ -73,6 +73,15 @@ pub struct ScrobbleCacheStatus {
     pub last_attempt: Option<i64>,
 }
 
+/// Statistics from bulk synchronizing favourite tracks to ListenBrainz.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncFavouritesResult {
+    pub total_favourites: u32,
+    pub synced: u32,
+    pub skipped_no_mbid: u32,
+    pub failed: u32,
+}
+
 #[derive(Deserialize)]
 struct ValidateTokenResponse {
     valid: bool,
@@ -474,6 +483,93 @@ impl ScrobblerManager {
                 log::warn!("Failed to submit rating feedback to ListenBrainz: {e}");
             }
         });
+    }
+
+    /// Bulk synchronize all favourite tracks with MusicBrainz Recording IDs to ListenBrainz as loved tracks.
+    pub async fn sync_favourites(&self) -> Result<SyncFavouritesResult, String> {
+        let settings = self.get_settings().await;
+        if !settings.listenbrainz_enabled {
+            return Err("ListenBrainz scrobbling is not enabled".into());
+        }
+        let token = settings.listenbrainz_token.trim().to_string();
+        if token.is_empty() {
+            return Err("ListenBrainz user token is not configured".into());
+        }
+
+        let songs: Vec<Song> = {
+            let conn = self.db.pool.get().map_err(|e| e.to_string())?;
+            let sql = format!(
+                "SELECT {} FROM songs
+                 WHERE rating >= 4
+                   AND source IN (1, 2)
+                   AND unavailable = 0
+                   AND not_included = 0",
+                crate::collection::SONG_SELECT_COLS
+            );
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], crate::collection::row_to_song)
+                .map_err(|e| e.to_string())?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+
+        let total_favourites = songs.len() as u32;
+        let mut synced = 0u32;
+        let mut skipped_no_mbid = 0u32;
+        let mut failed = 0u32;
+        let mut seen_mbids = std::collections::HashSet::new();
+
+        for song in songs {
+            let mbid = match &song.musicbrainz_recording_id {
+                Some(id) if !id.trim().is_empty() => id.trim().to_string(),
+                _ => {
+                    skipped_no_mbid += 1;
+                    continue;
+                }
+            };
+
+            if !seen_mbids.insert(mbid.clone()) {
+                // Already synced this recording_mbid in this batch
+                synced += 1;
+                continue;
+            }
+
+            let payload = FeedbackRequest {
+                recording_mbid: mbid,
+                score: 1,
+            };
+
+            let res = self
+                .client
+                .post(format!("{LISTENBRAINZ_API_BASE}/feedback/recording-feedback"))
+                .header("Authorization", format!("Token {token}"))
+                .json(&payload)
+                .send()
+                .await;
+
+            match res {
+                Ok(resp) if resp.status().is_success() => {
+                    synced += 1;
+                }
+                Ok(resp) => {
+                    log::warn!("ListenBrainz feedback returned HTTP {}", resp.status());
+                    failed += 1;
+                }
+                Err(e) => {
+                    log::warn!("Failed to submit feedback to ListenBrainz: {e}");
+                    failed += 1;
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        Ok(SyncFavouritesResult {
+            total_favourites,
+            synced,
+            skipped_no_mbid,
+            failed,
+        })
     }
 
     /// Retrieve live scrobble cache statistics.

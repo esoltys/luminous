@@ -1055,7 +1055,12 @@ export const fr = {
     cacheEmpty: "La file d'attente hors ligne est vide",
     cachePending: "{count} écoute(s) en attente dans la file hors ligne",
     cacheDesc: "Les écoutes enregistrées hors ligne sont mises en file d'attente et envoyées automatiquement.",
-    syncNowBtn: "Synchroniser"
+    syncNowBtn: "Synchroniser",
+    syncFavouritesLabel: "Synchroniser les favoris existants",
+    syncFavouritesHint: "Transmettre tous les morceaux favoris actuels ayant un identifiant MusicBrainz",
+    syncFavouritesBtn: "Synchroniser les favoris",
+    syncingFavouritesBtn: "Synchronisation...",
+    syncFavouritesSuccess: "{synced} sur {total} favori(s) synchronisé(s) ({skipped} ignoré(s) sans identifiant MusicBrainz)"
   },
   smartPlaylistBuilder: {
     fallbackName: "Liste intelligente",
