@@ -559,21 +559,25 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        let existing_row: Option<(i64, i64, String)> = conn
+        let existing_row: Option<(i64, i64, i64, String)> = conn
             .query_row(
-                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
                 params![SPEC],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .ok();
         let mode = existing_row
             .as_ref()
-            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
             .unwrap_or_default();
 
         let needs_generation = match existing_row {
             None => true,
-            Some((_, updated, _)) => now - updated > STALE_AFTER_SECS,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
         };
         if !needs_generation {
             return Ok(());
@@ -582,7 +586,7 @@ impl PlaylistManager {
         let songs = scanner.get_songs_missing_core_tags(NO_SONG_LIMIT, mode)?;
 
         let playlist_id = match existing_row {
-            Some((id, _, _)) => {
+            Some((id, _, _, _)) => {
                 conn.execute(
                     "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                     params![now, id],
@@ -614,7 +618,7 @@ impl PlaylistManager {
 
     /// Regenerates the "Missing MusicBrainz" auto-playlist (#83) — a
     /// system-managed `playlists` row with `dynamic_enabled = 1` and
-    /// `dynamic_spec = "missingmbid"` — if missing or its `updated`
+    /// `dynamic_spec = "missingmbid"` — if missing, empty, or its `updated`
     /// timestamp is more than 24h old.
     /// Surfaced in the UI when scrobbling is enabled so users can easily
     /// identify tracks that cannot be scrobbled or loved on ListenBrainz due
@@ -628,21 +632,25 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        let existing_row: Option<(i64, i64, String)> = conn
+        let existing_row: Option<(i64, i64, i64, String)> = conn
             .query_row(
-                "SELECT id, COALESCE(updated, 0), COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec = ?1",
+                "SELECT p.id, COALESCE(p.updated, 0), COUNT(pi.id), COALESCE(p.population_mode, 'all')
+                 FROM playlists p
+                 LEFT JOIN playlist_items pi ON pi.playlist_id = p.id
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec = ?1
+                 GROUP BY p.id",
                 params![SPEC],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .ok();
         let mode = existing_row
             .as_ref()
-            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
             .unwrap_or_default();
 
         let needs_generation = match existing_row {
             None => true,
-            Some((_, updated, _)) => now - updated > STALE_AFTER_SECS,
+            Some((_, updated, count, _)) => count == 0 || now - updated > STALE_AFTER_SECS,
         };
         if !needs_generation {
             return Ok(());
@@ -651,7 +659,7 @@ impl PlaylistManager {
         let songs = scanner.get_songs_missing_musicbrainz_id(NO_SONG_LIMIT, mode)?;
 
         let playlist_id = match existing_row {
-            Some((id, _, _)) => {
+            Some((id, _, _, _)) => {
                 conn.execute(
                     "UPDATE playlists SET updated = ?1 WHERE id = ?2",
                     params![now, id],

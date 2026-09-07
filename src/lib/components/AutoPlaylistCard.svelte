@@ -79,10 +79,22 @@
     const pid = playlistId;
 
     const request =
-      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "missing_musicbrainz" || k === "daypart") && pid !== undefined
+      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
+        : k === "missing_musicbrainz"
+          ? (pid !== undefined
+              ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
+                  items.filter((item) => !!item.song).map((item) => item.song as Song)
+                )
+              : invoke<Song[]>("get_songs_missing_musicbrainz_id", { limit: 50 }))
+          : k === "missing_metadata"
+            ? (pid !== undefined
+                ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
+                    items.filter((item) => !!item.song).map((item) => item.song as Song)
+                  )
+                : invoke<Song[]>("get_songs_missing_metadata", { limit: 50 }))
         : k === "favourites"
           ? invoke<Song[]>("get_favourite_songs")
           : k === "recently_added"
@@ -129,13 +141,14 @@
       case "most_played": return "bg-[#DC2626] text-white";
       case "history": return "bg-[#8B5CF6] text-white";
       case "missing_metadata": return "bg-amber-600 text-white";
+      case "missing_musicbrainz": return "bg-indigo-600 text-white";
       case "daypart": return "bg-[#0D9488] text-white";
     }
   });
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "daypart") ||
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
       updated === undefined
     )
       return null;

@@ -930,6 +930,8 @@ pub fn run() {
             commands::collection::set_artist_profile,
             commands::collection::get_all_artist_profiles,
             commands::collection::set_songs_not_included,
+            commands::collection::get_songs_missing_musicbrainz_id,
+            commands::collection::get_songs_missing_metadata,
             // Playback commands
             commands::player::play_song,
             commands::player::play_songs,

@@ -335,3 +335,25 @@ pub async fn set_songs_not_included(
     let _ = app.emit("library-changed", ());
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_songs_missing_musicbrainz_id(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_missing_musicbrainz_id(limit.unwrap_or(-1), crate::models::QueuePopulationMode::All)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_songs_missing_metadata(
+    limit: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<Song>, String> {
+    let scanner = CollectionScanner::new(state.db.clone());
+    scanner
+        .get_songs_missing_core_tags(limit.unwrap_or(-1), crate::models::QueuePopulationMode::All)
+        .map_err(|e| e.to_string())
+}

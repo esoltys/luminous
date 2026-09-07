@@ -81,8 +81,38 @@
   let artistTag = $derived(view.artistTag);
   let decade = $derived(view.decade);
   let bpm = $derived(view.bpm);
-  let playlistId = $derived(view.playlistId);
-  let updated = $derived(view.updated);
+  let playlistId = $derived.by(() => {
+    if (view.playlistId !== undefined) return view.playlistId;
+    if (view.kind === "missing_musicbrainz") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")?.id;
+    }
+    if (view.kind === "missing_metadata") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")?.id;
+    }
+    if (view.kind === "daypart") {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec?.startsWith("daypart:"))?.id;
+    }
+    if (view.kind === "decade" && view.decade) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `decade:${view.decade}`)?.id;
+    }
+    if (view.kind === "bpm" && view.bpm) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `bpmrange:${view.bpm}`)?.id;
+    }
+    if (view.kind === "artist_tag" && view.artistTag) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `artisttag:${view.artistTag}`)?.id;
+    }
+    if (view.kind === "genre" && view.genre) {
+      return playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === `tag:${view.genre}`)?.id;
+    }
+    return undefined;
+  });
+  let updated = $derived.by(() => {
+    if (view.updated !== undefined) return view.updated;
+    if (playlistId !== undefined) {
+      return playlistsStore.playlists.find((p) => p.id === playlistId)?.updated;
+    }
+    return undefined;
+  });
   let pinRefKey = $derived(autoPlaylistRefKeyFor(view));
 
   let songs = $state<Song[]>([]);
@@ -204,9 +234,25 @@
   });
 
   async function fetchSongs(k: typeof kind, g: typeof genre, at: typeof artistTag, d: typeof decade, b: typeof bpm, pid: typeof playlistId): Promise<Song[]> {
-    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "missing_musicbrainz" || k === "daypart") && pid !== undefined) {
+    if ((k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "daypart") && pid !== undefined) {
       const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
       return items.filter((item) => !!item.song).map((item) => item.song as Song);
+    }
+    if (k === "missing_musicbrainz") {
+      if (pid !== undefined) {
+        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
+        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
+        if (songs.length > 0) return songs;
+      }
+      return invoke<Song[]>("get_songs_missing_musicbrainz_id");
+    }
+    if (k === "missing_metadata") {
+      if (pid !== undefined) {
+        const items = await invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid });
+        const songs = items.filter((item) => !!item.song).map((item) => item.song as Song);
+        if (songs.length > 0) return songs;
+      }
+      return invoke<Song[]>("get_songs_missing_metadata");
     }
     if (k === "favourites") return invoke<Song[]>("get_favourite_songs");
     if (k === "recently_added") return invoke<Song[]>("get_recently_added_songs", { limit: 50 });

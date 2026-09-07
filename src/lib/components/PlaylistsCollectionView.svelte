@@ -338,9 +338,11 @@
               ? { kind: "bpm", bpm: def.bpm, playlistId: def.playlistId, updated: def.updated }
               : def.kind === "missing_metadata"
                 ? { kind: "missing_metadata", playlistId: def.playlistId, updated: def.updated }
-                : def.kind === "daypart"
-                  ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
-                  : { kind: def.kind }
+                : def.kind === "missing_musicbrainz"
+                  ? { kind: "missing_musicbrainz", playlistId: def.playlistId, updated: def.updated }
+                  : def.kind === "daypart"
+                    ? { kind: "daypart", playlistId: def.playlistId, updated: def.updated }
+                    : { kind: def.kind }
     );
   }
 
