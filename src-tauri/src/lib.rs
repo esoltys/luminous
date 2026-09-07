@@ -24,6 +24,7 @@ pub mod lyrics;
 pub mod media_session;
 pub mod models;
 pub mod organizer;
+pub mod paths;
 pub mod picard;
 pub mod pins;
 pub mod player;
@@ -553,7 +554,7 @@ pub fn run() {
     tauri::Builder::default()
         .register_uri_scheme_protocol("luminous-art", move |ctx, request| {
             let app_handle = ctx.app_handle();
-            let covers_dir = app_handle.path().app_data_dir().unwrap().join("covers");
+            let covers_dir = crate::paths::resolve_app_data_dir(app_handle).join("covers");
 
             let uri_str = request.uri().to_string();
             let mut trimmed = &uri_str[..];
@@ -672,7 +673,7 @@ pub fn run() {
             }
 
             let db = Arc::new(
-                Database::new(app.path().app_data_dir().expect("no app data dir"))
+                Database::new(crate::paths::resolve_app_data_dir(app))
                     .expect("failed to initialize database"),
             );
 
@@ -747,7 +748,7 @@ pub fn run() {
 
             let cover_manager = Arc::new(CoverManager::new(
                 Arc::clone(&db),
-                app.path().app_data_dir().expect("no app data dir"),
+                crate::paths::resolve_app_data_dir(app),
             ));
 
             // Spawn real-time visualizer spectrum emission loop (Tokio)

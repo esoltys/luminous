@@ -372,7 +372,7 @@ impl CollectionScanner {
             .try_state::<crate::AppState>()
             .map(|state| WatcherPauseGuard::new(Arc::clone(&state.watcher_paused)));
 
-        let app_data_dir = app.path().app_data_dir().expect("no app data dir");
+        let app_data_dir = crate::paths::resolve_app_data_dir(&app);
         let app_for_progress = app.clone();
         self.scan_all_core(app_data_dir, force, silent, true, move |progress| {
             let _ = app_for_progress.emit("scan-progress", progress);
