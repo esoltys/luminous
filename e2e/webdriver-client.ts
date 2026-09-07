@@ -127,10 +127,12 @@ export function getTitle(session: DriverSession): Promise<string> {
   return webdriverRequest('GET', `/session/${session.sessionId}/title`);
 }
 
+const ELEMENT_KEY = 'element-6066-11e4-a52e-4f735466cecf';
+
 /** `using`: 'css selector' | 'xpath' | 'link text' | 'partial link text' */
 async function findElement(session: DriverSession, using: string, value: string): Promise<string> {
   const el = await webdriverRequest('POST', `/session/${session.sessionId}/element`, { using, value });
-  return el['element-6066-11e4-a52e-4f735466cecf'];
+  return el[ELEMENT_KEY];
 }
 
 export async function clickElement(session: DriverSession, using: string, value: string): Promise<void> {
@@ -141,4 +143,24 @@ export async function clickElement(session: DriverSession, using: string, value:
 export async function typeIntoElement(session: DriverSession, using: string, value: string, text: string): Promise<void> {
   const elementId = await findElement(session, using, value);
   await webdriverRequest('POST', `/session/${session.sessionId}/element/${elementId}/value`, { text });
+}
+
+/**
+ * Moves the pointer over an element via the WebDriver Actions API, so
+ * :hover / group-hover CSS actually engages for a follow-up screenshot.
+ * There's no separate "unhover" — start a fresh session (or move over a
+ * neutral element) to clear it.
+ */
+export async function hoverElement(session: DriverSession, using: string, value: string): Promise<void> {
+  const elementId = await findElement(session, using, value);
+  await webdriverRequest('POST', `/session/${session.sessionId}/actions`, {
+    actions: [
+      {
+        type: 'pointer',
+        id: 'mouse1',
+        parameters: { pointerType: 'mouse' },
+        actions: [{ type: 'pointerMove', duration: 0, origin: { [ELEMENT_KEY]: elementId }, x: 0, y: 0 }],
+      },
+    ],
+  });
 }
