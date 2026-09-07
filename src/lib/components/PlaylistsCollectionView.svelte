@@ -30,11 +30,12 @@
   } from "phosphor-svelte";
   import { isSmartPlaylistSpec } from "../utils/filterParser";
   import { getPlaylistDisplayName } from "../utils/playlist";
+  import { scrobblerStore } from "../stores/scrobbler.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
 
   interface AutoDef {
     id: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -105,6 +106,11 @@
   let missingMetadataAutoPlaylist = $derived(
     playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmeta")
   );
+  // Missing MusicBrainz (#83) is surfaced when scrobbling is enabled, identifying
+  // songs that lack MusicBrainz recording IDs.
+  let missingMusicBrainzAutoPlaylist = $derived(
+    playlistsStore.playlists.find((p) => p.dynamic_enabled && p.dynamic_spec === "missingmbid")
+  );
   // Daypart Mix (#223) is also a singleton, but unlike missing-metadata its
   // dynamic_spec changes content (bucket/date/genre) every time the daypart
   // boundary crosses — matched by prefix, not exact spec, so the same row
@@ -162,6 +168,16 @@
         playlistId: missingMetadataAutoPlaylist.id,
         updated: missingMetadataAutoPlaylist.updated,
         trackCount: missingMetadataAutoPlaylist.track_count,
+      });
+    }
+    if (scrobblerStore.enabled && missingMusicBrainzAutoPlaylist && missingMusicBrainzAutoPlaylist.track_count > 0) {
+      defs.push({
+        id: `auto:missing_musicbrainz:${missingMusicBrainzAutoPlaylist.id}`,
+        kind: "missing_musicbrainz",
+        label: getPlaylistDisplayName(missingMusicBrainzAutoPlaylist),
+        playlistId: missingMusicBrainzAutoPlaylist.id,
+        updated: missingMusicBrainzAutoPlaylist.updated,
+        trackCount: missingMusicBrainzAutoPlaylist.track_count,
       });
     }
     if (daypartMixPlaylist && daypartMixPlaylist.track_count > 0) {

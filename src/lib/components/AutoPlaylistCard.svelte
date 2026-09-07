@@ -25,7 +25,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -44,7 +44,7 @@
 
   let displayLabel = $derived.by(() => {
     if (
-      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "daypart") &&
+      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
@@ -55,6 +55,7 @@
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
+    if (kind === "missing_musicbrainz") return i18n.t("playlists.missingMusicBrainzAutoPlaylist");
     if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
@@ -78,7 +79,7 @@
     const pid = playlistId;
 
     const request =
-      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "daypart") && pid !== undefined
+      (k === "genre" || k === "decade" || k === "bpm" || k === "artist_tag" || k === "missing_metadata" || k === "missing_musicbrainz" || k === "daypart") && pid !== undefined
         ? invoke<PlaylistItem[]>("get_playlist_tracks", { playlistId: pid }).then((items) =>
             items.filter((item) => !!item.song).map((item) => item.song as Song)
           )
@@ -188,6 +189,10 @@
     {:else if kind === "missing_metadata"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-amber-600/25 to-amber-400/15 flex items-center justify-center overflow-hidden border border-amber-400/30 shadow-[0_0_20px_2px_rgba(245,158,11,0.35)]">
         <AlertTriangle class="w-10 h-10 text-amber-500" />
+      </div>
+    {:else if kind === "missing_musicbrainz"}
+      <div class="w-full h-full bg-brand-main bg-gradient-to-br from-indigo-600/25 to-indigo-400/15 flex items-center justify-center overflow-hidden border border-indigo-400/30 shadow-[0_0_20px_2px_rgba(99,102,241,0.35)]">
+        <AlertTriangle class="w-10 h-10 text-indigo-400" />
       </div>
     {:else if kind === "daypart"}
       <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_20px_2px_rgba(45,212,191,0.35)]">

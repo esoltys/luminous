@@ -19,7 +19,7 @@
 
   interface Props {
     label: string;
-    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "daypart";
+    kind: "favourites" | "recently_added" | "most_played" | "history" | "genre" | "decade" | "bpm" | "artist_tag" | "missing_metadata" | "missing_musicbrainz" | "daypart";
     genre?: string;
     artistTag?: string;
     decade?: string;
@@ -34,7 +34,7 @@
 
   let displayLabel = $derived.by(() => {
     if (
-      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "daypart") &&
+      (kind === "genre" || kind === "decade" || kind === "bpm" || kind === "artist_tag" || kind === "missing_metadata" || kind === "missing_musicbrainz" || kind === "daypart") &&
       playlistId !== undefined
     ) {
       const pl = playlistsStore.playlists.find((p) => p.id === playlistId);
@@ -45,6 +45,7 @@
 
   let subtitleLabel = $derived.by(() => {
     if (kind === "missing_metadata") return i18n.t("playlists.missingMetadataAutoPlaylist");
+    if (kind === "missing_musicbrainz") return i18n.t("playlists.missingMusicBrainzAutoPlaylist");
     if (kind === "daypart") return i18n.t("playlists.daypartAutoPlaylist");
     if (kind === "decade" || decade) return i18n.t("playlists.decadeAutoPlaylist");
     if (kind === "bpm") return i18n.t("playlists.bpmAutoPlaylist");
@@ -59,7 +60,7 @@
 
   let updatedLabel = $derived.by(() => {
     if (
-      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "daypart") ||
+      (kind !== "genre" && kind !== "decade" && kind !== "bpm" && kind !== "artist_tag" && kind !== "missing_metadata" && kind !== "missing_musicbrainz" && kind !== "daypart") ||
       updated === undefined
     )
       return null;
@@ -90,9 +91,11 @@
                   ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/30'
                   : kind === 'missing_metadata'
                     ? 'bg-amber-500/15 border-amber-500/30'
-                    : kind === 'daypart'
-                      ? 'bg-[#2DD4BF]/15 border-[#2DD4BF]/30'
-                      : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
+                    : kind === 'missing_musicbrainz'
+                      ? 'bg-indigo-500/15 border-indigo-500/30'
+                      : kind === 'daypart'
+                        ? 'bg-[#2DD4BF]/15 border-[#2DD4BF]/30'
+                        : 'bg-[#FACC15]/15 border-[#FACC15]/30'}"
   >
     {#if kind === "favourites"}
       <Heart class="w-5 h-5 text-[#F43F5E] fill-current" />
@@ -110,6 +113,8 @@
       <Gauge class="w-5 h-5 text-[#E879F9]" />
     {:else if kind === "missing_metadata"}
       <AlertTriangle class="w-5 h-5 text-amber-500" />
+    {:else if kind === "missing_musicbrainz"}
+      <AlertTriangle class="w-5 h-5 text-indigo-400" />
     {:else if kind === "daypart"}
       <SunHorizon class="w-5 h-5 text-[#2DD4BF]" />
     {:else}
