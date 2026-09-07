@@ -321,7 +321,7 @@ impl ScrobblerManager {
         let token = settings.listenbrainz_token.trim().to_string();
         let client = self.client.clone();
 
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let res = client
                 .post(format!("{LISTENBRAINZ_API_BASE}/submit-listens"))
                 .header("Authorization", format!("Token {token}"))
@@ -434,7 +434,7 @@ impl ScrobblerManager {
         }
 
         let client = self.client.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let payload = FeedbackRequest {
                 recording_mbid: mbid,
                 score,
@@ -490,7 +490,7 @@ impl ScrobblerManager {
         let db = self.db.clone();
         let settings_arc = self.settings.clone();
 
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             let settings = settings_arc.lock().await.clone();
             if !settings.listenbrainz_enabled
                 || settings.scrobble_paused
