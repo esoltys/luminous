@@ -1285,19 +1285,25 @@ mod tests {
             let conn = db_arc.pool.get().unwrap();
             // Complete — should not appear.
             conn.execute(
-                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('Complete Song', 'Artist', 'Album', 1, 0)",
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('Complete Song', 'Artist', 'Album', 1, 0, 'mbid-1')",
                 [],
             )
             .unwrap();
             // Missing artist (empty string, not NULL).
             conn.execute(
-                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('No Artist', '', 'Album', 1, 0)",
+                "INSERT INTO songs (title, artist, album, source, unavailable, musicbrainz_recording_id) VALUES ('No Artist', '', 'Album', 1, 0, 'mbid-2')",
                 [],
             )
             .unwrap();
             // Missing album (NULL).
             conn.execute(
-                "INSERT INTO songs (title, artist, source, unavailable) VALUES ('No Album', 'Artist', 1, 0)",
+                "INSERT INTO songs (title, artist, source, unavailable, musicbrainz_recording_id) VALUES ('No Album', 'Artist', 1, 0, 'mbid-3')",
+                [],
+            )
+            .unwrap();
+            // Missing MusicBrainz Recording ID.
+            conn.execute(
+                "INSERT INTO songs (title, artist, album, source, unavailable) VALUES ('No MBID', 'Artist', 'Album', 1, 0)",
                 [],
             )
             .unwrap();
@@ -1320,9 +1326,10 @@ mod tests {
             .iter()
             .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
             .collect();
-        assert_eq!(titles.len(), 2);
+        assert_eq!(titles.len(), 3);
         assert!(titles.contains(&"No Artist".to_string()));
         assert!(titles.contains(&"No Album".to_string()));
+        assert!(titles.contains(&"No MBID".to_string()));
         assert!(!titles.contains(&"Complete Song".to_string()));
 
         // Fixing the tags and reconciling should drop the songs out again.
@@ -1339,11 +1346,13 @@ mod tests {
         let deltas = manager.reconcile_dynamic_playlists().unwrap();
         assert!(deltas.iter().any(|d| d.playlist_id == pl.id));
         let tracks = manager.get_playlist_tracks(pl.id).unwrap();
-        assert_eq!(tracks.len(), 1);
-        assert_eq!(
-            tracks[0].song.as_ref().unwrap().title.as_deref(),
-            Some("No Album")
-        );
+        assert_eq!(tracks.len(), 2);
+        let remaining_titles: Vec<_> = tracks
+            .iter()
+            .map(|t| t.song.as_ref().unwrap().title.clone().unwrap())
+            .collect();
+        assert!(remaining_titles.contains(&"No Album".to_string()));
+        assert!(remaining_titles.contains(&"No MBID".to_string()));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

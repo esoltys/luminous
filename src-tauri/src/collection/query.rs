@@ -555,6 +555,7 @@ impl CollectionScanner {
                  title IS NULL OR TRIM(title) = ''
                  OR artist IS NULL OR TRIM(artist) = ''
                  OR album IS NULL OR TRIM(album) = ''
+                 OR musicbrainz_recording_id IS NULL OR TRIM(musicbrainz_recording_id) = ''
              )
                AND source IN (1, 2)
                AND unavailable = 0
