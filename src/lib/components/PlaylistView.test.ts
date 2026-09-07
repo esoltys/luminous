@@ -308,4 +308,43 @@ describe("PlaylistView.svelte", () => {
     expect(rows[1]).toHaveTextContent("Artist B");
     expect(rows[2]).toHaveTextContent("Artist C");
   });
+
+  it("renders genre chips on their own line and cover stack in top-right for custom playlist", () => {
+    // Ensure at least one track has artwork so topAlbums is populated
+    playlistsStore.activePlaylistTracks = [
+      {
+        ...mockTracks[0],
+        song: { ...mockTracks[0].song!, art_manual: "/covers/album-a.jpg" },
+      },
+      mockTracks[1],
+      mockTracks[2],
+    ];
+
+    const { getByText, getByTitle } = render(PlaylistView);
+
+    // Genre chips should be rendered
+    const rockChip = getByTitle("Browse Rock");
+    expect(rockChip).toBeInTheDocument();
+    expect(getByTitle("Browse Pop")).toBeInTheDocument();
+    expect(getByTitle("Browse Jazz")).toBeInTheDocument();
+
+    // Verify genre container is distinct from the metadata container with songs count
+    const genreContainer = rockChip.closest("div.flex.flex-wrap.gap-1");
+    expect(genreContainer).not.toBeNull();
+
+    const songsText = getByText("3 songs");
+    expect(songsText).toBeInTheDocument();
+    expect(genreContainer?.contains(songsText)).toBe(false);
+
+    const metadataRow = songsText.closest("div.flex.flex-wrap.items-center");
+    expect(metadataRow).not.toBeNull();
+    expect(metadataRow?.firstElementChild).toBe(songsText);
+
+    // Cover stack container should be positioned at top-right (not bottom-right / self-stretch)
+    const coverStackContainer = document.querySelector(".w-48.h-36");
+    expect(coverStackContainer).not.toBeNull();
+    expect(coverStackContainer).toHaveClass("items-start");
+    expect(coverStackContainer).not.toHaveClass("self-stretch");
+  });
 });
+
