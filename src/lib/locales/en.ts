@@ -1031,7 +1031,7 @@ export const en = {
     openSelectedInPicard: "Open {count} in Picard",
     notFoundTooltip: "MusicBrainz Picard not found. Install it from picard.musicbrainz.org, or set a custom path in Settings.",
     integrationTitle: "MusicBrainz Picard",
-    integrationDesc: "is an open-source program that identifies messy music files by their unique digital audio fingerprint, automatically filling in missing track details, artwork, and tidy filenames using a massive community encyclopedia.",
+    integrationDesc: "is an open-source program that identifies music files by their unique digital audio fingerprint, automatically filling in missing track details, artwork, and tidy filenames using a massive community encyclopedia.",
     foundAt: "Found at {path}",
     notFound: "Not found — install it from picard.musicbrainz.org, or set a custom path below.",
     customPathLabel: "Custom Path (optional)",

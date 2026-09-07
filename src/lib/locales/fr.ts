@@ -1030,7 +1030,7 @@ export const fr = {
     openSelectedInPicard: "Ouvrir {count} dans Picard",
     notFoundTooltip: "MusicBrainz Picard introuvable. Installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé dans les paramètres.",
     integrationTitle: "MusicBrainz Picard",
-    integrationDesc: "est un programme open source qui identifie les fichiers musicaux désorganisés grâce à leur empreinte audio numérique unique, complétant automatiquement les détails de piste manquants, les pochettes et des noms de fichiers soignés à l'aide d'une vaste encyclopédie communautaire.",
+    integrationDesc: "est un programme open source qui identifie les fichiers musicaux grâce à leur empreinte audio numérique unique, complétant automatiquement les détails de piste manquants, les pochettes et des noms de fichiers soignés à l'aide d'une vaste encyclopédie communautaire.",
     foundAt: "Trouvé à {path}",
     notFound: "Introuvable — installez-le depuis picard.musicbrainz.org, ou définissez un chemin personnalisé ci-dessous.",
     customPathLabel: "Chemin personnalisé (facultatif)",
