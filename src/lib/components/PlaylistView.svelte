@@ -638,7 +638,7 @@
 
   {#if activePlaylist}
     <div
-      class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto carousel-scroll"
+      class="flex-1 flex flex-col min-h-0 relative z-10 overflow-y-auto"
       use:rememberScroll={`playlist:${playlistsStore.activePlaylistId}`}
     >
     <div class="relative z-30 w-full overflow-hidden border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'} shrink-0">
@@ -1090,13 +1090,4 @@
   </Modal>
 {/if}
 
-<style>
-  :global(.carousel-scroll) {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  :global(.carousel-scroll::-webkit-scrollbar) {
-    display: none;
-  }
-</style>
 

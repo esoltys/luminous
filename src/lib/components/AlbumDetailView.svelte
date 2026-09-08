@@ -414,7 +414,7 @@
 </script>
 
 <div
-  class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full carousel-scroll {backdropUrl ? '' : 'bg-brand-main'}"
+  class="relative flex-1 flex flex-col overflow-y-auto text-brand-text-secondary h-full {backdropUrl ? '' : 'bg-brand-main'}"
   use:rememberScroll={`album-detail:${albumName}`}
 >
   {#if backdropUrl}
@@ -671,12 +671,3 @@
   />
 {/if}
 
-<style>
-  :global(.carousel-scroll) {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  :global(.carousel-scroll::-webkit-scrollbar) {
-    display: none;
-  }
-</style>
