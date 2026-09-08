@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n, type Locale } from "../stores/i18n.svelte";
-  import { prefs, type RatingStyle } from "../stores/prefs.svelte";
+  import { prefs, type RatingStyle, type WeekStart } from "../stores/prefs.svelte";
   import { updaterStore, MICROSOFT_STORE_URL } from "../stores/updater.svelte";
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -207,6 +207,22 @@
     >
       <option value="heart">{i18n.t('settings.ratingStyleHeart')}</option>
       <option value="stars">{i18n.t('settings.ratingStyleStars')}</option>
+    </Select>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-4">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <label for="week-start-select" class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.weekStart')}</label>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.weekStartHint')}</p>
+    </div>
+    <Select
+      id="week-start-select"
+      value={prefs.weekStart}
+      onchange={(e) => prefs.setWeekStart(e.currentTarget.value as WeekStart)}
+      class="shrink-0 bg-brand-main border border-brand-border hover:border-brand-accent/60 text-brand-text-primary text-xs rounded-full pl-3.5 pr-8 py-1.5 focus:outline-none focus:border-brand-accent transition-all font-medium"
+    >
+      <option value="sunday">{i18n.t('settings.weekStartSunday')}</option>
+      <option value="monday">{i18n.t('settings.weekStartMonday')}</option>
     </Select>
   </div>
 

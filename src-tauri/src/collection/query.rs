@@ -1084,7 +1084,15 @@ impl CollectionScanner {
     /// drive multiple synthetic weeks deterministically.
     fn get_top_albums_at(&self, limit: i64, now: i64) -> Result<Vec<TopAlbumItem>> {
         let conn = self.db.pool.get()?;
-        let period_start = week_start_utc(now);
+        let start_sunday: bool = conn
+            .query_row(
+                "SELECT value FROM app_state WHERE key = 'week_start'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|v| v == "sunday")
+            .unwrap_or(false);
+        let period_start = week_start_utc(now, start_sunday);
 
         // Rank this week's albums by play count. Every result must be an
         // Album card regardless of track count (unlike
@@ -1222,14 +1230,16 @@ impl CollectionScanner {
     }
 }
 
-/// Start (UTC unix timestamp, Monday 00:00:00) of the calendar week
-/// containing `now`. Pure integer arithmetic on the UTC unix timestamp — no
+/// Start (UTC unix timestamp, 00:00:00) of the calendar week containing
+/// `now`, rounding down to either the most recent Sunday or Monday depending
+/// on `start_sunday`. Pure integer arithmetic on the UTC unix timestamp — no
 /// DST to account for in UTC, so no need for chrono here. 1970-01-01 (day 0)
-/// was a Thursday, i.e. Monday-based weekday index 3.
-fn week_start_utc(now: i64) -> i64 {
+/// was a Thursday, i.e. Monday-based weekday index 3 (Sunday-based index 4).
+fn week_start_utc(now: i64, start_sunday: bool) -> i64 {
     const SECONDS_PER_DAY: i64 = 86_400;
     let days_since_epoch = now.div_euclid(SECONDS_PER_DAY);
-    let weekday = (days_since_epoch + 3).rem_euclid(7);
+    let epoch_offset = if start_sunday { 4 } else { 3 };
+    let weekday = (days_since_epoch + epoch_offset).rem_euclid(7);
     (days_since_epoch - weekday) * SECONDS_PER_DAY
 }
 
@@ -2870,11 +2880,21 @@ mod tests {
     #[test]
     fn test_week_start_utc_rounds_down_to_monday() {
         // Wed 2024-01-10 12:00:00 UTC -> Mon 2024-01-08 00:00:00 UTC.
-        assert_eq!(week_start_utc(1_704_888_000), 1_704_672_000);
+        assert_eq!(week_start_utc(1_704_888_000, false), 1_704_672_000);
         // Exactly a Monday midnight is its own week start.
-        assert_eq!(week_start_utc(1_704_672_000), 1_704_672_000);
+        assert_eq!(week_start_utc(1_704_672_000, false), 1_704_672_000);
         // Sun 2024-01-14 23:59:59 UTC is still the same week as the above Monday.
-        assert_eq!(week_start_utc(1_705_276_799), 1_704_672_000);
+        assert_eq!(week_start_utc(1_705_276_799, false), 1_704_672_000);
+    }
+
+    #[test]
+    fn test_week_start_utc_rounds_down_to_sunday() {
+        // Sun 2024-01-07 00:00:00 UTC is its own (Sunday-based) week start.
+        assert_eq!(week_start_utc(1_704_585_600, true), 1_704_585_600);
+        // Wed 2024-01-10 12:00:00 UTC -> Sun 2024-01-07 00:00:00 UTC.
+        assert_eq!(week_start_utc(1_704_888_000, true), 1_704_585_600);
+        // Sat 2024-01-13 23:59:59 UTC is still the same Sunday-based week.
+        assert_eq!(week_start_utc(1_705_190_399, true), 1_704_585_600);
     }
 
     #[test]

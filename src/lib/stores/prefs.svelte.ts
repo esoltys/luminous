@@ -5,6 +5,7 @@ type SeekBarMode = "waveform" | "bands";
 export type CollectionViewMode = "cards" | "rows";
 export type GenreViewMode = "genre" | "tags";
 export type GenreSortField = "name" | "count";
+export type WeekStart = "sunday" | "monday";
 
 /** Shape of the backend's UiPreferences struct — the schema (keys, domains,
  * defaults) lives in Rust (commands/settings.rs); this store just mirrors it. */
@@ -20,6 +21,7 @@ interface UiPreferences {
   genre_cards_view_mode: CollectionViewMode;
   genre_sort_field: GenreSortField;
   genre_sort_asc: boolean;
+  week_start: WeekStart;
 }
 
 class PrefsStore {
@@ -38,6 +40,7 @@ class PrefsStore {
    * display-only, doesn't touch the persisted drag-reorder sort_order. */
   genreSortField = $state<GenreSortField>("name");
   genreSortAsc = $state<boolean>(true);
+  weekStart = $state<WeekStart>("monday");
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
   /** Off by default; mirrors the OS's actual registration, queried fresh on init. */
@@ -56,6 +59,7 @@ class PrefsStore {
     this.genreCardsViewMode = prefs.genre_cards_view_mode;
     this.genreSortField = prefs.genre_sort_field;
     this.genreSortAsc = prefs.genre_sort_asc;
+    this.weekStart = prefs.week_start;
     this.minimizeToTray = await invoke<boolean>("get_minimize_to_tray_enabled");
     try {
       this.autostartEnabled = await invoke<boolean>("get_autostart_enabled");
@@ -78,6 +82,7 @@ class PrefsStore {
       genre_cards_view_mode: this.genreCardsViewMode,
       genre_sort_field: this.genreSortField,
       genre_sort_asc: this.genreSortAsc,
+      week_start: this.weekStart,
     };
     invoke("set_ui_preferences", { prefs });
   }
@@ -134,6 +139,11 @@ class PrefsStore {
 
   setGenreSortAsc(asc: boolean) {
     this.genreSortAsc = asc;
+    this.save();
+  }
+
+  setWeekStart(start: WeekStart) {
+    this.weekStart = start;
     this.save();
   }
 
