@@ -100,7 +100,7 @@ describe("RightPanel.svelte", () => {
   it("hides the MusicBrainz section when no MusicBrainz IDs are present", async () => {
     playerStore.currentSong = mockSong;
     const { getByText, queryByAltText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(queryByAltText("MusicBrainz")).not.toBeInTheDocument();
   });
@@ -113,7 +113,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_album_artist_id: "same-uuid",
     };
     const { getByText, queryByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(getByText("Artist")).toBeInTheDocument();
     expect(queryByText("Album Artist")).not.toBeInTheDocument();
@@ -142,7 +142,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_recording_id: "recording-uuid",
     };
     const { getByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(getByText("recording-uuid")).toBeInTheDocument();
   });
@@ -153,7 +153,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_recording_id: "recording-uuid",
     };
     const { getByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     await fireEvent.click(getByText("Test Track Title"));
 
@@ -170,7 +170,7 @@ describe("RightPanel.svelte", () => {
       catalog_number: "PHCR-1144",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe("RightPanel.svelte", () => {
       barcode: "4988011329586",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
-    await fireEvent.click(getByText("Context & Bio"));
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Barcode")).toBeInTheDocument();

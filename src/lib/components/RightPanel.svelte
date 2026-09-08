@@ -7,8 +7,7 @@
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
     ArrowsClockwiseIcon as RefreshCw,
-    StarIcon as Star,
-    QuotesIcon as Quotes
+    StarIcon as Star
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
@@ -25,10 +24,24 @@
   let { isOpen = true, width = 288, onClose }: Props = $props();
 
   let currentSong = $derived(playerStore.currentSong);
-  // Technicals is the default tab: it's the pre-existing content users
-  // already relied on seeing immediately (format/bitrate/etc.); Context &
-  // Bio is the new tab, one click away.
+  // Technicals is the default tab until the user's own choice loads from
+  // app_state (below) — it's the pre-existing content users already relied
+  // on seeing immediately (format/bitrate/etc.).
   let activeTab = $state<"context" | "technical">("technical");
+
+  function setActiveTab(tab: "context" | "technical") {
+    activeTab = tab;
+    invoke("set_app_setting", { key: "right_panel_active_tab", value: tab });
+  }
+
+  $effect(() => {
+    invoke<Record<string, string>>("get_all_app_settings")
+      .then((settings) => {
+        const saved = settings?.right_panel_active_tab;
+        if (saved === "context" || saved === "technical") activeTab = saved;
+      })
+      .catch(() => {});
+  });
 
   let contextData = $state<SongContextEnrichment | null>(null);
   let isLoadingContext = $state(false);
@@ -61,10 +74,10 @@
     if (!contextData) return false;
     return !!(
       contextData.wikipedia_extract ||
-      contextData.mb_tags.length > 0 ||
+      (contextData.mb_tags?.length ?? 0) > 0 ||
       contextData.mb_rating != null ||
       contextData.critiquebrainz_rating != null ||
-      contextData.critiquebrainz_review_links.length > 0
+      (contextData.critiquebrainz_review_links?.length ?? 0) > 0
     );
   });
 
@@ -150,6 +163,10 @@
        above the dock instead of running the full sidebar height behind it. -->
   <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-6 space-y-6 {currentSong ? 'mb-24' : ''}">
     {#if currentSong}
+      <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
+        {i18n.t('playerBar.nowPlayingHeading', {}, 'Now Playing')}
+      </h2>
+
       <div class="space-y-2 text-xs">
         {#if currentSong.year}
           <div class="flex items-start justify-between gap-3">
@@ -176,17 +193,17 @@
       <div class="flex gap-1 p-1 rounded-lg bg-brand-bg/40 text-xs font-semibold">
         <button
           type="button"
-          onclick={() => activeTab = "context"}
+          onclick={() => setActiveTab("context")}
           class="flex-1 px-3 py-1.5 rounded-md transition-all {activeTab === 'context' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
-          {i18n.t('playerBar.tabContextBio', {}, 'Context & Bio')}
+          {i18n.t('playerBar.tabContextBio', {}, 'Information')}
         </button>
         <button
           type="button"
-          onclick={() => activeTab = "technical"}
+          onclick={() => setActiveTab("technical")}
           class="flex-1 px-3 py-1.5 rounded-md transition-all {activeTab === 'technical' ? 'bg-brand-accent text-brand-accent-contrast shadow-md' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         >
-          {i18n.t('playerBar.tabAudioTechnicals', {}, 'Audio & File Technicals')}
+          {i18n.t('playerBar.tabAudioTechnicals', {}, 'Technical')}
         </button>
       </div>
 
@@ -210,7 +227,18 @@
         {:else}
           {#if contextData?.wikipedia_extract}
             <div class="space-y-1.5 text-xs">
-              <span class="text-brand-text-secondary/60">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+              {#if contextData.wikipedia_page_url}
+                <button
+                  type="button"
+                  onclick={() => contextData?.wikipedia_page_url && openExternalUrl(contextData.wikipedia_page_url)}
+                  class="group relative inline-flex items-center gap-1 text-brand-text-secondary/60 hover:text-brand-accent transition-colors cursor-pointer"
+                >
+                  <span class="underline decoration-brand-text-secondary/40 group-hover:decoration-brand-accent transition-colors">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                  <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              {:else}
+                <span class="text-brand-text-secondary/60">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+              {/if}
               <p class="text-brand-text-secondary leading-relaxed {bioExpanded ? '' : 'line-clamp-3'}">{contextData.wikipedia_extract}</p>
               <button type="button" onclick={() => bioExpanded = !bioExpanded} class="text-brand-accent hover:underline">
                 {bioExpanded ? i18n.t('playerBar.contextReadLess', {}, 'Read less') : i18n.t('playerBar.contextReadMore', {}, 'Read more')}
@@ -218,7 +246,7 @@
             </div>
           {/if}
 
-          {#if contextData && contextData.mb_tags.length > 0}
+          {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
             <div class="space-y-1.5 text-xs">
               <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Tags')}</span>
               <div class="flex flex-wrap gap-1.5">
@@ -244,12 +272,20 @@
             </div>
           {/if}
 
-          {#if contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links.length ?? 0) > 0}
+          {#if contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
             <div class="space-y-1.5 text-xs">
-              <span class="text-brand-text-secondary/60 inline-flex items-center gap-1">
-                <Quotes class="w-3 h-3" />
-                {i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')}
-              </span>
+              {#if currentSong.musicbrainz_release_group_id}
+                <button
+                  type="button"
+                  onclick={() => openExternalUrl(`https://critiquebrainz.org/release-group/${currentSong.musicbrainz_release_group_id}`)}
+                  class="group relative inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-3.5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              {:else}
+                <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-3.5 w-auto opacity-80" />
+              {/if}
               {#if contextData?.critiquebrainz_rating != null}
                 <div class="flex items-start justify-between gap-3">
                   <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.critiquebrainzRatingLabel', {}, 'Community Rating')}</span>
