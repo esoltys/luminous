@@ -63,8 +63,14 @@
     bioIsTruncated = el.scrollHeight > el.clientHeight + 1;
   });
 
+  // A request-id guard, since switching tracks quickly can otherwise let an
+  // earlier, slower fetch resolve after a newer one and overwrite
+  // contextData with stale data for a track the user has already left.
+  let contextRequestId = 0;
+
   async function loadContext(songId: number | undefined, forceRefresh = false) {
     bioExpanded = false;
+    const requestId = ++contextRequestId;
     if (!songId) {
       contextData = null;
       contextErrorMsg = "";
@@ -73,11 +79,14 @@
     isLoadingContext = true;
     contextErrorMsg = "";
     try {
-      contextData = await invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh });
+      const data = await invoke<SongContextEnrichment>("get_song_context", { songId, forceRefresh });
+      if (requestId !== contextRequestId) return;
+      contextData = data;
     } catch (e) {
+      if (requestId !== contextRequestId) return;
       contextErrorMsg = e instanceof Error ? e.message : String(e);
     } finally {
-      isLoadingContext = false;
+      if (requestId === contextRequestId) isLoadingContext = false;
     }
   }
 
@@ -269,8 +278,8 @@
 
               {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
                 <div class="space-y-1.5">
-                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}</span>
-                  <div class="flex flex-wrap gap-1.5">
+                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}:</span>
+                  <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
                     {#each contextData.mb_tags as tag (tag)}
                       <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
                     {/each}
