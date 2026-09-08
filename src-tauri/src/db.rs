@@ -266,8 +266,19 @@ impl Database {
 
         log::info!("Database schema version: {version} (current: {CURRENT_SCHEMA_VERSION})");
 
+        // Check each migration's own recorded row rather than relying on MAX(version)
+        // being contiguous — an interrupted run in the past can leave a gap (e.g. a
+        // later migration's row present but an earlier one's missing), and MAX alone
+        // would then skip that earlier migration forever since it never re-evaluates
+        // versions below the max.
+        let mut applied_versions: std::collections::HashSet<i32> = {
+            let mut stmt = conn.prepare("SELECT version FROM schema_version")?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+
         for migration in MIGRATIONS {
-            if version < migration.version {
+            if !applied_versions.contains(&migration.version) {
                 log::info!(
                     "Running migration {}: {}",
                     migration.version,
@@ -278,6 +289,7 @@ impl Database {
                     "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
                     params![migration.version],
                 )?;
+                applied_versions.insert(migration.version);
             }
         }
 
@@ -946,6 +958,49 @@ mod tests {
         let db = Database::new(temp_dir.clone()).unwrap();
         assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION + 1);
         assert!(db.is_newer_than_app());
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_reopen_heals_a_gap_left_by_an_interrupted_migration() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration_gap_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        // Simulate an interrupted migration 23: its schema_version row never
+        // got written even though every migration around it did, and its
+        // column was never added — as would happen if the app crashed
+        // between `apply()` completing for a later migration and 23's own
+        // `INSERT INTO schema_version`. A MAX(version)-based runner would
+        // see 26 as the max and conclude 23 (< 26) already ran.
+        {
+            let conn = db.pool.get().unwrap();
+            conn.execute("DELETE FROM schema_version WHERE version = 23", [])
+                .unwrap();
+            conn.execute("ALTER TABLE songs DROP COLUMN not_included", [])
+                .unwrap();
+        }
+        drop(db);
+
+        let reopened = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(reopened.schema_version, CURRENT_SCHEMA_VERSION);
+        let conn = reopened.pool.get().unwrap();
+        let has_not_included: bool = conn
+            .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'not_included'")
+            .unwrap()
+            .exists([])
+            .unwrap();
+        assert!(
+            has_not_included,
+            "reopening should have re-run migration 23 and healed the gap"
+        );
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
