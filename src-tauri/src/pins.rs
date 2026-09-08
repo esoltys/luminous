@@ -347,13 +347,7 @@ mod tests {
     use crate::db::Database;
 
     fn test_db() -> (Database, std::path::PathBuf) {
-        let temp_dir = std::env::temp_dir().join(format!(
-            "luminous_pins_test_{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let temp_dir = tempfile::tempdir().unwrap().keep();
         (Database::new(temp_dir.clone()).unwrap(), temp_dir)
     }
 
