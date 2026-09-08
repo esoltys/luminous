@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render } from "@testing-library/svelte";
+import { fireEvent, render, within } from "@testing-library/svelte";
 import SettingsThemes from "./SettingsThemes.svelte";
 import { themeStore, LUMINOUS_DARK_COLORS, type Theme } from "../stores/theme.svelte";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -18,6 +18,7 @@ describe("SettingsThemes.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     themeStore.customThemes = [];
+    themeStore.colorSchemeMode = "system";
   });
 
   it("renders Dynamic Themes row and footnotes for Luminous and System", async () => {
@@ -25,6 +26,36 @@ describe("SettingsThemes.svelte", () => {
     expect(await findByText("Dynamic Themes")).toBeInTheDocument();
     expect(await findByText("Colors shift to match whatever album art is playing now")).toBeInTheDocument();
     expect(await findByText("Switches between light and dark to match your OS")).toBeInTheDocument();
+  });
+
+  it("renders a Light/Dark/System segmented control scoped to the System theme card", async () => {
+    const { findByRole } = render(SettingsThemes);
+    const group = await findByRole("group", { name: "Select Theme" });
+    expect(group).toBeInTheDocument();
+
+    const scoped = within(group);
+    const lightBtn = scoped.getByRole("button", { name: /light/i });
+    const darkBtn = scoped.getByRole("button", { name: /dark/i });
+    const systemBtn = scoped.getByRole("button", { name: "System" });
+    expect(lightBtn).toBeInTheDocument();
+    expect(darkBtn).toBeInTheDocument();
+    expect(systemBtn).toBeInTheDocument();
+    expect(systemBtn).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clicking a segmented control option pins colorSchemeMode without changing activeThemeId or reselecting the theme", async () => {
+    const setModeSpy = vi.spyOn(themeStore, "setColorSchemeMode");
+    const setThemeSpy = vi.spyOn(themeStore, "setTheme");
+    themeStore.activeThemeId = "dynamic-artwork";
+
+    const { findByRole } = render(SettingsThemes);
+    const group = await findByRole("group", { name: "Select Theme" });
+    const darkBtn = within(group).getByRole("button", { name: /dark/i });
+    await fireEvent.click(darkBtn);
+
+    expect(setModeSpy).toHaveBeenCalledWith("dark");
+    expect(setThemeSpy).not.toHaveBeenCalled();
+    expect(themeStore.activeThemeId).toBe("dynamic-artwork");
   });
 
   it("triggers file dialog and themeStore.importTheme on Import Theme click", async () => {

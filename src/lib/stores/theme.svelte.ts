@@ -434,6 +434,15 @@ export class ThemeStore {
   customThemes = $state<Theme[]>([]);
   artworkColors = $state<ExtractedColors | null>(null);
   systemColorScheme = $state<"light" | "dark">("dark");
+  /**
+   * Sub-setting of the System theme (#692): "system" keeps following the OS
+   * preference (default), while "light"/"dark" pin the System theme's
+   * resolved scheme regardless of what the OS reports. Distinct from
+   * systemColorScheme, which always tracks the raw OS preference so it's
+   * still available to resolve against once the user switches back to
+   * "system".
+   */
+  colorSchemeMode = $state<"light" | "dark" | "system">("system");
 
   constructor() {}
 
@@ -456,6 +465,9 @@ export class ThemeStore {
             this.activeThemeId = themeId;
           }
         }
+        if (settings.color_scheme_mode === "light" || settings.color_scheme_mode === "dark" || settings.color_scheme_mode === "system") {
+          this.colorSchemeMode = settings.color_scheme_mode;
+        }
       }
       this.applyActiveTheme();
     } catch (e) {
@@ -475,10 +487,27 @@ export class ThemeStore {
     this.systemColorScheme = mq.matches ? "dark" : "light";
     mq.addEventListener("change", (e) => {
       this.systemColorScheme = e.matches ? "dark" : "light";
-      if (this.activeThemeId === "system") {
+      if (this.activeThemeId === "system" && this.colorSchemeMode === "system") {
         this.applyActiveTheme();
       }
     });
+  }
+
+  /**
+   * The System theme's actual resolved scheme: the OS preference when
+   * colorSchemeMode is "system", or the pinned mode otherwise.
+   */
+  get effectiveColorScheme(): "light" | "dark" {
+    return this.colorSchemeMode === "system" ? this.systemColorScheme : this.colorSchemeMode;
+  }
+
+  /** Pins or unpins the System theme's Light/Dark resolution (#692). */
+  async setColorSchemeMode(mode: "light" | "dark" | "system") {
+    this.colorSchemeMode = mode;
+    if (this.activeThemeId === "system") {
+      this.applyActiveTheme();
+    }
+    await invoke("set_app_setting", { key: "color_scheme_mode", value: mode });
   }
 
   get isGlassTheme(): boolean {
@@ -507,7 +536,7 @@ export class ThemeStore {
   get resolvedColors(): ThemeColors {
     const theme = this.currentTheme;
     if (theme.id === "system") {
-      return this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      return this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     if (theme.id === "dynamic-artwork") {
       const artColors = this.artworkColors || getFallbackColors();
@@ -718,10 +747,11 @@ export class ThemeStore {
     }
 
     const isLuminous = theme.id === "system";
-    // The System theme's live colors come from whichever OS-scheme palette
-    // is active, not the static preview colors on the theme entry.
+    // The System theme's live colors come from whichever scheme is
+    // effectively active (OS preference, or a pinned Light/Dark mode), not
+    // the static preview colors on the theme entry.
     const colors = isLuminous
-      ? (this.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
+      ? (this.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS)
       : theme.colors;
 
     // Heuristically derived, not hand-picked: text rendered directly on

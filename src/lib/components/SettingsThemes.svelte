@@ -12,9 +12,13 @@
     ArrowCounterClockwiseIcon as RotateCcw,
     SunIcon as Sun,
     MoonIcon as Moon,
+    SlidersHorizontalIcon as SlidersHorizontal,
     FolderOpenIcon as FolderInput,
     ExportIcon as FileOutput
   } from "phosphor-svelte";
+
+  const COLOR_SCHEME_MODES = ["light", "dark", "system"] as const;
+  type ColorSchemeMode = (typeof COLOR_SCHEME_MODES)[number];
 
   let editingThemeId = $state<string | null>(null);
 
@@ -38,7 +42,7 @@
   // use the current system scheme so its swatch matches what's on screen.
   function getPreviewColors(theme: Theme): ThemeColors {
     if (theme.id === "system") {
-      return themeStore.systemColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
+      return themeStore.effectiveColorScheme === "dark" ? LUMINOUS_DARK_COLORS : LUMINOUS_LIGHT_COLORS;
     }
     if (theme.id === "dynamic-artwork") {
       return themeStore.resolvedColors;
@@ -169,24 +173,44 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {#each DYNAMIC_THEMES as theme}
         {@const previewColors = getPreviewColors(theme)}
-        <button
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
           onclick={() => themeStore.setTheme(theme.id)}
+          role="button"
+          tabindex="0"
           class="bg-brand-main/50 border-2 rounded-xl p-4 flex flex-col items-start gap-3 text-left transition-colors duration-200 group hover:border-brand-accent/40 w-full relative {themeStore.activeThemeId === theme.id ? 'border-brand-accent shadow-md shadow-brand-accent/5' : 'border-brand-border/60'}"
         >
           <div class="flex items-center justify-between w-full">
             <span class="font-semibold text-sm text-brand-text-primary flex items-center gap-1.5">
-              {#if theme.id === 'system'}
-                <span title={themeStore.systemColorScheme === 'dark' ? i18n.t('settings.systemThemeDark') : i18n.t('settings.systemThemeLight')}>
-                  {#if themeStore.systemColorScheme === 'dark'}
-                    <Moon class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {:else}
-                    <Sun class="w-3.5 h-3.5 text-brand-text-secondary" />
-                  {/if}
-                </span>
-              {/if}
               {theme.isCustom ? theme.name : i18n.t('themes.' + theme.id, {}, theme.name)}
             </span>
           </div>
+          {#if theme.id === 'system'}
+            <div
+              role="group"
+              aria-label={i18n.t('settings.selectColorScheme', {}, 'Select Theme')}
+              class="flex items-center gap-0.5 w-full bg-brand-main/60 border border-brand-border/60 rounded-lg p-0.5"
+            >
+              {#each COLOR_SCHEME_MODES as mode (mode)}
+                <button
+                  type="button"
+                  onclick={(e) => { e.stopPropagation(); themeStore.setColorSchemeMode(mode); }}
+                  aria-pressed={themeStore.colorSchemeMode === mode}
+                  class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md text-[11px] font-semibold transition-colors {themeStore.colorSchemeMode === mode ? 'bg-brand-accent text-brand-accent-contrast' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+                >
+                  {#if mode === 'light'}
+                    <Sun class="w-3.5 h-3.5" />
+                  {:else if mode === 'dark'}
+                    <Moon class="w-3.5 h-3.5" />
+                  {:else}
+                    <SlidersHorizontal class="w-3.5 h-3.5" />
+                  {/if}
+                  {i18n.t('settings.colorScheme' + mode.charAt(0).toUpperCase() + mode.slice(1))}
+                </button>
+              {/each}
+            </div>
+          {/if}
           <!-- Miniature colors preview matching 1-6 Theme Builder archetype order -->
           <div class="flex gap-0.5 w-full h-8 rounded-lg overflow-hidden border border-brand-border/40 bg-black/10">
             <div class="flex-1" style="background-color: {previewColors['bg-main']}" title={i18n.t('settings.mainViewLabel')}></div>
@@ -201,7 +225,7 @@
           {:else if theme.id === 'system'}
             <span class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.systemFootnote', {}, 'Switches between light and dark to match your OS')}</span>
           {/if}
-        </button>
+        </div>
       {/each}
     </div>
   </div>
