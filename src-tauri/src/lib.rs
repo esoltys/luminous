@@ -14,6 +14,7 @@ pub mod audio;
 pub mod band_waveform;
 pub mod collection;
 pub mod commands;
+pub mod context;
 pub mod covermanager;
 pub mod db;
 pub mod equalizer;
