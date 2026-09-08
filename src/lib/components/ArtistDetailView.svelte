@@ -6,6 +6,7 @@
   import { playerStore } from "../stores/player.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { shuffleArray } from "../utils/shuffle";
   import { formatDuration } from "../utils/formatters";
   import CoverArt from "./CoverArt.svelte";
@@ -32,7 +33,8 @@
     ArrowSquareOutIcon as OpenInPicard,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    DotsThreeIcon as MoreHorizontal
+    DotsThreeIcon as MoreHorizontal,
+    ChartBarIcon as BarChart2
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
   import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
@@ -382,6 +384,15 @@
     navigationStore.viewPlaylist(playlist.id);
   }
 
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("artist", artistName);
+    await statsExclusionsStore.setExcluded("artist", artistName, excluded);
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name: artistName })
+      : i18n.t("stats.includedToast", { name: artistName });
+    toastStore.show(message);
+  }
+
   async function handlePlayAll() {
     if (playableSongs.length === 0) return;
     const queuePl = await playlistsStore.requireQueue();
@@ -460,6 +471,16 @@
               {:else}
                 <Pin class="w-4 h-4" />
               {/if}
+            {/snippet}
+          </IconActionButton>
+          <IconActionButton
+            onclick={handleToggleStatsExcluded}
+            title={statsExclusionsStore.isExcluded("artist", artistName)
+              ? i18n.t("stats.includeInStats")
+              : i18n.t("stats.excludeFromStats")}
+          >
+            {#snippet icon()}
+              <BarChart2 class="w-4 h-4" />
             {/snippet}
           </IconActionButton>
           {#if singleSongs.length > 0}

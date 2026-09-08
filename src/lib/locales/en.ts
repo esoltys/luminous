@@ -4,6 +4,7 @@ export const en = {
     collection: "Collection",
     playlists: "Playlists",
     lyrics: "Lyrics",
+    stats: "Stats",
     settings: "Settings",
     help: "Help",
     artists: "Artists",
@@ -603,6 +604,29 @@ export const en = {
     saveFailedPrefix: "Failed to save lyrics: ",
     noOnlineResults: "No lyrics found from any online provider.",
     insufficientMetadata: "Not enough song info (artist/title) to search for lyrics online."
+  },
+  stats: {
+    title: "Stats",
+    subtitle: "Your private listening insights — computed on-device, never shared.",
+    range7d: "Past 7 Days",
+    range28d: "Past 28 Days",
+    range1y: "Past Year",
+    topSongs: "Top Songs",
+    topAlbums: "Top Albums",
+    topArtists: "Top Artists",
+    topGenres: "Top Genres",
+    listeningClock: "Time of Day",
+    clockMorning: "Morning",
+    clockAfternoon: "Afternoon",
+    clockEvening: "Evening",
+    clockLateNight: "Late Night",
+    loading: "Loading stats...",
+    empty: "No listening history for this range yet.",
+    noData: "No data for this range.",
+    excludeFromStats: "Don't Include in Stats",
+    includeInStats: "Include in Stats",
+    excludedToast: "Excluded {name} from Stats",
+    includedToast: "Included {name} in Stats again"
   },
   help: {
     loading: "Loading user guide..."

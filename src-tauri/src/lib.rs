@@ -33,6 +33,7 @@ pub mod playlist_parsers;
 pub mod restart_manager;
 pub mod scrobbler;
 pub mod stats;
+pub mod stats_summary;
 pub mod tageditor;
 pub mod tags;
 pub mod tray;
@@ -1081,6 +1082,9 @@ pub fn run() {
             // Stats commands
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,
+            commands::stats::get_stats_summary,
+            commands::stats::get_stats_exclusions,
+            commands::stats::set_stats_excluded,
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,

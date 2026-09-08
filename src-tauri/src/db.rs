@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 26;
+pub const CURRENT_SCHEMA_VERSION: i32 = 27;
 
 struct Migration {
     version: i32,
@@ -187,6 +187,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 26,
         description: "scrobble_cache table for offline scrobbles (#83)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_26)?),
+    },
+    Migration {
+        version: 27,
+        description: "play_history song_id index and stats_exclusions table for Personal Stats (#130)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_27)?),
     },
 ];
 
@@ -773,6 +778,24 @@ CREATE TABLE IF NOT EXISTS scrobble_cache (
     created_at         INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_scrobble_cache_created ON scrobble_cache(created_at);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 27: play_history.song_id index (aggregation joins for Personal
+// Stats previously had no index to use) and stats_exclusions — a generic
+// per-entity-kind exclusion table for the "Don't include in stats" flag
+// (#130). One table instead of per-entity boolean columns because most of
+// these entities (album/artist/genre) are denormalized text on `songs`, not
+// rows with their own primary key — `entity_key` follows the same raw-string
+// keying convention as `album_ratings.album_key`/`artist_profiles.artist_key`.
+// ---------------------------------------------------------------------------
+const MIGRATION_27: &str = "
+CREATE INDEX IF NOT EXISTS idx_play_history_song_id ON play_history(song_id);
+CREATE TABLE IF NOT EXISTS stats_exclusions (
+    entity_type TEXT NOT NULL,
+    entity_key TEXT NOT NULL,
+    PRIMARY KEY (entity_type, entity_key)
+);
 ";
 
 // ---------------------------------------------------------------------------

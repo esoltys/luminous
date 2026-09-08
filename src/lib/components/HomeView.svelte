@@ -3,12 +3,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { playerStore } from "../stores/player.svelte";
-  import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
-  import type { HomeItem, ArtistItem, TopAlbumItem, ScanProgress } from "../types";
-  import { getArtistAlbums, getArtistSongs } from "../utils/artist";
-  import HorizontalScrollRow from "./HorizontalScrollRow.svelte";
-  import ArtistCard from "./ArtistCard.svelte";
+  import type { HomeItem, TopAlbumItem, ScanProgress } from "../types";
   import HomeRowList from "./HomeRowList.svelte";
   import PinnedRow from "./PinnedRow.svelte";
   import LibraryWelcome from "./LibraryWelcome.svelte";
@@ -16,7 +12,6 @@
   import { rememberScroll } from "../utils/scrollMemory";
   import { getDaypartBucket } from "../utils/daypart";
 
-  let topArtists = $state<ArtistItem[]>([]);
   let topAlbums = $state<HomeItem[]>([]);
   let recentlyAdded = $state<HomeItem[]>([]);
   let featuredAlbums = $state<HomeItem[]>([]);
@@ -31,22 +26,6 @@
   let daypartBucket = $state(getDaypartBucket());
   let daypartPollTimer: ReturnType<typeof setInterval> | undefined;
 
-  /** Routes "Top Artists" to Collection → Artists, pre-sorted by popularity
-   * (total plays). CollectionView reads its initial sort from localStorage
-   * on mount, so writing it here before navigating is enough — see #169. */
-  function viewTopArtists() {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("sort_artist_field", "total_playcount");
-      localStorage.setItem("sort_artist_asc", "false");
-    }
-    collectionStore.searchQuery = "";
-    collectionStore.searchResults = [];
-    navigationStore.selectedArtistName = null;
-    navigationStore.selectedAlbumName = null;
-    navigationStore.activeTab = "collection";
-    navigationStore.activeSubTab = "artists";
-  }
-
   const timeOfDayGreeting = $derived.by((): string => {
     switch (daypartBucket) {
       case "morning": return i18n.t("home.greetingMorning");
@@ -59,13 +38,11 @@
   async function loadCuratedData() {
     isLoading = true;
     try {
-      const [artists, top, added, featured] = await Promise.all([
-        invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
+      const [top, added, featured] = await Promise.all([
         invoke<TopAlbumItem[]>("get_top_albums", { limit: 10 }),
         invoke<HomeItem[]>("get_recently_added", { limit: 12 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
-      topArtists = artists;
       // Album-scoped, trend-aware ranking (#662) — replaces the old flat
       // all-time play-count mix of Album/Song/Playlist cards.
       topAlbums = top.map(
@@ -126,21 +103,6 @@
     {:else}
       <PinnedRow />
 
-      {#if topArtists.length > 0}
-        <HorizontalScrollRow title={i18n.t('home.topArtists')} onHeaderClick={viewTopArtists}>
-          {#each topArtists as artist (artist.name)}
-            <div class="w-44 shrink-0 snap-start">
-              <ArtistCard
-                {artist}
-                artistAlbums={getArtistAlbums(collectionStore.albums, artist.name)}
-                artistSongs={getArtistSongs(collectionStore.songs, artist.name)}
-                onclick={() => navigationStore.viewArtist(artist.name || "")}
-              />
-            </div>
-          {/each}
-        </HorizontalScrollRow>
-      {/if}
-
       {#if topAlbums.length > 0 || featuredAlbums.length > 0 || recentlyAdded.length > 0}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {#if topAlbums.length > 0}
@@ -159,7 +121,7 @@
         </div>
       {/if}
 
-      {#if topArtists.length === 0 && topAlbums.length === 0 && recentlyAdded.length === 0}
+      {#if topAlbums.length === 0 && recentlyAdded.length === 0}
         <div class="flex items-center justify-center py-16">
           <LibraryWelcome />
         </div>

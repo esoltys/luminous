@@ -1,5 +1,40 @@
+use crate::models::StatsSummary;
+use crate::stats_summary::StatsRange;
 use crate::AppState;
 use tauri::{AppHandle, Emitter, State};
+
+#[tauri::command]
+pub async fn get_stats_summary(
+    range: String,
+    state: State<'_, AppState>,
+) -> Result<StatsSummary, String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let range = StatsRange::parse(&range).ok_or_else(|| format!("invalid range: {range}"))?;
+    crate::stats_summary::get_summary(&conn, range).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_stats_exclusions(
+    state: State<'_, AppState>,
+) -> Result<Vec<(String, String)>, String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    crate::stats::get_stats_exclusions(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_stats_excluded(
+    entity_type: String,
+    entity_key: String,
+    excluded: bool,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    crate::stats::set_stats_excluded(&conn, &entity_type, &entity_key, excluded)
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("stats-exclusions-changed", ());
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn set_song_rating(

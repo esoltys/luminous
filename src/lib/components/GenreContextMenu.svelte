@@ -2,9 +2,12 @@
   import {
     PencilSimpleIcon as Pencil,
     ArrowLineUpIcon as ArrowUpToLine,
-    TrashIcon as Trash2
+    TrashIcon as Trash2,
+    ChartBarIcon as BarChart2
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
+  import { toastStore } from "../stores/toast.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
@@ -23,6 +26,15 @@
   }
 
   let { x, y, name, isRoot, onRename, onPromote, onDelete, onClose }: Props = $props();
+
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("genre", name);
+    await statsExclusionsStore.setExcluded("genre", name, excluded);
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name })
+      : i18n.t("stats.includedToast", { name });
+    toastStore.show(message);
+  }
 </script>
 
 <ContextMenu {x} {y} {onClose} estimatedHeight={isRoot ? 140 : 180}>
@@ -43,6 +55,14 @@
       onclick={() => { onPromote?.(); onClose(); }}
     />
   {/if}
+
+  <ContextMenuItem
+    icon={BarChart2}
+    label={statsExclusionsStore.isExcluded("genre", name)
+      ? i18n.t("stats.includeInStats")
+      : i18n.t("stats.excludeFromStats")}
+    onclick={() => { handleToggleStatsExcluded(); onClose(); }}
+  />
 
   <ContextMenuDivider />
 

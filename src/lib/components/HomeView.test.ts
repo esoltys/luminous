@@ -5,17 +5,7 @@ import HomeView from "./HomeView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { HomeItem, ArtistItem, AlbumItem, TopAlbumItem, ScanProgress } from "../types";
-
-function makeArtist(overrides: Partial<ArtistItem> = {}): ArtistItem {
-  return {
-    name: "Tom Petty",
-    album_count: 2,
-    song_count: 12,
-    genre: "Rock",
-    ...overrides,
-  };
-}
+import type { HomeItem, AlbumItem, TopAlbumItem, ScanProgress } from "../types";
 
 function makeAlbum(overrides: Partial<AlbumItem> = {}): AlbumItem {
   return {
@@ -57,14 +47,12 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
-let mockTopArtists: ArtistItem[] = [];
 let mockTopAlbums: TopAlbumItem[] = [];
 let mockRecentlyAdded: HomeItem[] = [];
 let mockFeaturedAlbums: HomeItem[] = [];
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn((cmd: string) => {
-    if (cmd === "get_top_artists") return Promise.resolve(mockTopArtists);
     if (cmd === "get_top_albums") return Promise.resolve(mockTopAlbums);
     if (cmd === "get_recently_added") return Promise.resolve(mockRecentlyAdded);
     if (cmd === "get_featured_albums") return Promise.resolve(mockFeaturedAlbums);
@@ -78,7 +66,6 @@ describe("HomeView.svelte", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(listenCallbacks)) delete listenCallbacks[key];
-    mockTopArtists = [];
     mockTopAlbums = [];
     mockRecentlyAdded = [];
     mockFeaturedAlbums = [];
@@ -93,11 +80,10 @@ describe("HomeView.svelte", () => {
     collectionStore.albums = [];
   });
 
-  it("fetches all four curated home queries on mount", async () => {
+  it("fetches all three curated home queries on mount", async () => {
     render(HomeView);
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_top_artists", { limit: 15 });
       expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
       expect(invoke).toHaveBeenCalledWith("get_recently_added", { limit: 12 });
       expect(invoke).toHaveBeenCalledWith("get_featured_albums", { limit: 5 });
@@ -112,14 +98,13 @@ describe("HomeView.svelte", () => {
     });
   });
 
-  it("does not show LibraryWelcome once recentlyAdded/topArtists have content, even with zero plays", async () => {
-    mockTopArtists = [makeArtist()];
+  it("does not show LibraryWelcome once recentlyAdded has content, even with zero plays", async () => {
     mockRecentlyAdded = [{ type: "album", album: makeAlbum() }];
 
     render(HomeView);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Tom Petty").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Full Moon Fever").length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Welcome to Luminous")).not.toBeInTheDocument();
   });
@@ -158,7 +143,7 @@ describe("HomeView.svelte", () => {
     listenCallbacks["scan-progress"]({ payload: doneEvent });
 
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("get_top_artists", { limit: 15 });
+      expect(invoke).toHaveBeenCalledWith("get_top_albums", { limit: 10 });
     });
   });
 
@@ -180,10 +165,10 @@ describe("HomeView.svelte", () => {
 
       await vi.advanceTimersByTimeAsync(500);
 
-      const topArtistsCalls = vi
+      const topAlbumsCalls = vi
         .mocked(invoke)
-        .mock.calls.filter(([cmd]) => cmd === "get_top_artists");
-      expect(topArtistsCalls).toHaveLength(1);
+        .mock.calls.filter(([cmd]) => cmd === "get_top_albums");
+      expect(topAlbumsCalls).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }

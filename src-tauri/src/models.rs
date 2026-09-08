@@ -794,6 +794,45 @@ pub struct TopAlbumItem {
     pub movement: String,
 }
 
+/// One ranked entry in a Personal Stats Top 10 list (#130) — a song, album,
+/// artist, or genre and its play count within the selected range.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsTopItem {
+    /// Identity used for exclusion lookups/toggles: song id as a string,
+    /// or the raw album/artist/genre text, matching `stats_exclusions.entity_key`.
+    pub key: String,
+    pub label: String,
+    /// Secondary line, e.g. the artist for a song or album row. `None` for
+    /// artist/genre rows, which have no secondary line of their own.
+    pub secondary: Option<String>,
+    pub play_count: i64,
+    pub excluded: bool,
+    /// The song's album title, set only on `top_songs` rows — songs have no
+    /// detail page of their own, so clicking one navigates to this album
+    /// instead. `None` for every other row kind.
+    pub album: Option<String>,
+}
+
+/// Personal Stats summary for one range (#130) — top 10 songs/albums/artists/
+/// genres by play count, plus every play's raw timestamp in range so the
+/// frontend can bucket the "listening clock" histogram in local time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsSummary {
+    /// "7d" | "28d" | "1y", echoing the requested range back to the caller.
+    pub range: String,
+    pub top_songs: Vec<StatsTopItem>,
+    /// Album play count is `MIN` of plays across an album's tracks (a
+    /// completionist metric — full listens front-to-back), not `SUM` like the
+    /// Home "Top Albums" chart's engagement metric — the two numbers are
+    /// deliberately different and will disagree for the same album/range.
+    pub top_albums: Vec<StatsTopItem>,
+    pub top_artists: Vec<StatsTopItem>,
+    pub top_genres: Vec<StatsTopItem>,
+    /// Unix-second timestamps of every in-range, non-excluded play, for
+    /// client-side local-time listening-clock bucketing.
+    pub play_timestamps: Vec<i64>,
+}
+
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]

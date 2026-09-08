@@ -173,7 +173,7 @@
     </h2>
   {/if}
 
-  <div class="flex-1 flex flex-col justify-between gap-2">
+  <div class="flex-1 flex flex-col gap-2">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -186,7 +186,7 @@
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
         {#if variant === "rank" || variant === "chart"}
-          <div class="w-5 shrink-0 flex flex-col items-center gap-0.5">
+          <div class="w-14 shrink-0 flex flex-col items-center gap-0.5">
             <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
               {String(rankFor(item, i)).padStart(2, "0")}
             </span>
@@ -198,7 +198,7 @@
                 title={movementLabel(chart.movement)}
               >
                 {#if chart.movement === "new"}
-                  <span class="text-[8px] font-bold uppercase tracking-wide">{i18n.t('home.chartNew')}</span>
+                  <span class="text-[8px] font-bold uppercase tracking-wide whitespace-nowrap">{i18n.t('home.chartNew')}</span>
                 {:else if chart.movement === "rising"}
                   <TrendingUp class="w-3 h-3" />
                 {:else if chart.movement === "falling"}
