@@ -1091,7 +1091,7 @@ impl CollectionScanner {
                 |row| row.get::<_, String>(0),
             )
             .map(|v| v == "sunday")
-            .unwrap_or(false);
+            .unwrap_or(true);
         let period_start = week_start_utc(now, start_sunday);
 
         // Rank this week's albums by play count. Every result must be an
@@ -2908,6 +2908,13 @@ mod tests {
         ));
         let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
         let conn = db.pool.get().unwrap();
+        // This test's timestamps are all Monday-aligned; pin week_start
+        // explicitly so it doesn't depend on the preference's default.
+        conn.execute(
+            "INSERT OR REPLACE INTO app_state (key, value) VALUES ('week_start', 'monday')",
+            [],
+        )
+        .unwrap();
 
         let seed = |path: &str, album: &str| -> i64 {
             upsert_song(

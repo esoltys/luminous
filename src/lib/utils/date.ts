@@ -44,12 +44,14 @@ export function formatDateAdded(timestampSec: number | undefined | null): string
  * `get_top_albums`'s chart is computed over (#662), so the Home "Top Albums"
  * header can show what period it covers. The week boundary (Sunday or
  * Monday) follows the user's `week_start` preference, same as the backend. */
-export function formatChartWeekRange(weekStart: WeekStart = "monday"): string {
+export function formatChartWeekRange(weekStart: WeekStart = "sunday"): string {
   const now = new Date();
   const diffToStart = weekStart === "sunday" ? now.getUTCDay() : (now.getUTCDay() + 6) % 7;
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - diffToStart));
   const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 6));
-  return new Intl.DateTimeFormat(i18n.currentLocale, { month: "short", day: "numeric" }).formatRange(start, end);
+  // `start`/`end` are UTC midnight instants — format them in UTC too, or a
+  // timezone behind UTC (e.g. Pacific) renders each as the previous local day.
+  return new Intl.DateTimeFormat(i18n.currentLocale, { month: "short", day: "numeric", timeZone: "UTC" }).formatRange(start, end);
 }
 
 export function formatRelativeDate(timestampSec: number | undefined | null): string {

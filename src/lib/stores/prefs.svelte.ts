@@ -40,7 +40,7 @@ class PrefsStore {
    * display-only, doesn't touch the persisted drag-reorder sort_order. */
   genreSortField = $state<GenreSortField>("name");
   genreSortAsc = $state<boolean>(true);
-  weekStart = $state<WeekStart>("monday");
+  weekStart = $state<WeekStart>("sunday");
   /** Off by default — closing the window quits unless explicitly opted in. */
   minimizeToTray = $state<boolean>(false);
   /** Off by default; mirrors the OS's actual registration, queried fresh on init. */

@@ -65,7 +65,7 @@ impl Default for UiPreferences {
             genre_cards_view_mode: "cards".into(),
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
-            week_start: "monday".into(),
+            week_start: "sunday".into(),
         }
     }
 }
