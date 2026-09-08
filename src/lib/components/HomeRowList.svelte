@@ -12,6 +12,7 @@
   import FavouriteCornerFlag from "./FavouriteCornerFlag.svelte";
   import SongContextMenu from "./SongContextMenu.svelte";
   import { i18n } from "../stores/i18n.svelte";
+  import { prefs } from "../stores/prefs.svelte";
   import { getPlaylistDisplayName } from "../utils/playlist";
   import { formatChartWeekRange } from "../utils/date";
   import {
@@ -160,7 +161,7 @@
     >
       {title}
       {#if variant === "chart"}
-        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange()}</span>
+        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange(prefs.weekStart)}</span>
       {/if}
       <ChevronRight class="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
@@ -168,7 +169,7 @@
     <h2 class="flex items-center gap-2 text-xl font-semibold text-brand-text-primary">
       {title}
       {#if variant === "chart"}
-        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange()}</span>
+        <span class="text-sm font-normal text-brand-text-secondary">{formatChartWeekRange(prefs.weekStart)}</span>
       {/if}
     </h2>
   {/if}

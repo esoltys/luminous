@@ -48,6 +48,7 @@ pub struct UiPreferences {
     pub genre_cards_view_mode: String,
     pub genre_sort_field: String,
     pub genre_sort_asc: bool,
+    pub week_start: String,
 }
 
 impl Default for UiPreferences {
@@ -64,6 +65,7 @@ impl Default for UiPreferences {
             genre_cards_view_mode: "cards".into(),
             genre_sort_field: "name".into(),
             genre_sort_asc: true,
+            week_start: "sunday".into(),
         }
     }
 }
@@ -71,12 +73,13 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 10] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 11] {
         const RATING: &[&str] = &["heart", "stars"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
         const GENRE_VIEW: &[&str] = &["genre", "tags"];
         const GENRE_SORT: &[&str] = &["name", "count"];
+        const WEEK_START: &[&str] = &["sunday", "monday"];
         const ANY: &[&str] = &[];
         [
             ("rating_style", &mut self.rating_style, RATING),
@@ -101,6 +104,7 @@ impl UiPreferences {
                 VIEW,
             ),
             ("genre_sort_field", &mut self.genre_sort_field, GENRE_SORT),
+            ("week_start", &mut self.week_start, WEEK_START),
         ]
     }
 }
