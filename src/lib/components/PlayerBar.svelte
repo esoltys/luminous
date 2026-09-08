@@ -185,6 +185,13 @@
     );
   });
 
+  // Nudge users toward the Details pane when there's live enrichment content
+  // to fetch for the current track (#23) — matches the two IDs get_song_context
+  // actually reads (musicbrainz_release_group_id / musicbrainz_artist_id).
+  let hasContextEnrichmentSource = $derived(
+    !!(playerStore.currentSong?.musicbrainz_release_group_id || playerStore.currentSong?.musicbrainz_artist_id)
+  );
+
   let coverTitle = $derived.by(() => {
     if (!playerStore.currentSong) return "";
     return isViewingQueue
@@ -416,7 +423,7 @@
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
           onclick={() => windowLayoutStore.toggleRightPanel()}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''}"
+          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded-full hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''} {!windowLayoutStore.rightPanelOpen && hasContextEnrichmentSource ? 'ring-1 ring-brand-accent' : ''}"
           title={i18n.t('topNav.toggleRightPanel')}
         >
           <Info class="w-5 h-5" />
