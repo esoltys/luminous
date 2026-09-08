@@ -248,7 +248,7 @@
 
           {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
             <div class="space-y-1.5 text-xs">
-              <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Tags')}</span>
+              <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}</span>
               <div class="flex flex-wrap gap-1.5">
                 {#each contextData.mb_tags as tag (tag)}
                   <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
@@ -272,7 +272,7 @@
             </div>
           {/if}
 
-          {#if contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
+          {#if currentSong.musicbrainz_release_group_id || contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
             <div class="space-y-1.5 text-xs">
               {#if currentSong.musicbrainz_release_group_id}
                 <button

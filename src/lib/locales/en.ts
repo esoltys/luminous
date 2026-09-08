@@ -726,7 +726,7 @@ export const en = {
     tabAudioTechnicals: "Technical",
     filePathLabel: "File Path",
     wikipediaSectionLabel: "Wikipedia",
-    mbTagsSectionLabel: "Tags",
+    mbTagsSectionLabel: "Community Tags",
     mbRatingLabel: "MusicBrainz Rating",
     mbRatingVotes: "({count} votes)",
     critiquebrainzSectionLabel: "CritiqueBrainz",
