@@ -22,7 +22,8 @@
     BroadcastIcon as Broadcast,
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
-    HeartIcon as Heart
+    HeartIcon as Heart,
+    GlobeIcon as Globe
   } from "phosphor-svelte";
 
   let showAcoustidKey = $state(false);
@@ -30,6 +31,12 @@
   let hasEnvKey = $state(false);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
+  let contextEnrichmentEnabled = $state(true);
+
+  async function handleContextEnrichmentToggle(v: boolean) {
+    contextEnrichmentEnabled = v;
+    await invoke("set_app_setting", { key: "context_enrichment_enabled", value: v ? "true" : "false" });
+  }
 
   async function handlePicardCustomPathChange() {
     await invoke("set_app_setting", { key: "picard_path", value: picardCustomPath.trim() });
@@ -67,6 +74,7 @@
     try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       picardCustomPath = settings?.picard_path ?? "";
+      contextEnrichmentEnabled = settings?.context_enrichment_enabled !== "false";
     } catch (e) {
       console.error("Failed to load Picard custom path on mount:", e);
     }
@@ -398,5 +406,32 @@
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Context & Bio Enrichment Integration Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <Globe class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.contextEnrichmentIntegrationTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.contextEnrichmentDesc')}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.contextEnrichmentLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.contextEnrichmentHint')}</p>
+    </div>
+    <Toggle
+      checked={contextEnrichmentEnabled}
+      onchange={(v) => handleContextEnrichmentToggle(v)}
+      label={i18n.t('settings.contextEnrichmentLabel')}
+    />
   </div>
 </div>

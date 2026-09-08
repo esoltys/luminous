@@ -557,7 +557,7 @@
     </div>
   </div>
 
-  <div class="relative z-10 px-6 py-6" class:pb-28={!!playerStore.currentSong}>
+  <div class="relative z-10 px-6 py-6 flex flex-col gap-6" class:pb-28={!!playerStore.currentSong}>
     <div class="border border-brand-border rounded-lg bg-brand-sidebar/50 backdrop-blur-xl shadow-2xl overflow-hidden table-surface-blur">
       <SongTable
         rows={tableRows}

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 27;
+pub const CURRENT_SCHEMA_VERSION: i32 = 28;
 
 struct Migration {
     version: i32,
@@ -192,6 +192,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 27,
         description: "play_history song_id index and stats_exclusions table for Personal Stats (#130)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_27)?),
+    },
+    Migration {
+        version: 28,
+        description: "context_enrichment/artist_context_enrichment cache tables for the Details pane (#23)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_28)?),
     },
 ];
 
@@ -799,6 +804,37 @@ CREATE TABLE IF NOT EXISTS stats_exclusions (
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 28: context_enrichment/artist_context_enrichment — cached results
+// from the Details pane's external lookups (MusicBrainz ratings/genres/tags,
+// CritiqueBrainz reviews, Wikipedia bio), keyed on the MusicBrainz release
+// group / artist IDs already stored on `songs` (see MIGRATION_1/24). `fetched_at`
+// (unix seconds) is the first TTL column in this schema — read-time code treats
+// a row older than 30 days as stale and refetches, rather than an explicit
+// expiry mechanism here.
+// ---------------------------------------------------------------------------
+const MIGRATION_28: &str = "
+CREATE TABLE IF NOT EXISTS context_enrichment (
+    release_group_id TEXT PRIMARY KEY,
+    mb_rating REAL,
+    mb_rating_votes INTEGER,
+    mb_tags TEXT NOT NULL DEFAULT '[]',
+    mb_release_country TEXT,
+    critiquebrainz_rating REAL,
+    critiquebrainz_review_count INTEGER,
+    critiquebrainz_review_links TEXT NOT NULL DEFAULT '[]',
+    fetched_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS artist_context_enrichment (
+    artist_id TEXT PRIMARY KEY,
+    wikidata_id TEXT,
+    wikipedia_extract TEXT,
+    wikipedia_page_url TEXT,
+    wikipedia_thumbnail_url TEXT,
+    fetched_at INTEGER NOT NULL
+);
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -1151,6 +1187,52 @@ mod tests {
         assert_eq!(nickname.as_deref(), Some("My Library"));
         assert_eq!(icon.as_deref(), Some("hard-drive"));
         assert_eq!(color.as_deref(), Some("#3b82f6"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_28_context_enrichment_tables_round_trip() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration28_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO context_enrichment (release_group_id, mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["rg-123", 4.5_f64, 10_i64, r#"["black metal","norwegian"]"#, 3.8_f64, 2_i64, r#"[{"url":"https://critiquebrainz.org/review/x"}]"#, 1_700_000_000_i64],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO artist_context_enrichment (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, fetched_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params!["artist-456", "Q12345", "An example artist bio.", "https://en.wikipedia.org/wiki/Example", 1_700_000_000_i64],
+        )
+        .unwrap();
+
+        let (mb_rating, mb_tags): (Option<f64>, String) = conn
+            .query_row(
+                "SELECT mb_rating, mb_tags FROM context_enrichment WHERE release_group_id = 'rg-123'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(mb_rating, Some(4.5));
+        assert_eq!(mb_tags, r#"["black metal","norwegian"]"#);
+
+        let wikidata_id: Option<String> = conn
+            .query_row(
+                "SELECT wikidata_id FROM artist_context_enrichment WHERE artist_id = 'artist-456'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(wikidata_id.as_deref(), Some("Q12345"));
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

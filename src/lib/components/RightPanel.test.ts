@@ -97,14 +97,15 @@ describe("RightPanel.svelte", () => {
     expect(getByText("5.1 Surround")).toBeInTheDocument();
   });
 
-  it("hides the MusicBrainz section when no MusicBrainz IDs are present", () => {
+  it("hides the MusicBrainz section when no MusicBrainz IDs are present", async () => {
     playerStore.currentSong = mockSong;
-    const { queryByAltText } = render(RightPanel);
+    const { getByText, queryByAltText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(queryByAltText("MusicBrainz")).not.toBeInTheDocument();
   });
 
-  it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", () => {
+  it("shows only the MusicBrainz fields present on the song, by name rather than raw ID", async () => {
     playerStore.currentSong = {
       ...mockSong,
       album_artist: "Other Artist",
@@ -112,6 +113,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_album_artist_id: "album-artist-uuid",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Test Artist")).toBeInTheDocument();
@@ -120,25 +122,27 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("Release")).not.toBeInTheDocument();
   });
 
-  it("hides Album Artist when it's the same MusicBrainz entity as Artist", () => {
+  it("hides Album Artist when it's the same MusicBrainz entity as Artist", async () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_artist_id: "same-uuid",
       musicbrainz_album_artist_id: "same-uuid",
     };
     const { getByText, queryByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(getByText("Artist")).toBeInTheDocument();
     expect(queryByText("Album Artist")).not.toBeInTheDocument();
   });
 
-  it("falls back to the raw ID when no matching name field is available", () => {
+  it("falls back to the raw ID when no matching name field is available", async () => {
     playerStore.currentSong = {
       ...mockSong,
       title: "",
       musicbrainz_recording_id: "recording-uuid",
     };
     const { getByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(getByText("recording-uuid")).toBeInTheDocument();
   });
@@ -149,6 +153,7 @@ describe("RightPanel.svelte", () => {
       musicbrainz_recording_id: "recording-uuid",
     };
     const { getByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     await fireEvent.click(getByText("Test Track Title"));
 
@@ -157,7 +162,7 @@ describe("RightPanel.svelte", () => {
     );
   });
 
-  it("shows release type/barcode/catalog # as plain text, title-casing the release type", () => {
+  it("shows release type/barcode/catalog # as plain text, title-casing the release type", async () => {
     playerStore.currentSong = {
       ...mockSong,
       musicbrainz_release_type: "album",
@@ -165,6 +170,7 @@ describe("RightPanel.svelte", () => {
       catalog_number: "PHCR-1144",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Album")).toBeInTheDocument();
@@ -173,15 +179,24 @@ describe("RightPanel.svelte", () => {
     expect(queryByText("Country")).not.toBeInTheDocument();
   });
 
-  it("shows the MusicBrainz section for release metadata alone, with no MusicBrainz IDs at all", () => {
+  it("shows the MusicBrainz section for release metadata alone, with no MusicBrainz IDs at all", async () => {
     playerStore.currentSong = {
       ...mockSong,
       barcode: "4988011329586",
     };
     const { getByText, getByAltText, queryByText } = render(RightPanel);
+    await fireEvent.click(getByText("Information"));
 
     expect(getByAltText("MusicBrainz")).toBeInTheDocument();
     expect(getByText("Barcode")).toBeInTheDocument();
     expect(queryByText("Artist")).not.toBeInTheDocument();
+  });
+
+  it("shows the File Path row on the Technicals tab", () => {
+    playerStore.currentSong = mockSong;
+    const { getByText } = render(RightPanel);
+
+    expect(getByText("File Path:")).toBeInTheDocument();
+    expect(getByText("/music/test.flac")).toBeInTheDocument();
   });
 });

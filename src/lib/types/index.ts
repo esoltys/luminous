@@ -149,6 +149,23 @@ export interface Song {
   not_included?: boolean;
 }
 
+/** Result of `get_song_context` — cached live enrichment for the Details
+    pane's "Context & Bio" tab (MusicBrainz ratings/tags, CritiqueBrainz
+    reviews, Wikipedia bio). Every field is optional/empty-array-default
+    since each source degrades independently on the backend (#23). */
+export interface SongContextEnrichment {
+  mb_rating?: number;
+  mb_rating_votes?: number;
+  mb_tags: string[];
+  critiquebrainz_rating?: number;
+  critiquebrainz_review_count?: number;
+  critiquebrainz_review_links: string[];
+  wikipedia_extract?: string;
+  wikipedia_page_url?: string;
+  wikipedia_thumbnail_url?: string;
+  fetched_at?: number;
+}
+
 export type PlaylistItemType = "song" | "stream" | "streaming_service";
 
 export interface PlaylistItem {

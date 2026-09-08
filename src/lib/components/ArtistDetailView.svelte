@@ -37,7 +37,7 @@
     ChartBarIcon as BarChart2
   } from "phosphor-svelte";
   const ExternalLink = OpenInPicard;
-  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse } from "../types";
+  import type { Song, Playlist, AlbumItem, PlayContext, ArtistProfile, ExtendedArtworkResponse, SongContextEnrichment } from "../types";
   import { getCoverArtUrl } from "../types";
   import { resolveSocialUrl, formatDisplayLabel, deriveFanartTvUrl } from "../utils/artistSocials";
   import { getArtistAlbums, classifyRelease } from "../utils/artist";
@@ -88,9 +88,38 @@
   let artistProfile = $derived(collectionStore.getArtistProfile(artistName));
   let hasWebsite = $derived(!!artistProfile?.website);
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
-  let hasBio = $derived(!!artistProfile?.bio);
   let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
-  let hasProfileContent = $derived(hasWebsite || hasTags || hasBio || hasSocials);
+
+  // Fetched MusicBrainz/Wikipedia context (#23), keyed off any one track by
+  // this artist — neither ArtistProfile nor a dedicated artist entity carry
+  // a MusicBrainz ID of their own, so the backend resolves it from a song row.
+  let contextData = $state<SongContextEnrichment | null>(null);
+  $effect(() => {
+    const id = songs[0]?.id;
+    if (!id) {
+      contextData = null;
+      return;
+    }
+    let cancelled = false;
+    invoke<SongContextEnrichment>("get_song_context", { songId: id })
+      .then((data) => {
+        if (!cancelled) contextData = data;
+      })
+      .catch(() => {
+        if (!cancelled) contextData = null;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // The user's own bio (personal curation) always wins over the fetched
+  // Wikipedia extract — fetched data only fills the gap when nothing local
+  // exists, per the canonical-lookup-vs-personal-curation split in AGENTS.md.
+  let effectiveBio = $derived(artistProfile?.bio || contextData?.wikipedia_extract);
+  let bioIsFromWikipedia = $derived(!artistProfile?.bio && !!contextData?.wikipedia_extract);
+  let hasBio = $derived(!!effectiveBio);
+  let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
@@ -473,16 +502,6 @@
               {/if}
             {/snippet}
           </IconActionButton>
-          <IconActionButton
-            onclick={handleToggleStatsExcluded}
-            title={statsExclusionsStore.isExcluded("artist", artistName)
-              ? i18n.t("stats.includeInStats")
-              : i18n.t("stats.excludeFromStats")}
-          >
-            {#snippet icon()}
-              <BarChart2 class="w-4 h-4" />
-            {/snippet}
-          </IconActionButton>
           {#if singleSongs.length > 0}
             <ColumnSelector align="left" iconOnly />
           {/if}
@@ -517,37 +536,44 @@
   </div>
 
   <div class="px-6 pt-6 flex flex-col gap-8">
+    <!-- Tags Pills — kept outside/above the profile card so they read as
+         top-level artist identity, not a sub-item of "About". -->
+    {#if hasTags}
+      <div class="flex flex-wrap gap-1.5 sm:gap-2">
+        {#each artistProfile?.tags ?? [] as tag (tag)}
+          <button
+            type="button"
+            onclick={() => handleTagClick(tag)}
+            class="px-2.5 sm:px-3 py-1 bg-brand-accent/10 hover:bg-brand-accent/25 hover:border-brand-accent/40 text-brand-text-primary rounded-full text-xs font-medium border border-brand-border/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+            title={`Filter artists tagged "${tag}"`}
+          >
+            <span>{tag}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
+
     <!-- Artist Profile Card (About & Links) -->
-    {#if hasProfileContent && artistProfile}
+    {#if hasProfileContent}
       {@const profile = artistProfile}
       <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all">
         <!-- About Column (Left) -->
         <div class="flex-1 flex flex-col gap-3 min-w-0">
-          <h2 class="text-sm sm:text-base font-bold text-brand-text-primary font-heading">
-            {i18n.t("artistDetail.about", {}, "About")}
-          </h2>
-
-          <!-- Tags Pills -->
-          {#if hasTags}
-            <div class="flex flex-wrap gap-1.5 sm:gap-2">
-              {#each profile?.tags ?? [] as tag (tag)}
-                <button
-                  type="button"
-                  onclick={() => handleTagClick(tag)}
-                  class="px-2.5 sm:px-3 py-1 bg-brand-accent/10 hover:bg-brand-accent/25 hover:border-brand-accent/40 text-brand-text-primary rounded-full text-xs font-medium border border-brand-border/60 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title={`Filter artists tagged "${tag}"`}
-                >
-                  <span>{tag}</span>
-                </button>
-              {/each}
-            </div>
-          {/if}
-
           <!-- Bio -->
           {#if hasBio}
-            {@const bioText = profile?.bio ?? ""}
+            {@const bioText = effectiveBio ?? ""}
             {@const isLongBio = bioText.length > 200}
             <div class="text-xs text-brand-text-secondary leading-relaxed">
+              {#if bioIsFromWikipedia}
+                <button
+                  type="button"
+                  onclick={() => contextData?.wikipedia_page_url && handleOpenUrl(contextData.wikipedia_page_url)}
+                  class="group relative inline-flex items-center gap-1 mb-1 text-[11px] font-semibold text-brand-text-secondary/70 hover:text-brand-accent transition-colors cursor-pointer"
+                >
+                  <span class="underline decoration-brand-text-secondary/40 group-hover:decoration-brand-accent">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
+                  <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              {/if}
               <p class="{!isBioExpanded && isLongBio ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
                 {bioText}
               </p>
@@ -809,6 +835,13 @@
       onclick={() => { handleOpenAllInPicard(); overflowMenuPos = null; }}
       disabled={loading || songs.length === 0 || !picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
+    />
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("artist", artistName)
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); overflowMenuPos = null; }}
     />
   </ContextMenu>
 {/if}

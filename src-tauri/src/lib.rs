@@ -14,6 +14,7 @@ pub mod audio;
 pub mod band_waveform;
 pub mod collection;
 pub mod commands;
+pub mod context;
 pub mod covermanager;
 pub mod db;
 pub mod equalizer;
@@ -1028,6 +1029,8 @@ pub fn run() {
             commands::lyrics::get_lyrics,
             commands::lyrics::save_lyrics,
             commands::lyrics::set_instrumental,
+            // Details pane context enrichment (#23)
+            commands::context::get_song_context,
             // Tag Editor commands
             commands::tageditor::get_song_details,
             commands::tageditor::lookup_acoustid_tags,
