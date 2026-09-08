@@ -727,7 +727,7 @@ export const en = {
     filePathLabel: "File Path",
     wikipediaSectionLabel: "Wikipedia",
     mbTagsSectionLabel: "Community Tags",
-    mbRatingLabel: "MusicBrainz Rating",
+    mbRatingLabel: "Community Rating",
     mbRatingVotes: "({count} votes)",
     critiquebrainzSectionLabel: "CritiqueBrainz",
     critiquebrainzRatingLabel: "Community Rating",

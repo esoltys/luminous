@@ -9,28 +9,24 @@
   } from "phosphor-svelte";
 
   /** `songId` is a representative track — one whose MusicBrainz IDs the
-      backend resolves into a release-group (album) or artist ID. Neither
-      `AlbumItem` nor `ArtistProfile` carry a MusicBrainz ID of their own
-      (see #23), so callers pass e.g. `songs[0]?.id`. */
+      backend resolves into a release-group. Neither `AlbumItem` nor
+      `ArtistProfile` carry a MusicBrainz ID of their own (see #23), so the
+      caller passes e.g. `songs[0]?.id`. Album-scoped only: fetched MB
+      tags/rating and CritiqueBrainz reviews are correctly release-group-
+      scoped here, unlike an artist's whole discography (the artist page
+      instead folds the fetched Wikipedia bio into its own local About
+      card — see ArtistDetailView.svelte). */
   interface Props {
     songId: number | undefined;
     releaseGroupId?: string;
-    /** "artist" shows only the Wikipedia bio (release-group-scoped fields
-        like MB tags/rating would misrepresent an artist's whole discography
-        if sourced from just one album). "album" shows MB tags/rating and
-        CritiqueBrainz, all correctly release-group-scoped, but not the
-        artist's Wikipedia bio (that belongs on the artist page). */
-    variant: "artist" | "album";
   }
 
-  let { songId, releaseGroupId, variant }: Props = $props();
+  let { songId, releaseGroupId }: Props = $props();
 
   let contextData = $state<SongContextEnrichment | null>(null);
-  let bioExpanded = $state(false);
 
   $effect(() => {
     const id = songId;
-    bioExpanded = false;
     if (!id) {
       contextData = null;
       return;
@@ -43,7 +39,7 @@
       .catch(() => {
         // Supplementary content on a browsing page — fail silently rather
         // than surfacing an error banner every time an untagged/offline
-        // album or artist is opened.
+        // album is opened.
         if (!cancelled) contextData = null;
       });
     return () => {
@@ -51,36 +47,13 @@
     };
   });
 
-  let hasArtistContent = $derived(variant === "artist" && !!contextData?.wikipedia_extract);
-  let hasAlbumContent = $derived(
-    variant === "album" &&
+  let hasContent = $derived(
     !!contextData &&
-    (((contextData.mb_tags?.length ?? 0) > 0) || contextData.mb_rating != null || contextData.critiquebrainz_rating != null || (contextData.critiquebrainz_review_links?.length ?? 0) > 0)
+    (((contextData.mb_tags?.length ?? 0) > 0) || contextData.mb_rating != null || contextData.critiquebrainz_rating != null)
   );
 </script>
 
-{#if hasArtistContent && contextData}
-  <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col gap-3">
-    {#if contextData.wikipedia_page_url}
-      <button
-        type="button"
-        onclick={() => contextData?.wikipedia_page_url && openExternalUrl(contextData.wikipedia_page_url)}
-        class="group relative inline-flex items-center gap-1.5 self-start text-sm font-bold text-brand-text-primary hover:text-brand-accent transition-colors cursor-pointer font-heading"
-      >
-        <span>{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
-        <ExternalLink class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-      </button>
-    {:else}
-      <h2 class="text-sm font-bold text-brand-text-primary font-heading">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</h2>
-    {/if}
-    <div class="text-xs text-brand-text-secondary leading-relaxed">
-      <p class="{bioExpanded ? '' : 'line-clamp-3'} whitespace-pre-line">{contextData.wikipedia_extract}</p>
-      <button type="button" onclick={() => bioExpanded = !bioExpanded} class="mt-1 text-xs font-semibold text-brand-accent hover:underline cursor-pointer">
-        {bioExpanded ? i18n.t('playerBar.contextReadLess', {}, 'Read less') : i18n.t('playerBar.contextReadMore', {}, 'Read more')}
-      </button>
-    </div>
-  </div>
-{:else if hasAlbumContent && contextData}
+{#if hasContent && contextData}
   <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col gap-3">
     {#if (contextData.mb_tags?.length ?? 0) > 0}
       <div class="flex flex-wrap gap-1.5">
@@ -93,7 +66,7 @@
       {#if contextData.mb_rating != null}
         <span class="inline-flex items-center gap-1.5 text-brand-text-secondary">
           <Star class="w-3.5 h-3.5" />
-          {i18n.t('playerBar.mbRatingLabel', {}, 'MusicBrainz Rating')}:
+          {i18n.t('playerBar.mbRatingLabel', {}, 'Community Rating')}:
           <span class="text-brand-text-primary font-medium">{contextData.mb_rating.toFixed(2)} / 5</span>
         </span>
       {/if}

@@ -6,8 +6,7 @@
     MusicNotesIcon as Music,
     ClockIcon as Clock,
     ArrowSquareOutIcon as ExternalLink,
-    ArrowsClockwiseIcon as RefreshCw,
-    StarIcon as Star
+    ArrowsClockwiseIcon as RefreshCw
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { lyricsStatus } from "../utils/lyrics";
@@ -47,6 +46,22 @@
   let isLoadingContext = $state(false);
   let contextErrorMsg = $state("");
   let bioExpanded = $state(false);
+  let bioParagraphEl = $state<HTMLParagraphElement | undefined>();
+  let bioIsTruncated = $state(false);
+
+  // Only show "Read more" when the clamp actually hides text — measured
+  // once per bio while still clamped (bioExpanded resets to false on every
+  // song/tab load), since a fixed character threshold would be wrong for
+  // this panel's user-resizable width.
+  $effect(() => {
+    const text = contextData?.wikipedia_extract;
+    const el = bioParagraphEl;
+    if (!text || !el) {
+      bioIsTruncated = false;
+      return;
+    }
+    bioIsTruncated = el.scrollHeight > el.clientHeight + 1;
+  });
 
   async function loadContext(songId: number | undefined, forceRefresh = false) {
     bioExpanded = false;
@@ -239,40 +254,65 @@
               {:else}
                 <span class="text-brand-text-secondary/60">{i18n.t('playerBar.wikipediaSectionLabel', {}, 'Wikipedia')}</span>
               {/if}
-              <p class="text-brand-text-secondary leading-relaxed {bioExpanded ? '' : 'line-clamp-3'}">{contextData.wikipedia_extract}</p>
-              <button type="button" onclick={() => bioExpanded = !bioExpanded} class="text-brand-accent hover:underline">
-                {bioExpanded ? i18n.t('playerBar.contextReadLess', {}, 'Read less') : i18n.t('playerBar.contextReadMore', {}, 'Read more')}
-              </button>
+              <p bind:this={bioParagraphEl} class="text-brand-text-secondary leading-relaxed {bioExpanded ? '' : 'line-clamp-3'}">{contextData.wikipedia_extract}</p>
+              {#if bioIsTruncated || bioExpanded}
+                <button type="button" onclick={() => bioExpanded = !bioExpanded} class="text-brand-accent hover:underline">
+                  {bioExpanded ? i18n.t('playerBar.contextReadLess', {}, 'Read less') : i18n.t('playerBar.contextReadMore', {}, 'Read more')}
+                </button>
+              {/if}
             </div>
           {/if}
 
-          {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
-            <div class="space-y-1.5 text-xs">
-              <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}</span>
-              <div class="flex flex-wrap gap-1.5">
-                {#each contextData.mb_tags as tag (tag)}
-                  <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
-                {/each}
-              </div>
+          {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0 || (contextData?.mb_tags?.length ?? 0) > 0 || contextData?.mb_rating != null}
+            <div class="space-y-2 text-xs">
+              <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
+
+              {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
+                <div class="space-y-1.5">
+                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}</span>
+                  <div class="flex flex-wrap gap-1.5">
+                    {#each contextData.mb_tags as tag (tag)}
+                      <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if contextData?.mb_rating != null}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.mbRatingLabel', {}, 'Community Rating')}</span>
+                  <span class="text-brand-text-primary text-right">
+                    {contextData.mb_rating.toFixed(2)} / 5
+                    {#if contextData.mb_rating_votes}
+                      <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
+                    {/if}
+                  </span>
+                </div>
+              {/if}
+
+              {#each musicbrainzRows as row (row.label)}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <button
+                    type="button"
+                    onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
+                    class="group relative text-right transition-colors cursor-pointer min-w-0"
+                  >
+                    <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
+                    <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                </div>
+              {/each}
+              {#each musicbrainzMetaRows as row (row.label)}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
+                </div>
+              {/each}
             </div>
           {/if}
 
-          {#if contextData?.mb_rating != null}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0 inline-flex items-center gap-1">
-                <Star class="w-3 h-3" />
-                {i18n.t('playerBar.mbRatingLabel', {}, 'MusicBrainz Rating')}
-              </span>
-              <span class="text-brand-text-primary text-right">
-                {contextData.mb_rating.toFixed(2)} / 5
-                {#if contextData.mb_rating_votes}
-                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
-                {/if}
-              </span>
-            </div>
-          {/if}
-
-          {#if currentSong.musicbrainz_release_group_id || contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
+          {#if contextData?.critiquebrainz_rating != null || (contextData?.critiquebrainz_review_links?.length ?? 0) > 0}
             <div class="space-y-1.5 text-xs">
               {#if currentSong.musicbrainz_release_group_id}
                 <button
@@ -300,31 +340,6 @@
                 >
                   {i18n.t('playerBar.critiquebrainzReviewsLabel', {}, 'Review')} {i + 1}
                 </button>
-              {/each}
-            </div>
-          {/if}
-
-          {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0}
-            <div class="space-y-2 text-xs">
-              <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
-              {#each musicbrainzRows as row (row.label)}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-                  <button
-                    type="button"
-                    onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
-                    class="group relative text-right transition-colors cursor-pointer min-w-0"
-                  >
-                    <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
-                    <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                </div>
-              {/each}
-              {#each musicbrainzMetaRows as row (row.label)}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-                  <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
-                </div>
               {/each}
             </div>
           {/if}
@@ -372,9 +387,9 @@
             <span class="text-brand-text-primary text-right break-words min-w-0">{lyricsStatusLabel()}</span>
           </div>
           {#if currentSong.path}
-            <div class="flex items-start justify-between gap-3 text-xs">
-              <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.filePathLabel', {}, 'File Path')}</span>
-              <span class="text-brand-text-primary text-right break-words min-w-0 font-mono text-[11px]">{currentSong.path}</span>
+            <div class="space-y-1 text-xs">
+              <span class="text-brand-text-secondary/60">{i18n.t('playerBar.filePathLabel', {}, 'File Path')}:</span>
+              <p class="text-brand-text-primary text-left break-words">{currentSong.path}</p>
             </div>
           {/if}
         </div>

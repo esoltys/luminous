@@ -196,7 +196,7 @@ describe("RightPanel.svelte", () => {
     playerStore.currentSong = mockSong;
     const { getByText } = render(RightPanel);
 
-    expect(getByText("File Path")).toBeInTheDocument();
+    expect(getByText("File Path:")).toBeInTheDocument();
     expect(getByText("/music/test.flac")).toBeInTheDocument();
   });
 });
