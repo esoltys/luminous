@@ -54,10 +54,9 @@ describe("ArtistDetailView", () => {
     expect(screen.getByTitle("More actions")).toBeTruthy();
   });
 
-  it("renders Profile Card with About, Tags, Bio, and Links", async () => {
+  it("renders Profile Card with Tags, Bio, and Links", async () => {
     render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
 
-    expect(screen.getByText("About")).toBeTruthy();
     expect(screen.getByText("country")).toBeTruthy();
     expect(screen.getByText("canadian")).toBeTruthy();
     expect(screen.getByText("pop")).toBeTruthy();
