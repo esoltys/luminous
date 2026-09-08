@@ -21,6 +21,7 @@
   import { tagsStore } from '../lib/stores/tags.svelte';
   import { updaterStore } from '../lib/stores/updater.svelte';
   import { picardStore } from '../lib/stores/picard.svelte';
+  import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
   import { isLinux as platformIsLinux } from '../lib/platform';
   import { themeStore } from '../lib/stores/theme.svelte';
@@ -72,6 +73,7 @@
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     picardStore.init();
+    scrobblerStore.init();
     void getCurrentWindow().show().catch(() => {});
 
     function handleGlobalHotkeys(e: KeyboardEvent) {
