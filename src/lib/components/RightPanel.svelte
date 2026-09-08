@@ -320,11 +320,11 @@
                   onclick={() => openExternalUrl(`https://critiquebrainz.org/release-group/${currentSong.musicbrainz_release_group_id}`)}
                   class="group relative inline-flex items-center gap-1 cursor-pointer"
                 >
-                  <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-3.5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
+                  <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
                   <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               {:else}
-                <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-3.5 w-auto opacity-80" />
+                <img src="/critiquebrainz-logo.svg" alt={i18n.t('playerBar.critiquebrainzSectionLabel', {}, 'CritiqueBrainz')} class="h-5 w-auto opacity-80" />
               {/if}
               {#if contextData?.critiquebrainz_rating != null}
                 <div class="flex items-start justify-between gap-3">
