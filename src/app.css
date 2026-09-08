@@ -88,13 +88,18 @@
   }
 
   /* Custom scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--bg-main);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
