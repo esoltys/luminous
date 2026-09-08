@@ -62,7 +62,7 @@
       const [artists, top, added, featured] = await Promise.all([
         invoke<ArtistItem[]>("get_top_artists", { limit: 15 }),
         invoke<TopAlbumItem[]>("get_top_albums", { limit: 10 }),
-        invoke<HomeItem[]>("get_recently_added", { limit: 10 }),
+        invoke<HomeItem[]>("get_recently_added", { limit: 12 }),
         invoke<HomeItem[]>("get_featured_albums", { limit: 5 }),
       ]);
       topArtists = artists;
@@ -116,15 +116,6 @@
       <h1 class="text-3xl font-heading font-bold text-brand-text-primary">
         {timeOfDayGreeting}
       </h1>
-      <p class="text-sm text-brand-text-secondary mt-1">
-        {collectionStore.stats.total_songs > 0
-          ? i18n.t('home.libraryOverview', {
-              songs: collectionStore.stats.total_songs,
-              albums: collectionStore.stats.total_albums,
-              artists: collectionStore.stats.total_artists
-            })
-          : i18n.t('home.exploreSub')}
-      </p>
     </div>
 
     <div class="px-6 pt-4 space-y-12">

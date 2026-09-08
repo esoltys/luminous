@@ -96,10 +96,14 @@
     return i18n.t("home.chartSteady");
   }
 
-  function peakWeeksLabel(chart: TopAlbumChartInfo): string {
+  function peakLabel(chart: TopAlbumChartInfo): string {
+    return i18n.t("home.chartPeak", { peak: chart.peak_rank });
+  }
+
+  function weeksOnChartLabel(chart: TopAlbumChartInfo): string {
     return chart.weeks_on_chart === 1
-      ? i18n.t("home.chartPeakWeek", { peak: chart.peak_rank })
-      : i18n.t("home.chartPeakWeeks", { peak: chart.peak_rank, weeks: chart.weeks_on_chart });
+      ? i18n.t("home.chartWeek")
+      : i18n.t("home.chartWeeksCount", { weeks: chart.weeks_on_chart });
   }
 
   // Mirrors ArtistDetailView's openPlaylist: genre/decade auto-playlists open
@@ -147,7 +151,7 @@
   }
 </script>
 
-<div class="space-y-4">
+<div class="h-full flex flex-col gap-4">
   {#if title && onHeaderClick}
     <button
       type="button"
@@ -169,7 +173,7 @@
     </h2>
   {/if}
 
-  <div class="flex flex-col gap-2">
+  <div class="flex-1 flex flex-col justify-between gap-2">
     {#each items as item, i (keyFor(item))}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -182,9 +186,29 @@
         class="group flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-sidebar border border-brand-border/60 outline-2 -outline-offset-2 outline-transparent hover:outline-brand-accent transition-[outline-color,border-color] duration-200 select-none"
       >
         {#if variant === "rank" || variant === "chart"}
-          <span class="w-5 shrink-0 text-center text-sm font-bold text-brand-text-secondary tabular-nums">
-            {String(rankFor(item, i)).padStart(2, "0")}
-          </span>
+          <div class="w-5 shrink-0 flex flex-col items-center gap-0.5">
+            <span class="text-center text-sm font-bold text-brand-text-secondary tabular-nums">
+              {String(rankFor(item, i)).padStart(2, "0")}
+            </span>
+            {#if variant === "chart" && item.type === "album" && item.chart}
+              {@const chart = item.chart}
+              <span
+                class="flex items-center justify-center text-brand-text-primary"
+                aria-label={movementLabel(chart.movement)}
+                title={movementLabel(chart.movement)}
+              >
+                {#if chart.movement === "new"}
+                  <span class="text-[8px] font-bold uppercase tracking-wide">{i18n.t('home.chartNew')}</span>
+                {:else if chart.movement === "rising"}
+                  <TrendingUp class="w-3 h-3" />
+                {:else if chart.movement === "falling"}
+                  <TrendingDown class="w-3 h-3" />
+                {:else}
+                  <Minus class="w-3 h-3" />
+                {/if}
+              </span>
+            {/if}
+          </div>
         {/if}
 
         <div class="relative shrink-0 overflow-hidden">
@@ -213,7 +237,7 @@
         </div>
 
         {#if item.type === "album" || item.type === "song"}
-          <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+          <div class="min-w-0 flex-1 flex flex-col gap-0.5 {variant === 'chart' ? 'leading-tight' : ''}">
             <div class="flex items-center justify-between gap-2">
               <p class="truncate text-sm font-semibold text-brand-text-primary min-w-0">{titleFor(item)}</p>
               <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{yearFor(item)}</span>
@@ -231,24 +255,8 @@
             {#if variant === "chart" && item.type === "album" && item.chart}
               {@const chart = item.chart}
               <div class="flex items-center justify-between gap-2">
-                <span
-                  class="flex items-center gap-1 text-xs font-semibold {chart.movement === 'rising' ? 'text-green-400' : chart.movement === 'falling' ? 'text-red-400' : 'text-brand-text-secondary'}"
-                  aria-label={movementLabel(chart.movement)}
-                  title={movementLabel(chart.movement)}
-                >
-                  {#if chart.movement === "new"}
-                    <span class="uppercase tracking-wide">{i18n.t('home.chartNew')}</span>
-                  {:else if chart.movement === "rising"}
-                    <TrendingUp class="w-3.5 h-3.5" />
-                  {:else if chart.movement === "falling"}
-                    <TrendingDown class="w-3.5 h-3.5" />
-                  {:else}
-                    <Minus class="w-3.5 h-3.5" />
-                  {/if}
-                </span>
-                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">
-                  {peakWeeksLabel(chart)}
-                </span>
+                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{peakLabel(chart)}</span>
+                <span class="text-xs text-brand-text-secondary font-medium tabular-nums shrink-0">{weeksOnChartLabel(chart)}</span>
               </div>
             {/if}
           </div>
