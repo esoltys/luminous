@@ -52,7 +52,6 @@ export const fr = {
     greetingAfternoon: "Bon après-midi",
     greetingEvening: "Bonsoir",
     greetingNight: "Bonne nuit",
-    exploreSub: "Explorez votre collection musicale",
     loading: "Chargement de votre collection...",
     topArtists: "Artistes populaires",
     topAlbums: "Top 10 des albums",
@@ -60,12 +59,12 @@ export const fr = {
     chartRising: "En hausse",
     chartFalling: "En baisse",
     chartSteady: "Stable",
-    chartPeakWeek: "Sommet n°{peak} · 1 semaine",
-    chartPeakWeeks: "Sommet n°{peak} · {weeks} semaines",
+    chartPeak: "Sommet n°{peak}",
+    chartWeek: "1 semaine",
+    chartWeeksCount: "{weeks} semaines",
     recentlyAdded: "Ajoutés récemment",
     pinned: "Épinglé",
     exploreLibrary: "Explorez votre bibliothèque",
-    libraryOverview: "Explorez votre collection musicale : {artists} artistes • {albums} albums • {songs} titres",
     emptyState: "Commencez à ajouter de la musique pour voir vos collections personnalisées"
   },
   emptyLibrary: {
