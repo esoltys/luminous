@@ -192,6 +192,7 @@ fn parse_field_filter(token: &str) -> Option<FieldFilter> {
         "artist_tag" | "artist-tag" | "artisttag" | "artist_tags" | "tag" | "tags" => {
             ("artist_tag", false)
         }
+        "lyrics" | "lyric" => ("lyrics", false),
         _ => return None,
     };
 
@@ -326,6 +327,33 @@ mod tests {
         assert_eq!(parse_duration_ns("3:45"), Some(225_000_000_000));
         assert_eq!(parse_duration_ns("1:02:03"), Some(3_723_000_000_000));
         assert_eq!(parse_duration_ns("180"), Some(180_000_000_000));
+    }
+
+    #[test]
+    fn test_parse_lyrics_filter() {
+        // Both aliases should resolve to the `lyrics` column via LIKE (Contains).
+        let q = parse_query("lyrics:hello");
+        assert_eq!(q.bare_terms, Vec::<String>::new());
+        assert_eq!(q.field_filters.len(), 1);
+        assert_eq!(q.field_filters[0].field, "lyrics");
+        assert_eq!(q.field_filters[0].sql_column, "lyrics");
+        assert_eq!(q.field_filters[0].op, Op::Contains);
+        assert_eq!(
+            q.field_filters[0].value,
+            FilterValue::Text("%hello%".to_string())
+        );
+        assert_eq!(q.field_filters[0].to_sql_clause(1), "lyrics LIKE ?1");
+
+        // Singular alias
+        let q2 = parse_query("lyric:world");
+        assert_eq!(q2.field_filters.len(), 1);
+        assert_eq!(q2.field_filters[0].sql_column, "lyrics");
+
+        // Lyrics: filter must NOT bleed into bare-term FTS search
+        let q3 = parse_query("lyrics:heart blue");
+        assert_eq!(q3.bare_terms, vec!["blue"]);
+        assert_eq!(q3.field_filters.len(), 1);
+        assert_eq!(q3.field_filters[0].sql_column, "lyrics");
     }
 
     #[test]
