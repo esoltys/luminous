@@ -1,7 +1,7 @@
 import { collectionStore } from "./collection.svelte";
 import { playlistsStore } from "./playlists.svelte";
 
-export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "help";
+export type ActiveTab = "home" | "collection" | "playlists" | "settings" | "lyrics" | "stats" | "help";
 export type ActiveSubTab = "songs" | "albums" | "artists" | "genres";
 
 /** Which grid is shown under the Playlists tab (mirrors `ActiveSubTab` for Collection). */

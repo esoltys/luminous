@@ -4,6 +4,7 @@ export const fr = {
     collection: "Collection",
     playlists: "Listes de lecture",
     lyrics: "Paroles",
+    stats: "Statistiques",
     settings: "Paramètres",
     help: "Aide",
     artists: "Artistes",
@@ -602,6 +603,29 @@ export const fr = {
     saveFailedPrefix: "Échec de l'enregistrement des paroles : ",
     noOnlineResults: "Aucune parole trouvée auprès des fournisseurs en ligne.",
     insufficientMetadata: "Informations insuffisantes (artiste/titre) pour rechercher des paroles en ligne."
+  },
+  stats: {
+    title: "Statistiques",
+    subtitle: "Vos statistiques d'écoute privées — calculées sur l'appareil, jamais partagées.",
+    range7d: "7 derniers jours",
+    range28d: "28 derniers jours",
+    range1y: "Dernière année",
+    topSongs: "Meilleurs titres",
+    topAlbums: "Meilleurs albums",
+    topArtists: "Meilleurs artistes",
+    topGenres: "Meilleurs genres",
+    listeningClock: "Moment de la journée",
+    clockMorning: "Matin",
+    clockAfternoon: "Après-midi",
+    clockEvening: "Soirée",
+    clockLateNight: "Fin de nuit",
+    loading: "Chargement des statistiques...",
+    empty: "Aucun historique d'écoute pour cette période pour le moment.",
+    noData: "Aucune donnée pour cette période.",
+    excludeFromStats: "Ne pas inclure dans les statistiques",
+    includeInStats: "Inclure dans les statistiques",
+    excludedToast: "{name} exclu des statistiques",
+    includedToast: "{name} de nouveau inclus dans les statistiques"
   },
   help: {
     loading: "Chargement du guide d'utilisation..."

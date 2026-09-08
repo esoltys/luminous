@@ -8,11 +8,13 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     PencilSimpleIcon as Edit3,
-    ArrowSquareOutIcon as OpenInPicard
+    ArrowSquareOutIcon as OpenInPicard,
+    ChartBarIcon as BarChart2
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
@@ -73,6 +75,16 @@
     } catch (err) {
       console.error("Failed to open album in Picard:", err);
     }
+  }
+
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("album", albumName);
+    await statsExclusionsStore.setExcluded("album", albumName, excluded);
+    const name = albumName || i18n.t("collection.unknownAlbum");
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name })
+      : i18n.t("stats.includedToast", { name });
+    toastStore.show(message);
   }
 </script>
 
@@ -153,6 +165,13 @@
         ? i18n.t("playlists.contextMenuUnpinHome")
         : i18n.t("playlists.contextMenuPinHome")}
       onclick={() => { pinnedStore.toggle("album", albumName); onClose(); }}
+    />
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("album", albumName)
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); onClose(); }}
     />
   {/if}
 </ContextMenu>

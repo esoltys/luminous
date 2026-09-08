@@ -281,6 +281,37 @@ export interface TopAlbumItem {
   movement: "new" | "rising" | "falling" | "steady";
 }
 
+/** Personal Stats time window (#130). */
+export type StatsRange = "7d" | "28d" | "1y";
+
+/** One ranked entry in a Personal Stats Top 10 list. */
+export interface StatsTopItem {
+  /** Exclusion-lookup identity: song id as a string, or the raw album/artist/genre text. */
+  key: string;
+  label: string;
+  /** Secondary line (e.g. artist for a song/album row); null for artist/genre rows. */
+  secondary: string | null;
+  play_count: number;
+  excluded: boolean;
+  /** The song's album title, set only on top_songs rows — songs have no detail
+   * page of their own, so clicking one navigates to this album instead. */
+  album: string | null;
+}
+
+/** Personal Stats summary for one range (#130). */
+export interface StatsSummary {
+  range: StatsRange;
+  top_songs: StatsTopItem[];
+  /** MIN of plays across an album's tracks (completionist metric) — deliberately
+   * different from the Home "Top Albums" chart's SUM-based engagement metric. */
+  top_albums: StatsTopItem[];
+  top_artists: StatsTopItem[];
+  top_genres: StatsTopItem[];
+  /** Unix-second timestamps of every in-range, non-excluded play, for
+   * client-side local-time listening-clock bucketing. */
+  play_timestamps: number[];
+}
+
 export interface ArtistItem {
   name: string | null;
   sort_artist?: string | null;

@@ -118,6 +118,43 @@ pub fn get_album_rating(conn: &Connection, album: &str) -> Result<f32> {
     Ok(rating)
 }
 
+/// Every current Personal Stats exclusion (#130), as `(entity_type,
+/// entity_key)` pairs — loaded once by the frontend's exclusion store,
+/// mirroring how `PinnedStore` preloads `get_pinned_items` rather than
+/// checking pin state one item at a time.
+pub fn get_stats_exclusions(conn: &Connection) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT entity_type, entity_key FROM stats_exclusions")?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
+/// Set or clear a Personal Stats exclusion (#130) for a song/album/artist/
+/// genre, keyed the same way `stats_exclusions.entity_key` is queried in
+/// `crate::stats_summary` (song id as text, or the raw album/artist/genre
+/// string).
+pub fn set_stats_excluded(
+    conn: &Connection,
+    entity_type: &str,
+    entity_key: &str,
+    excluded: bool,
+) -> Result<()> {
+    if excluded {
+        conn.execute(
+            "INSERT OR IGNORE INTO stats_exclusions (entity_type, entity_key) VALUES (?1, ?2)",
+            params![entity_type, entity_key],
+        )?;
+    } else {
+        conn.execute(
+            "DELETE FROM stats_exclusions WHERE entity_type = ?1 AND entity_key = ?2",
+            params![entity_type, entity_key],
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -133,6 +133,10 @@
       {#await import("../lib/components/LyricsView.svelte") then { default: LyricsView }}
         <LyricsView />
       {/await}
+    {:else if navigationStore.activeTab === "stats"}
+      {#await import("../lib/components/StatsView.svelte") then { default: StatsView }}
+        <StatsView />
+      {/await}
     {:else if navigationStore.activeTab === "help"}
       {#await import("../lib/components/HelpView.svelte") then { default: HelpView }}
         <HelpView />

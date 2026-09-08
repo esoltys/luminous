@@ -12,13 +12,15 @@
     PushPinSlashIcon as PinOff,
     ArrowSquareOutIcon as OpenInPicard,
     EyeSlashIcon as EyeSlash,
-    EyeIcon as Eye
+    EyeIcon as Eye,
+    ChartBarIcon as BarChart2
   } from "phosphor-svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
   import { pinnedStore } from "../stores/pinned.svelte";
+  import { statsExclusionsStore } from "../stores/statsExclusions.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import type { Song } from "../types";
   import ContextMenu from "./ContextMenu.svelte";
@@ -74,6 +76,16 @@
       : i18n.t("playlists.unmarkedNotIncluded", { name });
     toastStore.show(message);
   }
+
+  async function handleToggleStatsExcluded() {
+    const excluded = !statsExclusionsStore.isExcluded("song", String(song.id));
+    await statsExclusionsStore.setExcluded("song", String(song.id), excluded);
+    const name = song.title || i18n.t("collection.unknownSong");
+    const message = excluded
+      ? i18n.t("stats.excludedToast", { name })
+      : i18n.t("stats.includedToast", { name });
+    toastStore.show(message);
+  }
 </script>
 
 <ContextMenu {x} {y} {onClose} estimatedHeight={280}>
@@ -126,6 +138,14 @@
   />
 
   {#if selectedCount === 1}
+    <ContextMenuItem
+      icon={BarChart2}
+      label={statsExclusionsStore.isExcluded("song", String(song.id))
+        ? i18n.t("stats.includeInStats")
+        : i18n.t("stats.excludeFromStats")}
+      onclick={() => { handleToggleStatsExcluded(); onClose(); }}
+    />
+
     <ContextMenuDivider />
 
     {#if onGoToArtist && song.artist}
