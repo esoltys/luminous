@@ -537,12 +537,12 @@
         {#if rawGenre}
           <GenreChips genre={rawGenre} variant="full" limit={4} />
         {:else}
-          <div class="text-xs text-brand-text-secondary font-medium">
+          <div class="text-xs text-brand-text-primary font-medium">
             <span>{genreLabel}</span>
           </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
           <span>{songsText}</span>
           <span>•</span>
           <span>{totalDurationLabel}</span>
