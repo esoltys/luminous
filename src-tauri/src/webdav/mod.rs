@@ -329,7 +329,12 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
                 if inside_response {
                     let text = e.unescape().unwrap_or_default().to_string();
                     match current_tag.as_str() {
-                        "href" => current_href = text,
+                        "href" => {
+                            // quick-xml's unescape() converts XML entities like &amp; → &,
+                            // but & is illegal unencoded in a URL path — it's a query-separator.
+                            // Re-encode it (and bare spaces) so the href is a valid URL path.
+                            current_href = text.replace('&', "%26").replace(' ', "%20");
+                        }
                         "getcontentlength" => current_length = text.trim().parse::<u64>().ok(),
                         "getlastmodified" => current_mtime = Some(text.trim().to_string()),
                         "getetag" => current_etag = Some(text.trim().to_string()),
@@ -427,5 +432,52 @@ mod tests {
             detect_filetype_from_url("/files/album/unknown.xyz"),
             FileType::Unknown
         );
+    }
+
+    /// rclone encodes `&` in directory names as `&amp;` in the XML response body.
+    /// `quick-xml`'s `unescape()` converts `&amp;` → `&`, which is illegal unencoded
+    /// in a URL path (it is treated as a query-string separator). The parser must
+    /// re-encode it as `%26` so the resulting href is a valid URL path component.
+    #[test]
+    fn test_parse_propfind_xml_amp_in_href_is_reencoded() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:">
+  <D:response>
+    <D:href>/Music/BandCamp/Astropilot%20&amp;%20Crows%20Labyrinth/</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:resourcetype><D:collection/></D:resourcetype>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>
+  <D:response>
+    <D:href>/Music/BandCamp/Astropilot%20&amp;%20Crows%20Labyrinth/track.mp3</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:resourcetype/>
+        <D:getcontentlength>1234567</D:getcontentlength>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>
+</D:multistatus>"#;
+
+        let items = parse_propfind_response(xml).unwrap();
+        assert_eq!(items.len(), 2);
+
+        // The & must be re-encoded as %26 — NOT left as a bare &
+        assert_eq!(
+            items[0].href,
+            "/Music/BandCamp/Astropilot%20%26%20Crows%20Labyrinth/"
+        );
+        assert!(items[0].is_directory);
+
+        assert_eq!(
+            items[1].href,
+            "/Music/BandCamp/Astropilot%20%26%20Crows%20Labyrinth/track.mp3"
+        );
+        assert!(!items[1].is_directory);
+        assert_eq!(items[1].content_length, Some(1234567));
     }
 }
