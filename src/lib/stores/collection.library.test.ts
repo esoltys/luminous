@@ -29,6 +29,18 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
           return true;
         case "get_directories":
           return [{ id: 1, path: "/music/rock", created_at: "2026-01-01" }];
+        case "list_webdav_servers":
+          return [
+            {
+              id: 5,
+              name: "WebDAV Test",
+              url: "http://127.0.0.1:8080",
+              remotePath: "/Music/BandCamp/",
+              enabled: true,
+              syncStatus: "idle",
+              createdAt: 0,
+            },
+          ];
         case "get_library_stats":
           return {
             total_songs: 10,
@@ -73,6 +85,25 @@ describe("CollectionStore - directories, scanning, and library stats", () => {
     expect(collectionStore.songs).toHaveLength(3);
     expect(collectionStore.albums).toHaveLength(2);
     expect(collectionStore.artists).toHaveLength(2);
+  });
+
+  it("resolves a WebDAV server as the Library badge for a song's credentialed URL (#682)", async () => {
+    await collectionStore.refreshWebDavServers();
+
+    const badge = collectionStore.getDirectoryForPath(
+      "http://test:test@127.0.0.1:8080/Music/BandCamp/Somniacs%20%26%20Crows%20Labyrinth/track.mp3"
+    );
+
+    expect(badge).toBeDefined();
+    expect(badge?.nickname).toBe("WebDAV Test");
+    expect(badge?.icon).toBe("cloud");
+    // Negative id keeps it from colliding with a real watched-directory id.
+    expect(badge?.id).toBe(-5);
+  });
+
+  it("returns undefined for a path matching neither a directory nor a WebDAV server", async () => {
+    await collectionStore.refreshWebDavServers();
+    expect(collectionStore.getDirectoryForPath("http://example.com/other/track.mp3")).toBeUndefined();
   });
 
   it("invokes backend on addDirectory and removeDirectory", async () => {

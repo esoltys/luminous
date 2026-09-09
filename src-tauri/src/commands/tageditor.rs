@@ -166,18 +166,25 @@ pub async fn save_song_tags(
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let (path_str, compilation, existing_acoustid_id, existing_acoustid_fingerprint): (
+    let (path_str, source, compilation, existing_acoustid_id, existing_acoustid_fingerprint): (
         String,
+        i32,
         bool,
         Option<String>,
         Option<String>,
     ) = conn
         .query_row(
-            "SELECT path, compilation, acoustid_id, acoustid_fingerprint FROM songs WHERE id = ?1",
+            "SELECT path, source, compilation, acoustid_id, acoustid_fingerprint FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
+    // WebDAV songs (source 11) have no local file to write lofty tags to —
+    // there's no write-back to the remote server implemented, so the edit is
+    // saved to Luminous's own DB only (the tag editor surfaces this to the
+    // user). Attempting the on-disk write here would always fail and abort
+    // the whole save before the DB update below ever ran.
+    let is_webdav = source == models::SongSource::WebDav as i32;
     let acoustid_id = acoustid_id.or(existing_acoustid_id);
     let acoustid_fingerprint = acoustid_fingerprint.or(existing_acoustid_fingerprint);
 
@@ -218,37 +225,39 @@ pub async fn save_song_tags(
     let acoustid_id_c = acoustid_id.clone();
     let acoustid_fingerprint_c = acoustid_fingerprint.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::tageditor::write_tags(
-            &path_clone,
-            &crate::tageditor::TagWriteRequest {
-                title: &title_c,
-                titlesort: titlesort_c.as_deref(),
-                artist: &artist_c,
-                artistsort: artistsort_c.as_deref(),
-                album: &album_c,
-                albumsort: albumsort_c.as_deref(),
-                album_artist: &album_artist_c,
-                album_artist_sort: album_artist_sort_c.as_deref(),
-                composer: &composer_c,
-                composersort: composersort_c.as_deref(),
-                genre: &genre_c,
-                track,
-                disc,
-                year,
-                originalyear,
-                grouping: &grouping_c,
-                bpm,
-                initial_key: &initial_key_c,
-                compilation,
-                acoustid_id: acoustid_id_c.as_deref(),
-                acoustid_fingerprint: acoustid_fingerprint_c.as_deref(),
-            },
-        )
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| format!("{e:#}"))?;
+    if !is_webdav {
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::tageditor::write_tags(
+                &path_clone,
+                &crate::tageditor::TagWriteRequest {
+                    title: &title_c,
+                    titlesort: titlesort_c.as_deref(),
+                    artist: &artist_c,
+                    artistsort: artistsort_c.as_deref(),
+                    album: &album_c,
+                    albumsort: albumsort_c.as_deref(),
+                    album_artist: &album_artist_c,
+                    album_artist_sort: album_artist_sort_c.as_deref(),
+                    composer: &composer_c,
+                    composersort: composersort_c.as_deref(),
+                    genre: &genre_c,
+                    track,
+                    disc,
+                    year,
+                    originalyear,
+                    grouping: &grouping_c,
+                    bpm,
+                    initial_key: &initial_key_c,
+                    compilation,
+                    acoustid_id: acoustid_id_c.as_deref(),
+                    acoustid_fingerprint: acoustid_fingerprint_c.as_deref(),
+                },
+            )
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))?;
+    }
 
     // 3. Update SQLite database cache in-place
     conn.execute(
@@ -334,6 +343,7 @@ pub async fn save_album_tags(
     struct SongMetadata {
         id: i64,
         path: String,
+        source: i32,
         title: String,
         titlesort: Option<String>,
         artist: String,
@@ -352,26 +362,27 @@ pub async fn save_album_tags(
     let mut songs_data = Vec::with_capacity(song_ids.len());
     for &song_id in &song_ids {
         let res = conn.query_row(
-            "SELECT path, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key, acoustid_id, acoustid_fingerprint
+            "SELECT path, source, title, titlesort, artist, artistsort, composer, composersort, track, originalyear, grouping, bpm, initial_key, acoustid_id, acoustid_fingerprint
              FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
             |row| {
                 Ok(SongMetadata {
                     id: song_id,
                     path: row.get(0)?,
-                    title: row.get(1).unwrap_or_default(),
-                    titlesort: row.get(2).ok(),
-                    artist: row.get(3).unwrap_or_default(),
-                    artistsort: row.get(4).ok(),
-                    composer: row.get(5).unwrap_or_default(),
-                    composersort: row.get(6).ok(),
-                    track: row.get(7).ok(),
-                    originalyear: row.get(8).ok(),
-                    grouping: row.get(9).unwrap_or_default(),
-                    bpm: row.get(10).ok(),
-                    initial_key: row.get(11).unwrap_or_default(),
-                    acoustid_id: row.get(12).ok(),
-                    acoustid_fingerprint: row.get(13).ok(),
+                    source: row.get(1)?,
+                    title: row.get(2).unwrap_or_default(),
+                    titlesort: row.get(3).ok(),
+                    artist: row.get(4).unwrap_or_default(),
+                    artistsort: row.get(5).ok(),
+                    composer: row.get(6).unwrap_or_default(),
+                    composersort: row.get(7).ok(),
+                    track: row.get(8).ok(),
+                    originalyear: row.get(9).ok(),
+                    grouping: row.get(10).unwrap_or_default(),
+                    bpm: row.get(11).ok(),
+                    initial_key: row.get(12).unwrap_or_default(),
+                    acoustid_id: row.get(13).ok(),
+                    acoustid_fingerprint: row.get(14).ok(),
                 })
             },
         );
@@ -401,6 +412,14 @@ pub async fn save_album_tags(
     let updated_count = tauri::async_runtime::spawn_blocking(move || {
         let mut count = 0u32;
         for item in songs_data {
+            // WebDAV songs (source 11) have no local file to write lofty tags to,
+            // and there's no write-back to the remote server implemented — the
+            // change is saved to Luminous's own DB only (the tag editor surfaces
+            // this to the user), same as save_song_tags/rewrite_genre_and_persist.
+            if item.source == models::SongSource::WebDav as i32 {
+                count += 1;
+                continue;
+            }
             let path = std::path::PathBuf::from(&item.path);
             let write_res = crate::tageditor::write_tags(
                 &path,
@@ -485,24 +504,34 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: String = conn
+    let (path_str, source): (String, i32) = conn
         .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
-    // See save_song_tags — close the timing race the coarse guard above can't (#514).
-    state
-        .self_writes
-        .mark_written(std::iter::once(path.clone()));
-    let path_clone = path.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
+    // WebDAV songs (source 11) have no local file to clear an embedded
+    // picture from, and there's no write-back to the remote server
+    // implemented — same as tag edits (see save_song_tags), this is
+    // DB-only. The tag editor hides the Clear Artwork button for these
+    // songs; this guard is what keeps it from erroring if it's ever
+    // reached some other way.
+    if source != models::SongSource::WebDav as i32 {
+        // See save_song_tags — close the timing race the coarse guard above can't (#514).
+        state
+            .self_writes
+            .mark_written(std::iter::once(path.clone()));
+        let path_clone = path.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::tageditor::clear_embedded_art(&path_clone)
+        })
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| format!("{e:#}"))?;
+    }
 
     let folder_art = state
         .cover_manager
@@ -534,30 +563,40 @@ pub async fn clear_album_cover_art(
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    let mut paths = Vec::with_capacity(song_ids.len());
+    let mut local_paths = Vec::with_capacity(song_ids.len());
+    let mut webdav_paths = Vec::new();
     for &song_id in &song_ids {
-        if let Ok(path_str) = conn.query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+        if let Ok((path_str, source)) = conn.query_row(
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)),
         ) {
-            paths.push((song_id, std::path::PathBuf::from(path_str)));
+            let path = std::path::PathBuf::from(path_str);
+            // WebDAV songs (source 11) have no local file to clear an embedded
+            // picture from — DB-only, same as clear_song_cover_art above.
+            if source == models::SongSource::WebDav as i32 {
+                webdav_paths.push((song_id, path));
+            } else {
+                local_paths.push((song_id, path));
+            }
         }
     }
 
     // See save_song_tags — close the timing race the coarse guard above can't (#514).
     state
         .self_writes
-        .mark_written(paths.iter().map(|(_, p)| p.clone()));
+        .mark_written(local_paths.iter().map(|(_, p)| p.clone()));
 
-    let cleared: Vec<(i64, std::path::PathBuf)> = tauri::async_runtime::spawn_blocking(move || {
-        paths
-            .into_iter()
-            .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
-            .collect()
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let mut cleared: Vec<(i64, std::path::PathBuf)> =
+        tauri::async_runtime::spawn_blocking(move || {
+            local_paths
+                .into_iter()
+                .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
+                .collect()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    cleared.extend(webdav_paths);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for (song_id, path) in &cleared {

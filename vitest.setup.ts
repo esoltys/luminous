@@ -101,6 +101,9 @@ vi.mock("@tauri-apps/api/core", () => {
       if (cmd === "get_directories") {
         return [];
       }
+      if (cmd === "list_webdav_servers") {
+        return [];
+      }
       if (cmd === "get_library_stats") {
         return { song_count: 0, album_count: 0, artist_count: 0, total_duration_nanosec: 0 };
       }

@@ -11,7 +11,8 @@
     CheckIcon as Check,
     MagnifyingGlassMinusIcon as SearchX,
     LockIcon as Lock,
-    ImageBrokenIcon as ImageOff
+    ImageBrokenIcon as ImageOff,
+    CloudIcon
   } from "phosphor-svelte";
   import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
@@ -54,6 +55,12 @@
   let initialKey = $state("");
   let path = $state("");
   let rating = $state(-1);
+  // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
+  // and there's no write-back to the remote server -- edits here only ever
+  // reach Luminous's own DB. Derived from the path scheme rather than a
+  // dedicated field since it's the same signal audio.rs/collection.rs
+  // already key off of for "is this a remote source" checks.
+  let isRemoteSource = $derived(/^https?:\/\//i.test(path));
   // Compilation is an album-level property edited via AlbumTagEditor, not
   // here — this is read-only, just so a compilation's Album Artist shows
   // the same "Various Artists" pill here as it does there instead of an
@@ -333,6 +340,13 @@
             <span class="text-[10px] text-brand-text-secondary break-all select-text font-mono">{path}</span>
           </div>
 
+          {#if isRemoteSource}
+            <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
+              <CloudIcon class="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{i18n.t('tagEditor.remoteSourceNote')}</span>
+            </div>
+          {/if}
+
           <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
             {#key coverArtVersion}
               <CoverArt {songId} sizeClass="w-12 h-12 rounded" />
@@ -343,15 +357,17 @@
                 {artEmbedded ? i18n.t('tagEditor.artworkEmbedded') : i18n.t('tagEditor.artworkNotEmbedded')}
               </span>
             </div>
-            <Button
-              onclick={() => { showClearArtConfirm = true; }}
-              disabled={!artEmbedded || isSaving || isClearingArt}
-              variant="secondary"
-              size="sm"
-            >
-              <ImageOff class="w-3.5 h-3.5" />
-              {i18n.t('tagEditor.clearArtBtn')}
-            </Button>
+            {#if !isRemoteSource}
+              <Button
+                onclick={() => { showClearArtConfirm = true; }}
+                disabled={!artEmbedded || isSaving || isClearingArt}
+                variant="secondary"
+                size="sm"
+              >
+                <ImageOff class="w-3.5 h-3.5" />
+                {i18n.t('tagEditor.clearArtBtn')}
+              </Button>
+            {/if}
           </div>
 
           {#if lookupErrorMsg}

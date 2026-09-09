@@ -7,7 +7,9 @@
   import Button from "./Button.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
   import FolderEditModal from "./FolderEditModal.svelte";
-  import type { MusicDirectory } from "../types";
+  import WebDavModal from "./WebDavModal.svelte";
+  import type { MusicDirectory, WebDavServer } from "../types";
+  import { invoke } from "@tauri-apps/api/core";
   import {
     FolderIcon as Folder,
     PlusIcon as Plus,
@@ -17,13 +19,63 @@
     ArrowCounterClockwiseIcon as RotateCcw,
     ClockIcon as Clock,
     PulseIcon as Activity,
-    WarningIcon as AlertTriangle
+    WarningIcon as AlertTriangle,
+    CloudIcon as Cloud,
+    CircleNotchIcon as LoaderCircle,
   } from "phosphor-svelte";
 
   let editingDirectory = $state<MusicDirectory | null>(null);
+  let webdavServers = $state<WebDavServer[]>([]);
+  let isWebdavModalOpen = $state(false);
+  let editingWebdavServer = $state<WebDavServer | null>(null);
+  let syncingServerId = $state<number | null>(null);
+  let syncFeedback = $state<string | null>(null);
+
+  async function loadWebdavServers() {
+    try {
+      webdavServers = await invoke<WebDavServer[]>("list_webdav_servers");
+    } catch (e) {
+      console.error("Failed to load WebDAV servers:", e);
+    }
+  }
+
+  async function handleRemoveWebdavServer(server: WebDavServer) {
+    if (confirm(i18n.t("settings.confirmRemoveWebdavServer", { name: server.name }))) {
+      try {
+        await invoke("delete_webdav_server", { id: server.id });
+        await loadWebdavServers();
+      } catch (e) {
+        console.error("Failed to delete WebDAV server:", e);
+      }
+    }
+  }
+
+  async function handleSyncWebdavServer(server: WebDavServer) {
+    if (syncingServerId !== null) return;
+    syncingServerId = server.id;
+    syncFeedback = null;
+    try {
+      const stats = await invoke<{ added: number; updated: number; removed: number; errors: number }>(
+        "sync_webdav_server",
+        { id: server.id }
+      );
+      syncFeedback = i18n.t("settings.webdavSyncComplete", {
+        added: stats.added,
+        updated: stats.updated,
+        errors: stats.errors,
+      });
+      await loadWebdavServers();
+    } catch (e: any) {
+      console.error("Failed to sync WebDAV server:", e);
+      syncFeedback = String(e?.message || e);
+    } finally {
+      syncingServerId = null;
+    }
+  }
 
   onMount(() => {
     loudnessStore.init();
+    loadWebdavServers();
   });
 
   async function handleRemoveDirectory(path: string) {
@@ -130,6 +182,115 @@
     {/if}
   </div>
 </div>
+
+<!-- WebDAV Remote Libraries (#682) -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <Cloud class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.webdavTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed text-pretty">{i18n.t('settings.webdavSubtitle')}</p>
+      </div>
+    </div>
+    <Button
+      onclick={() => {
+        editingWebdavServer = null;
+        isWebdavModalOpen = true;
+      }}
+      variant="primary"
+      size="sm"
+    >
+      <Plus class="w-4 h-4" /> {i18n.t('settings.addWebdavServer')}
+    </Button>
+  </div>
+
+  {#if syncFeedback}
+    <div class="p-3 bg-brand-main/60 border border-brand-border rounded-xl text-xs text-brand-text-secondary flex items-center justify-between">
+      <span>{syncFeedback}</span>
+      <button
+        onclick={() => { syncFeedback = null; }}
+        class="text-brand-text-secondary hover:text-brand-text-primary font-bold ml-2"
+      >
+        ✕
+      </button>
+    </div>
+  {/if}
+
+  <div class="space-y-2">
+    {#each webdavServers as server (server.id)}
+      <div class="flex items-center justify-between p-3 bg-brand-main/40 border border-brand-border/60 rounded-xl hover:border-brand-accent/40 transition-colors">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="p-2 rounded-lg bg-brand-sidebar border border-brand-border shrink-0 text-brand-accent-text">
+            <Cloud class="w-4 h-4" />
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-sm text-brand-text-primary truncate">{server.name}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-sidebar border border-brand-border text-brand-text-secondary font-mono">
+                {server.remotePath}
+              </span>
+            </div>
+            <p class="text-xs text-brand-text-secondary truncate">{server.url}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0 ml-3">
+          <button
+            onclick={() => handleSyncWebdavServer(server)}
+            disabled={syncingServerId === server.id}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors disabled:opacity-50"
+            title={i18n.t('settings.webdavSyncBtn')}
+          >
+            {#if syncingServerId === server.id}
+              <LoaderCircle class="w-4 h-4 animate-spin text-brand-accent-text" />
+            {:else}
+              <RefreshCw class="w-4 h-4 text-brand-accent-text" />
+            {/if}
+          </button>
+          <button
+            onclick={() => {
+              editingWebdavServer = server;
+              isWebdavModalOpen = true;
+            }}
+            class="p-2 rounded-lg bg-brand-main hover:bg-brand-sidebar text-brand-text-secondary hover:text-brand-text-primary border border-brand-border hover:border-brand-accent/40 transition-colors"
+            title={i18n.t('settings.editWebdavServer')}
+          >
+            <Edit3 class="w-4 h-4" />
+          </button>
+          <button
+            onclick={() => handleRemoveWebdavServer(server)}
+            class="p-2 rounded-lg bg-brand-main hover:bg-red-950/20 text-brand-text-secondary hover:text-red-400 border border-brand-border hover:border-red-900/30 transition-colors"
+            title={i18n.t('settings.confirmRemoveWebdavServer', { name: server.name })}
+          >
+            <Trash2 class="w-4 h-4 text-brand-accent-text" />
+          </button>
+        </div>
+      </div>
+    {/each}
+
+    {#if webdavServers.length === 0}
+      <div class="border border-dashed border-brand-border rounded-xl py-8 text-center text-brand-text-secondary">
+        <Cloud class="w-10 h-10 mx-auto mb-2 text-brand-text-secondary/50" />
+        <h4 class="font-semibold text-brand-text-primary mb-1 text-xs">{i18n.t('settings.webdavNoServersTitle')}</h4>
+        <p class="text-xs text-brand-text-secondary text-pretty">{i18n.t('settings.webdavNoServersText')}</p>
+      </div>
+    {/if}
+  </div>
+</div>
+
+{#if isWebdavModalOpen}
+  <WebDavModal
+    server={editingWebdavServer}
+    onClose={() => { isWebdavModalOpen = false; }}
+    onSaved={() => {
+      isWebdavModalOpen = false;
+      loadWebdavServers();
+    }}
+  />
+{/if}
 
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
   <div class="pb-3 flex items-center justify-between">

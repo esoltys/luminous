@@ -16,4 +16,5 @@ pub mod tageditor;
 pub mod tags;
 pub mod theme;
 pub mod visualizer;
+pub mod webdav;
 pub mod window;

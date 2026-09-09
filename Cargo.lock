@@ -2905,6 +2905,7 @@ name = "luminous"
 version = "2.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bs1770",
  "chrono",
  "cpal",
@@ -2916,6 +2917,7 @@ dependencies = [
  "notify",
  "parking_lot",
  "percent-encoding",
+ "quick-xml",
  "r2d2",
  "r2d2_sqlite",
  "rand 0.10.2",
@@ -3949,6 +3951,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]
@@ -4226,6 +4229,7 @@ checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http",

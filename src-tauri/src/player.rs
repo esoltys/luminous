@@ -991,11 +991,18 @@ impl Player {
 
         let mut flagged_unavailable = false;
         if let Some(song) = &self.current_song {
-            let missing_on_disk = song
-                .path
-                .as_deref()
-                .map(|p| !std::path::Path::new(p).exists())
-                .unwrap_or(false);
+            // WebDAV songs (source 11) have HTTP URLs as their path — `Path::exists()`
+            // always returns false for them, so a transient network/auth failure would
+            // otherwise get misread as "confirmed missing" and hide the song from every
+            // library view (which all filter on `unavailable = 0`). They're managed by
+            // the WebDAV sync instead, mirroring the same exemption in
+            // `find_missing_song_ids` (see collection.rs).
+            let missing_on_disk = song.source != crate::models::SongSource::WebDav
+                && song
+                    .path
+                    .as_deref()
+                    .map(|p| !std::path::Path::new(p).exists())
+                    .unwrap_or(false);
             if missing_on_disk {
                 if let Ok(conn) = self._db.pool.get() {
                     flagged_unavailable = conn
@@ -1787,6 +1794,41 @@ mod tests {
             std::env::temp_dir().join(format!("luminous_player_test_{}", uuid::Uuid::new_v4()));
         let db = Database::new(temp_dir.clone()).unwrap();
         (db, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn note_playback_error_never_flags_webdav_songs_unavailable() {
+        let (db, _temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "INSERT INTO songs (id, source, path, title) VALUES (99, 11, 'http://127.0.0.1:8080/song.mp3', 'Remote Song')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+        player.current_song = Some(crate::models::Song {
+            id: 99,
+            source: crate::models::SongSource::WebDav,
+            path: Some("http://127.0.0.1:8080/song.mp3".to_string()),
+            ..Default::default()
+        });
+
+        let outcome = player.note_playback_error();
+        assert!(!outcome.flagged_unavailable);
+
+        let conn = db_arc.pool.get().unwrap();
+        let unavailable: i64 = conn
+            .query_row("SELECT unavailable FROM songs WHERE id = 99", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(unavailable, 0);
     }
 
     #[tokio::test]

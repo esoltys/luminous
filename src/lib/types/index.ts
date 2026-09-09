@@ -13,7 +13,8 @@ export type SongSource =
   | "soma_fm"
   | "radio_paradise"
   | "spotify"
-  | "radio_browser";
+  | "radio_browser"
+  | "webdav";
 
 export type FileType =
   | "UNKNOWN"
@@ -226,6 +227,26 @@ export interface MusicDirectory {
   nickname?: string | null;
   icon?: string | null;
   color?: string | null;
+}
+
+export interface WebDavServer {
+  id: number;
+  name: string;
+  url: string;
+  username?: string | null;
+  password?: string | null;
+  remotePath: string;
+  enabled: boolean;
+  syncStatus: string;
+  lastSyncedAt?: number | null;
+  createdAt: number;
+}
+
+export interface WebDavSyncStats {
+  added: number;
+  updated: number;
+  removed: number;
+  errors: number;
 }
 
 export type ScanPhase = "discovering" | "reading_tags" | "updating" | "done";

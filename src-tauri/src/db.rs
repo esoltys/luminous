@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 28;
+pub const CURRENT_SCHEMA_VERSION: i32 = 29;
 
 struct Migration {
     version: i32,
@@ -197,6 +197,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 28,
         description: "context_enrichment/artist_context_enrichment cache tables for the Details pane (#23)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_28)?),
+    },
+    Migration {
+        version: 29,
+        description: "webdav_servers and webdav_cache tables for remote WebDAV library support (#682)",
+        apply: |conn| Ok(conn.execute_batch(MIGRATION_29)?),
     },
 ];
 
@@ -836,6 +841,38 @@ CREATE TABLE IF NOT EXISTS artist_context_enrichment (
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 29: webdav_servers and webdav_cache — remote WebDAV library
+// storage, sync states, and file metadata cache (#682).
+// ---------------------------------------------------------------------------
+const MIGRATION_29: &str = "
+CREATE TABLE IF NOT EXISTS webdav_servers (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    username       TEXT,
+    password       TEXT,
+    remote_path    TEXT NOT NULL DEFAULT '/',
+    enabled        BOOLEAN NOT NULL DEFAULT 1,
+    sync_status    TEXT NOT NULL DEFAULT 'idle',
+    last_synced_at INTEGER,
+    created_at     INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS webdav_cache (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER NOT NULL REFERENCES webdav_servers(id) ON DELETE CASCADE,
+    remote_path    TEXT NOT NULL,
+    etag           TEXT,
+    size           INTEGER NOT NULL DEFAULT 0,
+    last_modified  TEXT,
+    song_id        INTEGER REFERENCES songs(id) ON DELETE SET NULL,
+    cached_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    UNIQUE(server_id, remote_path)
+);
+CREATE INDEX IF NOT EXISTS idx_webdav_cache_server ON webdav_cache(server_id);
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -883,7 +920,7 @@ fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
 
     let mut stmt = conn.prepare(
         "SELECT genre FROM songs
-         WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+         WHERE source IN (1, 2, 11) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
     )?;
     let lists: Vec<Vec<String>> = stmt
         .query_map([], |row| row.get::<_, String>(0))?
@@ -1234,6 +1271,48 @@ mod tests {
             )
             .unwrap();
         assert_eq!(wikidata_id.as_deref(), Some("Q12345"));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_migration_29_webdav_tables_round_trip() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_migration29_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let db = Database::new(temp_dir.clone()).unwrap();
+        assert_eq!(db.schema_version, CURRENT_SCHEMA_VERSION);
+
+        let conn = db.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO webdav_servers (name, url, username, remote_path) VALUES (?1, ?2, ?3, ?4)",
+            params!["My NAS", "http://nas.local:8080/remote.php/webdav", "musicuser", "/Music"],
+        )
+        .unwrap();
+
+        let server_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO webdav_cache (server_id, remote_path, etag, size, last_modified) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![server_id, "/Music/track.flac", "etag-12345", 10_485_760_i64, "Wed, 21 Oct 2025 07:28:00 GMT"],
+        )
+        .unwrap();
+
+        let (server_name, remote_path, size): (String, String, i64) = conn
+            .query_row(
+                "SELECT s.name, c.remote_path, c.size FROM webdav_servers s JOIN webdav_cache c ON s.id = c.server_id WHERE s.id = ?1",
+                params![server_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(server_name, "My NAS");
+        assert_eq!(remote_path, "/Music/track.flac");
+        assert_eq!(size, 10_485_760);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
