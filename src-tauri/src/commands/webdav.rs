@@ -231,16 +231,16 @@ pub async fn sync_webdav_server(
                     let playback_url = client.build_authenticated_url(&item.href);
 
                     // Check cache for existing etag/size match
-                    let cached_info: Option<(i64, Option<String>, i64)> = conn
+                    let cached_info: Option<(i64, Option<String>, i64, i64)> = conn
                         .query_row(
-                            "SELECT id, etag, size FROM webdav_cache WHERE server_id = ?1 AND remote_path = ?2",
+                            "SELECT id, etag, size, song_id FROM webdav_cache WHERE server_id = ?1 AND remote_path = ?2",
                             params![id, item.href],
-                            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
                         )
                         .ok();
 
                     let needs_rescan = match cached_info {
-                        Some((_, ref cached_etag, cached_size)) => {
+                        Some((_, ref cached_etag, cached_size, _)) => {
                             if let (Some(c_etag), Some(ref i_etag)) = (cached_etag, &item.etag) {
                                 c_etag != i_etag
                             } else {
@@ -251,6 +251,17 @@ pub async fn sync_webdav_server(
                     };
 
                     if !needs_rescan {
+                        // The remote file itself is unchanged, so skip re-probing tags —
+                        // but the stored playback URL may still be stale (e.g. it predates
+                        // #682's fix to embed credentials for playback, or the server's
+                        // credentials changed since). Refresh it unconditionally so a
+                        // rescan actually repairs previously-synced songs, not just new ones.
+                        if let Some((_, _, _, cached_song_id)) = cached_info {
+                            let _ = conn.execute(
+                                "UPDATE songs SET path = ?1, url = ?1, stream_url = ?1 WHERE id = ?2",
+                                params![playback_url, cached_song_id],
+                            );
+                        }
                         continue;
                     }
 
