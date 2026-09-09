@@ -26,6 +26,7 @@
   import { isLinux as platformIsLinux } from '../lib/platform';
   import { themeStore } from '../lib/stores/theme.svelte';
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
+  import { formatWindowTitle } from '../lib/utils/formatters';
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -64,6 +65,18 @@
     const art = themeStore.artworkColors;
     const colors = art ? [art.vibrant, art.darkVibrant, art.lightVibrant, art.muted].filter((c): c is string => !!c) : undefined;
     return generateEllipseGradientSvg({ colors, seed: playerStore.currentSong?.id ?? 'immersive-empty' });
+  });
+
+  // Dynamically synchronize the OS window title with Now Playing track status (#29).
+  // When playing: "[Song Title] - [Artist] - Luminous" (or "[Song Title] - Luminous").
+  // When stopped/paused: reverts to "Luminous".
+  $effect(() => {
+    void i18n.currentLocale;
+    const title = formatWindowTitle(playerStore.currentSong, playerStore.state);
+    if (typeof document !== 'undefined') {
+      document.title = title;
+    }
+    void getCurrentWindow()?.setTitle?.(title)?.catch(() => {});
   });
 
   onMount(() => {
