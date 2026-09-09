@@ -223,7 +223,12 @@ pub async fn sync_webdav_server(
                     }
 
                     let file_size = item.content_length.unwrap_or(0);
-                    let full_stream_url = client.build_url(&item.href);
+                    // Used for internal probing (Authorization header set explicitly by the client).
+                    let probe_url = client.build_url(&item.href);
+                    // Used for the stored path/stream_url: the audio engine has no separate
+                    // credential lookup at playback time, so credentials travel embedded in
+                    // the URL itself (see `WebDavClient::build_authenticated_url`).
+                    let playback_url = client.build_authenticated_url(&item.href);
 
                     // Check cache for existing etag/size match
                     let cached_info: Option<(i64, Option<String>, i64)> = conn
@@ -250,11 +255,11 @@ pub async fn sync_webdav_server(
                     }
 
                     // Probe remote tags using byte ranges
-                    match client.probe_song_tags(&full_stream_url, file_size) {
+                    match client.probe_song_tags(&probe_url, file_size) {
                         Ok(mut song) => {
-                            song.path = Some(full_stream_url.clone());
-                            song.url = Some(full_stream_url.clone());
-                            song.stream_url = Some(full_stream_url.clone());
+                            song.path = Some(playback_url.clone());
+                            song.url = Some(playback_url.clone());
+                            song.stream_url = Some(playback_url.clone());
 
                             if let Err(e) = crate::collection::upsert_song(&conn, &song) {
                                 log::warn!("Failed to upsert WebDAV song {}: {e}", item.href);
@@ -265,7 +270,7 @@ pub async fn sync_webdav_server(
                             let song_id: i64 = conn
                                 .query_row(
                                     "SELECT id FROM songs WHERE path = ?1",
-                                    params![full_stream_url],
+                                    params![playback_url],
                                     |r| r.get(0),
                                 )
                                 .unwrap_or(0);

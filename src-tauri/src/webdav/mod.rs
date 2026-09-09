@@ -75,6 +75,25 @@ impl WebDavClient {
         format!("{}{clean_path}", self.base_url)
     }
 
+    /// Resolve a path to a full URL with credentials embedded as URL userinfo
+    /// (`scheme://user:pass@host/path`). The audio engine only ever has the
+    /// bare URL string stored on the `Song` to work with — no separate
+    /// credential lookup is available at playback time — so this is how
+    /// Basic Auth reaches WebDAV streaming requests (see `audio.rs`'s
+    /// `HttpRangeReader`, which extracts and strips the userinfo again
+    /// before sending the request).
+    pub fn build_authenticated_url(&self, path: &str) -> String {
+        let base = self.build_url(path);
+        if let (Some(u), Some(p)) = (&self.username, &self.password) {
+            if let Ok(mut parsed) = reqwest::Url::parse(&base) {
+                if parsed.set_username(u).is_ok() && parsed.set_password(Some(p)).is_ok() {
+                    return parsed.to_string();
+                }
+            }
+        }
+        base
+    }
+
     /// Test server connectivity and authentication using PROPFIND with Depth: 0.
     pub fn test_connection(&self) -> Result<bool> {
         let url = self.build_url("");
@@ -416,6 +435,31 @@ mod tests {
             Some("Wed, 21 Oct 2025 07:28:00 GMT")
         );
         assert_eq!(items[1].etag.as_deref(), Some("\"abcd1234efgh\""));
+    }
+
+    #[test]
+    fn test_build_authenticated_url_embeds_credentials() {
+        let client = WebDavClient::new(
+            "http://127.0.0.1:8080".to_string(),
+            Some("test".to_string()),
+            Some("test".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            client.build_authenticated_url("/Music/song.mp3"),
+            "http://test:test@127.0.0.1:8080/Music/song.mp3"
+        );
+    }
+
+    #[test]
+    fn test_build_authenticated_url_without_credentials_is_unchanged() {
+        let client = WebDavClient::new("http://127.0.0.1:8080".to_string(), None, None).unwrap();
+
+        assert_eq!(
+            client.build_authenticated_url("/Music/song.mp3"),
+            "http://127.0.0.1:8080/Music/song.mp3"
+        );
     }
 
     #[test]

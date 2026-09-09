@@ -351,10 +351,44 @@ impl Default for AudioEngine {
 // Media source & track opening (source-agnostic seam for #682 WebDAV / #82 streaming)
 // ---------------------------------------------------------------------------
 
+/// Splits a `user:pass@` prefix out of a URL's authority, if present, returning
+/// the credential-free URL and a ready-to-use `Authorization: Basic ...` header
+/// value. WebDAV playback URLs carry credentials embedded as userinfo (see
+/// `WebDavClient::build_authenticated_url`) since there's no separate credential
+/// lookup available here — just the bare URL string stored on the `Song`.
+fn extract_basic_auth(url: &str) -> (String, Option<String>) {
+    let Ok(mut parsed) = reqwest::Url::parse(url) else {
+        return (url.to_string(), None);
+    };
+    let username = parsed.username().to_string();
+    let password = parsed.password().map(|p| p.to_string());
+    if username.is_empty() && password.is_none() {
+        return (url.to_string(), None);
+    }
+
+    use percent_encoding::percent_decode_str;
+    let decoded_user = percent_decode_str(&username)
+        .decode_utf8_lossy()
+        .to_string();
+    let decoded_pass = password
+        .as_deref()
+        .map(|p| percent_decode_str(p).decode_utf8_lossy().to_string())
+        .unwrap_or_default();
+
+    let _ = parsed.set_username("");
+    let _ = parsed.set_password(None);
+
+    use base64::Engine;
+    let encoded =
+        base64::engine::general_purpose::STANDARD.encode(format!("{decoded_user}:{decoded_pass}"));
+    (parsed.to_string(), Some(format!("Basic {encoded}")))
+}
+
 /// A seekable HTTP media source using HTTP Range requests (`Range: bytes=start-end`).
 /// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
 pub struct HttpRangeReader {
     url: String,
+    auth_header: Option<String>,
     client: reqwest::blocking::Client,
     content_length: u64,
     position: u64,
@@ -365,14 +399,18 @@ pub struct HttpRangeReader {
 
 impl HttpRangeReader {
     pub fn new(url: &str) -> Result<Self, String> {
+        let (url, auth_header) = extract_basic_auth(url);
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
         // Issue a HEAD request to discover Content-Length and verify reachability
-        let resp = client
-            .head(url)
+        let mut head_req = client.head(&url);
+        if let Some(ref h) = auth_header {
+            head_req = head_req.header(reqwest::header::AUTHORIZATION, h);
+        }
+        let resp = head_req
             .send()
             .map_err(|e| format!("HEAD request failed for '{url}': {e}"))?;
 
@@ -392,6 +430,7 @@ impl HttpRangeReader {
 
         let mut reader = Self {
             url: url.to_string(),
+            auth_header,
             client,
             content_length,
             position: 0,
@@ -413,10 +452,14 @@ impl HttpRangeReader {
         };
 
         let range_header = format!("bytes={start}-{end}");
-        let mut resp = self
+        let mut req = self
             .client
             .get(&self.url)
-            .header(reqwest::header::RANGE, range_header)
+            .header(reqwest::header::RANGE, range_header);
+        if let Some(ref h) = self.auth_header {
+            req = req.header(reqwest::header::AUTHORIZATION, h);
+        }
+        let mut resp = req
             .send()
             .map_err(|e| format!("Range request failed for '{}': {e}", self.url))?;
 
@@ -1875,6 +1918,22 @@ mod tests {
     #[test]
     fn test_get_default_device_name_does_not_panic() {
         let _ = get_default_device_name();
+    }
+
+    #[test]
+    fn extract_basic_auth_strips_credentials_and_builds_header() {
+        let (clean_url, header) =
+            extract_basic_auth("http://test:test@127.0.0.1:8080/Music/song.mp3");
+        assert_eq!(clean_url, "http://127.0.0.1:8080/Music/song.mp3");
+        // base64("test:test") == "dGVzdDp0ZXN0"
+        assert_eq!(header.as_deref(), Some("Basic dGVzdDp0ZXN0"));
+    }
+
+    #[test]
+    fn extract_basic_auth_no_credentials_is_unchanged() {
+        let (clean_url, header) = extract_basic_auth("http://127.0.0.1:8080/Music/song.mp3");
+        assert_eq!(clean_url, "http://127.0.0.1:8080/Music/song.mp3");
+        assert!(header.is_none());
     }
 
     #[tokio::test]
