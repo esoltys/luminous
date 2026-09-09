@@ -642,7 +642,7 @@
         <EyeSlash class="w-3.5 h-3.5 text-brand-text-secondary/70" />
       </span>
     {:else if mode === "position"}
-      <span class="absolute text-xs font-medium text-brand-text-secondary group-hover:opacity-0 transition-opacity">{displayIndex + 1}</span>
+      <span class="absolute text-xs font-medium text-brand-text-primary group-hover:opacity-0 transition-opacity">{displayIndex + 1}</span>
     {/if}
     {#if song}
       <button
