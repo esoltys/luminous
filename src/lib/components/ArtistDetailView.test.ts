@@ -197,16 +197,16 @@ describe("ArtistDetailView", () => {
 
     render(ArtistDetailView, { props: { artistName: "Nightwish" } });
 
-    expect(await screen.findByTitle("Browse Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Symphonic Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Gothic Metal")).toBeTruthy();
-    expect(screen.getByTitle("Browse Power Metal")).toBeTruthy();
+    expect(await screen.findByTitle("Browse Gothic Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Heavy Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Pop Rock")).toBeTruthy();
 
-    expect(screen.queryByTitle("Browse Heavy Metal")).toBeNull();
-    expect(screen.queryByTitle("Browse Pop Rock")).toBeNull();
+    expect(screen.queryByTitle("Browse Power Metal")).toBeNull();
+    expect(screen.queryByTitle("Browse Symphonic Metal")).toBeNull();
     const badge = screen.getByText("+2");
     expect(badge).toBeTruthy();
-    expect(badge.getAttribute("title")).toBe("Heavy Metal, Pop Rock");
+    expect(badge.getAttribute("title")).toBe("Power Metal, Symphonic Metal");
   });
 
   describe("extended artist artwork (#98/#761)", () => {
