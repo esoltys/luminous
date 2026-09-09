@@ -317,15 +317,10 @@ describe("ArtistDetailView", () => {
         },
       };
 
-      // In the DOM spec, scrollHeight/clientHeight are on Element.prototype.
-      // Mocking on HTMLParagraphElement.prototype targets <p> without affecting container elements.
+      // Mock scrollHeight to exceed the available room baseline (~140px)
       Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {
         configurable: true,
-        get: () => 120,
-      });
-      Object.defineProperty(HTMLParagraphElement.prototype, "clientHeight", {
-        configurable: true,
-        get: () => 60,
+        get: () => 300,
       });
 
       try {
@@ -344,8 +339,73 @@ describe("ArtistDetailView", () => {
         expect(screen.getByRole("button", { name: "Show more" })).toBeTruthy();
       } finally {
         delete (HTMLParagraphElement.prototype as any).scrollHeight;
-        delete (HTMLParagraphElement.prototype as any).clientHeight;
+      }
+    });
+
+    it("does not show 'Show more' when bio fits within the available height of the Links column", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string, args?: any) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") {
+          return Promise.resolve({
+            artist_key: "Shania Twain",
+            website: "https://www.shaniatwain.com",
+            tags: ["country"],
+            social_links: [
+              { platform: "threads", handle_or_url: "shaniatwain" },
+              { platform: "instagram", handle_or_url: "shaniatwain" },
+            ],
+            bio: longBio,
+          });
+        }
+        return Promise.resolve();
+      });
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          website: "https://www.shaniatwain.com",
+          tags: ["country"],
+          social_links: [
+            { platform: "threads", handle_or_url: "shaniatwain" },
+            { platform: "instagram", handle_or_url: "shaniatwain" },
+          ],
+          bio: longBio,
+        },
+      };
+
+      // Bio is 160px, but card width is >= 768 and links column is 220px tall
+      Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {
+        configurable: true,
+        get: () => 160,
+      });
+      Object.defineProperty(HTMLDivElement.prototype, "clientWidth", {
+        configurable: true,
+        get() {
+          return 800;
+        },
+      });
+      Object.defineProperty(HTMLDivElement.prototype, "offsetHeight", {
+        configurable: true,
+        get() {
+          return 220;
+        },
+      });
+
+      try {
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
+      } finally {
+        delete (HTMLParagraphElement.prototype as any).scrollHeight;
+        delete (HTMLDivElement.prototype as any).clientWidth;
+        delete (HTMLDivElement.prototype as any).offsetHeight;
       }
     });
   });
 });
+
+

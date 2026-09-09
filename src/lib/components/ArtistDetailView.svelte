@@ -121,21 +121,67 @@
   let hasBio = $derived(!!effectiveBio);
   let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
 
+  let profileCardEl = $state<HTMLDivElement | undefined>();
+  let linksColEl = $state<HTMLDivElement | undefined>();
   let bioParagraphEl = $state<HTMLParagraphElement | undefined>();
-  let bioIsTruncated = $state(false);
+  let bioNeedsClamp = $state(false);
+  let clampedLines = $state(6);
 
-  // Only show "Show more" when the clamp actually hides text — measured
-  // once per bio while still clamped (isBioExpanded resets to false on every
-  // artist load), since a fixed character threshold would be wrong for
-  // responsive widths.
-  $effect(() => {
+  function measureBio() {
     const text = effectiveBio;
     const el = bioParagraphEl;
     if (!text || !el) {
-      bioIsTruncated = false;
+      bioNeedsClamp = false;
       return;
     }
-    bioIsTruncated = el.scrollHeight > el.clientHeight + 1;
+
+    // Baseline height is ~6 lines of text-xs leading-relaxed (~130px)
+    const baselineHeight = 130;
+    const lineHeight = 20;
+
+    // Available height in profile card: when rendered side-by-side in md:flex-row (>= 768px),
+    // the card already expands to the height of the Links column, so the bio can occupy
+    // that height without taking any extra vertical space.
+    const cardEl = profileCardEl;
+    const linksEl = linksColEl;
+    const isSideBySide = !!cardEl && cardEl.clientWidth >= 768 && !!linksEl;
+    const linksHeight = isSideBySide && linksEl ? linksEl.offsetHeight : 0;
+    const availableHeight = Math.max(baselineHeight, linksHeight);
+
+    // scrollHeight reflects the full natural height of the text content even when clamped
+    const naturalHeight = el.scrollHeight;
+
+    // Only clamp if the bio genuinely overflows the available height
+    if (naturalHeight > availableHeight + 10) {
+      bioNeedsClamp = true;
+      clampedLines = Math.max(3, Math.floor(availableHeight / lineHeight));
+    } else {
+      bioNeedsClamp = false;
+    }
+  }
+
+  $effect(() => {
+    const _bio = effectiveBio;
+    const _el = bioParagraphEl;
+    const _links = linksColEl;
+    const _card = profileCardEl;
+    if (!_bio || !_el) {
+      bioNeedsClamp = false;
+      return;
+    }
+
+    measureBio();
+
+    if (typeof ResizeObserver !== "undefined" && _card) {
+      const observer = new ResizeObserver(() => {
+        measureBio();
+      });
+      observer.observe(_card);
+      if (_links) observer.observe(_links);
+      return () => {
+        observer.disconnect();
+      };
+    }
   });
 
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
@@ -574,7 +620,10 @@
     <!-- Artist Profile Card (About & Links) -->
     {#if hasProfileContent}
       {@const profile = artistProfile}
-      <div class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all">
+      <div
+        bind:this={profileCardEl}
+        class="border border-brand-border rounded-xl bg-brand-sidebar/40 backdrop-blur-md p-4 sm:p-5 md:p-6 shadow-xs flex flex-col md:flex-row gap-5 md:gap-6 justify-between transition-all"
+      >
         <!-- About Column (Left) -->
         <div class="flex-1 flex flex-col gap-3 min-w-0">
           <!-- Bio -->
@@ -591,10 +640,16 @@
                   <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               {/if}
-              <p bind:this={bioParagraphEl} class="{!isBioExpanded ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
+              <p
+                bind:this={bioParagraphEl}
+                style={bioNeedsClamp && !isBioExpanded
+                  ? `display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${clampedLines}; overflow: hidden;`
+                  : undefined}
+                class="whitespace-pre-line"
+              >
                 {bioText}
               </p>
-              {#if bioIsTruncated || isBioExpanded}
+              {#if bioNeedsClamp}
                 <button
                   type="button"
                   onclick={() => { isBioExpanded = !isBioExpanded; }}
@@ -609,7 +664,10 @@
 
         <!-- Links Column (Right) -->
         {#if hasWebsite || hasSocials}
-          <div class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3">
+          <div
+            bind:this={linksColEl}
+            class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
+          >
             <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
               {i18n.t("artistDetail.links", {}, "LINKS")}
             </h2>
