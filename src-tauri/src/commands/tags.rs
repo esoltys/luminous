@@ -150,6 +150,7 @@ pub async fn reorder_tag_in_group(
 struct SongFullMetadata {
     id: i64,
     path: String,
+    source: crate::models::SongSource,
     title: String,
     titlesort: Option<String>,
     artist: String,
@@ -189,6 +190,7 @@ fn load_full_metadata(conn: &rusqlite::Connection, song_ids: &[i64]) -> Vec<Song
             out.push(SongFullMetadata {
                 id: song.id,
                 path: song.path.unwrap_or_default(),
+                source: song.source,
                 title: song.title.unwrap_or_default(),
                 titlesort: song.titlesort,
                 artist: song.artist.unwrap_or_default(),
@@ -241,6 +243,16 @@ async fn rewrite_genre_and_persist(
             let mut writes = Vec::with_capacity(metas.len());
             for item in &metas {
                 let new_genre = rewrite_genre(&item.genre);
+                // WebDAV songs (source 11) have no local file to write lofty tags to,
+                // and there's no write-back to the remote server implemented — the
+                // change is saved to Luminous's own DB only (the tag editor surfaces
+                // this to the user). Attempting the write here would always fail and
+                // just spam the log with a warning that tells nobody anything new.
+                if item.source == crate::models::SongSource::WebDav {
+                    count += 1;
+                    writes.push((item.id, new_genre));
+                    continue;
+                }
                 let path = std::path::PathBuf::from(&item.path);
                 let write_res = crate::tageditor::write_tags(
                     &path,

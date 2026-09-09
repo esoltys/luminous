@@ -8,7 +8,8 @@
     CircleNotchIcon as LoaderCircle,
     StackIcon as Layers,
     LockIcon as Lock,
-    ImageBrokenIcon as ImageOff
+    ImageBrokenIcon as ImageOff,
+    CloudIcon
   } from "phosphor-svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { tagsStore } from "../stores/tags.svelte";
@@ -80,6 +81,15 @@
   let albumArtistSort = $state(initialAlbumArtistSort ?? "");
   // svelte-ignore state_referenced_locally
   let genresort = $state(initialGenreSort ?? "");
+
+  // WebDAV songs (#682) have no local file Luminous can write lofty tags to,
+  // and there's no write-back to the remote server -- edits here only ever
+  // reach Luminous's own DB. A representative track's path is enough since
+  // an album's tracks all share one source.
+  let isRemoteSource = $derived.by(() => {
+    const sample = collectionStore.songs.find((s) => s.id === songIds[0]);
+    return !!sample?.path && /^https?:\/\//i.test(sample.path);
+  });
 
   onMount(() => {
     // Best-effort preload for the genre field's autocomplete — a failure
@@ -182,6 +192,13 @@
 
     <div class="flex-1 overflow-y-auto p-6 max-h-[calc(100vh-200px)]">
       <div class="flex flex-col gap-4">
+        {#if isRemoteSource}
+          <div class="flex items-start gap-2.5 bg-brand-main border border-brand-border rounded-lg p-2.5 text-brand-text-secondary text-xs">
+            <CloudIcon class="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{i18n.t('albumTagEditor.remoteSourceNote')}</span>
+          </div>
+        {/if}
+
         <div class="flex items-center gap-3 bg-brand-main border border-brand-border rounded-lg p-2.5">
           <CoverArt songId={songIds[0]} artEmbedded={hasEmbeddedArt} artAutomatic={initialArtAutomatic} artManual={initialArtManual} sizeClass="w-12 h-12 rounded" />
           <div class="flex-1 flex flex-col gap-0.5 min-w-0">

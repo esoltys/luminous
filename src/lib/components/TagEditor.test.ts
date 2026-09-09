@@ -72,6 +72,25 @@ describe("TagEditor.svelte", () => {
     expect(getByText("Original Composer")).toBeInTheDocument();
   });
 
+  it("shows a remote-source note for a WebDAV song and not for a local one (#682)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return { ...mockSongDetails, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" };
+      }
+      return null;
+    });
+    const { findByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    expect(
+      await findByText(/changes are saved in Luminous only/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows no remote-source note for a local song", async () => {
+    const { findByText, queryByText } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText("/music/rock/song.flac");
+    expect(queryByText(/changes are saved in Luminous only/i)).not.toBeInTheDocument();
+  });
+
   it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_details") {

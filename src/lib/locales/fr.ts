@@ -831,6 +831,7 @@ export const fr = {
     readingTags: "Lecture des tags...",
     readFailed: "Échec de la lecture des tags",
     locationField: "Emplacement",
+    remoteSourceNote: "Ce morceau se trouve sur un serveur WebDAV. Les modifications ne sont enregistrées que dans Luminous — le fichier sur le serveur ne sera pas modifié.",
     albumArtistField: "Artiste de l'album",
     albumArtistPlaceholder: "Ajouter un artiste de l'album...",
     albumArtistTooltip: "Artiste principal crédité pour l'album entier, utile pour les compilations",
@@ -862,6 +863,7 @@ export const fr = {
   },
   albumTagEditor: {
     title: "Modifier les tags de l'album",
+    remoteSourceNote: "Cet album se trouve sur un serveur WebDAV. Les modifications ne sont enregistrées que dans Luminous — les fichiers sur le serveur ne seront pas modifiés.",
     albumField: "Titre de l'album",
     albumArtistField: "Artiste de l'album",
     albumArtistPlaceholder: "Ajouter un artiste de l'album...",
