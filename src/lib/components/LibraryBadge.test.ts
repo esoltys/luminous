@@ -66,4 +66,16 @@ describe("LibraryBadge.svelte", () => {
     });
     expect(queryByText("HighRes")).toBeNull();
   });
+
+  it("applies rounded-full, avoids glass blur, and uses solid genre chip styling by default", () => {
+    const { container } = render(LibraryBadge, {
+      props: { directory: baseDirectory },
+    });
+    const badge = container.querySelector("span");
+    expect(badge).toBeInTheDocument();
+    expect(badge?.classList.contains("rounded-full")).toBe(true);
+    expect(badge?.classList.contains("backdrop-blur-md")).toBe(false);
+    expect(badge?.classList.contains("text-brand-text-primary")).toBe(true);
+    expect(badge?.getAttribute("style")).toContain("var(--color-brand-sidebar)");
+  });
 });

@@ -476,7 +476,8 @@
           {:else if albumDirectories.length > 1}
             <span>•</span>
             <span
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-brand-sidebar/80 border border-brand-border/70 text-brand-text-secondary select-none"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium text-brand-text-primary border select-none"
+              style="background-color: color-mix(in srgb, var(--color-brand-accent) 15%, var(--color-brand-sidebar)); border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));"
               title={albumDirectories.map((d) => d.nickname || d.path).join(", ")}
             >
               <Folders class="w-3.5 h-3.5 text-brand-accent-text" />
