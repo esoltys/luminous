@@ -357,15 +357,17 @@
                 {artEmbedded ? i18n.t('tagEditor.artworkEmbedded') : i18n.t('tagEditor.artworkNotEmbedded')}
               </span>
             </div>
-            <Button
-              onclick={() => { showClearArtConfirm = true; }}
-              disabled={!artEmbedded || isSaving || isClearingArt}
-              variant="secondary"
-              size="sm"
-            >
-              <ImageOff class="w-3.5 h-3.5" />
-              {i18n.t('tagEditor.clearArtBtn')}
-            </Button>
+            {#if !isRemoteSource}
+              <Button
+                onclick={() => { showClearArtConfirm = true; }}
+                disabled={!artEmbedded || isSaving || isClearingArt}
+                variant="secondary"
+                size="sm"
+              >
+                <ImageOff class="w-3.5 h-3.5" />
+                {i18n.t('tagEditor.clearArtBtn')}
+              </Button>
+            {/if}
           </div>
 
           {#if lookupErrorMsg}

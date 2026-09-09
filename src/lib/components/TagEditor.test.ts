@@ -91,6 +91,22 @@ describe("TagEditor.svelte", () => {
     expect(queryByText(/changes are saved in Luminous only/i)).not.toBeInTheDocument();
   });
 
+  it("hides the Clear Artwork button for a WebDAV song even with embedded art (#682)", async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_song_details") {
+        return {
+          ...mockSongDetails,
+          path: "http://user:pass@127.0.0.1:8080/Music/song.mp3",
+          art_embedded: true,
+        };
+      }
+      return null;
+    });
+    const { findByText, queryByRole } = render(TagEditor, { songId: 10, onClose: vi.fn() });
+    await findByText(/changes are saved in Luminous only/i);
+    expect(queryByRole("button", { name: /clear artwork/i })).not.toBeInTheDocument();
+  });
+
   it("shows a read-only Various Artists pill instead of the Album Artist input when the song is part of a compilation", async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_details") {

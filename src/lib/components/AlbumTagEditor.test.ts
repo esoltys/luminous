@@ -72,6 +72,19 @@ describe("AlbumTagEditor.svelte", () => {
     expect(queryByText(/changes are saved in Luminous only/i)).not.toBeInTheDocument();
   });
 
+  it("hides the Clear Embedded Artwork button for a WebDAV album even with embedded art (#682)", async () => {
+    collectionStore.songs = [
+      { id: 101, path: "http://user:pass@127.0.0.1:8080/Music/song.mp3" } as any,
+    ];
+    const { findByText, queryByRole } = render(AlbumTagEditor, {
+      songIds: [101, 102],
+      hasEmbeddedArt: true,
+      onClose: vi.fn(),
+    });
+    await findByText(/changes are saved in Luminous only/i);
+    expect(queryByRole("button", { name: /clear embedded artwork/i })).not.toBeInTheDocument();
+  });
+
   it("calls onClose when cancel button is clicked", async () => {
     const onClose = vi.fn();
     const { getByRole } = render(AlbumTagEditor, {

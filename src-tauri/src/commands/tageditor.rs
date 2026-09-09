@@ -504,24 +504,34 @@ pub async fn clear_song_cover_art(state: State<'_, AppState>, song_id: i64) -> R
     let _watcher_pause_guard = WatcherPauseGuard::new(Arc::clone(&state.watcher_paused));
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
-    let path_str: String = conn
+    let (path_str, source): (String, i32) = conn
         .query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|_| "Song not found in library".to_string())?;
 
     let path = std::path::PathBuf::from(path_str);
-    // See save_song_tags — close the timing race the coarse guard above can't (#514).
-    state
-        .self_writes
-        .mark_written(std::iter::once(path.clone()));
-    let path_clone = path.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::tageditor::clear_embedded_art(&path_clone))
+    // WebDAV songs (source 11) have no local file to clear an embedded
+    // picture from, and there's no write-back to the remote server
+    // implemented — same as tag edits (see save_song_tags), this is
+    // DB-only. The tag editor hides the Clear Artwork button for these
+    // songs; this guard is what keeps it from erroring if it's ever
+    // reached some other way.
+    if source != models::SongSource::WebDav as i32 {
+        // See save_song_tags — close the timing race the coarse guard above can't (#514).
+        state
+            .self_writes
+            .mark_written(std::iter::once(path.clone()));
+        let path_clone = path.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::tageditor::clear_embedded_art(&path_clone)
+        })
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| format!("{e:#}"))?;
+    }
 
     let folder_art = state
         .cover_manager
@@ -553,30 +563,40 @@ pub async fn clear_album_cover_art(
 
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
 
-    let mut paths = Vec::with_capacity(song_ids.len());
+    let mut local_paths = Vec::with_capacity(song_ids.len());
+    let mut webdav_paths = Vec::new();
     for &song_id in &song_ids {
-        if let Ok(path_str) = conn.query_row(
-            "SELECT path FROM songs WHERE id = ?1",
+        if let Ok((path_str, source)) = conn.query_row(
+            "SELECT path, source FROM songs WHERE id = ?1",
             rusqlite::params![song_id],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)),
         ) {
-            paths.push((song_id, std::path::PathBuf::from(path_str)));
+            let path = std::path::PathBuf::from(path_str);
+            // WebDAV songs (source 11) have no local file to clear an embedded
+            // picture from — DB-only, same as clear_song_cover_art above.
+            if source == models::SongSource::WebDav as i32 {
+                webdav_paths.push((song_id, path));
+            } else {
+                local_paths.push((song_id, path));
+            }
         }
     }
 
     // See save_song_tags — close the timing race the coarse guard above can't (#514).
     state
         .self_writes
-        .mark_written(paths.iter().map(|(_, p)| p.clone()));
+        .mark_written(local_paths.iter().map(|(_, p)| p.clone()));
 
-    let cleared: Vec<(i64, std::path::PathBuf)> = tauri::async_runtime::spawn_blocking(move || {
-        paths
-            .into_iter()
-            .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
-            .collect()
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let mut cleared: Vec<(i64, std::path::PathBuf)> =
+        tauri::async_runtime::spawn_blocking(move || {
+            local_paths
+                .into_iter()
+                .filter(|(_, path)| crate::tageditor::clear_embedded_art(path).is_ok())
+                .collect()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    cleared.extend(webdav_paths);
 
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for (song_id, path) in &cleared {

@@ -207,20 +207,22 @@
               {hasEmbeddedArt ? i18n.t('albumTagEditor.artworkEmbedded') : i18n.t('albumTagEditor.artworkNotEmbedded')}
             </span>
           </div>
-          <Button
-            onclick={() => { showClearArtConfirm = true; }}
-            disabled={!hasEmbeddedArt || isSaving || isClearingArt}
-            variant="secondary"
-            size="sm"
-          >
-            {#if isClearingArt}
-              <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
-              <span>{i18n.t('albumTagEditor.clearingArt')}</span>
-            {:else}
-              <ImageOff class="w-3.5 h-3.5" />
-              <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
-            {/if}
-          </Button>
+          {#if !isRemoteSource}
+            <Button
+              onclick={() => { showClearArtConfirm = true; }}
+              disabled={!hasEmbeddedArt || isSaving || isClearingArt}
+              variant="secondary"
+              size="sm"
+            >
+              {#if isClearingArt}
+                <LoaderCircle class="w-3.5 h-3.5 animate-spin" />
+                <span>{i18n.t('albumTagEditor.clearingArt')}</span>
+              {:else}
+                <ImageOff class="w-3.5 h-3.5" />
+                <span>{i18n.t('albumTagEditor.clearArtBtn')}</span>
+              {/if}
+            </Button>
+          {/if}
         </div>
 
         <div class="grid grid-cols-2 gap-4">
