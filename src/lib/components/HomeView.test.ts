@@ -176,11 +176,11 @@ describe("HomeView.svelte", () => {
     }
   });
 
-  it("aligns the greeting header with the sidebar Home nav button using pt-4", () => {
+  it("optically aligns the greeting header with the sidebar Home nav button using pt-2", () => {
     const { container } = render(HomeView);
     const greetingHeading = container.querySelector("h1");
     expect(greetingHeading).toBeInTheDocument();
-    expect(greetingHeading?.parentElement).toHaveClass("pt-4");
+    expect(greetingHeading?.parentElement).toHaveClass("pt-2");
     expect(greetingHeading?.parentElement).not.toHaveClass("pt-8");
   });
 });
