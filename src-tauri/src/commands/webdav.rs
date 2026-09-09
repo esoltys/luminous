@@ -257,10 +257,20 @@ pub async fn sync_webdav_server(
                         // credentials changed since). Refresh it unconditionally so a
                         // rescan actually repairs previously-synced songs, not just new ones.
                         if let Some((_, _, _, cached_song_id)) = cached_info {
-                            let _ = conn.execute(
-                                "UPDATE songs SET path = ?1, url = ?1, stream_url = ?1 WHERE id = ?2",
-                                params![playback_url, cached_song_id],
-                            );
+                            let current_path: Option<String> = conn
+                                .query_row(
+                                    "SELECT path FROM songs WHERE id = ?1",
+                                    params![cached_song_id],
+                                    |r| r.get(0),
+                                )
+                                .ok();
+                            if current_path.as_deref() != Some(playback_url.as_str()) {
+                                let _ = conn.execute(
+                                    "UPDATE songs SET path = ?1, url = ?1, stream_url = ?1 WHERE id = ?2",
+                                    params![playback_url, cached_song_id],
+                                );
+                                stats.updated += 1;
+                            }
                         }
                         continue;
                     }
