@@ -90,12 +90,14 @@
   let hasTags = $derived((artistProfile?.tags?.length ?? 0) > 0);
   let hasSocials = $derived((artistProfile?.social_links?.length ?? 0) > 0);
 
-  // Fetched MusicBrainz/Wikipedia context (#23), keyed off any one track by
-  // this artist — neither ArtistProfile nor a dedicated artist entity carry
-  // a MusicBrainz ID of their own, so the backend resolves it from a song row.
+  // Fetched MusicBrainz/Wikipedia context (#23), keyed off a track by
+  // this artist with a MusicBrainz ID (or first song) — neither ArtistProfile
+  // nor a dedicated artist entity carry a MusicBrainz ID of their own,
+  // so the backend resolves it from a song row.
   let contextData = $state<SongContextEnrichment | null>(null);
   $effect(() => {
-    const id = songs[0]?.id;
+    const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+    const id = songWithMb?.id || songs[0]?.id;
     if (!id) {
       contextData = null;
       return;
@@ -262,6 +264,7 @@
 
   $effect(() => {
     const requested = artistName;
+    contextData = null;
     // Track collectionStore.songs so artist details update when the library changes (e.g. new albums added)
     const _libraryVersion = collectionStore.songs;
     loading = true;

@@ -14,8 +14,95 @@ use parking_lot::Mutex;
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
+use tokio::sync::watch;
+
+// ---------------------------------------------------------------------------
+// In-flight request coalescer (SingleFlight) — ensures that concurrent
+// calls for the same artist or release group share a single in-flight operation
+// rather than duplicating network requests or racing writes.
+// ---------------------------------------------------------------------------
+
+struct FlightGuard<T: Clone> {
+    in_flight: Arc<Mutex<HashMap<String, watch::Receiver<Option<T>>>>>,
+    key: String,
+}
+
+impl<T: Clone> Drop for FlightGuard<T> {
+    fn drop(&mut self) {
+        let mut map = self.in_flight.lock();
+        map.remove(&self.key);
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct FlightGroup<T: Clone> {
+    in_flight: Arc<Mutex<HashMap<String, watch::Receiver<Option<T>>>>>,
+}
+
+impl<T: Clone + Send + 'static> FlightGroup<T> {
+    pub fn new() -> Self {
+        Self {
+            in_flight: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub async fn work<F, Fut>(&self, key: &str, f: F) -> T
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = T>,
+    {
+        enum FlightAction<T> {
+            Wait(watch::Receiver<Option<T>>),
+            Leader(watch::Sender<Option<T>>),
+        }
+
+        let action = {
+            let mut map = self.in_flight.lock();
+            if let Some(rx) = map.get(key) {
+                FlightAction::Wait(rx.clone())
+            } else {
+                let (tx, rx) = watch::channel(None);
+                map.insert(key.to_string(), rx);
+                FlightAction::Leader(tx)
+            }
+        };
+
+        match action {
+            FlightAction::Leader(tx) => {
+                let _guard = FlightGuard {
+                    in_flight: self.in_flight.clone(),
+                    key: key.to_string(),
+                };
+                let result = f().await;
+                let _ = tx.send(Some(result.clone()));
+                result
+            }
+            FlightAction::Wait(mut rx) => {
+                while rx.borrow().is_none() {
+                    if rx.changed().await.is_err() {
+                        break;
+                    }
+                }
+                if let Some(val) = rx.borrow().clone() {
+                    return val;
+                }
+                f().await
+            }
+        }
+    }
+}
+
+pub static ARTIST_FLIGHT: LazyLock<FlightGroup<Result<Option<WikipediaSummary>, String>>> =
+    LazyLock::new(FlightGroup::new);
+
+pub static RELEASE_GROUP_FLIGHT: LazyLock<
+    FlightGroup<(
+        Result<MusicBrainzReleaseGroupData, String>,
+        Result<CritiqueBrainzData, String>,
+    )>,
+> = LazyLock::new(FlightGroup::new);
 
 // ---------------------------------------------------------------------------
 // MusicBrainz rate limiting — MetaBrainz asks for roughly one request per
@@ -224,6 +311,7 @@ pub fn is_cache_fresh(fetched_at: i64, now: i64) -> bool {
 /// Holds the shared HTTP client used for every source. Cheap to construct
 /// (no state beyond the client), so callers can create one per-lookup rather
 /// than needing to share an instance — matches `LyricsManager`.
+#[derive(Clone)]
 pub struct ContextManager {
     client: Client,
 }
@@ -592,5 +680,41 @@ mod tests {
                 "https://critiquebrainz.org/review/22222222-2222-2222-2222-222222222222",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn test_flight_group_deduplicates_concurrent_calls() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let group: FlightGroup<String> = FlightGroup::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let g1 = group.clone();
+        let c1 = counter.clone();
+        let t1 = tokio::spawn(async move {
+            g1.work("key1", move || async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                c1.fetch_add(1, Ordering::SeqCst);
+                "result_val".to_string()
+            })
+            .await
+        });
+
+        let g2 = group.clone();
+        let c2 = counter.clone();
+        let t2 = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            g2.work("key1", move || async move {
+                c2.fetch_add(1, Ordering::SeqCst);
+                "result_val".to_string()
+            })
+            .await
+        });
+
+        let (r1, r2) = tokio::join!(t1, t2);
+        assert_eq!(r1.unwrap(), "result_val");
+        assert_eq!(r2.unwrap(), "result_val");
+        // Only one worker should have actually executed the inner work future
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
     }
 }

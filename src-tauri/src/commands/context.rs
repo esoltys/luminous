@@ -4,7 +4,10 @@
 //! (see `db.rs` migration 28) with a 30-day TTL. Each source degrades
 //! independently on failure — see `context::ContextManager`'s doc comment.
 
-use crate::context::{is_cache_fresh, ContextManager};
+use crate::context::{
+    is_cache_fresh, ContextManager, ARTIST_FLIGHT, RELEASE_GROUP_FLIGHT,
+};
+use crate::db::Database;
 use crate::AppState;
 use rusqlite::params;
 use serde::Serialize;
@@ -58,14 +61,25 @@ pub async fn get_song_context(
         if !context_enrichment_enabled(&conn) {
             return Ok(SongContextEnrichment::default());
         }
-        let (rg, artist): (Option<String>, Option<String>) = conn
+        let (rg, artist, album_artist): (Option<String>, Option<String>, Option<String>) = conn
             .query_row(
-                "SELECT musicbrainz_release_group_id, musicbrainz_artist_id FROM songs WHERE id = ?1",
+                "SELECT musicbrainz_release_group_id, musicbrainz_artist_id, musicbrainz_album_artist_id FROM songs WHERE id = ?1",
                 params![song_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
-            .unwrap_or((None, None));
-        (rg, artist)
+            .unwrap_or((None, None, None));
+        let resolved_artist = artist
+            .filter(|a| !a.trim().is_empty())
+            .or_else(|| album_artist.filter(|a| !a.trim().is_empty()))
+            .map(|a| {
+                a.split(&[';', '/'][..])
+                    .next()
+                    .unwrap_or(&a)
+                    .trim()
+                    .to_string()
+            })
+            .filter(|a| !a.is_empty());
+        (rg, resolved_artist)
     };
 
     if release_group_id.is_none() && artist_id.is_none() {
@@ -75,9 +89,10 @@ pub async fn get_song_context(
     let now = now_unix();
     let mut result = SongContextEnrichment::default();
     let context_manager = ContextManager::new();
+    let db = state.db.clone();
 
     if let Some(ref rg_id) = release_group_id {
-        let cached = read_release_group_cache(&state, rg_id)?;
+        let cached = read_release_group_cache(&db, rg_id)?;
         let fresh = cached
             .as_ref()
             .map(|c| is_cache_fresh(c.fetched_at, now))
@@ -86,31 +101,74 @@ pub async fn get_song_context(
         if fresh && !force_refresh {
             apply_release_group_cache(&mut result, cached.unwrap());
         } else {
-            let mb = context_manager
-                .fetch_musicbrainz_release_group(rg_id)
-                .await
-                .ok();
-            let cb = context_manager
-                .fetch_critiquebrainz_reviews(rg_id)
-                .await
-                .ok();
-            write_release_group_cache(&state, rg_id, &mb, &cb, now)?;
-            if let Some(mb) = mb {
+            let db_clone = db.clone();
+            let rg_id_clone = rg_id.clone();
+            let cm = context_manager.clone();
+            let (mb_res, cb_res) = RELEASE_GROUP_FLIGHT
+                .work(rg_id, move || async move {
+                    let mb = cm
+                        .fetch_musicbrainz_release_group(&rg_id_clone)
+                        .await
+                        .map_err(|e| e.to_string());
+                    let cb = cm
+                        .fetch_critiquebrainz_reviews(&rg_id_clone)
+                        .await
+                        .map_err(|e| e.to_string());
+
+                    let mb_ok = mb.as_ref().ok().cloned();
+                    let cb_ok = cb.as_ref().ok().cloned();
+
+                    if mb.is_ok() || cb.is_ok() {
+                        let _ = write_release_group_cache(
+                            &db_clone,
+                            &rg_id_clone,
+                            &mb_ok,
+                            &cb_ok,
+                            now,
+                        );
+                    }
+                    (mb, cb)
+                })
+                .await;
+
+            if let Ok(ref mb) = mb_res {
                 result.mb_rating = mb.rating;
                 result.mb_rating_votes = mb.rating_votes;
-                result.mb_tags = mb.tags;
+                result.mb_tags = mb.tags.clone();
+            } else if let Some(ref cached_row) = cached {
+                result.mb_rating = cached_row.mb_rating;
+                result.mb_rating_votes = cached_row.mb_rating_votes;
+                result.mb_tags = cached_row
+                    .mb_tags
+                    .as_ref()
+                    .and_then(|t| serde_json::from_str(t).ok())
+                    .unwrap_or_default();
             }
-            if let Some(cb) = cb {
+
+            if let Ok(ref cb) = cb_res {
                 result.critiquebrainz_rating = cb.average_rating;
                 result.critiquebrainz_review_count = Some(cb.review_count);
-                result.critiquebrainz_review_links = cb.review_links;
+                result.critiquebrainz_review_links = cb.review_links.clone();
+            } else if let Some(ref cached_row) = cached {
+                result.critiquebrainz_rating = cached_row.critiquebrainz_rating;
+                result.critiquebrainz_review_count = cached_row.critiquebrainz_review_count;
+                result.critiquebrainz_review_links = cached_row
+                    .critiquebrainz_review_links
+                    .as_ref()
+                    .and_then(|l| serde_json::from_str(l).ok())
+                    .unwrap_or_default();
             }
-            result.fetched_at = Some(now);
+
+            if mb_res.is_ok() || cb_res.is_ok() {
+                result.fetched_at = Some(now);
+            } else if let Some(ref cached_row) = cached {
+                result.fetched_at = Some(cached_row.fetched_at);
+            }
         }
     }
 
     if let Some(ref artist_id) = artist_id {
-        let cached = read_artist_cache(&state, artist_id)?;
+        let cached = read_artist_cache(&db, artist_id)?;
         let fresh = cached
             .as_ref()
             .map(|c| is_cache_fresh(c.3, now))
@@ -123,18 +181,55 @@ pub async fn get_song_context(
                 result.wikipedia_thumbnail_url = thumbnail_url;
             }
         } else {
-            let bio = context_manager
-                .fetch_wikipedia_bio_for_artist(artist_id)
-                .await
-                .ok()
-                .flatten();
-            write_artist_cache(&state, artist_id, &bio, now)?;
-            if let Some(bio) = bio {
-                result.wikipedia_extract = Some(bio.extract);
-                result.wikipedia_page_url = bio.page_url;
-                result.wikipedia_thumbnail_url = bio.thumbnail_url;
+            let db_clone = db.clone();
+            let artist_id_clone = artist_id.clone();
+            let bio_res = ARTIST_FLIGHT
+                .work(artist_id, move || async move {
+                    let res = context_manager
+                        .fetch_wikipedia_bio_for_artist(&artist_id_clone)
+                        .await
+                        .map_err(|e| e.to_string());
+
+                    match &res {
+                        Ok(bio) => {
+                            let _ = write_artist_cache(
+                                &db_clone,
+                                &artist_id_clone,
+                                bio,
+                                now,
+                            );
+                        }
+                        Err(err) => {
+                            log::warn!(
+                                "Failed to fetch Wikipedia bio for artist {}: {}",
+                                artist_id_clone,
+                                err
+                            );
+                        }
+                    }
+                    res
+                })
+                .await;
+
+            match bio_res {
+                Ok(Some(bio)) => {
+                    result.wikipedia_extract = Some(bio.extract);
+                    result.wikipedia_page_url = bio.page_url;
+                    result.wikipedia_thumbnail_url = bio.thumbnail_url;
+                    result.fetched_at = Some(now);
+                }
+                Ok(None) => {
+                    result.fetched_at = Some(now);
+                }
+                Err(_) => {
+                    if let Some((extract, page_url, thumbnail_url, fetched_at)) = cached {
+                        result.wikipedia_extract = extract;
+                        result.wikipedia_page_url = page_url;
+                        result.wikipedia_thumbnail_url = thumbnail_url;
+                        result.fetched_at = Some(fetched_at);
+                    }
+                }
             }
-            result.fetched_at = Some(now);
         }
     }
 
@@ -152,10 +247,10 @@ struct ReleaseGroupCacheRow {
 }
 
 fn read_release_group_cache(
-    state: &State<'_, AppState>,
+    db: &Database,
     release_group_id: &str,
 ) -> Result<Option<ReleaseGroupCacheRow>, String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT mb_rating, mb_rating_votes, mb_tags, critiquebrainz_rating, critiquebrainz_review_count, critiquebrainz_review_links, fetched_at
          FROM context_enrichment WHERE release_group_id = ?1",
@@ -196,13 +291,13 @@ fn apply_release_group_cache(result: &mut SongContextEnrichment, cached: Release
 }
 
 fn write_release_group_cache(
-    state: &State<'_, AppState>,
+    db: &Database,
     release_group_id: &str,
     mb: &Option<crate::context::MusicBrainzReleaseGroupData>,
     cb: &Option<crate::context::CritiqueBrainzData>,
     fetched_at: i64,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = db.pool.get().map_err(|e| e.to_string())?;
     let mb_tags_json = serde_json::to_string(&mb.as_ref().map(|m| m.tags.clone()).unwrap_or_default())
         .unwrap_or_else(|_| "[]".to_string());
     let cb_links_json =
@@ -238,10 +333,10 @@ fn write_release_group_cache(
 type ArtistCacheRow = (Option<String>, Option<String>, Option<String>, i64);
 
 fn read_artist_cache(
-    state: &State<'_, AppState>,
+    db: &Database,
     artist_id: &str,
 ) -> Result<Option<ArtistCacheRow>, String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = db.pool.get().map_err(|e| e.to_string())?;
     conn.query_row(
         "SELECT wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at
          FROM artist_context_enrichment WHERE artist_id = ?1",
@@ -263,12 +358,12 @@ fn read_artist_cache(
 }
 
 fn write_artist_cache(
-    state: &State<'_, AppState>,
+    db: &Database,
     artist_id: &str,
     bio: &Option<crate::context::WikipediaSummary>,
     fetched_at: i64,
 ) -> Result<(), String> {
-    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let conn = db.pool.get().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO artist_context_enrichment
             (artist_id, wikidata_id, wikipedia_extract, wikipedia_page_url, wikipedia_thumbnail_url, fetched_at)
