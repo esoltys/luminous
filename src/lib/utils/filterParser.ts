@@ -105,10 +105,12 @@ export function hasAdvancedSearchTerms(query: string): boolean {
 /**
  * True if a playlist's `dynamic_spec` is a user-authored Smart Playlist rule
  * spec (e.g. "genre:rock", "artist:Miles Davis; rating:>=4"), as opposed to a
- * system genre/decade/BPM/artist-tag auto-playlist. Smart Playlist specs always contain
+ * system genre/decade/BPM/artist-tag/daypart auto-playlist. Smart Playlist specs always contain
  * a "field:value" rule; system genre auto-playlists use a "tag:" prefix
  * (#548), decade auto-playlists use "decade:", BPM auto-playlists use
- * "bpmrange:", and artist tag auto-playlists use "artisttag:". Mirrors the categorization in playlist.rs.
+ * "bpmrange:", artist tag auto-playlists use "artisttag:", and the Moment
+ * Mix (formerly Daypart Mix, #223) auto-playlist uses "daypart:". Mirrors
+ * the categorization in playlist.rs.
  */
 export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
   return (
@@ -117,6 +119,7 @@ export function isSmartPlaylistSpec(spec: string | null | undefined): boolean {
     !spec.startsWith("decade:") &&
     !spec.startsWith("bpmrange:") &&
     !spec.startsWith("tag:") &&
-    !spec.startsWith("artisttag:")
+    !spec.startsWith("artisttag:") &&
+    !spec.startsWith("daypart:")
   );
 }
