@@ -11,12 +11,18 @@
         indicator, for narrow contexts like table columns. "full" shows every
         value as its own chip, for wide contexts like detail-view headers. */
     variant?: "compact" | "full";
+    /** Optional maximum number of chips to display when variant is "full".
+        When specified and genres exceed this limit, a "+N" overflow badge is shown. */
+    limit?: number;
     class?: string;
   }
 
-  let { genre, variant = "compact", class: className = "" }: Props = $props();
+  let { genre, variant = "compact", limit, class: className = "" }: Props = $props();
 
   let values = $derived(parseMultiValue(genre || ""));
+  let displayedValues = $derived(limit && limit > 0 ? values.slice(0, limit) : values);
+  let remainingCount = $derived(values.length - displayedValues.length);
+  let remainingValues = $derived(remainingCount > 0 ? values.slice(displayedValues.length) : []);
 
   const chipClass =
     "inline-flex items-center pl-2 pr-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 text-xs font-medium hover:bg-brand-accent/25 hover:border-brand-accent/50 transition-colors";
@@ -42,7 +48,7 @@
     </button>
   {:else}
     <div class="flex flex-wrap gap-1 {className}">
-      {#each values as value (value)}
+      {#each displayedValues as value (value)}
         <button
           type="button"
           onclick={(e) => goToTag(e, value)}
@@ -52,6 +58,14 @@
           <span class="truncate">{value}</span>
         </button>
       {/each}
+      {#if remainingCount > 0}
+        <span
+          class="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-sidebar/80 text-brand-text-secondary border border-brand-border/60 text-xs font-medium select-none shrink-0"
+          title={remainingValues.join(", ")}
+        >
+          +{remainingCount}
+        </span>
+      {/if}
     </div>
   {/if}
 {/if}

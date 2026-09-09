@@ -489,7 +489,7 @@
         {/if}
 
         {#if rawGenre}
-          <GenreChips genre={rawGenre} variant="full" />
+          <GenreChips genre={rawGenre} variant="full" limit={4} />
         {:else}
           <div class="text-xs text-brand-text-secondary font-medium">
             <span>{genreLabel}</span>

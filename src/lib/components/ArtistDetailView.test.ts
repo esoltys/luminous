@@ -175,6 +175,40 @@ describe("ArtistDetailView", () => {
     expect(await screen.findByText("Unknown genre")).toBeTruthy();
   });
 
+  it("limits header genre chips to 4 and shows overflow badge when artist has many genres (#817)", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockImplementation((cmd: string, args?: any) => {
+      if (cmd === "get_songs_by_artist") {
+        return Promise.resolve([
+          {
+            id: 1,
+            title: "Song 1",
+            artist: "Nightwish",
+            genre: "Metal; Symphonic Metal; Gothic Metal; Power Metal; Heavy Metal; Pop Rock",
+            length_nanosec: 180_000_000_000,
+          } as any,
+        ]);
+      }
+      if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+      if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+      if (cmd === "get_artist_profile") return Promise.resolve(null as any);
+      return Promise.resolve();
+    });
+
+    render(ArtistDetailView, { props: { artistName: "Nightwish" } });
+
+    expect(await screen.findByTitle("Browse Gothic Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Heavy Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Metal")).toBeTruthy();
+    expect(screen.getByTitle("Browse Pop Rock")).toBeTruthy();
+
+    expect(screen.queryByTitle("Browse Power Metal")).toBeNull();
+    expect(screen.queryByTitle("Browse Symphonic Metal")).toBeNull();
+    const badge = screen.getByText("+2");
+    expect(badge).toBeTruthy();
+    expect(badge.getAttribute("title")).toBe("Power Metal, Symphonic Metal");
+  });
+
   describe("extended artist artwork (#98/#761)", () => {
     it("renders a discovered artist portrait and band logo instead of the album-art composite and text heading", async () => {
       const invokeMock = vi.mocked(invoke);
