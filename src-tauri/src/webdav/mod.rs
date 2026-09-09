@@ -315,6 +315,12 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
     let mut inside_response = false;
     let mut inside_resourcetype = false;
     let mut current_tag = String::new();
+    // Accumulates a leaf element's text across however many events it arrives
+    // in — quick-xml 0.41 delivers an entity reference (e.g. `&amp;`) as its
+    // own `GeneralRef` event, splitting what used to be one `Text` event into
+    // `Text` + `GeneralRef` + `Text`. Committed into the matching current_*
+    // field only once the leaf element's `End` event confirms it's complete.
+    let mut text_buf = String::new();
 
     let mut buf = Vec::new();
 
@@ -323,6 +329,7 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
             Ok(Event::Start(e)) => {
                 let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 current_tag = name.to_ascii_lowercase();
+                text_buf.clear();
 
                 if current_tag == "response" {
                     inside_response = true;
@@ -346,24 +353,51 @@ pub fn parse_propfind_response(xml: &str) -> Result<Vec<WebDavItem>> {
             }
             Ok(Event::Text(e)) => {
                 if inside_response {
-                    let text = e.unescape().unwrap_or_default().to_string();
-                    match current_tag.as_str() {
-                        "href" => {
-                            // quick-xml's unescape() converts XML entities like &amp; → &,
-                            // but & is illegal unencoded in a URL path — it's a query-separator.
-                            // Re-encode it (and bare spaces) so the href is a valid URL path.
-                            current_href = text.replace('&', "%26").replace(' ', "%20");
+                    // `decode()` handles the document's byte encoding only — entity
+                    // references arrive separately as `GeneralRef` events (below).
+                    if let Ok(decoded) = e.decode() {
+                        text_buf.push_str(&decoded);
+                    }
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                if inside_response {
+                    if let Ok(Some(ch)) = e.resolve_char_ref() {
+                        text_buf.push(ch);
+                    } else if let Ok(name) = e.decode() {
+                        // The five predefined XML entities — a DTD-less WebDAV
+                        // PROPFIND response can't define any others.
+                        match name.as_ref() {
+                            "amp" => text_buf.push('&'),
+                            "lt" => text_buf.push('<'),
+                            "gt" => text_buf.push('>'),
+                            "apos" => text_buf.push('\''),
+                            "quot" => text_buf.push('"'),
+                            _ => {}
                         }
-                        "getcontentlength" => current_length = text.trim().parse::<u64>().ok(),
-                        "getlastmodified" => current_mtime = Some(text.trim().to_string()),
-                        "getetag" => current_etag = Some(text.trim().to_string()),
-                        _ => {}
                     }
                 }
             }
             Ok(Event::End(e)) => {
                 let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 let tag_lower = name.to_ascii_lowercase();
+
+                if inside_response {
+                    match tag_lower.as_str() {
+                        "href" => {
+                            // & is illegal unencoded in a URL path — it's a query-separator.
+                            // Re-encode it (and bare spaces) so the href is a valid URL path.
+                            current_href = text_buf.replace('&', "%26").replace(' ', "%20");
+                        }
+                        "getcontentlength" => {
+                            current_length = text_buf.trim().parse::<u64>().ok()
+                        }
+                        "getlastmodified" => current_mtime = Some(text_buf.trim().to_string()),
+                        "getetag" => current_etag = Some(text_buf.trim().to_string()),
+                        _ => {}
+                    }
+                }
+                text_buf.clear();
 
                 if tag_lower == "resourcetype" {
                     inside_resourcetype = false;
