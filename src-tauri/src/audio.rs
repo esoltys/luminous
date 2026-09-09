@@ -565,7 +565,10 @@ impl MediaSource for HttpRangeReader {
 }
 
 /// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
-fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
+/// Shared with the offline analyzers (`analyzer::decode_all_samples`,
+/// `loudness::decode_channels`) so waveform/band-waveform generation and R128
+/// loudness analysis also work against WebDAV songs, not just live playback.
+pub(crate) fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
     if path.starts_with("http://") || path.starts_with("https://") {
         let reader = HttpRangeReader::new(path)?;
         Ok(Box::new(reader))
