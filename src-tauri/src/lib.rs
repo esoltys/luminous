@@ -589,6 +589,10 @@ pub fn run() {
 
             let uri_str = request.uri().to_string();
             let mut trimmed = &uri_str[..];
+            // On Windows WebView2, requests are made to `http://luminous-art.localhost/`
+            // via the frontend rewrite in `getCoverArtUrl()`. wry intercepts the HTTP request
+            // and runs `revert_uri_work_around` which rewrites the URI to `luminous-art://localhost/`
+            // before calling this handler (see #715). We strip either prefix here.
             if let Some(t) = uri_str.strip_prefix("http://luminous-art.localhost/") {
                 trimmed = t;
             } else if let Some(t) = uri_str.strip_prefix("luminous-art://") {

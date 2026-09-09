@@ -471,6 +471,13 @@ export function getCoverArtUrl(uri: string | null | undefined): string | null {
       }
       return `/fixtures/${cleanPath}`;
     }
+    // On Windows, WebView2 does not intercept non-standard URI schemes (like luminous-art://)
+    // directly. Instead, wry sets up an AddWebResourceRequestedFilter for `http://luminous-art.*`
+    // (see custom_protocol_workaround.rs in wry). The webview must therefore request
+    // `http://luminous-art.localhost/...`. wry's handler intercepts this and internally
+    // reverts the URI back to `luminous-art://localhost/...` before invoking the Tauri
+    // protocol handler (which is why backend logs display `URI = luminous-art://...`).
+    // Do not remove this rewrite (see #715).
     if (isWindows) {
       return uri.replace("luminous-art://", "http://luminous-art.localhost/");
     }
