@@ -44,7 +44,6 @@
     PlusIcon as Plus,
     PencilSimpleIcon as Edit3,
     TrashIcon as Trash2,
-    DotsSixVerticalIcon as GripVertical,
     WarningIcon as AlertTriangle,
     EyeSlashIcon as EyeSlash,
     MusicNotesIcon as Music,
@@ -647,15 +646,12 @@
     {#if song}
       <button
         onclick={(e) => { e.stopPropagation(); if (!rowDisabled(row)) onRowDoubleClick(row); }}
-        class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-accent-text hover:text-brand-accent-text-hover transition-all duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
+        class="absolute flex items-center justify-center opacity-0 group-hover:opacity-100 text-brand-text-primary hover:text-brand-accent-text-hover transition-all duration-150 disabled:opacity-0 disabled:cursor-not-allowed"
         disabled={rowDisabled(row)}
         title={row.disabledTooltip ?? i18n.t("collection.playSong")}
       >
         <Play class="w-3.5 h-3.5 fill-current" />
       </button>
-    {/if}
-    {#if onReorder}
-      <GripVertical class="absolute right-0 w-3.5 h-3.5 text-brand-text-secondary/60 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
     {/if}
   </div>
 {/snippet}
