@@ -22,7 +22,7 @@
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
-    GlobeIcon as Globe
+    BookOpenIcon as Globe
   } from "phosphor-svelte";
 
   let showListenBrainzToken = $state(false);
