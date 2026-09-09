@@ -16,7 +16,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
     "knip": "knip",
     "tauri": "NO_STRIP=true tauri",
-    "icon": "tauri icon app-icon.svg && bun run scripts/generate-msix-assets.ts",
+    "icon": "tauri icon app-icon.png && bun run scripts/generate-msix-assets.ts",
     "generate:msix-assets": "bun run scripts/generate-msix-assets.ts",
     "test": "vitest",
     "test:run": "vitest run",
