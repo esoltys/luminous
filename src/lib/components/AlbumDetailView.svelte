@@ -487,7 +487,7 @@
         </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
+        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}

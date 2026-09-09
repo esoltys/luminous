@@ -702,7 +702,7 @@
           </div>
           {/if}
 
-          <div class="flex flex-wrap items-center gap-3 mt-3">
+          <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'}">
             <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
