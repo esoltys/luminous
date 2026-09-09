@@ -750,7 +750,6 @@
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
         onEditTags={(song) => openTagEditor(song.id)}
         onEditAlbum={openAlbumEditor}
-        onOpenInPicard={(song) => openInPicard([song.id])}
       />
     </div>
 

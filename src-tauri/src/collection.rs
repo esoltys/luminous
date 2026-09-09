@@ -1037,18 +1037,6 @@ pub(crate) fn read_tags(path: &Path) -> Result<Song> {
                 .map(|s| s.to_string());
         }
 
-        // AcoustID fingerprint match (written by Luminous's own AcoustID lookup
-        // flow in tageditor.rs, or by another tagger) — same dead-columns bug
-        // as the MusicBrainz IDs above (#752).
-        if song.acoustid_id.is_none() {
-            song.acoustid_id = tag.get_string(ItemKey::AcoustId).map(|s| s.to_string());
-        }
-        if song.acoustid_fingerprint.is_none() {
-            song.acoustid_fingerprint = tag
-                .get_string(ItemKey::AcoustIdFingerprint)
-                .map(|s| s.to_string());
-        }
-
         // Release metadata Picard writes alongside the MusicBrainz IDs, but
         // not IDs themselves (#752).
         if song.musicbrainz_release_type.is_none() {
@@ -1220,8 +1208,6 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
                     musicbrainz_recording_id=excluded.musicbrainz_recording_id,
                     musicbrainz_track_id=excluded.musicbrainz_track_id,
                     musicbrainz_work_id=excluded.musicbrainz_work_id,
-                    acoustid_id=excluded.acoustid_id,
-                    acoustid_fingerprint=excluded.acoustid_fingerprint,
                     musicbrainz_release_type=excluded.musicbrainz_release_type,
                     musicbrainz_release_country=excluded.musicbrainz_release_country,
                     barcode=excluded.barcode,
@@ -1275,8 +1261,6 @@ pub(crate) fn upsert_song(conn: &rusqlite::Connection, song: &Song) -> Result<()
             song.musicbrainz_recording_id,
             song.musicbrainz_track_id,
             song.musicbrainz_work_id,
-            song.acoustid_id,
-            song.acoustid_fingerprint,
             song.musicbrainz_release_type,
             song.musicbrainz_release_country,
             song.barcode,
@@ -1340,7 +1324,7 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     is_vbr, is_instrumental, not_included, added,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
+    musicbrainz_work_id,
     musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
 ";
 
@@ -1367,10 +1351,10 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.is_vbr, s.is_instrumental, s.not_included, s.added,
     s.musicbrainz_artist_id, s.musicbrainz_album_artist_id, s.musicbrainz_album_id,
     s.musicbrainz_release_group_id, s.musicbrainz_recording_id, s.musicbrainz_track_id,
-    s.musicbrainz_work_id, s.acoustid_id, s.acoustid_fingerprint,
+    s.musicbrainz_work_id,
     s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 71;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 69;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -1381,12 +1365,12 @@ const SONG_INSERT_COLS: &str = "
     replaygain_track_gain, replaygain_album_gain, is_vbr,
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
-    musicbrainz_work_id, acoustid_id, acoustid_fingerprint,
+    musicbrainz_work_id,
     musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
 ";
 
 const SONG_INSERT_PLACEHOLDERS: &str =
-    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51";
+    "?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49";
 
 pub(crate) fn row_to_song(row: &rusqlite::Row) -> rusqlite::Result<Song> {
     row_to_song_at(row, 0)
@@ -1468,12 +1452,10 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         musicbrainz_recording_id: row.get(col(62))?,
         musicbrainz_track_id: row.get(col(63))?,
         musicbrainz_work_id: row.get(col(64))?,
-        acoustid_id: row.get(col(65))?,
-        acoustid_fingerprint: row.get(col(66))?,
-        musicbrainz_release_type: row.get(col(67))?,
-        musicbrainz_release_country: row.get(col(68))?,
-        barcode: row.get(col(69))?,
-        catalog_number: row.get(col(70))?,
+        musicbrainz_release_type: row.get(col(65))?,
+        musicbrainz_release_country: row.get(col(66))?,
+        barcode: row.get(col(67))?,
+        catalog_number: row.get(col(68))?,
         ..Default::default()
     })
 }
@@ -1728,34 +1710,6 @@ mod tests {
             song.musicbrainz_album_artist_id.as_deref(),
             Some("album-artist-uuid")
         );
-    }
-
-    /// Unlike the three MusicBrainz release/release-group/track keys above,
-    /// `AcoustId`/`AcoustIdFingerprint` *are* on lofty's ID3v2 TXXX write
-    /// allowlist, so this exercises the full `write_tags()` -> `read_tags()`
-    /// round trip directly rather than hand-poking the tag (#752).
-    #[test]
-    fn test_write_tags_then_read_tags_acoustid_round_trip() {
-        let temp_dir = tempfile::tempdir().expect("temp dir");
-        let path = temp_dir.path().join("song.wav");
-        write_test_wav(&path);
-
-        crate::tageditor::write_tags(
-            &path,
-            &crate::tageditor::TagWriteRequest {
-                title: "Title",
-                artist: "Artist",
-                album: "Album",
-                acoustid_id: Some("acoustid-uuid"),
-                acoustid_fingerprint: Some("AQADtEmI"),
-                ..Default::default()
-            },
-        )
-        .expect("write_tags should succeed");
-
-        let song = read_tags(&path).expect("read_tags should succeed");
-        assert_eq!(song.acoustid_id.as_deref(), Some("acoustid-uuid"));
-        assert_eq!(song.acoustid_fingerprint.as_deref(), Some("AQADtEmI"));
     }
 
     /// `write_tags()` has no support for these (Luminous's tag editor doesn't

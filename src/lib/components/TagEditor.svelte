@@ -5,18 +5,13 @@
     SlidersIcon as Sliders,
     FloppyDiskIcon as Save,
     XIcon as X,
-    SparkleIcon as Sparkles,
     CircleNotchIcon as LoaderCircle,
     WarningIcon as AlertTriangle,
-    CheckIcon as Check,
-    MagnifyingGlassMinusIcon as SearchX,
     LockIcon as Lock,
     ImageBrokenIcon as ImageOff,
     CloudIcon
   } from "phosphor-svelte";
-  import { fade } from "svelte/transition";
   import { collectionStore } from "../stores/collection.svelte";
-  import { navigationStore } from "../stores/navigation.svelte";
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
@@ -78,21 +73,9 @@
   let composersort = $state("");
   let genresort = $state("");
 
-  /** Loaded from the song on open, then overwritten by a fresh AcoustID
-      lookup (#752) — always sent on save so an unrelated edit never wipes
-      out a previously-recorded AcoustID match. */
-  let acoustidId = $state<string | null>(null);
-  let acoustidFingerprint = $state<string | null>(null);
-
   let isLoading = $state(false);
   let isSaving = $state(false);
-  let isLookingUp = $state(false);
-  let lookupSucceeded = $state(false);
   let errorMsg = $state("");
-  let lookupErrorMsg = $state("");
-  let lookupNotFound = $state(false);
-  /** Fields last changed by an AcoustID lookup, so they can be highlighted until edited or re-looked-up. */
-  let changedFields = $state(new Set<string>());
 
   async function loadMetadata() {
     isLoading = true;
@@ -123,8 +106,6 @@
         rating: number;
         compilation: boolean;
         art_embedded: boolean;
-        acoustid_id: string | null;
-        acoustid_fingerprint: string | null;
       }>("get_song_details", { songId });
 
       title = details.title;
@@ -150,73 +131,11 @@
       rating = details.rating;
       compilation = details.compilation;
       artEmbedded = details.art_embedded;
-      acoustidId = details.acoustid_id;
-      acoustidFingerprint = details.acoustid_fingerprint;
     } catch (e: any) {
       console.error("Failed to load metadata:", e);
       errorMsg = e.toString();
     } finally {
       isLoading = false;
-    }
-  }
-
-  async function handleLookup() {
-    if (!songId) return;
-    isLookingUp = true;
-    lookupErrorMsg = "";
-    lookupSucceeded = false;
-    lookupNotFound = false;
-    changedFields = new Set();
-    try {
-      const suggestions = await invoke<{
-        title: string | null;
-        artist: string | null;
-        album: string | null;
-        year: number | null;
-        acoustid_id: string | null;
-        fingerprint: string | null;
-      }>("lookup_acoustid_tags", { songId });
-
-      const next = new Set<string>();
-      if (suggestions.title && suggestions.title !== title) {
-        title = suggestions.title;
-        next.add("title");
-      }
-      if (suggestions.artist && suggestions.artist !== artist) {
-        artist = suggestions.artist;
-        next.add("artist");
-      }
-      if (suggestions.album && suggestions.album !== album) {
-        album = suggestions.album;
-        next.add("album");
-      }
-      if (suggestions.year && suggestions.year !== year) {
-        year = suggestions.year;
-        next.add("year");
-      }
-      changedFields = next;
-      acoustidId = suggestions.acoustid_id;
-      acoustidFingerprint = suggestions.fingerprint;
-      lookupSucceeded = true;
-    } catch (e: any) {
-      console.error("AcoustID lookup failed:", e);
-      const str = e.toString();
-      if (str.includes("NO_API_KEY")) {
-        navigationStore.activeTab = "settings";
-        invoke("set_app_setting", { key: "active_settings_tab", value: "tools" });
-        onClose();
-        return;
-      } else if (str.includes("fpcalc") || str.includes("chromaprint")) {
-        lookupErrorMsg = i18n.t('tagEditor.acoustidFpcalcError');
-      } else if (str.includes("invalid API key") || str.includes("API key")) {
-        lookupErrorMsg = i18n.t('tagEditor.acoustidApiKeyError');
-      } else if (str.includes("No matching")) {
-        lookupNotFound = true;
-      } else {
-        lookupErrorMsg = str;
-      }
-    } finally {
-      isLookingUp = false;
     }
   }
 
@@ -244,8 +163,6 @@
         grouping,
         bpm,
         initialKey,
-        acoustidId,
-        acoustidFingerprint,
       });
 
       await collectionStore.refreshStats();
@@ -370,13 +287,6 @@
             {/if}
           </div>
 
-          {#if lookupErrorMsg}
-            <div class="flex items-start gap-2.5 bg-brand-main border border-red-500/40 rounded-xl p-3 text-red-500 text-xs">
-              <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{lookupErrorMsg}</span>
-            </div>
-          {/if}
-
           <!-- Grid form: field order mirrors the collection table's column order (track, title, artist,
                album, composer, album artist, year, genre, grouping, bpm, initial key), with Disc paired
                alongside Track (Disc first) since it has no column of its own in the table. -->
@@ -415,10 +325,8 @@
               <Input
                 id="tag-title"
                 bind:value={title}
-                oninput={() => changedFields.delete("title")}
                 disabled={isSaving}
                 size="sm"
-                highlighted={changedFields.has('title')}
                 class="w-full"
               />
             </FormField>
@@ -427,10 +335,8 @@
               <ChipInput
                 id="tag-artist"
                 bind:value={artist}
-                oninput={() => changedFields.delete("artist")}
                 disabled={isSaving}
                 placeholder={i18n.t('tagEditor.artistPlaceholder')}
-                highlighted={changedFields.has('artist')}
                 class="w-full"
               />
             </FormField>
@@ -439,10 +345,8 @@
               <Input
                 id="tag-album"
                 bind:value={album}
-                oninput={() => changedFields.delete("album")}
                 disabled={isSaving}
                 size="sm"
-                highlighted={changedFields.has('album')}
                 class="w-full"
               />
             </FormField>
@@ -485,10 +389,8 @@
                 oninput={(e) => {
                   const val = parseInt(e.currentTarget.value, 10);
                   year = isNaN(val) ? null : val;
-                  changedFields.delete("year");
                 }}
                 size="sm"
-                highlighted={changedFields.has('year')}
                 class="w-full"
               />
             </FormField>
@@ -586,32 +488,7 @@
     </div>
 
     <div class="h-16 flex items-center justify-between px-6 border-t border-brand-border shrink-0 bg-brand-main">
-      {#if !isLoading && !errorMsg}
-        <div class="flex items-center gap-3">
-          <Button onclick={handleLookup} disabled={isLookingUp || isSaving} variant="secondary" size="sm">
-            {#if isLookingUp}
-              <LoaderCircle class="w-3.5 h-3.5 animate-spin text-brand-accent-text" />
-              {i18n.t('tagEditor.lookingUp')}
-            {:else}
-              <Sparkles class="w-3.5 h-3.5 text-brand-accent-text" />
-              {i18n.t('tagEditor.lookupAcoustID')}
-            {/if}
-          </Button>
-          {#if lookupSucceeded}
-            <div in:fade class="flex items-center gap-1.5 text-brand-accent-text text-xs font-semibold">
-              <Check class="w-3.5 h-3.5 font-bold {changedFields.size > 0 ? 'animate-bounce' : ''}" />
-              <span>{changedFields.size > 0 ? i18n.t('tagEditor.matched') : i18n.t('tagEditor.noChange')}</span>
-            </div>
-          {:else if lookupNotFound}
-            <div in:fade class="flex items-center gap-1.5 text-brand-text-secondary text-xs font-semibold">
-              <SearchX class="w-3.5 h-3.5" />
-              <span>{i18n.t('tagEditor.notFound')}</span>
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <div></div>
-      {/if}
+      <div></div>
 
       <div class="flex items-center gap-2">
         <Button onclick={onClose} disabled={isSaving} variant="secondary" size="sm">

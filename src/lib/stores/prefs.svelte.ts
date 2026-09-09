@@ -12,7 +12,6 @@ export type WeekStart = "sunday" | "monday";
 interface UiPreferences {
   rating_style: RatingStyle;
   seekbar_mode: SeekBarMode;
-  acoustid_api_key: string;
   albums_view_mode: CollectionViewMode;
   artists_view_mode: CollectionViewMode;
   playlists_auto_view_mode: CollectionViewMode;
@@ -27,7 +26,6 @@ interface UiPreferences {
 class PrefsStore {
   ratingStyle = $state<RatingStyle>("heart");
   seekBarMode = $state<SeekBarMode>("waveform");
-  acoustidApiKey = $state<string>("");
   albumsViewMode = $state<CollectionViewMode>("cards");
   artistsViewMode = $state<CollectionViewMode>("cards");
   playlistsAutoViewMode = $state<CollectionViewMode>("cards");
@@ -50,7 +48,6 @@ class PrefsStore {
     const prefs = await invoke<UiPreferences>("get_ui_preferences");
     this.ratingStyle = prefs.rating_style;
     this.seekBarMode = prefs.seekbar_mode;
-    this.acoustidApiKey = prefs.acoustid_api_key;
     this.albumsViewMode = prefs.albums_view_mode;
     this.artistsViewMode = prefs.artists_view_mode;
     this.playlistsAutoViewMode = prefs.playlists_auto_view_mode;
@@ -73,7 +70,6 @@ class PrefsStore {
     const prefs: UiPreferences = {
       rating_style: this.ratingStyle,
       seekbar_mode: this.seekBarMode,
-      acoustid_api_key: this.acoustidApiKey,
       albums_view_mode: this.albumsViewMode,
       artists_view_mode: this.artistsViewMode,
       playlists_auto_view_mode: this.playlistsAutoViewMode,
@@ -94,11 +90,6 @@ class PrefsStore {
 
   toggleSeekBarMode() {
     this.seekBarMode = this.seekBarMode === "waveform" ? "bands" : "waveform";
-    this.save();
-  }
-
-  setAcoustidApiKey(key: string) {
-    this.acoustidApiKey = key;
     this.save();
   }
 

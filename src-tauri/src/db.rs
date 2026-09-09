@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 29;
+pub const CURRENT_SCHEMA_VERSION: i32 = 30;
 
 struct Migration {
     version: i32,
@@ -202,6 +202,19 @@ const MIGRATIONS: &[Migration] = &[
         version: 29,
         description: "webdav_servers and webdav_cache tables for remote WebDAV library support (#682)",
         apply: |conn| Ok(conn.execute_batch(MIGRATION_29)?),
+    },
+    Migration {
+        version: 30,
+        description: "drop acoustid_id/acoustid_fingerprint/fingerprint columns — AcoustID support removed (#847)",
+        apply: |conn| {
+            let has_acoustid_id: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('songs') WHERE name = 'acoustid_id'")?
+                .exists([])?;
+            if has_acoustid_id {
+                conn.execute_batch(MIGRATION_30)?;
+            }
+            Ok(())
+        },
     },
 ];
 
@@ -870,6 +883,19 @@ CREATE TABLE IF NOT EXISTS webdav_cache (
     UNIQUE(server_id, remote_path)
 );
 CREATE INDEX IF NOT EXISTS idx_webdav_cache_server ON webdav_cache(server_id);
+";
+
+// ---------------------------------------------------------------------------
+// Migration 30: AcoustID support removed (#847) — drop the fingerprint-
+// lookup columns. `fingerprint` (distinct from `acoustid_fingerprint`) was
+// dead weight even before this: declared in the schema and the `Song`
+// model but never populated or read anywhere.
+// ---------------------------------------------------------------------------
+
+const MIGRATION_30: &str = "
+ALTER TABLE songs DROP COLUMN acoustid_id;
+ALTER TABLE songs DROP COLUMN acoustid_fingerprint;
+ALTER TABLE songs DROP COLUMN fingerprint;
 ";
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,6 @@
   import { navigationStore } from "../stores/navigation.svelte";
   import { playerStore } from "../stores/player.svelte";
   import { i18n } from "../stores/i18n.svelte";
-  import { picardStore } from "../stores/picard.svelte";
   import { formatDate, formatFileSize, formatSampleRate, formatBitDepth, formatChannels, formatDuration } from "../utils/formatters";
   import { formatDateAdded } from "../utils/date";
   import { formatTrackNumber } from "../utils/artist";
@@ -48,8 +47,7 @@
     EyeSlashIcon as EyeSlash,
     MusicNotesIcon as Music,
     ClockIcon as Clock,
-    DiscIcon as DiscAlbum,
-    ArrowSquareOutIcon as OpenInPicard
+    DiscIcon as DiscAlbum
   } from "phosphor-svelte";
   import { VirtualList } from "svelte-virtual-list-ts";
   import type { Snippet } from "svelte";
@@ -85,8 +83,6 @@
     onEditTags: (song: Song) => void;
     /** Adds a per-row "edit this song's album" quick action (AutoPlaylistDetailView only). */
     onEditAlbum?: (song: Song) => void;
-    /** Adds a per-row "open this song's file in MusicBrainz Picard" quick action (#367). */
-    onOpenInPicard?: (song: Song) => void;
     /** When set, position rows show a drag handle and pointer-based reorder is enabled (PlaylistView only). */
     onReorder?: (fromIndex: number, toIndex: number, selectedKeys: string[]) => void;
     /** When set in "position" mode, the leading column header becomes a sortable control for this field instead of a plain label. */
@@ -128,7 +124,6 @@
     onRemoveFromPlaylist,
     onEditTags,
     onEditAlbum,
-    onOpenInPicard,
     onReorder,
     positionSortField,
     interactiveWhenDisabled = false,
@@ -601,16 +596,6 @@
           title={i18n.t("songTags.editAlbumTooltip", {}, "Edit Album")}
         >
           <DiscAlbum class="w-4 h-4" />
-        </button>
-      {/if}
-      {#if onOpenInPicard}
-        <button
-          onclick={() => onOpenInPicard?.(song)}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          disabled={!picardStore.available}
-          title={picardStore.available ? i18n.t("picard.openInPicard") : i18n.t("picard.notFoundTooltip")}
-        >
-          <OpenInPicard class="w-4 h-4" />
         </button>
       {/if}
       {#if onRemoveFromPlaylist}

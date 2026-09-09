@@ -11,11 +11,10 @@
   import Input from "./Input.svelte";
   import Toggle from "./Toggle.svelte";
   import {
-    SparkleIcon as Sparkles,
     CheckIcon as Check,
     EyeIcon as Eye,
     EyeSlashIcon as EyeOff,
-    AppWindowIcon as PicardIcon,
+    TagIcon as PicardIcon,
     WarningIcon as AlertTriangle,
     ArrowsClockwiseIcon as RefreshCw,
     FolderOpenIcon as FolderOpen,
@@ -23,12 +22,10 @@
     CircleNotchIcon as LoaderCircle,
     ArrowUpRightIcon as ArrowUpRight,
     HeartIcon as Heart,
-    GlobeIcon as Globe
+    BookOpenIcon as Globe
   } from "phosphor-svelte";
 
-  let showAcoustidKey = $state(false);
   let showListenBrainzToken = $state(false);
-  let hasEnvKey = $state(false);
   let picardCustomPath = $state("");
   let isRecheckingPicard = $state(false);
   let contextEnrichmentEnabled = $state(true);
@@ -67,11 +64,6 @@
   onMount(async () => {
     scrobblerStore.init();
     try {
-      hasEnvKey = await invoke("has_acoustid_env_key");
-    } catch (e) {
-      console.error("Failed to check AcoustID env key on mount:", e);
-    }
-    try {
       const settings = await invoke<Record<string, string>>("get_all_app_settings");
       picardCustomPath = settings?.picard_path ?? "";
       contextEnrichmentEnabled = settings?.context_enrichment_enabled !== "false";
@@ -80,6 +72,33 @@
     }
   });
 </script>
+
+<!-- Online Data Sources (Context & Bio Enrichment) Integration Card -->
+<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
+  <div class="pb-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
+        <Globe class="w-5 h-5" />
+      </div>
+      <div class="space-y-1 min-w-0">
+        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.contextEnrichmentIntegrationTitle')}</h3>
+        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.contextEnrichmentDesc')}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between gap-4 py-1">
+    <div class="flex flex-col gap-0.5 min-w-0">
+      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.contextEnrichmentLabel')}</span>
+      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.contextEnrichmentHint')}</p>
+    </div>
+    <Toggle
+      checked={contextEnrichmentEnabled}
+      onchange={(v) => handleContextEnrichmentToggle(v)}
+      label={i18n.t('settings.contextEnrichmentLabel')}
+    />
+  </div>
+</div>
 
 <!-- ListenBrainz Scrobbler Integration Card -->
 <div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-5">
@@ -354,84 +373,5 @@
         {i18n.t('picard.browseBtn')}
       </Button>
     </div>
-  </div>
-</div>
-
-<!-- AcoustID Integration Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Sparkles class="w-5 h-5" />
-      </div>
-      <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.acoustidIntegration')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">
-          {i18n.t('settings.acoustidDesc1')}<button onclick={() => openExternalUrl("https://acoustid.org")} class="text-brand-accent hover:underline">AcoustID</button>{i18n.t('settings.acoustidDesc2')}
-          <br />
-          {i18n.t('settings.acoustidDesc3')}<button onclick={() => { window.location.hash = '#help'; }} class="text-brand-accent hover:underline">{i18n.t('settings.acoustidUserGuide')}</button>{i18n.t('settings.acoustidDesc4')}
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <div>
-    {#if hasEnvKey}
-      <div class="mb-4 text-xs font-medium text-brand-accent-text flex items-center gap-2">
-        <Check class="w-3.5 h-3.5" />
-        <span>{i18n.t('settings.acoustidEnvKeyFound', { env: 'ACOUSTID_API_KEY' })}</span>
-      </div>
-    {/if}
-
-    <div class="flex items-center gap-3 max-w-md">
-      <div class="relative flex-1">
-        <Input
-          type={showAcoustidKey ? "text" : "password"}
-          bind:value={prefs.acoustidApiKey}
-          onchange={() => prefs.setAcoustidApiKey(prefs.acoustidApiKey)}
-          placeholder={i18n.t('settings.acoustidPlaceholder')}
-          class="w-full pr-10"
-        />
-        <button
-          type="button"
-          onclick={() => showAcoustidKey = !showAcoustidKey}
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-secondary hover:text-brand-text-primary transition-colors"
-          title={showAcoustidKey ? "Hide key" : "Show key"}
-        >
-          {#if showAcoustidKey}
-            <EyeOff class="w-4 h-4" />
-          {:else}
-            <Eye class="w-4 h-4" />
-          {/if}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Context & Bio Enrichment Integration Card -->
-<div class="bg-brand-sidebar border border-brand-border rounded-xl p-6 space-y-4">
-  <div class="pb-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-brand-accent/15 text-brand-accent-text shrink-0">
-        <Globe class="w-5 h-5" />
-      </div>
-      <div class="space-y-1 min-w-0">
-        <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('settings.contextEnrichmentIntegrationTitle')}</h3>
-        <p class="text-xs text-brand-text-secondary leading-relaxed">{i18n.t('settings.contextEnrichmentDesc')}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-between gap-4 py-1">
-    <div class="flex flex-col gap-0.5 min-w-0">
-      <span class="text-sm font-medium text-brand-text-primary">{i18n.t('settings.contextEnrichmentLabel')}</span>
-      <p class="text-xs text-brand-text-secondary">{i18n.t('settings.contextEnrichmentHint')}</p>
-    </div>
-    <Toggle
-      checked={contextEnrichmentEnabled}
-      onchange={(v) => handleContextEnrichmentToggle(v)}
-      label={i18n.t('settings.contextEnrichmentLabel')}
-    />
   </div>
 </div>

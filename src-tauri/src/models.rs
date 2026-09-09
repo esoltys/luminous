@@ -262,11 +262,6 @@ pub struct Song {
     // CUE support
     pub cue_path: Option<String>,
 
-    // AcoustID / fingerprint
-    pub acoustid_id: Option<String>,
-    pub acoustid_fingerprint: Option<String>,
-    pub fingerprint: Option<String>,
-
     // MusicBrainz IDs
     pub musicbrainz_album_artist_id: Option<String>,
     pub musicbrainz_artist_id: Option<String>,
