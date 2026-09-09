@@ -18,6 +18,11 @@ describe("isSmartPlaylistSpec", () => {
     expect(isSmartPlaylistSpec("artisttag:canadian")).toBe(false);
   });
 
+  it("returns false for the Moment Mix (daypart) auto-playlist spec (#223)", () => {
+    expect(isSmartPlaylistSpec("daypart:afternoon:2026-09-09:Indie")).toBe(false);
+    expect(isSmartPlaylistSpec("daypart:morning:2026-09-09:")).toBe(false);
+  });
+
   it("returns false for a null/undefined/empty spec", () => {
     expect(isSmartPlaylistSpec(null)).toBe(false);
     expect(isSmartPlaylistSpec(undefined)).toBe(false);
