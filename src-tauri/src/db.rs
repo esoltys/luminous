@@ -918,10 +918,12 @@ CREATE TABLE IF NOT EXISTS tag_assignments (
 fn seed_tag_hierarchy(conn: &rusqlite::Connection) -> Result<()> {
     use std::collections::HashMap;
 
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT genre FROM songs
-         WHERE source IN (1, 2, 11) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-    )?;
+         WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+        lib = *crate::models::LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let lists: Vec<Vec<String>> = stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .filter_map(|r| r.ok())

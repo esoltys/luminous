@@ -6,7 +6,7 @@
 //! summing across weeks would silently undercount anything that never
 //! cracked a weekly top 10. See issue #130's comment thread.
 
-use crate::models::{parse_multi_value, StatsSummary, StatsTopItem};
+use crate::models::{parse_multi_value, StatsSummary, StatsTopItem, LIBRARY_SOURCES_SQL};
 use anyhow::Result;
 use rusqlite::{params, Connection};
 
@@ -76,12 +76,12 @@ fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<Stat
 }
 
 fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT CAST(s.id AS TEXT), s.title, s.artist, COUNT(*) AS play_count, s.album
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2, 11) AND s.unavailable = 0
+           AND s.source IN ({lib}) AND s.unavailable = 0
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
                WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
@@ -89,7 +89,9 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
          GROUP BY s.id
          ORDER BY play_count DESC, s.title COLLATE NOCASE ASC
          LIMIT ?2",
-    )?;
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
             Ok(StatsTopItem {
@@ -112,7 +114,7 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
 /// metric (`CollectionScanner::get_top_albums`). The two numbers will
 /// legitimately disagree for the same album/range — see #130's discussion.
 fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT s.album, MIN(COALESCE(s.album_artist, s.artist)), MIN(track_plays.plays) AS min_plays
          FROM songs s
          JOIN (
@@ -122,7 +124,7 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
              WHERE ph.played_at >= ?1
              GROUP BY s2.id
          ) track_plays ON track_plays.song_id = s.id
-         WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+         WHERE s.source IN ({lib}) AND s.unavailable = 0
            AND s.album IS NOT NULL AND s.album != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
@@ -131,7 +133,9 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
          GROUP BY s.album
          ORDER BY min_plays DESC, s.album COLLATE NOCASE ASC
          LIMIT ?2",
-    )?;
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
             Ok(StatsTopItem {
@@ -149,13 +153,13 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
 }
 
 fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                 COUNT(*) AS play_count
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2, 11) AND s.unavailable = 0
+           AND s.source IN ({lib}) AND s.unavailable = 0
            AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
@@ -165,7 +169,9 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
          GROUP BY effective_artist COLLATE NOCASE
          ORDER BY play_count DESC, effective_artist COLLATE NOCASE ASC
          LIMIT ?2",
-    )?;
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start, TOP_N], |row| {
             Ok(StatsTopItem {
@@ -187,14 +193,16 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
 /// counting can't be a plain SQL `GROUP BY` — each play is attributed to
 /// every genre tag on its song, then tallied and ranked in Rust.
 fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT s.genre
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2, 11) AND s.unavailable = 0
+           AND s.source IN ({lib}) AND s.unavailable = 0
            AND s.genre IS NOT NULL AND s.genre != ''",
-    )?;
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let genre_lists: Vec<String> = stmt
         .query_map(params![range_start], |row| row.get(0))?
         .filter_map(|r| r.ok())
@@ -249,17 +257,19 @@ fn excluded_keys(
 /// stale-offset bugs if the user's timezone changes between listen-time and
 /// view-time.
 fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
-    let mut stmt = conn.prepare(
+    let sql = format!(
         "SELECT ph.played_at
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2, 11) AND s.unavailable = 0
+           AND s.source IN ({lib}) AND s.unavailable = 0
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
                WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
            )",
-    )?;
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let rows = stmt
         .query_map(params![range_start], |row| row.get(0))?
         .filter_map(|r| r.ok())

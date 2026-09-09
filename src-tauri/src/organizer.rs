@@ -6,7 +6,7 @@
 use crate::collection::is_audio_file;
 use crate::covermanager::CoverManager;
 use crate::db::Database;
-use crate::models::{self, Song};
+use crate::models::{self, Song, LOCAL_SOURCES_SQL};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -473,10 +473,12 @@ pub fn compute_preview(
         .collect();
 
     let songs: Vec<Song> = if song_ids.is_empty() {
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2) AND unavailable = 0",
-        )?;
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
+            lib = *LOCAL_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             Ok(Song {
                 id: row.get(0)?,
@@ -535,10 +537,12 @@ pub fn compute_preview(
     let casing_basis_songs: Vec<Song> = if song_ids.is_empty() {
         songs.clone()
     } else {
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT id, path, title, artist, album, album_artist, track, disc, year, genre
-             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN (1, 2) AND unavailable = 0",
-        )?;
+             FROM songs WHERE path IS NOT NULL AND TRIM(path) != '' AND source IN ({lib}) AND unavailable = 0",
+            lib = *LOCAL_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map([], |row| {
             Ok(Song {
                 id: row.get(0)?,

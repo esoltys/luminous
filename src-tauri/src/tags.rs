@@ -15,7 +15,7 @@ use crate::{
     db::Database,
     models::{
         join_multi_value, parse_multi_value, GenreGroup, QueuePopulationMode, Song, Tag, TagCount,
-        TagGroup, TagGroupChild,
+        TagGroup, TagGroupChild, LIBRARY_SOURCES_SQL,
     },
 };
 use anyhow::Result;
@@ -69,13 +69,15 @@ impl TagManager {
     /// for scanned/local songs that are currently available.
     fn all_song_genre_lists(&self) -> Result<Vec<Vec<String>>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT genre FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND genre IS NOT NULL
                AND genre != ''",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let lists = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
@@ -185,14 +187,14 @@ impl TagManager {
     /// from `all_song_genre_lists` entirely, so tracked separately.
     fn count_songs_without_genre(&self) -> Result<i64> {
         let conn = self.db.pool.get()?;
-        let count = conn.query_row(
+        let sql = format!(
             "SELECT COUNT(*) FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND (genre IS NULL OR genre = '')",
-            [],
-            |row| row.get(0),
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let count = conn.query_row(&sql, [], |row| row.get(0))?;
         Ok(count)
     }
 
@@ -207,12 +209,13 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE (genre IS NULL OR genre = '')
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -238,12 +241,13 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE genre LIKE '%' || ?1 || '%'
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let candidates: Vec<Song> = stmt
@@ -309,14 +313,15 @@ impl TagManager {
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                AND genre IS NOT NULL
                AND genre != ''
                {extra_where}
              ORDER BY {order_by}",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -796,10 +801,12 @@ impl TagManager {
     /// [`delete_tags`]: crate::commands::tags::delete_tags
     pub fn songs_containing_any(&self, names: &[String]) -> Result<Vec<(i64, String, String)>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT id, path, genre FROM songs
-             WHERE source IN (1, 2, 11) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
-        )?;
+             WHERE source IN ({lib}) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
         let rows: Vec<(i64, String, String)> = stmt
             .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
