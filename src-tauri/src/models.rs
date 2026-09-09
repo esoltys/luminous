@@ -28,6 +28,7 @@ pub enum SongSource {
     RadioParadise = 8,
     Spotify = 9,
     RadioBrowser = 10,
+    WebDav = 11,
 }
 
 impl fmt::Display for SongSource {
@@ -49,6 +50,7 @@ impl From<i64> for SongSource {
             8 => Self::RadioParadise,
             9 => Self::Spotify,
             10 => Self::RadioBrowser,
+            11 => Self::WebDav,
             _ => Self::Unknown,
         }
     }
@@ -684,6 +686,33 @@ pub struct MusicDirectory {
     pub nickname: Option<String>,
     pub icon: Option<String>,
     pub color: Option<String>,
+}
+
+/// A configured remote WebDAV server (#682).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WebDavServer {
+    pub id: i64,
+    pub name: String,
+    pub url: String,
+    pub username: Option<String>,
+    #[serde(skip_serializing)]
+    pub password: Option<String>,
+    pub remote_path: String,
+    pub enabled: bool,
+    pub sync_status: String,
+    pub last_synced_at: Option<i64>,
+    pub created_at: i64,
+}
+
+/// Statistics returned after syncing a WebDAV server.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WebDavSyncStats {
+    pub added: usize,
+    pub updated: usize,
+    pub removed: usize,
+    pub errors: usize,
 }
 
 /// Result of pruning missing/unavailable songs from the library.

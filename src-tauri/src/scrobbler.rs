@@ -501,7 +501,7 @@ impl ScrobblerManager {
             let sql = format!(
                 "SELECT {} FROM songs
                  WHERE rating >= 4
-                   AND source IN (1, 2)
+                   AND source IN (1, 2, 11)
                    AND unavailable = 0
                    AND not_included = 0",
                 crate::collection::SONG_SELECT_COLS

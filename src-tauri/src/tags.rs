@@ -71,7 +71,7 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT genre FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN (1, 2, 11)
                AND unavailable = 0
                AND genre IS NOT NULL
                AND genre != ''",
@@ -187,7 +187,7 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let count = conn.query_row(
             "SELECT COUNT(*) FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN (1, 2, 11)
                AND unavailable = 0
                AND (genre IS NULL OR genre = '')",
             [],
@@ -207,7 +207,7 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE (genre IS NULL OR genre = '')
-               AND source IN (1, 2)
+               AND source IN (1, 2, 11)
                AND unavailable = 0
                {extra_where}
              ORDER BY {order_by}
@@ -238,7 +238,7 @@ impl TagManager {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE genre LIKE '%' || ?1 || '%'
-               AND source IN (1, 2)
+               AND source IN (1, 2, 11)
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
@@ -309,7 +309,7 @@ impl TagManager {
         let (extra_where, order_by) = mode_query_fragments(mode);
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2)
+             WHERE source IN (1, 2, 11)
                AND unavailable = 0
                AND not_included = 0
                AND genre IS NOT NULL
@@ -798,7 +798,7 @@ impl TagManager {
         let conn = self.db.pool.get()?;
         let mut stmt = conn.prepare(
             "SELECT id, path, genre FROM songs
-             WHERE source IN (1, 2) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
+             WHERE source IN (1, 2, 11) AND unavailable = 0 AND genre IS NOT NULL AND genre != ''",
         )?;
         let targets: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
         let rows: Vec<(i64, String, String)> = stmt

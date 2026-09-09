@@ -200,6 +200,13 @@ impl CollectionScanner {
 
         let mut missing = Vec::new();
         for (id, path, source) in rows.flatten() {
+            // WebDAV songs (source 11) have HTTP URLs as their path — Path::exists()
+            // always returns false for them, so skip the filesystem check entirely.
+            // They're managed by the WebDAV sync and never pruned by this path.
+            if source == 11 {
+                continue;
+            }
+
             let p = Path::new(&path);
 
             // If the file is local (source 1 or 2) and not in any watched directory, it is orphaned.

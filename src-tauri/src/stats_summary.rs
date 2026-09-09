@@ -81,7 +81,7 @@ fn top_songs(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> {
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2) AND s.unavailable = 0
+           AND s.source IN (1, 2, 11) AND s.unavailable = 0
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
                WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
@@ -122,7 +122,7 @@ fn top_albums(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
              WHERE ph.played_at >= ?1
              GROUP BY s2.id
          ) track_plays ON track_plays.song_id = s.id
-         WHERE s.source IN (1, 2) AND s.unavailable = 0
+         WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
            AND s.album IS NOT NULL AND s.album != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
@@ -155,7 +155,7 @@ fn top_artists(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>>
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2) AND s.unavailable = 0
+           AND s.source IN (1, 2, 11) AND s.unavailable = 0
            AND COALESCE(NULLIF(s.album_artist, ''), s.artist, '') != ''
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
@@ -192,7 +192,7 @@ fn top_genres(conn: &Connection, range_start: i64) -> Result<Vec<StatsTopItem>> 
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2) AND s.unavailable = 0
+           AND s.source IN (1, 2, 11) AND s.unavailable = 0
            AND s.genre IS NOT NULL AND s.genre != ''",
     )?;
     let genre_lists: Vec<String> = stmt
@@ -254,7 +254,7 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
          FROM play_history ph
          JOIN songs s ON s.id = ph.song_id
          WHERE ph.played_at >= ?1
-           AND s.source IN (1, 2) AND s.unavailable = 0
+           AND s.source IN (1, 2, 11) AND s.unavailable = 0
            AND NOT EXISTS (
                SELECT 1 FROM stats_exclusions se
                WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)

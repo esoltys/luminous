@@ -29,6 +29,8 @@ use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
     HeapRb,
 };
+use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
 use std::sync::{
     atomic::{AtomicU32, AtomicU64, Ordering},
     mpsc, Arc, Mutex,
@@ -346,14 +348,188 @@ impl Default for AudioEngine {
 }
 
 // ---------------------------------------------------------------------------
-// Media source & track opening (source-agnostic seam for #82 streaming)
+// Media source & track opening (source-agnostic seam for #682 WebDAV / #82 streaming)
 // ---------------------------------------------------------------------------
 
-/// Open a playable media source. Local files today; internet-radio HTTP
-/// streams (#82) plug in here by returning a different `MediaSource` impl.
+/// A seekable HTTP media source using HTTP Range requests (`Range: bytes=start-end`).
+/// Enables streaming audio from WebDAV and remote HTTP endpoints without full downloads.
+pub struct HttpRangeReader {
+    url: String,
+    client: reqwest::blocking::Client,
+    content_length: u64,
+    position: u64,
+    buffer: Vec<u8>,
+    buffer_start: u64,
+    chunk_size: usize,
+}
+
+impl HttpRangeReader {
+    pub fn new(url: &str) -> Result<Self, String> {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+
+        // Issue a HEAD request to discover Content-Length and verify reachability
+        let resp = client
+            .head(url)
+            .send()
+            .map_err(|e| format!("HEAD request failed for '{url}': {e}"))?;
+
+        if !resp.status().is_success() {
+            return Err(format!(
+                "HTTP error {} when accessing '{url}'",
+                resp.status()
+            ));
+        }
+
+        let content_length = resp
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+
+        let mut reader = Self {
+            url: url.to_string(),
+            client,
+            content_length,
+            position: 0,
+            buffer: Vec::new(),
+            buffer_start: 0,
+            chunk_size: 256 * 1024, // 256 KB buffer chunk
+        };
+
+        // Pre-fetch initial chunk so first read is immediate
+        reader.fill_buffer(0)?;
+        Ok(reader)
+    }
+
+    fn fill_buffer(&mut self, start: u64) -> Result<(), String> {
+        let end = if self.content_length > 0 {
+            (start + self.chunk_size as u64 - 1).min(self.content_length - 1)
+        } else {
+            start + self.chunk_size as u64 - 1
+        };
+
+        let range_header = format!("bytes={start}-{end}");
+        let mut resp = self
+            .client
+            .get(&self.url)
+            .header(reqwest::header::RANGE, range_header)
+            .send()
+            .map_err(|e| format!("Range request failed for '{}': {e}", self.url))?;
+
+        if resp.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            self.buffer_start = start;
+            self.buffer.clear();
+            return Ok(());
+        }
+
+        if !resp.status().is_success() && resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+            return Err(format!(
+                "Range request returned unexpected status {}",
+                resp.status()
+            ));
+        }
+
+        let mut data = Vec::new();
+        resp.copy_to(&mut data)
+            .map_err(|e| format!("Failed to read stream chunk: {e}"))?;
+
+        if self.content_length == 0 && resp.status() == reqwest::StatusCode::OK {
+            self.content_length = data.len() as u64;
+        }
+
+        self.buffer_start = start;
+        self.buffer = data;
+        Ok(())
+    }
+}
+
+impl Read for HttpRangeReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.content_length > 0 && self.position >= self.content_length {
+            return Ok(0); // EOF
+        }
+
+        let in_buffer = self.position >= self.buffer_start
+            && self.position < self.buffer_start + self.buffer.len() as u64;
+
+        if !in_buffer {
+            if let Err(e) = self.fill_buffer(self.position) {
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+            }
+            if self.buffer.is_empty() {
+                return Ok(0);
+            }
+        }
+
+        let offset_in_buffer = (self.position - self.buffer_start) as usize;
+        let available = self.buffer.len().saturating_sub(offset_in_buffer);
+        if available == 0 {
+            return Ok(0);
+        }
+
+        let to_read = buf.len().min(available);
+        buf[..to_read].copy_from_slice(&self.buffer[offset_in_buffer..offset_in_buffer + to_read]);
+        self.position += to_read as u64;
+        Ok(to_read)
+    }
+}
+
+impl Seek for HttpRangeReader {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        let new_pos = match pos {
+            SeekFrom::Start(offset) => offset as i64,
+            SeekFrom::Current(offset) => self.position as i64 + offset,
+            SeekFrom::End(offset) => {
+                if self.content_length > 0 {
+                    self.content_length as i64 + offset
+                } else {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Cannot seek from end of stream with unknown length",
+                    ));
+                }
+            }
+        };
+
+        if new_pos < 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Cannot seek to a negative position",
+            ));
+        }
+
+        self.position = new_pos as u64;
+        Ok(self.position)
+    }
+}
+
+impl MediaSource for HttpRangeReader {
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        if self.content_length > 0 {
+            Some(self.content_length)
+        } else {
+            None
+        }
+    }
+}
+
+/// Open a playable media source. Local files or remote HTTP/WebDAV endpoints (#682).
 fn open_media_source(path: &str) -> Result<Box<dyn MediaSource>, String> {
-    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
-    Ok(Box::new(file))
+    if path.starts_with("http://") || path.starts_with("https://") {
+        let reader = HttpRangeReader::new(path)?;
+        Ok(Box::new(reader))
+    } else {
+        let file = std::fs::File::open(path).map_err(|e| format!("Cannot open file '{path}': {e}"))?;
+        Ok(Box::new(file))
+    }
 }
 
 /// A fully opened, probed, decode-ready track.
@@ -387,14 +563,23 @@ impl ActiveTrack {
         let path = song
             .path
             .as_deref()
-            .ok_or_else(|| "Song has no local path".to_string())?
+            .or_else(|| song.stream_url.as_deref())
+            .or_else(|| song.url.as_deref())
+            .ok_or_else(|| "Song has no playable path or URL".to_string())?
             .to_owned();
 
         let source = open_media_source(&path)?;
+        let mut hint = Hint::new();
+        if let Some(ext) = Path::new(&path).extension().and_then(|e| e.to_str()) {
+            hint.with_extension(ext);
+        } else if let Some(ext) = song.path.as_deref().and_then(|p| Path::new(p).extension()).and_then(|e| e.to_str()) {
+            hint.with_extension(ext);
+        }
+
         let mss = MediaSourceStream::new(source, Default::default());
         let mut format = symphonia::default::get_probe()
             .probe(
-                &Hint::new(),
+                &hint,
                 mss,
                 FormatOptions::default(),
                 MetadataOptions::default(),
@@ -1690,5 +1875,81 @@ mod tests {
     #[test]
     fn test_get_default_device_name_does_not_panic() {
         let _ = get_default_device_name();
+    }
+
+    #[tokio::test]
+    async fn http_range_reader_reads_and_seeks_correctly() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        let test_data = b"0123456789ABCDEFabcdefghijklmnopqrstuvwxyz";
+
+        // Mock HEAD request
+        Mock::given(method("HEAD"))
+            .and(path("/track.mp3"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-length", test_data.len().to_string())
+                    .insert_header("accept-ranges", "bytes"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Mock GET request with Range parsing
+        Mock::given(method("GET"))
+            .and(path("/track.mp3"))
+            .respond_with(|req: &wiremock::Request| {
+                if let Some(range) = req.headers.get(&wiremock::http::HeaderName::from_static("range")) {
+                    let range_str = range.to_str().unwrap();
+                    if let Some(bytes_part) = range_str.strip_prefix("bytes=") {
+                        let parts: Vec<&str> = bytes_part.split('-').collect();
+                        let start: usize = parts[0].parse().unwrap_or(0);
+                        let end: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(test_data.len() - 1);
+                        let end = end.min(test_data.len() - 1);
+                        if start <= end && start < test_data.len() {
+                            let slice = &test_data[start..=end];
+                            return ResponseTemplate::new(206)
+                                .insert_header("content-range", format!("bytes {start}-{end}/{}", test_data.len()))
+                                .insert_header("content-length", slice.len().to_string())
+                                .set_body_bytes(slice.to_vec());
+                        }
+                    }
+                }
+                ResponseTemplate::new(200).set_body_bytes(test_data.to_vec())
+            })
+            .mount(&mock_server)
+            .await;
+
+        let url = format!("{}/track.mp3", mock_server.uri());
+        tokio::task::spawn_blocking(move || {
+            let mut reader = HttpRangeReader::new(&url).expect("reader failed to initialize");
+            assert_eq!(reader.byte_len(), Some(test_data.len() as u64));
+            assert!(reader.is_seekable());
+
+            // Read first 10 bytes
+            let mut buf = [0u8; 10];
+            reader.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, b"0123456789");
+
+            // Seek to 16
+            let pos = reader.seek(SeekFrom::Start(16)).unwrap();
+            assert_eq!(pos, 16);
+
+            // Read next 5 bytes
+            let mut buf2 = [0u8; 5];
+            reader.read_exact(&mut buf2).unwrap();
+            assert_eq!(&buf2, b"abcde");
+
+            // Seek from current (+2)
+            let pos = reader.seek(SeekFrom::Current(2)).unwrap();
+            assert_eq!(pos, 23); // 16 + 5 + 2
+
+            let mut buf3 = [0u8; 3];
+            reader.read_exact(&mut buf3).unwrap();
+            assert_eq!(&buf3, b"hij");
+        })
+        .await
+        .unwrap();
     }
 }

@@ -39,6 +39,7 @@ pub mod tageditor;
 pub mod tags;
 pub mod tray;
 pub mod waveform;
+pub mod webdav;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -1095,6 +1096,12 @@ pub fn run() {
             // Organizer commands
             commands::organizer::preview_organize,
             commands::organizer::apply_organize,
+            // WebDAV commands (#682)
+            commands::webdav::list_webdav_servers,
+            commands::webdav::save_webdav_server,
+            commands::webdav::delete_webdav_server,
+            commands::webdav::test_webdav_connection,
+            commands::webdav::sync_webdav_server,
             // Window & Miniplayer commands
             commands::window::geometry_capture_supported,
             commands::window::enter_miniplayer_mode,

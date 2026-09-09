@@ -80,9 +80,11 @@ bs1770 = "1"
 # --- File watching ---
 notify = { version = "8", features = ["serde"] }
 
-# --- HTTP client ---
+# --- HTTP client & WebDAV ---
 # Use rustls to avoid requiring libssl-dev system package
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "form", "rustls", "blocking"] }
+quick-xml = { version = "0.37", features = ["serialize"] }
+base64 = "0.22"
 
 # --- UUID for playlist item identity ---
 uuid = { version = "1", features = ["v4"] }
