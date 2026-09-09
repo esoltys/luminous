@@ -92,7 +92,7 @@
         <div class="flex items-center gap-2">
           <h3 class="font-bold text-sm text-brand-text-primary">{i18n.t('listenbrainz.integrationTitle')}</h3>
           {#if scrobblerStore.enabled && scrobblerStore.username}
-            <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">
+            <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 font-medium">
               <Check class="w-3 h-3" />
               {scrobblerStore.username}
             </span>
@@ -217,7 +217,7 @@
               <span class="text-xs font-semibold text-brand-text-primary">{i18n.t('listenbrainz.syncFavouritesLabel')}</span>
               <p class="text-[11px] text-brand-text-secondary">{i18n.t('listenbrainz.syncFavouritesHint')}</p>
               {#if scrobblerStore.syncFavouritesResult}
-                <p class="text-[11px] text-emerald-400 font-medium">
+                <p class="text-[11px] text-brand-text-primary font-medium">
                   {i18n.t('listenbrainz.syncFavouritesSuccess', {
                     synced: scrobblerStore.syncFavouritesResult.synced,
                     total: scrobblerStore.syncFavouritesResult.total_favourites,
@@ -225,7 +225,7 @@
                   })}
                 </p>
               {:else if scrobblerStore.syncFavouritesError}
-                <p class="text-[11px] text-rose-400 font-medium">{scrobblerStore.syncFavouritesError}</p>
+                <p class="text-[11px] text-brand-text-primary font-medium">{scrobblerStore.syncFavouritesError}</p>
               {/if}
             </div>
             <Button
@@ -269,7 +269,7 @@
                 : i18n.t('listenbrainz.cachePending', { count: scrobblerStore.pendingCount })}
             </span>
             {#if scrobblerStore.flushSuccessMessage}
-              <span class="text-xs text-emerald-400 font-medium">({scrobblerStore.flushSuccessMessage})</span>
+              <span class="text-xs text-brand-text-primary font-medium">({scrobblerStore.flushSuccessMessage})</span>
             {/if}
           </div>
           {#if scrobblerStore.lastError}
