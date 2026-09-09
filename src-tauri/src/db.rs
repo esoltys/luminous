@@ -232,6 +232,7 @@ impl Database {
                 "PRAGMA journal_mode=WAL;
                      PRAGMA synchronous=NORMAL;
                      PRAGMA foreign_keys=ON;
+                     PRAGMA busy_timeout=5000;
                      PRAGMA cache_size=-32000;  -- 32 MB page cache
                      PRAGMA temp_store=MEMORY;",
             )
