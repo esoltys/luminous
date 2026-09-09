@@ -5,7 +5,7 @@
 //! ensuring listens survive offline sessions and application restarts.
 
 use crate::db::Database;
-use crate::models::{Song, SongSource};
+use crate::models::{Song, SongSource, LIBRARY_SOURCES_SQL};
 use anyhow::Result;
 use reqwest::Client;
 use rusqlite::params;
@@ -501,10 +501,11 @@ impl ScrobblerManager {
             let sql = format!(
                 "SELECT {} FROM songs
                  WHERE rating >= 4
-                   AND source IN (1, 2, 11)
+                   AND source IN ({lib})
                    AND unavailable = 0
                    AND not_included = 0",
-                crate::collection::SONG_SELECT_COLS
+                crate::collection::SONG_SELECT_COLS,
+                lib = *LIBRARY_SOURCES_SQL
             );
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let rows = stmt

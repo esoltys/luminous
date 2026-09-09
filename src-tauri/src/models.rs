@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,33 @@ impl From<i64> for SongSource {
         }
     }
 }
+
+/// SQL `IN (...)` fragment listing the source IDs that make up the browsable
+/// library (local files, managed collection folders, and WebDAV mounts).
+/// Derived from `SongSource` discriminants so it can't silently drift from
+/// the enum. Interpolate into query strings, e.g. `format!("source IN ({})",
+/// *LIBRARY_SOURCES_SQL)`.
+pub(crate) static LIBRARY_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}, {}",
+        SongSource::LocalFile as i32,
+        SongSource::Collection as i32,
+        SongSource::WebDav as i32,
+    )
+});
+
+/// SQL `IN (...)` fragment listing the source IDs backed by a local
+/// filesystem path (local files and managed collection folders). Excludes
+/// WebDAV — remote files can't be moved/renamed by filesystem operations
+/// like the Organize feature. Derived from `SongSource` discriminants so it
+/// can't silently drift from the enum.
+pub(crate) static LOCAL_SOURCES_SQL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}, {}",
+        SongSource::LocalFile as i32,
+        SongSource::Collection as i32,
+    )
+});
 
 // ---------------------------------------------------------------------------
 // File type enum

@@ -5,7 +5,7 @@ use crate::{
     db::Database,
     models::{
         self, FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress,
-        Song, SongSource,
+        Song, SongSource, LOCAL_SOURCES_SQL,
     },
 };
 use anyhow::{Context, Result};
@@ -91,8 +91,11 @@ impl CollectionScanner {
         // Mark all songs under this directory as unavailable
         let mut to_mark = Vec::new();
         {
-            let mut stmt = tx
-                .prepare("SELECT id, path FROM songs WHERE source IN (1, 2) AND unavailable = 0")?;
+            let sql = format!(
+                "SELECT id, path FROM songs WHERE source IN ({lib}) AND unavailable = 0",
+                lib = *LOCAL_SOURCES_SQL
+            );
+            let mut stmt = tx.prepare(&sql)?;
             let rows = stmt.query_map([], |row| {
                 let id: i64 = row.get(0)?;
                 let p: String = row.get(1)?;
@@ -561,7 +564,7 @@ impl CollectionScanner {
         log::info!("Starting artwork resolution for missing albums...");
         let mut albums_to_resolve = Vec::new();
         if let Ok(conn) = self.db.pool.get() {
-            if let Ok(mut stmt) = conn.prepare(
+            let sql = format!(
                 "SELECT
                     id,
                     path,
@@ -569,11 +572,13 @@ impl CollectionScanner {
                     album,
                     art_embedded
                  FROM songs
-                 WHERE source IN (1, 2)
+                 WHERE source IN ({lib})
                    AND album IS NOT NULL
                    AND (art_unset = 1 OR (art_automatic IS NULL AND art_manual IS NULL))
                  GROUP BY effective_artist, album",
-            ) {
+                lib = *LOCAL_SOURCES_SQL
+            );
+            if let Ok(mut stmt) = conn.prepare(&sql) {
                 if let Ok(mut rows) = stmt.query([]) {
                     while let Ok(Some(row)) = rows.next() {
                         if let (

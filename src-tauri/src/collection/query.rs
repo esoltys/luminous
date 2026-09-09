@@ -10,7 +10,7 @@ use super::{
 };
 use crate::models::{
     AlbumItem, ArtistProfile, ArtistSocialLink, HomeItem, LibraryStats, Playlist,
-    QueuePopulationMode, Song, TopAlbumItem,
+    QueuePopulationMode, Song, TopAlbumItem, LIBRARY_SOURCES_SQL,
 };
 use anyhow::Result;
 use rusqlite::{params, ToSql};
@@ -157,10 +157,11 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2, 11) AND unavailable = 0
+             WHERE source IN ({lib}) AND unavailable = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track
              LIMIT ?1 OFFSET ?2",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -175,10 +176,11 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE album = ?1
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
              ORDER BY disc, track",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -217,12 +219,13 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE ({} OR {})
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
              ORDER BY COALESCE(albumsort, album), disc, track",
             SONG_SELECT_COLS,
             multi_value_contains_sql("COALESCE(artist, '')", "?1"),
-            multi_value_contains_sql("COALESCE(album_artist, '')", "?1")
+            multi_value_contains_sql("COALESCE(album_artist, '')", "?1"),
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -258,7 +261,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs g
-                    WHERE g.album = songs.album AND g.source IN (1, 2, 11) AND g.unavailable = 0
+                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
@@ -271,14 +274,14 @@ impl CollectionScanner {
                 MAX(added) AS added,
                 COALESCE(SUM(length_nanosec), 0) AS total_duration_nanosec
              FROM songs
-             WHERE source IN (1, 2, 11) AND unavailable = 0 AND album IS NOT NULL AND album != ''
+             WHERE source IN ({lib}) AND unavailable = 0 AND album IS NOT NULL AND album != ''
                AND album IN (
                  SELECT album FROM songs s2
-                 WHERE s2.source IN (1, 2, 11) AND s2.unavailable = 0 AND {}
+                 WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND {}
                )
                AND album IN (
                  SELECT album FROM songs s3
-                 WHERE s3.source IN (1, 2, 11) AND s3.unavailable = 0
+                 WHERE s3.source IN ({lib}) AND s3.unavailable = 0
                  GROUP BY album
                  -- Mirrors get_albums()'s various-artists fallback: a compilation
                  -- either has TCMP set, is explicitly credited to Various
@@ -297,7 +300,8 @@ impl CollectionScanner {
                )
              GROUP BY album
              ORDER BY COALESCE(MAX(albumsort), album)",
-            multi_value_contains_sql("s2.artist", "?1")
+            multi_value_contains_sql("s2.artist", "?1"),
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
@@ -328,11 +332,12 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {} FROM songs
              WHERE rating = 5
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
              ORDER BY COALESCE(album_artist_sort, album_artist), COALESCE(albumsort, album), disc, track",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -347,13 +352,14 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                AND added IS NOT NULL
              ORDER BY added DESC
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -378,9 +384,10 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON ph.song_id = s.id
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0 AND s.not_included = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.not_included = 0
              ORDER BY ph.play_count DESC, s.added DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -394,15 +401,17 @@ impl CollectionScanner {
     /// auto-playlist per genre.
     pub fn get_library_genres(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT DISTINCT genre FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                AND genre IS NOT NULL
                AND genre != ''
              ORDER BY COALESCE(genresort, genre)",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let genres = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
@@ -414,17 +423,19 @@ impl CollectionScanner {
     /// auto-playlist per decade.
     pub fn get_library_decades(&self) -> Result<Vec<String>> {
         let conn = self.db.pool.get()?;
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT DISTINCT (COALESCE(year, originalyear) / 10 * 10) AS decade_start
              FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                AND COALESCE(year, originalyear) IS NOT NULL
                AND COALESCE(year, originalyear) >= 1000
                AND COALESCE(year, originalyear) <= 9999
              ORDER BY decade_start ASC",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let decades = stmt
             .query_map([], |row| {
                 let start: i32 = row.get(0)?;
@@ -453,13 +464,14 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE COALESCE(year, originalyear) >= ?1
                AND COALESCE(year, originalyear) <= ?2
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -489,13 +501,14 @@ impl CollectionScanner {
             "SELECT {} FROM songs
              WHERE bpm >= ?1
                {upper_bound}
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?3",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -521,13 +534,14 @@ impl CollectionScanner {
                  SELECT artist_key FROM artist_profiles, json_each(artist_profiles.tags)
                  WHERE json_each.value = ?1 COLLATE NOCASE
              )
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?2",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -556,13 +570,14 @@ impl CollectionScanner {
                  OR artist IS NULL OR TRIM(artist) = ''
                  OR album IS NULL OR TRIM(album) = ''
              )
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -587,13 +602,14 @@ impl CollectionScanner {
              WHERE (
                  musicbrainz_recording_id IS NULL OR TRIM(musicbrainz_recording_id) = ''
              )
-               AND source IN (1, 2, 11)
+               AND source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
                {extra_where}
              ORDER BY {order_by}
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -614,12 +630,13 @@ impl CollectionScanner {
         let conn = self.db.pool.get()?;
         let sql = format!(
             "SELECT {} FROM songs
-             WHERE source IN (1, 2, 11)
+             WHERE source IN ({lib})
                AND unavailable = 0
                AND not_included = 0
              ORDER BY RANDOM()
              LIMIT ?1",
-            SONG_SELECT_COLS
+            SONG_SELECT_COLS,
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -654,7 +671,7 @@ impl CollectionScanner {
         // but the same album title are consolidated into a single entry.
         // album_artist is taken as the shared value when all tracks agree on it;
         // if they differ (true various-artist albums), it comes back as NULL.
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "SELECT
                 CASE
                     WHEN COUNT(DISTINCT NULLIF(album_artist, '')) = 1 THEN MAX(NULLIF(album_artist, ''))
@@ -671,7 +688,7 @@ impl CollectionScanner {
                 (
                     SELECT genre
                     FROM songs g
-                    WHERE g.album = songs.album AND g.source IN (1, 2, 11) AND g.unavailable = 0
+                    WHERE g.album = songs.album AND g.source IN ({lib}) AND g.unavailable = 0
                       AND g.genre IS NOT NULL AND g.genre != ''
                     GROUP BY genre
                     ORDER BY COUNT(*) DESC, COALESCE(genresort, genre) ASC
@@ -686,10 +703,12 @@ impl CollectionScanner {
                 COALESCE(MAX(NULLIF(album_artist_sort, '')), MAX(NULLIF(artistsort, ''))) AS artist_sort,
                 MAX(NULLIF(albumsort, '')) AS albumsort
              FROM songs
-             WHERE source IN (1, 2, 11) AND album IS NOT NULL AND album != '' AND unavailable = 0
+             WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
              GROUP BY album
              ORDER BY COALESCE(MAX(album_artist_sort), MAX(artistsort), MAX(album_artist), MAX(artist)), COALESCE(MAX(albumsort), album)",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let albums: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
@@ -725,11 +744,11 @@ impl CollectionScanner {
         // drift across files/albums for the same real-world artist (e.g. "The War On
         // Drugs" vs "The War on Drugs") doesn't show up as two separate cards — see
         // issue #295. `MIN(...)` picks one deterministic casing per group to display.
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2, 11) AND album IS NOT NULL AND album != '' AND unavailable = 0
+                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
@@ -737,7 +756,7 @@ impl CollectionScanner {
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
-                WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+                WHERE s.source IN ({lib}) AND s.unavailable = 0
              ),
              grouped AS (
                 SELECT MIN(effective_artist) AS effective_artist,
@@ -760,7 +779,7 @@ impl CollectionScanner {
                     SELECT genre
                     FROM songs sg
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
-                      AND sg.source IN (1, 2, 11) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                      AND sg.source IN ({lib}) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
@@ -769,7 +788,9 @@ impl CollectionScanner {
                 g.total_playcount
              FROM grouped g
              ORDER BY g.sort_artist COLLATE NOCASE",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
@@ -795,11 +816,11 @@ impl CollectionScanner {
     pub fn get_top_artists(&self, limit: i64) -> Result<Vec<serde_json::Value>> {
         let conn = self.db.pool.get()?;
         // See get_artists() for why grouping is case-insensitive (issue #295).
-        let mut stmt = conn.prepare(
+        let sql = format!(
             "WITH album_counts AS (
                 SELECT album, COUNT(*) AS track_count
                 FROM songs
-                WHERE source IN (1, 2, 11) AND album IS NOT NULL AND album != '' AND unavailable = 0
+                WHERE source IN ({lib}) AND album IS NOT NULL AND album != '' AND unavailable = 0
                 GROUP BY album
              ),
              base AS (
@@ -807,7 +828,7 @@ impl CollectionScanner {
                        COALESCE(NULLIF(s.album_artist, ''), s.artist, '') AS effective_artist,
                        COALESCE(NULLIF(s.album_artist_sort, ''), NULLIF(s.album_artist, ''), NULLIF(s.artistsort, ''), s.artist, '') AS sort_artist
                 FROM songs s
-                WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+                WHERE s.source IN ({lib}) AND s.unavailable = 0
              ),
              totals AS (
                 SELECT SUM(COALESCE(playcount, 0)) AS lib_total_playcount FROM base
@@ -835,7 +856,7 @@ impl CollectionScanner {
                     SELECT genre
                     FROM songs sg
                     WHERE COALESCE(NULLIF(sg.album_artist, ''), sg.artist, '') = g.effective_artist COLLATE NOCASE
-                      AND sg.source IN (1, 2, 11) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
+                      AND sg.source IN ({lib}) AND sg.unavailable = 0 AND sg.genre IS NOT NULL AND sg.genre != ''
                     GROUP BY sg.genre
                     ORDER BY COUNT(*) DESC, COALESCE(sg.genresort, sg.genre) ASC
                     LIMIT 1
@@ -846,7 +867,9 @@ impl CollectionScanner {
                 CASE WHEN t.lib_total_playcount = 0 THEN g.song_count END DESC,
                 g.sort_artist COLLATE NOCASE
              LIMIT ?1",
-        )?;
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let mut stmt = conn.prepare(&sql)?;
         let artists: Vec<serde_json::Value> = stmt
             .query_map(params![limit], |row| {
                 Ok(serde_json::json!({
@@ -883,25 +906,25 @@ impl CollectionScanner {
 
     pub fn get_library_stats(&self) -> Result<LibraryStats> {
         let conn = self.db.pool.get()?;
-        let stats = conn.query_row(
+        let sql = format!(
             "SELECT
                 COUNT(*) as total_songs,
                 COUNT(DISTINCT COALESCE(NULLIF(album_artist,''), artist)) as total_artists,
                 COUNT(DISTINCT album) as total_albums,
                 COALESCE(SUM(length_nanosec), 0) as total_duration,
                 COALESCE(SUM(filesize), 0) as total_filesize
-             FROM songs WHERE source IN (1, 2, 11) AND unavailable = 0",
-            [],
-            |row| {
-                Ok(LibraryStats {
-                    total_songs: row.get(0)?,
-                    total_artists: row.get(1)?,
-                    total_albums: row.get(2)?,
-                    total_duration_nanosec: row.get(3)?,
-                    total_filesize_bytes: row.get(4)?,
-                })
-            },
-        )?;
+             FROM songs WHERE source IN ({lib}) AND unavailable = 0",
+            lib = *LIBRARY_SOURCES_SQL
+        );
+        let stats = conn.query_row(&sql, [], |row| {
+            Ok(LibraryStats {
+                total_songs: row.get(0)?,
+                total_artists: row.get(1)?,
+                total_albums: row.get(2)?,
+                total_duration_nanosec: row.get(3)?,
+                total_filesize_bytes: row.get(4)?,
+            })
+        })?;
         Ok(stats)
     }
 
@@ -921,9 +944,10 @@ impl CollectionScanner {
                  FROM play_history
                  GROUP BY song_id
              ) ph ON s.id = ph.song_id
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
              ORDER BY ph.last_played_at DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -956,7 +980,7 @@ impl CollectionScanner {
             "SELECT {home_item_select_cols}, ph.context_type, ph.playlist_id
              FROM play_history ph
              JOIN songs s ON s.id = ph.song_id
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
                AND NOT (
                    ph.context_type = 'playlist'
                    AND ph.playlist_id IN (
@@ -964,7 +988,8 @@ impl CollectionScanner {
                    )
                )
              ORDER BY ph.played_at DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, String, Option<i64>)> = stmt
@@ -1016,9 +1041,10 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {home_item_select_cols}
              FROM songs s
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0 AND s.added IS NOT NULL
+             WHERE s.source IN ({lib}) AND s.unavailable = 0 AND s.added IS NOT NULL
              ORDER BY s.added DESC
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
@@ -1048,10 +1074,11 @@ impl CollectionScanner {
         let sql = format!(
             "SELECT {home_item_select_cols}
              FROM songs s
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
                AND s.album IS NOT NULL AND s.album != ''
              ORDER BY RANDOM()
-             LIMIT ?1"
+             LIMIT ?1",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs_with_counts: Vec<(Song, i64, i64)> = stmt
@@ -1109,13 +1136,14 @@ impl CollectionScanner {
                  FROM play_history ph
                  JOIN songs s2 ON s2.id = ph.song_id
                  WHERE ph.played_at >= ?1
-                   AND s2.source IN (1, 2, 11) AND s2.unavailable = 0
+                   AND s2.source IN ({lib}) AND s2.unavailable = 0
                    AND s2.album IS NOT NULL AND s2.album != ''
                  GROUP BY s2.album
              ) wc ON wc.album = s.album
-             WHERE s.source IN (1, 2, 11) AND s.unavailable = 0
+             WHERE s.source IN ({lib}) AND s.unavailable = 0
              ORDER BY wc.week_plays DESC, s.added DESC
-             LIMIT ?2"
+             LIMIT ?2",
+            lib = *LIBRARY_SOURCES_SQL
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows: Vec<(Song, i64, i64, i64)> = stmt
@@ -1561,13 +1589,14 @@ fn multi_value_contains_pattern(value: &str) -> String {
 /// (`get_recently_played`, `get_recently_added`),
 /// which all join on `songs s`.
 fn home_item_select_cols() -> String {
+    let lib = &*LIBRARY_SOURCES_SQL;
     format!(
         "{SONG_SELECT_COLS_QUALIFIED},
     (SELECT COUNT(*) FROM songs s2
-     WHERE s2.source IN (1, 2, 11) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_track_count,
     (SELECT COALESCE(MAX(COALESCE(s2.disc, 1)), 1) FROM songs s2
-     WHERE s2.source IN (1, 2, 11) AND s2.unavailable = 0 AND s2.album = s.album
+     WHERE s2.source IN ({lib}) AND s2.unavailable = 0 AND s2.album = s.album
     ) AS album_disc_count"
     )
 }

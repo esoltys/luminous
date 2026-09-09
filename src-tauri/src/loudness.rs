@@ -11,7 +11,7 @@
 //! DSP chain by #47.
 
 use crate::db::Database;
-use crate::models::{LoudnessGainSource, LoudnessMode, LoudnessSettings};
+use crate::models::{LoudnessGainSource, LoudnessMode, LoudnessSettings, LOCAL_SOURCES_SQL};
 use anyhow::{anyhow, Context, Result};
 use rusqlite::{params, OptionalExtension};
 use std::path::Path;
@@ -266,10 +266,13 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
                 let next: Option<(i64, String)> = match db.pool.get() {
                     Ok(conn) => conn
                         .query_row(
-                            "SELECT id, path FROM songs
-                         WHERE source IN (1, 2) AND unavailable = 0 AND path IS NOT NULL
+                            &format!(
+                                "SELECT id, path FROM songs
+                         WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
                            AND ebur128_integrated_loudness_lufs IS NULL
                          ORDER BY added DESC, id DESC LIMIT 1",
+                                lib = *LOCAL_SOURCES_SQL
+                            ),
                             [],
                             |row| Ok((row.get(0)?, row.get(1)?)),
                         )
@@ -305,9 +308,12 @@ pub fn spawn_background_analyzer(app: AppHandle, db: Arc<Database>) {
                         )
                         .ok()?;
                         conn.query_row(
-                            "SELECT COUNT(*) FROM songs
-                         WHERE source IN (1, 2) AND unavailable = 0 AND path IS NOT NULL
+                            &format!(
+                                "SELECT COUNT(*) FROM songs
+                         WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL
                            AND ebur128_integrated_loudness_lufs IS NULL",
+                                lib = *LOCAL_SOURCES_SQL
+                            ),
                             [],
                             |row| row.get(0),
                         )
