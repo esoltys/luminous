@@ -89,7 +89,7 @@
 
 <div class="flex flex-col h-full w-full bg-brand-main overflow-hidden">
   <div class="flex-1 overflow-y-auto {playerStore.currentSong ? 'pb-28' : 'pb-6'}" use:rememberScroll={"home"}>
-    <div class="px-6 pt-8">
+    <div class="px-6 pt-4">
       <h1 class="text-3xl font-heading font-bold text-brand-text-primary">
         {timeOfDayGreeting}
       </h1>
