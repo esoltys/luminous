@@ -251,4 +251,101 @@ describe("ArtistDetailView", () => {
       expect(await screen.findByText("Fanart.tv")).toBeTruthy();
     });
   });
+
+  describe("biography 'Show more' truncation", () => {
+    const longBio = "Shania Twain is a Canadian singer and songwriter. She has sold over 100 million records, making her the best-selling female artist in country music history and one of the best-selling music artists of all time. Her success garnered her several titles including the Queen of Country Pop.";
+
+    it("does not show 'Show more' when the bio text is not truncated even if length > 200", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string, args?: any) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") {
+          return Promise.resolve({
+            artist_key: "Shania Twain",
+            website: "https://www.shaniatwain.com",
+            tags: ["country"],
+            social_links: [],
+            bio: longBio,
+          });
+        }
+        return Promise.resolve();
+      });
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          website: "https://www.shaniatwain.com",
+          tags: ["country"],
+          social_links: [],
+          bio: longBio,
+        },
+      };
+
+      render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(screen.getByText(longBio)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
+    });
+
+    it("shows 'Show more' when bio text is truncated, and toggles expansion on click", async () => {
+      const invokeMock = vi.mocked(invoke);
+      invokeMock.mockImplementation((cmd: string, args?: any) => {
+        if (cmd === "get_songs_by_artist") return Promise.resolve([]);
+        if (cmd === "get_playlists_by_artist") return Promise.resolve([]);
+        if (cmd === "get_compilations_by_artist") return Promise.resolve([]);
+        if (cmd === "get_artist_profile") {
+          return Promise.resolve({
+            artist_key: "Shania Twain",
+            website: "https://www.shaniatwain.com",
+            tags: ["country"],
+            social_links: [],
+            bio: longBio,
+          });
+        }
+        return Promise.resolve();
+      });
+      collectionStore.artistProfiles = {
+        "shania twain": {
+          artist_key: "Shania Twain",
+          website: "https://www.shaniatwain.com",
+          tags: ["country"],
+          social_links: [],
+          bio: longBio,
+        },
+      };
+
+      // In the DOM spec, scrollHeight/clientHeight are on Element.prototype.
+      // Mocking on HTMLParagraphElement.prototype targets <p> without affecting container elements.
+      Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {
+        configurable: true,
+        get: () => 120,
+      });
+      Object.defineProperty(HTMLParagraphElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => 60,
+      });
+
+      try {
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const showMoreBtn = screen.getByRole("button", { name: "Show more" });
+        expect(showMoreBtn).toBeTruthy();
+
+        await fireEvent.click(showMoreBtn);
+
+        const showLessBtn = screen.getByRole("button", { name: "Show less" });
+        expect(showLessBtn).toBeTruthy();
+
+        await fireEvent.click(showLessBtn);
+        expect(screen.getByRole("button", { name: "Show more" })).toBeTruthy();
+      } finally {
+        delete (HTMLParagraphElement.prototype as any).scrollHeight;
+        delete (HTMLParagraphElement.prototype as any).clientHeight;
+      }
+    });
+  });
 });

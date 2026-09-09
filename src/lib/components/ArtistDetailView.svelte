@@ -121,6 +121,23 @@
   let hasBio = $derived(!!effectiveBio);
   let hasProfileContent = $derived(hasWebsite || hasBio || hasSocials);
 
+  let bioParagraphEl = $state<HTMLParagraphElement | undefined>();
+  let bioIsTruncated = $state(false);
+
+  // Only show "Show more" when the clamp actually hides text — measured
+  // once per bio while still clamped (isBioExpanded resets to false on every
+  // artist load), since a fixed character threshold would be wrong for
+  // responsive widths.
+  $effect(() => {
+    const text = effectiveBio;
+    const el = bioParagraphEl;
+    if (!text || !el) {
+      bioIsTruncated = false;
+      return;
+    }
+    bioIsTruncated = el.scrollHeight > el.clientHeight + 1;
+  });
+
   // Locally-discovered artist visuals (#98/#761) — portrait/logo/fanart,
   // fetched on demand per artist since scanning every artist's folder
   // eagerly would be far too expensive (see #758's design notes).
@@ -262,6 +279,7 @@
 
   $effect(() => {
     const requested = artistName;
+    isBioExpanded = false;
     // Track collectionStore.songs so artist details update when the library changes (e.g. new albums added)
     const _libraryVersion = collectionStore.songs;
     loading = true;
@@ -562,7 +580,6 @@
           <!-- Bio -->
           {#if hasBio}
             {@const bioText = effectiveBio ?? ""}
-            {@const isLongBio = bioText.length > 200}
             <div class="text-xs text-brand-text-secondary leading-relaxed">
               {#if bioIsFromWikipedia}
                 <button
@@ -574,10 +591,10 @@
                   <ExternalLink class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               {/if}
-              <p class="{!isBioExpanded && isLongBio ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
+              <p bind:this={bioParagraphEl} class="{!isBioExpanded ? 'line-clamp-2 sm:line-clamp-3' : ''} whitespace-pre-line">
                 {bioText}
               </p>
-              {#if isLongBio}
+              {#if bioIsTruncated || isBioExpanded}
                 <button
                   type="button"
                   onclick={() => { isBioExpanded = !isBioExpanded; }}
