@@ -15,6 +15,7 @@ import type {
   ExtendedArtworkResponse,
   RecentSearchItem,
   QueuePopulationMode,
+  WebDavServer,
 } from "../types";
 import { applySongStats, type SongStatsPayload, applyAlbumStats, type AlbumStatsPayload } from "../utils/stats";
 import { navigationStore } from "./navigation.svelte";
@@ -83,6 +84,7 @@ const EMPTY_EXTENDED_ARTWORK: ExtendedArtworkResponse = {
 
 class CollectionStore {
   directories = $state<MusicDirectory[]>([]);
+  webdavServers = $state<WebDavServer[]>([]);
   stats = $state<LibraryStats>({
     total_songs: 0,
     total_artists: 0,
@@ -271,6 +273,7 @@ class CollectionStore {
       }
 
       await this.refreshDirectories();
+      await this.refreshWebDavServers();
       await this.refreshDbSchemaStatus();
       await this.refreshStats();
       await this.refreshLibrary();
@@ -382,6 +385,7 @@ class CollectionStore {
         this.refreshStats();
         this.refreshLibrary();
         this.refreshDirectories();
+        this.refreshWebDavServers();
         tagsStore.load().catch((err) => {
           console.error("Failed to refresh tags after library change:", err);
         });
@@ -461,6 +465,10 @@ class CollectionStore {
     this.directories = await invoke("get_directories");
   }
 
+  async refreshWebDavServers() {
+    this.webdavServers = await invoke("list_webdav_servers");
+  }
+
   async updateDirectoryMetadata(
     id: number,
     metadata: { nickname?: string | null; icon?: string | null; color?: string | null }
@@ -477,6 +485,9 @@ class CollectionStore {
   /**
    * Resolves the watched directory for a given song file path by finding the
    * longest matching directory root. Normalizes path separators and casing.
+   * Falls back to a synthesized directory-shaped badge for a WebDAV song
+   * (#682) — those live in `webdavServers`, not `directories`, since they're
+   * not local filesystem paths at all.
    */
   getDirectoryForPath(path: string | null | undefined): MusicDirectory | undefined {
     if (!path) return undefined;
@@ -493,7 +504,37 @@ class CollectionStore {
         }
       }
     }
-    return bestMatch;
+    if (bestMatch) return bestMatch;
+
+    return this.getWebDavServerForPath(path);
+  }
+
+  /**
+   * Resolves the WebDAV server a song's playback URL belongs to, for display
+   * as a "Library" badge. The stored URL carries embedded `user:pass@`
+   * credentials the server's own `url` field doesn't, so those are stripped
+   * before comparing. Returns a `MusicDirectory`-shaped object for reuse with
+   * `LibraryBadge` — negative `id` keeps it from colliding with a real
+   * watched-directory id; nothing acts on that id beyond display.
+   */
+  getWebDavServerForPath(path: string | null | undefined): MusicDirectory | undefined {
+    if (!path) return undefined;
+    const credentialFree = path.replace(/^(https?:\/\/)[^@/]*@/i, "$1");
+    const normalized = credentialFree.toLowerCase();
+    for (const server of this.webdavServers) {
+      const base = `${server.url.replace(/\/+$/, "")}/${server.remotePath.replace(/^\/+/, "")}`;
+      if (normalized.startsWith(base.toLowerCase())) {
+        return {
+          id: -server.id,
+          path: base,
+          subdirs: true,
+          nickname: server.name,
+          icon: "cloud",
+          is_available: server.syncStatus !== "error",
+        };
+      }
+    }
+    return undefined;
   }
 
   /**
