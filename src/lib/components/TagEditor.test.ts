@@ -34,14 +34,6 @@ describe("TagEditor.svelte", () => {
     vi.clearAllMocks();
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
       if (cmd === "get_song_details") return mockSongDetails;
-      if (cmd === "lookup_acoustid_tags") {
-        return {
-          title: "Fetched Title",
-          artist: "Fetched Artist",
-          album: "Fetched Album",
-          year: 2021,
-        };
-      }
       if (cmd === "save_song_tags") return null;
       if (cmd === "clear_song_cover_art") return null;
       if (cmd === "set_song_rating") return 5;
@@ -257,23 +249,5 @@ describe("TagEditor.svelte", () => {
 
     // The modal itself stays open (unlike Save), so the user can keep editing.
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("handles AcoustID fingerprint lookup to suggest tags", async () => {
-    const onClose = vi.fn();
-    const { getByRole, getByLabelText } = render(TagEditor, { songId: 10, onClose });
-
-    await waitFor(() => {
-      expect(getByRole("button", { name: /lookup acoustid/i })).toBeInTheDocument();
-    });
-
-    const lookupBtn = getByRole("button", { name: /lookup acoustid/i });
-    await fireEvent.click(lookupBtn);
-
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("lookup_acoustid_tags", { songId: 10 });
-      const titleInput = getByLabelText("Song Title") as HTMLInputElement;
-      expect(titleInput.value).toBe("Fetched Title");
-    });
   });
 });

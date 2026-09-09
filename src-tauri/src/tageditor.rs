@@ -1,11 +1,5 @@
-//! Tag editing and AcoustID-based tag suggestion.
-//!
-//! Two independent capabilities: writing user-edited tag fields back to a
-//! file on disk (`write_tags`), and suggesting tags for an unidentified file
-//! by fingerprinting it and querying the AcoustID lookup service
-//! (`generate_fingerprint` + `lookup_acoustid`, chained by the command layer
-//! in `commands/tageditor.rs`). Fingerprinting shells out to the external
-//! `fpcalc` (Chromaprint) binary rather than reimplementing the algorithm.
+//! Tag editing — writing user-edited tag fields back to a file on disk
+//! (`write_tags`).
 
 use crate::models;
 use anyhow::{anyhow, Context, Result};
@@ -13,81 +7,7 @@ use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey, Tag, TagItem};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::Duration;
-
-#[derive(Deserialize)]
-struct FpCalcOutput {
-    duration: f64,
-    fingerprint: String,
-}
-
-/// Tag fields proposed by an AcoustID match, for the caller to review and
-/// selectively apply — a `None` field means AcoustID didn't return a value
-/// for it, not that the value should be cleared.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SuggestedTags {
-    pub title: Option<String>,
-    pub artist: Option<String>,
-    pub album: Option<String>,
-    pub year: Option<u32>,
-    /// The matched AcoustID recording's own UUID (#752) — set whenever a
-    /// match was found, independent of whether any of title/artist/album/year
-    /// also had values, so the caller can persist it even for a match with
-    /// otherwise-sparse metadata.
-    pub acoustid_id: Option<String>,
-    /// The fingerprint that was looked up, echoed back so the caller can
-    /// persist it alongside `acoustid_id` without recomputing it (#752).
-    pub fingerprint: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct AcoustIdArtist {
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct AcoustIdReleaseGroup {
-    title: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct AcoustIdRelease {
-    title: Option<String>,
-    date: Option<AcoustIdDate>,
-}
-
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum AcoustIdDate {
-    Year(u32),
-    Full(String),
-}
-
-#[derive(Deserialize)]
-struct AcoustIdRecording {
-    title: Option<String>,
-    artists: Option<Vec<AcoustIdArtist>>,
-    #[serde(rename = "releasegroups")]
-    release_groups: Option<Vec<AcoustIdReleaseGroup>>,
-    releases: Option<Vec<AcoustIdRelease>>,
-}
-
-#[derive(Deserialize)]
-struct AcoustIdResult {
-    id: String,
-    score: f64,
-    recordings: Option<Vec<AcoustIdRecording>>,
-}
-
-#[derive(Deserialize)]
-struct AcoustIdResponse {
-    status: String,
-    results: Option<Vec<AcoustIdResult>>,
-}
+use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Tag Editor File Writer
@@ -120,13 +40,6 @@ pub struct TagWriteRequest<'a> {
     pub bpm: Option<f32>,
     pub initial_key: &'a str,
     pub compilation: bool,
-    /// The matched AcoustID recording's UUID and the fingerprint it was
-    /// matched against (#752) — `None` clears any existing values, same as
-    /// every other `Option` field here, so callers must pass the song's
-    /// current values through unchanged on saves that aren't a fresh
-    /// AcoustID lookup, not just omit them.
-    pub acoustid_id: Option<&'a str>,
-    pub acoustid_fingerprint: Option<&'a str>,
 }
 
 /// Write the given tag fields to `path`'s primary tag, creating one if the
@@ -159,8 +72,6 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
         bpm,
         initial_key,
         compilation,
-        acoustid_id,
-        acoustid_fingerprint,
     } = *req;
 
     let mut tagged_file = Probe::open(path)
@@ -199,8 +110,6 @@ pub fn write_tags(path: &Path, req: &TagWriteRequest) -> Result<()> {
     set_or_remove_sort(lofty::tag::ItemKey::AlbumTitleSortOrder, albumsort);
     set_or_remove_sort(lofty::tag::ItemKey::AlbumArtistSortOrder, album_artist_sort);
     set_or_remove_sort(lofty::tag::ItemKey::ComposerSortOrder, composersort);
-    set_or_remove_sort(lofty::tag::ItemKey::AcoustId, acoustid_id);
-    set_or_remove_sort(lofty::tag::ItemKey::AcoustIdFingerprint, acoustid_fingerprint);
 
     // Genre, Artist, Album Artist, and Composer are all written as one
     // `TagItem` per value rather than a single `set_*()`/`insert_text()`
@@ -434,183 +343,6 @@ pub fn clear_embedded_art(path: &Path) -> Result<()> {
     sanitize_tag_languages(tag);
 
     save_tagged_file_with_retry(&tagged_file, path, "clear embedded art")
-}
-
-// ---------------------------------------------------------------------------
-// AcoustID Fingerprinting Engine
-// ---------------------------------------------------------------------------
-
-/// Resolves to the `FPCALC_PATH` env var when set (for dev/packaging
-/// environments where `fpcalc` isn't on `PATH`), otherwise falls back to
-/// letting the OS resolve the bare `fpcalc` name.
-fn get_fpcalc_path() -> PathBuf {
-    if let Ok(env_path) = std::env::var("FPCALC_PATH") {
-        if !env_path.trim().is_empty() {
-            return PathBuf::from(env_path);
-        }
-    }
-    PathBuf::from("fpcalc")
-}
-
-/// Run the external `fpcalc` (Chromaprint) binary on `path` and return its
-/// `(fingerprint, duration_seconds)`. Fails if `fpcalc` isn't installed/on
-/// `PATH`, isn't executable, or exits non-zero.
-pub fn generate_fingerprint(path: &Path) -> Result<(String, u32)> {
-    let fpcalc_bin = get_fpcalc_path();
-    eprintln!(
-        "[Luminous Backend] AcoustID: Running fpcalc binary '{:?}' on file '{:?}'",
-        fpcalc_bin, path
-    );
-
-    let mut cmd = Command::new(&fpcalc_bin);
-    cmd.arg("-json").arg(path);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    let output = cmd
-        .output()
-        .context("failed to execute fpcalc binary. Is libchromaprint-tools installed?")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("[Luminous Backend] AcoustID: fpcalc failed: {}", stderr);
-        return Err(anyhow!("fpcalc failed: {}", stderr));
-    }
-
-    let res: FpCalcOutput =
-        serde_json::from_slice(&output.stdout).context("failed to parse fpcalc JSON output")?;
-    eprintln!(
-        "[Luminous Backend] AcoustID: fpcalc completed successfully. Duration: {}s",
-        res.duration.round() as u32
-    );
-    Ok((res.fingerprint, res.duration.round() as u32))
-}
-
-/// Look up a fingerprint (from `generate_fingerprint`) against the AcoustID
-/// API and return the best-scoring match's tags. `api_key` takes precedence
-/// over the `ACOUSTID_API_KEY` env var; if neither is set, fails with the
-/// literal error text `"NO_API_KEY"` — the frontend (`TagEditor.svelte`)
-/// pattern-matches on that string to show a "configure your API key"
-/// prompt instead of a generic error, so it must not be reworded without
-/// updating that check.
-pub async fn lookup_acoustid(
-    fingerprint: &str,
-    duration_sec: u32,
-    api_key: Option<String>,
-) -> Result<SuggestedTags> {
-    let client_key = match api_key.or_else(|| std::env::var("ACOUSTID_API_KEY").ok()) {
-        Some(k) if !k.trim().is_empty() => k,
-        _ => return Err(anyhow!("NO_API_KEY")),
-    };
-
-    eprintln!(
-        "[Luminous Backend] AcoustID: Querying API lookup service via POST (duration: {}s)...",
-        duration_sec
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(8))
-        .user_agent(concat!("LuminousMusicPlayer/", env!("CARGO_PKG_VERSION")))
-        .build()?;
-
-    let params = [
-        ("client", client_key),
-        ("meta", "recordings releasegroups releases".to_string()),
-        ("duration", duration_sec.to_string()),
-        ("fingerprint", fingerprint.to_string()),
-    ];
-
-    let response = client
-        .post("https://api.acoustid.org/v2/lookup")
-        .form(&params)
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        eprintln!(
-            "[Luminous Backend] AcoustID: API request failed with status: {}. Body: {}",
-            status, body
-        );
-        return Err(anyhow!(
-            "AcoustID API request failed: {}. Details: {}",
-            status,
-            body
-        ));
-    }
-
-    let resp: AcoustIdResponse = response.json().await?;
-    if resp.status != "ok" {
-        eprintln!(
-            "[Luminous Backend] AcoustID: Service returned non-ok status: {}",
-            resp.status
-        );
-        return Err(anyhow!("AcoustID service status error"));
-    }
-
-    let results = resp.results.unwrap_or_default();
-    let best_result = results
-        .iter()
-        .filter(|r| r.recordings.is_some() && !r.recordings.as_ref().unwrap().is_empty())
-        .max_by(|a, b| {
-            a.score
-                .partial_cmp(&b.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-    if let Some(r) = best_result {
-        if let Some(recordings) = &r.recordings {
-            if let Some(rec) = recordings.first() {
-                let title = rec.title.clone();
-                let artist = rec
-                    .artists
-                    .as_ref()
-                    .and_then(|artists| artists.first().map(|a| a.name.clone()));
-                let album = rec
-                    .release_groups
-                    .as_ref()
-                    .and_then(|rgs| rgs.first().and_then(|rg| rg.title.clone()))
-                    .or_else(|| {
-                        rec.releases
-                            .as_ref()
-                            .and_then(|rels| rels.first().and_then(|rel| rel.title.clone()))
-                    });
-
-                let year = rec.releases.as_ref().and_then(|rels| {
-                    rels.iter().find_map(|rel| {
-                        rel.date.as_ref().and_then(|d| match d {
-                            AcoustIdDate::Year(y) => Some(*y),
-                            AcoustIdDate::Full(s) => s
-                                .split('-')
-                                .next()
-                                .and_then(|part| part.parse::<u32>().ok()),
-                        })
-                    })
-                });
-
-                let suggested = SuggestedTags {
-                    title,
-                    artist,
-                    album,
-                    year,
-                    acoustid_id: Some(r.id.clone()),
-                    fingerprint: Some(fingerprint.to_string()),
-                };
-                eprintln!(
-                    "[Luminous Backend] AcoustID: Successfully matched track. Suggestions: {:?}",
-                    suggested
-                );
-                return Ok(suggested);
-            }
-        }
-    }
-
-    eprintln!("[Luminous Backend] AcoustID: No matching recording found in AcoustID database");
-    Err(anyhow!("No matching audio recordings found on AcoustID"))
 }
 
 #[cfg(test)]
@@ -1107,35 +839,5 @@ mod tests {
         assert_eq!(tag.title().as_deref(), Some("Healed Title"));
         let lyrics_item = tag.get(ItemKey::UnsyncLyrics).unwrap();
         assert_eq!(lyrics_item.lang(), b"XXX");
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_debug_lookup() {
-        let db_path = "C:\\Users\\ericj\\AppData\\Roaming\\org.luminous.app\\luminous.db";
-        println!("Checking database at {}", db_path);
-        let conn = rusqlite::Connection::open(db_path).unwrap();
-        let path_str: String = conn
-            .query_row(
-                "SELECT path FROM songs WHERE id = ?1",
-                rusqlite::params![1336],
-                |row| row.get(0),
-            )
-            .expect("Could not find song 1336 in database");
-        println!("Found path: {}", path_str);
-
-        let path = std::path::PathBuf::from(path_str);
-        let (fingerprint, duration_sec) = generate_fingerprint(&path).unwrap();
-        println!(
-            "Generated fingerprint length: {}, duration: {}s",
-            fingerprint.len(),
-            duration_sec
-        );
-
-        let suggestions = lookup_acoustid(&fingerprint, duration_sec, None).await;
-        match suggestions {
-            Ok(s) => println!("Success! Suggestions: {:?}", s),
-            Err(e) => println!("Error during AcoustID lookup: {:?}", e),
-        }
     }
 }

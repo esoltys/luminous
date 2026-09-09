@@ -25,9 +25,6 @@ vi.mock("@tauri-apps/api/core", () => ({
         last_attempt: null,
       });
     }
-    if (cmd === "has_acoustid_env_key") {
-      return Promise.resolve(false);
-    }
     if (cmd === "get_all_app_settings") {
       return Promise.resolve({});
     }
@@ -47,12 +44,12 @@ describe("SettingsIntegrations.svelte", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all three integration cards: ListenBrainz, Picard, and AcoustID", async () => {
+  it("renders all three integration cards: Online Data Sources, ListenBrainz, and Picard", async () => {
     const { findByText, findByRole } = render(SettingsIntegrations);
 
+    expect(await findByText("Online Data Sources")).toBeInTheDocument();
     expect(await findByText("ListenBrainz Scrobbler")).toBeInTheDocument();
     expect(await findByRole("heading", { name: "MusicBrainz Picard" })).toBeInTheDocument();
-    expect(await findByText("AcoustID Integration")).toBeInTheDocument();
   });
 
   it("hides Enable toggle until user token is validated, then enables scrobbling", async () => {

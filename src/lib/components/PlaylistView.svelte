@@ -878,7 +878,6 @@
           onRowContextMenu={handleRowContextMenu}
           onRate={rateSong}
           onEditTags={(song) => openTagEditor(song.id)}
-          onOpenInPicard={(song) => openSelectedInPicard(song.id)}
           onRemoveFromPlaylist={(row) => handleRemoveItem(row.key)}
           onReorder={handleReorder}
           isRowPlaying={(row) => (!!playerStore.playlistItemUuid && playerStore.playlistItemUuid === row.key) || (!!playerStore.currentSong && !!row.song && playerStore.currentSong.id === row.song.id)}

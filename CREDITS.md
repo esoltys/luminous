@@ -22,7 +22,6 @@ Created by [Eric Soltys](https://esoltys.github.io/), a Canadian software develo
 
 ### Metadata & Tagging
 - **Tag Reading & Writing**: [lofty](https://github.com/Serial-Scanner/lofty-rs) (FLAC, ID3, MP4, Ogg Vorbis, WAV metadata)
-- **Audio Fingerprinting**: [AcoustID / Chromaprint (`fpcalc`)](https://acoustid.org/) for acoustic track identification
 
 ### External APIs & Web Services (Active)
 - **Synced Lyrics**: [LRCLIB](https://lrclib.net/) and [Lyrics.ovh](https://lyricsovh.docs.apiary.io/)

@@ -39,7 +39,6 @@ pub async fn set_app_setting(
 pub struct UiPreferences {
     pub rating_style: String,
     pub seekbar_mode: String,
-    pub acoustid_api_key: String,
     pub albums_view_mode: String,
     pub artists_view_mode: String,
     pub playlists_auto_view_mode: String,
@@ -56,7 +55,6 @@ impl Default for UiPreferences {
         Self {
             rating_style: "heart".into(),
             seekbar_mode: "waveform".into(),
-            acoustid_api_key: String::new(),
             albums_view_mode: "cards".into(),
             artists_view_mode: "cards".into(),
             playlists_auto_view_mode: "cards".into(),
@@ -73,18 +71,16 @@ impl Default for UiPreferences {
 impl UiPreferences {
     /// Field ↔ app_state key mapping, shared by load and store so the two
     /// can't drift.
-    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 11] {
+    fn fields(&mut self) -> [(&'static str, &mut String, &'static [&'static str]); 10] {
         const RATING: &[&str] = &["heart", "stars"];
         const SEEKBAR: &[&str] = &["waveform", "bands"];
         const VIEW: &[&str] = &["cards", "rows"];
         const GENRE_VIEW: &[&str] = &["genre", "tags"];
         const GENRE_SORT: &[&str] = &["name", "count"];
         const WEEK_START: &[&str] = &["sunday", "monday"];
-        const ANY: &[&str] = &[];
         [
             ("rating_style", &mut self.rating_style, RATING),
             ("seekbar_mode", &mut self.seekbar_mode, SEEKBAR),
-            ("acoustid_api_key", &mut self.acoustid_api_key, ANY),
             ("albums_view_mode", &mut self.albums_view_mode, VIEW),
             ("artists_view_mode", &mut self.artists_view_mode, VIEW),
             (

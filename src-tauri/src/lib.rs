@@ -1038,8 +1038,6 @@ pub fn run() {
             commands::context::get_song_context,
             // Tag Editor commands
             commands::tageditor::get_song_details,
-            commands::tageditor::lookup_acoustid_tags,
-            commands::tageditor::has_acoustid_env_key,
             commands::tageditor::save_song_tags,
             commands::tageditor::save_album_tags,
             commands::tageditor::clear_song_cover_art,

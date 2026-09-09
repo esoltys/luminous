@@ -554,7 +554,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     get_all_app_settings: () => window.mockSettings,
     get_commit_hash: () => "048f421",
-    has_acoustid_env_key: () => true,
     geometry_capture_supported: () => true,
 
     preview_organize: (args) => {
@@ -934,7 +933,6 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   commands["get_ui_preferences"] = () => ({
     rating_style: "heart",
     seekbar_mode: "waveform",
-    acoustid_api_key: "",
     albums_view_mode: "cards",
     artists_view_mode: "cards",
     playlists_auto_view_mode: "cards",
@@ -958,7 +956,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
     "move_window_to_preset", "get_window_geometry", "plugin:window|show",
-    "save_song_tags", "save_album_tags", "lookup_acoustid_tags",
+    "save_song_tags", "save_album_tags",
     // Genres curation (#545) — not exercised by any screenshot target, but
     // mocked so manual dev-server testing of GenreCards' drag/context-menu
     // actions doesn't log "unhandled command" warnings.

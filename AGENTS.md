@@ -72,7 +72,7 @@ into Picard's territory; it's a different, complementary axis Picard was never m
 - `analyzer.rs` — real-time FFT spectrum processing
 - `lyrics.rs` — LRCLIB + Lyrics.ovh clients
 - `covermanager.rs` — embedded art extraction + iTunes API fallback
-- `tageditor.rs` — lofty tag reader/writer + AcoustID fingerprinting
+- `tageditor.rs` — lofty tag reader/writer
 - `commands/` — all `#[tauri::command]` IPC handlers (registry in `commands/mod.rs`)
 
 ## Package Manager

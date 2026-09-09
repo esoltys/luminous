@@ -106,11 +106,6 @@ export interface Song {
   // CUE support
   cue_path?: string;
 
-  // AcoustID / fingerprint
-  acoustid_id?: string;
-  acoustid_fingerprint?: string;
-  fingerprint?: string;
-
   // MusicBrainz IDs
   musicbrainz_album_artist_id?: string;
   musicbrainz_artist_id?: string;

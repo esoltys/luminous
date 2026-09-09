@@ -577,7 +577,6 @@
         onRate={rateSong}
         onAddToPlaylist={(song) => handleAddSongToPlaylist(song.id)}
         onEditTags={(song) => openTagEditor(song.id)}
-        onOpenInPicard={(song) => openInPicard([song.id])}
       />
     </div>
   </div>
