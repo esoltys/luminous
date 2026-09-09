@@ -514,15 +514,15 @@
 </script>
 
 <div class="flex-1 flex flex-col overflow-y-auto bg-brand-main text-brand-text-secondary h-full" use:rememberScroll={`artist-detail:${artistName}`}>
-  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6 min-h-48'} overflow-hidden">
+  <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6 min-h-48'}">
     {#if fanartBannerUrl && !windowLayoutStore.isDetailHeaderCollapsed}
-      <div class="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
+      <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
         <img src={fanartBannerUrl} alt="" class="w-full h-full object-cover opacity-25" />
         <div class="absolute inset-0 bg-gradient-to-t from-brand-main via-brand-main/70 to-brand-main/30"></div>
       </div>
     {/if}
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <div class="flex flex-col justify-end gap-1.5 max-w-xl">
+      <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
         {#if bandLogoUrl}
           <img
@@ -549,7 +549,7 @@
         </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 mt-3">
+        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}
@@ -605,7 +605,7 @@
   <div class="px-6 pt-6 flex flex-col gap-8">
     <!-- Tags Pills — kept outside/above the profile card so they read as
          top-level artist identity, not a sub-item of "About". -->
-    {#if hasTags}
+    {#if hasTags && !windowLayoutStore.isDetailHeaderCollapsed}
       <div class="flex flex-wrap gap-1.5 sm:gap-2">
         {#each artistProfile?.tags ?? [] as tag (tag)}
           <button
@@ -621,7 +621,7 @@
     {/if}
 
     <!-- Artist Profile Card (About & Links) -->
-    {#if hasProfileContent}
+    {#if hasProfileContent && !windowLayoutStore.isDetailHeaderCollapsed}
       {@const profile = artistProfile}
       <div
         bind:this={profileCardEl}
