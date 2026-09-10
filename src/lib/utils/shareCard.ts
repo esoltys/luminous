@@ -65,7 +65,12 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const scrimFrom = isDark ? "rgba(255,255,255,0)" : "rgba(0,0,0,0)";
   const scrimTo = isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
   const cardPad = Math.round(width * 0.06);
-  const coverSize = Math.round(Math.min(width, height) * 0.34);
+  // Portrait/square frames stack cover-then-text centered in the middle of
+  // the canvas (a bigger cover, since there's little horizontal room);
+  // landscape frames keep a side-by-side row so the wide aspect isn't mostly
+  // empty gradient either side of a narrow text column.
+  const isPortrait = height >= width;
+  const coverSize = Math.round(isPortrait ? width * 0.56 : Math.min(width, height) * 0.46);
 
   const background = generateEllipseGradientSvg({
     width,
@@ -99,23 +104,26 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   }
 
   const showTrackList = trackRows.length > 0;
+  const textAlign = isPortrait ? "center" : "left";
+  const groupDirection = isPortrait ? "column" : "row";
+  const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
-      <div style="display:flex;flex-direction:${showTrackList ? "row" : "column"};align-items:${showTrackList ? "flex-end" : "flex-start"};gap:${Math.round(width * 0.03)}px;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
+      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035)}px;max-width:100%;">
         ${
           options.coverDataUri
-            ? `<img src="${options.coverDataUri}" style="width:${coverSize}px;height:${coverSize}px;object-fit:cover;border-radius:${Math.round(coverSize * 0.06)}px;box-shadow:0 12px 40px rgba(0,0,0,0.35);flex-shrink:0;" />`
+            ? `<img src="${options.coverDataUri}" style="width:${coverSize}px;height:${coverSize}px;object-fit:cover;border-radius:${Math.round(coverSize * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
             : ""
         }
-        <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;">
-          <div style="font-size:${Math.round(width * 0.042)}px;font-weight:800;color:${textPrimary};line-height:1.12;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
-          <div style="font-size:${Math.round(width * 0.024)}px;font-weight:600;color:${textSecondary};margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(options.subtitle)}</div>
-          <div style="font-size:${Math.round(width * 0.018)}px;color:${textSecondary};margin-top:4px;">${escapeHtml(options.metadataLine)}</div>
-          ${showTrackList ? `<div style="margin-top:${Math.round(width * 0.02)}px;display:flex;flex-direction:column;">${trackRows.join("")}</div>` : ""}
+        <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
+          <div style="font-size:${Math.round(width * 0.046)}px;font-weight:800;color:${textPrimary};line-height:1.14;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          <div style="font-size:${Math.round(width * 0.026)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
+          <div style="font-size:${Math.round(width * 0.019)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
+          ${showTrackList ? `<div style="margin-top:${Math.round(width * 0.025)}px;display:flex;flex-direction:column;text-align:left;width:100%;">${trackRows.join("")}</div>` : ""}
         </div>
       </div>
-      <div style="margin-top:${Math.round(width * 0.02)}px;font-size:${Math.round(width * 0.014)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};opacity:0.8;">LUMINOUS</div>
+      <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;font-size:${Math.round(width * 0.014)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};opacity:0.8;">LUMINOUS</div>
     </div>
   `;
 

@@ -9,6 +9,7 @@
     MoonIcon as Moon,
   } from "phosphor-svelte";
   import Modal from "./Modal.svelte";
+  import Button from "./Button.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
   import { collectionStore } from "../stores/collection.svelte";
@@ -273,7 +274,7 @@
           <button
             onclick={() => (aspectRatio = ratio.id)}
             class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer {aspectRatio === ratio.id
-              ? 'bg-brand-accent text-brand-accent-text border-brand-accent'
+              ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
             {ratio.id}
@@ -288,7 +289,7 @@
             onclick={() => (theme = "dark")}
             title={i18n.t("shareModal.themeDark")}
             class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme === 'dark'
-              ? 'bg-brand-accent text-brand-accent-text border-brand-accent'
+              ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
             <Moon class="w-4 h-4" />
@@ -297,7 +298,7 @@
             onclick={() => (theme = "light")}
             title={i18n.t("shareModal.themeLight")}
             class="flex items-center justify-center w-8 h-8 rounded-full border transition-colors cursor-pointer {theme === 'light'
-              ? 'bg-brand-accent text-brand-accent-text border-brand-accent'
+              ? 'bg-brand-accent text-brand-accent-contrast border-brand-accent'
               : 'border-brand-border text-brand-text-secondary hover:bg-brand-main'}"
           >
             <Sun class="w-4 h-4" />
@@ -312,22 +313,14 @@
     </div>
 
     <div class="flex items-center justify-end gap-2 pt-2 border-t border-brand-border">
-      <button
-        onclick={handleCopy}
-        disabled={exporting || rendering}
-        class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border border-brand-border text-brand-text-primary hover:bg-brand-main transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-      >
+      <Button variant="secondary" onclick={handleCopy} disabled={exporting || rendering}>
         <Copy class="w-4 h-4" />
         {i18n.t("shareModal.copyButton")}
-      </button>
-      <button
-        onclick={handleSave}
-        disabled={exporting || rendering}
-        class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-brand-accent text-brand-accent-text hover:bg-brand-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-      >
+      </Button>
+      <Button variant="primary" onclick={handleSave} disabled={exporting || rendering}>
         <Download class="w-4 h-4" />
         {i18n.t("shareModal.saveButton")}
-      </button>
+      </Button>
     </div>
   </div>
 </Modal>
