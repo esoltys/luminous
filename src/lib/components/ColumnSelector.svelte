@@ -80,6 +80,7 @@
     { key: "genre",       label: "collection.columnGenre" },
     { key: "grouping",    label: "collection.columnGrouping" },
     { key: "initial_key", label: "collection.columnInitialKey" },
+    { key: "musicbrainz_id", label: "collection.columnMusicBrainzId" },
     { key: "originalyear",label: "collection.columnOriginalYear" },
     { key: "path",        label: "collection.columnPath" },
     { key: "samplerate",  label: "collection.columnSampleRate" },

@@ -335,6 +335,7 @@
     grouping: { i18nKey: "collection.tableHeaderGrouping", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     bpm: { i18nKey: "collection.tableHeaderBpm", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     initial_key: { i18nKey: "collection.tableHeaderInitialKey", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
+    musicbrainz_id: { i18nKey: "collection.tableHeaderMusicBrainzId", className: "flex items-center justify-center hover:text-brand-text-primary transition-colors font-semibold uppercase tracking-wider min-w-0 w-full" },
     bitrate: { i18nKey: "collection.tableHeaderBitrate", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     samplerate: { i18nKey: "collection.tableHeaderSampleRate", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
     bitdepth: { i18nKey: "collection.tableHeaderBitDepth", className: "text-left hover:text-brand-text-primary transition-colors flex items-center gap-1 font-semibold uppercase tracking-wider min-w-0 w-full", truncateClass: "max-w-[calc(100%-0.5rem)]" },
@@ -512,6 +513,10 @@
   {:else if col.key === "initial_key"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
       {song.initial_key || "—"}
+    </div>
+  {:else if col.key === "musicbrainz_id"}
+    <div class="text-center {secondaryColor(song)} text-xs font-medium">
+      {song.musicbrainz_track_id ? i18n.t("collection.booleanYes") : i18n.t("collection.booleanNo")}
     </div>
   {:else if col.key === "bitrate"}
     <div class="{secondaryColor(song)} truncate pr-2 min-w-0 text-xs font-medium">
