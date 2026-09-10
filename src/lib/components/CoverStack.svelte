@@ -38,6 +38,14 @@
      * lightbox/gallery is built here, per owner feedback on #98.
      */
     extendedArtworkSongId?: number;
+    /**
+     * Bump (e.g. increment) to force the `extendedArtworkSongId` lookup to
+     * bypass the cache and re-scan, even though the song id itself hasn't
+     * changed — used by AlbumDetailView's Rescan action (#867) so a cover/
+     * back/booklet image added, replaced, or deleted on disk shows up
+     * without restarting the app.
+     */
+    refreshToken?: number;
   }
 
   let {
@@ -48,18 +56,23 @@
     fallbackName = null,
     hoverEffect = false,
     extendedArtworkSongId = undefined,
+    refreshToken = 0,
   }: Props = $props();
 
   let extendedArtwork = $state<import("../types").ExtendedArtworkResponse | null>(null);
+  let lastFetchedRefreshToken: number | undefined;
 
   $effect(() => {
     const songId = extendedArtworkSongId;
+    const token = refreshToken;
     if (songId === undefined) {
       extendedArtwork = null;
       return;
     }
+    const force = lastFetchedRefreshToken !== undefined && token !== lastFetchedRefreshToken;
+    lastFetchedRefreshToken = token;
     let cancelled = false;
-    collectionStore.getExtendedArtworkForSong(songId).then((result) => {
+    collectionStore.getExtendedArtworkForSong(songId, force).then((result) => {
       if (!cancelled) extendedArtwork = result;
     });
     return () => {

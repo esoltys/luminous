@@ -641,14 +641,20 @@ class CollectionStore {
   /** Cached extended-artwork lookup for a song's album (#98/#760) — returns
    * the cached result if already fetched, otherwise scans on demand via
    * `get_extended_artwork_for_song` and caches the result. Concurrent calls
-   * for the same `songId` share one in-flight request. */
-  async getExtendedArtworkForSong(songId: number): Promise<ExtendedArtworkResponse> {
-    const cached = this.extendedArtworkBySong[songId];
-    if (cached) return cached;
-
+   * for the same `songId` share one in-flight request. Pass `force` to
+   * bypass the cache and re-scan — used by the album Rescan action (#867)
+   * to pick up cover/back/booklet art the user just added, replaced, or
+   * deleted on disk. */
+  async getExtendedArtworkForSong(songId: number, force = false): Promise<ExtendedArtworkResponse> {
     const fetchKey = `song:${songId}`;
-    const inFlight = this.extendedArtworkFetches.get(fetchKey);
-    if (inFlight) return inFlight;
+
+    if (!force) {
+      const cached = this.extendedArtworkBySong[songId];
+      if (cached) return cached;
+
+      const inFlight = this.extendedArtworkFetches.get(fetchKey);
+      if (inFlight) return inFlight;
+    }
 
     const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_song", { songId })
       .then((result) => {
@@ -670,17 +676,21 @@ class CollectionStore {
   /** Cached extended-artwork lookup for an artist's portrait/logo/fanart
    * (#98/#761) — same lazy-fetch-and-cache pattern as
    * {@link getExtendedArtworkForSong}, keyed by lowercased artist name to
-   * match `artistProfiles`. */
-  async getExtendedArtworkForArtist(artistName: string | null | undefined): Promise<ExtendedArtworkResponse> {
+   * match `artistProfiles`. Pass `force` to bypass the cache and re-scan —
+   * used by the artist Rescan action (#867) to pick up a portrait/logo/
+   * banner the user just added, replaced, or deleted on disk. */
+  async getExtendedArtworkForArtist(artistName: string | null | undefined, force = false): Promise<ExtendedArtworkResponse> {
     if (!artistName) return EMPTY_EXTENDED_ARTWORK;
     const key = artistName.toLowerCase();
-
-    const cached = this.extendedArtworkByArtist[key];
-    if (cached) return cached;
-
     const fetchKey = `artist:${key}`;
-    const inFlight = this.extendedArtworkFetches.get(fetchKey);
-    if (inFlight) return inFlight;
+
+    if (!force) {
+      const cached = this.extendedArtworkByArtist[key];
+      if (cached) return cached;
+
+      const inFlight = this.extendedArtworkFetches.get(fetchKey);
+      if (inFlight) return inFlight;
+    }
 
     const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", { artist: artistName })
       .then((result) => {

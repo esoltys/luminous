@@ -31,6 +31,7 @@
   import {
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
+    ArrowsClockwiseIcon as RefreshCw,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
@@ -57,6 +58,7 @@
   let playlists = $state<Playlist[]>([]);
   let compilations = $state<AlbumItem[]>([]);
   let loading = $state(true);
+  let refreshing = $state(false);
 
   let albumContextMenuState = $state<{ x: number; y: number; album: AlbumItem } | null>(null);
   let singleContextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
@@ -257,6 +259,37 @@
   async function refetchSongs() {
     const fetchedSongs = await invoke<Song[]>("get_songs_by_artist", { artist: artistName });
     songs = Array.isArray(fetchedSongs) ? fetchedSongs : [];
+  }
+
+  // Rescans the library for this artist's local portrait/band logo/fanart
+  // banner (#761) and re-fetches its MusicBrainz/Wikipedia context (#23),
+  // bypassing both caches — mirrors AlbumDetailView's handleRefreshAlbum.
+  // Fixes #867: a portrait/logo/banner added, replaced, or removed on disk
+  // otherwise never refreshes since both lookups are cached for the session.
+  async function handleRescanArtist() {
+    if (refreshing || collectionStore.isScanning) return;
+    refreshing = true;
+    try {
+      await collectionStore.startScan(true);
+      await collectionStore.refreshLibrary();
+      await refetchSongs();
+      const songWithMb = songs.find((s) => s.musicbrainz_artist_id || s.musicbrainz_album_artist_id);
+      const contextSongId = songWithMb?.id ?? songs[0]?.id;
+      const [artwork, context] = await Promise.all([
+        collectionStore.getExtendedArtworkForArtist(artistName, true),
+        contextSongId
+          ? invoke<SongContextEnrichment>("get_song_context", { songId: contextSongId, forceRefresh: true }).catch(() => null)
+          : Promise.resolve(null)
+      ]);
+      artistArtwork = artwork;
+      if (context) contextData = context;
+      toastStore.show(i18n.t("artistDetail.refreshSuccess", {}, "Artist artwork and bio refreshed"));
+    } catch (err) {
+      console.error("Failed to refresh artist:", err);
+      toastStore.show(i18n.t("artistDetail.refreshError", {}, "Failed to refresh artist"));
+    } finally {
+      refreshing = false;
+    }
   }
 
   async function handleTagEditorSaved() {
@@ -555,6 +588,13 @@
             onShufflePlay={handleShufflePlay}
             disabled={loading || songs.length === 0}
           />
+          <IconActionButton
+            onclick={handleRescanArtist}
+            disabled={loading || collectionStore.isScanning || refreshing}
+            title={i18n.t('artistDetail.refreshTooltip')}
+          >
+            {#snippet icon()}<RefreshCw class="w-4 h-4 {refreshing || collectionStore.isScanning ? 'animate-spin' : ''}" />{/snippet}
+          </IconActionButton>
           <IconActionButton
             onclick={() => pinnedStore.toggle("artist", artistName)}
             title={pinnedStore.isPinned("artist", artistName)

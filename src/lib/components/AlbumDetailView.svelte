@@ -71,6 +71,7 @@
         return (a.track ?? 0) - (b.track ?? 0);
       });
       songs = filtered;
+      artworkRefreshToken++;
       toastStore.show(i18n.t("albumDetail.refreshSuccess", {}, "Album metadata and artwork refreshed"));
     } catch (err) {
       console.error("Failed to refresh album:", err);
@@ -113,6 +114,9 @@
    * for this album's directory — there's no dedicated album id in the
    * schema (see #758), so a representative song stands in for one. */
   let representativeSongId = $derived(songs[0]?.id);
+  /** Bumped by handleRefreshAlbum (#867) to force CoverStack's extended-
+   * artwork lookup for {@link representativeSongId} to bypass its cache. */
+  let artworkRefreshToken = $state(0);
 
   let albumDirectories = $derived.by(() => {
     const map = new Map<number, MusicDirectory>();
@@ -544,6 +548,7 @@
               artManual: albumItem?.art_manual,
             }]}
             extendedArtworkSongId={representativeSongId}
+            refreshToken={artworkRefreshToken}
             sizeClass="w-full h-full object-cover"
           />
           {#if albumItem && albumItem.rating === 5}
