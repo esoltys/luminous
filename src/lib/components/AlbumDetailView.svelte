@@ -25,7 +25,6 @@
   import LinkButton from "./LinkButton.svelte";
   import ColumnSelector from "./ColumnSelector.svelte";
   import SongTable, { type SongTableRow } from "./SongTable.svelte";
-  import LibraryBadge from "./LibraryBadge.svelte";
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import {
@@ -34,11 +33,10 @@
     ArrowsClockwiseIcon as RefreshCw,
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
-    FoldersIcon as Folders,
     DotsThreeIcon as MoreHorizontal,
     ArrowSquareOutIcon as OpenInPicard
   } from "phosphor-svelte";
-  import type { Song, AlbumItem, PlayContext, MusicDirectory } from "../types";
+  import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
   import { picardStore } from "../stores/picard.svelte";
@@ -117,17 +115,6 @@
   /** Bumped by handleRefreshAlbum (#867) to force CoverStack's extended-
    * artwork lookup for {@link representativeSongId} to bypass its cache. */
   let artworkRefreshToken = $state(0);
-
-  let albumDirectories = $derived.by(() => {
-    const map = new Map<number, MusicDirectory>();
-    for (const song of songs) {
-      if (song.path) {
-        const dir = collectionStore.getDirectoryForPath(song.path);
-        if (dir) map.set(dir.id, dir);
-      }
-    }
-    return Array.from(map.values());
-  });
 
   let artistName = $derived.by(() => {
     if (albumItem?.artist) return albumItem.artist;
@@ -435,13 +422,13 @@
 
   <div class="relative z-30 w-full border-b border-brand-border/60 bg-brand-main/60 backdrop-blur-md px-6 {windowLayoutStore.isDetailHeaderCollapsed ? 'py-3' : 'pt-6 pb-6'}">
     <div class="flex items-start justify-between gap-6 relative z-10">
-      <div class="flex flex-col justify-end gap-1.5 min-w-0 max-w-xl">
+      <div class="flex flex-col justify-end min-w-0 max-w-xl">
         {#if !windowLayoutStore.isDetailHeaderCollapsed}
         <h1 class="text-3xl sm:text-4xl font-heading font-bold text-brand-text-primary leading-snug truncate py-0.5" title={albumName}>
           {albumName}
         </h1>
 
-        <div class="flex items-center gap-2 text-base font-semibold text-brand-text-primary">
+        <div class="flex items-center gap-2 text-base font-semibold text-brand-text-primary mt-0.5">
           {#if artistName}
             <LinkButton
               onclick={() => navigationStore.viewArtist(artistName)}
@@ -454,15 +441,7 @@
           {/if}
         </div>
 
-        {#if rawGenre}
-          <GenreChips genre={rawGenre} variant="full" limit={4} />
-        {:else}
-          <div class="text-xs text-brand-text-primary font-medium">
-            <span>{genreLabel}</span>
-          </div>
-        {/if}
-
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium mt-1.5">
           {#if yearLabel}
             <span>{yearLabel}</span>
             <span>•</span>
@@ -474,21 +453,15 @@
             <span>•</span>
             <SongRating rating={albumItem.rating} onRate={rateAlbum} size="sm" />
           {/if}
-          {#if albumDirectories.length === 1}
-            <span>•</span>
-            <LibraryBadge directory={albumDirectories[0]} size="sm" />
-          {:else if albumDirectories.length > 1}
-            <span>•</span>
-            <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium text-brand-text-primary border select-none"
-              style="background-color: color-mix(in srgb, var(--color-brand-accent) 15%, var(--color-brand-sidebar)); border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));"
-              title={albumDirectories.map((d) => d.nickname || d.path).join(", ")}
-            >
-              <Folders class="w-3.5 h-3.5 text-brand-accent-text" />
-              <span>{i18n.t('albumDetail.multiLibraries', { count: albumDirectories.length }, `${albumDirectories.length} Libraries`)}</span>
-            </span>
-          {/if}
         </div>
+
+        {#if rawGenre}
+          <GenreChips genre={rawGenre} variant="full" limit={4} class="mt-1.5" />
+        {:else}
+          <div class="text-xs text-brand-text-primary font-medium mt-1.5">
+            <span>{genreLabel}</span>
+          </div>
+        {/if}
         {/if}
 
         <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">

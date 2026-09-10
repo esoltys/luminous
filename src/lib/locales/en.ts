@@ -986,7 +986,6 @@ export const en = {
     refreshTooltip: "Rescan metadata and artwork for this album",
     refreshSuccess: "Album metadata and artwork refreshed",
     refreshError: "Failed to refresh album metadata",
-    multiLibraries: "{count} Libraries",
   },
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."

@@ -1017,8 +1017,7 @@ export const fr = {
     editInfoTooltip: "Modifier les infos de l'album",
     refreshTooltip: "Actualiser les métadonnées et la pochette de cet album",
     refreshSuccess: "Métadonnées et pochette de l'album actualisées",
-    refreshError: "Échec de l'actualisation de l'album",
-    multiLibraries: "{count} bibliothèques"
+    refreshError: "Échec de l'actualisation de l'album"
   },
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
