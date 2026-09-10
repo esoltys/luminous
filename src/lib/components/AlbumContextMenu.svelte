@@ -9,7 +9,8 @@
     PushPinSlashIcon as PinOff,
     PencilSimpleIcon as Edit3,
     ArrowSquareOutIcon as OpenInPicard,
-    ChartBarIcon as BarChart2
+    ChartBarIcon as BarChart2,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { playlistsStore } from "../stores/playlists.svelte";
@@ -24,6 +25,7 @@
   import ContextMenu from "./ContextMenu.svelte";
   import ContextMenuItem from "./ContextMenuItem.svelte";
   import ContextMenuDivider from "./ContextMenuDivider.svelte";
+  import ShareModal from "./ShareModal.svelte";
 
   let {
     x,
@@ -50,6 +52,8 @@
     onOpenInPicard?: () => void;
     onClose: () => void;
   } = $props();
+
+  let showShareModal = $state(false);
 
   async function handleDefaultAddToQueue() {
     try {
@@ -158,6 +162,11 @@
       disabled={!picardStore.available}
       title={picardStore.available ? undefined : i18n.t("picard.notFoundTooltip")}
     />
+    <ContextMenuItem
+      icon={Share}
+      label={i18n.t("shareModal.menuItem")}
+      onclick={() => { showShareModal = true; }}
+    />
     <ContextMenuDivider />
     <ContextMenuItem
       icon={pinnedStore.isPinned("album", albumName) ? PinOff : Pin}
@@ -175,3 +184,7 @@
     />
   {/if}
 </ContextMenu>
+
+{#if showShareModal}
+  <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
+{/if}
