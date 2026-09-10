@@ -1099,6 +1099,7 @@ pub fn run() {
             commands::webdav::save_webdav_server,
             commands::webdav::delete_webdav_server,
             commands::webdav::test_webdav_connection,
+            commands::webdav::check_webdav_connection,
             commands::webdav::sync_webdav_server,
             // Window & Miniplayer commands
             commands::window::geometry_capture_supported,

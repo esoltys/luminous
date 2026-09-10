@@ -8,20 +8,11 @@
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
   import LibraryBadge from "./LibraryBadge.svelte";
+  import ColorPicker from "./ColorPicker.svelte";
+  import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
   import {
-    FolderIcon,
-    HardDriveIcon,
-    CloudIcon,
-    DesktopIcon,
-    UsbIcon,
-    HouseIcon,
-    DiscIcon,
-    MusicNotesIcon,
-    ArchiveIcon,
-    BroadcastIcon,
     XIcon as X,
     FolderSimpleIcon as FolderSimple,
-    CheckIcon as Check,
   } from "phosphor-svelte";
 
   interface Props {
@@ -36,31 +27,8 @@
   let selectedColor = $state<string | null>(untrack(() => directory.color ?? null));
   let saving = $state(false);
 
-  const ICON_CHOICES = [
-    { id: "folder", label: "Folder", icon: FolderIcon },
-    { id: "hard-drive", label: "Drive", icon: HardDriveIcon },
-    { id: "cloud", label: "Cloud / NAS", icon: CloudIcon },
-    { id: "desktop", label: "Computer", icon: DesktopIcon },
-    { id: "usb", label: "USB", icon: UsbIcon },
-    { id: "house", label: "Home", icon: HouseIcon },
-    { id: "disc", label: "Disc", icon: DiscIcon },
-    { id: "music", label: "Music", icon: MusicNotesIcon },
-    { id: "archive", label: "Archive", icon: ArchiveIcon },
-    { id: "broadcast", label: "Shared", icon: BroadcastIcon },
-  ];
-
-  const COLOR_CHOICES: { value: string | null; label: string }[] = [
-    { value: null, label: "Default" },
-    { value: "#3b82f6", label: "Blue" },
-    { value: "#8b5cf6", label: "Purple" },
-    { value: "#ec4899", label: "Pink" },
-    { value: "#ef4444", label: "Red" },
-    { value: "#f97316", label: "Orange" },
-    { value: "#eab308", label: "Yellow" },
-    { value: "#10b981", label: "Emerald" },
-    { value: "#06b6d4", label: "Cyan" },
-    { value: "#6366f1", label: "Indigo" },
-  ];
+  const ICON_CHOICES = BADGE_ICON_CHOICES;
+  const COLOR_CHOICES = BADGE_COLOR_CHOICES;
 
   let previewDirectory = $derived<MusicDirectory>({
     ...directory,
@@ -116,7 +84,7 @@
         </div>
         <div class="min-w-0">
           <h2 class="text-base font-bold text-brand-text-primary truncate">{i18n.t("settings.editFolderTitle")}</h2>
-          <p class="text-xs text-brand-text-secondary/70 truncate font-mono" title={directory.path}>{directory.path}</p>
+          <p class="text-xs text-brand-text-secondary/70 truncate" title={directory.path}>{directory.path}</p>
         </div>
       </div>
       <button
@@ -183,24 +151,7 @@
         <span class="block text-xs font-semibold text-brand-text-secondary uppercase tracking-wider mb-2">
           {i18n.t("settings.folderColor")}
         </span>
-        <div class="flex flex-wrap items-center gap-2.5">
-          {#each COLOR_CHOICES as choice}
-            {@const isSelected = selectedColor === choice.value}
-            <button
-              type="button"
-              onclick={() => { selectedColor = choice.value; }}
-              class="relative w-7 h-7 rounded-full border-2 transition-transform duration-150 flex items-center justify-center
-                {isSelected ? 'scale-110 ring-2 ring-brand-accent' : 'hover:scale-105'}
-                {choice.value === null ? 'bg-brand-sidebar border-brand-border' : 'border-white/20'}"
-              style={choice.value ? `background-color: ${choice.value}` : ''}
-              title={choice.label}
-            >
-              {#if isSelected}
-                <Check class="w-3.5 h-3.5 {choice.value === null ? 'text-brand-accent-text' : 'text-white'} drop-shadow-sm" />
-              {/if}
-            </button>
-          {/each}
-        </div>
+        <ColorPicker choices={COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />
       </div>
 
       <!-- Footer Buttons -->

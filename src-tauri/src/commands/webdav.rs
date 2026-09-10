@@ -13,7 +13,7 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at
+            "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
              FROM webdav_servers
              ORDER BY created_at ASC",
         )
@@ -32,6 +32,9 @@ pub async fn list_webdav_servers(state: State<'_, AppState>) -> Result<Vec<WebDa
                 sync_status: row.get(6)?,
                 last_synced_at: row.get(7)?,
                 created_at: row.get(8)?,
+                nickname: row.get(9)?,
+                icon: row.get(10)?,
+                color: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -53,6 +56,9 @@ pub async fn save_webdav_server(
     password: Option<String>,
     remote_path: Option<String>,
     enabled: Option<bool>,
+    nickname: Option<String>,
+    icon: Option<String>,
+    color: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<WebDavServer, String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
@@ -63,24 +69,36 @@ pub async fn save_webdav_server(
         if let Some(pass) = password {
             conn.execute(
                 "UPDATE webdav_servers
-                 SET name = ?1, url = ?2, username = ?3, password = ?4, remote_path = ?5, enabled = ?6
-                 WHERE id = ?7",
-                params![name, url, username, pass, remote_path_val, enabled_val, server_id],
+                 SET name = ?1, url = ?2, username = ?3, password = ?4, remote_path = ?5, enabled = ?6,
+                     nickname = ?7, icon = ?8, color = ?9
+                 WHERE id = ?10",
+                params![name, url, username, pass, remote_path_val, enabled_val, nickname, icon, color, server_id],
             )
             .map_err(|e| e.to_string())?;
         } else {
             conn.execute(
                 "UPDATE webdav_servers
-                 SET name = ?1, url = ?2, username = ?3, remote_path = ?4, enabled = ?5
-                 WHERE id = ?6",
-                params![name, url, username, remote_path_val, enabled_val, server_id],
+                 SET name = ?1, url = ?2, username = ?3, remote_path = ?4, enabled = ?5,
+                     nickname = ?6, icon = ?7, color = ?8
+                 WHERE id = ?9",
+                params![
+                    name,
+                    url,
+                    username,
+                    remote_path_val,
+                    enabled_val,
+                    nickname,
+                    icon,
+                    color,
+                    server_id
+                ],
             )
             .map_err(|e| e.to_string())?;
         }
 
         let s: WebDavServer = conn
             .query_row(
-                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at
+                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
                  FROM webdav_servers WHERE id = ?1",
                 params![server_id],
                 |row| {
@@ -95,6 +113,9 @@ pub async fn save_webdav_server(
                         sync_status: row.get(6)?,
                         last_synced_at: row.get(7)?,
                         created_at: row.get(8)?,
+                        nickname: row.get(9)?,
+                        icon: row.get(10)?,
+                        color: row.get(11)?,
                     })
                 },
             )
@@ -102,16 +123,16 @@ pub async fn save_webdav_server(
         Ok(s)
     } else {
         conn.execute(
-            "INSERT INTO webdav_servers (name, url, username, password, remote_path, enabled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![name, url, username, password, remote_path_val, enabled_val],
+            "INSERT INTO webdav_servers (name, url, username, password, remote_path, enabled, nickname, icon, color)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![name, url, username, password, remote_path_val, enabled_val, nickname, icon, color],
         )
         .map_err(|e| e.to_string())?;
 
         let new_id = conn.last_insert_rowid();
         let s: WebDavServer = conn
             .query_row(
-                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at
+                "SELECT id, name, url, username, remote_path, enabled, sync_status, last_synced_at, created_at, nickname, icon, color
                  FROM webdav_servers WHERE id = ?1",
                 params![new_id],
                 |row| {
@@ -126,6 +147,9 @@ pub async fn save_webdav_server(
                         sync_status: row.get(6)?,
                         last_synced_at: row.get(7)?,
                         created_at: row.get(8)?,
+                        nickname: row.get(9)?,
+                        icon: row.get(10)?,
+                        color: row.get(11)?,
                     })
                 },
             )
@@ -136,10 +160,7 @@ pub async fn save_webdav_server(
 
 /// Delete a WebDAV server profile and its associated cache.
 #[tauri::command]
-pub async fn delete_webdav_server(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn delete_webdav_server(id: i64, state: State<'_, AppState>) -> Result<(), String> {
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM webdav_servers WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
@@ -154,6 +175,31 @@ pub async fn test_webdav_connection(
     password: Option<String>,
 ) -> Result<bool, String> {
     tokio::task::spawn_blocking(move || {
+        let client = WebDavClient::new(url, username, password).map_err(|e| e.to_string())?;
+        client.test_connection().map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Live-checks reachability of an already-saved server, using its stored
+/// credentials — the WebDAV counterpart to how a watched folder's
+/// `is_available` is recomputed from `Path::exists()` on every fetch (#682's
+/// settings redesign). Unlike a local path check this is a network call, so
+/// the frontend runs it asynchronously per-server rather than blocking the
+/// server list on it.
+#[tauri::command]
+pub async fn check_webdav_connection(id: i64, state: State<'_, AppState>) -> Result<bool, String> {
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || {
+        let conn = db.pool.get().map_err(|e| e.to_string())?;
+        let (url, username, password): (String, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT url, username, password FROM webdav_servers WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|e| e.to_string())?;
         let client = WebDavClient::new(url, username, password).map_err(|e| e.to_string())?;
         client.test_connection().map_err(|e| e.to_string())
     })

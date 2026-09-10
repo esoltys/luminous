@@ -3,12 +3,15 @@
   import { tagsStore } from "../stores/tags.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { toastStore } from "../stores/toast.svelte";
-  import { GENRE_PALETTE_HUES, genreColorHsl, genreColorHslBright, genreColorHslDark } from "../utils/genrePalette";
+  import { genreColorHsl, genreColorHslBright, genreColorHslDark, getGenreColorChoices } from "../utils/genrePalette";
   import { portal } from "../utils/portal";
   import { themeStore } from "../stores/theme.svelte";
   import { isLightColor } from "../utils/colorUtils";
   import GenreContextMenu from "./GenreContextMenu.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import ColorPicker from "./ColorPicker.svelte";
+
+  const genreColorChoices = getGenreColorChoices();
 
   /** Subgenre chip text/border must read clearly against the chip's own pale
    * fill, which tracks the active theme: bright text only works on a dark
@@ -403,18 +406,16 @@
   <div
     use:portal
     bind:this={colorPopoverEl}
-    class="fixed z-50 grid grid-cols-5 gap-1.5 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl"
+    class="fixed z-50 p-2 rounded-lg bg-brand-main border border-brand-border shadow-2xl"
     style={`left: ${colorPopoverPos.x}px; top: ${colorPopoverPos.y}px;`}
   >
-    {#each GENRE_PALETTE_HUES as _, i (i)}
-      <button
-        type="button"
-        onclick={() => { tagsStore.setGroupColor(colorPopoverFor!, i); colorPopoverFor = null; }}
-        class="w-5 h-5 rounded-full border-2 {group?.color_index === i ? 'border-brand-text-primary' : 'border-transparent'}"
-        style="background-color: {genreColorHsl(i)}"
-        aria-label={`${i}`}
-      ></button>
-    {/each}
+    <ColorPicker
+      choices={genreColorChoices}
+      value={group ? String(group.color_index) : null}
+      onChange={(v) => { tagsStore.setGroupColor(colorPopoverFor!, Number(v)); colorPopoverFor = null; }}
+      size="sm"
+      columns={5}
+    />
   </div>
 {/if}
 

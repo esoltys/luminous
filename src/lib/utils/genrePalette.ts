@@ -1,8 +1,9 @@
 import type { TagGroup } from "../types";
+import type { ColorChoice } from "../badgeChoices";
 
 /** The Genres page's fixed, curated 10-hue palette — colors are stored as an
  * index into this array (`TagGroup.color_index`), never a free color picker. */
-export const GENRE_PALETTE_HUES = [226, 262, 298, 334, 10, 46, 82, 118, 154, 190] as const;
+const GENRE_PALETTE_HUES = [226, 262, 298, 334, 10, 46, 82, 118, 154, 190] as const;
 
 /**
  * Resolves the curated color index for a genre/tag name, given the current
@@ -27,6 +28,17 @@ export function resolveGenreColorIndex(
   if (directCi) return directCi.color_index;
   const parentCi = hierarchy.find((g) => g.children?.some((c) => c.name.toLowerCase() === lower));
   return parentCi?.color_index;
+}
+
+/** The curated palette as `ColorPicker` choices — `value` is the stringified
+ * palette index (`TagGroup.color_index` as text) since `ColorPicker` keys
+ * choices by string, and `swatchColor` carries the actual HSL swatch fill. */
+export function getGenreColorChoices(): ColorChoice[] {
+  return GENRE_PALETTE_HUES.map((_, i) => ({
+    value: String(i),
+    label: `Color ${i + 1}`,
+    swatchColor: genreColorHsl(i),
+  }));
 }
 
 export function genreColorHsl(colorIndex: number): string {

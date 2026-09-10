@@ -5,8 +5,12 @@
   import { invoke } from "@tauri-apps/api/core";
   import { playerStore } from "../stores/player.svelte";
   import { PLAYER_DOCK_CLEARANCE_PX } from "../constants";
+  import { BADGE_ICON_CHOICES, BADGE_COLOR_CHOICES } from "../badgeChoices";
+  import { combineWebdavPath } from "../webdavDisplay";
   import Button from "./Button.svelte";
   import Input from "./Input.svelte";
+  import LibraryBadge from "./LibraryBadge.svelte";
+  import ColorPicker from "./ColorPicker.svelte";
   import {
     CloudIcon,
     XIcon as X,
@@ -29,11 +33,21 @@
   let password = $state("");
   let remotePath = $state(untrack(() => server?.remotePath ?? "/"));
   let enabled = $state(untrack(() => server?.enabled ?? true));
+  let nickname = $state(untrack(() => server?.nickname ?? ""));
+  let selectedIcon = $state(untrack(() => server?.icon ?? "cloud"));
+  let selectedColor = $state<string | null>(untrack(() => server?.color ?? null));
 
   let testing = $state(false);
   let testSuccess = $state<boolean | null>(null);
   let testError = $state<string | null>(null);
   let saving = $state(false);
+
+  let previewSource = $derived({
+    path: combineWebdavPath(url, remotePath),
+    nickname: nickname.trim() || null,
+    icon: selectedIcon,
+    color: selectedColor,
+  });
 
   const dockClearance = $derived(
     playerStore.currentSong ? PLAYER_DOCK_CLEARANCE_PX : 0
@@ -78,6 +92,9 @@
         password: password ? password : null,
         remotePath: remotePath.trim() || "/",
         enabled,
+        nickname: nickname.trim() || null,
+        icon: selectedIcon,
+        color: selectedColor,
       });
       onSaved(saved);
       onClose();
@@ -182,6 +199,61 @@
           bind:value={remotePath}
           placeholder="/Music"
         />
+      </div>
+
+      <!-- Live Preview -->
+      <div class="bg-brand-main/40 border border-brand-border/50 rounded-xl p-4 flex items-center justify-between gap-4">
+        <span class="text-xs font-semibold text-brand-text-secondary uppercase tracking-wider">
+          {i18n.t("settings.folderPreview")}
+        </span>
+        <div>
+          <LibraryBadge directory={previewSource} size="md" />
+        </div>
+      </div>
+
+      <!-- Nickname -->
+      <div class="space-y-1.5">
+        <label for="webdav-nickname" class="block text-xs font-semibold text-brand-text-secondary">
+          {i18n.t("settings.folderNickname")}
+        </label>
+        <Input
+          id="webdav-nickname"
+          bind:value={nickname}
+          placeholder={i18n.t("settings.folderNicknamePlaceholder")}
+        />
+      </div>
+
+      <!-- Icon Selection -->
+      <div>
+        <span class="block text-xs font-semibold text-brand-text-secondary mb-2">
+          {i18n.t("settings.folderIcon")}
+        </span>
+        <div class="grid grid-cols-5 gap-2">
+          {#each BADGE_ICON_CHOICES as choice}
+            {@const Icon = choice.icon}
+            {@const isSelected = selectedIcon === choice.id}
+            <button
+              type="button"
+              onclick={() => { selectedIcon = choice.id; }}
+              class="flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all duration-150 gap-1
+                {isSelected
+                  ? 'bg-brand-accent/20 border-brand-accent text-brand-accent-text ring-1 ring-brand-accent'
+                  : 'bg-brand-main/40 border-brand-border/60 text-brand-text-secondary hover:text-brand-text-primary hover:border-brand-border'}"
+              title={choice.label}
+            >
+              <Icon class="w-5 h-5" />
+              <span class="text-[10px] font-medium truncate max-w-full">{choice.label}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Color Selection -->
+      <div>
+        <span class="block text-xs font-semibold text-brand-text-secondary mb-2">
+          {i18n.t("settings.folderColor")}
+        </span>
+        <ColorPicker choices={BADGE_COLOR_CHOICES} value={selectedColor} onChange={(v) => { selectedColor = v; }} />
       </div>
 
       {#if testSuccess === true}

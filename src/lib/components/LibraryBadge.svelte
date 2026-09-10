@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Component } from "svelte";
-  import type { MusicDirectory } from "../types";
+  import type { BadgeSource } from "../types";
   import {
     FolderIcon,
     HardDriveIcon,
@@ -16,7 +16,7 @@
   } from "phosphor-svelte";
 
   interface Props {
-    directory: MusicDirectory;
+    directory: BadgeSource;
     size?: "xs" | "sm" | "md";
     showName?: boolean;
     class?: string;
