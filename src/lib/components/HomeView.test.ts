@@ -38,7 +38,9 @@ function makeTopAlbum(overrides: Partial<TopAlbumItem> = {}): TopAlbumItem {
 
 // Captures listen() callbacks by event name so tests can fire them directly,
 // mirroring how the real backend would emit scan-progress/library-changed.
-const listenCallbacks: Record<string, (event: { payload: unknown }) => void> = {};
+const { listenCallbacks } = vi.hoisted(() => ({
+  listenCallbacks: {} as Record<string, (event: { payload: unknown }) => void>,
+}));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn((event: string, callback: (e: { payload: unknown }) => void) => {
@@ -172,5 +174,13 @@ describe("HomeView.svelte", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("matches detail view header top whitespace using pt-6", () => {
+    const { container } = render(HomeView);
+    const greetingHeading = container.querySelector("h1");
+    expect(greetingHeading).toBeInTheDocument();
+    expect(greetingHeading?.parentElement).toHaveClass("pt-6");
+    expect(greetingHeading?.parentElement).not.toHaveClass("pt-8");
   });
 });

@@ -22,6 +22,7 @@ class TagsStore {
 
   /** The persisted Genres curation hierarchy — one card per primary genre. */
   hierarchy = $state<TagGroup[]>([]);
+  private hierarchyLoadStarted = false;
 
   /** Call from the Genres tab's onMount (and unlisten on unmount, same as
    * its existing "library-changed" listener) to keep `hierarchy` in sync
@@ -34,7 +35,20 @@ class TagsStore {
   }
 
   async loadHierarchy() {
-    this.hierarchy = await invoke<TagGroup[]>("get_tag_hierarchy");
+    const result = await invoke<TagGroup[]>("get_tag_hierarchy");
+    this.hierarchy = Array.isArray(result) ? result : [];
+  }
+
+  /** Kick off the initial hierarchy load at most once per session — genre
+   * chips across many widely-reused components (AlbumCard, PlaylistView,
+   * ArtistDetailView, ...) call this from an $effect on every mount, and an
+   * empty result (no genres curated yet) is a legitimate steady state, not
+   * a signal to keep retrying; live updates already flow through
+   * `listenForHierarchyChanges`'s "tags-changed" listener instead. */
+  ensureHierarchyLoaded() {
+    if (this.hierarchyLoadStarted) return;
+    this.hierarchyLoadStarted = true;
+    this.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
   }
 
   async setGroupColor(name: string, colorIndex: number) {

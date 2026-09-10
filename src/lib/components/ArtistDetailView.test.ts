@@ -4,6 +4,7 @@ import ArtistDetailView from "./ArtistDetailView.svelte";
 import { collectionStore } from "../stores/collection.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
 import { picardStore } from "../stores/picard.svelte";
+import { windowLayoutStore } from "../stores/windowLayout.svelte";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -435,7 +436,33 @@ describe("ArtistDetailView", () => {
       } finally {
         delete (HTMLParagraphElement.prototype as any).scrollHeight;
         delete (HTMLDivElement.prototype as any).clientWidth;
-        delete (HTMLDivElement.prototype as any).offsetHeight;
+      }
+    });
+
+    it("hides tags and bio/profile section while keeping action buttons visible when detail header is collapsed", async () => {
+      const originalHeight = windowLayoutStore.viewportHeight;
+      try {
+        // Set viewportHeight to less than DETAIL_HEADER_COLLAPSE_HEIGHT_PX (600)
+        windowLayoutStore.viewportHeight = 500;
+        expect(windowLayoutStore.isDetailHeaderCollapsed).toBe(true);
+
+        render(ArtistDetailView, { props: { artistName: "Shania Twain" } });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Action buttons remain visible
+        expect(screen.getByRole("button", { name: /^Play$/i })).toBeTruthy();
+        expect(screen.getByRole("button", { name: /Shuffle Play/i })).toBeTruthy();
+        expect(screen.getByTitle("More actions")).toBeTruthy();
+
+        // Artist name, tags, and bio profile section are hidden
+        expect(screen.queryByText("Shania Twain")).toBeNull();
+        expect(screen.queryByText("country")).toBeNull();
+        expect(screen.queryByText("canadian")).toBeNull();
+        expect(screen.queryByText("pop")).toBeNull();
+        expect(screen.queryByText("Canadian music icon")).toBeNull();
+        expect(screen.queryByText("LINKS")).toBeNull();
+      } finally {
+        windowLayoutStore.viewportHeight = originalHeight;
       }
     });
   });

@@ -13,11 +13,20 @@ export const GENRE_PALETTE_HUES = [226, 262, 298, 334, 10, 46, 82, 118, 154, 190
  * threshold, or a stale reference), letting the caller fall back to a
  * default color rather than crashing.
  */
-export function resolveGenreColorIndex(hierarchy: TagGroup[], name: string): number | undefined {
+export function resolveGenreColorIndex(
+  hierarchy: TagGroup[] | undefined | null,
+  name: string | undefined | null
+): number | undefined {
+  if (!Array.isArray(hierarchy) || !name) return undefined;
   const direct = hierarchy.find((g) => g.name === name);
   if (direct) return direct.color_index;
-  const parent = hierarchy.find((g) => g.children.some((c) => c.name === name));
-  return parent?.color_index;
+  const parent = hierarchy.find((g) => g.children?.some((c) => c.name === name));
+  if (parent) return parent.color_index;
+  const lower = name.toLowerCase();
+  const directCi = hierarchy.find((g) => g.name.toLowerCase() === lower);
+  if (directCi) return directCi.color_index;
+  const parentCi = hierarchy.find((g) => g.children?.some((c) => c.name.toLowerCase() === lower));
+  return parentCi?.color_index;
 }
 
 export function genreColorHsl(colorIndex: number): string {

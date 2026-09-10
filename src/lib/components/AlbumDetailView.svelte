@@ -437,7 +437,7 @@
           {albumName}
         </h1>
 
-        <div class="flex items-center gap-2 text-base font-semibold text-brand-accent-text">
+        <div class="flex items-center gap-2 text-base font-semibold text-brand-text-primary">
           {#if artistName}
             <LinkButton
               onclick={() => navigationStore.viewArtist(artistName)}
@@ -446,19 +446,19 @@
               {artistName}
             </LinkButton>
           {:else}
-            <span class="text-brand-text-secondary">{i18n.t('collection.unknownArtist')}</span>
+            <span class="text-brand-text-primary">{i18n.t('collection.unknownArtist')}</span>
           {/if}
         </div>
 
         {#if rawGenre}
           <GenreChips genre={rawGenre} variant="full" limit={4} />
         {:else}
-          <div class="text-xs text-brand-text-secondary font-medium">
+          <div class="text-xs text-brand-text-primary font-medium">
             <span>{genreLabel}</span>
           </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
           {#if yearLabel}
             <span>{yearLabel}</span>
             <span>•</span>
@@ -487,7 +487,7 @@
         </div>
         {/if}
 
-        <div class="flex flex-wrap items-center gap-3 mt-3 select-none">
+        <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'} select-none">
           <PlayShuffleButtons
             onPlayAll={handlePlayAll}
             onShufflePlay={handleShufflePlay}

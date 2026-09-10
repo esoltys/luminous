@@ -685,13 +685,13 @@
             {#if rawGenre}
               <GenreChips genre={rawGenre} variant="full" limit={4} />
             {:else}
-              <div class="text-xs text-brand-text-secondary font-medium">
+              <div class="text-xs text-brand-text-primary font-medium">
                 <span>{genreLabel}</span>
               </div>
             {/if}
           {/if}
 
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-secondary font-medium">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-text-primary font-medium">
             <span>
               {playlistsStore.activePlaylistTracks.length === 1
                 ? i18n.t("playlists.oneSong")
@@ -702,7 +702,7 @@
           </div>
           {/if}
 
-          <div class="flex flex-wrap items-center gap-3 mt-3">
+          <div class="flex flex-wrap items-center gap-3 {windowLayoutStore.isDetailHeaderCollapsed ? '' : 'mt-3'}">
             <Button
               onclick={handlePlayAll}
               disabled={playlistsStore.activePlaylistTracks.length === 0}
