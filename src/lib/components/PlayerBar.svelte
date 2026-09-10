@@ -16,6 +16,10 @@
   import WaveformSeekBar from "./WaveformSeekBar.svelte";
   import SpectrumVisualizer from "./SpectrumVisualizer.svelte";
   import LinkButton from "./LinkButton.svelte";
+  import SongContextMenu from "./SongContextMenu.svelte";
+  import TagEditor from "./TagEditor.svelte";
+  import { tagsStore } from "../stores/tags.svelte";
+  import { openInPicard } from "../utils/picard";
   import { isLinux } from "../platform";
 
   // Responsive control trimming (issue #413, refined against real usage,
@@ -49,7 +53,10 @@
     MicrophoneStageIcon as Mic2,
     PlaylistIcon as ListMusic,
     MusicNotesIcon as Music,
-    InfoIcon as Info
+    InfoIcon as Info,
+    ListIcon as Menu,
+    SubtitlesIcon as Lyrics,
+    StackIcon as Layers
   } from "phosphor-svelte";
 
 
@@ -169,35 +176,32 @@
     }
   }
 
-  // True only when the user is already looking at the Queue itself (not
-  // immersive, on the Playlists tab's custom-playlists sub-tab, with the
-  // Queue playlist selected) — distinguishes "viewing the Queue" from
-  // "viewing any other collection/playlist", which the cover-art click
-  // handler below needs in order to pick the right next state (#523).
-  let isViewingQueue = $derived.by(() => {
-    if (windowLayoutStore.immersiveMode) return false;
-    const queuePl = playlistsStore.queuePlaylist;
-    if (!queuePl) return false;
-    return (
-      navigationStore.activeTab === 'playlists' &&
-      navigationStore.playlistsSubTab === 'custom' &&
-      navigationStore.selectedPlaylistId === queuePl.id
-    );
-  });
-
-  // Nudge users toward the Details pane when there's live enrichment content
-  // to fetch for the current track (#23) — matches the two IDs get_song_context
-  // actually reads (musicbrainz_release_group_id / musicbrainz_artist_id).
-  let hasContextEnrichmentSource = $derived(
-    !!(playerStore.currentSong?.musicbrainz_release_group_id || playerStore.currentSong?.musicbrainz_artist_id)
+  let coverTitle = $derived(
+    playerStore.currentSong ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode') : ""
   );
 
-  let coverTitle = $derived.by(() => {
-    if (!playerStore.currentSong) return "";
-    return isViewingQueue
-      ? i18n.t('playerBar.immersiveTitle', {}, 'Immersive Mode')
-      : i18n.t('playerBar.queueTitle', {}, 'Queue');
-  });
+  // Cover art now only toggles Immersive View (#876) — navigating to the
+  // Queue is the dedicated Queue button's job.
+  function handleCoverClick(e: MouseEvent) {
+    if (!playerStore.currentSong) return;
+    e.stopPropagation();
+
+    // While the window is too narrow to show the front face at all
+    // (isImmersiveForced), immersive is already engaged regardless of what
+    // this toggles, so leave it alone until the window widens back out.
+    if (windowLayoutStore.isImmersiveForced) return;
+
+    windowLayoutStore.toggleImmersiveMode();
+  }
+
+  // New playbar button row (#876): Menu/Lyrics/Queue/Info/Miniplayer.
+  let contextMenuState = $state<{ x: number; y: number } | null>(null);
+  let editingSongId = $state<number | null>(null);
+
+  function openCurrentSongMenu(e: MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    contextMenuState = { x: rect.left, y: rect.top };
+  }
 
   async function navigateToQueue() {
     const queuePl = await playlistsStore.requireQueue();
@@ -205,28 +209,9 @@
     navigationStore.viewPlaylist(queuePl.id);
   }
 
-  // Three-state navigation flow (#523): from any collection/playlist view,
-  // clicking goes to the Queue; from the Queue, it flips into Immersive
-  // Mode; from Immersive Mode, it flips back to the Queue.
-  async function handleCoverClick(e: MouseEvent) {
-    if (!playerStore.currentSong) return;
-    e.stopPropagation();
-
-    // While the window is too narrow to show the front face at all
-    // (isImmersiveForced), immersive is engaged regardless of what this
-    // toggles — clicking through to "exit and view Queue" would silently
-    // clear the user's own immersiveMode preference for a screen they can't
-    // actually reach yet, so leave it alone until the window widens back out.
-    if (windowLayoutStore.isImmersiveForced) return;
-
-    if (windowLayoutStore.immersiveMode) {
-      windowLayoutStore.exitImmersiveMode();
-      await navigateToQueue();
-    } else if (isViewingQueue) {
-      windowLayoutStore.toggleImmersiveMode();
-    } else {
-      await navigateToQueue();
-    }
+  function handleTagEditorSaved() {
+    collectionStore.refreshLibrary();
+    tagsStore.load();
   }
 </script>
 
@@ -393,37 +378,34 @@
     </div>
   </div>
 
-  <div class="hidden min-[700px]:flex items-center justify-end gap-1.5 min-[700px]:gap-3 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
-    <div class="w-24 h-7 mr-2 hidden md:block">
-      <SpectrumVisualizer />
-    </div>
-    <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
-      {#if isMuted || playerStore.volume === 0}
-        <VolumeX class="w-4 h-4" />
-      {:else}
-        <Volume2 class="w-4 h-4" />
-      {/if}
-    </button>
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.01"
-      value={playerStore.volume}
-      oninput={handleVolumeChange}
-      onchange={releaseVolumeFocus}
-      onpointerup={releaseVolumeFocus}
-      onkeyup={releaseVolumeFocus}
-      class="volume-slider hidden min-[700px]:block w-20 h-1 rounded-lg outline-none"
-      style={volumeSliderStyle}
-      aria-label={i18n.t('playerBar.volumeSlider')}
-      title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
-    />
-    <div class="hidden min-[700px]:flex flex-col items-center justify-center gap-1 flex-shrink-0">
+  <div class="hidden min-[700px]:flex flex-col items-center gap-1.5 w-1/3 min-w-[50px] min-[700px]:min-w-[200px] max-w-xs">
+    <div class="flex items-center gap-3 min-[700px]:gap-5">
+      <button
+        onclick={openCurrentSongMenu}
+        disabled={!playerStore.currentSong}
+        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+        title={i18n.t('playerBar.menuTooltip', {}, 'Song menu')}
+      >
+        <Menu class="w-5 h-5" />
+      </button>
+      <button
+        onclick={() => { navigationStore.activeTab = "lyrics"; }}
+        class="transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
+        title={i18n.t('sidebar.lyrics')}
+      >
+        <Lyrics class="w-5 h-5" />
+      </button>
+      <button
+        onclick={navigateToQueue}
+        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+        title={i18n.t('playerBar.queueTitle', {}, 'Queue')}
+      >
+        <Layers class="w-5 h-5" />
+      </button>
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
           onclick={() => windowLayoutStore.toggleRightPanel()}
-          class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded-full hover:bg-brand-main/60 {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : ''} {!windowLayoutStore.rightPanelOpen && hasContextEnrichmentSource ? 'ring-1 ring-brand-accent' : ''}"
+          class="transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           title={i18n.t('topNav.toggleRightPanel')}
         >
           <Info class="w-5 h-5" />
@@ -431,14 +413,66 @@
       {/if}
       <button
         onclick={() => windowLayoutStore.toggleMiniplayerMode()}
-        class="text-brand-text-secondary hover:text-brand-accent-text transition-colors p-1.5 rounded hover:bg-brand-main/60"
+        class="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
         title={i18n.t('miniplayer.toggleTooltip', {}, 'Picture-in-Picture Mode (Ctrl+M)')}
       >
-        <PictureInPicture class="w-4.5 h-4.5" />
+        <PictureInPicture class="w-5 h-5" />
       </button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <div class="w-24 h-7 hidden md:block">
+        <SpectrumVisualizer />
+      </div>
+      <button onclick={toggleMute} class="text-brand-text-secondary hover:text-brand-text-primary transition-colors" title={i18n.t('playerBar.volume')}>
+        {#if isMuted || playerStore.volume === 0}
+          <VolumeX class="w-4 h-4" />
+        {:else}
+          <Volume2 class="w-4 h-4" />
+        {/if}
+      </button>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={playerStore.volume}
+        oninput={handleVolumeChange}
+        onchange={releaseVolumeFocus}
+        onpointerup={releaseVolumeFocus}
+        onkeyup={releaseVolumeFocus}
+        class="volume-slider w-20 h-1 rounded-lg outline-none"
+        style={volumeSliderStyle}
+        aria-label={i18n.t('playerBar.volumeSlider')}
+        title={i18n.t('playerBar.volumeWithValue', { value: Math.round(volumePercent) })}
+      />
     </div>
   </div>
 </footer>
+
+{#if contextMenuState && playerStore.currentSong}
+  {@const song = playerStore.currentSong}
+  <SongContextMenu
+    x={contextMenuState.x}
+    y={contextMenuState.y}
+    {song}
+    onPlay={() => playerStore.playSong(song.id)}
+    onAddToPlaylist={() => playlistsStore.addSongsToActiveTarget([song.id], song.title || "Song")}
+    onGoToArtist={song.artist ? () => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "") : undefined}
+    onGoToAlbum={song.album ? () => navigationStore.viewAlbum(song.album || "") : undefined}
+    onEditTags={() => { editingSongId = song.id; }}
+    onOpenInPicard={() => openInPicard([song.id])}
+    onClose={() => { contextMenuState = null; }}
+  />
+{/if}
+
+{#if editingSongId !== null}
+  <TagEditor
+    songId={editingSongId}
+    onClose={() => { editingSongId = null; }}
+    onSave={handleTagEditorSaved}
+  />
+{/if}
 
 <style>
   /* Accent glow: only the PlayDock gets it, not the other glass panels —
