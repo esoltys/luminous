@@ -17,7 +17,7 @@ export function resolveGenreColorIndex(
   hierarchy: TagGroup[] | undefined | null,
   name: string | undefined | null
 ): number | undefined {
-  if (!hierarchy || !name) return undefined;
+  if (!Array.isArray(hierarchy) || !name) return undefined;
   const direct = hierarchy.find((g) => g.name === name);
   if (direct) return direct.color_index;
   const parent = hierarchy.find((g) => g.children?.some((c) => c.name === name));

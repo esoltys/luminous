@@ -78,7 +78,7 @@
       {/if}
     </button>
   {:else}
-    <div class="flex flex-wrap gap-1.5 {className}">
+    <div class="flex flex-wrap gap-1 {className}">
       {#each displayedValues as value (value)}
         <button
           type="button"

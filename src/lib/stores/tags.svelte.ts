@@ -34,7 +34,8 @@ class TagsStore {
   }
 
   async loadHierarchy() {
-    this.hierarchy = (await invoke<TagGroup[]>("get_tag_hierarchy")) ?? [];
+    const result = await invoke<TagGroup[]>("get_tag_hierarchy");
+    this.hierarchy = Array.isArray(result) ? result : [];
   }
 
   async setGroupColor(name: string, colorIndex: number) {
