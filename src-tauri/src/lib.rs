@@ -982,6 +982,8 @@ pub fn run() {
             commands::pins::unpin_item,
             commands::pins::get_pinned_items,
             commands::pins::reorder_pinned_items,
+            // Social share card export (#97)
+            commands::share::save_share_card_image,
             // Playlist commands
             commands::playlist::validate_playlist_name,
             commands::playlist::create_playlist,

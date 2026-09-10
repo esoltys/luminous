@@ -11,6 +11,7 @@ pub mod player;
 pub mod playlist;
 pub mod scrobbler;
 pub mod settings;
+pub mod share;
 pub mod stats;
 pub mod tageditor;
 pub mod tags;

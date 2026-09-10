@@ -1022,6 +1022,25 @@ export const fr = {
   immersive: {
     emptyStateText: "Sélectionnez une chanson de votre collection pour commencer la lecture."
   },
+  shareModal: {
+    menuItem: "Partager la carte...",
+    title: "Partager la carte",
+    closeTooltip: "Fermer",
+    previewAlt: "Aperçu de la carte de partage",
+    rendering: "Génération de l'aperçu...",
+    aspectRatioLabel: "Format",
+    themeLabel: "Thème",
+    themeLight: "Clair",
+    themeDark: "Sombre",
+    trackListToggle: "Afficher la liste des pistes",
+    copyButton: "Copier l'image",
+    saveButton: "Enregistrer l'image",
+    copySuccess: "Carte de partage copiée dans le presse-papiers",
+    copyError: "Échec de la copie de la carte de partage",
+    saveDialogTitle: "Enregistrer la carte de partage",
+    saveSuccess: "Carte de partage enregistrée",
+    saveError: "Échec de l'enregistrement de la carte de partage"
+  },
   rating: {
     label: "Note",
     setTooltip: "Noter {value} sur 5",

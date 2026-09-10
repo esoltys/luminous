@@ -990,6 +990,25 @@ export const en = {
   immersive: {
     emptyStateText: "Select a song from your collection to start playing."
   },
+  shareModal: {
+    menuItem: "Share Card...",
+    title: "Share Card",
+    closeTooltip: "Close",
+    previewAlt: "Share card preview",
+    rendering: "Rendering preview...",
+    aspectRatioLabel: "Aspect ratio",
+    themeLabel: "Theme",
+    themeLight: "Light",
+    themeDark: "Dark",
+    trackListToggle: "Show track list",
+    copyButton: "Copy Image",
+    saveButton: "Save Image",
+    copySuccess: "Share card copied to clipboard",
+    copyError: "Failed to copy share card",
+    saveDialogTitle: "Save Share Card",
+    saveSuccess: "Share card saved",
+    saveError: "Failed to save share card"
+  },
   rating: {
     label: "Rating",
     setTooltip: "Rate {value} of 5",

@@ -34,8 +34,10 @@
     PushPinIcon as Pin,
     PushPinSlashIcon as PinOff,
     DotsThreeIcon as MoreHorizontal,
-    ArrowSquareOutIcon as OpenInPicard
+    ArrowSquareOutIcon as OpenInPicard,
+    ShareNetworkIcon as Share
   } from "phosphor-svelte";
+  import ShareModal from "./ShareModal.svelte";
   import type { Song, AlbumItem, PlayContext } from "../types";
   import { getCoverArtUrl, resolveArtUrl } from "../types";
   import { i18n } from "../stores/i18n.svelte";
@@ -53,6 +55,7 @@
   let editingSongId = $state<number | null>(null);
   let showAlbumTagEditor = $state(false);
   let contextMenuState = $state<{ x: number; y: number; song: Song } | null>(null);
+  let showShareModal = $state(false);
 
   async function handleRefreshAlbum() {
     if (refreshing || collectionStore.isScanning) return;
@@ -500,6 +503,12 @@
               {/if}
             {/snippet}
           </IconActionButton>
+          <IconActionButton
+            onclick={() => { showShareModal = true; }}
+            title={i18n.t("shareModal.menuItem")}
+          >
+            {#snippet icon()}<Share class="w-4 h-4" />{/snippet}
+          </IconActionButton>
           <ColumnSelector align="left" iconOnly />
           <button
             onclick={toggleOverflowMenu}
@@ -647,5 +656,9 @@
     onAddToPlaylist={handleBulkAddToPlaylist}
     onClear={() => { selectedKeys = new Set(); }}
   />
+{/if}
+
+{#if showShareModal}
+  <ShareModal {albumName} onClose={() => { showShareModal = false; }} />
 {/if}
 
