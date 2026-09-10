@@ -54,6 +54,32 @@ impl ArtworkCategory {
             ArtworkCategory::Subfolder => "subfolder",
         }
     }
+
+    /// True for categories that belong to an album (primary cover, back cover,
+    /// disc media, booklet, matrix, or unnamed subfolder finds). Excludes
+    /// parent artist-level categories (portrait, band logo, fanart banner).
+    pub fn is_album_level(&self) -> bool {
+        matches!(
+            self,
+            ArtworkCategory::PrimaryCover
+                | ArtworkCategory::BackCover
+                | ArtworkCategory::DiscMedia
+                | ArtworkCategory::Booklet
+                | ArtworkCategory::Matrix
+                | ArtworkCategory::Subfolder
+        )
+    }
+
+    /// True for categories that belong to an artist (artist portrait,
+    /// band logo, fanart/backdrop banner).
+    pub fn is_artist_level(&self) -> bool {
+        matches!(
+            self,
+            ArtworkCategory::ArtistPortrait
+                | ArtworkCategory::BandLogo
+                | ArtworkCategory::FanartBanner
+        )
+    }
 }
 
 /// One discovered artwork file, categorized and ready to sort by
@@ -218,6 +244,34 @@ fn scan_dir_for_category(
     }
 }
 
+/// Like `scan_dir_for_category`, but a file that doesn't match a named
+/// category still gets included as `Subfolder` fallback instead of being
+/// silently dropped — for a directory whose *entire* contents are known to
+/// be artwork scans (the album directory itself, or a nested artwork
+/// subfolder), a compound or numbered filename (`Booklet 1.jpg`,
+/// `Front + OBI.jpg`) is still legitimate album artwork, just unranked
+/// (#855).
+fn scan_dir_for_category_with_fallback(
+    dir: &Path,
+    categorize: impl Fn(&str) -> Option<ArtworkCategory>,
+    out: &mut Vec<ArtworkEntry>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() || !has_extended_artwork_extension(&path) {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let category = categorize(stem.to_lowercase().as_str()).unwrap_or(ArtworkCategory::Subfolder);
+        out.push(ArtworkEntry { category, path });
+    }
+}
+
 /// Scan a nested artwork subfolder (`Artwork/`, `Scans/`, etc.): files whose
 /// name matches an album-level or artist-level category keep that category;
 /// everything else with a supported extension falls back to `Subfolder`, per
@@ -258,7 +312,7 @@ pub fn scan_extended_artwork(audio_path: &Path, album_name: Option<&str>) -> Ext
         return ExtendedArtworkSet { entries };
     };
 
-    scan_dir_for_category(
+    scan_dir_for_category_with_fallback(
         album_dir,
         |stem| categorize_album_art_name(stem, album_name),
         &mut entries,
@@ -918,6 +972,32 @@ mod tests {
     }
 
     #[test]
+    fn test_artwork_category_scopes() {
+        let album_categories = [
+            ArtworkCategory::PrimaryCover,
+            ArtworkCategory::BackCover,
+            ArtworkCategory::DiscMedia,
+            ArtworkCategory::Booklet,
+            ArtworkCategory::Matrix,
+            ArtworkCategory::Subfolder,
+        ];
+        for cat in &album_categories {
+            assert!(cat.is_album_level(), "{cat:?} must be album level");
+            assert!(!cat.is_artist_level(), "{cat:?} must not be artist level");
+        }
+
+        let artist_categories = [
+            ArtworkCategory::ArtistPortrait,
+            ArtworkCategory::BandLogo,
+            ArtworkCategory::FanartBanner,
+        ];
+        for cat in &artist_categories {
+            assert!(cat.is_artist_level(), "{cat:?} must be artist level");
+            assert!(!cat.is_album_level(), "{cat:?} must not be album level");
+        }
+    }
+
+    #[test]
     fn test_scan_extended_artwork_categorizes_album_level_hierarchy() {
         let temp_dir = unique_temp_dir("album_hierarchy");
         let _ = std::fs::create_dir_all(&temp_dir);
@@ -929,7 +1009,7 @@ mod tests {
         std::fs::write(temp_dir.join("booklet.png"), b"booklet").unwrap();
         std::fs::write(temp_dir.join("disc.webp"), b"disc").unwrap();
         std::fs::write(temp_dir.join("tray.jpg"), b"tray").unwrap();
-        // Not a recognized name — should be excluded, not miscategorized.
+        // Not a recognized name — still counted, just unranked as Subfolder.
         std::fs::write(temp_dir.join("random.jpg"), b"random").unwrap();
 
         let set = scan_extended_artwork(&audio_path, None).sorted();
@@ -943,6 +1023,7 @@ mod tests {
                 ArtworkCategory::DiscMedia,
                 ArtworkCategory::Booklet,
                 ArtworkCategory::Matrix,
+                ArtworkCategory::Subfolder,
             ]
         );
         assert_eq!(
@@ -1022,6 +1103,39 @@ mod tests {
             categories,
             vec![ArtworkCategory::BackCover, ArtworkCategory::Subfolder]
         );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_scan_extended_artwork_counts_compound_named_album_scans() {
+        // Regression for #855 review feedback: a real-world reissue booklet
+        // scan set (numbered/compound filenames living directly in the album
+        // directory, not a named subfolder) was being silently dropped down
+        // to only the 2-3 exactly-named files instead of all of them.
+        let temp_dir = unique_temp_dir("compound_named_scans");
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let audio_path = temp_dir.join("song.mp3");
+        std::fs::write(&audio_path, b"fake audio").unwrap();
+        for name in [
+            "Booklet 1.jpg",
+            "Booklet 2.jpg",
+            "Booklet 3.jpg",
+            "Booklet 4.jpg",
+            "CD.jpg",
+            "Folder.jpg",
+            "Front + Inlay.jpg",
+            "Front + OBI.jpg",
+            "Front.jpg",
+            "obi.jpg",
+        ] {
+            std::fs::write(temp_dir.join(name), b"scan").unwrap();
+        }
+
+        let set = scan_extended_artwork(&audio_path, None);
+
+        assert_eq!(set.entries.len(), 10);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

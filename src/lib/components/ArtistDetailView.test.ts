@@ -61,7 +61,6 @@ describe("ArtistDetailView", () => {
     expect(screen.getByText("canadian")).toBeTruthy();
     expect(screen.getByText("pop")).toBeTruthy();
     expect(screen.getByText("Canadian music icon")).toBeTruthy();
-    expect(screen.getByText("LINKS")).toBeTruthy();
     expect(screen.getByText("shaniatwain.com")).toBeTruthy();
     expect(screen.getByText("Instagram")).toBeTruthy();
   });

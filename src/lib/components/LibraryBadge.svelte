@@ -60,17 +60,16 @@
 
   let badgeStyle = $derived(
     customColor
-      ? `background-color: color-mix(in srgb, ${customColor} 18%, var(--color-brand-sidebar)); border-color: color-mix(in srgb, ${customColor} 45%, var(--color-brand-sidebar)); color: ${customColor};`
-      : `background-color: color-mix(in srgb, var(--color-brand-accent) 15%, var(--color-brand-sidebar)); border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));`
+      ? `border-color: ${customColor};`
+      : `border-color: color-mix(in srgb, var(--color-brand-accent) 25%, var(--color-brand-sidebar));`
   );
 </script>
 
 <span
-  class="inline-flex items-center font-medium border rounded-full transition-colors select-none max-w-full truncate
+  class="inline-flex items-center font-medium border-2 rounded-full transition-colors select-none max-w-full truncate bg-brand-accent/15 text-brand-text-primary
     {size === 'xs' ? 'text-[10px] px-2 py-0.5 gap-1' : ''}
     {size === 'sm' ? 'text-xs px-2.5 py-0.5 gap-1.5' : ''}
     {size === 'md' ? 'text-xs px-3 py-1 gap-2' : ''}
-    {!customColor ? 'text-brand-text-primary' : ''}
     {isUnavailable ? 'opacity-70 border-dashed border-red-400/60' : ''}
     {className}"
   style={badgeStyle}
