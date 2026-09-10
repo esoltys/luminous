@@ -671,10 +671,6 @@
             bind:this={linksColEl}
             class="md:w-60 lg:w-72 shrink-0 border-t border-brand-border/40 pt-4 md:border-t-0 md:border-l md:border-brand-border/60 md:pt-0 md:pl-6 flex flex-col gap-3"
           >
-            <h2 class="text-xs font-bold text-brand-text-secondary uppercase tracking-wider">
-              {i18n.t("artistDetail.links", {}, "LINKS")}
-            </h2>
-
             <div class="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-2.5">
               <!-- Primary Website Link -->
               {#if hasWebsite}

@@ -349,8 +349,8 @@
             onpointerdown={(e) => handleChipPointerDown(e, child.name, group.name)}
             onclick={() => { if (selectMode) onToggleSelect(child.name); }}
             oncontextmenu={(e) => openContextMenu(e, child.name, false)}
-            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full border text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
-            style={`background-color: color-mix(in srgb, ${genreColorHsl(group.color_index)} 38%, transparent); border-color: color-mix(in srgb, ${genreColorHslFg(group.color_index)} 70%, transparent); color: ${genreColorHslFg(group.color_index)};`}
+            class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 rounded-full border-2 bg-brand-accent/15 text-brand-text-primary text-xs font-medium select-none touch-none transition-[opacity,box-shadow,transform] {selectMode ? 'cursor-pointer' : 'genre-drag-handle'} {!selectMode && draggedChip?.name === child.name ? 'is-dragging' : ''} {draggedChip?.name === child.name ? 'opacity-40' : ''} {dropTarget?.kind === 'chip' && dropTarget.chip === child.name ? 'ring-4 ring-brand-accent scale-110' : selected.has(child.name) ? 'ring-2 ring-brand-accent' : ''}"
+            style={`border-color: ${genreColorHsl(group.color_index)};`}
           >
             {#if selectMode}
               <input
@@ -391,8 +391,8 @@
 
 {#if ghostInfo && pointerPos}
   <div
-    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border text-xs font-semibold shadow-2xl -translate-y-1/2"
-    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; background-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 40%, var(--color-brand-sidebar)); color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 90%, var(--color-brand-text-primary)); border-color: color-mix(in srgb, ${genreColorHsl(ghostInfo.colorIndex)} 60%, transparent);`}
+    class="fixed z-50 pointer-events-none px-3 py-1.5 rounded-full border-2 bg-brand-accent/15 text-brand-text-primary text-xs font-semibold shadow-2xl -translate-y-1/2"
+    style={`left: ${pointerPos.x + 16}px; top: ${pointerPos.y}px; border-color: ${genreColorHsl(ghostInfo.colorIndex)};`}
   >
     {ghostInfo.label}
   </div>

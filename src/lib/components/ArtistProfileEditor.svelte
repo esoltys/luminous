@@ -105,7 +105,6 @@
       };
 
       const saved = await collectionStore.saveArtistProfile(profile);
-      toastStore.show(i18n.t("artistProfileEditor.savedSuccess", {}, "Artist profile updated"));
       onSaved?.(saved);
       onClose();
     } catch (err) {

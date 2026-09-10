@@ -50,7 +50,7 @@
   function getChipClass(value: string): string {
     const colorIndex = resolveGenreColorIndex(tagsStore.hierarchy, value);
     const padding = variant === "compact" ? "px-2 py-0.5" : "px-2.5 py-1";
-    const base = `inline-flex items-center rounded-full border text-xs font-medium select-none transition-[opacity,box-shadow,transform,filter,colors] hover:brightness-110 active:scale-[0.98] ${padding}`;
+    const base = `inline-flex items-center rounded-full border-2 text-xs font-medium select-none transition-[opacity,box-shadow,transform,filter,colors] hover:brightness-110 active:scale-[0.98] ${padding}`;
     if (colorIndex !== undefined) {
       return base;
     }

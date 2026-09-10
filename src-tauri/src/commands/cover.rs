@@ -85,8 +85,11 @@ fn build_extended_artwork_response(set: ExtendedArtworkSet) -> ExtendedArtworkRe
     response
 }
 
-/// Full hierarchical artwork scan (#98/#757) for one song's album directory
-/// and its parent artist directory, exposed over IPC. There's no dedicated
+/// Album-level slice of the hierarchical scan (#98/#757/#760) for one song's
+/// album directory, exposed over IPC. Artist-level categories (portrait,
+/// band logo, fanart banner) and media residing in parent directories are
+/// excluded here so that the cover stack badge and "Open Images" count
+/// represent only images belonging to the album (#855). There's no dedicated
 /// "album" row in the schema — an album is just a group of songs sharing an
 /// `album` value — so this is keyed on any one representative song from the
 /// album rather than a synthetic album id; the frontend already has a
@@ -121,8 +124,17 @@ pub async fn get_extended_artwork_for_song(
         return Ok(ExtendedArtworkResponse::default());
     };
 
-    let set = scan_extended_artwork(Path::new(&path), album.as_deref()).sorted();
-    Ok(build_extended_artwork_response(set))
+    let set = scan_extended_artwork(Path::new(&path), album.as_deref());
+    let album_only = ExtendedArtworkSet {
+        entries: set
+            .entries
+            .into_iter()
+            .filter(|e| e.category.is_album_level())
+            .collect(),
+    }
+    .sorted();
+
+    Ok(build_extended_artwork_response(album_only))
 }
 
 /// Artist-level slice of the same hierarchical scan (portrait, band logo,
@@ -159,14 +171,7 @@ pub async fn get_extended_artwork_for_artist(
         entries: set
             .entries
             .into_iter()
-            .filter(|e| {
-                matches!(
-                    e.category,
-                    ArtworkCategory::ArtistPortrait
-                        | ArtworkCategory::BandLogo
-                        | ArtworkCategory::FanartBanner
-                )
-            })
+            .filter(|e| e.category.is_artist_level())
             .collect(),
     }
     .sorted();
@@ -270,5 +275,56 @@ mod tests {
             Some("luminous-art://local//music/Artist/fanart.jpg")
         );
         assert_eq!(response.count, 4);
+    }
+
+    #[test]
+    fn test_album_scoped_filtering_excludes_parent_artist_folder_media() {
+        let set = ExtendedArtworkSet {
+            entries: vec![
+                ArtworkEntry {
+                    category: ArtworkCategory::PrimaryCover,
+                    path: PathBuf::from("/music/Artist/Album/cover.jpg"),
+                },
+                ArtworkEntry {
+                    category: ArtworkCategory::BackCover,
+                    path: PathBuf::from("/music/Artist/Album/back.jpg"),
+                },
+                ArtworkEntry {
+                    category: ArtworkCategory::ArtistPortrait,
+                    path: PathBuf::from("/music/Artist/artist.jpg"),
+                },
+                ArtworkEntry {
+                    category: ArtworkCategory::BandLogo,
+                    path: PathBuf::from("/music/Artist/logo.png"),
+                },
+                ArtworkEntry {
+                    category: ArtworkCategory::FanartBanner,
+                    path: PathBuf::from("/music/Artist/fanart.jpg"),
+                },
+            ],
+        };
+
+        let album_only = ExtendedArtworkSet {
+            entries: set
+                .entries
+                .into_iter()
+                .filter(|e| e.category.is_album_level())
+                .collect(),
+        }
+        .sorted();
+
+        let response = build_extended_artwork_response(album_only);
+
+        assert_eq!(response.count, 2);
+        assert_eq!(
+            response.primary_uri.as_deref(),
+            Some("luminous-art://local//music/Artist/Album/cover.jpg")
+        );
+        assert_eq!(response.artist_portrait_uri, None);
+        assert_eq!(response.band_logo_uri, None);
+        assert_eq!(response.fanart_uri, None);
+        assert_eq!(response.items.len(), 2);
+        assert_eq!(response.items[0].category, "primary_cover");
+        assert_eq!(response.items[1].category, "back_cover");
     }
 }
