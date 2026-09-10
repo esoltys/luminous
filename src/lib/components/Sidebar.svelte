@@ -12,7 +12,6 @@
     PlaylistIcon as ListMusic,
     SparkleIcon as Sparkles,
     GearIcon as Settings,
-    FileTextIcon as FileText,
     ChartBarIcon as BarChart2,
     HouseIcon as Home,
     MicrophoneStageIcon as Mic2,
@@ -233,17 +232,6 @@
         </div>
       {/if}
     </div>
-
-    <button
-      onclick={() => { navigationStore.activeTab = "lyrics"; }}
-      class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'lyrics' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
-      title={i18n.t('sidebar.lyrics')}
-    >
-      <FileText class={isCollapsed ? "w-5 h-5" : "w-4 h-4"} />
-      {#if !isCollapsed}
-        <span class="truncate whitespace-nowrap">{i18n.t('sidebar.lyrics')}</span>
-      {/if}
-    </button>
 
     <button
       onclick={() => { navigationStore.activeTab = "stats"; }}

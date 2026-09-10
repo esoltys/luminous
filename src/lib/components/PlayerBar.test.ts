@@ -117,37 +117,15 @@ describe("PlayerBar.svelte", () => {
     is_queue: true,
   };
 
-  // #523: the three-state PlayerBar cover-art click flow — collection/
-  // playlist view -> Queue -> Immersive Mode -> back to Queue.
+  // #876: cover art now only toggles Immersive View — navigating to the
+  // Queue is the dedicated Queue button's job (see the "playbar button row"
+  // tests below).
 
-  it("navigates to the Queue when the album cover is clicked from a collection/playlist view", async () => {
+  it("toggles Immersive Mode when the album cover is clicked, regardless of the current view", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
     windowLayoutStore.immersiveMode = false;
     navigationStore.activeTab = "collection";
-
-    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
-    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
-    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
-    const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
-
-    const { getByTitle } = render(PlayerBar);
-    const coverButton = getByTitle("Queue");
-    await fireEvent.click(coverButton);
-
-    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
-    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
-    expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
-  });
-
-  it("flips into Immersive Mode when the album cover is clicked while already viewing the Queue", async () => {
-    playerStore.currentSong = mockSong;
-    playerStore.state = "playing";
-    windowLayoutStore.immersiveMode = false;
-    playlistsStore.playlists = [mockQueue];
-    navigationStore.activeTab = "playlists";
-    navigationStore.playlistsSubTab = "custom";
-    navigationStore.selectedPlaylistId = mockQueue.id;
 
     const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
     const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
@@ -161,24 +139,19 @@ describe("PlayerBar.svelte", () => {
     expect(viewPlaylistSpy).not.toHaveBeenCalled();
   });
 
-  it("exits Immersive Mode and navigates to the Queue when the album cover is clicked", async () => {
+  it("exits Immersive Mode when the album cover is clicked while immersive", async () => {
     playerStore.currentSong = mockSong;
     playerStore.state = "playing";
     windowLayoutStore.immersiveMode = true;
 
-    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
-    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
-    const exitImmersiveModeSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
-    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+    const toggleImmersiveModeSpy = vi.spyOn(windowLayoutStore, "toggleImmersiveMode");
 
     const { getByTitle } = render(PlayerBar);
-    const coverButton = getByTitle("Queue");
+    const coverButton = getByTitle("Immersive Mode");
     await fireEvent.click(coverButton);
 
-    expect(exitImmersiveModeSpy).toHaveBeenCalled();
+    expect(toggleImmersiveModeSpy).toHaveBeenCalled();
     expect(windowLayoutStore.immersiveMode).toBe(false);
-    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
-    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
   });
 
   it("calls playerStore.resume() when play button is clicked in paused/stopped state", async () => {
@@ -281,7 +254,7 @@ describe("PlayerBar.svelte", () => {
 
     const { getByTitle } = render(PlayerBar);
     expect(windowLayoutStore.isImmersiveForced).toBe(true);
-    const coverButton = getByTitle("Queue");
+    const coverButton = getByTitle("Immersive Mode");
     await fireEvent.click(coverButton);
 
     expect(toggleImmersiveModeSpy).not.toHaveBeenCalled();
@@ -312,11 +285,11 @@ describe("PlayerBar.svelte", () => {
     expect(shuffleBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
     expect(repeatBtn.closest(".hidden")).toHaveClass("min-[700px]:block");
     const volumeSlider = container.querySelector('input[type="range"]');
-    expect(volumeSlider).toHaveClass("hidden", "min-[700px]:block");
+    expect(volumeSlider?.closest(".hidden")).toHaveClass("min-[700px]:flex");
     const [transportToggle, rightColumnToggle] = getAllByTitle(/picture-in-picture/i);
     expect(transportToggle).toHaveClass("min-[700px]:hidden");
     expect(rightColumnToggle.closest(".hidden")).toHaveClass("min-[700px]:flex");
-    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("justify-end"))!;
+    const rightColumn = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("min-w-[50px]"))!;
     expect(rightColumn).toHaveClass("hidden", "min-[700px]:flex");
     const seekRow = Array.from(container.querySelectorAll("div")).find(d => d.className.includes("gap-2.5"))!;
     expect(seekRow).toHaveClass("hidden", "min-[700px]:flex");
@@ -325,7 +298,7 @@ describe("PlayerBar.svelte", () => {
     expect(getByTitle(/previous song/i)).toHaveClass("hidden", "min-[400px]:block");
 
     // Never hidden (the constant core): cover art, play/pause, skip-next.
-    const coverButton = getByTitle("Queue");
+    const coverButton = getByTitle("Immersive Mode");
     expect(coverButton.closest(".hidden")).toBeNull();
     expect(getByTitle(/^pause$/i)).not.toHaveClass("hidden");
     expect(getByTitle(/next song/i)).not.toHaveClass("hidden");
@@ -355,6 +328,47 @@ describe("PlayerBar.svelte", () => {
     const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
     await fireEvent.click(infoBtn);
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
+  });
+
+  // #876: the playbar's Menu/Lyrics/Queue button row.
+
+  it("switches to the Lyrics tab when the Lyrics button is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    navigationStore.activeTab = "collection";
+    const { getByTitle } = render(PlayerBar);
+
+    await fireEvent.click(getByTitle("Lyrics"));
+
+    expect(navigationStore.activeTab).toBe("lyrics");
+  });
+
+  it("navigates to the Queue when the Queue button is clicked", async () => {
+    playerStore.currentSong = mockSong;
+    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
+    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+
+    const { getByTitle } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Queue"));
+
+    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+  });
+
+  it("opens the current song's context menu from the Menu button", async () => {
+    playerStore.currentSong = mockSong;
+    const { getByTitle, getByText } = render(PlayerBar);
+
+    await fireEvent.click(getByTitle("Song menu"));
+
+    expect(getByText(/add to queue/i)).toBeInTheDocument();
+  });
+
+  it("disables the Menu button when nothing is playing", () => {
+    playerStore.currentSong = undefined;
+    const { getByTitle } = render(PlayerBar);
+
+    expect(getByTitle("Song menu")).toBeDisabled();
   });
 
   it("hides the info-panel toggle at the same breakpoint that auto-hides the panel itself", () => {
