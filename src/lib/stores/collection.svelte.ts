@@ -668,17 +668,21 @@ class CollectionStore {
   /** Cached extended-artwork lookup for an artist's portrait/logo/fanart
    * (#98/#761) — same lazy-fetch-and-cache pattern as
    * {@link getExtendedArtworkForSong}, keyed by lowercased artist name to
-   * match `artistProfiles`. */
-  async getExtendedArtworkForArtist(artistName: string | null | undefined): Promise<ExtendedArtworkResponse> {
+   * match `artistProfiles`. Pass `force` to bypass the cache and re-scan —
+   * used by the artist Rescan action (#867) to pick up a portrait/logo/
+   * banner the user just added, replaced, or deleted on disk. */
+  async getExtendedArtworkForArtist(artistName: string | null | undefined, force = false): Promise<ExtendedArtworkResponse> {
     if (!artistName) return EMPTY_EXTENDED_ARTWORK;
     const key = artistName.toLowerCase();
-
-    const cached = this.extendedArtworkByArtist[key];
-    if (cached) return cached;
-
     const fetchKey = `artist:${key}`;
-    const inFlight = this.extendedArtworkFetches.get(fetchKey);
-    if (inFlight) return inFlight;
+
+    if (!force) {
+      const cached = this.extendedArtworkByArtist[key];
+      if (cached) return cached;
+
+      const inFlight = this.extendedArtworkFetches.get(fetchKey);
+      if (inFlight) return inFlight;
+    }
 
     const promise = invoke<ExtendedArtworkResponse>("get_extended_artwork_for_artist", { artist: artistName })
       .then((result) => {
