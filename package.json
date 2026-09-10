@@ -55,7 +55,7 @@
     "typescript": "~6.0.3",
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
-    "@choochmeque/tauri-windows-bundle": "^0.1.28"
+    "@choochmeque/tauri-windows-bundle": "^0.1.29"
   },
   "overrides": {
     "postcss": "^8.5.18",
