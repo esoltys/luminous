@@ -65,11 +65,14 @@ function trackListLayout(dims: { width: number; height: number }, trackCount: nu
 export function buildShareCardSvg(options: ShareCardOptions): { svg: string; width: number; height: number } {
   const dims = SHARE_ASPECT_RATIOS.find((r) => r.id === options.aspectRatio) ?? SHARE_ASPECT_RATIOS[0];
   const { width, height } = dims;
+  // "Dark" means the card itself reads dark (a darkening scrim, light text);
+  // "light" means the card reads light (a brightening scrim, dark text) —
+  // the opposite pairing looked backwards against the sun/moon icons.
   const isDark = options.theme === "dark";
-  const textPrimary = isDark ? "#0b0c0f" : "#f5f6f8";
-  const textSecondary = isDark ? "rgba(11,12,15,0.72)" : "rgba(245,246,248,0.78)";
-  const scrimFrom = isDark ? "rgba(255,255,255,0)" : "rgba(0,0,0,0)";
-  const scrimTo = isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
+  const textPrimary = isDark ? "#f5f6f8" : "#0b0c0f";
+  const textSecondary = isDark ? "rgba(245,246,248,0.78)" : "rgba(11,12,15,0.72)";
+  const scrimFrom = isDark ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)";
+  const scrimTo = isDark ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.55)";
   const cardPad = Math.round(width * 0.06);
   // Portrait/square frames stack cover-then-text centered in the middle of
   // the canvas (a bigger cover, since there's little horizontal room);
