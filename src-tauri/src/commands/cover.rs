@@ -124,18 +124,12 @@ pub async fn get_extended_artwork_for_song(
         return Ok(ExtendedArtworkResponse::default());
     };
 
-    let audio_path = Path::new(&path);
-    let album_dir = audio_path.parent();
-
-    let set = scan_extended_artwork(audio_path, album.as_deref());
+    let set = scan_extended_artwork(Path::new(&path), album.as_deref());
     let album_only = ExtendedArtworkSet {
         entries: set
             .entries
             .into_iter()
-            .filter(|e| {
-                e.category.is_album_level()
-                    && album_dir.map(|dir| e.path.starts_with(dir)).unwrap_or(true)
-            })
+            .filter(|e| e.category.is_album_level())
             .collect(),
     }
     .sorted();
@@ -285,7 +279,6 @@ mod tests {
 
     #[test]
     fn test_album_scoped_filtering_excludes_parent_artist_folder_media() {
-        let album_dir = PathBuf::from("/music/Artist/Album");
         let set = ExtendedArtworkSet {
             entries: vec![
                 ArtworkEntry {
@@ -315,7 +308,7 @@ mod tests {
             entries: set
                 .entries
                 .into_iter()
-                .filter(|e| e.category.is_album_level() && e.path.starts_with(&album_dir))
+                .filter(|e| e.category.is_album_level())
                 .collect(),
         }
         .sorted();
