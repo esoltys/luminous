@@ -76,7 +76,13 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // landscape frames keep a side-by-side row so the wide aspect isn't mostly
   // empty gradient either side of a narrow text column.
   const isPortrait = height >= width;
-  const coverSize = Math.round(isPortrait ? width * 0.56 : Math.min(width, height) * 0.46);
+  // A very elongated portrait frame (9:16) has a lot more vertical room than
+  // a mild one (3:4) at the same width, so content sized purely off width
+  // reads small and leaves dead space top and bottom. Scale content up
+  // relative to how much taller the frame is than a baseline 3:4 (1.33:1).
+  const elongation = height / width;
+  const contentScale = isPortrait ? Math.min(1.5, Math.max(1, elongation / 1.33)) : 1;
+  const coverSize = Math.round(isPortrait ? width * 0.56 * contentScale : Math.min(width, height) * 0.46);
 
   const background = generateEllipseGradientSvg({
     width,
@@ -92,7 +98,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
     const { columns, maxVisible } = trackListLayout(dims, options.tracks.length);
     const visible = options.tracks.slice(0, maxVisible);
     const overflow = options.tracks.length - visible.length;
-    const rowFontSize = Math.round(width * 0.017);
+    const rowFontSize = Math.round(width * 0.017 * contentScale);
 
     const rows = visible.map(
       (track) =>
@@ -109,7 +115,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
         : "";
 
     trackListHtml =
-      `<div style="margin-top:${Math.round(width * 0.025)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;">` +
+      `<div style="margin-top:${Math.round(width * 0.025 * contentScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;">` +
         rows.join("") + overflowRow +
       `</div>`;
   }
@@ -121,16 +127,16 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
 
   const contentHtml = `
     <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
-      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035)}px;max-width:100%;">
+      <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035 * contentScale)}px;max-width:100%;">
         ${
           options.coverDataUri
             ? `<img src="${options.coverDataUri}" style="width:${coverSize}px;height:${coverSize}px;object-fit:cover;border-radius:${Math.round(coverSize * 0.06)}px;box-shadow:0 20px 50px rgba(0,0,0,0.4);flex-shrink:0;" />`
             : ""
         }
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
-          <div style="font-size:${Math.round(width * 0.046)}px;font-weight:800;color:${textPrimary};line-height:1.14;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
-          <div style="font-size:${Math.round(width * 0.026)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
-          <div style="font-size:${Math.round(width * 0.019)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
+          <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.14;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
+          <div style="font-size:${Math.round(width * 0.019 * contentScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}
         </div>
       </div>

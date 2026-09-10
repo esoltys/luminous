@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { save } from "@tauri-apps/plugin-dialog";
   import {
@@ -27,13 +28,57 @@
 
   let { albumName, onClose }: { albumName: string; onClose: () => void } = $props();
 
+  // Remembered across cards/sessions as app settings — a user who picks
+  // 9:16 + track list once almost always wants the same setup next time.
+  const SETTING_ASPECT_RATIO = "share_card_aspect_ratio";
+  const SETTING_THEME = "share_card_theme";
+  const SETTING_INCLUDE_TRACK_LIST = "share_card_include_track_list";
+
   let aspectRatio = $state<ShareAspectRatio>("1:1");
   let theme = $state<ShareCardTheme>("dark");
   let includeTrackList = $state(true);
+  let settingsLoaded = $state(false);
   let previewUrl = $state<string | null>(null);
   let rendering = $state(false);
   let exporting = $state(false);
   let lastBlob: Blob | null = null;
+
+  onMount(async () => {
+    try {
+      const settings = await invoke<Record<string, string>>("get_all_app_settings");
+      const savedRatio = settings[SETTING_ASPECT_RATIO];
+      if (savedRatio && SHARE_ASPECT_RATIOS.some((r) => r.id === savedRatio)) {
+        aspectRatio = savedRatio as ShareAspectRatio;
+      }
+      const savedTheme = settings[SETTING_THEME];
+      if (savedTheme === "light" || savedTheme === "dark") {
+        theme = savedTheme;
+      }
+      const savedTrackList = settings[SETTING_INCLUDE_TRACK_LIST];
+      if (savedTrackList === "true" || savedTrackList === "false") {
+        includeTrackList = savedTrackList === "true";
+      }
+    } catch (err) {
+      console.error("Failed to load share card settings:", err);
+    } finally {
+      settingsLoaded = true;
+    }
+  });
+
+  $effect(() => {
+    if (!settingsLoaded) return;
+    void invoke("set_app_setting", { key: SETTING_ASPECT_RATIO, value: aspectRatio });
+  });
+
+  $effect(() => {
+    if (!settingsLoaded) return;
+    void invoke("set_app_setting", { key: SETTING_THEME, value: theme });
+  });
+
+  $effect(() => {
+    if (!settingsLoaded) return;
+    void invoke("set_app_setting", { key: SETTING_INCLUDE_TRACK_LIST, value: String(includeTrackList) });
+  });
 
   let albumItem = $derived(collectionStore.albums.find((a) => a.album === albumName) || null);
   let songs = $state<Song[]>([]);
