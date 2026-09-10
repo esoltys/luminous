@@ -25,7 +25,7 @@
   let remainingValues = $derived(remainingCount > 0 ? values.slice(displayedValues.length) : []);
 
   const chipClass =
-    "inline-flex items-center pl-2 pr-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border border-brand-accent/25 text-xs font-medium hover:bg-brand-accent/25 hover:border-brand-accent/50 transition-colors";
+    "inline-flex items-center pl-2 pr-2 py-0.5 rounded-full bg-brand-accent/15 text-brand-text-primary border-2 border-brand-accent/25 text-xs font-medium hover:bg-brand-accent/25 hover:border-brand-accent/50 transition-colors";
 
   function goToTag(e: MouseEvent, value: string) {
     e.stopPropagation();
