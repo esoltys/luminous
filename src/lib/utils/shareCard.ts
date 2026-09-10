@@ -114,8 +114,15 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
         ? `<div style="column-span:all;padding:4px 0;font-size:${rowFontSize}px;color:${textSecondary};opacity:0.7;">+${overflow} more</div>`
         : "";
 
+    // Belt-and-suspenders against a pathological combination (a very long,
+    // two-line-wrapped title plus a huge box-set tracklist): even though
+    // trackListLayout already sizes for the expected case, cap the block's
+    // own height and clip it so it can never grow past the LUMINOUS mark
+    // pinned near the bottom of the frame, rather than overlapping it.
+    const trackListMaxHeight = Math.round(height * (isPortrait ? 0.3 : 0.4));
+
     trackListHtml =
-      `<div style="margin-top:${Math.round(width * 0.025 * contentScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;">` +
+      `<div style="margin-top:${Math.round(width * 0.025 * contentScale)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;max-height:${trackListMaxHeight}px;overflow:hidden;">` +
         rows.join("") + overflowRow +
       `</div>`;
   }
@@ -126,7 +133,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
 
   const contentHtml = `
-    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:${cardPad}px;box-sizing:border-box;font-family:'Inter','Segoe UI',system-ui,sans-serif;">
       <div style="display:flex;flex-direction:${groupDirection};align-items:center;gap:${Math.round(width * 0.035 * contentScale)}px;max-width:100%;">
         ${
           options.coverDataUri
@@ -134,7 +141,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
             : ""
         }
         <div style="min-width:0;${isPortrait ? "" : "flex:1;"}display:flex;flex-direction:column;gap:2px;align-items:${isPortrait ? "center" : "flex-start"};text-align:${textAlign};${textBlockMaxWidth ? `max-width:${textBlockMaxWidth}px;` : ""}">
-          <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.14;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
+          <div style="font-size:${Math.round(width * 0.046 * contentScale)}px;font-weight:800;color:${textPrimary};line-height:1.3;padding-bottom:0.08em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026 * contentScale)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019 * contentScale)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
           ${showTrackList ? trackListHtml : ""}
