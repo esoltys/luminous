@@ -26,6 +26,12 @@ describe("resolveGenreColorIndex", () => {
     expect(resolveGenreColorIndex(hierarchy, "Progressive Metal")).toBe(3);
   });
 
+  it("resolves names with different casing (case-insensitive fallback)", () => {
+    expect(resolveGenreColorIndex(hierarchy, "metal")).toBe(3);
+    expect(resolveGenreColorIndex(hierarchy, "progressive metal")).toBe(3);
+    expect(resolveGenreColorIndex(hierarchy, "AMBIENT")).toBe(7);
+  });
+
   it("returns undefined for a name not present anywhere in the hierarchy", () => {
     expect(resolveGenreColorIndex(hierarchy, "Unknown Genre")).toBeUndefined();
   });

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import GenreChips from "./GenreChips.svelte";
 import { navigationStore } from "../stores/navigation.svelte";
+import { tagsStore } from "../stores/tags.svelte";
 
 describe("GenreChips.svelte", () => {
   it("renders nothing when genre is null or empty", () => {
@@ -116,6 +117,36 @@ describe("GenreChips.svelte", () => {
 
       expect(viewSpy).toHaveBeenCalledWith("Symphonic Metal");
       viewSpy.mockRestore();
+    });
+
+    it("applies curated genre hierarchy styling when genre is found in hierarchy", () => {
+      tagsStore.hierarchy = [
+        {
+          name: "Rock",
+          color_index: 3,
+          song_count: 50,
+          children: [{ name: "Indie Rock", song_count: 10 }],
+        },
+      ];
+
+      const { getByTitle } = render(GenreChips, {
+        props: {
+          genre: "Rock; Indie Rock; Synthwave",
+          variant: "full",
+        },
+      });
+
+      const rockChip = getByTitle("Browse Rock");
+      const indieChip = getByTitle("Browse Indie Rock");
+      const synthwaveChip = getByTitle("Browse Synthwave");
+
+      // Curated chips have inline style with color-mix
+      expect(rockChip.getAttribute("style")).toContain("background-color: color-mix");
+      expect(rockChip.getAttribute("style")).toContain("border-color: color-mix");
+      expect(indieChip.getAttribute("style")).toContain("background-color: color-mix");
+
+      // Unknown chip falls back to no inline style (using default class colors)
+      expect(synthwaveChip.getAttribute("style")).toBeNull();
     });
   });
 });
