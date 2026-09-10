@@ -25,6 +25,7 @@ export const SONG_TABLE_COLUMNS: { key: keyof VisibleColumns; field?: keyof Song
   { key: "grouping",     field: "grouping",       label: "collection.columnGrouping" },
   { key: "bpm",          field: "bpm",            label: "collection.columnBpm" },
   { key: "initial_key",  field: "initial_key",    label: "collection.columnInitialKey" },
+  { key: "musicbrainz_id", field: "musicbrainz_track_id" as keyof Song, label: "collection.columnMusicBrainzId" },
   { key: "bitrate",      field: "bitrate",        label: "collection.columnBitrate" },
   { key: "samplerate",   field: "samplerate",     label: "collection.columnSampleRate" },
   { key: "bitdepth",     field: "bitdepth",       label: "collection.columnBitDepth" },

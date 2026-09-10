@@ -43,6 +43,7 @@ export interface VisibleColumns {
   genre: boolean;
   grouping: boolean;
   initial_key: boolean;
+  musicbrainz_id: boolean;
   path: boolean;
   samplerate: boolean;
   year: boolean;
@@ -161,6 +162,7 @@ class CollectionStore {
         genre: false,
         grouping: false,
         initial_key: false,
+        musicbrainz_id: false,
         path: false,
         samplerate: false,
         year: true,
