@@ -33,9 +33,7 @@
   let remainingValues = $derived(remainingCount > 0 ? values.slice(displayedValues.length) : []);
 
   $effect(() => {
-    if (!tagsStore.hierarchy || tagsStore.hierarchy.length === 0) {
-      tagsStore.loadHierarchy().catch((e) => console.error("Failed to load tag hierarchy:", e));
-    }
+    tagsStore.ensureHierarchyLoaded();
   });
 
   let isLightTheme = $derived(isLightColor(themeStore.resolvedColors["bg-main"]));
