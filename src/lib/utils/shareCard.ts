@@ -47,13 +47,19 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** How many track rows fit before "+N more" overflow, tuned per aspect ratio's usable height. */
-function maxVisibleTracks(dims: { width: number; height: number }): number {
+/**
+ * Track list is laid out as CSS columns so a long tracklist fans out
+ * sideways instead of forcing one tall, mostly-empty-feeling column —
+ * landscape frames have the width to spare for a third column, portrait/
+ * square ones cap out at two.
+ */
+function trackListLayout(dims: { width: number; height: number }, trackCount: number): { columns: number; maxVisible: number } {
   const isPortrait = dims.height > dims.width;
   const isSquareish = Math.abs(dims.width - dims.height) < dims.width * 0.15;
-  if (isPortrait) return 12;
-  if (isSquareish) return 6;
-  return 5;
+  const rowsPerColumn = isPortrait ? 10 : isSquareish ? 7 : 6;
+  const maxColumns = isPortrait || isSquareish ? 2 : 3;
+  const columns = Math.min(maxColumns, Math.max(1, Math.ceil(trackCount / rowsPerColumn)));
+  return { columns, maxVisible: columns * rowsPerColumn };
 }
 
 export function buildShareCardSvg(options: ShareCardOptions): { svg: string; width: number; height: number } {
@@ -81,29 +87,34 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
   // Strip the outer <svg ...> wrapper so it can be inlined as this card's own background layer.
   const backgroundInner = background.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
 
-  const trackRows: string[] = [];
+  let trackListHtml = "";
   if (options.includeTrackList && options.tracks && options.tracks.length > 0) {
-    const limit = maxVisibleTracks(dims);
-    const visible = options.tracks.slice(0, limit);
+    const { columns, maxVisible } = trackListLayout(dims, options.tracks.length);
+    const visible = options.tracks.slice(0, maxVisible);
     const overflow = options.tracks.length - visible.length;
-    for (const track of visible) {
-      trackRows.push(
-        `<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:${Math.round(width * 0.017)}px;color:${textSecondary};">` +
+    const rowFontSize = Math.round(width * 0.017);
+
+    const rows = visible.map(
+      (track) =>
+        `<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:${rowFontSize}px;color:${textSecondary};break-inside:avoid;">` +
           (track.number != null
             ? `<span style="min-width:1.8em;text-align:right;opacity:0.7;">${track.number}</span>`
             : "") +
           `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(track.title)}</span>` +
         `</div>`
-      );
-    }
-    if (overflow > 0) {
-      trackRows.push(
-        `<div style="padding:4px 0;font-size:${Math.round(width * 0.017)}px;color:${textSecondary};opacity:0.7;">+${overflow} more</div>`
-      );
-    }
+    );
+    const overflowRow =
+      overflow > 0
+        ? `<div style="column-span:all;padding:4px 0;font-size:${rowFontSize}px;color:${textSecondary};opacity:0.7;">+${overflow} more</div>`
+        : "";
+
+    trackListHtml =
+      `<div style="margin-top:${Math.round(width * 0.025)}px;text-align:left;width:100%;column-count:${columns};column-gap:${Math.round(width * 0.03)}px;">` +
+        rows.join("") + overflowRow +
+      `</div>`;
   }
 
-  const showTrackList = trackRows.length > 0;
+  const showTrackList = trackListHtml.length > 0;
   const textAlign = isPortrait ? "center" : "left";
   const groupDirection = isPortrait ? "column" : "row";
   const textBlockMaxWidth = isPortrait ? Math.round(width * 0.82) : undefined;
@@ -120,7 +131,7 @@ export function buildShareCardSvg(options: ShareCardOptions): { svg: string; wid
           <div style="font-size:${Math.round(width * 0.046)}px;font-weight:800;color:${textPrimary};line-height:1.14;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(options.title)}</div>
           <div style="font-size:${Math.round(width * 0.026)}px;font-weight:600;color:${textSecondary};margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${escapeHtml(options.subtitle)}</div>
           <div style="font-size:${Math.round(width * 0.019)}px;color:${textSecondary};margin-top:6px;">${escapeHtml(options.metadataLine)}</div>
-          ${showTrackList ? `<div style="margin-top:${Math.round(width * 0.025)}px;display:flex;flex-direction:column;text-align:left;width:100%;">${trackRows.join("")}</div>` : ""}
+          ${showTrackList ? trackListHtml : ""}
         </div>
       </div>
       <div style="position:absolute;left:${cardPad}px;bottom:${cardPad}px;font-size:${Math.round(width * 0.014)}px;font-weight:700;letter-spacing:0.04em;color:${textSecondary};opacity:0.8;">LUMINOUS</div>

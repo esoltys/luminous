@@ -49,6 +49,20 @@ describe("buildShareCardSvg", () => {
     expect(svg).toMatch(/\+\d+ more/);
   });
 
+  it("fans a long track list out into multiple CSS columns, more on wider frames", () => {
+    const tracks = Array.from({ length: 20 }, (_, i) => ({ number: i + 1, title: `Track ${i + 1}` }));
+    const landscape = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
+    const portrait = buildShareCardSvg({ ...baseOptions, aspectRatio: "9:16", tracks });
+    expect(landscape.svg).toContain("column-count:3");
+    expect(portrait.svg).toContain("column-count:2");
+  });
+
+  it("keeps a short track list to a single column", () => {
+    const tracks = [{ number: 1, title: "Only Track" }];
+    const { svg } = buildShareCardSvg({ ...baseOptions, aspectRatio: "16:9", tracks });
+    expect(svg).toContain("column-count:1");
+  });
+
   it("is deterministic for a given seed", () => {
     const a = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1" });
     const b = buildShareCardSvg({ ...baseOptions, aspectRatio: "1:1" });
