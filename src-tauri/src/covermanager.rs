@@ -54,6 +54,32 @@ impl ArtworkCategory {
             ArtworkCategory::Subfolder => "subfolder",
         }
     }
+
+    /// True for categories that belong to an album (primary cover, back cover,
+    /// disc media, booklet, matrix, or unnamed subfolder finds). Excludes
+    /// parent artist-level categories (portrait, band logo, fanart banner).
+    pub fn is_album_level(&self) -> bool {
+        matches!(
+            self,
+            ArtworkCategory::PrimaryCover
+                | ArtworkCategory::BackCover
+                | ArtworkCategory::DiscMedia
+                | ArtworkCategory::Booklet
+                | ArtworkCategory::Matrix
+                | ArtworkCategory::Subfolder
+        )
+    }
+
+    /// True for categories that belong to an artist (artist portrait,
+    /// band logo, fanart/backdrop banner).
+    pub fn is_artist_level(&self) -> bool {
+        matches!(
+            self,
+            ArtworkCategory::ArtistPortrait
+                | ArtworkCategory::BandLogo
+                | ArtworkCategory::FanartBanner
+        )
+    }
 }
 
 /// One discovered artwork file, categorized and ready to sort by
@@ -915,6 +941,32 @@ mod tests {
             category_for_picture_type(PictureType::Other),
             ArtworkCategory::Subfolder
         );
+    }
+
+    #[test]
+    fn test_artwork_category_scopes() {
+        let album_categories = [
+            ArtworkCategory::PrimaryCover,
+            ArtworkCategory::BackCover,
+            ArtworkCategory::DiscMedia,
+            ArtworkCategory::Booklet,
+            ArtworkCategory::Matrix,
+            ArtworkCategory::Subfolder,
+        ];
+        for cat in &album_categories {
+            assert!(cat.is_album_level(), "{cat:?} must be album level");
+            assert!(!cat.is_artist_level(), "{cat:?} must not be artist level");
+        }
+
+        let artist_categories = [
+            ArtworkCategory::ArtistPortrait,
+            ArtworkCategory::BandLogo,
+            ArtworkCategory::FanartBanner,
+        ];
+        for cat in &artist_categories {
+            assert!(cat.is_artist_level(), "{cat:?} must be artist level");
+            assert!(!cat.is_album_level(), "{cat:?} must not be album level");
+        }
     }
 
     #[test]
