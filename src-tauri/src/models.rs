@@ -726,6 +726,9 @@ pub struct WebDavServer {
     pub sync_status: String,
     pub last_synced_at: Option<i64>,
     pub created_at: i64,
+    pub nickname: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
 }
 
 /// Statistics returned after syncing a WebDAV server.

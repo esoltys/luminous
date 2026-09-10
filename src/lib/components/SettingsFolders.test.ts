@@ -58,15 +58,14 @@ describe("SettingsFolders.svelte - WebDAV section", () => {
   it("renders the WebDAV remote libraries card and configured server", async () => {
     const { findByText } = render(SettingsFolders);
 
-    expect(await findByText("Remote WebDAV Libraries")).toBeInTheDocument();
-    expect(await findByText("Nextcloud Music")).toBeInTheDocument();
-    expect(await findByText("https://cloud.example.com/remote.php/webdav")).toBeInTheDocument();
+    expect(await findByText("Remote WebDAV")).toBeInTheDocument();
+    expect(await findByText("https://cloud.example.com/remote.php/webdav/Music")).toBeInTheDocument();
   });
 
-  it("opens WebDavModal when clicking Add WebDAV Server", async () => {
+  it("opens WebDavModal when clicking Add WebDAV", async () => {
     const { findByText, getByRole } = render(SettingsFolders);
 
-    const addBtn = await findByText("Add WebDAV Server");
+    const addBtn = await findByText("Add WebDAV");
     await fireEvent.click(addBtn);
 
     expect(await findByText("Server URL")).toBeInTheDocument();

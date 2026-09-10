@@ -214,14 +214,19 @@ export interface PlaybackState {
   remaining_playlist_items?: number;
 }
 
-export interface MusicDirectory {
-  id: number;
+/** Shared shape for anything rendered as a `LibraryBadge` — a music source's
+ * nickname/icon/colour plus the path or address it represents. */
+export interface BadgeSource {
   path: string;
-  subdirs: boolean;
   is_available?: boolean;
   nickname?: string | null;
   icon?: string | null;
   color?: string | null;
+}
+
+export interface MusicDirectory extends BadgeSource {
+  id: number;
+  subdirs: boolean;
 }
 
 export interface WebDavServer {
@@ -235,6 +240,9 @@ export interface WebDavServer {
   syncStatus: string;
   lastSyncedAt?: number | null;
   createdAt: number;
+  nickname?: string | null;
+  icon?: string | null;
+  color?: string | null;
 }
 
 export interface WebDavSyncStats {

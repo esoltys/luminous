@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 30;
+pub const CURRENT_SCHEMA_VERSION: i32 = 31;
 
 struct Migration {
     version: i32,
@@ -212,6 +212,19 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if has_acoustid_id {
                 conn.execute_batch(MIGRATION_30)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 31,
+        description: "nickname, icon, and color metadata columns on webdav_servers table",
+        apply: |conn| {
+            let has_nickname: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('webdav_servers') WHERE name = 'nickname'")?
+                .exists([])?;
+            if !has_nickname {
+                conn.execute_batch(MIGRATION_31)?;
             }
             Ok(())
         },
@@ -899,6 +912,17 @@ ALTER TABLE songs DROP COLUMN fingerprint;
 ";
 
 // ---------------------------------------------------------------------------
+// Migration 31: nickname, icon, and color metadata columns on webdav_servers
+// — aligns WebDAV server badges with the watched-folder badges added in
+// MIGRATION_25.
+// ---------------------------------------------------------------------------
+const MIGRATION_31: &str = "
+ALTER TABLE webdav_servers ADD COLUMN nickname TEXT;
+ALTER TABLE webdav_servers ADD COLUMN icon TEXT;
+ALTER TABLE webdav_servers ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
 // Migration 18: tag_groups/tag_assignments — a persisted, curatable Genres
 // hierarchy (#545) layered on top of the existing `songs.genre` string
 // column. `songs.genre` remains the source of truth for which songs carry
@@ -1318,7 +1342,12 @@ mod tests {
         let conn = db.pool.get().unwrap();
         conn.execute(
             "INSERT INTO webdav_servers (name, url, username, remote_path) VALUES (?1, ?2, ?3, ?4)",
-            params!["My NAS", "http://nas.local:8080/remote.php/webdav", "musicuser", "/Music"],
+            params![
+                "My NAS",
+                "http://nas.local:8080/remote.php/webdav",
+                "musicuser",
+                "/Music"
+            ],
         )
         .unwrap();
 
