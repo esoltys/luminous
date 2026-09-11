@@ -15,6 +15,7 @@ function makeSummary(range: StatsSummary["range"]): StatsSummary {
     top_artists: [{ key: "Artist A", label: "Artist A", secondary: null, play_count: 5, excluded: false, album: null }],
     top_genres: [{ key: "Rock", label: "Rock", secondary: null, play_count: 5, excluded: false, album: null }],
     play_timestamps: [1_700_000_000, 1_700_003_600],
+    total_minutes: 42,
   };
 }
 
@@ -43,6 +44,11 @@ describe("StatsView.svelte", () => {
     // "Artist A" appears twice: as the song row's secondary line and as the Top Artists entry.
     expect(getAllByText("Artist A").length).toBeGreaterThanOrEqual(2);
     expect(getByText("Rock")).toBeInTheDocument();
+  });
+
+  it("shows total minutes listened flush-right on the range row", async () => {
+    const { getByText } = render(StatsView);
+    await waitFor(() => expect(getByText("42 minutes listened")).toBeInTheDocument());
   });
 
   it("refetches when the range switcher changes", async () => {
@@ -101,6 +107,7 @@ describe("StatsView.svelte", () => {
           top_artists: [],
           top_genres: [],
           play_timestamps: [],
+          total_minutes: 0,
         } satisfies StatsSummary);
       }
       return Promise.resolve(null);

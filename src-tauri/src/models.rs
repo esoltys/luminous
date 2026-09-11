@@ -886,6 +886,9 @@ pub struct StatsSummary {
     /// Unix-second timestamps of every in-range, non-excluded play, for
     /// client-side local-time listening-clock bucketing.
     pub play_timestamps: Vec<i64>,
+    /// Total minutes listened across every in-range, non-excluded play
+    /// (`SUM(play_history.duration_secs) / 60`), for the range header.
+    pub total_minutes: i64,
 }
 
 /// One completed listen's timing, for the daily listening heatmap (#890) to

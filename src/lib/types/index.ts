@@ -351,6 +351,8 @@ export interface StatsSummary {
   /** Unix-second timestamps of every in-range, non-excluded play, for
    * client-side local-time listening-clock bucketing. */
   play_timestamps: number[];
+  /** Total minutes listened across every in-range, non-excluded play. */
+  total_minutes: number;
 }
 
 /** One completed listen's timing, for the daily listening heatmap to bucket

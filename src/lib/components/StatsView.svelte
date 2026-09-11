@@ -110,18 +110,27 @@
         <ListeningHeatmap />
       </div>
 
-      <div class="flex items-center gap-2 mt-4">
-        {#each RANGES as r (r.value)}
-          <button
-            onclick={() => {
-              range = r.value;
-              if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
-            }}
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
-          >
-            {r.label()}
-          </button>
-        {/each}
+      <div class="flex items-center justify-between gap-2 mt-4">
+        <div class="flex items-center gap-2">
+          {#each RANGES as r (r.value)}
+            <button
+              onclick={() => {
+                range = r.value;
+                if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
+              }}
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+            >
+              {r.label()}
+            </button>
+          {/each}
+        </div>
+        {#if summary}
+          <span class="text-sm font-medium text-brand-text-secondary shrink-0">
+            {summary.total_minutes === 1
+              ? i18n.t("stats.totalMinutesOne", {}, "1 minute listened")
+              : i18n.t("stats.totalMinutes", { count: summary.total_minutes }, `${summary.total_minutes} minutes listened`)}
+          </span>
+        {/if}
       </div>
     </div>
 

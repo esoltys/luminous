@@ -658,6 +658,8 @@ export const fr = {
     loading: "Chargement des statistiques...",
     empty: "Aucun historique d'écoute pour cette période pour le moment.",
     noData: "Aucune donnée pour cette période.",
+    totalMinutesOne: "1 minute écoutée",
+    totalMinutes: "{count} minutes écoutées",
     excludeFromStats: "Ne pas inclure dans les statistiques",
     includeInStats: "Inclure dans les statistiques",
     excludedToast: "{name} exclu des statistiques",

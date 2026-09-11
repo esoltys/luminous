@@ -659,6 +659,8 @@ export const en = {
     loading: "Loading stats...",
     empty: "No listening history for this range yet.",
     noData: "No data for this range.",
+    totalMinutesOne: "1 minute listened",
+    totalMinutes: "{count} minutes listened",
     excludeFromStats: "Don't Include in Stats",
     includeInStats: "Include in Stats",
     excludedToast: "Excluded {name} from Stats",
