@@ -1298,8 +1298,8 @@ export const fr = {
         description: "Lisez, mettez en pause, passez au morceau suivant, avancez dans la piste et activez la lecture aléatoire ou la répétition depuis ici."
       },
       playerBarToolbar: {
-        title: "Menu, paroles, file d'attente et infos",
-        description: "Ouvrez le menu du morceau, accédez aux Paroles, à votre file d'attente ou au panneau d'informations — ainsi que le volume, juste ici."
+        title: "Menu, paroles, file d'attente, infos et mini-lecteur",
+        description: "Ouvrez le menu du morceau, accédez aux Paroles, à votre file d'attente, au panneau d'informations, ou passez en Mini-lecteur flottant — ainsi que le volume, juste ici."
       },
       rightPanel: {
         title: "Détails du morceau",

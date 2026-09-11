@@ -1299,8 +1299,8 @@ export const en = {
         description: "Play, pause, skip, seek, and cycle shuffle or repeat from here."
       },
       playerBarToolbar: {
-        title: "Song menu, lyrics, queue, and info",
-        description: "Open the song menu, jump to Lyrics, view your Queue, or show the info panel — plus volume, right here."
+        title: "Song menu, lyrics, queue, info, and miniplayer",
+        description: "Open the song menu, jump to Lyrics, view your Queue, show the info panel, or switch to the floating Miniplayer — plus volume, right here."
       },
       rightPanel: {
         title: "Track details",
