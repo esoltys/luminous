@@ -636,6 +636,29 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
           ]
         : [],
 
+    list_webdav_servers: () => [],
+
+    // Unmocked, these resolve to null — collection.svelte.ts caches whatever
+    // invoke() returns without validating it, so every caller (search
+    // dropdown, artist rows, album/song detail headers) then dereferences
+    // `.artist_portrait_uri` etc. on that null and crashes.
+    get_extended_artwork_for_artist: () => ({
+      count: 0,
+      primary_uri: null,
+      artist_portrait_uri: null,
+      band_logo_uri: null,
+      fanart_uri: null,
+      items: [],
+    }),
+    get_extended_artwork_for_song: () => ({
+      count: 0,
+      primary_uri: null,
+      artist_portrait_uri: null,
+      band_logo_uri: null,
+      fanart_uri: null,
+      items: [],
+    }),
+
     get_db_schema_status: () => ({
       db_version: 1,
       app_version: 1,
@@ -764,6 +787,33 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         .sort((a, b) => (b.added || 0) - (a.added || 0));
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
     },
+
+    get_top_albums: (args) => {
+      const playcountByAlbum = new Map<string, number>();
+      for (const song of library.songs) {
+        if (!song.album) continue;
+        const key = `${song.album}::${song.album_artist || song.artist || ""}`;
+        playcountByAlbum.set(key, (playcountByAlbum.get(key) ?? 0) + (song.playcount || 0));
+      }
+      return [...library.albums]
+        .filter((a) => (playcountByAlbum.get(`${a.album}::${a.artist || ""}`) ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (playcountByAlbum.get(`${b.album}::${b.artist || ""}`) ?? 0) -
+            (playcountByAlbum.get(`${a.album}::${a.artist || ""}`) ?? 0)
+        )
+        .slice(0, (args.limit as number) || 10)
+        .map((album, i) => ({
+          album,
+          rank: i + 1,
+          previous_rank: i === 0 ? null : i,
+          peak_rank: i + 1,
+          weeks_on_chart: 1,
+          movement: i === 0 ? "new" : "steady",
+        }));
+    },
+    get_featured_albums: (args) =>
+      [...library.albums].slice(0, (args.limit as number) || 5).map((album) => ({ type: "album", album })),
 
     get_albums: () => library.albums,
     get_artists: () => library.artists,
