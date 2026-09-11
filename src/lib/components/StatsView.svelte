@@ -95,36 +95,36 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
-  <div class="px-6 pt-8 pb-4 shrink-0">
-    <div class="flex items-start justify-between gap-6">
-      <div>
-        <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
-          <BarChart2 class="w-7 h-7 text-brand-accent" />
-          {i18n.t("stats.title", {}, "Stats")}
-        </h1>
-        <p class="text-sm text-brand-text-secondary mt-1">
-          {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
-        </p>
-      </div>
-      <ListeningHeatmap />
-    </div>
-
-    <div class="flex items-center gap-2 mt-4">
-      {#each RANGES as r (r.value)}
-        <button
-          onclick={() => {
-            range = r.value;
-            if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
-          }}
-          class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
-        >
-          {r.label()}
-        </button>
-      {/each}
-    </div>
-  </div>
-
   <div class="flex-1 overflow-y-auto px-6 pb-12" class:pb-28={!!playerStore.currentSong} use:rememberScroll={"stats"}>
+    <div class="pt-8 pb-4">
+      <div class="flex items-start justify-between gap-6">
+        <div>
+          <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
+            <BarChart2 class="w-7 h-7 text-brand-accent" />
+            {i18n.t("stats.title", {}, "Stats")}
+          </h1>
+          <p class="text-sm text-brand-text-secondary mt-1">
+            {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
+          </p>
+        </div>
+        <ListeningHeatmap />
+      </div>
+
+      <div class="flex items-center gap-2 mt-4">
+        {#each RANGES as r (r.value)}
+          <button
+            onclick={() => {
+              range = r.value;
+              if (typeof window !== "undefined") localStorage.setItem("stats_range", r.value);
+            }}
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {range === r.value ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'}"
+          >
+            {r.label()}
+          </button>
+        {/each}
+      </div>
+    </div>
+
     {#if loading}
       <div class="flex items-center justify-center h-64">
         <LoadingSpinner label={i18n.t("stats.loading", {}, "Loading stats...")} />
