@@ -208,6 +208,14 @@ async function main() {
     console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${filename}...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
+    // The System theme (used by every screenshot except the dynamic-artwork
+    // ones) resolves light/dark from the OS color-scheme media query —
+    // Chromium defaults that to light, which is why these used to render
+    // light. Force dark so System-theme captures actually show the dark
+    // System theme rather than an unintended light one.
+    if (theme !== "dynamic-artwork") {
+      await page.emulateMedia({ colorScheme: "dark" });
+    }
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
         const text = msg.text();
@@ -269,7 +277,10 @@ async function main() {
         custom_themes: "[]",
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
-        language: "${language}"
+        language: "${language}",
+        // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
+        // tour, whose popover would cover every capture (see #897).
+        walkthrough_completed: "true"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
@@ -422,7 +433,12 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
       await page.waitForTimeout(500);
-      await page.getByTitle(t(language, "albumDetail.editInfoTooltip"), { exact: true }).click();
+      // "Edit album info" lives behind the "More actions" overflow menu (#97) —
+      // it's a role="menuitem" button with no title attribute of its own, so
+      // it has to be opened first and found by name rather than getByTitle.
+      await page.getByTitle(t(language, "playlists.moreActionsTooltip"), { exact: true }).click();
+      await page.waitForTimeout(300);
+      await page.getByRole("menuitem", { name: t(language, "albumDetail.editInfoTooltip"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-themes": async (page, _featured, language) => {
@@ -447,6 +463,10 @@ async function main() {
     },
     "click-settings-folders": async (page, _featured, language) => {
       await page.getByRole("button", { name: t(language, "settings.tabFolders"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
+    "click-settings-integrations": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabIntegrations"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-settings-tools": async (page, _featured, language) => {
