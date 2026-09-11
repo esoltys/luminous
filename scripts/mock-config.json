@@ -242,6 +242,12 @@
       "sidebarWidth": 220
     },
     {
+      "name": "stats",
+      "filename": "stats.png",
+      "tab": "stats",
+      "sidebarWidth": 220
+    },
+    {
       "name": "themes",
       "filename": "themes.png",
       "tab": "settings",

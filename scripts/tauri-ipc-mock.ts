@@ -19,6 +19,8 @@ import type {
   RepeatMode,
   ShuffleMode,
   Song,
+  StatsRange,
+  StatsTopItem,
   Tag,
   TagCount,
   TagGroup,
@@ -190,6 +192,51 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
   let artistProfiles: ArtistProfile[] = library.artistProfiles ?? [];
   const featured = window.__LUMINOUS_MOCK_FEATURED__ ?? {};
   const featuredSong = featured.song ?? library.songs[0];
+
+  // Deterministic pseudo-random listening history for the Personal Stats
+  // screenshots (heatmap, top lists, time-of-day) — seeded so repeated
+  // `bun run take-screenshots` runs produce the same-looking capture instead
+  // of a different random shape every time. Not wired to any real backend
+  // stats table; get_listening_activity/get_stats_summary below just slice
+  // and aggregate this in-memory log the same way the real commands
+  // aggregate SQLite rows.
+  function mulberry32(seed: number): () => number {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  interface MockListenEvent {
+    played_at: number;
+    duration_secs: number;
+    song: Song;
+  }
+
+  const NOW_SEC = Math.floor(Date.now() / 1000);
+  const LISTEN_HISTORY_DAYS = 400;
+  const listenHistory: MockListenEvent[] = (() => {
+    if (library.songs.length === 0) return [];
+    const rng = mulberry32(42);
+    const events: MockListenEvent[] = [];
+    for (let dayOffset = 0; dayOffset < LISTEN_HISTORY_DAYS; dayOffset++) {
+      if (rng() < 0.22) continue; // some days have no listening at all
+      const playsToday = 1 + Math.floor(rng() * 6);
+      for (let i = 0; i < playsToday; i++) {
+        const song = library.songs[Math.floor(rng() * library.songs.length)];
+        const secondsIntoDay = Math.floor(rng() * 86400);
+        events.push({
+          played_at: NOW_SEC - dayOffset * 86400 - secondsIntoDay,
+          duration_secs: Math.max(30, Math.floor((song.length_nanosec || 180_000_000_000) / 1_000_000_000)),
+          song,
+        });
+      }
+    }
+    return events.sort((a, b) => a.played_at - b.played_at);
+  })();
 
   const callbacks: Record<number, (data: unknown) => void> = {};
   let nextCallbackId = 1;
@@ -594,6 +641,71 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       app_version: 1,
       db_newer_than_app: false,
     }),
+
+    get_listening_activity: (args) => {
+      const days = Number(args.days ?? 98);
+      const cutoff = NOW_SEC - days * 86400;
+      return listenHistory
+        .filter((e) => e.played_at >= cutoff)
+        .map((e) => ({ played_at: e.played_at, duration_secs: e.duration_secs }));
+    },
+
+    get_stats_summary: (args) => {
+      const range = (args.range as StatsRange) ?? "7d";
+      const rangeDays = range === "7d" ? 7 : range === "28d" ? 28 : 365;
+      const inRange = listenHistory.filter((e) => e.played_at >= NOW_SEC - rangeDays * 86400);
+
+      const songCounts = new Map<string, { song: Song; count: number }>();
+      const albumCounts = new Map<string, { label: string; secondary: string | null; count: number }>();
+      const artistCounts = new Map<string, number>();
+      const genreCounts = new Map<string, number>();
+      for (const e of inRange) {
+        const song = e.song;
+        const songKey = String(song.id);
+        songCounts.set(songKey, { song, count: (songCounts.get(songKey)?.count ?? 0) + 1 });
+        const artist = song.album_artist || song.artist;
+        if (song.album) {
+          const albumKey = `${song.album}::${artist ?? ""}`;
+          const existing = albumCounts.get(albumKey);
+          albumCounts.set(albumKey, { label: song.album, secondary: artist ?? null, count: (existing?.count ?? 0) + 1 });
+        }
+        if (artist) artistCounts.set(artist, (artistCounts.get(artist) ?? 0) + 1);
+        if (song.genre) genreCounts.set(song.genre, (genreCounts.get(song.genre) ?? 0) + 1);
+      }
+
+      const top_songs: StatsTopItem[] = [...songCounts.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => ({
+          key,
+          label: v.song.title ?? "Untitled",
+          secondary: v.song.artist ?? null,
+          play_count: v.count,
+          excluded: false,
+          album: v.song.album ?? null,
+        }));
+      const top_albums: StatsTopItem[] = [...albumCounts.entries()]
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([key, v]) => ({ key, label: v.label, secondary: v.secondary, play_count: v.count, excluded: false, album: null }));
+      const top_artists: StatsTopItem[] = [...artistCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([key, count]) => ({ key, label: key, secondary: null, play_count: count, excluded: false, album: null }));
+      const top_genres: StatsTopItem[] = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([key, count]) => ({ key, label: key, secondary: null, play_count: count, excluded: false, album: null }));
+
+      return {
+        range,
+        top_songs,
+        top_albums,
+        top_artists,
+        top_genres,
+        play_timestamps: inRange.map((e) => e.played_at),
+      };
+    },
 
     get_library_stats: () => ({
       total_songs: library.songs.length,

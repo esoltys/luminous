@@ -269,7 +269,10 @@ async function main() {
         custom_themes: "[]",
         active_tab: "${tab}",
         active_sub_tab: "${subTab}",
-        language: "${language}"
+        language: "${language}",
+        // Otherwise +layout.svelte auto-starts the first-launch Walkthrough
+        // tour, whose popover would cover every capture (see #897).
+        walkthrough_completed: "true"
       };
       window.mockPlaybackPositionSec = ${positionSeconds};
       window.localStorage.setItem("layout_immersiveMode", "${isImmersive ? 'true' : 'false'}");
