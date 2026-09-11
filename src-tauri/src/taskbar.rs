@@ -27,7 +27,7 @@ use crate::models::{PlayState, PlaybackState};
 use crate::AppState;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Listener, Manager};
-use windows::core::BOOL;
+use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DwmSetIconicLivePreviewBitmap, DwmSetIconicThumbnail, DwmSetWindowAttribute,
@@ -43,7 +43,8 @@ use windows::Win32::UI::Shell::{
     THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateIconIndirect, GetClientRect, GetSystemMetrics, HICON, ICONINFO, SM_CXSMICON, WM_COMMAND,
+    CreateIconIndirect, GetClientRect, GetSystemMetrics, RegisterWindowMessageW, HICON, ICONINFO,
+    SM_CXSMICON, WM_COMMAND,
 };
 
 /// Not currently exported by the `windows` crate's `Win32_Graphics_Dwm`
@@ -93,18 +94,30 @@ struct NowPlayingArt {
 struct TaskbarContext {
     app: AppHandle,
     hwnd: HWND,
-    taskbar: ITaskbarList3,
+    /// `None` until a taskbar button actually exists for our window (see
+    /// `try_register_thumbbar`) — `ThumbBarAddButtons` is a no-op if called
+    /// before that, which is exactly what a window created hidden
+    /// (`"visible": false`, shown later from the frontend) hits if it's
+    /// called eagerly at `.setup()` time.
+    taskbar: parking_lot::Mutex<Option<ITaskbarList3>>,
     icons: ButtonIcons,
+    /// The most recently applied (playing, has_song) pair, so a taskbar
+    /// button created *after* playback already started (or after Explorer
+    /// restarts and re-broadcasts `TaskbarButtonCreated`) can be seeded
+    /// correctly instead of starting from "no track loaded".
+    last_known_state: parking_lot::Mutex<(bool, bool)>,
     now_playing: parking_lot::Mutex<NowPlayingArt>,
     fallback_art: Arc<image::DynamicImage>,
+    taskbar_button_created_msg: u32,
 }
 
-// SAFETY: `taskbar` (an apartment-threaded COM pointer) and `icons` (raw
-// HICON handles) are only ever touched from the main thread — the thread
-// that created them in `try_init` below, and the only thread the window's
-// message pump (and therefore every `SetWindowSubclass` callback) runs on.
-// Code on other threads reaches this struct only to read/write
-// `now_playing`, which is guarded by its own `Mutex`, or to hand work back
+// SAFETY: `taskbar` (an apartment-threaded COM pointer, behind its own
+// Mutex) and `icons` (raw HICON handles) are only ever touched from the
+// main thread — the thread that created them in `try_init`/
+// `try_register_thumbbar`, and the only thread the window's message pump
+// (and therefore every `SetWindowSubclass` callback) runs on. Code on other
+// threads reaches this struct only to read/write `now_playing`/
+// `last_known_state`, each guarded by its own `Mutex`, or to hand work back
 // to the main thread via `AppHandle::run_on_main_thread`.
 unsafe impl Send for TaskbarContext {}
 unsafe impl Sync for TaskbarContext {}
@@ -127,10 +140,6 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
     };
     let hwnd = HWND(raw_hwnd.0);
 
-    let taskbar: ITaskbarList3 =
-        unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER) }?;
-    unsafe { taskbar.HrInit() }?;
-
     let icon_size = (unsafe { GetSystemMetrics(SM_CXSMICON) }).max(16) as u32;
     let icons = ButtonIcons {
         previous: build_icon(ButtonGlyph::Previous, icon_size)?,
@@ -139,30 +148,60 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
         next: build_icon(ButtonGlyph::Next, icon_size)?,
     };
 
-    let initial_buttons = [
-        thumb_button(BTN_PREVIOUS, icons.previous, "Previous", false),
-        thumb_button(BTN_PLAY_PAUSE, icons.play, "Play", false),
-        thumb_button(BTN_NEXT, icons.next, "Next", false),
-    ];
-    unsafe { taskbar.ThumbBarAddButtons(hwnd, &initial_buttons) }?;
-
     force_iconic_representation(hwnd)?;
+
+    // Registered once here (rather than hardcoding WM_APP+N) so Explorer can
+    // tell every top-level window when a taskbar button becomes available
+    // for it — see `try_register_thumbbar`.
+    let taskbar_button_created_msg = unsafe { RegisterWindowMessageW(w!("TaskbarButtonCreated")) };
 
     let ctx = Box::new(TaskbarContext {
         app: app.handle().clone(),
         hwnd,
-        taskbar,
+        taskbar: parking_lot::Mutex::new(None),
         icons,
+        last_known_state: parking_lot::Mutex::new((false, false)),
         now_playing: parking_lot::Mutex::new(NowPlayingArt::default()),
         fallback_art: load_fallback_art(),
+        taskbar_button_created_msg,
     });
     let ctx_ptr = Box::into_raw(ctx) as usize;
 
     unsafe { SetWindowSubclass(hwnd, Some(subclass_proc), SUBCLASS_ID, ctx_ptr) }.ok()?;
 
+    // Covers the (unlikely, given the window starts hidden) case where a
+    // taskbar button already exists by the time we get here; the normal
+    // path is via `TaskbarButtonCreated` in `subclass_proc`.
+    let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+    register_thumbbar(ctx);
+
     listen_playback_state(app, ctx_ptr);
     seed_playback_state(app.handle().clone(), ctx_ptr);
 
+    Ok(())
+}
+
+/// (Re-)creates the `ITaskbarList3` for our window and registers the
+/// thumbbar buttons, seeded with whatever playback state was last applied.
+/// Called once a taskbar button actually exists for the window — see the
+/// `TaskbarButtonCreated` handling in `subclass_proc` — and, in principle,
+/// again if Explorer restarts and rebroadcasts that message.
+fn register_thumbbar(ctx: &TaskbarContext) {
+    if let Err(e) = try_register_thumbbar(ctx) {
+        log::warn!("Failed to register taskbar thumbbar buttons: {e:?}");
+    }
+}
+
+fn try_register_thumbbar(ctx: &TaskbarContext) -> windows::core::Result<()> {
+    let taskbar: ITaskbarList3 =
+        unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER) }?;
+    unsafe { taskbar.HrInit() }?;
+
+    let (playing, has_song) = *ctx.last_known_state.lock();
+    let buttons = build_buttons(ctx, playing, has_song);
+    unsafe { taskbar.ThumbBarAddButtons(ctx.hwnd, &buttons) }?;
+
+    *ctx.taskbar.lock() = Some(taskbar);
     Ok(())
 }
 
@@ -209,6 +248,14 @@ unsafe extern "system" fn subclass_proc(
     ref_data: usize,
 ) -> LRESULT {
     let ctx = &*(ref_data as *const TaskbarContext);
+
+    if msg == ctx.taskbar_button_created_msg {
+        register_thumbbar(ctx);
+        // Not a message with a meaningful return value or default handling
+        // of its own, but fall through to `DefSubclassProc` anyway rather
+        // than swallowing a registered message other subclasses might care
+        // about.
+    }
 
     match msg {
         WM_COMMAND => {
@@ -332,18 +379,30 @@ fn apply_playback_state(app: AppHandle, ctx_ptr: usize, state: PlaybackState) {
     });
 }
 
-fn sync_thumbbar_buttons(ctx: &TaskbarContext, playing: bool, has_song: bool) {
+fn build_buttons(ctx: &TaskbarContext, playing: bool, has_song: bool) -> [THUMBBUTTON; 3] {
     let (play_pause_icon, play_pause_tip) = if playing {
         (ctx.icons.pause, "Pause")
     } else {
         (ctx.icons.play, "Play")
     };
-    let buttons = [
+    [
         thumb_button(BTN_PREVIOUS, ctx.icons.previous, "Previous", has_song),
         thumb_button(BTN_PLAY_PAUSE, play_pause_icon, play_pause_tip, has_song),
         thumb_button(BTN_NEXT, ctx.icons.next, "Next", has_song),
-    ];
-    if let Err(e) = unsafe { ctx.taskbar.ThumbBarUpdateButtons(ctx.hwnd, &buttons) } {
+    ]
+}
+
+fn sync_thumbbar_buttons(ctx: &TaskbarContext, playing: bool, has_song: bool) {
+    *ctx.last_known_state.lock() = (playing, has_song);
+
+    let taskbar_guard = ctx.taskbar.lock();
+    let Some(taskbar) = taskbar_guard.as_ref() else {
+        // No taskbar button yet — `register_thumbbar` will apply
+        // `last_known_state` once `TaskbarButtonCreated` arrives.
+        return;
+    };
+    let buttons = build_buttons(ctx, playing, has_song);
+    if let Err(e) = unsafe { taskbar.ThumbBarUpdateButtons(ctx.hwnd, &buttons) } {
         log::warn!("Failed to update taskbar thumbbar buttons: {e:?}");
     }
 }
