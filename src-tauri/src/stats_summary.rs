@@ -74,6 +74,7 @@ fn get_summary_at(conn: &Connection, range: StatsRange, now: i64) -> Result<Stat
         top_artists: top_artists(conn, range_start)?,
         top_genres: top_genres(conn, range_start)?,
         play_timestamps: play_timestamps(conn, range_start)?,
+        total_minutes: total_minutes(conn, range_start)?,
     })
 }
 
@@ -277,6 +278,26 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
         .filter_map(|r| r.ok())
         .collect();
     Ok(rows)
+}
+
+/// Total minutes listened across every in-range, non-excluded play — same
+/// exclusion/library filtering as `play_timestamps`, rounded down to whole
+/// minutes.
+fn total_minutes(conn: &Connection, range_start: i64) -> Result<i64> {
+    let sql = format!(
+        "SELECT COALESCE(SUM(ph.duration_secs), 0)
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let total_secs: i64 = conn.query_row(&sql, params![range_start], |row| row.get(0))?;
+    Ok(total_secs / 60)
 }
 
 /// Raw `(played_at, duration_secs)` pairs for every non-excluded play since
@@ -498,7 +519,7 @@ mod tests {
         let range_start = range_start_unix(StatsRange::SevenDays, now);
 
         let song = insert_song(&conn, "/s.flac", "Song", "Artist", "Album", "Rock");
-        insert_play(&conn, song, range_start + 10);
+        insert_play_with_duration(&conn, song, range_start + 10, 180);
 
         let summary = get_summary_at(&conn, StatsRange::SevenDays, now).unwrap();
         assert_eq!(summary.range, "7d");
@@ -507,6 +528,32 @@ mod tests {
         assert_eq!(summary.top_artists.len(), 1);
         assert_eq!(summary.top_genres.len(), 1);
         assert_eq!(summary.play_timestamps, vec![range_start + 10]);
+        assert_eq!(summary.total_minutes, 3);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_total_minutes_excludes_out_of_range_and_flagged_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let in_range = insert_song(&conn, "/g.flac", "In Range", "Artist G", "Album G", "Rock");
+        let out_of_range = insert_song(&conn, "/h.flac", "Out", "Artist H", "Album H", "Pop");
+        let excluded = insert_song(&conn, "/i.flac", "Excluded", "Artist I", "Album I", "Jazz");
+
+        insert_play_with_duration(&conn, in_range, range_start + 10, 120);
+        insert_play_with_duration(&conn, out_of_range, range_start - 10, 600);
+        insert_play_with_duration(&conn, excluded, range_start + 10, 600);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('song', ?1)",
+            params![excluded.to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(total_minutes(&conn, range_start).unwrap(), 2);
 
         let _ = std::fs::remove_dir_all(dir);
     }
