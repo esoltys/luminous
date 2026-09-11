@@ -142,7 +142,7 @@
       role="dialog"
       aria-modal="true"
       aria-labelledby="walkthrough-step-title"
-      class="absolute w-80 max-w-[calc(100vw-2rem)] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-5 pointer-events-auto"
+      class="absolute w-96 max-w-[calc(100vw-2rem)] bg-brand-sidebar border border-brand-border rounded-2xl shadow-2xl p-5 pointer-events-auto"
       style="top: {popoverPos.top}px; left: {popoverPos.left}px;"
     >
       <div class="flex items-start justify-between gap-3 mb-2">
@@ -163,7 +163,7 @@
         {i18n.t(walkthroughStore.currentStep.descriptionKey)}
       </p>
 
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center justify-between gap-x-3 gap-y-2 flex-wrap">
         <div class="flex items-center gap-1.5" role="tablist" aria-label={i18n.t('walkthrough.progress', {}, 'Walkthrough progress')}>
           {#each walkthroughStore.steps as step, i (step.id)}
             <span
