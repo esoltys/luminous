@@ -208,6 +208,14 @@ async function main() {
     console.log(`${progressLabel ? progressLabel + " " : ""}Capturing ${filename}...`);
     const page = await browser.newPage();
     await page.setViewportSize({ width: viewportWidth, height: viewportHeight });
+    // The System theme (used by every screenshot except the dynamic-artwork
+    // ones) resolves light/dark from the OS color-scheme media query —
+    // Chromium defaults that to light, which is why these used to render
+    // light. Force dark so System-theme captures actually show the dark
+    // System theme rather than an unintended light one.
+    if (theme !== "dynamic-artwork") {
+      await page.emulateMedia({ colorScheme: "dark" });
+    }
     page.on("console", (msg) => {
       if (msg.type() === "error" || msg.type() === "warning") {
         const text = msg.text();

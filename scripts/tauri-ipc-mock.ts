@@ -805,6 +805,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     // a real user's Home would typically have pinned, rather than the empty
     // row an unmocked get_pinned_items (null) silently produced before.
     get_pinned_items: () => {
+      if (library.songs.length === 0) return [];
       const favouritesCount = library.songs.filter((s) => (s.rating ?? -1) >= 4).length || 18;
       const pinnedArtist = library.artists.find((a) => a.name === featured.artist) ?? library.artists[0];
       return [
