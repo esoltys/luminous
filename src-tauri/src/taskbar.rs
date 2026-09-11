@@ -30,8 +30,8 @@ use tauri::{AppHandle, Emitter, Listener, Manager};
 use windows::core::{w, BOOL};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
-    DwmSetIconicLivePreviewBitmap, DwmSetIconicThumbnail, DwmSetWindowAttribute,
-    DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP,
+    DwmInvalidateIconicBitmaps, DwmSetIconicLivePreviewBitmap, DwmSetIconicThumbnail,
+    DwmSetWindowAttribute, DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP,
 };
 use windows::Win32::Graphics::Gdi::{
     CreateBitmap, CreateDIBSection, DeleteObject, GetDC, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER,
@@ -109,6 +109,12 @@ struct TaskbarContext {
     now_playing: parking_lot::Mutex<NowPlayingArt>,
     fallback_art: Arc<image::DynamicImage>,
     taskbar_button_created_msg: u32,
+    /// Bumped once per `apply_playback_state` call. Lets an art-decode task
+    /// that's still running when a *newer* track change comes in tell it's
+    /// been superseded and skip writing stale art into `now_playing` —
+    /// otherwise two rapid track changes could race and leave the slower
+    /// (now outdated) decode as the one that "wins".
+    art_request_seq: std::sync::atomic::AtomicU64,
 }
 
 // SAFETY: `taskbar` (an apartment-threaded COM pointer, behind its own
@@ -164,6 +170,7 @@ fn try_init(app: &tauri::App) -> windows::core::Result<()> {
         now_playing: parking_lot::Mutex::new(NowPlayingArt::default()),
         fallback_art: load_fallback_art(),
         taskbar_button_created_msg,
+        art_request_seq: std::sync::atomic::AtomicU64::new(0),
     });
     let ctx_ptr = Box::into_raw(ctx) as usize;
 
@@ -357,6 +364,11 @@ fn apply_playback_state(app: AppHandle, ctx_ptr: usize, state: PlaybackState) {
     // Slower: resolve and decode cover art off the main thread, caching it
     // for the next WM_DWMSENDICONICTHUMBNAIL/LIVEPREVIEWBITMAP request.
     let song_id = state.current_song.as_ref().map(|s| s.id);
+    let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
+    let my_seq = ctx
+        .art_request_seq
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        + 1;
     tauri::async_runtime::spawn(async move {
         // SAFETY: same as above.
         let ctx = unsafe { &*(ctx_ptr as *const TaskbarContext) };
@@ -373,9 +385,35 @@ fn apply_playback_state(app: AppHandle, ctx_ptr: usize, state: PlaybackState) {
         });
         let decoded = cover_path.and_then(|p| image::open(p).ok()).map(Arc::new);
 
-        let mut now_playing = ctx.now_playing.lock();
-        now_playing.song_id = song_id;
-        now_playing.image = decoded;
+        // A newer track change may have started (and possibly already
+        // finished) while this decode was running — if so, don't let this
+        // now-stale result clobber it.
+        if ctx
+            .art_request_seq
+            .load(std::sync::atomic::Ordering::SeqCst)
+            != my_seq
+        {
+            return;
+        }
+
+        {
+            let mut now_playing = ctx.now_playing.lock();
+            now_playing.song_id = song_id;
+            now_playing.image = decoded;
+        }
+
+        // The art just changed — tell DWM its cached thumbnail/live-preview
+        // bitmaps are stale so it re-requests them (via
+        // WM_DWMSENDICONICTHUMBNAIL/LIVEPREVIEWBITMAP) instead of continuing
+        // to show whatever was last handed to it, which could otherwise
+        // persist until some unrelated event happens to invalidate it.
+        // `HWND` wraps a raw pointer and isn't `Send`; it's just an opaque
+        // handle value here; reconstructed on the main thread it's actually
+        // used on.
+        let hwnd_value = ctx.hwnd.0 as isize;
+        let _ = app.run_on_main_thread(move || unsafe {
+            let _ = DwmInvalidateIconicBitmaps(HWND(hwnd_value as *mut core::ffi::c_void));
+        });
     });
 }
 
