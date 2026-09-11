@@ -457,6 +457,10 @@ async function main() {
       await page.getByRole("button", { name: t(language, "settings.tabFolders"), exact: true }).click();
       await page.waitForTimeout(400);
     },
+    "click-settings-integrations": async (page, _featured, language) => {
+      await page.getByRole("button", { name: t(language, "settings.tabIntegrations"), exact: true }).click();
+      await page.waitForTimeout(400);
+    },
     "click-settings-tools": async (page, _featured, language) => {
       await page.getByRole("button", { name: t(language, "settings.tabTools"), exact: true }).click();
       await page.waitForTimeout(400);

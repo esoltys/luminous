@@ -220,6 +220,13 @@
       "tab": "settings"
     },
     {
+      "name": "settings-integrations",
+      "filename": "settings-integrations.png",
+      "tab": "settings",
+      "action": "click-settings-integrations",
+      "viewportHeight": 850
+    },
+    {
       "name": "settings-organize",
       "filename": "settings-organize.png",
       "tab": "settings",

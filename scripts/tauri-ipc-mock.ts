@@ -638,6 +638,18 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
 
     list_webdav_servers: () => [],
 
+    get_scrobbler_settings: () => ({
+      listenbrainz_enabled: false,
+      listenbrainz_token: "",
+      listenbrainz_username: null,
+      scrobble_now_playing: true,
+      scrobble_ratings: true,
+      scrobble_paused: false,
+      min_duration_secs: 30,
+    }),
+    get_scrobble_cache_status: () => ({ pending_count: 0, last_error: null, last_attempt: null }),
+    get_autostart_enabled: () => false,
+
     // Unmocked, these resolve to null — collection.svelte.ts caches whatever
     // invoke() returns without validating it, so every caller (search
     // dropdown, artist rows, album/song detail headers) then dereferences
@@ -786,6 +798,35 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         .filter((s) => s.added)
         .sort((a, b) => (b.added || 0) - (a.added || 0));
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
+    },
+
+    // A representative Home > Pinned row for screenshots: the Daypart Mix
+    // ("Moment Mix", #223), Favourites, and one pinned artist — mirrors what
+    // a real user's Home would typically have pinned, rather than the empty
+    // row an unmocked get_pinned_items (null) silently produced before.
+    get_pinned_items: () => {
+      const favouritesCount = library.songs.filter((s) => (s.rating ?? -1) >= 4).length || 18;
+      const pinnedArtist = library.artists.find((a) => a.name === featured.artist) ?? library.artists[0];
+      return [
+        {
+          type: "auto_playlist",
+          // A "daypart" card needs a playlistId to take AutoPlaylistCard's
+          // cover-fetching branch at all — without one it falls through to
+          // the curated-tag branch instead and crashes building the cover
+          // stack from a null songs list. get_playlist_tracks below falls
+          // back to the first few mock songs for any id it doesn't
+          // recognize, so this sentinel id just needs to not collide with a
+          // real playlist's. It intentionally isn't added to
+          // library.playlists (that would also surface it in the Auto
+          // Playlists tab, changing an unrelated screenshot) — with no
+          // matching row there, both PinnedRow's and AutoPlaylistCard's own
+          // display-name lookups miss and fall back to the `genre` field
+          // below as the card's title text instead.
+          autoPlaylist: { kind: "daypart", playlistId: 999001, genre: "Morning Mix", trackCount: 32, updated: Math.floor(NOW_SEC) },
+        },
+        { type: "auto_playlist", autoPlaylist: { kind: "favourites", trackCount: favouritesCount } },
+        ...(pinnedArtist ? [{ type: "artist", artist: pinnedArtist }] : []),
+      ];
     },
 
     get_top_albums: (args) => {
