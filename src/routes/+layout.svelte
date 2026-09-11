@@ -85,7 +85,15 @@
     isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
-    walkthroughStore.init();
+    // Auto-prompt the tour once, on first launch — skippable in one click via
+    // the overlay's Skip button or Escape, and the steps themselves already
+    // degrade gracefully against an empty library (see WalkthroughOverlay's
+    // target-resolution skip logic).
+    walkthroughStore.init().then(() => {
+      if (!walkthroughStore.hasCompleted) {
+        walkthroughStore.start();
+      }
+    });
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     picardStore.init();
