@@ -732,6 +732,8 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         .slice(0, 10)
         .map(([key, count]) => ({ key, label: key, secondary: null, play_count: count, excluded: false, album: null }));
 
+      const total_minutes = Math.round(inRange.reduce((acc, e) => acc + e.duration_secs, 0) / 60);
+
       return {
         range,
         top_songs,
@@ -739,6 +741,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
         top_artists,
         top_genres,
         play_timestamps: inRange.map((e) => e.played_at),
+        total_minutes,
       };
     },
 
@@ -792,6 +795,15 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
       const sorted = [...library.songs].sort((a, b) => (b.playcount || 0) - (a.playcount || 0));
       return groupSongsIntoHomeItems(sorted, (args.limit as number) || 10);
     },
+
+    get_most_played_songs: (args) =>
+      [...library.songs].sort((a, b) => (b.playcount || 0) - (a.playcount || 0)).slice(0, (args.limit as number) || 50),
+
+    // No exclusions in the mock fixture — matches the real command's shape
+    // ([song/artist key, kind] pairs) for a library with nothing excluded.
+    get_stats_exclusions: (): [string, string][] => [],
+
+    get_picard_path: (): string | null => null,
 
     get_recently_added: (args) => {
       const sorted = library.songs
@@ -1159,7 +1171,7 @@ function getIpcCallback(id: number | undefined): IpcCallback | undefined {
     "next_track", "previous_track", "seek_to", "set_volume", "set_shuffle_mode", "set_repeat_mode",
     "get_startup_file",
     "enter_miniplayer_mode", "exit_miniplayer_mode", "start_window_drag", "start_window_resize",
-    "move_window_to_preset", "get_window_geometry", "plugin:window|show",
+    "move_window_to_preset", "get_window_geometry", "plugin:window|show", "plugin:window|set_title",
     "save_song_tags", "save_album_tags",
     // Genres curation (#545) — not exercised by any screenshot target, but
     // mocked so manual dev-server testing of GenreCards' drag/context-menu
