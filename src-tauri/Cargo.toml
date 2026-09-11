@@ -127,7 +127,17 @@ windows = { version = "0.61", features = [
     "Win32_System_WinRT",
     "Win32_System_Recovery",
     "Win32_Storage_Packaging_Appx",
+    # --- Taskbar thumbnail toolbar + iconic (album art) preview (#852) ---
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
 ] }
+# Decodes/resizes cover art into the RGBA buffer used for the taskbar's
+# iconic thumbnail (#852). Already pulled in transitively by Tauri's
+# "image-png" feature (see Cargo.lock) — added directly here since taskbar.rs
+# calls into it itself rather than through Tauri.
+image = "0.25"
 # tauri-plugin-notification hardcodes the toast's AppUserModelID to the Tauri
 # `identifier` config value, which Windows only accepts for apps registered
 # under that exact AUMID — an MSIX/Store install's real AUMID is

@@ -37,6 +37,8 @@ pub mod stats;
 pub mod stats_summary;
 pub mod tageditor;
 pub mod tags;
+#[cfg(target_os = "windows")]
+pub mod taskbar;
 pub mod tray;
 pub mod waveform;
 pub mod webdav;
@@ -889,6 +891,9 @@ pub fn run() {
             if let Err(e) = tray::init(app) {
                 log::warn!("Failed to initialize system tray: {e}");
             }
+
+            #[cfg(target_os = "windows")]
+            taskbar::init(app);
 
             register_media_shortcuts(app);
 
