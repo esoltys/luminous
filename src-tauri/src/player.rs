@@ -1610,35 +1610,17 @@ impl Player {
         }
     }
 
-    /// The current playlist's items in "up next" order: from the current
-    /// track through the end of `shuffle_order`, which holds identity order
-    /// `[0, 1, 2, ...]` when shuffle is off — so this works the same way
-    /// regardless of shuffle mode. Doesn't wrap around to before the current
-    /// track.
+    /// The current playlist's items in actual playback order: `shuffle_order`
+    /// holds identity order `[0, 1, 2, ...]` when shuffle is off, so this
+    /// works the same way regardless of shuffle mode. Includes every item —
+    /// already-played and upcoming — since `current_index` only marks a
+    /// position within this order, not a cutoff; a Queue row must stay
+    /// visible after it plays (#888/#902).
     pub fn get_playlist_tracks_in_playback_order(&self) -> Vec<PlaylistItem> {
-        let len = self.playlist_items.len();
-        if len == 0 {
-            return Vec::new();
-        }
-
-        let start_pos = self.current_index.unwrap_or(0);
-        let mut result = Vec::new();
-
-        if start_pos < self.shuffle_order.len() {
-            for &real_idx in &self.shuffle_order[start_pos..] {
-                if let Some(item) = self.playlist_items.get(real_idx) {
-                    result.push(item.clone());
-                }
-            }
-        } else {
-            for &real_idx in &self.shuffle_order {
-                if let Some(item) = self.playlist_items.get(real_idx) {
-                    result.push(item.clone());
-                }
-            }
-        }
-
-        result
+        self.shuffle_order
+            .iter()
+            .filter_map(|&real_idx| self.playlist_items.get(real_idx).cloned())
+            .collect()
     }
 
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
@@ -2528,6 +2510,59 @@ mod tests {
         // Shuffle order should be: Song 1 (0), Song 4 (2), Song 5 (3), Song 3 (1) -> vec![0, 2, 3, 1]
         assert_eq!(player.shuffle_order, vec![0, 2, 3, 1]);
         assert_eq!(player.current_index, Some(0));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_get_playlist_tracks_in_playback_order_includes_already_played_items() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for id in 1..=3i64 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (id, path, title, artist, album, length_nanosec) VALUES ({id}, '/fake/path{id}.mp3', 'Track {id}', 'Artist', 'Album', 180000000000)"
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let audio = Arc::new(Mutex::new(AudioEngine::new()));
+        let mut player = Player::new(db_arc.clone(), audio.clone());
+
+        let items = (1..=3i64)
+            .map(|id| {
+                let conn = db_arc.pool.get().unwrap();
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                let song = conn
+                    .query_row(&sql, rusqlite::params![id], crate::collection::row_to_song)
+                    .unwrap();
+                PlaylistItem::new_song(0, 0, song)
+            })
+            .collect::<Vec<_>>();
+
+        player
+            .play_playlist(items.clone(), 0, 0, None)
+            .await
+            .unwrap();
+
+        // Simulate having advanced past the first two tracks (#902): they must
+        // still be returned, not sliced away just because current_index moved.
+        player.current_index = Some(2);
+
+        let result = player.get_playlist_tracks_in_playback_order();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].uuid, items[0].uuid);
+        assert_eq!(result[1].uuid, items[1].uuid);
+        assert_eq!(result[2].uuid, items[2].uuid);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
