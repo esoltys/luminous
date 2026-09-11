@@ -353,6 +353,13 @@ export interface StatsSummary {
   play_timestamps: number[];
 }
 
+/** One completed listen's timing, for the daily listening heatmap to bucket
+ * into local calendar days and sum minutes played. */
+export interface ListenEvent {
+  played_at: number;
+  duration_secs: number;
+}
+
 export interface ArtistItem {
   name: string | null;
   sort_artist?: string | null;

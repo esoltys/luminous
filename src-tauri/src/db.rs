@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub type DbPool = Pool<SqliteConnectionManager>;
 
 /// Current schema version. Increment when adding migrations.
-pub const CURRENT_SCHEMA_VERSION: i32 = 31;
+pub const CURRENT_SCHEMA_VERSION: i32 = 32;
 
 struct Migration {
     version: i32,
@@ -225,6 +225,19 @@ const MIGRATIONS: &[Migration] = &[
                 .exists([])?;
             if !has_nickname {
                 conn.execute_batch(MIGRATION_31)?;
+            }
+            Ok(())
+        },
+    },
+    Migration {
+        version: 32,
+        description: "duration_secs column on play_history for the daily listening heatmap (#890)",
+        apply: |conn| {
+            let has_duration_secs: bool = conn
+                .prepare("SELECT 1 FROM pragma_table_info('play_history') WHERE name = 'duration_secs'")?
+                .exists([])?;
+            if !has_duration_secs {
+                conn.execute_batch(MIGRATION_32)?;
             }
             Ok(())
         },
@@ -920,6 +933,17 @@ const MIGRATION_31: &str = "
 ALTER TABLE webdav_servers ADD COLUMN nickname TEXT;
 ALTER TABLE webdav_servers ADD COLUMN icon TEXT;
 ALTER TABLE webdav_servers ADD COLUMN color TEXT;
+";
+
+// ---------------------------------------------------------------------------
+// Migration 32: duration_secs column on play_history — the daily listening
+// heatmap (#890) needs each play's length to sum minutes-listened per day,
+// which play_history didn't previously record (only that a play happened).
+// Existing rows default to 0 and are simply undercounted; there's no way to
+// recover their original duration retroactively.
+// ---------------------------------------------------------------------------
+const MIGRATION_32: &str = "
+ALTER TABLE play_history ADD COLUMN duration_secs INTEGER NOT NULL DEFAULT 0;
 ";
 
 // ---------------------------------------------------------------------------

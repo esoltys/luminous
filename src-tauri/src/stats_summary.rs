@@ -6,7 +6,9 @@
 //! summing across weeks would silently undercount anything that never
 //! cracked a weekly top 10. See issue #130's comment thread.
 
-use crate::models::{parse_multi_value, StatsSummary, StatsTopItem, LIBRARY_SOURCES_SQL};
+use crate::models::{
+    parse_multi_value, ListenEvent, StatsSummary, StatsTopItem, LIBRARY_SOURCES_SQL,
+};
 use anyhow::Result;
 use rusqlite::{params, Connection};
 
@@ -277,6 +279,36 @@ fn play_timestamps(conn: &Connection, range_start: i64) -> Result<Vec<i64>> {
     Ok(rows)
 }
 
+/// Raw `(played_at, duration_secs)` pairs for every non-excluded play since
+/// `since_unix`, for the daily listening heatmap (#890) to bucket into local
+/// calendar days and sum minutes played client-side — same rationale as
+/// `play_timestamps` above (no server-side UTC-offset day math).
+pub fn listening_activity(conn: &Connection, since_unix: i64) -> Result<Vec<ListenEvent>> {
+    let sql = format!(
+        "SELECT ph.played_at, ph.duration_secs
+         FROM play_history ph
+         JOIN songs s ON s.id = ph.song_id
+         WHERE ph.played_at >= ?1
+           AND s.source IN ({lib}) AND s.unavailable = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM stats_exclusions se
+               WHERE se.entity_type = 'song' AND se.entity_key = CAST(s.id AS TEXT)
+           )",
+        lib = *LIBRARY_SOURCES_SQL
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map(params![since_unix], |row| {
+            Ok(ListenEvent {
+                played_at: row.get(0)?,
+                duration_secs: row.get(1)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,9 +343,18 @@ mod tests {
     }
 
     fn insert_play(conn: &Connection, song_id: i64, played_at: i64) {
+        insert_play_with_duration(conn, song_id, played_at, 0);
+    }
+
+    fn insert_play_with_duration(
+        conn: &Connection,
+        song_id: i64,
+        played_at: i64,
+        duration_secs: i64,
+    ) {
         conn.execute(
-            "INSERT INTO play_history (context_type, song_id, played_at) VALUES ('song', ?1, ?2)",
-            params![song_id, played_at],
+            "INSERT INTO play_history (context_type, song_id, played_at, duration_secs) VALUES ('song', ?1, ?2, ?3)",
+            params![song_id, played_at, duration_secs],
         )
         .unwrap();
     }
@@ -417,6 +458,34 @@ mod tests {
         let genres = top_genres(&conn, range_start).unwrap();
         let labels: Vec<&str> = genres.iter().map(|g| g.label.as_str()).collect();
         assert_eq!(labels, vec!["Metal"]);
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_listening_activity_excludes_out_of_range_and_flagged_songs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let now = 1_700_000_000;
+        let range_start = range_start_unix(StatsRange::SevenDays, now);
+
+        let in_range = insert_song(&conn, "/d.flac", "In Range", "Artist D", "Album D", "Rock");
+        let out_of_range = insert_song(&conn, "/e.flac", "Out", "Artist E", "Album E", "Pop");
+        let excluded = insert_song(&conn, "/f.flac", "Excluded", "Artist F", "Album F", "Jazz");
+
+        insert_play_with_duration(&conn, in_range, range_start + 10, 200);
+        insert_play_with_duration(&conn, out_of_range, range_start - 10, 200);
+        insert_play_with_duration(&conn, excluded, range_start + 10, 200);
+        conn.execute(
+            "INSERT INTO stats_exclusions (entity_type, entity_key) VALUES ('song', ?1)",
+            params![excluded.to_string()],
+        )
+        .unwrap();
+
+        let events = listening_activity(&conn, range_start).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].played_at, range_start + 10);
+        assert_eq!(events[0].duration_secs, 200);
 
         let _ = std::fs::remove_dir_all(dir);
     }

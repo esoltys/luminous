@@ -1,4 +1,4 @@
-use crate::models::StatsSummary;
+use crate::models::{ListenEvent, StatsSummary};
 use crate::stats_summary::StatsRange;
 use crate::AppState;
 use tauri::{AppHandle, Emitter, State};
@@ -11,6 +11,18 @@ pub async fn get_stats_summary(
     let conn = state.db.pool.get().map_err(|e| e.to_string())?;
     let range = StatsRange::parse(&range).ok_or_else(|| format!("invalid range: {range}"))?;
     crate::stats_summary::get_summary(&conn, range).map_err(|e| e.to_string())
+}
+
+/// Raw listen events for the past `days` days, for the daily listening
+/// heatmap (#890) to bucket into local calendar days client-side.
+#[tauri::command]
+pub async fn get_listening_activity(
+    days: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<ListenEvent>, String> {
+    let conn = state.db.pool.get().map_err(|e| e.to_string())?;
+    let since_unix = chrono::Utc::now().timestamp() - days * 86_400;
+    crate::stats_summary::listening_activity(&conn, since_unix).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -70,8 +82,16 @@ pub async fn set_song_rating(
         Some(s) => Some(s),
         None => {
             if let Ok(conn) = state.db.pool.get() {
-                let sql = format!("SELECT {} FROM songs WHERE id = ?1", crate::collection::SONG_SELECT_COLS);
-                conn.query_row(&sql, rusqlite::params![song_id], crate::collection::row_to_song).ok()
+                let sql = format!(
+                    "SELECT {} FROM songs WHERE id = ?1",
+                    crate::collection::SONG_SELECT_COLS
+                );
+                conn.query_row(
+                    &sql,
+                    rusqlite::params![song_id],
+                    crate::collection::row_to_song,
+                )
+                .ok()
             } else {
                 None
             }

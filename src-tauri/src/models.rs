@@ -888,6 +888,16 @@ pub struct StatsSummary {
     pub play_timestamps: Vec<i64>,
 }
 
+/// One completed listen's timing, for the daily listening heatmap (#890) to
+/// bucket into local calendar days and sum minutes played. Raw and
+/// unaggregated, same rationale as `StatsSummary::play_timestamps` — bucketing
+/// by calendar day must happen client-side in the viewer's local timezone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListenEvent {
+    pub played_at: i64,
+    pub duration_secs: i64,
+}
+
 /// Represents a dynamic item in the Home curation carousels (a Song, an Album, or a Playlist).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
