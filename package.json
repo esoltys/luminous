@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "install:git-hooks": "git config core.hooksPath .githooks",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo && bun run knip",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --fail-on-warnings && bun run knip",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --tsgo --watch",
     "knip": "knip",
     "tauri": "NO_STRIP=true tauri",
