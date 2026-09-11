@@ -238,29 +238,6 @@ pub async fn deduplicate_playlist(
     Ok(removed_uuids)
 }
 
-/// Removes every item ahead of `uuid` in `playlist_id` and mirrors the
-/// removal into the live play queue in one call. Resolves `uuid`'s position
-/// and removes it atomically server-side (see
-/// `PlaylistManager::trim_playlist_before_uuid`), so there's no window for
-/// the Queue to change shape between reading a position and cutting it.
-#[tauri::command]
-pub async fn trim_playlist_before_uuid(
-    playlist_id: i64,
-    uuid: String,
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let removed_uuids = state
-        .playlists
-        .lock()
-        .await
-        .trim_playlist_before_uuid(playlist_id, &uuid)
-        .map_err(|e| e.to_string())?;
-
-    sync_player_after_removal(&state, &app, &removed_uuids).await;
-    Ok(())
-}
-
 /// Reorders a playlist row and mirrors the move into the live play queue in
 /// one call. The live-queue side is keyed by item UUID (never shared across
 /// playlists), so it's a safe no-op whenever `playlist_id` isn't the Queue

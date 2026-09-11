@@ -67,7 +67,6 @@ export class PlayerStore {
         }
         if (this.currentSong?.id !== oldSongId || this.playlistItemUuid !== oldItemUuid) {
           themeStore.updateArtworkColors(this.currentSong);
-          await this.syncQueueTrackPosition();
         }
 
         // Queue completion celebration (#182, Milestone tier): fires when
@@ -108,7 +107,6 @@ export class PlayerStore {
       await listen<{ song: Song | null }>("track-changed", async (event) => {
         this.currentSong = event.payload.song || undefined;
         themeStore.updateArtworkColors(this.currentSong);
-        await this.syncQueueTrackPosition();
       });
 
       // A song couldn't be opened/decoded (e.g. its file just vanished —
@@ -311,22 +309,6 @@ export class PlayerStore {
     if (queuePl) {
       await playlistsStore.selectPlaylist(queuePl.id);
       await playlistsStore.refreshPlaylists();
-    }
-  }
-
-  /** Background cleanup only — never a precondition for playback. Trims
-   * already-played Queue rows behind the now-playing track so the Queue
-   * view visually shrinks as you play through it. Runs *after* a track
-   * change has already succeeded, using the backend's own authoritative
-   * `this.playlistId`/`playlistItemUuid`, so it can never race with (or
-   * block on) the act of starting playback itself. */
-  private async syncQueueTrackPosition() {
-    if (!this.currentSong || !this.playlistId || !this.playlistItemUuid) return;
-    if (this.repeatMode === "playlist") return;
-    if (this.shuffleMode !== "off") return;
-    const pl = playlistsStore.playlists.find((p) => p.id === this.playlistId);
-    if (pl?.is_queue || this.activeContextName === "Queue") {
-      await playlistsStore.trimQueueBeforeUuid(this.playlistId, this.playlistItemUuid);
     }
   }
 

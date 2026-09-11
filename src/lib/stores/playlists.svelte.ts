@@ -280,25 +280,6 @@ class PlaylistsStore {
     await this.refreshPlaylists();
   }
 
-  /** Removes every track ahead of `uuid` (in current DB order) from
-   * `playlistId`. Takes the target playlist id explicitly rather than
-   * re-resolving "the Queue" via `requireQueue()` — that lookup can
-   * disagree with whichever playlist the caller actually means (e.g. is
-   * already viewing). The backend resolves `uuid`'s position and removes
-   * it in one atomic call, so there's no gap for the Queue to change shape
-   * between reading a position and cutting it. */
-  async trimQueueBeforeUuid(playlistId: number, uuid: string) {
-    try {
-      await invoke("trim_playlist_before_uuid", { playlistId, uuid });
-      if (this.activePlaylistId === playlistId) {
-        await this.selectPlaylist(playlistId);
-      }
-      await this.refreshPlaylists();
-    } catch (err) {
-      console.error("Failed to trim Queue tracks before uuid:", err);
-    }
-  }
-
   /** Add songs to the built-in Queue. The backend appends the DB rows and
    * mirrors them into the live play order in one call, so callers no longer
    * pair add_to_playlist with a live-queue append. */
