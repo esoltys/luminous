@@ -1268,5 +1268,40 @@ export const en = {
     addedSong: "Added 1 song to queue",
     addedSongs: "Added {count} songs to queue",
     nothingToAdd: "No supported audio files found to add."
+  },
+  walkthrough: {
+    takeTour: "Take a quick tour",
+    restartTour: "Restart Feature Walkthrough",
+    skip: "Skip",
+    back: "Back",
+    next: "Next",
+    finish: "Finish",
+    progress: "Walkthrough progress",
+    steps: {
+      sidebar: {
+        title: "Navigate your library",
+        description: "Jump between Home, Collection, Playlists, Genres, and Settings from here."
+      },
+      topNavigation: {
+        title: "Search and go back",
+        description: "Search your library instantly, move back and forward through your browsing history, and toggle layout options."
+      },
+      collectionView: {
+        title: "Browse your collection",
+        description: "Switch between Albums, Artists, Songs, and Genres, and toggle between card and row density."
+      },
+      playerBar: {
+        title: "Control playback",
+        description: "Play, pause, seek, adjust volume, and toggle shuffle, repeat, or the miniplayer from here."
+      },
+      rightPanel: {
+        title: "See track details and queue",
+        description: "View track details, your live queue, synchronized lyrics, and the audio spectrum visualizer."
+      },
+      libraryFolders: {
+        title: "Add your music",
+        description: "Add folders to scan from Settings, and Luminous keeps your library up to date automatically."
+      }
+    }
   }
 };

@@ -14,6 +14,7 @@
   import Miniplayer from '../lib/components/Miniplayer.svelte';
   import KeyboardShortcutsModal from '../lib/components/KeyboardShortcutsModal.svelte';
   import Toast from '../lib/components/Toast.svelte';
+  import WalkthroughOverlay from '../lib/components/WalkthroughOverlay.svelte';
   import { IconContext, MusicNotesIcon as Music, CloudArrowUpIcon as UploadCloud } from 'phosphor-svelte';
 
   import { i18n } from '../lib/stores/i18n.svelte';
@@ -23,6 +24,7 @@
   import { picardStore } from '../lib/stores/picard.svelte';
   import { scrobblerStore } from '../lib/stores/scrobbler.svelte';
   import { toastStore } from '../lib/stores/toast.svelte';
+  import { walkthroughStore } from '../lib/stores/walkthrough.svelte';
   import { isLinux as platformIsLinux } from '../lib/platform';
   import { themeStore } from '../lib/stores/theme.svelte';
   import { generateEllipseGradientSvg } from '../lib/utils/ellipseGradient';
@@ -83,6 +85,7 @@
     isLinux = platformIsLinux;
     i18n.init();
     prefs.init();
+    walkthroughStore.init();
     tagsStore.load().catch((err) => console.error('Failed to load tags:', err));
     updaterStore.init();
     picardStore.init();
@@ -564,6 +567,8 @@
 {#if isShortcutsModalOpen}
   <KeyboardShortcutsModal onClose={() => (isShortcutsModalOpen = false)} />
 {/if}
+
+<WalkthroughOverlay />
 
   <Toast />
 </IconContext>

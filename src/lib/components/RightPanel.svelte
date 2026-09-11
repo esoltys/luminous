@@ -178,6 +178,7 @@
 </script>
 
 <aside
+  data-walkthrough-target="right-panel"
   style="width: {width}px;"
   class="relative bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden {themeStore.isGlassTheme ? 'glass-surface' : ''}"
 >

@@ -77,7 +77,7 @@
 </script>
 
 <aside style="width: {width}px;" class="bg-brand-sidebar flex flex-col h-full text-brand-text-secondary select-none flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out {themeStore.isGlassTheme ? 'glass-surface' : ''}" class:transition-none={resizing}>
-  <nav class="{isCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center">
+  <nav data-walkthrough-target="sidebar" class="{isCollapsed ? 'p-2' : 'p-4'} space-y-0.5 flex flex-col items-center">
     <button
       onclick={() => { navigationStore.activeTab = "home"; }}
       class="flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'home' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
@@ -246,6 +246,7 @@
     {/if}
 
     <button
+      data-walkthrough-target="library-folders"
       onclick={() => { navigationStore.activeTab = "settings"; }}
       class="relative flex items-center gap-3 transition-all duration-150 {navigationStore.activeTab === 'settings' ? 'bg-brand-accent text-brand-accent-contrast shadow-lg shadow-brand-accent/20' : 'text-brand-text-secondary hover:bg-brand-accent/10 hover:text-brand-accent-text-hover'} {isCollapsed ? 'justify-center w-10 h-10 rounded-xl p-0' : 'w-full px-3 py-1.5 rounded-lg text-sm font-medium'}"
       title={showUpdateBadge ? `${i18n.t('sidebar.settings')} (${i18n.t('settings.updateAvailable', {}, 'Update available')})` : i18n.t('sidebar.settings')}

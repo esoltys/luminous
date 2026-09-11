@@ -277,7 +277,7 @@
 
 <svelte:window on:keydown={handleKeyDown} on:mouseup={handleMouseUp} on:mousedown={handleWindowMouseDown} />
 
-<header in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
+<header data-walkthrough-target="top-navigation" in:fade={{ duration: 600 }} class="w-full h-20 bg-brand-sidebar flex items-center px-6 gap-6 z-50 overflow-visible {themeStore.isGlassTheme ? 'glass-surface' : ''}">
   <div class="flex items-center gap-2">
     {#if !windowLayoutStore.isSidebarAutoCollapsed}
       <button

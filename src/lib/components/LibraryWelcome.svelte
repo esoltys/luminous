@@ -3,6 +3,7 @@
   import { i18n } from "../stores/i18n.svelte";
   import { collectionStore } from "../stores/collection.svelte";
   import { navigationStore } from "../stores/navigation.svelte";
+  import { walkthroughStore } from "../stores/walkthrough.svelte";
   import Button from "./Button.svelte";
 
   // A database last opened by a newer Luminous build looks identical to a
@@ -46,6 +47,9 @@
       </Button>
       <Button onclick={() => { navigationStore.activeTab = 'help'; }} variant="secondary" size="sm">
         {i18n.t('sidebar.help')}
+      </Button>
+      <Button onclick={() => walkthroughStore.start()} variant="secondary" size="sm">
+        {i18n.t('walkthrough.takeTour', {}, 'Take a quick tour')}
       </Button>
     </div>
   {/if}

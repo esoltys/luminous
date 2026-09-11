@@ -1267,5 +1267,40 @@ export const fr = {
     addedSong: "1 chanson ajoutée à la file d'attente",
     addedSongs: "{count} chansons ajoutées à la file d'attente",
     nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter."
+  },
+  walkthrough: {
+    takeTour: "Faire une visite rapide",
+    restartTour: "Relancer la visite guidée",
+    skip: "Passer",
+    back: "Précédent",
+    next: "Suivant",
+    finish: "Terminer",
+    progress: "Progression de la visite guidée",
+    steps: {
+      sidebar: {
+        title: "Naviguez dans votre bibliothèque",
+        description: "Passez d'Accueil à Collection, Listes de lecture, Genres et Paramètres depuis ici."
+      },
+      topNavigation: {
+        title: "Recherchez et revenez en arrière",
+        description: "Recherchez instantanément dans votre bibliothèque, naviguez dans votre historique et basculez les options de mise en page."
+      },
+      collectionView: {
+        title: "Parcourez votre collection",
+        description: "Basculez entre Albums, Artistes, Chansons et Genres, et entre l'affichage en cartes ou en lignes."
+      },
+      playerBar: {
+        title: "Contrôlez la lecture",
+        description: "Lisez, mettez en pause, avancez, réglez le volume et activez la lecture aléatoire, la répétition ou le mini-lecteur depuis ici."
+      },
+      rightPanel: {
+        title: "Consultez les détails et la file d'attente",
+        description: "Affichez les détails du morceau, votre file d'attente en direct, les paroles synchronisées et le visualiseur de spectre audio."
+      },
+      libraryFolders: {
+        title: "Ajoutez votre musique",
+        description: "Ajoutez des dossiers à analyser depuis les Paramètres, et Luminous maintient votre bibliothèque à jour automatiquement."
+      }
+    }
   }
 };
