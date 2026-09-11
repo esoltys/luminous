@@ -1267,5 +1267,48 @@ export const fr = {
     addedSong: "1 chanson ajoutée à la file d'attente",
     addedSongs: "{count} chansons ajoutées à la file d'attente",
     nothingToAdd: "Aucun fichier audio pris en charge trouvé à ajouter."
+  },
+  walkthrough: {
+    takeTour: "Faire une visite rapide",
+    restartTour: "Relancer la visite guidée",
+    skip: "Passer",
+    back: "Précédent",
+    next: "Suivant",
+    finish: "Terminer",
+    progress: "Progression de la visite guidée",
+    steps: {
+      sidebar: {
+        title: "Naviguez dans votre bibliothèque",
+        description: "Passez d'Accueil à Collection, Listes de lecture, Statistiques, Paramètres et Aide depuis ici."
+      },
+      topNavigation: {
+        title: "Recherchez et revenez en arrière",
+        description: "Recherchez instantanément dans votre bibliothèque, et naviguez dans votre historique."
+      },
+      collectionView: {
+        title: "Parcourez votre collection",
+        description: "Basculez entre l'affichage en cartes ou en lignes lorsque vous parcourez Albums ou Artistes."
+      },
+      playerBarCover: {
+        title: "Pochette",
+        description: "Cliquez sur la pochette pour passer en mode Immersif, un affichage plein écran du morceau en cours."
+      },
+      playerBarControls: {
+        title: "Contrôles de lecture",
+        description: "Lisez, mettez en pause, passez au morceau suivant, avancez dans la piste et activez la lecture aléatoire ou la répétition depuis ici."
+      },
+      playerBarToolbar: {
+        title: "Menu, paroles, file d'attente, infos et mini-lecteur",
+        description: "Ouvrez le menu du morceau, accédez aux Paroles, à votre file d'attente, au panneau d'informations, ou passez en Mini-lecteur flottant — ainsi que le volume, juste ici."
+      },
+      rightPanel: {
+        title: "Détails du morceau",
+        description: "Consultez la biographie de l'artiste, les liens MusicBrainz et les détails techniques comme le format et le débit."
+      },
+      libraryFolders: {
+        title: "Ajoutez votre musique",
+        description: "Ajoutez des dossiers à analyser depuis les Paramètres, et Luminous maintient votre bibliothèque à jour automatiquement."
+      }
+    }
   }
 };

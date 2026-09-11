@@ -413,7 +413,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <div class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
+            <div data-walkthrough-target="collection-view" class="inline-flex items-center gap-0.5 bg-brand-sidebar border border-brand-border rounded-full p-1">
               <button
                 onclick={() => setActiveViewMode("cards")}
                 class="flex items-center justify-center w-7 h-7 rounded-full transition-colors {activeViewMode === 'cards' ? 'bg-brand-accent text-white' : 'text-brand-text-secondary hover:text-brand-text-primary'}"

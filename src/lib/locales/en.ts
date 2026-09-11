@@ -1268,5 +1268,48 @@ export const en = {
     addedSong: "Added 1 song to queue",
     addedSongs: "Added {count} songs to queue",
     nothingToAdd: "No supported audio files found to add."
+  },
+  walkthrough: {
+    takeTour: "Take a quick tour",
+    restartTour: "Restart Feature Walkthrough",
+    skip: "Skip",
+    back: "Back",
+    next: "Next",
+    finish: "Finish",
+    progress: "Walkthrough progress",
+    steps: {
+      sidebar: {
+        title: "Navigate your library",
+        description: "Jump between Home, your Collection, Playlists, Stats, Settings, and Help from here."
+      },
+      topNavigation: {
+        title: "Search and go back",
+        description: "Search your library instantly, and move back and forward through your browsing history."
+      },
+      collectionView: {
+        title: "Browse your collection",
+        description: "Toggle between card and row density while browsing Albums or Artists."
+      },
+      playerBarCover: {
+        title: "Cover art",
+        description: "Click the cover art to switch to Immersive View, a full-screen look at what's playing."
+      },
+      playerBarControls: {
+        title: "Playback controls",
+        description: "Play, pause, skip, seek, and cycle shuffle or repeat from here."
+      },
+      playerBarToolbar: {
+        title: "Song menu, lyrics, queue, info, and miniplayer",
+        description: "Open the song menu, jump to Lyrics, view your Queue, show the info panel, or switch to the floating Miniplayer — plus volume, right here."
+      },
+      rightPanel: {
+        title: "Track details",
+        description: "See the current song's artist bio, MusicBrainz links, and technical details like format and bitrate."
+      },
+      libraryFolders: {
+        title: "Add your music",
+        description: "Add folders to scan from Settings, and Luminous keeps your library up to date automatically."
+      }
+    }
   }
 };
