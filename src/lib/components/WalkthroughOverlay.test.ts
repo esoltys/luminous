@@ -42,7 +42,7 @@ describe("WalkthroughOverlay.svelte", () => {
     await waitFor(() => {
       expect(screen.getByText("Navigate your library")).toBeInTheDocument();
     });
-    expect(screen.getByText(/Jump between Home, Collection/)).toBeInTheDocument();
+    expect(screen.getByText(/Jump between Home, your Collection/)).toBeInTheDocument();
   });
 
   it("Next advances the store to the next step", async () => {

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { walkthroughStore } from "./walkthrough.svelte";
 import { navigationStore } from "./navigation.svelte";
 import { windowLayoutStore } from "./windowLayout.svelte";
+import { playerStore } from "./player.svelte";
 
 describe("WalkthroughStore", () => {
   beforeEach(() => {
@@ -100,15 +101,31 @@ describe("WalkthroughStore", () => {
     expect(["albums", "artists"]).toContain(navigationStore.activeSubTab);
   });
 
-  it("the right-panel step's beforeStep opens the right panel if it's closed", () => {
+  it("the right-panel step's beforeStep opens the right panel if something is playing and it's closed", () => {
     windowLayoutStore.rightPanelOpen = false;
+    playerStore.currentSong = { id: 1 } as any;
     walkthroughStore.start();
 
     walkthroughStore.next(); // top-navigation
     walkthroughStore.next(); // collection-view
-    walkthroughStore.next(); // player-bar
+    walkthroughStore.next(); // player-bar-cover
+    walkthroughStore.next(); // player-bar-controls
+    walkthroughStore.next(); // player-bar-toolbar
     walkthroughStore.next(); // right-panel
 
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
+
+    playerStore.currentSong = undefined;
+  });
+
+  it("the right-panel step's beforeStep leaves the panel closed when nothing is playing", () => {
+    windowLayoutStore.rightPanelOpen = false;
+    playerStore.currentSong = undefined;
+    walkthroughStore.start();
+
+    for (let i = 0; i < 6; i++) walkthroughStore.next();
+    expect(walkthroughStore.currentStep.id).toBe("right-panel");
+
+    expect(windowLayoutStore.rightPanelOpen).toBe(false);
   });
 });

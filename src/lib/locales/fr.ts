@@ -1279,23 +1279,31 @@ export const fr = {
     steps: {
       sidebar: {
         title: "Naviguez dans votre bibliothèque",
-        description: "Passez d'Accueil à Collection, Listes de lecture, Genres et Paramètres depuis ici."
+        description: "Passez d'Accueil à Collection, Listes de lecture, Statistiques, Paramètres et Aide depuis ici."
       },
       topNavigation: {
         title: "Recherchez et revenez en arrière",
-        description: "Recherchez instantanément dans votre bibliothèque, naviguez dans votre historique et basculez les options de mise en page."
+        description: "Recherchez instantanément dans votre bibliothèque, et naviguez dans votre historique."
       },
       collectionView: {
         title: "Parcourez votre collection",
-        description: "Basculez entre Albums, Artistes, Chansons et Genres, et entre l'affichage en cartes ou en lignes."
+        description: "Basculez entre l'affichage en cartes ou en lignes lorsque vous parcourez Albums ou Artistes."
       },
-      playerBar: {
-        title: "Contrôlez la lecture",
-        description: "Lisez, mettez en pause, avancez, réglez le volume et activez la lecture aléatoire, la répétition ou le mini-lecteur depuis ici."
+      playerBarCover: {
+        title: "Pochette",
+        description: "Cliquez sur la pochette pour passer en mode Immersif, un affichage plein écran du morceau en cours."
+      },
+      playerBarControls: {
+        title: "Contrôles de lecture",
+        description: "Lisez, mettez en pause, passez au morceau suivant, avancez dans la piste et activez la lecture aléatoire ou la répétition depuis ici."
+      },
+      playerBarToolbar: {
+        title: "Menu, paroles, file d'attente et infos",
+        description: "Ouvrez le menu du morceau, accédez aux Paroles, à votre file d'attente ou au panneau d'informations — ainsi que le volume, juste ici."
       },
       rightPanel: {
-        title: "Consultez les détails et la file d'attente",
-        description: "Affichez les détails du morceau, votre file d'attente en direct, les paroles synchronisées et le visualiseur de spectre audio."
+        title: "Détails du morceau",
+        description: "Consultez la biographie de l'artiste, les liens MusicBrainz et les détails techniques comme le format et le débit."
       },
       libraryFolders: {
         title: "Ajoutez votre musique",

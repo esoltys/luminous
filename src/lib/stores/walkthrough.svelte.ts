@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { navigationStore } from "./navigation.svelte";
 import { windowLayoutStore } from "./windowLayout.svelte";
+import { playerStore } from "./player.svelte";
 
 type WalkthroughPlacement = "top" | "bottom" | "left" | "right" | "center";
 
@@ -44,10 +45,24 @@ const STEPS: WalkthroughStep[] = [
     },
   },
   {
-    id: "player-bar",
-    targetSelector: '[data-walkthrough-target="player-bar"]',
-    titleKey: "walkthrough.steps.playerBar.title",
-    descriptionKey: "walkthrough.steps.playerBar.description",
+    id: "player-bar-cover",
+    targetSelector: '[data-walkthrough-target="player-bar-cover"]',
+    titleKey: "walkthrough.steps.playerBarCover.title",
+    descriptionKey: "walkthrough.steps.playerBarCover.description",
+    placement: "top",
+  },
+  {
+    id: "player-bar-controls",
+    targetSelector: '[data-walkthrough-target="player-bar-controls"]',
+    titleKey: "walkthrough.steps.playerBarControls.title",
+    descriptionKey: "walkthrough.steps.playerBarControls.description",
+    placement: "top",
+  },
+  {
+    id: "player-bar-toolbar",
+    targetSelector: '[data-walkthrough-target="player-bar-toolbar"]',
+    titleKey: "walkthrough.steps.playerBarToolbar.title",
+    descriptionKey: "walkthrough.steps.playerBarToolbar.description",
     placement: "top",
   },
   {
@@ -56,8 +71,14 @@ const STEPS: WalkthroughStep[] = [
     titleKey: "walkthrough.steps.rightPanel.title",
     descriptionKey: "walkthrough.steps.rightPanel.description",
     placement: "left",
+    // Only force it open when something's playing — that's the only state
+    // where the panel's own close control (the Info toggle in the player
+    // bar's button row) is reachable. With nothing playing there'd be no
+    // way back except the Ctrl+I shortcut, so leave it alone and let the
+    // step skip forward if the panel isn't already open (see
+    // WalkthroughOverlay's target-resolution skip logic).
     beforeStep: () => {
-      if (!windowLayoutStore.rightPanelOpen) {
+      if (playerStore.currentSong && !windowLayoutStore.rightPanelOpen) {
         windowLayoutStore.toggleRightPanel();
       }
     },

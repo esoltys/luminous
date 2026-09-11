@@ -1280,23 +1280,31 @@ export const en = {
     steps: {
       sidebar: {
         title: "Navigate your library",
-        description: "Jump between Home, Collection, Playlists, Genres, and Settings from here."
+        description: "Jump between Home, your Collection, Playlists, Stats, Settings, and Help from here."
       },
       topNavigation: {
         title: "Search and go back",
-        description: "Search your library instantly, move back and forward through your browsing history, and toggle layout options."
+        description: "Search your library instantly, and move back and forward through your browsing history."
       },
       collectionView: {
         title: "Browse your collection",
-        description: "Switch between Albums, Artists, Songs, and Genres, and toggle between card and row density."
+        description: "Toggle between card and row density while browsing Albums or Artists."
       },
-      playerBar: {
-        title: "Control playback",
-        description: "Play, pause, seek, adjust volume, and toggle shuffle, repeat, or the miniplayer from here."
+      playerBarCover: {
+        title: "Cover art",
+        description: "Click the cover art to switch to Immersive View, a full-screen look at what's playing."
+      },
+      playerBarControls: {
+        title: "Playback controls",
+        description: "Play, pause, skip, seek, and cycle shuffle or repeat from here."
+      },
+      playerBarToolbar: {
+        title: "Song menu, lyrics, queue, and info",
+        description: "Open the song menu, jump to Lyrics, view your Queue, or show the info panel — plus volume, right here."
       },
       rightPanel: {
-        title: "See track details and queue",
-        description: "View track details, your live queue, synchronized lyrics, and the audio spectrum visualizer."
+        title: "Track details",
+        description: "See the current song's artist bio, MusicBrainz links, and technical details like format and bitrate."
       },
       libraryFolders: {
         title: "Add your music",
