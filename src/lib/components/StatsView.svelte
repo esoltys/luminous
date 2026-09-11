@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import LoadingSpinner from "./LoadingSpinner.svelte";
+  import ListeningHeatmap from "./ListeningHeatmap.svelte";
   import { i18n } from "../stores/i18n.svelte";
   import { rememberScroll } from "../utils/scrollMemory";
   import { playerStore } from "../stores/player.svelte";
@@ -95,13 +96,18 @@
 
 <div class="flex-1 flex flex-col h-full bg-brand-main text-brand-text-primary select-none overflow-hidden relative">
   <div class="px-6 pt-8 pb-4 shrink-0">
-    <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
-      <BarChart2 class="w-7 h-7 text-brand-accent" />
-      {i18n.t("stats.title", {}, "Stats")}
-    </h1>
-    <p class="text-sm text-brand-text-secondary mt-1">
-      {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
-    </p>
+    <div class="flex items-start justify-between gap-6">
+      <div>
+        <h1 class="text-3xl font-heading font-bold text-brand-text-primary flex items-center gap-3">
+          <BarChart2 class="w-7 h-7 text-brand-accent" />
+          {i18n.t("stats.title", {}, "Stats")}
+        </h1>
+        <p class="text-sm text-brand-text-secondary mt-1">
+          {i18n.t("stats.subtitle", {}, "Your private listening insights — computed on-device, never shared.")}
+        </p>
+      </div>
+      <ListeningHeatmap />
+    </div>
 
     <div class="flex items-center gap-2 mt-4">
       {#each RANGES as r (r.value)}

@@ -1735,6 +1735,7 @@ impl Player {
         }
 
         let song_id = self.current_song.as_ref()?.id;
+        let duration_secs = self.current_song.as_ref()?.duration_secs().round() as i64;
         match self._db.pool.get() {
             Ok(conn) => match stats::record_play(&conn, song_id) {
                 Ok(()) => {
@@ -1742,7 +1743,9 @@ impl Player {
                         .current_play_context
                         .clone()
                         .unwrap_or(PlayContext::Song);
-                    if let Err(e) = stats::record_play_context(&conn, &context, song_id) {
+                    if let Err(e) =
+                        stats::record_play_context(&conn, &context, song_id, duration_secs)
+                    {
                         log::warn!("Failed to record play context for song {song_id}: {e}");
                     }
                     Some(stats::stats_payload(&conn, song_id))

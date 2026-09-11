@@ -1095,6 +1095,7 @@ pub fn run() {
             commands::stats::set_song_rating,
             commands::stats::set_album_rating,
             commands::stats::get_stats_summary,
+            commands::stats::get_listening_activity,
             commands::stats::get_stats_exclusions,
             commands::stats::set_stats_excluded,
             // Organizer commands

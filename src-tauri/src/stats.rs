@@ -22,17 +22,23 @@ pub fn record_play(conn: &Connection, song_id: i64) -> Result<()> {
 
 /// Record what the user was inside (album/playlist/standalone song) when a
 /// listen completed, so "Recently Played" can reflect that context instead
-/// of a post-hoc heuristic.
-pub fn record_play_context(conn: &Connection, context: &PlayContext, song_id: i64) -> Result<()> {
+/// of a post-hoc heuristic. `duration_secs` is the song's length at play
+/// time, summed per calendar day by the daily listening heatmap (#890).
+pub fn record_play_context(
+    conn: &Connection,
+    context: &PlayContext,
+    song_id: i64,
+    duration_secs: i64,
+) -> Result<()> {
     let (context_type, playlist_id) = match context {
         PlayContext::Song => ("song", None),
         PlayContext::Album { .. } => ("album", None),
         PlayContext::Playlist { playlist_id } => ("playlist", Some(*playlist_id)),
     };
     conn.execute(
-        "INSERT INTO play_history (context_type, song_id, playlist_id, played_at)
-         VALUES (?1, ?2, ?3, strftime('%s','now'))",
-        params![context_type, song_id, playlist_id],
+        "INSERT INTO play_history (context_type, song_id, playlist_id, played_at, duration_secs)
+         VALUES (?1, ?2, ?3, strftime('%s','now'), ?4)",
+        params![context_type, song_id, playlist_id, duration_secs],
     )?;
     Ok(())
 }
@@ -218,7 +224,7 @@ mod tests {
         .unwrap();
         let playlist_id = conn.last_insert_rowid();
 
-        record_play_context(&conn, &PlayContext::Song, id).unwrap();
+        record_play_context(&conn, &PlayContext::Song, id, 180).unwrap();
         record_play_context(
             &conn,
             &PlayContext::Album {
@@ -226,9 +232,10 @@ mod tests {
                 album_artist: Some("Test Artist".into()),
             },
             id,
+            180,
         )
         .unwrap();
-        record_play_context(&conn, &PlayContext::Playlist { playlist_id }, id).unwrap();
+        record_play_context(&conn, &PlayContext::Playlist { playlist_id }, id, 180).unwrap();
 
         let rows: Vec<(String, Option<i64>)> = conn
             .prepare(
@@ -248,6 +255,26 @@ mod tests {
                 ("playlist".to_string(), Some(playlist_id)),
             ]
         );
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_record_play_context_persists_duration_secs() {
+        let (db, dir) = test_db();
+        let conn = db.pool.get().unwrap();
+        let id = insert_song(&conn, "/tmp/duration.flac");
+
+        record_play_context(&conn, &PlayContext::Song, id, 245).unwrap();
+
+        let duration: i64 = conn
+            .query_row(
+                "SELECT duration_secs FROM play_history WHERE song_id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(duration, 245);
 
         let _ = std::fs::remove_dir_all(dir);
     }
