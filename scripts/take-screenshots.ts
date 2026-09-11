@@ -425,7 +425,12 @@ async function main() {
         }
       }, featured.album ?? featured.song?.album);
       await page.waitForTimeout(500);
-      await page.getByTitle(t(language, "albumDetail.editInfoTooltip"), { exact: true }).click();
+      // "Edit album info" lives behind the "More actions" overflow menu (#97) —
+      // it's a role="menuitem" button with no title attribute of its own, so
+      // it has to be opened first and found by name rather than getByTitle.
+      await page.getByTitle(t(language, "playlists.moreActionsTooltip"), { exact: true }).click();
+      await page.waitForTimeout(300);
+      await page.getByRole("menuitem", { name: t(language, "albumDetail.editInfoTooltip"), exact: true }).click();
       await page.waitForTimeout(400);
     },
     "click-themes": async (page, _featured, language) => {
