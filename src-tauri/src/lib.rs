@@ -1004,7 +1004,6 @@ pub fn run() {
             commands::playlist::add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::deduplicate_playlist,
-            commands::playlist::trim_playlist_before_uuid,
             commands::playlist::reorder_playlist_item,
             commands::playlist::reorder_playlist_item_by_uuid,
             commands::playlist::reorder_playlist_items,

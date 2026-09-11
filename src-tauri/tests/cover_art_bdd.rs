@@ -283,8 +283,12 @@ fn update_db_art_automatic(w: &mut CoverArtWorld) {
 
 #[tokio::main]
 async fn main() {
+    // with_default_cli() skips clap-parsing argv, so `cargo test <filter>` (which
+    // passes the filter string to every test binary, this one included) doesn't
+    // blow up on an "unexpected argument" cucumber's CLI doesn't recognize.
     CoverArtWorld::cucumber()
         .max_concurrent_scenarios(4)
+        .with_default_cli()
         .run_and_exit("../features/cover_art.feature")
         .await;
 }
