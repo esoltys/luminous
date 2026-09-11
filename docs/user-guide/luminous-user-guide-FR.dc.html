@@ -42,7 +42,7 @@
     <div style="width:252px; flex-shrink:0; padding:32px 16px 64px; position:sticky; top:61px; max-height:calc(100vh - 61px); overflow-y:auto;">
       <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6d7286; padding:0 12px; margin-bottom:8px;">Les bases</div>
       <div style="display:flex; flex-direction:column; gap:2px; margin-bottom:28px;">
-        <sc-for list="{{ basicsItems }}" as="item" hint-placeholder-count="7">
+        <sc-for list="{{ basicsItems }}" as="item" hint-placeholder-count="8">
           <div onClick="{{ item.onClick }}" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; background:{{ item.bg }}; color:{{ item.color }}; font-weight:{{ item.weight }}; font-size:13px;">
             <div style="width:16px; height:16px; flex-shrink:0; color:{{ item.color }};" dangerouslySetInnerHTML="{{ item.icon }}"></div>
             {{ item.label }}
@@ -60,7 +60,7 @@
       </div>
       <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6d7286; padding:0 12px; margin-bottom:8px;">Paramètres</div>
       <div style="display:flex; flex-direction:column; gap:2px;">
-        <sc-for list="{{ settingsItems }}" as="item" hint-placeholder-count="6">
+        <sc-for list="{{ settingsItems }}" as="item" hint-placeholder-count="7">
           <div onClick="{{ item.onClick }}" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; background:{{ item.bg }}; color:{{ item.color }}; font-weight:{{ item.weight }}; font-size:13px;">
             <div style="width:16px; height:16px; flex-shrink:0; color:{{ item.color }};" dangerouslySetInnerHTML="{{ item.icon }}"></div>
             {{ item.label }}
@@ -108,7 +108,7 @@
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
           <image-slot id="home-full-fr" src="screenshots/home-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Écran d'accueil"></image-slot>
         </div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Rien n'a encore été analysé? Accueil affiche plutôt une invite simple, avec un raccourci pour ajouter un dossier ou ouvrir l'aide.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Nouveau sur Luminous? Une visite guidée de l'interface vous sera proposée. Vous pouvez la revoir à tout moment depuis la section Aide.<br></div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="home-welcome-fr" src="screenshots/home-welcome-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="État initial d'Accueil"></image-slot>
         </div>
@@ -157,8 +157,6 @@
           <image-slot id="searchbar-fr" src="assets/searchbar-FR.png?v=1788022709868" shape="rect" fit="contain" style="height:auto; aspect-ratio:1918/122;" placeholder="Barre de recherche"></image-slot>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:24px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône « info » dans la barre du lecteur, à côté du bouton mini-lecteur, affiche ou masque le panneau d'informations à droite. Son raccourci est <kbd>Ctrl</kbd><kbd>I</kbd> (ou <kbd>Ctrl</kbd><kbd>3</kbd>).</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Pour les pistes taguées avec MusicBrainz Picard, le panneau d'informations affiche aussi une section MusicBrainz avec des liens vers les pages de l'artiste, de la sortie et de l'enregistrement.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Le logo Luminous réagit à la musique en cours de lecture — cliquez dessus pour activer ou désactiver cet effet.</div></div>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:32px;">
@@ -179,12 +177,7 @@
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
           <image-slot id="playbar-fr" src="assets/playbar-FR.png?v=1788022709868" shape="rect" fit="contain" style="height:auto; aspect-ratio:1324/144;" placeholder="Barre de lecture"></image-slot>
         </div>
-        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur la forme d'onde pour sauter à un autre moment de la chanson.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt les <b style="color:#f1f3f8;">bandes de fréquences</b>. Elles superposent les trois bandes à la fois — bleu pour les graves, ambre pour les médiums (voix, caisses claires, lignes principales), blanc pour les aigus (charleston, cymbales, transitoires) — les bandes plus hautes portant plus d'énergie.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un petit affichage du spectre à côté du contrôle de volume vous donne un aperçu en direct des fréquences de la chanson pendant sa lecture.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône à l'extrême droite détache le lecteur en un petit <b style="color:#f1f3f8;">mini lecteur</b> flottant — pratique pour garder un œil sur la lecture pendant que vous travaillez dans d'autres applications. <kbd>Ctrl</kbd><kbd>M</kbd> l'active ou le désactive depuis n'importe où.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur <b style="color:#f1f3f8;">Aléatoire</b> pour parcourir cinq modes :
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Cliquez sur la pochette de l'album dans la barre de lecture pour activer le mode Immersif (<kbd>Ctrl</kbd><kbd>2</kbd> fonctionne aussi).</div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur le cœur pour ajouter la chanson à vos favoris, ou donnez-lui une note de 1 à 5 étoiles, selon vos paramètres.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les touches multimédias lecture/pause, piste suivante et volume fonctionnent même lorsque Luminous n'est pas la fenêtre active, et la lecture apparaît dans les commandes multimédias de votre système — pour la voir et la piloter sans revenir à l'application.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur <b style="color:#f1f3f8;">Aléatoire</b> pour parcourir cinq modes :
             <ul style="margin: 4px 0 0 -10px; padding-left: 20px;">
               <li><b style="color:#f1f3f8;">Tout mélanger</b> : lire toutes les pistes dans un ordre aléatoire.</li>
               <li><b style="color:#f1f3f8;">Mélanger dans l'album</b> : lire les albums dans leur ordre normal, mais mélanger les pistes à l'intérieur de chaque album.</li>
@@ -202,10 +195,14 @@
               <li><b style="color:#f1f3f8;">Répétition désactivée</b> : lire la file d'attente en cours normalement et s'arrêter à la fin.</li>
             </ul>
           </div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur le cœur pour ajouter la chanson à vos favoris, ou donnez-lui une note de 1 à 5 étoiles, selon vos paramètres.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les touches multimédias lecture/pause, piste suivante et volume fonctionnent même lorsque Luminous n'est pas la fenêtre active, et la lecture apparaît dans les commandes multimédias de votre système — pour la voir et la piloter sans revenir à l'application.</div></div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur la forme d'onde pour sauter à un autre moment de la chanson.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un petit affichage du spectre à côté du contrôle de volume vous donne un aperçu en direct des fréquences de la chanson pendant sa lecture.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cliquez sur l'icône à côté de la forme d'onde pour afficher plutôt les <b style="color:#f1f3f8;">bandes de fréquences</b>. Elles superposent les trois bandes à la fois — bleu pour les graves, ambre pour les médiums (voix, caisses claires, lignes principales), blanc pour les aigus (charleston, cymbales, transitoires) — les bandes plus hautes portant plus d'énergie.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Cinq icônes se trouvent à droite de la barre de lecture : un <b style="color:#f1f3f8;">menu</b> d'actions rapides pour la chanson en cours, un bouton pour afficher les <b style="color:#f1f3f8;">paroles</b>, un raccourci vers la <b style="color:#f1f3f8;">file d'attente</b>, le bouton du panneau d'informations, et le bouton du mini lecteur.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône « info » affiche ou masque le panneau d'informations à droite. Son raccourci est <kbd>Ctrl</kbd><kbd>I</kbd> (ou <kbd>Ctrl</kbd><kbd>3</kbd>).</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Pour les pistes taguées avec MusicBrainz Picard, le panneau d'informations affiche aussi une section MusicBrainz avec des liens vers les pages de l'artiste, de la sortie et de l'enregistrement.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>L'icône du mini lecteur à l'extrême droite détache le lecteur en un petit <b style="color:#f1f3f8;">mini lecteur</b> flottant — pratique pour garder un œil sur la lecture pendant que vous travaillez dans d'autres applications. <kbd>Ctrl</kbd><kbd>M</kbd> l'active ou le désactive depuis n'importe où.</div></div>
         </div>
-        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Cliquez sur la pochette de l'album dans la barre de lecture pour activer le mode Immersif (<kbd>Ctrl</kbd><kbd>2</kbd> fonctionne aussi); cliquez à nouveau (ou depuis le mode Immersif) pour aller directement à la file d'attente.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-top:24px; margin-bottom:28px;">
           <image-slot id="now-playing-fr" src="screenshots/now-playing-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Lecture en cours"></image-slot>
         </div>
@@ -224,7 +221,7 @@
       <sc-if value="{{ isPlaylists }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Les bases</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Listes de lecture</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Il en existe trois sortes : celles que vous créez vous-même, les listes intelligentes que Luminous remplit selon une règle que vous définissez, et les listes automatiques qu'il crée et actualise de lui-même.</div>
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Si vous cliquez sur le <b style="color:#f1f3f8;">+</b> à côté d'une chanson ou d'un album, il se retrouve dans votre liste Queue par défaut. Vous créez une nouvelle liste et voulez y ajouter des éléments plutôt? Marquez-la <b style="color:#f1f3f8;">Active</b> d'abord, et tout ce que vous ajoutez avec <b style="color:#f1f3f8;">+</b> par la suite s'y retrouvera à la place.</div><div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Il en existe trois sortes : celles que vous créez vous-même, les listes intelligentes que Luminous remplit selon une règle que vous définissez, et les listes automatiques qu'il crée et actualise de lui-même.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Personnalisée :</b> créez une liste de lecture, nommez-la, puis glissez-y des chansons depuis n'importe où dans votre collection.</div></div>
         </div>
@@ -241,16 +238,14 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Haute énergie BPM</div><div>130–150</div></div>
           <div style="display:grid; grid-template-columns:1fr 1fr; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Extrême BPM</div><div>150+</div></div>
         </div>
-        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Luminous ne calcule pas le BPM lui-même — il lit l'étiquette BPM déjà présente sur chaque fichier. Ajoutez des étiquettes BPM avec l'éditeur d'étiquettes ou l'outil de votre choix; les chansons sans étiquette n'entreront dans aucune catégorie.</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-fr" src="screenshots/playlist-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Liste de lecture personnalisée"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Une liste de lecture personnalisée</div></div>
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Luminous ne calcule pas le BPM lui-même — il lit l'étiquette BPM déjà présente sur chaque fichier. Ajoutez des étiquettes BPM avec l'éditeur d'étiquettes ou l'outil de votre choix; les chansons sans étiquette n'entreront dans aucune catégorie. Vous pouvez créer vos propres catégories de BPM avec les listes de lecture intelligentes.</div>
+        <div style="max-width:700px; margin-bottom:32px;">
           <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-smart-edit-fr" src="screenshots/playlist-smart-edit-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Modification d'une règle intelligente"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Modification d'une règle intelligente</div></div>
         </div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Si vous cliquez sur le <b style="color:#f1f3f8;">+</b> à côté d'une chanson ou d'un album, il se retrouve dans votre liste Queue par défaut. Vous créez une nouvelle liste et voulez y ajouter des éléments plutôt? Marquez-la <b style="color:#f1f3f8;">Active</b> d'abord, et tout ce que vous ajoutez avec <b style="color:#f1f3f8;">+</b> par la suite s'y retrouvera à la place.</div>
+        
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Vous pouvez aussi glisser des fichiers audio ou un dossier entier directement sur la fenêtre de Luminous pour les jouer ou les mettre en file d'attente — déposez normalement pour remplacer la file d'attente et démarrer la lecture, ou maintenez <b style="color:#f1f3f8;">Maj</b> en déposant pour les ajouter à la fin de la file d'attente à la place.</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
+        <div style="max-width:700px; margin-bottom:32px;">
           <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-fr" src="screenshots/playlist-auto-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Une liste de lecture générée automatiquement"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Vignette de liste automatique</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-detail-fr" src="screenshots/playlist-auto-detail-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Détail d'une liste automatique"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">En parcourir une</div></div>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px; margin-top:32px;">Gérer une liste de lecture</div>
@@ -268,10 +263,25 @@
         </div>
       </sc-if>
 
+      <sc-if value="{{ isStats }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Les bases</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Statistiques</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;"><b style="color:#f1f3f8;">Statistiques</b> dans la barre latérale montre vos habitudes d'écoute — calculées entièrement sur votre propre appareil à partir de votre historique de lecture local, jamais envoyées ailleurs. Basculez entre <b style="color:#f1f3f8;">7 derniers jours</b>, <b style="color:#f1f3f8;">28 derniers jours</b> et <b style="color:#f1f3f8;">Dernière année</b> pour changer la période.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Meilleurs artistes</b>, <b style="color:#f1f3f8;">Meilleurs albums</b>, <b style="color:#f1f3f8;">Meilleurs titres</b> et <b style="color:#f1f3f8;">Meilleurs genres</b> classent ce que vous avez réellement écouté sur la période sélectionnée. Cliquez sur une entrée pour y accéder directement.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Une carte thermique suit les minutes d'écoute par jour, avec votre <b style="color:#f1f3f8;">Série en cours</b> et votre <b style="color:#f1f3f8;">Plus longue série</b> de jours d'écoute consécutifs.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Moment de la journée</b> répartit votre écoute en Matin, Après-midi, Soirée et Fin de nuit, pour voir quand vous écoutez vraiment.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Vous ne voulez pas qu'une chanson, un album, un artiste ou un genre fausse vos chiffres&nbsp;? Faites un clic droit dessus n'importe où dans votre collection et choisissez <b style="color:#f1f3f8;">Ne pas inclure dans les statistiques</b> — annulez plus tard depuis le même menu.</div></div>
+        </div>
+        <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <image-slot id="stats" src="screenshots/stats-FR.png?v=1789200000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Vue Statistiques"></image-slot>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ isLyrics }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Les bases</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Paroles</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Ouvrez <b style="color:#f1f3f8;">Paroles</b> dans la barre latérale pour suivre ce qui joue — la ligne en cours est mise en surbrillance en synchronisation avec la musique, le reste étant estompé au-dessus et en dessous. Luminous recherche automatiquement les paroles de la chanson en cours; s'il s'agit d'un instrumental, vous pouvez le marquer comme tel pour que Luminous arrête de chercher.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Activez <b style="color:#f1f3f8;">Paroles</b> depuis la barre de lecture pour suivre ce qui joue — la ligne en cours est mise en surbrillance en synchronisation avec la musique, le reste étant estompé au-dessus et en dessous. Luminous recherche automatiquement les paroles de la chanson en cours; s'il s'agit d'un instrumental, vous pouvez le marquer comme tel pour que Luminous arrête de chercher.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Si les paroles n'ont pas encore été trouvées, cliquez sur <b style="color:#f1f3f8;">Rechercher à nouveau</b> pour relancer la recherche.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Synchronisation décalée, ou une ligne erronée? <b style="color:#f1f3f8;">Modifier</b> vous permet de corriger le texte ou d'ajuster la synchronisation vous-même.</div></div>
@@ -298,8 +308,8 @@
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Sans opérateur sur un champ texte (artiste, album, genre…), le sens par défaut est <b style="color:#f1f3f8;">contient</b> : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">genre:rock</code> correspond à tout genre contenant « jazz ».</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Sans opérateur sur un champ numérique (année, note, bpm…), le sens par défaut est <b style="color:#f1f3f8;">correspondance exacte</b> : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">year:1994</code> ne correspond qu'à 1994.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Plusieurs termes se combinent avec <b style="color:#f1f3f8;">ET</b> : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:>=4 year:<2000 genre:rock</code> — chansons notées 4 étoiles ou plus, sorties avant 2000, dans un genre contenant « rock ».</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les mots seuls sans deux-points sont du texte libre, combinés avec OU sur titre/artiste/album — mélangez-les librement : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:>=4 "tom cochrane"</code>.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Plusieurs termes se combinent avec <b style="color:#f1f3f8;">ET</b> : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:&gt;=4 year:&lt;2000 genre:rock</code> — chansons notées 4 étoiles ou plus, sorties avant 2000, dans un genre contenant « rock ».</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Les mots seuls sans deux-points sont du texte libre, combinés avec OU sur titre/artiste/album — mélangez-les librement : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:&gt;=4 "tom cochrane"</code>.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Entourez de guillemets une valeur contenant des espaces : <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">artist:"tom cochrane"</code>. Les noms de champs ne sont pas sensibles à la casse.</div></div>
         </div>
 
@@ -346,7 +356,7 @@
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Valeurs de durée</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Le champ <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration</code>/<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">length</code> accepte des secondes simples (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:>180</code>), <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">MM:SS</code> (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:>3:30</code>), ou <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">H:MM:SS</code> (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:<1:02:03</code>).</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Le champ <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration</code>/<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">length</code> accepte des secondes simples (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:&gt;180</code>), <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">MM:SS</code> (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:&gt;3:30</code>), ou <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">H:MM:SS</code> (<code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:&lt;1:02:03</code>).</div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Créer une liste intelligente depuis la recherche</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:28px;">Dès que votre requête contient au moins un terme <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">champ:valeur</code>, une carte <b style="color:#f1f3f8;">Créer une liste intelligente depuis la recherche</b> apparaît en haut du menu. Cliquez sur <b style="color:#f1f3f8;">Ouvrir le créateur →</b> pour ouvrir la fenêtre de liste intelligente avec chaque terme déjà ajouté comme règle — vous pouvez ensuite ajouter d'autres règles, nommer la liste, et enregistrer.</div>
@@ -354,12 +364,12 @@
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Exemples pratiques</div>
         <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <div style="display:grid; grid-template-columns:1fr 260px; background:#15161c; padding:10px 16px; font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:#6f7ea9;"><div>Objectif</div><div>Requête</div></div>
-          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Chansons rock notées 4+ étoiles d'avant 2000</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:>=4 year:<2000 genre:rock</code></div>
+          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Chansons rock notées 4+ étoiles d'avant 2000</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:&gt;=4 year:&lt;2000 genre:rock</code></div>
           <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Chansons en tonalité de D</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">key:d</code></div>
-          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Pistes rapides (120–130 BPM)</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">bpm:>=120 bpm:<=130</code></div>
-          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Mélange texte libre + champ</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:>=4 "tom cochrane"</code></div>
+          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Pistes rapides (120–130 BPM)</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">bpm:&gt;=120 bpm:&lt;=130</code></div>
+          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Mélange texte libre + champ</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">rating:&gt;=4 "tom cochrane"</code></div>
           <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Albums compilation seulement</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">compilation:1</code></div>
-          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Pistes de plus de 3:30</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:>3:30</code></div>
+          <div style="display:grid; grid-template-columns:1fr 260px; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Pistes de plus de 3:30</div><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">duration:&gt;3:30</code></div>
         </div>
       </sc-if>
 
@@ -369,9 +379,10 @@
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Les préférences à l'échelle de l'application — comportement au démarrage et autres paramètres par défaut du quotidien se trouvent ici.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Langue :</b> basculez l'interface entre l'anglais et le français.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Style de notation :</b> choisissez si les chansons sont notées avec un cœur, ou sur une échelle de 1 à 5 étoiles — c'est le paramètre mentionné dans la section Lecture en cours.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Style de notation :</b> choisissez si les chansons sont notées avec un cœur, ou sur une échelle de 1 à 5 étoiles — c'est le paramètre mentionné dans la section Lecture en cours.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Début de semaine :</b> dimanche ou lundi. Choisissez quel jour les palmarès et statistiques hebdomadaires considèrent comme le début de la semaine.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color: rgb(241, 243, 248);">Application et mises à jour :</b> vérifiez les mises à jour à la demande et consultez votre version installée. Les notifications et fonctionnalités disponibles dépendent de la façon dont Luminous a été installé. Les installations via le Microsoft Store gèrent les mises à jour automatiquement pour vous.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Réduire dans la barre d'état système :</b> lorsque cette option est activée, fermer la fenêtre masque Luminous dans la barre d'état système au lieu de quitter l'application. Le menu contextuel de l'icône dans la barre d'état propose Lecture/Pause, Suivant et Précédent, pour contrôler la lecture sans même rouvrir la fenêtre.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Lancer au démarrage :</b> démarre Luminous automatiquement quand vous ouvrez une session.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-general-fr" src="screenshots/settings-general-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Paramètres généraux"></image-slot>
@@ -387,19 +398,35 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Réanalyser au démarrage</b> fait vérifier vos dossiers par Luminous à chaque lancement.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Analyse incrémentielle</b> ne recherche que ce qui a changé; <b style="color:#f1f3f8;">Analyse complète forcée</b> relit tout depuis le début. Les deux affichent une progression en direct.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Un panneau de statistiques indique la dernière analyse de votre bibliothèque, ainsi que le nombre de chansons, d'albums, d'artistes et la taille totale.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Vous pouvez aussi ajouter un serveur <b style="color:#f1f3f8;">WebDAV</b> distant comme source. Les dossiers WebDAV sont en lecture seule — toute modification d'étiquette ou d'organisation reste locale à Luminous et n'est jamais réécrite sur le serveur.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-folders-fr" src="screenshots/settings-folders-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1100;" placeholder="Paramètres des dossiers"></image-slot>
         </div>
       </sc-if>
 
+      <sc-if value="{{ isIntegrations }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Intégrations</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;"><b style="color:#f1f3f8;">Paramètres → Intégrations</b> connecte Luminous à quelques outils et services externes — chacun est facultatif, et chacun peut être désactivé pour garder cette partie de Luminous entièrement hors ligne.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:12px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Sources de données en ligne&nbsp;:</b> alimente le panneau d'informations et les pages d'artistes avec des notes, tags, avis et biographies récupérés depuis MusicBrainz, CritiqueBrainz et Wikipedia. Désactivez <b style="color:#f1f3f8;">Récupérer le contexte et les biographies</b> pour rester entièrement hors ligne.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Scrobbler ListenBrainz&nbsp;:</b> collez un jeton utilisateur ListenBrainz et cliquez sur <b style="color:#f1f3f8;">Valider et enregistrer</b> pour connecter votre compte. Une fois connecté, activez le scrobbling, et choisissez séparément de transmettre l'état <b style="color:#f1f3f8;">En cours de lecture</b> et les <b style="color:#f1f3f8;">notes</b> — avec les notes activées, un bouton <b style="color:#f1f3f8;">Synchroniser les favoris</b> ponctuel transmet aussi vos favoris existants.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Mettre en pause le scrobbling</b> arrête l'envoi des chansons écoutées sans déconnecter votre compte. Les chansons écoutées hors ligne sont mises en file d'attente localement et envoyées avec <b style="color:#f1f3f8;">Synchroniser</b> une fois de retour en ligne.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">MusicBrainz Picard&nbsp;:</b> Luminous détecte automatiquement une installation de Picard existante et indique où il l'a trouvée, ou vous laisse pointer vers un chemin personnalisé — pratique pour accéder aux outils de tagging de Picard sur un fichier sans quitter Luminous.</div></div>
+        </div>
+        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <image-slot id="settings-integrations" src="screenshots/settings-integrations-FR.png?v=1789200000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/850;" placeholder="Paramètres Intégrations"></image-slot>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ isOrganize }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Paramètres</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Organiser</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Des outils groupés pour ranger votre bibliothèque — nettoyer les étiquettes et les fichiers de plusieurs pistes à la fois, plutôt qu'une par une. <b style="color:#f1f3f8;">Purger les chansons manquantes</b> retire en un clic les entrées des fichiers qui n'existent plus sur le disque.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Des outils groupés pour ranger votre bibliothèque selon leurs étiquettes.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">L'outil de renommage fonctionne sur votre <b style="color:#f1f3f8;">Sélection</b> actuelle ou sur toute la <b style="color:#f1f3f8;">Bibliothèque</b>. Cliquez sur <b style="color:#f1f3f8;">Aperçu</b> avant que quoi que ce soit ne bouge : un tableau De → Vers liste chaque fichier avec un statut — <b style="color:#f1f3f8;">OK</b>, <b style="color:#f1f3f8;">Inchangé</b>, <b style="color:#f1f3f8;">Collision</b>, <b style="color:#f1f3f8;">Étiquette manquante</b> ou <b style="color:#f1f3f8;">Erreur</b> — avec un filtre pour n'afficher que les fichiers qui changent réellement, des colonnes redimensionnables, et une ligne de résumé qui totalise ce qui va se passer avant de valider avec <b style="color:#f1f3f8;">Appliquer</b>. Une substitution de dossier de destination envoie les résultats vers un dossier différent de celui analysé, si vous préférez ne pas réorganiser sur place. Des options supplémentaires permettent de remplacer les espaces par des tirets bas, de garder les noms de fichiers en ASCII seulement, et de déplacer les fichiers supplémentaires comme les pochettes pour qu'ils suivent au nouvel emplacement.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
-          <image-slot id="settings-tools-fr" src="screenshots/settings-organize-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1220;" placeholder="Outils d'organisation"></image-slot>
+          <image-slot id="settings-tools-fr" src="screenshots/settings-organize-FR.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1000;" placeholder="Outils d'organisation"></image-slot>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Variables de nommage des fichiers</div>
@@ -432,23 +459,19 @@
           <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">{%track }%title</code><div>Ajoute « 07 » avant le titre, seulement s'il y a un numéro de piste</div></div>
         </div>
 
-        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px; margin-top:32px;">Configuration AcoustID / Chromaprint (optionnel)</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Pour activer l'empreinte audio AcoustID et la récupération automatique des métadonnées, vous avez besoin de l'utilitaire <b style="color:#f1f3f8;">fpcalc</b> et d'une clé API AcoustID valide.</div>
 
-        <div style="font-size:14px; font-weight:600; color:#f1f3f8; margin-bottom:12px;">1. Installer fpcalc</div>
+
+        
         <div style="display:flex; flex-direction:column; gap:16px; max-width:640px; margin-bottom:28px;">
-          <div>
-            <div style="font-size:14px; color:#d5d9e6; line-height:1.6; margin-bottom:8px;"><b style="color:#f1f3f8;">Linux (Ubuntu/Debian) :</b></div>
-            <div style="background:#101218; border:1px solid #23262f; border-radius:8px; padding:12px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#8fd0ff;">sudo apt install libchromaprint-tools</div>
-          </div>
-          <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Windows :</b> téléchargez le binaire depuis le <a href="https://acoustid.org/chromaprint" target="_blank" rel="noopener">site AcoustID</a>, extrayez-le, et ajoutez le dossier contenant <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">fpcalc.exe</code> à la variable PATH de votre système. Vous pouvez aussi définir la variable d'environnement <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">FPCALC_PATH</code> pointant directement vers le binaire.</div>
+          
+          
         </div>
 
-        <div style="font-size:14px; font-weight:600; color:#f1f3f8; margin-bottom:12px;">2. Obtenir et configurer une clé API AcoustID</div>
+        
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">1</div><div>Inscrivez-vous ou connectez-vous sur le <a href="https://acoustid.org/chromaprint" target="_blank" rel="noopener">site AcoustID</a>.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">2</div><div>Allez sur la page <a href="https://acoustid.org/my-applications" target="_blank" rel="noopener">My Applications</a> et enregistrez Luminous comme nouvelle application pour générer une clé API client gratuite.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">3</div><div>Collez la clé dans le champ <b style="color:#f1f3f8;">Intégration AcoustID</b> sous Paramètres → Organiser. Les utilisateurs avancés peuvent plutôt définir la variable d'environnement <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">ACOUSTID_API_KEY</code> avant de lancer l'application — Luminous la détecte automatiquement et ignore le champ.</div></div>
+          
+          
+          
         </div>
       </sc-if>
 
@@ -529,10 +552,12 @@ const NAV = [
   { id: 'search', label: 'Recherche et navigation', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>' },
   { id: 'now-playing', label: 'Lecture en cours et mini lecteur', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 17V7M9 20V4M14 17V7M19 14v-4"/></svg>' },
   { id: 'playlists', label: 'Listes de lecture', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg>' },
+  { id: 'stats', label: 'Statistiques', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="16" y="3" width="4" height="17" rx="1"/></svg>' },
   { id: 'lyrics', label: 'Paroles', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>' },
   { id: 'advanced-search', label: 'Recherche avanc\u00e9e', group: 'advanced', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/><path d="M8 10.5h5"/></svg>' },
   { id: 'general', label: 'G\u00e9n\u00e9ral', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>' },
   { id: 'folders', label: 'Dossiers', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Z"/></svg>' },
+  { id: 'integrations', label: 'Intégrations', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="2"/><path d="M8 8a5.66 5.66 0 0 0 0 8M16 8a5.66 5.66 0 0 1 0 8M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/></svg>' },
   { id: 'organize', label: 'Organiser', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 6h16M4 12h10M4 18h13"/></svg>' },
   { id: 'ui-themes', label: "Th\u00e8mes d'interface", group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>' },
   { id: 'equalizer', label: '\u00c9galiseur', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>' },
@@ -555,7 +580,7 @@ class Component extends DCLogic {
       weight: active === item.id ? 600 : 500,
     });
 
-    const wrapKeys = (arr) => arr.map(s => ({ action: s.action, keysHtml: { __html: s.keys.map(k => `<kbd>${k}</kbd>`).join('') } }));
+    const wrapKeys = (arr) => arr.map(s => ({ action: s.action, keysHtml: { __html: s.keys.map(k => `<kbd>${k}</kbd>`).join('') + (s.alt ? `<span style="color:#6d7286; font-size:11px; margin:0 2px; align-self:center;">ou</span>${s.alt.map(k => `<kbd>${k}</kbd>`).join('')}` : '') } }));
     const shortcutGroups = [
       { label: 'Lecture', items: wrapKeys([
         { keys: ['Espace'], action: 'Jouer / mettre en pause' },
@@ -577,7 +602,7 @@ class Component extends DCLogic {
       { label: 'Disposition et affichage', items: wrapKeys([
         { keys: ['Ctrl', '1'], action: 'Afficher/masquer la barre lat\u00e9rale gauche' },
         { keys: ['Ctrl', '2'], action: 'Activer/d\u00e9sactiver le mode immersif' },
-        { keys: ['Ctrl', '3'], action: 'Afficher/masquer le panneau droit' },
+        { keys: ['Ctrl', '3'], alt: ['Ctrl', 'I'], action: 'Afficher/masquer le panneau d\'informations' },
         { keys: ['Ctrl', 'M'], action: 'Afficher/masquer le mini lecteur' },
         { keys: ['Ctrl', ','], action: 'Ouvrir les param\u00e8tres' },
         { keys: ['Ctrl', '/'], action: 'Afficher cette liste' },
@@ -597,10 +622,12 @@ class Component extends DCLogic {
       isSearch: active === 'search',
       isNowPlaying: active === 'now-playing',
       isPlaylists: active === 'playlists',
+      isStats: active === 'stats',
       isLyrics: active === 'lyrics',
       isAdvancedSearch: active === 'advanced-search',
       isGeneral: active === 'general',
       isFolders: active === 'folders',
+      isIntegrations: active === 'integrations',
       isOrganize: active === 'organize',
       isEqualizer: active === 'equalizer',
       isThemes: active === 'ui-themes',

@@ -42,7 +42,7 @@
     <div style="width:252px; flex-shrink:0; padding:32px 16px 64px; position:sticky; top:61px; max-height:calc(100vh - 61px); overflow-y:auto;">
       <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6d7286; padding:0 12px; margin-bottom:8px;">Basics</div>
       <div style="display:flex; flex-direction:column; gap:2px; margin-bottom:28px;">
-        <sc-for list="{{ basicsItems }}" as="item" hint-placeholder-count="7">
+        <sc-for list="{{ basicsItems }}" as="item" hint-placeholder-count="8">
           <div onClick="{{ item.onClick }}" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; background:{{ item.bg }}; color:{{ item.color }}; font-weight:{{ item.weight }}; font-size:13px;">
             <div style="width:16px; height:16px; flex-shrink:0; color:{{ item.color }};" dangerouslySetInnerHTML="{{ item.icon }}"></div>
             {{ item.label }}
@@ -60,7 +60,7 @@
       </div>
       <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6d7286; padding:0 12px; margin-bottom:8px;">Settings</div>
       <div style="display:flex; flex-direction:column; gap:2px;">
-        <sc-for list="{{ settingsItems }}" as="item" hint-placeholder-count="6">
+        <sc-for list="{{ settingsItems }}" as="item" hint-placeholder-count="7">
           <div onClick="{{ item.onClick }}" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; cursor:pointer; background:{{ item.bg }}; color:{{ item.color }}; font-weight:{{ item.weight }}; font-size:13px;">
             <div style="width:16px; height:16px; flex-shrink:0; color:{{ item.color }};" dangerouslySetInnerHTML="{{ item.icon }}"></div>
             {{ item.label }}
@@ -108,7 +108,7 @@
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
           <image-slot id="home-full" src="screenshots/home-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Home screen"></image-slot>
         </div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Nothing scanned yet? Home shows a simple prompt instead, with a shortcut to add a folder or open Help.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">New to Luminous? You'll be introduced with a walkthrough of the interface. You can replay it anytime you want from the Help section.<br></div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="home-welcome" src="screenshots/home-welcome-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Empty Home state"></image-slot>
         </div>
@@ -153,10 +153,10 @@
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Search &amp; browsing</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">The search bar at the top of the window looks across songs, albums, and artists at once — you never have to think about where something is filed before you go looking for it.</div>
-        
+        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
+          <image-slot id="searchbar" src="assets/searchbar-EN.png?v=1789300000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1918/122;" placeholder="Search bar"></image-slot>
+        </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:24px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The "info" icon in the player bar, next to the miniplayer toggle, shows or hides the right-side info panel. Its shortcut is <kbd>Ctrl</kbd><kbd>I</kbd> (or <kbd>Ctrl</kbd><kbd>3</kbd>).</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>For tracks tagged with MusicBrainz Picard, the info panel also shows a MusicBrainz section with links to the artist, release, and recording pages.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The Luminous logo reacts to music playing — click it to toggle this on or off.</div></div>
         </div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:32px;">
@@ -175,14 +175,9 @@
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Now Playing &amp; the mini player</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">A player bar sits at the bottom of the window when you're playing a song, with the waveform, transport controls, volume, and a shortcut into the full Now Playing view.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:20px;">
-          <image-slot id="playbar" src="assets/playbar-EN.png?v=1788022709868" shape="rect" fit="contain" style="height:auto; aspect-ratio:1324/144;" placeholder="Player bar"></image-slot>
+          <image-slot id="playbar" src="assets/playbar-EN.png?v=1789300000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1324/144;" placeholder="Player bar"></image-slot>
         </div>
-        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the waveform to jump to a different point in the song.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the icon next to the waveform to toggle showing <b style="color:#f1f3f8;">Frequency Bands</b> instead. It layers all three bands at once — blue for low (bass), amber for mid (vocals/snares/leads), white for high (hi-hats/cymbals/transients) — with taller bands carrying more energy.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A small spectrum display next to the volume control gives you a live look at the song's frequencies as it plays.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The icon on the far right pops the player out into a small floating <b style="color:#f1f3f8;">mini player</b> — handy for keeping an eye on playback while you work in other apps. <kbd>Ctrl</kbd><kbd>M</kbd> toggles it from anywhere.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click <b style="color:#f1f3f8;">Shuffle</b> to cycle through five modes:
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Click the album cover art in the player bar to toggle Immersive Mode (<kbd>Ctrl</kbd><kbd>2</kbd> also works).</div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the heart to favourite a song, or give it a 1–5 star rating, depending on your settings.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Play/pause, skip, and volume media keys work even when Luminous isn't the focused window, and playback shows up in your system's own media controls — so you can see and steer it without switching back.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click <b style="color:#f1f3f8;">Shuffle</b> to cycle through five modes:
             <ul style="margin: 4px 0 0 -10px; padding-left: 20px;">
               <li><b style="color:#f1f3f8;">Shuffle All</b>: play all tracks in a randomized order.</li>
               <li><b style="color:#f1f3f8;">Shuffle Inside Album</b>: play albums in their normal order, but randomize the tracks within each album.</li>
@@ -190,8 +185,7 @@
               <li><b style="color:#f1f3f8;">Shuffle Artists</b>: play all tracks by an artist before moving to a new, randomly selected artist.</li>
               <li><b style="color:#f1f3f8;">Shuffle Off</b>: play tracks in their normal sequential order.</li>
             </ul>
-          </div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click <b style="color:#f1f3f8;">Repeat</b> to cycle through four modes:
+          </div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click <b style="color:#f1f3f8;">Repeat</b> to cycle through four modes:
             <ul style="margin: 4px 0 0 -10px; padding-left: 20px;">
               <li><b style="color:#f1f3f8;">Repeat Song</b>: loop the current track indefinitely.</li>
               <li><b style="color:#f1f3f8;">Repeat Album</b>: loop the current album indefinitely.</li>
@@ -199,11 +193,19 @@
               
               <li><b style="color:#f1f3f8;">Repeat Off</b>: play through the current queue normally and stop at the end.</li>
             </ul>
-          </div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the heart to favourite a song, or give it a 1–5 star rating, depending on your settings.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Play/pause, skip, and volume media keys work even when Luminous isn't the focused window, and playback shows up in your system's own media controls — so you can see and steer it without switching back.</div></div>
+          </div></div><div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the waveform to jump to a different point in the song.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A small spectrum display next to the volume control gives you a live look at the song's frequencies as it plays.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Click the icon next to the waveform to toggle showing <b style="color:#f1f3f8;">Frequency Bands</b> instead. It layers all three bands at once — blue for low (bass), amber for mid (vocals/snares/leads), white for high (hi-hats/cymbals/transients) — with taller bands carrying more energy.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Five icons sit on the right side of the player bar: a <b style="color:#f1f3f8;">menu</b> of quick actions for the current song, a <b style="color:#f1f3f8;">lyrics</b> toggle, a shortcut to the <b style="color:#f1f3f8;">Queue</b>, the info panel toggle, and the mini player switch.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The "info" icon shows or hides the right-side info panel. Its shortcut is <kbd>Ctrl</kbd><kbd>I</kbd> (or <kbd>Ctrl</kbd><kbd>3</kbd>).</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>For tracks tagged with MusicBrainz Picard, the info panel also shows a MusicBrainz section with links to the artist, release, and recording pages.</div></div>
+          
+          
+          
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>The mini player icon on the far right pops the player out into a small floating <b style="color:#f1f3f8;">mini player</b> — handy for keeping an eye on playback while you work in other apps. <kbd>Ctrl</kbd><kbd>M</kbd> toggles it from anywhere.</div></div>
+          
+          
+          
+          
         </div>
-        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Click the album cover art in the player bar to toggle Immersive Mode (<kbd>Ctrl</kbd><kbd>2</kbd> also works); click it again (or from Immersive Mode) to jump straight to the Queue.</div>
+        
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-top:24px; margin-bottom:28px;">
           <image-slot id="now-playing" src="screenshots/now-playing-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Now Playing"></image-slot>
         </div>
@@ -222,7 +224,7 @@
       <sc-if value="{{ isPlaylists }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Playlists</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">There are three kinds: the ones you build by hand, smart ones Luminous keeps filled from a rule you set, and Auto Playlists it builds and refreshes on its own.</div>
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">If you click the <b>+</b> next to a song or album, it goes to your Queue playlist by default. Making a new playlist you want to add to instead? Mark it <b>Active</b> first, and anything you <b>+</b> after that lands there instead.</div><div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">There are three kinds: the ones you build by hand, smart ones Luminous keeps filled from a rule you set, and Auto Playlists it builds and refreshes on its own.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Custom:</b> create a playlist, name it, then drag songs in from anywhere in your collection.</div></div>
         </div>
@@ -239,16 +241,14 @@
           <div style="display:grid; grid-template-columns:1fr 1fr; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>High Energy BPM</div><div>130–150</div></div>
           <div style="display:grid; grid-template-columns:1fr 1fr; padding:10px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><div>Extreme BPM</div><div>150+</div></div>
         </div>
-        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Luminous doesn't calculate BPM itself — it reads the BPM tag already on each file. Add BPM tags with the Tag Editor or your tagging tool of choice; songs without one won't land in any category.</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist" src="screenshots/playlist-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Custom playlist"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">A custom playlist</div></div>
+        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">Luminous doesn't calculate BPM itself — it reads the BPM tag already on each file. Add BPM tags with the Tag Editor or your tagging tool of choice; songs without one won't land in any category. You can make your own BPM categories with Smart Playlists.</div>
+        <div style="max-width:700px; margin-bottom:32px;">
           <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-smart-edit" src="screenshots/playlist-smart-edit-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Editing a smart rule"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Editing a smart rule</div></div>
         </div>
-        <div style="font-size:15px; color:#f1f3f8; line-height:1.75; max-width:640px; margin-bottom:28px; background:rgba(111,126,169,0.12); border:1px solid rgba(111,126,169,0.35); border-radius:10px; padding:16px 18px;">If you click the <b>+</b> next to a song or album, it goes to your Queue playlist by default. Making a new playlist you want to add to instead? Mark it <b>Active</b> first, and anything you <b>+</b> after that lands there instead.</div>
+        
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">You can also drag audio files or a whole folder straight onto the Luminous window to play or queue them — drop normally to replace the Queue and start playing, or hold <b style="color:#f1f3f8;">Shift</b> while dropping to append to the end of the Queue instead.</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin-bottom:32px;">
+        <div style="max-width:700px; margin-bottom:32px;">
           <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto" src="screenshots/playlist-auto-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="An auto-generated playlist"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Auto Playlist tile</div></div>
-          <div><div style="border-radius:14px; overflow:hidden; border:1px solid #23262f;"><image-slot id="playlist-auto-detail" src="screenshots/playlist-auto-detail-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Auto Playlist detail"></image-slot></div><div style="font-size:12px; color:#6d7286; margin-top:8px;">Browsing one</div></div>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px; margin-top:32px;">Managing a playlist</div>
@@ -266,10 +266,25 @@
         </div>
       </sc-if>
 
+      <sc-if value="{{ isStats }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Stats</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;"><b style="color:#f1f3f8;">Stats</b> in the sidebar shows your listening habits — computed entirely on your own machine from your local play history, never sent anywhere. Switch between <b style="color:#f1f3f8;">Past 7 Days</b>, <b style="color:#f1f3f8;">Past 28 Days</b>, and <b style="color:#f1f3f8;">Past Year</b> to change the window.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Top Artists</b>, <b style="color:#f1f3f8;">Top Albums</b>, <b style="color:#f1f3f8;">Top Songs</b>, and <b style="color:#f1f3f8;">Top Genres</b> rank what you've actually played in the selected range. Click any entry to jump straight to it.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A calendar heatmap tracks daily listening minutes, alongside your <b style="color:#f1f3f8;">Current Streak</b> and <b style="color:#f1f3f8;">Longest Streak</b> of consecutive listening days.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Time of Day</b> breaks your listening into Morning, Afternoon, Evening, and Late Night, so you can see when you actually listen.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Don't want a song, album, artist, or genre skewing your numbers? Right-click it anywhere in your collection and choose <b style="color:#f1f3f8;">Don't Include in Stats</b> — reverse it later with the same menu.</div></div>
+        </div>
+        <div style="max-width:700px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <image-slot id="stats" src="screenshots/stats-EN.png?v=1789200000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="Stats view"></image-slot>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ isLyrics }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Basics</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Lyrics</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Open <b style="color:#f1f3f8;">Lyrics</b> in the sidebar to follow along with whatever's playing — the current line highlights in sync with the music, with the rest dimmed above and below it. Luminous automatically looks up lyrics for the currently playing song; if it's an instrumental, you can mark it as such so Luminous stops looking.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Toggle <b style="color:#f1f3f8;">Lyrics</b> from the player bar to follow along with whatever's playing — the current line highlights in sync with the music, with the rest dimmed above and below it. Luminous automatically looks up lyrics for the currently playing song; if it's an instrumental, you can mark it as such so Luminous stops looking.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>If lyrics haven't been found yet, click <b style="color:#f1f3f8;">Refetch</b> to look them up again.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>Timing off, or a line wrong? <b style="color:#f1f3f8;">Edit</b> lets you correct the text or nudge the sync yourself.</div></div>
@@ -367,9 +382,9 @@
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">App-wide preferences — things like startup behavior and other everyday defaults live here.</div>
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Language:</b> switch the interface between English and French.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Rating style:</b> choose whether songs are rated with a heart, or a 1–5 star scale — this is the setting the Now Playing section mentions.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color: rgb(241, 243, 248);">App &amp; Updates:</b> check for updates on demand and see your installed version. Which notifications and features depend upon how Luminous was installed. Microsoft Store installations will manage updates for you automatically.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Minimize to tray:</b> when enabled, closing the window hides Luminous to the system tray instead of quitting. The tray icon's own right-click menu offers Play/Pause, Next, and Previous, so you can control playback without bringing the window back at all.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Rating style:</b> choose whether songs are rated with a heart, or a 1–5 star scale — this is the setting the Now Playing section mentions.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Start the week with:</b> Sunday or Monday. Choose which day charts and weekly stats treat as the start of the week.</div></div>
+          
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Minimize to tray:</b> when enabled, closing the window hides Luminous to the system tray instead of quitting. The tray icon's own right-click menu offers Play/Pause, Next, and Previous, so you can control playback without bringing the window back at all.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Launch at login:</b> Starts Luminous automatically when you sign in.</div></div><div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color: rgb(241, 243, 248);">App &amp; Updates:</b> check for updates on demand and see your installed version. Which notifications and features depend upon how Luminous was installed. Microsoft Store installations will manage updates for you automatically.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-general" src="screenshots/settings-general-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/800;" placeholder="General settings"></image-slot>
@@ -385,19 +400,35 @@
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Rescan on startup</b> has Luminous check your folders every time it launches.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Incremental Rescan</b> looks only for what's changed; <b style="color:#f1f3f8;">Force Full Scan</b> re-reads everything from scratch. Both show live progress as they run.</div></div>
           <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>A stats panel shows when your library was last scanned, plus running counts of songs, albums, artists, and total size.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div>You can also add a remote <b style="color:#f1f3f8;">WebDAV</b> server as a source. WebDAV folders are read-only — any tag edits or organizing you do stay local to Luminous and are never written back to the server.</div></div>
         </div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
           <image-slot id="settings-folders" src="screenshots/settings-folders-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1100;" placeholder="Folders settings"></image-slot>
         </div>
       </sc-if>
 
+      <sc-if value="{{ isIntegrations }}">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
+        <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Integrations</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;"><b style="color:#f1f3f8;">Settings → Integrations</b> connects Luminous to a few outside tools and services — each is optional, and each can be turned off to keep that part of Luminous fully offline.</div>
+        <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:12px;">
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Online Data Sources:</b> feeds the Info Panel and artist pages with ratings, tags, reviews, and bios looked up from MusicBrainz, CritiqueBrainz, and Wikipedia. Turn <b style="color:#f1f3f8;">Fetch context &amp; bio data</b> off to keep this fully offline.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">ListenBrainz Scrobbler:</b> paste in a ListenBrainz user token and click <b style="color:#f1f3f8;">Validate &amp; Save</b> to connect your account. Once connected, toggle scrobbling on, and choose separately whether to scrobble <b style="color:#f1f3f8;">now playing</b> status and <b style="color:#f1f3f8;">ratings</b> — with ratings enabled, a one-time <b style="color:#f1f3f8;">Sync Favourites</b> button sends your existing favourites over too.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">Pause all scrobbling</b> stops sending the songs you've listened to without disconnecting your account. Songs played while you're offline queue up locally and send with <b style="color:#f1f3f8;">Sync Now</b> once you're back online.</div></div>
+          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">•</div><div><b style="color:#f1f3f8;">MusicBrainz Picard:</b> Luminous detects an existing Picard install automatically and shows where it found it, or lets you point at a custom path — handy for jumping into Picard's own tagging tools on a file without leaving Luminous.</div></div>
+        </div>
+        <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f;">
+          <image-slot id="settings-integrations" src="screenshots/settings-integrations-EN.png?v=1789200000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/850;" placeholder="Integrations settings"></image-slot>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ isOrganize }}">
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">Settings</div>
         <div style="font-family:'Expose',sans-serif; font-weight:700; font-size:32px; letter-spacing:-0.02em; margin-bottom:18px;">Organize</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Bulk tools for tidying up your library — cleaning up tags and files across many tracks at once, rather than one at a time. <b style="color:#f1f3f8;">Prune Missing Songs</b> clears out entries for files that no longer exist on disk, in one click.</div>
+        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">Bulk tools for tidying up your library based upon their tags.</div>
         <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">The file-renaming tool works against your current <b style="color:#f1f3f8;">Selection</b> or the whole <b style="color:#f1f3f8;">Library</b>. Click <b style="color:#f1f3f8;">Preview</b> before anything moves: a From → To table lists every file with a status — <b style="color:#f1f3f8;">OK</b>, <b style="color:#f1f3f8;">Unchanged</b>, <b style="color:#f1f3f8;">Collision</b>, <b style="color:#f1f3f8;">Missing Tag</b>, or <b style="color:#f1f3f8;">Error</b> — with a filter to show only files that are actually changing, resizable columns, and a summary line totaling what will happen before you commit with <b style="color:#f1f3f8;">Apply</b>. A destination override sends the results to a different folder than the one you scanned, if you'd rather not reorganize in place. Extra toggles let you replace spaces with underscores, keep filenames ASCII-only, and move along extra files like cover art so they land in the new location too.</div>
         <div style="max-width:640px; border-radius:14px; overflow:hidden; border:1px solid #23262f; margin-bottom:28px;">
-          <image-slot id="settings-tools" src="screenshots/settings-organize-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1220;" placeholder="Organize tools"></image-slot>
+          <image-slot id="settings-tools" src="screenshots/settings-organize-EN.png?v=1788000000000" shape="rect" fit="contain" style="height:auto; aspect-ratio:1280/1000;" placeholder="Organize tools"></image-slot>
         </div>
 
         <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px;">File naming variables</div>
@@ -430,23 +461,20 @@
           <div style="display:grid; grid-template-columns:200px 1fr; padding:12px 16px; border-top:1px solid #23262f; font-size:14px; color:#d5d9e6;"><code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">{%track }%title</code><div>Adds "07 " before the title, only if there's a track number</div></div>
         </div>
 
-        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#6f7ea9; margin-bottom:10px; margin-top:32px;">AcoustID / Chromaprint setup (optional)</div>
-        <div style="font-size:15px; color:#d5d9e6; line-height:1.75; max-width:640px; margin-bottom:20px;">To enable AcoustID audio fingerprinting and automatic metadata lookup, you need both the <b style="color:#f1f3f8;">fpcalc</b> utility and a valid AcoustID API key.</div>
+        
+        
 
-        <div style="font-size:14px; font-weight:600; color:#f1f3f8; margin-bottom:12px;">1. Install fpcalc</div>
+        
         <div style="display:flex; flex-direction:column; gap:16px; max-width:640px; margin-bottom:28px;">
-          <div>
-            <div style="font-size:14px; color:#d5d9e6; line-height:1.6; margin-bottom:8px;"><b style="color:#f1f3f8;">Linux (Ubuntu/Debian):</b></div>
-            <div style="background:#101218; border:1px solid #23262f; border-radius:8px; padding:12px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#8fd0ff;">sudo apt install libchromaprint-tools</div>
-          </div>
-          <div style="font-size:14px; color:#d5d9e6; line-height:1.6;"><b style="color:#f1f3f8;">Windows:</b> download the binary from the <a href="https://acoustid.org/chromaprint" target="_blank" rel="noopener">AcoustID website</a>, extract it, and add the folder containing <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">fpcalc.exe</code> to your system PATH. Alternatively, set the <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">FPCALC_PATH</code> environment variable pointing directly to the binary.</div>
+          
+          
         </div>
 
-        <div style="font-size:14px; font-weight:600; color:#f1f3f8; margin-bottom:12px;">2. Get and set an AcoustID API key</div>
+        
         <div style="display:flex; flex-direction:column; gap:14px; max-width:640px; margin-bottom:28px;">
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">1</div><div>Register or log in to the <a href="https://acoustid.org/chromaprint" target="_blank" rel="noopener">AcoustID website</a>.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">2</div><div>Go to the <a href="https://acoustid.org/my-applications" target="_blank" rel="noopener">My Applications</a> page and register Luminous as a new application to generate a free Client API Key.</div></div>
-          <div style="display:flex; gap:14px; font-size:14px; color:#d5d9e6; line-height:1.6;"><div style="color:#6f7ea9; font-weight:700; flex-shrink:0;">3</div><div>Paste the key into the <b style="color:#f1f3f8;">AcoustID Integration</b> field under Settings → Organize. Advanced users can instead set it as the <code style="color:#8fd0ff; font-family:'IBM Plex Mono',monospace;">ACOUSTID_API_KEY</code> environment variable before starting the application — Luminous detects it automatically and skips the field.</div></div>
+          
+          
+          
         </div>
       </sc-if>
 
@@ -527,10 +555,12 @@ const NAV = [
   { id: 'search', label: 'Search & browsing', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>' },
   { id: 'now-playing', label: 'Now Playing & mini player', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 17V7M9 20V4M14 17V7M19 14v-4"/></svg>' },
   { id: 'playlists', label: 'Playlists', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg>' },
+  { id: 'stats', label: 'Stats', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="4" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="16" y="3" width="4" height="17" rx="1"/></svg>' },
   { id: 'lyrics', label: 'Lyrics', group: 'basics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>' },
   { id: 'advanced-search', label: 'Advanced Search', group: 'advanced', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/><path d="M8 10.5h5"/></svg>' },
   { id: 'general', label: 'General', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>' },
   { id: 'folders', label: 'Folders', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Z"/></svg>' },
+  { id: 'integrations', label: 'Integrations', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="2"/><path d="M8 8a5.66 5.66 0 0 0 0 8M16 8a5.66 5.66 0 0 1 0 8M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/></svg>' },
   { id: 'organize', label: 'Organize', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M4 6h16M4 12h10M4 18h13"/></svg>' },
   { id: 'ui-themes', label: 'UI Themes', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/></svg>' },
   { id: 'equalizer', label: 'Equalizer', group: 'customize', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="100%" height="100%"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>' },
@@ -553,7 +583,7 @@ class Component extends DCLogic {
       weight: active === item.id ? 600 : 500,
     });
 
-    const wrapKeys = (arr) => arr.map(s => ({ action: s.action, keysHtml: { __html: s.keys.map(k => `<kbd>${k}</kbd>`).join('') } }));
+    const wrapKeys = (arr) => arr.map(s => ({ action: s.action, keysHtml: { __html: s.keys.map(k => `<kbd>${k}</kbd>`).join('') + (s.alt ? `<span style="color:#6d7286; font-size:11px; margin:0 2px; align-self:center;">or</span>${s.alt.map(k => `<kbd>${k}</kbd>`).join('')}` : '') } }));
     const shortcutGroups = [
       { label: 'Playback', items: wrapKeys([
         { keys: ['Space'], action: 'Play / pause' },
@@ -575,7 +605,7 @@ class Component extends DCLogic {
       { label: 'Layout & view', items: wrapKeys([
         { keys: ['Ctrl', '1'], action: 'Toggle left sidebar' },
         { keys: ['Ctrl', '2'], action: 'Toggle immersion mode' },
-        { keys: ['Ctrl', '3'], action: 'Toggle right panel' },
+        { keys: ['Ctrl', '3'], alt: ['Ctrl', 'I'], action: 'Toggle info panel' },
         { keys: ['Ctrl', 'M'], action: 'Toggle miniplayer' },
         { keys: ['Ctrl', ','], action: 'Open Settings' },
         { keys: ['Ctrl', '/'], action: 'Show this list' },
@@ -595,10 +625,12 @@ class Component extends DCLogic {
       isSearch: active === 'search',
       isNowPlaying: active === 'now-playing',
       isPlaylists: active === 'playlists',
+      isStats: active === 'stats',
       isLyrics: active === 'lyrics',
       isAdvancedSearch: active === 'advanced-search',
       isGeneral: active === 'general',
       isFolders: active === 'folders',
+      isIntegrations: active === 'integrations',
       isOrganize: active === 'organize',
       isEqualizer: active === 'equalizer',
       isThemes: active === 'ui-themes',
