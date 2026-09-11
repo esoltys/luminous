@@ -176,6 +176,43 @@ fn with_webview2_occlusion_disabled(current: &str) -> String {
     }
 }
 
+/// Appends the Chromium switches that keep a minimized/hidden WebView2's
+/// renderer process from being deprioritized, to an existing
+/// `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` value, without duplicating any
+/// that are already present.
+///
+/// Regression test for #884: Chromium's own renderer-backgrounding drops a
+/// hidden/minimized page's renderer process to background OS scheduling
+/// priority (Windows 11 shows this as "Efficiency Mode" in Task Manager) and
+/// throttles its timers. Luminous's audio plays natively via CPAL, never
+/// through the DOM, so Chromium has no signal that the page still matters
+/// while minimized — and un-throttling after a long minimize isn't instant,
+/// leaving the window blank for up to a minute after restore. This is a
+/// distinct mechanism from `with_webview2_occlusion_disabled`'s
+/// `CalculateNativeWinOcclusion` (a rendering-pipeline feature): backgrounding
+/// is a process-priority/timer-throttling behavior that persists even with
+/// occlusion calculation disabled.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn with_webview2_backgrounding_disabled(current: &str) -> String {
+    const SWITCHES: &[&str] = &[
+        "--disable-renderer-backgrounding",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-background-timer-throttling",
+    ];
+    let mut result = current.to_string();
+    for switch in SWITCHES {
+        if !result.contains(switch) {
+            if result.is_empty() {
+                result = switch.to_string();
+            } else {
+                result.push(' ');
+                result.push_str(switch);
+            }
+        }
+    }
+    result
+}
+
 /// Reads persisted equalizer settings (linear + parametric) from the DB and
 /// applies them to a freshly-constructed `AudioEngine`, so playback starts
 /// with the user's last-saved EQ state instead of engine defaults.
@@ -582,7 +619,8 @@ pub fn run() {
     {
         let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
         let current = std::env::var(key).unwrap_or_default();
-        std::env::set_var(key, with_webview2_occlusion_disabled(&current));
+        let current = with_webview2_occlusion_disabled(&current);
+        std::env::set_var(key, with_webview2_backgrounding_disabled(&current));
     }
 
     tauri::Builder::default()
@@ -1182,6 +1220,39 @@ mod startup_rendering_workaround_tests {
         assert_eq!(
             with_webview2_occlusion_disabled("--foo --disable-features=msWebOOUI --bar"),
             "--foo --disable-features=msWebOOUI,CalculateNativeWinOcclusion --bar"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_added_to_empty_value() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled(""),
+            "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_appended_to_existing_args() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled("--disable-features=CalculateNativeWinOcclusion"),
+            "--disable-features=CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_not_duplicated_if_already_present() {
+        let already_set = "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling";
+        assert_eq!(
+            with_webview2_backgrounding_disabled(already_set),
+            already_set
+        );
+    }
+
+    #[test]
+    fn test_webview2_backgrounding_flags_only_add_missing_ones() {
+        assert_eq!(
+            with_webview2_backgrounding_disabled("--disable-renderer-backgrounding"),
+            "--disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-background-timer-throttling"
         );
     }
 }

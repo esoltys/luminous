@@ -34,8 +34,9 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_FORCE_ICONIC_REPRESENTATION, DWMWA_HAS_ICONIC_BITMAP,
 };
 use windows::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, DeleteObject, GetDC, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER,
-    BI_RGB, DIB_RGB_COLORS, HBITMAP,
+    CreateBitmap, CreateDIBSection, DeleteObject, GetDC, RedrawWindow, ReleaseDC, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE,
+    RDW_UPDATENOW,
 };
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::Shell::{
@@ -44,7 +45,7 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconIndirect, GetClientRect, GetSystemMetrics, RegisterWindowMessageW, HICON, ICONINFO,
-    SM_CXSMICON, WM_COMMAND,
+    SIZE_RESTORED, SM_CXSMICON, WM_COMMAND, WM_SIZE,
 };
 
 /// Not currently exported by the `windows` crate's `Win32_Graphics_Dwm`
@@ -287,10 +288,41 @@ unsafe extern "system" fn subclass_proc(
             send_live_preview(ctx, hwnd);
             return LRESULT(0);
         }
+        WM_SIZE if wparam.0 as u32 == SIZE_RESTORED => {
+            invalidate_iconic_representation(hwnd);
+        }
         _ => {}
     }
 
     DefSubclassProc(hwnd, msg, wparam, lparam)
+}
+
+/// Forces DWM to drop any cached iconic (taskbar thumbnail / live preview)
+/// representation of the window and repaint its real client area, then asks
+/// WebView2 to redraw. Windows only sends `WM_SIZE`/`SIZE_RESTORED` when the
+/// window transitions *out* of the minimized state, so this only fires on
+/// restore, not on every resize.
+///
+/// `force_iconic_representation`'s `DWMWA_FORCE_ICONIC_REPRESENTATION` tells
+/// DWM to always ask us for iconic bitmaps instead of taking its own live
+/// capture of the window. That capture is also what DWM's compositor falls
+/// back on to reconnect a window's surface after it's been minimized —
+/// without it, restoring can leave the window's real content unpainted for
+/// up to a minute until something else invalidates it (#884, a regression
+/// introduced by #852's taskbar integration; the window itself never
+/// previously opted into forced-iconic mode). Explicitly invalidating and
+/// forcing a synchronous repaint on restore keeps that reconnection from
+/// stalling.
+fn invalidate_iconic_representation(hwnd: HWND) {
+    unsafe {
+        let _ = DwmInvalidateIconicBitmaps(hwnd);
+        let _ = RedrawWindow(
+            Some(hwnd),
+            None,
+            None,
+            RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_ERASE,
+        );
+    }
 }
 
 /// Mirrors `tray::handle_menu_event` / `lib.rs::register_media_shortcuts`:
