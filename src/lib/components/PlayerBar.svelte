@@ -204,9 +204,21 @@
   }
 
   async function navigateToQueue() {
+    windowLayoutStore.exitImmersiveMode();
     const queuePl = await playlistsStore.requireQueue();
     playlistsStore.selectPlaylist(queuePl.id);
     navigationStore.viewPlaylist(queuePl.id);
+  }
+
+  function handleInfoClick() {
+    if (windowLayoutStore.immersiveMode) {
+      windowLayoutStore.exitImmersiveMode();
+      if (!windowLayoutStore.rightPanelOpen) {
+        windowLayoutStore.toggleRightPanel();
+      }
+    } else {
+      windowLayoutStore.toggleRightPanel();
+    }
   }
 
   function handleTagEditorSaved() {
@@ -246,7 +258,11 @@
       </div>
       {#if playerStore.currentSong?.album?.trim()}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewAlbum(playerStore.currentSong?.album || ""); }}
+          onclick={(e) => {
+            e.stopPropagation();
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.viewAlbum(playerStore.currentSong?.album || "");
+          }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByAlbum', { album: playerStore.currentSong.album })}
         >
@@ -255,7 +271,11 @@
       {/if}
       {#if playerStore.currentSong?.artist}
         <LinkButton
-          onclick={(e) => { e.stopPropagation(); navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || ""); }}
+          onclick={(e) => {
+            e.stopPropagation();
+            windowLayoutStore.exitImmersiveMode();
+            navigationStore.viewArtist(playerStore.currentSong?.album_artist?.trim() || playerStore.currentSong?.artist || "");
+          }}
           class="text-xs text-brand-text-secondary/70 truncate"
           title={i18n.t('collection.filterByArtist', { artist: playerStore.currentSong.artist })}
         >
@@ -389,7 +409,10 @@
         <Menu class="w-5 h-5" />
       </button>
       <button
-        onclick={() => { navigationStore.activeTab = "lyrics"; }}
+        onclick={() => {
+          windowLayoutStore.exitImmersiveMode();
+          navigationStore.activeTab = "lyrics";
+        }}
         class="transition-colors {navigationStore.activeTab === 'lyrics' ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
         title={i18n.t('sidebar.lyrics')}
       >
@@ -404,7 +427,7 @@
       </button>
       {#if !windowLayoutStore.isRightPanelAutoHidden}
         <button
-          onclick={() => windowLayoutStore.toggleRightPanel()}
+          onclick={handleInfoClick}
           class="transition-colors {windowLayoutStore.rightPanelOpen ? 'text-brand-accent-text' : 'text-brand-text-secondary hover:text-brand-text-primary'}"
           title={i18n.t('topNav.toggleRightPanel')}
         >
@@ -458,9 +481,9 @@
     {song}
     onPlay={() => playerStore.playSong(song.id)}
     onAddToPlaylist={() => playlistsStore.addSongsToActiveTarget([song.id], song.title || "Song")}
-    onGoToArtist={song.artist ? () => navigationStore.viewArtist(song.album_artist?.trim() || song.artist || "") : undefined}
-    onGoToAlbum={song.album ? () => navigationStore.viewAlbum(song.album || "") : undefined}
-    onEditTags={() => { editingSongId = song.id; }}
+    onGoToArtist={song.artist ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewArtist(song.album_artist?.trim() || song.artist || ""); } : undefined}
+    onGoToAlbum={song.album ? () => { windowLayoutStore.exitImmersiveMode(); navigationStore.viewAlbum(song.album || ""); } : undefined}
+    onEditTags={() => { windowLayoutStore.exitImmersiveMode(); editingSongId = song.id; }}
     onOpenInPicard={() => openInPicard([song.id])}
     onClose={() => { contextMenuState = null; }}
   />

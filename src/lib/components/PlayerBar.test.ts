@@ -107,6 +107,36 @@ describe("PlayerBar.svelte", () => {
     expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
   });
 
+  it("exits Immersive Mode and navigates to album when album title is clicked while immersive (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    windowLayoutStore.immersiveMode = true;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum").mockImplementation(() => {});
+
+    const { getByText } = render(PlayerBar);
+    await fireEvent.click(getByText("Test Album"));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
+  });
+
+  it("exits Immersive Mode and navigates to artist when artist title is clicked while immersive (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    playerStore.state = "playing";
+    windowLayoutStore.immersiveMode = true;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+    const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist").mockImplementation(() => {});
+
+    const { getByText } = render(PlayerBar);
+    await fireEvent.click(getByText("Test Artist"));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(viewArtistSpy).toHaveBeenCalledWith("Test Artist");
+  });
+
   const mockQueue: Playlist = {
     id: 1,
     name: "Queue",
@@ -330,6 +360,36 @@ describe("PlayerBar.svelte", () => {
     expect(windowLayoutStore.rightPanelOpen).toBe(true);
   });
 
+  it("exits Immersive Mode and opens the right panel when Info button is clicked while immersive and panel was closed (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    windowLayoutStore.rightPanelOpen = false;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
+    await fireEvent.click(infoBtn);
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+  });
+
+  it("exits Immersive Mode and keeps the right panel open when Info button is clicked while immersive and panel was already open (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    windowLayoutStore.rightPanelOpen = true;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    const infoBtn = getByTitle("Show Info Panel (Ctrl+I)");
+    await fireEvent.click(infoBtn);
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(windowLayoutStore.rightPanelOpen).toBe(true);
+  });
+
   // #876: the playbar's Menu/Lyrics/Queue button row.
 
   it("switches to the Lyrics tab when the Lyrics button is clicked", async () => {
@@ -339,6 +399,20 @@ describe("PlayerBar.svelte", () => {
 
     await fireEvent.click(getByTitle("Lyrics"));
 
+    expect(navigationStore.activeTab).toBe("lyrics");
+  });
+
+  it("exits Immersive Mode and switches to the Lyrics tab when Lyrics button is clicked while immersive (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    navigationStore.activeTab = "collection";
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Lyrics"));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
     expect(navigationStore.activeTab).toBe("lyrics");
   });
 
@@ -355,6 +429,23 @@ describe("PlayerBar.svelte", () => {
     expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
   });
 
+  it("exits Immersive Mode and navigates to the Queue when Queue button is clicked while immersive (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    vi.spyOn(playlistsStore, "requireQueue").mockResolvedValue(mockQueue);
+    const selectPlaylistSpy = vi.spyOn(playlistsStore, "selectPlaylist").mockImplementation(async () => {});
+    const viewPlaylistSpy = vi.spyOn(navigationStore, "viewPlaylist").mockImplementation(() => {});
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+
+    const { getByTitle } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Queue"));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(selectPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+    expect(viewPlaylistSpy).toHaveBeenCalledWith(mockQueue.id);
+  });
+
   it("opens the current song's context menu from the Menu button", async () => {
     playerStore.currentSong = mockSong;
     const { getByTitle, getByText } = render(PlayerBar);
@@ -362,6 +453,36 @@ describe("PlayerBar.svelte", () => {
     await fireEvent.click(getByTitle("Song menu"));
 
     expect(getByText(/add to queue/i)).toBeInTheDocument();
+  });
+
+  it("exits Immersive Mode when 'Go to Artist' is clicked in the song context menu (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+    const viewArtistSpy = vi.spyOn(navigationStore, "viewArtist").mockImplementation(() => {});
+
+    const { getByTitle, getByText } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Song menu"));
+    await fireEvent.click(getByText(/go to artist/i));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(viewArtistSpy).toHaveBeenCalledWith("Test Artist");
+  });
+
+  it("exits Immersive Mode when 'Go to Album' is clicked in the song context menu (#909)", async () => {
+    playerStore.currentSong = mockSong;
+    windowLayoutStore.immersiveMode = true;
+    const exitImmersiveSpy = vi.spyOn(windowLayoutStore, "exitImmersiveMode");
+    const viewAlbumSpy = vi.spyOn(navigationStore, "viewAlbum").mockImplementation(() => {});
+
+    const { getByTitle, getByText } = render(PlayerBar);
+    await fireEvent.click(getByTitle("Song menu"));
+    await fireEvent.click(getByText(/go to album/i));
+
+    expect(exitImmersiveSpy).toHaveBeenCalled();
+    expect(windowLayoutStore.immersiveMode).toBe(false);
+    expect(viewAlbumSpy).toHaveBeenCalledWith("Test Album");
   });
 
   it("disables the Menu button when nothing is playing", () => {
