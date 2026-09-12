@@ -95,11 +95,10 @@
   });
 
   let hasContextData = $derived.by(() => {
+    if (listenbrainzRows.length > 0) return true;
     if (!contextData) return false;
     return !!(
       contextData.wikipedia_extract ||
-      (contextData.mb_tags?.length ?? 0) > 0 ||
-      contextData.mb_rating != null ||
       contextData.critiquebrainz_rating != null ||
       (contextData.critiquebrainz_review_links?.length ?? 0) > 0
     );
@@ -181,6 +180,57 @@
       { label: i18n.t('playerBar.catalogNumberLabel', {}, 'Catalog #'), value: currentSong.catalog_number },
     ];
     return entries.filter((e): e is { label: string; value: string } => !!e.value);
+  });
+
+  const listenbrainzRows = $derived.by(() => {
+    if (!currentSong) return [];
+    const albumMbid = currentSong.musicbrainz_release_group_id || currentSong.musicbrainz_album_id;
+    const albumPath = currentSong.musicbrainz_release_group_id ? "album" : "release";
+    const recordingMbid = currentSong.musicbrainz_recording_id || currentSong.musicbrainz_track_id;
+    const recordingPath = currentSong.musicbrainz_recording_id ? "recording" : "track";
+
+    const entries: { label: string; id?: string; url: string; name?: string }[] = [
+      {
+        label: i18n.t('playerBar.listenbrainzArtistLabel', {}, 'Artist'),
+        id: currentSong.musicbrainz_artist_id,
+        url: currentSong.musicbrainz_artist_id ? `https://listenbrainz.org/artist/${currentSong.musicbrainz_artist_id}/` : "",
+        name: currentSong.artist,
+      },
+      ...(currentSong.musicbrainz_album_artist_id && currentSong.musicbrainz_album_artist_id !== currentSong.musicbrainz_artist_id
+        ? [{
+            label: i18n.t('playerBar.listenbrainzAlbumArtistLabel', {}, 'Album Artist'),
+            id: currentSong.musicbrainz_album_artist_id,
+            url: `https://listenbrainz.org/artist/${currentSong.musicbrainz_album_artist_id}/`,
+            name: currentSong.album_artist,
+          }]
+        : []),
+      {
+        label: i18n.t('playerBar.listenbrainzAlbumLabel', {}, 'Album'),
+        id: albumMbid,
+        url: albumMbid ? `https://listenbrainz.org/${albumPath}/${albumMbid}/` : "",
+        name: currentSong.album,
+      },
+      {
+        label: i18n.t('playerBar.listenbrainzRecordingLabel', {}, 'Track'),
+        id: recordingMbid,
+        url: recordingMbid ? `https://listenbrainz.org/${recordingPath}/${recordingMbid}/` : "",
+        name: currentSong.title,
+      },
+    ];
+    return entries.filter((e): e is typeof entries[number] & { id: string } => !!e.id);
+  });
+
+  const listenbrainzLogoUrl = $derived.by(() => {
+    if (!currentSong) return "https://listenbrainz.org";
+    const albumMbid = currentSong.musicbrainz_release_group_id || currentSong.musicbrainz_album_id;
+    if (albumMbid) {
+      const albumPath = currentSong.musicbrainz_release_group_id ? "album" : "release";
+      return `https://listenbrainz.org/${albumPath}/${albumMbid}/`;
+    }
+    if (currentSong.musicbrainz_artist_id) {
+      return `https://listenbrainz.org/artist/${currentSong.musicbrainz_artist_id}/`;
+    }
+    return "https://listenbrainz.org";
   });
 
   function formatChannels(channels?: number): string {
@@ -289,50 +339,28 @@
             </div>
           {/if}
 
-          {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0 || (contextData?.mb_tags?.length ?? 0) > 0 || contextData?.mb_rating != null}
+          {#if listenbrainzRows.length > 0}
             <div class="space-y-2 text-xs">
-              <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
+              <button
+                type="button"
+                onclick={() => openExternalUrl(listenbrainzLogoUrl)}
+                class="group relative inline-flex items-center gap-1 cursor-pointer"
+              >
+                <img src="/listenbrainz-logo.png" alt={i18n.t('playerBar.listenbrainzSectionLabel', {}, 'ListenBrainz')} class="h-4.5 w-auto opacity-80 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink class="w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
 
-              {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
-                <div class="space-y-1.5">
-                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}:</span>
-                  <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
-                    {#each contextData.mb_tags as tag (tag)}
-                      <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-
-              {#if contextData?.mb_rating != null}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.mbRatingLabel', {}, 'Community Rating')}</span>
-                  <span class="text-brand-text-primary text-right">
-                    {contextData.mb_rating.toFixed(2)} / 5
-                    {#if contextData.mb_rating_votes}
-                      <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
-                    {/if}
-                  </span>
-                </div>
-              {/if}
-
-              {#each musicbrainzRows as row (row.label)}
+              {#each listenbrainzRows as row (row.label)}
                 <div class="flex items-start justify-between gap-3">
                   <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
                   <button
                     type="button"
-                    onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
+                    onclick={() => openExternalUrl(row.url)}
                     class="group relative text-right transition-colors cursor-pointer min-w-0"
                   >
                     <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
                     <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
-                </div>
-              {/each}
-              {#each musicbrainzMetaRows as row (row.label)}
-                <div class="flex items-start justify-between gap-3">
-                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
-                  <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
                 </div>
               {/each}
             </div>
@@ -370,7 +398,7 @@
             </div>
           {/if}
 
-          {#if !hasContextData && musicbrainzRows.length === 0 && musicbrainzMetaRows.length === 0}
+          {#if !hasContextData}
             <div class="text-xs text-brand-text-secondary/60 py-2">
               {i18n.t('playerBar.contextEmptyState', {}, 'No enrichment data available for this track.')}
             </div>
@@ -422,6 +450,55 @@
             <div class="space-y-1 text-xs">
               <span class="text-brand-text-secondary/60">{i18n.t('playerBar.filePathLabel', {}, 'File Path')}:</span>
               <p class="text-brand-text-primary text-left break-words">{currentSong.path}</p>
+            </div>
+          {/if}
+
+          {#if musicbrainzRows.length > 0 || musicbrainzMetaRows.length > 0 || (contextData?.mb_tags?.length ?? 0) > 0 || contextData?.mb_rating != null}
+            <div class="space-y-2 text-xs pt-4 border-t border-brand-border/40">
+              <img src="/musicbrainz-logo.svg" alt={i18n.t('playerBar.musicbrainzSectionLabel', {}, 'MusicBrainz')} class="h-3.5 w-auto" />
+
+              {#if contextData && (contextData.mb_tags?.length ?? 0) > 0}
+                <div class="space-y-1.5">
+                  <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbTagsSectionLabel', {}, 'Community Tags')}:</span>
+                  <div class="flex flex-wrap gap-x-1.5 gap-y-1 leading-relaxed">
+                    {#each contextData.mb_tags as tag (tag)}
+                      <span class="px-2 py-0.5 rounded-full bg-brand-bg/60 text-brand-text-secondary text-[11px]">{tag}</span>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if contextData?.mb_rating != null}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{i18n.t('playerBar.mbRatingLabel', {}, 'Community Rating')}</span>
+                  <span class="text-brand-text-primary text-right">
+                    {contextData.mb_rating.toFixed(2)} / 5
+                    {#if contextData.mb_rating_votes}
+                      <span class="text-brand-text-secondary/60">{i18n.t('playerBar.mbRatingVotes', { count: contextData.mb_rating_votes }, `(${contextData.mb_rating_votes} votes)`)}</span>
+                    {/if}
+                  </span>
+                </div>
+              {/if}
+
+              {#each musicbrainzRows as row (row.label)}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <button
+                    type="button"
+                    onclick={() => openExternalUrl(`https://musicbrainz.org/${row.entityPath}/${row.id}`)}
+                    class="group relative text-right transition-colors cursor-pointer min-w-0"
+                  >
+                    <span class="text-brand-text-primary group-hover:text-brand-accent underline decoration-brand-text-secondary/40 break-words transition-colors">{row.name || row.id}</span>
+                    <ExternalLink class="absolute -right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-brand-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                </div>
+              {/each}
+              {#each musicbrainzMetaRows as row (row.label)}
+                <div class="flex items-start justify-between gap-3">
+                  <span class="text-brand-text-secondary/60 shrink-0">{row.label}</span>
+                  <span class="text-brand-text-primary text-right break-words min-w-0">{row.value}</span>
+                </div>
+              {/each}
             </div>
           {/if}
         </div>
