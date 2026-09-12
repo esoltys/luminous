@@ -322,7 +322,13 @@ fn spawn_position_tick_loop(
             };
             if state == crate::models::PlayState::Playing {
                 let mut p = player.lock().await;
-                if let Some(stats) = p.on_position_update(pos) {
+                // `pos` is the audio engine's absolute position within the
+                // current file; the UI and play-stats logic below both deal
+                // in track-relative time (0 at the start of the song), which
+                // only differs from `pos` for a CUE sheet track (#78) — for
+                // a plain song `beginning_nanosec` is 0 and this is exact.
+                let relative_pos = pos.saturating_sub(p.current_song_beginning_nanosec());
+                if let Some(stats) = p.on_position_update(relative_pos) {
                     let _ = app_handle.emit("song-stats-changed", stats);
                 }
                 tick_counter = tick_counter.wrapping_add(1);
@@ -334,7 +340,7 @@ fn spawn_position_tick_loop(
                 let _ = app_handle.emit(
                     "playback-position",
                     serde_json::json!({
-                        "position_nanosec": pos
+                        "position_nanosec": relative_pos
                     }),
                 );
             }
