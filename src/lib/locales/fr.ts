@@ -1025,7 +1025,6 @@ export const fr = {
     backToAlbums: "Retour aux albums",
     unknownGenre: "Genre inconnu",
     statsLine: "{genre} · {year} · {duration}",
-    dynamicRange: "DR de l'album : {value}",
     addAllToPlaylistTooltip: "Ajouter toutes les chansons à {name}",
     addAllToPlaylistTooltipDefault: "Ajouter toutes les chansons à la file d'attente",
     editInfoTooltip: "Modifier les infos de l'album",

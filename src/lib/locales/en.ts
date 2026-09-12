@@ -993,7 +993,6 @@ export const en = {
     backToAlbums: "Back to Albums",
     unknownGenre: "Unknown genre",
     statsLine: "{genre} · {year} · {duration}",
-    dynamicRange: "Album DR: {value}",
     addAllToPlaylistTooltip: "Add all songs to {name}",
     addAllToPlaylistTooltipDefault: "Add all songs to Queue",
     editInfoTooltip: "Edit album info",
