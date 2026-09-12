@@ -616,7 +616,7 @@ impl PlaylistManager {
         Ok(())
     }
 
-    /// Regenerates the "Missing MusicBrainz" auto-playlist (#83) — a
+    /// Regenerates the "Missing MusicBrainz ID" auto-playlist (#83) — a
     /// system-managed `playlists` row with `dynamic_enabled = 1` and
     /// `dynamic_spec = "missingmbid"` — if missing, empty, or its `updated`
     /// timestamp is more than 24h old.
@@ -626,7 +626,7 @@ impl PlaylistManager {
     pub fn sync_missing_musicbrainz_auto_playlist(&self) -> Result<()> {
         const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
         const SPEC: &str = "missingmbid";
-        const NAME: &str = "Missing MusicBrainz";
+        const NAME: &str = "Missing MusicBrainz ID";
 
         let scanner = CollectionScanner::new(self.db.clone());
         let conn = self.db.pool.get()?;
@@ -643,6 +643,14 @@ impl PlaylistManager {
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .ok();
+
+        if let Some((id, _, _, _)) = existing_row {
+            conn.execute(
+                "UPDATE playlists SET name = ?1 WHERE id = ?2 AND name != ?1",
+                params![NAME, id],
+            )?;
+        }
+
         let mode = existing_row
             .as_ref()
             .map(|(_, _, _, m)| QueuePopulationMode::from(m.as_str()))
@@ -661,8 +669,8 @@ impl PlaylistManager {
         let playlist_id = match existing_row {
             Some((id, _, _, _)) => {
                 conn.execute(
-                    "UPDATE playlists SET updated = ?1 WHERE id = ?2",
-                    params![now, id],
+                    "UPDATE playlists SET name = ?1, updated = ?2 WHERE id = ?3",
+                    params![NAME, now, id],
                 )?;
                 conn.execute(
                     "DELETE FROM playlist_items WHERE playlist_id = ?1",
@@ -1455,7 +1463,7 @@ mod tests {
             .iter()
             .find(|p| p.dynamic_spec.as_deref() == Some("missingmbid"))
             .expect("Missing MusicBrainz auto-playlist should be created");
-        assert_eq!(pl.name, "Missing MusicBrainz");
+        assert_eq!(pl.name, "Missing MusicBrainz ID");
 
         let tracks = manager.get_playlist_tracks(pl.id).unwrap();
         let titles: Vec<_> = tracks

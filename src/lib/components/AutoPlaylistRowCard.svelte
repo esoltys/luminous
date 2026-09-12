@@ -114,7 +114,7 @@
     {:else if kind === "missing_metadata"}
       <AlertTriangle class="w-5 h-5 text-amber-500" />
     {:else if kind === "missing_musicbrainz"}
-      <AlertTriangle class="w-5 h-5 text-indigo-400" />
+      <img src="/musicbrainz-icon.png" alt="MusicBrainz" class="w-5 h-5 object-contain" />
     {:else if kind === "daypart"}
       <SunHorizon class="w-5 h-5 text-[#2DD4BF]" />
     {:else}

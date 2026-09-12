@@ -158,7 +158,7 @@
               type: "auto",
               id: `auto:missing_musicbrainz:${p.id}`,
               label: getPlaylistDisplayName(p),
-              subtitle: `${i18n.t("playlists.autoPlaylistLabel", {}, "Auto-Playlist")} • Missing MusicBrainz`,
+              subtitle: i18n.t("playlists.missingMusicBrainzAutoPlaylist", {}, "Auto-Playlist"),
               ref: { kind: "missing_musicbrainz", playlistId: p.id, updated: p.updated }
             });
           } else if (p.dynamic_spec?.startsWith("daypart:")) {

@@ -587,7 +587,7 @@ impl CollectionScanner {
         Ok(songs)
     }
 
-    /// Diagnostic query backing the "Missing MusicBrainz" auto-playlist.
+    /// Diagnostic query backing the "Missing MusicBrainz ID" auto-playlist.
     /// Surfaces songs that have not yet been tagged with a MusicBrainz Recording ID,
     /// so users who enable scrobbling can easily identify and resolve them via Picard.
     pub fn get_songs_missing_musicbrainz_id(
