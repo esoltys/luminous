@@ -4,7 +4,7 @@
 
 use super::{PlaylistManager, NO_SONG_LIMIT};
 use crate::collection::CollectionScanner;
-use crate::models::QueuePopulationMode;
+use crate::models::{QueuePopulationMode, LIBRARY_SOURCES_SQL};
 use crate::tags::TagManager;
 use anyhow::Result;
 use chrono::Timelike;
@@ -16,7 +16,7 @@ use uuid::Uuid;
 /// Minimum number of matching library songs required before a genre/decade
 /// auto-playlist is created. Once created, an auto-playlist is populated
 /// with every matching song (see [`NO_SONG_LIMIT`]), not just this many.
-const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
+pub(super) const MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST: i64 = 25;
 
 /// Fixed BPM buckets for the BPM auto-playlist category: (display name, min
 /// BPM inclusive, max BPM inclusive — `None` means "or higher"). Unlike
@@ -727,17 +727,23 @@ impl PlaylistManager {
 
         let mut candidates: Vec<Candidate> = Vec::new();
         for group in &hierarchy {
-            candidates.push(Candidate::Group {
-                name: &group.name,
-                song_count: group.song_count,
-            });
-            for child in &group.children {
-                candidates.push(Candidate::Child {
-                    name: &child.name,
-                    song_count: child.song_count,
-                    parent_name: &group.name,
-                    parent_count: group.song_count,
+            if group.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST {
+                candidates.push(Candidate::Group {
+                    name: &group.name,
+                    song_count: group.song_count,
                 });
+            }
+            for child in &group.children {
+                if child.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST
+                    || group.song_count >= MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST
+                {
+                    candidates.push(Candidate::Child {
+                        name: &child.name,
+                        song_count: child.song_count,
+                        parent_name: &group.name,
+                        parent_count: group.song_count,
+                    });
+                }
             }
         }
 
@@ -804,32 +810,60 @@ impl PlaylistManager {
         let conn = self.db.pool.get()?;
         let now = chrono::Utc::now().timestamp();
 
-        let existing_row: Option<(i64, Option<String>, String)> = conn
+        let existing_row: Option<(i64, Option<String>, String, i64)> = conn
             .query_row(
-                "SELECT id, dynamic_spec, COALESCE(population_mode, 'all') FROM playlists WHERE dynamic_enabled = 1 AND dynamic_spec LIKE 'daypart:%'",
+                "SELECT p.id, p.dynamic_spec, COALESCE(p.population_mode, 'all'),
+                        (SELECT COUNT(*) FROM playlist_items pi WHERE pi.playlist_id = p.id)
+                 FROM playlists p
+                 WHERE p.dynamic_enabled = 1 AND p.dynamic_spec LIKE 'daypart:%'",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .ok();
 
-        if let Some((_, Some(spec), _)) = &existing_row {
-            let mut parts = spec.strip_prefix(SPEC_PREFIX).unwrap_or("").splitn(3, ':');
-            let stored_bucket = parts.next().unwrap_or("");
-            let stored_date = parts.next().unwrap_or("");
-            if stored_bucket == bucket && stored_date == today {
-                // Already correct for today's bucket — no reroll, no rewrite.
-                return Ok(());
+        let total_library_songs: i64 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*) FROM songs WHERE source IN ({lib}) AND unavailable = 0 AND not_included = 0",
+                    lib = *LIBRARY_SOURCES_SQL
+                ),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+
+        if let Some((_, Some(spec), _, track_count)) = &existing_row {
+            let healthy_min = total_library_songs.min(MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST);
+            if *track_count >= healthy_min && (healthy_min == 0 || *track_count > 0) {
+                let mut parts = spec.strip_prefix(SPEC_PREFIX).unwrap_or("").splitn(3, ':');
+                let stored_bucket = parts.next().unwrap_or("");
+                let stored_date = parts.next().unwrap_or("");
+                if stored_bucket == bucket && stored_date == today {
+                    // Already correct for today's bucket and healthy — no reroll, no rewrite.
+                    return Ok(());
+                }
             }
         }
 
         let mode = existing_row
             .as_ref()
-            .map(|(_, _, m)| QueuePopulationMode::from(m.as_str()))
+            .map(|(_, _, m, _)| QueuePopulationMode::from(m.as_str()))
             .unwrap_or_default();
 
         let resolved_name = self.pick_daypart_genre_grouping()?.unwrap_or_default();
-        let new_spec = format!("{SPEC_PREFIX}{bucket}:{today}:{resolved_name}");
-        let songs = self.songs_for_spec(&new_spec, mode)?;
+        let mut new_spec = format!("{SPEC_PREFIX}{bucket}:{today}:{resolved_name}");
+        let mut songs = self.songs_for_spec(&new_spec, mode)?;
+
+        // Fallback: if the picked genre didn't clear the minimum threshold,
+        // fall back to random fill across the library (#223).
+        if songs.len() < MIN_LIBRARY_SONGS_FOR_AUTO_PLAYLIST as usize {
+            let fallback_spec = format!("{SPEC_PREFIX}{bucket}:{today}:");
+            let fallback_songs = self.songs_for_spec(&fallback_spec, mode)?;
+            if fallback_songs.len() >= songs.len() {
+                new_spec = fallback_spec;
+                songs = fallback_songs;
+            }
+        }
 
         // Creation gate: only skip creating a brand-new row if this pass
         // didn't find enough songs (mirrors genre/decade/BPM's "need an
@@ -841,7 +875,7 @@ impl PlaylistManager {
         }
 
         let playlist_id = match &existing_row {
-            Some((id, _, _)) => {
+            Some((id, _, _, _)) => {
                 conn.execute(
                     "UPDATE playlists SET name = ?1, dynamic_spec = ?2, updated = ?3 WHERE id = ?4",
                     params![bucket_name, new_spec, now, id],
@@ -1918,6 +1952,59 @@ mod tests {
             playlists_after.iter().any(|p| p.id == id),
             "Daypart Mix must not be deleted just because a reroll landed below 25 songs"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_sync_daypart_heals_empty_playlist_in_same_bucket() {
+        let (db, temp_dir) = setup_test_db();
+        let db_arc = std::sync::Arc::new(db);
+
+        {
+            let conn = db_arc.pool.get().unwrap();
+            for i in 1..=30 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO songs (title, genre, source, unavailable) VALUES ('Rock Song {}', 'Rock', 1, 0)",
+                        i
+                    ),
+                    [],
+                )
+                .unwrap();
+            }
+        }
+
+        let manager = PlaylistManager::new(db_arc.clone()).unwrap();
+        manager.sync_daypart_auto_playlist().unwrap();
+
+        let playlists = manager.get_playlists().unwrap();
+        let daypart_pl = playlists
+            .iter()
+            .find(|p| {
+                p.dynamic_spec
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("daypart:")
+            })
+            .unwrap();
+        let id = daypart_pl.id;
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 30);
+
+        // Simulate playlist becoming empty in the same bucket (e.g., retagged songs)
+        {
+            let conn = db_arc.pool.get().unwrap();
+            conn.execute(
+                "DELETE FROM playlist_items WHERE playlist_id = ?1",
+                params![id],
+            )
+            .unwrap();
+        }
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 0);
+
+        // Calling sync_daypart_auto_playlist in the same bucket must heal the empty playlist
+        manager.sync_daypart_auto_playlist().unwrap();
+        assert_eq!(manager.get_playlist_tracks(id).unwrap().len(), 30);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
