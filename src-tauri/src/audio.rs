@@ -1039,7 +1039,7 @@ fn decode_thread(
                     }
                     Ok(AudioCommand::Cue(r)) => {
                         if output.is_none() {
-                            match build_output(
+                            match build_output_on_fresh_thread(
                                 &position,
                                 &volume,
                                 &visualizer_buf,
@@ -1158,8 +1158,12 @@ fn decode_thread(
 
         // Ensure the persistent output stream exists (built lazily on the
         // first track this thread ever plays; reused for every track after).
+        // Built on a fresh thread — `output` can already be `None` here after
+        // a mid-session device-change rebuild (see `check_and_rebuild_output`),
+        // and re-touching COM on `decode_thread`'s own long-lived OS thread a
+        // second time risks the same RPC_E_CHANGED_MODE wedge #624 fixed.
         if output.is_none() {
-            match build_output(
+            match build_output_on_fresh_thread(
                 &position,
                 &volume,
                 &visualizer_buf,
