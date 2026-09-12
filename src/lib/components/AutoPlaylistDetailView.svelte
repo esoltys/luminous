@@ -710,7 +710,7 @@
           </div>
         {:else if kind === "missing_musicbrainz"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-indigo-600/25 to-indigo-400/15 flex items-center justify-center overflow-hidden border border-indigo-400/30 shadow-[0_0_28px_3px_rgba(99,102,241,0.4)]">
-            <img src="/musicbrainz-icon.png" alt="MusicBrainz" class="w-16 h-16 object-contain" />
+            <img src="/picard-icon.png" alt="Picard" class="w-16 h-16 object-contain" />
           </div>
         {:else if kind === "daypart"}
           <div class="w-full h-full bg-brand-main bg-gradient-to-br from-[#0D9488]/25 to-[#2DD4BF]/15 flex items-center justify-center overflow-hidden border border-[#2DD4BF]/30 shadow-[0_0_28px_3px_rgba(45,212,191,0.4)]">

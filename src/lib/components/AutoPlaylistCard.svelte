@@ -185,7 +185,7 @@
       {:else if kind === "missing_metadata"}
         <AlertTriangle class="w-10 h-10 {t.iconColorClass}" />
       {:else if kind === "missing_musicbrainz"}
-        <img src="/musicbrainz-icon.png" alt="MusicBrainz" class="w-10 h-10 object-contain" />
+        <img src="/picard-icon.png" alt="Picard" class="w-10 h-10 object-contain" />
       {:else}
         <SunHorizon class="w-10 h-10 {t.iconColorClass}" />
       {/if}
