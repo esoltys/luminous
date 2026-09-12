@@ -18,6 +18,7 @@ pub mod context;
 pub mod covermanager;
 pub mod cue;
 pub mod db;
+pub mod dr_parser;
 pub mod equalizer;
 pub mod filter_parser;
 pub mod install_format;

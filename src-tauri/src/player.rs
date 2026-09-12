@@ -793,6 +793,8 @@ impl Player {
                 song.ebur128_integrated_loudness_lufs,
                 song.replaygain_track_gain,
                 song.replaygain_album_gain,
+                song.dynamic_range_rms,
+                song.dynamic_range_peak,
                 settings,
             );
             (result.linear, result.source, Some(result.gain_db))

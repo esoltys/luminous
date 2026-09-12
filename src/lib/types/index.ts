@@ -132,6 +132,14 @@ export interface Song {
   replaygain_track_gain?: number;
   replaygain_album_gain?: number;
 
+  // Dynamic Range Meter log fallback (#57) — parsed from a foobar2000
+  // foo_dr.txt sidecar. dynamic_range_album is album-wide, duplicated onto
+  // every song in the folder.
+  dynamic_range?: number;
+  dynamic_range_peak?: number;
+  dynamic_range_rms?: number;
+  dynamic_range_album?: number;
+
   // Streaming service IDs
   artist_id?: string;
   album_id?: string;
@@ -197,7 +205,7 @@ export type QueuePopulationMode = "all" | "favourites" | "familiar" | "discover"
 export type ShuffleMode = "off" | "all" | "inside_album" | "albums" | "artists";
 export type RepeatMode = "off" | "track" | "album" | "playlist" | "intro";
 export type PlayState = "stopped" | "playing" | "paused";
-export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "fallback";
+export type LoudnessGainSource = "disabled" | "analyzed" | "replay_gain" | "dynamic_range_log" | "fallback";
 
 export interface PlaybackState {
   state: PlayState;

@@ -3,6 +3,7 @@
 use crate::{
     covermanager::CoverManager,
     db::Database,
+    dr_parser,
     models::{
         self, FileType, MusicDirectory, PruneResult, QueuePopulationMode, ScanPhase, ScanProgress,
         Song, SongSource, LOCAL_SOURCES_SQL,
@@ -254,6 +255,123 @@ impl CollectionScanner {
             log::info!("Marked {marked} song(s) unavailable (file missing on disk)");
         }
         Ok(marked)
+    }
+
+    /// Finds a `foo_dr.txt` sidecar (case-insensitive) directly inside
+    /// `dir`, parses it, and backfills matched tracks' dynamic range fields
+    /// for every local album folder whose log is new or has changed since
+    /// the last scan (#57). Peak/RMS become a last-resort loudness gain
+    /// source (`loudness::compute_gain`) for tracks with neither R128
+    /// analysis nor a ReplayGain tag.
+    pub fn resolve_dynamic_range_logs(&self) -> Result<()> {
+        let conn = self.db.pool.get()?;
+
+        // One row per local, available song, grouped below by parent
+        // directory — cheaper than a query per folder for large libraries.
+        let mut stmt = conn.prepare(&format!(
+            "SELECT id, path, track, title, dr_log_mtime FROM songs
+             WHERE source IN ({lib}) AND unavailable = 0 AND path IS NOT NULL",
+            lib = *LOCAL_SOURCES_SQL
+        ))?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<i32>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+            ))
+        })?;
+
+        struct SongRow {
+            id: i64,
+            path: PathBuf,
+            track: Option<i32>,
+            title: Option<String>,
+            dr_log_mtime: Option<i64>,
+        }
+
+        let mut by_dir: HashMap<PathBuf, Vec<SongRow>> = HashMap::new();
+        for row in rows.filter_map(|r| r.ok()) {
+            let (id, path_str, track, title, dr_log_mtime) = row;
+            let path = PathBuf::from(&path_str);
+            if let Some(dir) = path.parent() {
+                by_dir.entry(dir.to_path_buf()).or_default().push(SongRow {
+                    id,
+                    path,
+                    track,
+                    title,
+                    dr_log_mtime,
+                });
+            }
+        }
+        drop(stmt);
+
+        let mut updated_songs = 0usize;
+        let mut updated_folders = 0usize;
+
+        for (dir, songs) in by_dir {
+            let Some(log_path) = find_dr_log(&dir) else {
+                continue;
+            };
+            let Some(log_mtime) = get_mtime(&log_path) else {
+                continue;
+            };
+            // Already parsed against this exact log revision — skip. A song
+            // added to the folder since the last parse has no dr_log_mtime
+            // yet, so its NULL correctly forces a re-parse of the folder.
+            if songs.iter().all(|s| s.dr_log_mtime == Some(log_mtime)) {
+                continue;
+            }
+
+            let Ok(content) = std::fs::read_to_string(&log_path) else {
+                continue;
+            };
+            let log = dr_parser::parse(&content);
+
+            let candidates: Vec<dr_parser::SongCandidate> = songs
+                .iter()
+                .map(|s| dr_parser::SongCandidate {
+                    id: s.id,
+                    track_number: s.track,
+                    title: s.title.clone(),
+                    filename_stem: s
+                        .path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                })
+                .collect();
+            let matches = dr_parser::match_tracks(&log.tracks, &candidates);
+
+            let tx = conn.unchecked_transaction()?;
+            for (song_id, entry) in &matches {
+                tx.execute(
+                    "UPDATE songs SET dynamic_range = ?1, dynamic_range_peak = ?2, dynamic_range_rms = ?3 WHERE id = ?4",
+                    params![entry.dr, entry.peak_db, entry.rms_db, song_id],
+                )?;
+                updated_songs += 1;
+            }
+            // Album-wide DR and the "parsed against this log" marker apply
+            // to every song in the folder, whether or not its own track row
+            // was confidently matched.
+            for song in &songs {
+                tx.execute(
+                    "UPDATE songs SET dynamic_range_album = ?1, dr_log_mtime = ?2 WHERE id = ?3",
+                    params![log.album_dr, log_mtime, song.id],
+                )?;
+            }
+            tx.commit()?;
+            updated_folders += 1;
+        }
+
+        if updated_folders > 0 {
+            log::info!(
+                "Parsed {updated_folders} foo_dr.txt log(s), updated dynamic range for {updated_songs} song(s)"
+            );
+        }
+
+        Ok(())
     }
 
     /// Merges `songs` rows that point to the same physical file *and* the same
@@ -631,6 +749,12 @@ impl CollectionScanner {
             log::error!("Failed to mark missing songs during scan: {e}");
         }
 
+        // Parse foo_dr.txt DR Meter logs (#57) and backfill dynamic range
+        // fields for tracks in folders whose log is new or has changed.
+        if let Err(e) = self.resolve_dynamic_range_logs() {
+            log::error!("Failed to resolve foo_dr.txt logs during scan: {e}");
+        }
+
         // Phase 3: Resolve missing album artwork (local & remote) and backfill visualizers
         log::info!("Starting artwork resolution for missing albums...");
         let mut albums_to_resolve = Vec::new();
@@ -807,6 +931,17 @@ pub(crate) fn get_mtime(path: &Path) -> Option<i64> {
         .duration_since(UNIX_EPOCH)
         .ok()
         .map(|d| d.as_secs() as i64)
+}
+
+/// Finds a `foo_dr.txt` DR Meter log directly inside `dir` (#57), matching
+/// case-insensitively since foobar2000 writes it with whatever casing the
+/// user's OS/plugin defaults to.
+fn find_dr_log(dir: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()).find_map(|entry| {
+        let path = entry.path();
+        let is_match = path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.eq_ignore_ascii_case("foo_dr.txt"));
+        (path.is_file() && is_match).then_some(path)
+    })
 }
 
 fn detect_filetype(path: &Path) -> FileType {
@@ -1549,7 +1684,8 @@ pub(crate) const SONG_SELECT_COLS: &str = "
     musicbrainz_artist_id, musicbrainz_album_artist_id, musicbrainz_album_id,
     musicbrainz_release_group_id, musicbrainz_recording_id, musicbrainz_track_id,
     musicbrainz_work_id,
-    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number
+    musicbrainz_release_type, musicbrainz_release_country, barcode, catalog_number,
+    dynamic_range, dynamic_range_peak, dynamic_range_rms, dynamic_range_album
 ";
 
 /// Same columns as `SONG_SELECT_COLS`, in the same order, qualified with the
@@ -1576,9 +1712,10 @@ pub(crate) const SONG_SELECT_COLS_QUALIFIED: &str =
     s.musicbrainz_artist_id, s.musicbrainz_album_artist_id, s.musicbrainz_album_id,
     s.musicbrainz_release_group_id, s.musicbrainz_recording_id, s.musicbrainz_track_id,
     s.musicbrainz_work_id,
-    s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number";
+    s.musicbrainz_release_type, s.musicbrainz_release_country, s.barcode, s.catalog_number,
+    s.dynamic_range, s.dynamic_range_peak, s.dynamic_range_rms, s.dynamic_range_album";
 
-pub(crate) const SONG_SELECT_COL_COUNT: usize = 69;
+pub(crate) const SONG_SELECT_COL_COUNT: usize = 73;
 
 const SONG_INSERT_COLS: &str = "
     source, filetype, path, title, titlesort, artist, artistsort, album, albumsort, album_artist, album_artist_sort,
@@ -1681,6 +1818,10 @@ pub(crate) fn row_to_song_at(row: &rusqlite::Row, offset: usize) -> rusqlite::Re
         musicbrainz_release_country: row.get(col(66))?,
         barcode: row.get(col(67))?,
         catalog_number: row.get(col(68))?,
+        dynamic_range: row.get(col(69))?,
+        dynamic_range_peak: row.get(col(70))?,
+        dynamic_range_rms: row.get(col(71))?,
+        dynamic_range_album: row.get(col(72))?,
         ..Default::default()
     })
 }
@@ -2653,6 +2794,84 @@ mod tests {
             rating, 0.8,
             "a real rating from the discarded row must not be lost to an unset -1"
         );
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_dynamic_range_logs_parses_and_matches_by_track_number() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "luminous_dr_log_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let album_dir = temp_dir.join("album");
+        std::fs::create_dir_all(&album_dir).unwrap();
+
+        std::fs::write(
+            album_dir.join("foo_dr.txt"),
+            "foobar2000 2.24.1 / Dynamic Range Meter 1.1.1\n\
+DR         Peak         RMS     Duration Track\n\
+--------------------------------------------------------------------------------\n\
+DR14      -0.80 dB   -17.46 dB      4:16 01-Free Fallin'\n\
+DR13      -0.70 dB   -17.56 dB      2:58 02-I Won't Back Down\n\
+--------------------------------------------------------------------------------\n\
+Official DR value: DR13\n",
+        )
+        .unwrap();
+
+        let db = Arc::new(Database::new(temp_dir.clone()).unwrap());
+        {
+            let conn = db.pool.get().unwrap();
+            for (track, title) in [(1, "Free Fallin'"), (2, "I Won't Back Down")] {
+                let song = Song {
+                    path: Some(
+                        album_dir
+                            .join(format!("{track:02} - {title}.flac"))
+                            .to_string_lossy()
+                            .to_string(),
+                    ),
+                    title: Some(title.to_string()),
+                    track: Some(track),
+                    source: SongSource::LocalFile,
+                    filetype: FileType::Flac,
+                    unavailable: false,
+                    ..Default::default()
+                };
+                upsert_song(&conn, &song).unwrap();
+            }
+        }
+
+        let scanner = CollectionScanner::new(Arc::clone(&db));
+        scanner.resolve_dynamic_range_logs().unwrap();
+
+        let conn = db.pool.get().unwrap();
+        let (dr, peak, rms, album_dr): (i32, f64, f64, i32) = conn
+            .query_row(
+                "SELECT dynamic_range, dynamic_range_peak, dynamic_range_rms, dynamic_range_album
+                 FROM songs WHERE track = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(dr, 14);
+        assert_eq!(peak, -0.80);
+        assert_eq!(rms, -17.46);
+        assert_eq!(album_dr, 13);
+
+        // Re-running against the same unchanged log is a no-op fast path —
+        // shouldn't error, and values stay as-is.
+        scanner.resolve_dynamic_range_logs().unwrap();
+        let dr_again: i32 = conn
+            .query_row(
+                "SELECT dynamic_range FROM songs WHERE track = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dr_again, 14);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
